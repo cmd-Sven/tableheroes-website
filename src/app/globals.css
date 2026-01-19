@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@layer base {
+:root {
+    /* Default-Fallbacks – die eigentlichen Farben kommen über Tailwind Klassen
+       (z.B. bg-background-dark / text-gray-100) aus `layout.tsx`. */
+    --background: #0a1f10;
+    --foreground: #e5e7eb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+    --font-sans: var(--font-barlow);
+    --font-serif: var(--font-libre);
+}
+
+body {
+    background-color: var(--background);
+  color: var(--foreground);
+    font-family: var(--font-libre), serif;
+  }
+}
+
+@keyframes kenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.15) translate(-2%, -2%);
+  }
+}
+
+.animate-ken-burns {
+  animation: kenBurns 20s ease-in-out infinite;
+}
+
+/* 3D Flip Card Styles */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Button Glint Animation */
+@keyframes buttonGlint {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(200%) translateY(200%) rotate(45deg);
+  }
+}
+
+.button-glint {
+  position: relative;
+  overflow: hidden;
+}
+
+.button-glint::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  transition: transform 0.6s;
+}
+
+.button-glint:active::after {
+  animation: buttonGlint 0.5s ease-out;
+}
+
+.flip-card-container {
+  transform-style: preserve-3d;
+  transition: transform 0.7s;
+}
+
+.flip-card-container:hover {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front {
+  backface-visibility: hidden;
+}
+
+.flip-card-back {
+  backface-visibility: hidden;
+  transform: rotateY(180deg);
+}
