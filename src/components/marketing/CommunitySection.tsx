@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
 import { useRef } from "react";
 import Image from "next/image";
 import { Calendar, Heart, MessageCircle } from "lucide-react";
@@ -13,7 +13,7 @@ export function CommunitySection() {
   });
 
   // Parallax-Effekt: Bild bewegt sich stärker beim Scrollen
-  const backgroundY = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
+  const backgroundY = useTransform<number, string>(scrollYProgress, [0, 1], ["-15%", "15%"]);
 
   // Smoothing für butterweiche Bewegung
   const smoothY = useSpring(backgroundY, {

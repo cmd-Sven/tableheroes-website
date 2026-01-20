@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
 import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
 import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketing/CloudFogOverlay";
@@ -9,7 +9,15 @@ import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketi
 // Parallax Layer Configuration
 // yRange in Pixel: sehr dezente vertikale Verschiebung (entgegengesetzt zur Scrollrichtung)
 // Hinweis: Vordergrund bewegt sich am stärksten, Hintergrund fast statisch – aber insgesamt nur leicht
-const PARALLAX_LAYERS = [
+interface ParallaxLayer {
+  src: string;
+  alt: string;
+  yRange: [number, number];
+  zIndex: number;
+  blurClass?: string;
+}
+
+const PARALLAX_LAYERS: ParallaxLayer[] = [
   {
     src: "/images/paralax/layer-e-himmel.png",
     alt: "Himmel Hintergrund",
@@ -29,12 +37,14 @@ const PARALLAX_LAYERS = [
     alt: "Hügel und Schloss",
     yRange: [0, -18],
     zIndex: 3,
+    blurClass: "",
   },
   {
     src: "/images/paralax/layer-b-felsen-baum.png",
     alt: "Felsen und Bäume",
     yRange: [0, -26],
     zIndex: 4,
+    blurClass: "",
   },
   {
     src: "/images/paralax/layer-a-felsen.png",
@@ -42,8 +52,9 @@ const PARALLAX_LAYERS = [
     // Vordergrund soll sich spürbar bewegen, aber im Bild bleiben
     yRange: [0, -34],
     zIndex: 5,
+    blurClass: "",
   },
-] as const;
+];
 
 function ParallaxBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,14 +70,14 @@ function ParallaxBackground() {
         {PARALLAX_LAYERS.map((layer, index) => {
           // Rohe vertikale Bewegung (entgegengesetzt zur Scrollrichtung)
           // Bewegung nur im ersten Teil des Scrolls (0–0.8), danach bleibt der Wert konstant,
-          // sodass der Effekt am Ende des Hero-Bereichs „ausläuft“.
-          const yRaw = useTransform(
+          // sodass der Effekt am Ende des Hero-Bereichs „ausläuft".
+          const yRaw = useTransform<number, number>(
             scrollYProgress,
             [0, 0.8, 1],
             [layer.yRange[0], layer.yRange[1], layer.yRange[1]]
           );
 
-          // Sanftes Spring-Smoothing, damit der Effekt „butterweich“ wirkt
+          // Sanftes Spring-Smoothing, damit der Effekt „butterweich" wirkt
           const y = useSpring(yRaw, {
             stiffness: 60,
             damping: 20,
