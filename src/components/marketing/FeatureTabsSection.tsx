@@ -46,27 +46,39 @@ export function FeatureTabsSection() {
   const gmCards: FeatureCard[] = useMemo(
     () => [
       {
-        title: "Beziehungen visualisieren",
+        title: "Beziehungen und Abhängikeiten visualisieren",
         description:
-          "Wer zieht die Fäden? Mach Fraktionen, Rivalitäten und Intrigen sichtbar, statt sie in Textblöcken zu vergraben.",
+          "Wer zieht die Fäden? Mach Fraktionen, Rivalitäten und Intrigen sichtbar, statt sie in Textblöcken zu vergraben. Entscheide welcher Spieler was sieht und welche Geheimnisse wer aufgedeckt hat.",
         Icon: Share2,
       },
       {
-        title: "Lore-basierte KI-Generation",
+        title: "Lore-basierte KI-Unterstützung",
         description:
-          "Brauchst du schnell eine neue Gilde oder einen Rivalen? Lass die KI Inhalte generieren, die deine bestehende Lore respektieren.",
+          "Brauchst du schnell eine neue Gilde oder einen Rivalen? Lass dir von der KI helfen schnell die wichtigsten Fakten zu sammeln um die passende Story zu entwickeln.",
         Icon: Sparkles,
       },
       {
-        title: "Volle Kontrolle (Human-in-the-Loop)",
+        title: "Volle Kontrolle für Deine Vision und Deiner Geschichte",
         description:
-          "Nichts ist in Stein gemeißelt. Die KI liefert den Rohbau für NPCs oder Orte – du übernimmst den Feinschliff für deine Vision.",
+          "Die KI generiert Dir keine Inhalte. Die KI liefert den Rohbau für NPCs oder Orte, schafft Verknüpfungen und visualsiert sie – du übernimmst den Feinschliff für deine Vision.",
         Icon: Sliders,
       },
       {
-        title: "Szenen-Support",
+        title: "Szenen-Support für lebendige Spielwelten",
         description:
-          "Bereite die Stimmung vor. Wenn die Spieler einen Ort betreten, hast du sofort die passenden Beschreibungen und Geheimnisse parat.",
+          "Bereite die Stimmung vor. Wenn die Spieler einen Ort betreten, hast du sofort die passenden Beschreibungen und Geheimnisse parat - Auf dem Session Board positionierst Du den NPC und entscheidest was die Spieler sehen (und was nicht)",
+        Icon: Zap,
+      },
+            {
+        title: "Deine Welt, deine Lore und deine Regeln",
+        description:
+          "Erstellle Lore-Einträge samt Gehmeihmnisse, schaffe Verknüpfungen zwischen NPCs und Quests, erstelle einzigartige Orte mit passendem Bilder und das innerhalb von Minuten.",
+        Icon: Zap,
+      },
+                  {
+        title: "Die KI als dein Assistent",
+        description:
+          "Der KI-Assistent als wertvoller Helfer und Inspiration. Schnelle Vorschläge, richtige Impulse und schnelle Umsetzung Deiner Ideen. Direkt Sichtbar (oder auch nicht) für Deine Spieler.",
         Icon: Zap,
       },
     ],
@@ -108,7 +120,7 @@ export function FeatureTabsSection() {
   return (
     <section
       id="features"
-      className="scroll-mt-20 bg-background-dark border-b border-hero-border/30"
+      className="relative scroll-mt-20 bg-background-dark"
     >
       <div className="mx-auto max-w-6xl px-6 py-16">
         <motion.div
@@ -198,6 +210,18 @@ export function FeatureTabsSection() {
             </AnimatePresence>
           </div>
         </motion.div>
+      </div>
+      {/* Goldene, sich wiederholende Border zwischen Sektionen */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundSize: "100px auto",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "bottom center",
+          }}
+        />
       </div>
     </section>
   );

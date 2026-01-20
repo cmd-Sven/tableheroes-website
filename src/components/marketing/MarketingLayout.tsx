@@ -91,14 +91,24 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                     type="button"
                     onClick={() => scrollTo(id)}
                     className={[
-                      "relative grid h-11 w-11 place-items-center rounded-full border transition-colors",
-                      isActive
-                        ? "border-hero-border bg-hero-vibrant text-background-dark"
-                        : "border-hero-border/40 bg-background-card text-gray-200 hover:border-hero-border hover:bg-background-card/80",
+                      "relative grid h-11 w-11 place-items-center transition-opacity",
+                      isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
                     ].join(" ")}
+                    style={{
+                      backgroundImage: "url('/images/icon-empty.png')",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
                     aria-label={label}
                   >
-                    <Icon className="h-5 w-5" aria-hidden />
+                    <Icon
+                      className={[
+                        "h-5 w-5 relative z-10",
+                        isActive ? "text-accent-gold" : "text-gray-200",
+                      ].join(" ")}
+                      aria-hidden
+                    />
                   </button>
 
                   {/* Tooltip */}

@@ -2,6 +2,7 @@ import { HeroSection } from "@/src/components/marketing/HeroSection";
 import { FeatureTabsSection } from "@/src/components/marketing/FeatureTabsSection";
 import { ActiveCampaignsSection } from "@/src/components/marketing/ActiveCampaignsSection";
 import { CommunitySection } from "@/src/components/marketing/CommunitySection";
+import { GamificationSection } from "@/src/components/marketing/GamificationSection";
 import { SystemsSection } from "@/src/components/marketing/SystemsSection";
 import { FaqSection } from "@/src/components/marketing/FaqSection";
 
@@ -18,6 +19,9 @@ export default function MarketingLandingPage() {
 
       {/* Vereins-Plattform - Wie wir uns organisieren */}
       <FeatureTabsSection />
+
+      {/* Gamification - Belohnungssystem */}
+      <GamificationSection />
 
       {/* Systeme - Was wir spielen */}
       <SystemsSection />

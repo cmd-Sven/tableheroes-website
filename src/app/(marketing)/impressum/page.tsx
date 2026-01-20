@@ -50,12 +50,12 @@ export default function ImpressumPage() {
                 <br />
                 <strong>Discord:</strong>{" "}
                 <a
-                  href="https://discord.gg/tableheroes"
+                  href="https://discord.gg/JzfXw9b7v7"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-hero-vibrant hover:text-accent-gold transition-colors"
                 >
-                  discord.gg/tableheroes
+                  discord.gg/JzfXw9b7v7
                 </a>
               </p>
             </section>

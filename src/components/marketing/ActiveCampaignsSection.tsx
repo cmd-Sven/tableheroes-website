@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { supabase } from "@/src/lib/supabaseClient";
 import {
   CampaignListAnimation,
@@ -158,9 +159,17 @@ export async function ActiveCampaignsSection() {
   return (
     <section
       id="campaigns"
-      className="scroll-mt-20 bg-background-dark border-b border-hero-border/30"
+      className="relative scroll-mt-20 bg-background-dark"
+      style={{
+        backgroundImage: "url('/images/dark-wood.jpg')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        boxShadow: "0 -15px 40px rgba(0, 0, 0, 0.6), 0 15px 40px rgba(0, 0, 0, 0.6)",
+        zIndex: 10,
+      }}
     >
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="text-center md:text-left">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block">
             Aktuelle Runden in Osnabrück &amp; Online
@@ -171,6 +180,68 @@ export async function ActiveCampaignsSection() {
         </div>
 
         <CampaignListAnimation tickets={finalTickets} />
+      </div>
+
+      {/* Dekorative Eck-Grafiken: Skull in allen vier Ecken */}
+      {/* Oben Links: Skull (horizontal gespiegelt) */}
+      <div className="pointer-events-none absolute top-0 left-0 z-30 hidden md:block">
+        <Image
+          src="/images/skull-corner-only.png"
+          alt=""
+          width={70}
+          height={70}
+          className="max-w-[70px] h-auto scale-x-[-1]"
+          style={{ height: "auto" }}
+        />
+      </div>
+
+      {/* Unten Links: Skull (horizontal gespiegelt) mit 12px Abstand */}
+      <div className="pointer-events-none absolute bottom-[12px] left-0 z-30 hidden md:block">
+        <Image
+          src="/images/skull-corner-only.png"
+          alt=""
+          width={70}
+          height={70}
+          className="max-w-[70px] h-auto scale-x-[-1]"
+          style={{ height: "auto" }}
+        />
+      </div>
+
+      {/* Oben Rechts: Skull (vertikal gespiegelt) */}
+      <div className="pointer-events-none absolute top-0 right-0 z-30 hidden md:block">
+        <Image
+          src="/images/skull-corner-only.png"
+          alt=""
+          width={70}
+          height={70}
+          className="max-w-[70px] h-auto scale-y-[-1]"
+          style={{ height: "auto" }}
+        />
+      </div>
+
+      {/* Unten Rechts: Skull (horizontal gespiegelt) mit 12px Abstand */}
+      <div className="pointer-events-none absolute bottom-[12px] right-0 z-30 hidden md:block">
+        <Image
+          src="/images/skull-corner-only.png"
+          alt=""
+          width={70}
+          height={70}
+          className="max-w-[70px] h-auto scale-x-[-1]"
+          style={{ height: "auto" }}
+        />
+      </div>
+
+      {/* Goldene, sich wiederholende Border zwischen Sektionen */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundSize: "100px auto",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "bottom center",
+          }}
+        />
       </div>
     </section>
   );

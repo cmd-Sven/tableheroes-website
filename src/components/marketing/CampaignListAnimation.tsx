@@ -24,8 +24,11 @@ export function CampaignListAnimation({ tickets }: { tickets: SessionTicket[] })
     return (
       <div className="mt-12 flex justify-center">
         <div className="rounded-md border border-hero-border/30 bg-background-card px-8 py-4 text-center">
-          <p className="font-libre text-gray-400">
-            Aktuell sind keine öffentlichen Termine geplant.
+          <p className="font-libre text-gray-200">
+            Termine stehen bald zur Verfügung.
+          </p>
+          <p className="mt-2 font-libre text-gray-400 text-sm">
+            Schau pünktlich zum Launch wieder vorbei, um dir deinen Platz am Tisch zu sichern!
           </p>
         </div>
       </div>

@@ -16,7 +16,7 @@ export function SystemsSection() {
   return (
     <section
       id="systems"
-      className="scroll-mt-20 bg-background-dark border-b border-hero-border/30"
+      className="relative scroll-mt-20 bg-background-dark"
     >
       <div className="mx-auto max-w-6xl px-6 py-16">
         <motion.div
@@ -54,6 +54,18 @@ export function SystemsSection() {
             ))}
           </div>
         </motion.div>
+      </div>
+      {/* Goldene, sich wiederholende Border zwischen Sektionen */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundSize: "100px auto",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "bottom center",
+          }}
+        />
       </div>
     </section>
   );

@@ -28,7 +28,7 @@ export function Footer() {
                 E-Mail schreiben
               </a>
               <a
-                href="https://discord.gg/tableheroes"
+                href="https://discord.gg/JzfXw9b7v7"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-md border border-hero-border/60 bg-background-card px-6 py-3 font-barlow font-bold uppercase text-gray-100 transition-colors hover:bg-background-card/80"
@@ -125,7 +125,7 @@ export function Footer() {
             </h3>
             <div className="flex items-center gap-4">
               <a
-                href="https://discord.gg/tableheroes"
+                href="https://discord.gg/JzfXw9b7v7"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="grid h-12 w-12 place-items-center rounded-md border border-hero-border/40 bg-background-card text-gray-300 transition-colors hover:border-hero-vibrant hover:bg-hero-dark hover:text-white"
