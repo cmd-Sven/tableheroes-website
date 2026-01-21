@@ -1,16 +1,62 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
-import { Dices, Skull, Sparkles, Swords } from "lucide-react";
 
-const systems = [
-  { name: "Dungeons & Dragons 5e", icon: Swords },
-  { name: "Call of Cthulhu", icon: Skull },
-  { name: "Pathfinder 2e", icon: Dices },
-  { name: "Vampire: Die Maskerade", icon: Sparkles },
-  { name: "Shadowrun", icon: Dices },
-  { name: "Fate", icon: Sparkles },
+type GameItem = {
+  name: string;
+  logo?: string;
+};
+
+const GAME_SYSTEMS: GameItem[] = [
+  { name: "Dungeons & Dragons", logo: "/images/logos/dnd-logo.png" },
+  { name: "Call of Cthulhu", logo: "/images/logos/cthulhu-logo.png" },
+  { name: "Pathfinder 2e", logo: "/images/logos/pathfinder2e-logo.png" },
+  { name: "Shadowrun", logo: "/images/logos/shadowrun-logo.png" },
+  {
+    name: "Vampire: The Masquerade",
+    logo: "/images/logos/vampire-masquerade-logo.png",
+  },
+  { name: "Star Wars: Edge of the Empire", logo: "/images/logos/sw-edge-logo.png" },
 ];
+
+const TOOLS: GameItem[] = [
+  { name: "Dungeon Alchemist", logo: "/images/logos/dungeon-alchemist.png" },
+  { name: "Inkarnate", logo: "/images/logos/inkarnate.png" },
+  { name: "Foundry VTT", logo: "/images/logos/foundry-logo.png" },
+  { name: "The Forge", logo: "/images/logos/the-forge.png" },
+  { name: "Roll20", logo: "/images/logos/roll20-logo.png" },
+];
+
+function ItemCard({ item }: { item: GameItem }) {
+  const hasLogo = Boolean(item.logo);
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-amber-700/50 bg-background-card/90 p-4 shadow-lg">
+      {hasLogo ? (
+        <div className="relative h-12 w-24 md:h-14 md:w-28 flex items-center justify-center">
+          <Image
+            src={item.logo as string}
+            alt={item.name}
+            fill
+            sizes="120px"
+            className="object-contain"
+            priority={false}
+          />
+        </div>
+      ) : (
+        <div className="flex h-12 items-center justify-center">
+          <span className="font-cinzel text-sm text-amber-200 text-center">
+            {item.name}
+          </span>
+        </div>
+      )}
+      <span className="font-libre text-xs md:text-sm text-gray-100 text-center">
+        {item.name}
+      </span>
+    </div>
+  );
+}
 
 export function SystemsSection() {
   return (
@@ -26,32 +72,34 @@ export function SystemsSection() {
           transition={{ duration: 0.5 }}
         >
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8">
-            Was wir spielen
+            Was und wie wir spielen
           </h2>
-          <p className="font-libre text-gray-200 leading-relaxed">
-            Von D&D bis Cthulhu – bei uns wird alles gespielt. Egal ob epische Fantasy, 
-            kosmischer Horror oder Cyberpunk: Hauptsache, wir haben Spaß am Tisch.
+          <p className="font-libre text-gray-200 leading-relaxed mb-10">
+            Systeme, Settings und Tools – so bringen wir unsere Abenteuer an den Tisch.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {systems.map(({ name, icon: Icon }) => (
-              <div
-                key={name}
-                className="flex items-center gap-3 rounded-md border border-hero-border/40 bg-background-card p-5 shadow-lg"
-              >
-                <div className="grid h-10 w-10 place-items-center rounded-md border border-hero-border/40 bg-background-dark">
-                  <Icon className="h-5 w-5 text-accent-gold" aria-hidden />
-                </div>
-                <div>
-                  <div className="font-barlow font-bold uppercase text-hero-vibrant">
-                    {name}
-                  </div>
-                  <div className="font-libre text-gray-200 leading-relaxed text-sm">
-                    Aktive Runden bei TableHeroes
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Gruppe 1: Spielsysteme */}
+          <div className="mb-10">
+            <h3 className="font-cinzel text-xl font-bold mb-6 text-amber-500">
+              Spielsysteme
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {GAME_SYSTEMS.map((item) => (
+                <ItemCard key={item.name} item={item} />
+              ))}
+            </div>
+          </div>
+
+          {/* Gruppe 2: Tools und Software */}
+          <div>
+            <h3 className="font-cinzel text-xl font-bold mb-6 text-amber-500">
+              Tools und Software
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {TOOLS.map((item) => (
+                <ItemCard key={item.name} item={item} />
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>
@@ -70,5 +118,4 @@ export function SystemsSection() {
     </section>
   );
 }
-
 

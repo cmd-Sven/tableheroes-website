@@ -342,8 +342,10 @@ export function HeroSection() {
         />
       </div>
 
-      {/* Externer Discord-Button als Holz-Grafik, zentriert am unteren Rand */}
-      <div className="pointer-events-auto absolute bottom-6 left-1/2 z-[70] -translate-x-1/2">
+      {/* Externer Discord-Button als Holz-Grafik.
+          Fixed position, damit er nicht vom nachfolgenden Bereich überdeckt wird,
+          bleibt aber optisch am unteren Rand des Viewports. */}
+      <div className="pointer-events-auto fixed bottom-4 left-1/2 z-[120] -translate-x-1/2">
         <a
           href="https://discord.gg/JzfXw9b7v7"
           target="_blank"

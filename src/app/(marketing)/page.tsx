@@ -4,6 +4,7 @@ import { ActiveCampaignsSection } from "@/src/components/marketing/ActiveCampaig
 import { CommunitySection } from "@/src/components/marketing/CommunitySection";
 import { GamificationSection } from "@/src/components/marketing/GamificationSection";
 import { SystemsSection } from "@/src/components/marketing/SystemsSection";
+import { ImageSliderSection } from "@/src/components/marketing/ImageSliderSection";
 import { FaqSection } from "@/src/components/marketing/FaqSection";
 
 export default function MarketingLandingPage() {
@@ -23,8 +24,11 @@ export default function MarketingLandingPage() {
       {/* Gamification - Belohnungssystem */}
       <GamificationSection />
 
-      {/* Systeme - Was wir spielen */}
+      {/* Systeme - Was und wie wir spielen */}
       <SystemsSection />
+
+      {/* Bild-Impressionen */}
+      <ImageSliderSection />
 
       {/* FAQ */}
       <FaqSection />
