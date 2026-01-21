@@ -222,7 +222,7 @@ export function ActiveCampaignsSection() {
     >
       <div className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="text-center md:text-left">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block">
+          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block mt-8">
             Aktuelle Runden in Osnabrück &amp; Online
           </h2>
           <p className="font-libre text-gray-200 leading-relaxed max-w-2xl">

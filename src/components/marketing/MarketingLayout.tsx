@@ -14,6 +14,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Footer } from "@/src/components/layout/Footer";
+import { HeroButton } from "@/src/components/ui/HeroButton";
 
 type NavItem = {
   id: string;
@@ -141,12 +142,13 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
 
       {/* Login Button (Fixed Top-Right Desktop, Footer Link Mobile) */}
       {isHomePage && (
-        <a
-          href="/login"
-          className="fixed top-6 right-6 z-50 hidden md:inline-flex items-center justify-center rounded-md border border-hero-border/60 bg-background-card px-6 py-2 font-barlow font-bold uppercase text-gray-100 shadow-lg transition-transform hover:scale-105 hover:bg-background-card/80 hover:text-hero-vibrant"
-        >
-          Login
-        </a>
+        <div className="fixed top-6 right-6 z-50 hidden md:block">
+          <div className="scale-[0.3] origin-top-right">
+            <HeroButton href="/login" ariaLabel="Zum Login">
+              Login
+            </HeroButton>
+          </div>
+        </div>
       )}
 
       <div className="relative">{children}</div>

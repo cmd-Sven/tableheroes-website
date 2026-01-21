@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-
 import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
 import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketing/CloudFogOverlay";
+import { HeroButton } from "@/src/components/ui/HeroButton";
 
 // Parallax Layer Configuration
 // yRange in Pixel: sehr dezente vertikale Verschiebung (entgegengesetzt zur Scrollrichtung)
@@ -295,14 +296,18 @@ export function HeroSection() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="flex items-center justify-center"
-                style={{ willChange: "transform, opacity" }}
+                style={{
+                  willChange: "transform, opacity",
+                  filter: "drop-shadow(0 0 15px rgba(255, 165, 0, 0.2))",
+                }}
               >
                 <Image
                   src="/images/tableHeroes-logo.png"
                   alt="TableHeroes Logo"
-                  width={260}
-                  height={80}
+                  width={520}
+                  height={160}
                   priority
+                  className="w-64 md:w-[500px] lg:w-[520px]"
                   style={{ height: "auto" }}
                 />
               </motion.div>
@@ -346,40 +351,104 @@ export function HeroSection() {
           Fixed position, damit er nicht vom nachfolgenden Bereich überdeckt wird,
           bleibt aber optisch am unteren Rand des Viewports. */}
       <div className="pointer-events-auto fixed bottom-4 left-1/2 z-[120] -translate-x-1/2">
-        <a
+        <HeroButton
           href="https://discord.gg/JzfXw9b7v7"
           target="_blank"
           rel="noopener noreferrer"
-          className="group relative inline-flex items-center justify-center"
-          aria-label="Zum Discord Server - Öffnet in neuem Tab"
+          ariaLabel="Zum Discord Server - Öffnet in neuem Tab"
         >
-          <div className="relative">
-            <Image
-              src="/images/button-green-wood.png"
-              alt="Zum Discord"
-              width={260}
-              height={80}
-              priority={false}
-              style={{ height: "auto" }}
-            />
-            <Image
-              src="/images/button-green-wood_hover.png"
-              alt=""
-              width={260}
-              height={80}
-              priority={false}
-              className="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-              style={{ height: "auto" }}
-            />
-            <span
-              className="absolute inset-0 flex items-center justify-center font-barlow font-bold uppercase tracking-wide text-white text-sm md:text-base"
-              style={{ padding: "10px" }}
-            >
-              Zum Discord
-            </span>
-          </div>
-        </a>
+          Zum Discord
+        </HeroButton>
       </div>
+
+      {/* Würfel-Container - Absolute Isolation, direkt nach dem Button */}
+      <motion.div
+        className="hidden md:block fixed bottom-4 z-[130] pointer-events-none"
+        style={{
+          left: "calc(50% - 150px)", // Links neben dem Button (Button ist 260px breit, also -130px für Mitte, dann -20px Abstand)
+        }}
+        initial={{
+          x: "-100vw",
+          y: -400,
+          rotate: -720,
+          opacity: 0.8,
+        }}
+        animate={{
+          x: 0,
+          y: [-400, 0, -200, 0, -100, 0, -40, 0, -10, 0], // 5 Bounces mit abnehmender Höhe
+          rotate: 720,
+          opacity: 1,
+        }}
+        transition={{
+          x: {
+            duration: 2.5,
+            ease: "easeOut",
+          },
+          y: {
+            duration: 2.5,
+            times: [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.92, 0.97, 1],
+            ease: [0.4, 0, 0.2, 1], // easeInOut für weiche Umkehrpunkte oben, harte Aufschläge unten
+          },
+          rotate: {
+            duration: 2.5,
+            ease: "linear",
+          },
+          opacity: {
+            duration: 0.8,
+          },
+          delay: 0.5,
+        }}
+      >
+        <motion.div
+          animate={{
+            scale: [1, 1.05, 1],
+            rotate: [0, 2, -2, 0],
+            filter: [
+              "drop-shadow(0 8px 12px rgba(0,0,0,0.4))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+              "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+              "drop-shadow(0 4px 8px rgba(0,0,0,0.4))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+              "drop-shadow(0 3px 6px rgba(0,0,0,0.45))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
+              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+            ],
+          }}
+          transition={{
+            scale: {
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut",
+            },
+            rotate: {
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut",
+            },
+            filter: {
+              duration: 2.5,
+              times: [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.92, 0.97, 1],
+            },
+          }}
+          whileHover={{
+            rotate: 15,
+            scale: 1.1,
+            transition: { duration: 0.2 },
+          }}
+          className="pointer-events-auto relative w-24 h-24"
+        >
+          <Image
+            src="/images/logos/dice1.png"
+            alt="Würfel"
+            fill
+            className="object-contain"
+            priority={false}
+            sizes="96px"
+          />
+        </motion.div>
+      </motion.div>
     </section>
   );
 }

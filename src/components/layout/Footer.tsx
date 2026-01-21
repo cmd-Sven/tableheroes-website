@@ -1,14 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn } from "lucide-react";
+import { HeroButton } from "@/src/components/ui/HeroButton";
 
 export function Footer() {
   return (
     <footer className="bg-background-dark border-t border-hero-border/30">
       {/* Top Section - Contact Banner */}
-      <div className="bg-hero-dark/20 border-b border-hero-border/30">
-        <div className="container mx-auto max-w-7xl px-6 py-12">
+      <div
+        className="relative border-b border-hero-border/30 overflow-hidden"
+        style={{
+          backgroundImage: "url('/images/contact_image.jpg')",
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          backgroundAttachment: "fixed",
+        }}
+      >
+        {/* Dunkler Overlay für bessere Lesbarkeit mit radialem Verlauf (Vignette) */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%)",
+          }}
+        />
+        
+        <div className="relative container mx-auto max-w-7xl px-6 py-12 z-10">
           <div className="flex flex-col items-center text-center gap-6">
             <div>
               <h2 className="font-barlow font-bold text-2xl uppercase text-white mb-2">
@@ -19,23 +38,21 @@ export function Footer() {
               </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              <a
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+              <HeroButton
                 href="mailto:kontakt@tableheroes.de"
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-hero-border bg-hero-vibrant px-6 py-3 font-barlow font-bold uppercase text-background-dark shadow-lg transition-transform hover:scale-[1.02]"
+                ariaLabel="E-Mail schreiben"
               >
-                <Mail className="h-5 w-5" />
                 E-Mail schreiben
-              </a>
-              <a
+              </HeroButton>
+              <HeroButton
                 href="https://discord.gg/JzfXw9b7v7"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-hero-border/60 bg-background-card px-6 py-3 font-barlow font-bold uppercase text-gray-100 transition-colors hover:bg-background-card/80"
+                ariaLabel="Zum Discord Server - Öffnet in neuem Tab"
               >
-                <MessageCircle className="h-5 w-5" />
                 Zum Discord
-              </a>
+              </HeroButton>
             </div>
           </div>
         </div>
@@ -46,11 +63,16 @@ export function Footer() {
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Column 1 - Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="h-6 w-6 text-accent-gold" />
-              <span className="font-barlow font-bold text-xl uppercase tracking-wide text-hero-vibrant">
-                TableHeroes
-              </span>
+            <div className="flex items-center mb-4">
+              <Image
+                src="/images/tableHeroes-logo.png"
+                alt="TableHeroes Logo"
+                width={200}
+                height={62}
+                priority={false}
+                className="h-auto"
+                style={{ height: "auto" }}
+              />
             </div>
             <p className="font-libre text-gray-400 text-sm leading-relaxed">
               Deine Pen &amp; Paper Community in Osnabrück.

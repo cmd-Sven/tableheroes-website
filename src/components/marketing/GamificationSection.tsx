@@ -29,7 +29,7 @@ export function GamificationSection() {
   return (
     <section
       id="gamification"
-      className="relative scroll-mt-20 bg-background-dark py-16"
+      className="relative scroll-mt-20 bg-background-dark py-16 overflow-hidden"
       style={{
         backgroundImage: "url('/images/glory-group-tavern.jpg')",
         backgroundSize: "cover",
@@ -38,14 +38,22 @@ export function GamificationSection() {
         backgroundAttachment: "scroll",
       }}
     >
-      <div className="relative mx-auto max-w-6xl px-6">
+      {/* Dunkle Maske über dem Hintergrundbild mit radialem Verlauf (Vignette) */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.75) 100%)",
+        }}
+      />
+      
+      <div className="relative mx-auto max-w-6xl px-6 z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 text-center md:text-left">
+          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 text-center md:text-left mt-8">
             Deine Reise als Held
           </h2>
           <p className="font-libre text-gray-200 leading-relaxed text-center md:text-left max-w-3xl mb-8">

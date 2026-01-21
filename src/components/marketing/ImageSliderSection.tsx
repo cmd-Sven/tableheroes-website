@@ -26,6 +26,10 @@ const SLIDES: Slide[] = [
   { src: "/images/impressions/11.png", alt: "TableHeroes Impression 11" },
   { src: "/images/impressions/12.png", alt: "TableHeroes Impression 12" },
   { src: "/images/impressions/13.png", alt: "TableHeroes Impression 13" },
+  { src: "/images/impressions/14.png", alt: "TableHeroes Impression 14" },
+  { src: "/images/impressions/15.jpg", alt: "TableHeroes Impression 15" },
+  { src: "/images/impressions/16.jpg", alt: "TableHeroes Impression 16" },
+  { src: "/images/impressions/20.jpeg", alt: "TableHeroes Impression 20" },
 ];
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
@@ -56,8 +60,24 @@ export function ImageSliderSection() {
   });
 
   return (
-    <section className="relative scroll-mt-20 bg-background-dark">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+    <section
+      className="relative scroll-mt-20 bg-background-dark overflow-hidden"
+      style={{
+        backgroundImage: "url('/images/dragon-town.jpg')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Dunkle Maske über dem Hintergrundbild mit radialem Verlauf (Vignette) */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.75) 100%)",
+        }}
+      />
+      
+      <div className="relative mx-auto max-w-6xl px-6 py-16 z-10">
         <div className="text-center mb-10">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block">
             Impressionen aus unseren Abenteuern
@@ -67,7 +87,7 @@ export function ImageSliderSection() {
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-hero-border/50 bg-black/40 shadow-2xl">
+        <div className="relative overflow-hidden rounded-2xl border border-hero-border bg-background-card/80 shadow-2xl z-20">
           {/* Slider mit 3 gleichzeitigen Bildern */}
           <div className="relative h-[260px] md:h-[320px] lg:h-[360px]">
             <AnimatePresence initial={false} mode="wait">
@@ -84,7 +104,7 @@ export function ImageSliderSection() {
                     key={slide.src}
                     type="button"
                     onClick={() => setLightboxIndex(slideIndex)}
-                    className="relative flex-1 group overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/80"
+                    className="relative flex-1 group overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-gold/80"
                     aria-label="Bild vergrößern"
                   >
                     <div className="relative h-full w-full">
@@ -98,7 +118,7 @@ export function ImageSliderSection() {
                         quality={85}
                       />
                       {/* leichter Overlay für Hover-Effekt */}
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-emerald-950/30 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </button>
                 ))}
@@ -110,7 +130,7 @@ export function ImageSliderSection() {
           <button
             type="button"
             onClick={() => goTo(index - 3)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 border border-hero-border/60 text-gray-100 hover:bg-black/80 transition-colors"
+            className="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-background-card border border-hero-border text-accent-gold hover:bg-background-card/80 transition-colors"
             aria-label="Vorheriges Bild"
           >
             <ChevronLeft className="h-5 w-5" aria-hidden />
@@ -118,7 +138,7 @@ export function ImageSliderSection() {
           <button
             type="button"
             onClick={() => goTo(index + 3)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 border border-hero-border/60 text-gray-100 hover:bg-black/80 transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-background-card border border-hero-border text-accent-gold hover:bg-background-card/80 transition-colors"
             aria-label="Nächstes Bild"
           >
             <ChevronRight className="h-5 w-5" aria-hidden />
@@ -134,8 +154,10 @@ export function ImageSliderSection() {
                   type="button"
                   onClick={() => goTo(i)}
                   className={[
-                    "h-2.5 w-2.5 rounded-full border border-amber-500/60 transition-colors",
-                    isActive ? "bg-amber-400" : "bg-black/60 hover:bg-amber-300/70",
+                    "h-2.5 w-2.5 rounded-full border border-accent-gold/70 transition-colors",
+                    isActive
+                      ? "bg-accent-gold"
+                      : "bg-background-card hover:bg-accent-gold/70",
                   ].join(" ")}
                   aria-label={`Bild ${i + 1} anzeigen`}
                 />
