@@ -316,18 +316,13 @@ export function HeroSection() {
               >
                 Pen &amp; Paper Community Osnabrück, zu Tisch oder Online.
               </motion.div>
+
+              {/* Claim-Text direkt unter dem Untertitel, mittig und in Fließtext-Größe */}
+              <p className="mt-4 font-libre text-gray-100 leading-relaxed text-sm md:text-base max-w-xl">
+                Wir bringen Spieler und Spielleiter zusammen. Digital organisiert, analog erlebt. Finde deine
+                Gruppe und werde Teil der TableHeroes-Gemeinschaft.
+              </p>
             </div>
-
-            <h1 className="font-barlow font-extrabold text-4xl md:text-5xl lg:text-6xl uppercase tracking-wide">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-hero-vibrant via-accent-gold to-hero-vibrant">
-                Dein Pen &amp; Paper
-              </span>
-            </h1>
-
-            <p className="mt-6 font-libre text-gray-100 leading-relaxed text-lg md:text-xl drop-shadow-lg">
-              Wir bringen Spieler und Spielleiter zusammen. Digital organisiert, analog erlebt. 
-              Finde deine Gruppe und werde Teil der TableHeroes-Gemeinschaft.
-            </p>
           </div>
 
           <LaunchInfoCard />
@@ -487,19 +482,12 @@ function LaunchInfoCard() {
         </div>
       </div>
 
+      {/* Hinweistext ohne Button – der Haupt-Discord-Button bleibt im Hero-Footer */}
       <div className="mt-3">
         <p className="font-libre text-gray-200 text-sm leading-relaxed">
           Du willst nicht warten? Komm auf unseren Discord und tausche dich
           jetzt schon mit der Community aus!
         </p>
-        <a
-          href="https://discord.gg/JzfXw9b7v7"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center justify-center rounded-md border border-accent-gold/60 bg-background-card/70 px-4 py-2 font-barlow font-bold uppercase text-accent-gold text-xs tracking-wide transition-colors hover:bg-background-card/90"
-        >
-          Zum Discord
-        </a>
       </div>
     </motion.div>
   );

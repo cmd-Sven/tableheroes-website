@@ -1,9 +1,14 @@
+"use client";
+
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabaseClient";
 import {
   CampaignListAnimation,
   type SessionTicket,
 } from "@/src/components/marketing/CampaignListAnimation";
+
+const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
 
 // DB Types (manuell gemappt aus Query-Result)
 type UserRow = {
@@ -28,133 +33,179 @@ type CampaignWithRelations = {
   sessions: SessionRow[];
 };
 
-export async function ActiveCampaignsSection() {
-  // 1. Fetch Campaigns + GM + Sessions
-  // Wir holen zusätzlich 'mode' aus campaigns, um es als Ort anzuzeigen (Online/Hybrid/Tisch).
-  const { data, error } = await supabase
-    .from("campaigns")
-    .select(
+export function ActiveCampaignsSection() {
+  const [tickets, setTickets] = useState<SessionTicket[] | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async () => {
+      try {
+        // 1. Fetch Campaigns + GM + Sessions
+        const { data, error } = await supabase
+          .from("campaigns")
+          .select(
+            `
+        id,
+        name,
+        system,
+        max_players,
+        mode,
+        banner_url,
+        gm:users!gm_id (username, avatar_url),
+        sessions (id, start_time, status)
       `
-      id,
-      name,
-      system,
-      max_players,
-      mode,
-      banner_url,
-      gm:users!gm_id (username, avatar_url),
-      sessions (id, start_time, status)
-    `
-    )
-    .eq("status", "Active")
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+          )
+          .eq("status", "Active")
+          .eq("is_published", true)
+          .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("ActiveCampaignsSection Fetch Error:", error.message);
-    return null;
-  }
+        if (error) {
+          console.error("ActiveCampaignsSection Fetch Error:", error.message);
+          if (isMounted) {
+            setTickets([]);
+            setIsLoading(false);
+          }
+          return;
+        }
 
-  if (!data) return null;
+        if (!data) {
+          if (isMounted) {
+            setTickets([]);
+            setIsLoading(false);
+          }
+          return;
+        }
 
-  // Casten, weil Supabase Types manchmal tricky sind bei Deep Joins
-  const campaigns = data as unknown as CampaignWithRelations[];
+        // Casten, weil Supabase Types manchmal tricky sind bei Deep Joins
+        const campaigns = data as unknown as CampaignWithRelations[];
 
-  const now = new Date();
+        const now = new Date();
 
-  // 2. JS-Logik: Nächste Session finden & Sortieren
-  const relevantCampaigns = campaigns
-    .map((c) => {
-      if (!c.sessions) return null;
-      const futureSessions = c.sessions
-        .filter((s) => s.start_time && new Date(s.start_time) > now)
-        .sort(
-          (a, b) =>
-            new Date(a.start_time!).getTime() -
-            new Date(b.start_time!).getTime()
+        // 2. JS-Logik: Nächste Session finden & Sortieren
+        const relevantCampaigns = campaigns
+          .map((c) => {
+            if (!c.sessions) return null;
+            const futureSessions = c.sessions
+              .filter((s) => s.start_time && new Date(s.start_time) > now)
+              .sort(
+                (a, b) =>
+                  new Date(a.start_time!).getTime() -
+                  new Date(b.start_time!).getTime()
+              );
+
+            if (futureSessions.length === 0) return null;
+
+            return {
+              campaign: c,
+              nextSession: futureSessions[0],
+              dateObj: new Date(futureSessions[0].start_time!),
+            };
+          })
+          .filter((item) => item !== null) as {
+          campaign: CampaignWithRelations;
+          nextSession: SessionRow;
+          dateObj: Date;
+        }[];
+
+        // Sort by Date Ascending
+        relevantCampaigns.sort(
+          (a, b) => a.dateObj.getTime() - b.dateObj.getTime()
         );
 
-      if (futureSessions.length === 0) return null;
+        // Limit 3
+        const top3 = relevantCampaigns.slice(0, 3);
 
-      return {
-        campaign: c,
-        nextSession: futureSessions[0],
-        dateObj: new Date(futureSessions[0].start_time!),
-      };
-    })
-    .filter((item) => item !== null) as {
-    campaign: CampaignWithRelations;
-    nextSession: SessionRow;
-    dateObj: Date;
-  }[];
+        // Final Mapping & Async Member Count fetching
+        const finalTickets: SessionTicket[] = [];
 
-  // Sort by Date Ascending
-  relevantCampaigns.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+        for (const item of top3) {
+          const { campaign: c, dateObj } = item;
 
-  // Limit 3
-  const top3 = relevantCampaigns.slice(0, 3);
+          // Slots fetch (immer noch in Loop, bei 3 Items okay)
+          let currentPlayers = 0;
+          const { count, error: countError } = await supabase
+            .from("campaign_members")
+            .select("id", { count: "exact", head: true })
+            .eq("campaign_id", c.id)
+            .eq("status", "Accepted");
 
-  // Final Mapping & Async Member Count fetching
-  const finalTickets: SessionTicket[] = [];
+          if (countError) {
+            console.error(
+              `❌ Count Error for Campaign ${c.id}:`,
+              countError
+            );
+          }
 
-  for (const item of top3) {
-    const { campaign: c, dateObj } = item;
+          if (count !== null) currentPlayers = count;
+          const max = c.max_players || 0;
+          const freeSlots = Math.max(0, max - currentPlayers);
 
-    // Slots fetch (immer noch in Loop, bei 3 Items okay)
-    let currentPlayers = 0;
-    const { count, error: countError } = await supabase
-      .from("campaign_members")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", c.id)
-      .eq("status", "Accepted");
+          // Debug Logging in Development
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `🎟️ Campaign "${c.name}": ${currentPlayers}/${max} occupied, ${freeSlots} free slots`
+            );
+          }
 
-    if (countError) {
-      console.error(`❌ Count Error for Campaign ${c.id}:`, countError);
-    }
+          // Visual Label mit Farbcodierung
+          let slotsLabel = "";
+          if (max === 0) {
+            slotsLabel = "Auf Anfrage";
+          } else if (freeSlots === 0) {
+            slotsLabel = `Voll (${max}/${max})`;
+          } else {
+            slotsLabel = `${freeSlots}/${max} Plätze frei`;
+          }
 
-    if (count !== null) currentPlayers = count;
-    const max = c.max_players || 0;
-    const freeSlots = Math.max(0, max - currentPlayers);
-    
-    // Debug Logging in Development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`🎟️ Campaign "${c.name}": ${currentPlayers}/${max} occupied, ${freeSlots} free slots`);
-    }
+          const dateFormatter = new Intl.DateTimeFormat("de-DE", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            timeZone: "Europe/Berlin",
+          });
+          const timeFormatter = new Intl.DateTimeFormat("de-DE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Europe/Berlin",
+          });
 
-    // Visual Label mit Farbcodierung
-    let slotsLabel = "";
-    if (max === 0) {
-      slotsLabel = "Auf Anfrage";
-    } else if (freeSlots === 0) {
-      slotsLabel = `Voll (${max}/${max})`;
-    } else {
-      slotsLabel = `${freeSlots}/${max} Plätze frei`;
-    }
+          finalTickets.push({
+            campaignId: c.id,
+            campaignName: c.name || "Unbenanntes Abenteuer",
+            gameSystem: c.system || "System offen",
+            gmUsername: c.gm?.username || "Unbekannt",
+            gmAvatarUrl: c.gm?.avatar_url || null,
+            bannerUrl: c.banner_url || null,
+            location: c.mode || "Online",
+            dateString: dateFormatter.format(dateObj),
+            timeString: `${timeFormatter.format(dateObj)} Uhr`,
+            slotsLabel,
+          });
+        }
 
-    const dateFormatter = new Intl.DateTimeFormat("de-DE", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      timeZone: "Europe/Berlin",
-    });
-    const timeFormatter = new Intl.DateTimeFormat("de-DE", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Berlin",
-    });
+        if (isMounted) {
+          setTickets(finalTickets);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("ActiveCampaignsSection unexpected error:", err);
+        if (isMounted) {
+          setTickets([]);
+          setIsLoading(false);
+        }
+      }
+    };
 
-    finalTickets.push({
-      campaignId: c.id,
-      campaignName: c.name || "Unbenanntes Abenteuer",
-      gameSystem: c.system || "System offen",
-      gmUsername: c.gm?.username || "Unbekannt",
-      gmAvatarUrl: c.gm?.avatar_url || null,
-      bannerUrl: c.banner_url || null,
-      location: c.mode || "Online",
-      dateString: dateFormatter.format(dateObj),
-      timeString: `${timeFormatter.format(dateObj)} Uhr`,
-      slotsLabel,
-    });
-  }
+    void load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const finalTickets = tickets ?? [];
 
   return (
     <section
@@ -183,14 +234,14 @@ export async function ActiveCampaignsSection() {
       </div>
 
       {/* Dekorative Eck-Grafiken: Skull in allen vier Ecken */}
-      {/* Oben Links: Skull (horizontal gespiegelt) */}
+      {/* Oben Links: Skull (horizontal und vertikal gespiegelt) */}
       <div className="pointer-events-none absolute top-0 left-0 z-30 hidden md:block">
         <Image
           src="/images/skull-corner-only.png"
           alt=""
           width={70}
           height={70}
-          className="max-w-[70px] h-auto scale-x-[-1]"
+          className="max-w-[70px] h-auto scale-x-[-1] scale-y-[-1]"
           style={{ height: "auto" }}
         />
       </div>
@@ -219,16 +270,35 @@ export async function ActiveCampaignsSection() {
         />
       </div>
 
-      {/* Unten Rechts: Skull (horizontal gespiegelt) mit 12px Abstand */}
+      {/* Unten Rechts: Skull mit 12px Abstand */}
       <div className="pointer-events-none absolute bottom-[12px] right-0 z-30 hidden md:block">
         <Image
           src="/images/skull-corner-only.png"
           alt=""
           width={70}
           height={70}
-          className="max-w-[70px] h-auto scale-x-[-1]"
+          className="max-w-[70px] h-auto"
           style={{ height: "auto" }}
         />
+      </div>
+
+      {/* Glühende Runen-Reihe am unteren Rand */}
+      <div className="pointer-events-none absolute bottom-[20px] left-0 w-full flex justify-center z-30">
+        <div className="flex w-full max-w-6xl justify-between px-4 md:px-6 lg:px-8">
+          {RUNES.map((rune, index) => (
+            <span
+              key={`${rune}-${index}`}
+              className={[
+                "rune-glow font-cinzel tracking-[0.35em]",
+                "text-[9px] md:text-xs lg:text-sm",
+                index >= 6 ? "hidden sm:inline-block" : "",
+              ].join(" ")}
+              style={{ animationDelay: `${index * 1.25}s` }}
+            >
+              {rune}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Goldene, sich wiederholende Border zwischen Sektionen */}
@@ -243,6 +313,43 @@ export async function ActiveCampaignsSection() {
           }}
         />
       </div>
+
+      <style jsx>{`
+        .rune-glow {
+          color: #ffe8c7;
+          text-shadow: 0 0 5px #ff4500, 0 0 10px #ff4500, 0 0 20px #ff0000;
+          opacity: 0;
+          animation: rune-pulse 6s ease-in-out infinite;
+        }
+
+        @keyframes rune-pulse {
+          0% {
+            opacity: 0;
+            text-shadow: 0 0 2px #7f1d1d, 0 0 4px #7f1d1d, 0 0 8px #7f1d1d;
+            transform: translate3d(0, 0, 0) scale(0.95);
+          }
+          20% {
+            opacity: 1;
+            text-shadow: 0 0 5px #ff4500, 0 0 12px #ff4500, 0 0 24px #ff0000;
+            transform: translate3d(0, -1px, 0) scale(1.05);
+          }
+          50% {
+            opacity: 0.85;
+            text-shadow: 0 0 4px #ff7a1a, 0 0 10px #ff7a1a, 0 0 20px #ff4500;
+            transform: translate3d(0, 0, 0) scale(1.02);
+          }
+          80% {
+            opacity: 0.4;
+            text-shadow: 0 0 3px #b91c1c, 0 0 6px #b91c1c, 0 0 12px #7f1d1d;
+            transform: translate3d(0, 1px, 0) scale(0.98);
+          }
+          100% {
+            opacity: 0;
+            text-shadow: 0 0 2px #7f1d1d, 0 0 4px #7f1d1d, 0 0 8px #7f1d1d;
+            transform: translate3d(0, 0, 0) scale(0.95);
+          }
+        }
+      `}</style>
     </section>
   );
 }

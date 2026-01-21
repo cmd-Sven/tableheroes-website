@@ -11,6 +11,7 @@ import {
   Sparkles,
   Users,
   ArrowLeft,
+  Trophy,
 } from "lucide-react";
 import { Footer } from "@/src/components/layout/Footer";
 
@@ -30,6 +31,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       { id: "campaigns", label: "Runden", Icon: Flag },
       { id: "community", label: "Community", Icon: Users },
       { id: "features", label: "Plattform", Icon: Sparkles },
+      { id: "gamification", label: "Deine Reise als Held", Icon: Trophy },
       { id: "systems", label: "Systeme", Icon: BookOpen },
       { id: "faq", label: "FAQ", Icon: HelpCircle },
     ],

@@ -26,17 +26,35 @@ type FeatureCard = {
 
 function Card({ title, description, Icon }: FeatureCard) {
   return (
-    <div className="rounded-md border border-hero-border/40 bg-background-card p-6 shadow-lg">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-md border border-hero-border/40 bg-background-dark">
-          <Icon className="h-5 w-5 text-accent-gold" aria-hidden />
+    <motion.div
+      className="relative rounded-md border border-amber-800/60 shadow-lg overflow-hidden cursor-pointer"
+      whileHover={{ scale: 1.03, y: -6 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+    >
+      {/* Grunge-Paper Hintergrund */}
+      <div
+        className="absolute inset-0 opacity-90"
+        style={{
+          backgroundImage: "url('/images/grunge-paper-background.jpg')",
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+        }}
+      />
+      <div className="relative p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-md border border-amber-800/40 bg-amber-50">
+            <Icon className="h-5 w-5 text-amber-900" aria-hidden />
+          </div>
+          <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-0">
+            {title}
+          </h3>
         </div>
-        <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-0">
-          {title}
-        </h3>
+        <p className="font-libre text-stone-700 leading-relaxed">
+          {description}
+        </p>
       </div>
-      <p className="font-libre text-gray-200 leading-relaxed">{description}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -88,27 +106,39 @@ export function FeatureTabsSection() {
   const playerCards: FeatureCard[] = useMemo(
     () => [
       {
-        title: "Das Netz verstehen",
+        title: "Das wichtigste im Auge behalten",
         description:
-          "Behalte den Durchblick im Ränkespiel. Sieh auf einen Blick, wie NPCs und Fraktionen zueinander stehen.",
+          "Behalte den Durchblick im Ränkespiel. Sieh auf einen Blick, wie NPCs und Fraktionen zueinander stehen. Wenn du erfolgreich Informationen erwüfelt hast kannst du diese Infos jederzeit wieder abrufen (oder für Dich behalten)",
         Icon: Search,
       },
       {
-        title: "Story-Items & Loot",
+        title: "Deine Geschichte und BEziehungen festhalten",
         description:
-          "Nicht nur Stats, sondern Geschichte. Notiere dir Legenden zu deinen Fundstücken und was sie für deinen Charakter bedeuten.",
+          "Die Geschichte eines Charakters lebt von seinen Beziehungen. Halte fest, wer Freund, Feind oder einfach nur Bekannt ist – und wie sich diese Beziehungen im Laufe der Kampagne entwickeln.",
         Icon: Gem,
       },
       {
         title: "Intelligente Notizen",
         description:
-          "Verknüpfe deine Mitschriften direkt mit Personen und Orten. So findest du später sofort wieder, wer der 'Typ mit der Narbe' war.",
+          "Verknüpfe deine Mitschriften direkt mit Personen und Orten. So findest du später sofort wieder, wer der 'Typ mit der Narbe' war. Teile Deine Infos bequem mit deinen Mitspielern.",
         Icon: PenTool,
       },
       {
         title: "Dein persönlicher Fokus",
         description:
-          "Konzentriere dich auf das Rollenspiel. Foundry regelt die Zahlen, TableHeroes hält dir den Rücken frei für die Story.",
+          "Konzentriere dich auf das Rollenspiel. Löse Rätsel, entscheide welche Information nur für Dich ist, hüte Geheimnisse und entdecke versteckte Verbindungen in der Kampagne.",
+        Icon: UserCheck,
+      },
+            {
+        title: "Dein eigenes Dashboard",
+        description:
+          "Punkte, Achievements, Downloads udn wichtige Links für die nächste Kamapgne .... alles auf einen Blick",
+        Icon: UserCheck,
+      },
+                 {
+        title: "Entwickle Dein Spielerlevel und werde zum Mentor",
+        description:
+          "Du willst anderen helfen, Dich für bestimmte Rollen ausschreiben oder einfach nur Dich mit der Community austauschen? Zeige Deine Entwicklung und Erfahrung über Dein Spielerprofil.",
         Icon: UserCheck,
       },
     ],
@@ -121,6 +151,12 @@ export function FeatureTabsSection() {
     <section
       id="features"
       className="relative scroll-mt-20 bg-background-dark"
+      style={{
+        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+      }}
     >
       <div className="mx-auto max-w-6xl px-6 py-16">
         <motion.div
@@ -130,23 +166,26 @@ export function FeatureTabsSection() {
           transition={{ duration: 0.5 }}
         >
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8">
-            Unsere Vereins-Plattform
+            Individuelles Dashboard für SL &amp; Spieler
           </h2>
           <p className="font-libre text-gray-200 leading-relaxed">
-            Foundry macht die Maps und Würfelwürfe. TableHeroes macht die Connections und liefert kreative Impulse. 
-            Zusammen entsteht ein Erlebnis, das Zahlen und Story perfekt verbindet.
+            Nutze als SL mächtige Werkzeuge um Deine Lore, Quests, NPCs, Locations und vieles mehr aufzubauen. 
+            Als Spieler kannst du dein Dashboard mit wichtigen Infos zur Kampagne selber aufbauen. 
+            Verliere nie wieder den Roten Faden.
           </p>
 
           {/* Toggle */}
           <div className="mt-8 flex justify-center">
-            <div className="relative flex w-full max-w-xl rounded-full border border-hero-border/50 bg-background-card p-1 shadow-lg">
+            <div className="relative flex w-full max-w-xl rounded-full border border-hero-border/60 bg-background-card/90 p-1 shadow-lg">
               <button
                 type="button"
                 onClick={() => setTab("gm")}
                 className={[
                   "relative z-10 flex w-1/2 items-center justify-center gap-2 rounded-full px-4 py-3",
                   "font-barlow font-bold uppercase transition-colors",
-                  tab === "gm" ? "text-white" : "text-gray-400 hover:text-gray-200",
+                  tab === "gm"
+                    ? "text-stone-900"
+                    : "text-gray-400 hover:text-gray-200",
                 ].join(" ")}
                 aria-pressed={tab === "gm"}
               >
@@ -160,7 +199,7 @@ export function FeatureTabsSection() {
                   "relative z-10 flex w-1/2 items-center justify-center gap-2 rounded-full px-4 py-3",
                   "font-barlow font-bold uppercase transition-colors",
                   tab === "player"
-                    ? "text-white"
+                    ? "text-stone-900"
                     : "text-gray-400 hover:text-gray-200",
                 ].join(" ")}
                 aria-pressed={tab === "player"}
@@ -172,8 +211,8 @@ export function FeatureTabsSection() {
               <motion.div
                 layoutId="feature-tabs-pill"
                 className={[
-                  "absolute top-1 bottom-1 w-1/2 rounded-full bg-hero-vibrant",
-                  "shadow-[0_0_0_1px_rgba(35,199,99,0.35)]",
+                  "absolute top-1 bottom-1 w-1/2 rounded-full bg-accent-gold bg-[#cab926]",
+                  "shadow-[0_0_18px_rgba(202,185,38,0.55)]",
                 ].join(" ")}
                 initial={false}
                 animate={{ x: tab === "gm" ? "0%" : "100%" }}

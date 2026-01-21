@@ -30,6 +30,13 @@ export function GamificationSection() {
     <section
       id="gamification"
       className="relative scroll-mt-20 bg-background-dark py-16"
+      style={{
+        backgroundImage: "url('/images/glory-group-tavern.jpg')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundAttachment: "scroll",
+      }}
     >
       <div className="relative mx-auto max-w-6xl px-6">
         <motion.div
@@ -55,7 +62,7 @@ export function GamificationSection() {
           >
             {/* Säule 1: Punkte sammeln */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,
@@ -85,7 +92,7 @@ export function GamificationSection() {
 
             {/* Säule 2: Achievements */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,
@@ -115,7 +122,7 @@ export function GamificationSection() {
 
             {/* Säule 3: Goodies */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,

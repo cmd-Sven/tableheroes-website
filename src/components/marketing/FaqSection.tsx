@@ -19,6 +19,10 @@ const faqs = [
     q: "Brauche ich Vorkenntnisse?",
     a: "Nein. Der Einstieg ist bewusst einfach gehalten: Kampagne anlegen, Notizen strukturieren, Spieler einladen – fertig.",
   },
+  {
+    q: "Erstellt die KI komplette Inhalte und Geschichten?",
+    a: "Die KI ist für Spieler und Spielleiter ein Werkzeug und soll Euch helfen schnell Infos zu finden und Inspirationen zu geben. Die KI gibt Euch wichtige Bausteine und achtet darauf, dass alles sinnvoll miteinander verknüpft ist. Als SL oder Spieler entscheidet ihr wie und was ihr spielt ... niemals die KI!",
+  },
 ];
 
 export function FaqSection() {
