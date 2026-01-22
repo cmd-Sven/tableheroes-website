@@ -6,6 +6,7 @@ import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
 import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketing/CloudFogOverlay";
 import { HeroButton } from "@/src/components/ui/HeroButton";
+import { DragonCanvas } from "@/src/components/marketing/DragonCanvas";
 
 // Parallax Layer Configuration
 // yRange in Pixel: sehr dezente vertikale Verschiebung (entgegengesetzt zur Scrollrichtung)
@@ -278,6 +279,9 @@ export function HeroSection() {
       {/* Atmosphärischer Glut-/Staub-Effekt, zwischen Hintergrund und Content */}
       <EmberRainOverlay />
 
+      {/* Periodischer fliegender Drache */}
+      <DragonCanvas />
+
       {/* Content Container */}
       <div className="relative z-[60] mx-auto max-w-6xl px-6 py-20 md:py-28 w-full">
         <motion.div
@@ -350,7 +354,7 @@ export function HeroSection() {
       {/* Externer Discord-Button als Holz-Grafik.
           Fixed position, damit er nicht vom nachfolgenden Bereich überdeckt wird,
           bleibt aber optisch am unteren Rand des Viewports. */}
-      <div className="pointer-events-auto fixed bottom-4 left-1/2 z-[120] -translate-x-1/2">
+      <div className="pointer-events-auto fixed bottom-[116px] left-1/2 z-[120] -translate-x-1/2">
         <HeroButton
           href="https://discord.gg/JzfXw9b7v7"
           target="_blank"
@@ -363,7 +367,7 @@ export function HeroSection() {
 
       {/* Würfel-Container - Absolute Isolation, direkt nach dem Button */}
       <motion.div
-        className="hidden md:block fixed bottom-4 z-[130] pointer-events-none"
+        className="hidden md:block fixed bottom-[116px] z-[130] pointer-events-none"
         style={{
           left: "calc(50% - 150px)", // Links neben dem Button (Button ist 260px breit, also -130px für Mitte, dann -20px Abstand)
         }}

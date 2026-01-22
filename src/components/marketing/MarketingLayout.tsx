@@ -143,7 +143,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       {/* Login Button (Fixed Top-Right Desktop, Footer Link Mobile) */}
       {isHomePage && (
         <div className="fixed top-6 right-6 z-50 hidden md:block">
-          <div className="scale-[0.3] origin-top-right">
+          <div className="scale-[0.45] origin-top-right">
             <HeroButton href="/login" ariaLabel="Zum Login">
               Login
             </HeroButton>
