@@ -1,33 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { a } from "framer-motion/client";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 const faqs = [
   {
-    q: "Für wen ist TableHeroes gedacht?",
-    a: "Für Spielleitungen, die ihre Kampagne strukturiert vorbereiten möchten, und für Gruppen, die Loot, Ziele und Downtime zentral verwalten wollen.",
+    q: "Kan man sich nur für Online Runden bewerben?",
+    a: "Nein, es gibt auch Präsenz Runden die ausschließlich in Osnabrück stattfinden. Diese Runden sind aber limitiert und werden bevorzugt an Mitglieder vergeben die auch Online Runden leiten oder spielen.",
   },
   {
-    q: "Kann ich mehrere Kampagnen gleichzeitig verwalten?",
-    a: "Ja. TableHeroes ist darauf ausgelegt, mehrere Kampagnen parallel zu organisieren – sauber getrennt, schnell auffindbar und ohne Chaos.",
+    q: "Für wen ist Table-Heroes gedacht?",
+    a: "Die Table-Heroes Webseite mit Ihrem Dashboard ist für Mitglieder von Table-Heroes gedacht um ihre Runden besser zu organiseren, Spielleiter eine Möglichkeit zu geben sich mit Spielern Online auszutauschen und Spielern zusätzliche Anreize zu schaffen an Runden teilzunehmen.",
   },
   {
-    q: "Unterstützt ihr mein System?",
-    a: "TableHeroes fokussiert sich auf Kampagnen-Organisation statt Regel-Engine. Deshalb funktioniert es mit den meisten Systemen – von D&D 5e bis Cthulhu.",
+    q: "Kann ich direkt mich für Runden anmelden?",
+    a: "Es gibt offene Runden die zum kennenlernen gedacht sind. Um an einer festen bestehenden Runde teilzunehmen muss man sich registrieren und bewerben",
   },
   {
-    q: "Brauche ich Vorkenntnisse?",
-    a: "Nein. Der Einstieg ist bewusst einfach gehalten: Kampagne anlegen, Notizen strukturieren, Spieler einladen – fertig.",
+    q: "Entstehen mir als Mitglied kosten oder muss ich mich irgendwozu verpflichten?",
+    a: "Es gibt keine weiteren Kosten, du kannst aber gerne jederzeit eine Spende für das Team einreichen. Die einzige Pflicht die Du als Mitglied hast ist eine Teilnahme an zugesagten Terminen",
   },
   {
     q: "Erstellt die KI komplette Inhalte und Geschichten?",
     a: "Die KI ist für Spieler und Spielleiter ein Werkzeug und soll Euch helfen schnell Infos zu finden und Inspirationen zu geben. Die KI gibt Euch wichtige Bausteine und achtet darauf, dass alles sinnvoll miteinander verknüpft ist. Als SL oder Spieler entscheidet ihr wie und was ihr spielt ... niemals die KI!",
   },
+  {
+    q: "Kann ich mich auch als Spielleiter registrierenn?",
+    a: "Vorab musst du dich als Mitglied registrieren und kannst dich dann als SL über Discord bewerben. Dann erhälst du eine seperaten Zugang für den SL Dashboard.",
+  },
 ];
 
-function FaqItem({ question, answer, index }: { question: string; answer: string; index: number }) {
+function FaqItem({
+  question,
+  answer,
+  index,
+}: {
+  question: string;
+  answer: string;
+  index: number;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -95,7 +108,12 @@ export function FaqSection() {
 
           <div className="mt-8 space-y-3">
             {faqs.map((item, index) => (
-              <FaqItem key={item.q} question={item.q} answer={item.a} index={index} />
+              <FaqItem
+                key={item.q}
+                question={item.q}
+                answer={item.a}
+                index={index}
+              />
             ))}
           </div>
 
@@ -121,7 +139,3 @@ export function FaqSection() {
     </section>
   );
 }
-
-
-
-

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
 import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
 import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketing/CloudFogOverlay";
-import { HeroButton } from "@/src/components/ui/HeroButton";
 import { DragonCanvas } from "@/src/components/marketing/DragonCanvas";
 
 // Parallax Layer Configuration
@@ -263,13 +262,22 @@ function ParallaxBackground() {
   );
 }
 
-export function HeroSection() {
+type HeroContentType = "updates" | "membership" | "discord" | "login";
+
+interface HeroSectionProps {
+  heroContent?: HeroContentType;
+}
+
+export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
   return (
     <section
       id="hero"
-      className="relative h-[60vh] md:h-[80vh] flex items-center justify-center overflow-hidden scroll-mt-20 isolate"
+      className="relative h-[calc(60vh+100px)] md:h-[calc(80vh+100px)] flex items-center justify-center overflow-visible scroll-mt-20 isolate"
       style={{ contain: "strict" }}
     >
+      {/* Countdown oben mittig */}
+      <LaunchCountdown />
+
       {/* Parallax Background */}
       <ParallaxBackground />
 
@@ -334,125 +342,132 @@ export function HeroSection() {
             </div>
           </div>
 
-          <LaunchInfoCard />
+          {/* Container für Pergament-Box und Feder */}
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              <HeroContentBox key={heroContent} content={heroContent} />
+            </AnimatePresence>
+            
+            {/* Schwebende Feder */}
+            <motion.div
+              className="absolute top-10 -right-8 z-20 hidden lg:block"
+              style={{
+                transform: "translateX(75%)",
+              }}
+              animate={{
+                y: [0, -15, 0],
+              }}
+              transition={{
+                duration: 4,
+                ease: "easeInOut",
+                repeat: Infinity,
+              }}
+            >
+              <Image
+                src="/images/feder-frei.png"
+                alt=""
+                width={64}
+                height={64}
+                className="w-12 h-auto object-contain"
+                style={{ height: "auto" }}
+                priority={false}
+              />
+            </motion.div>
+          </div>
         </motion.div>
       </div>
 
-      {/* Goldene, sich wiederholende Border zwischen Sektionen */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-[40]">
-        <div
-          className="w-full h-full"
-          style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
-            backgroundSize: "100px auto",
-            backgroundRepeat: "repeat-x",
-            backgroundPosition: "bottom center",
-          }}
-        />
-      </div>
 
-      {/* Externer Discord-Button als Holz-Grafik.
-          Fixed position, damit er nicht vom nachfolgenden Bereich überdeckt wird,
-          bleibt aber optisch am unteren Rand des Viewports. */}
-      <div className="pointer-events-auto fixed bottom-[116px] left-1/2 z-[120] -translate-x-1/2">
-        <HeroButton
-          href="https://discord.gg/JzfXw9b7v7"
-          target="_blank"
-          rel="noopener noreferrer"
-          ariaLabel="Zum Discord Server - Öffnet in neuem Tab"
-        >
-          Zum Discord
-        </HeroButton>
-      </div>
-
-      {/* Würfel-Container - Absolute Isolation, direkt nach dem Button */}
-      <motion.div
-        className="hidden md:block fixed bottom-[116px] z-[130] pointer-events-none"
-        style={{
-          left: "calc(50% - 150px)", // Links neben dem Button (Button ist 260px breit, also -130px für Mitte, dann -20px Abstand)
-        }}
-        initial={{
-          x: "-100vw",
-          y: -400,
-          rotate: -720,
-          opacity: 0.8,
-        }}
-        animate={{
-          x: 0,
-          y: [-400, 0, -200, 0, -100, 0, -40, 0, -10, 0], // 5 Bounces mit abnehmender Höhe
-          rotate: 720,
-          opacity: 1,
-        }}
-        transition={{
-          x: {
-            duration: 2.5,
-            ease: "easeOut",
-          },
-          y: {
-            duration: 2.5,
-            times: [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.92, 0.97, 1],
-            ease: [0.4, 0, 0.2, 1], // easeInOut für weiche Umkehrpunkte oben, harte Aufschläge unten
-          },
-          rotate: {
-            duration: 2.5,
-            ease: "linear",
-          },
-          opacity: {
-            duration: 0.8,
-          },
-          delay: 0.5,
-        }}
+      {/* Würfel-Container - leicht unterhalb des unteren Rands positioniert */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-[100]"
+        style={{ bottom: "-30px" }}
       >
         <motion.div
+          className="hidden md:block pointer-events-auto mb-0"
+          initial={{
+            x: "-100vw",
+            y: -400,
+            rotate: -720,
+            opacity: 0.8,
+          }}
           animate={{
-            scale: [1, 1.05, 1],
-            rotate: [0, 2, -2, 0],
-            filter: [
-              "drop-shadow(0 8px 12px rgba(0,0,0,0.4))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
-              "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
-              "drop-shadow(0 4px 8px rgba(0,0,0,0.4))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
-              "drop-shadow(0 3px 6px rgba(0,0,0,0.45))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
-              "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
-            ],
+            x: 0,
+            y: [-400, 0, -200, 0, -100, 0, -40, 0, -10, 0], // 5 Bounces mit abnehmender Höhe
+            rotate: 720,
+            opacity: 1,
           }}
           transition={{
-            scale: {
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut",
+            x: {
+              duration: 2.5,
+              ease: "easeOut",
             },
-            rotate: {
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut",
-            },
-            filter: {
+            y: {
               duration: 2.5,
               times: [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.92, 0.97, 1],
+              ease: [0.4, 0, 0.2, 1], // easeInOut für weiche Umkehrpunkte oben, harte Aufschläge unten
             },
+            rotate: {
+              duration: 2.5,
+              ease: "linear",
+            },
+            opacity: {
+              duration: 0.8,
+            },
+            delay: 0.5,
           }}
-          whileHover={{
-            rotate: 15,
-            scale: 1.1,
-            transition: { duration: 0.2 },
-          }}
-          className="pointer-events-auto relative w-24 h-24"
         >
-          <Image
-            src="/images/logos/dice1.png"
-            alt="Würfel"
-            fill
-            className="object-contain"
-            priority={false}
-            sizes="96px"
-          />
+          <motion.div
+            animate={{
+              scale: [1, 1.05, 1],
+              rotate: [0, 2, -2, 0],
+              filter: [
+                "drop-shadow(0 8px 12px rgba(0,0,0,0.4))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+                "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+                "drop-shadow(0 4px 8px rgba(0,0,0,0.4))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+                "drop-shadow(0 3px 6px rgba(0,0,0,0.45))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
+                "drop-shadow(0 2px 4px rgba(0,0,0,0.6))",
+              ],
+            }}
+            transition={{
+              scale: {
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              },
+              rotate: {
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              },
+              filter: {
+                duration: 2.5,
+                times: [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.92, 0.97, 1],
+              },
+            }}
+            whileHover={{
+              rotate: 15,
+              scale: 1.1,
+              transition: { duration: 0.2 },
+            }}
+            className="relative w-24 h-24"
+          >
+            <Image
+              src="/images/logos/dice1.png"
+              alt="Würfel"
+              fill
+              className="object-contain"
+              priority={false}
+              sizes="96px"
+            />
+          </motion.div>
         </motion.div>
-      </motion.div>
+      </div>
     </section>
   );
 }
@@ -498,72 +513,104 @@ function useLaunchCountdown(): Countdown {
   return timeLeft;
 }
 
-function LaunchInfoCard() {
+function LaunchCountdown() {
   const { days, hours, minutes, seconds } = useLaunchCountdown();
 
   const format = (value: number) => value.toString().padStart(2, "0");
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 50 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md p-6 shadow-lg flex flex-col gap-4"
-      style={{ willChange: "transform, opacity" }}
+      className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2"
     >
-      <div>
-        <h3 className="font-barlow font-semibold uppercase tracking-wide text-accent-gold text-sm">
-          Das Abenteuer beginnt bald
-        </h3>
-        <p className="mt-2 font-libre text-gray-100 text-sm leading-relaxed">
-          Registrierungen sind erst ab dem Launch-Tag möglich.
-          Komm vorab auf unseren Discord!
-        </p>
-      </div>
-
-      <div className="mt-2">
-        <p className="font-barlow text-xs uppercase tracking-[0.3em] text-gray-300 mb-1">
-          Countdown bis zum Launch
-        </p>
-        <div className="flex items-center gap-3 font-mono font-semibold text-xl md:text-2xl text-accent-gold">
-          <div className="flex flex-col items-center">
+      <div className="px-6 py-2 rounded-full bg-[#215210] shadow-[0_0_15px_rgba(57,255,20,0.4)]">
+        <div className="flex items-center gap-3 font-mono font-bold text-base md:text-lg text-white tabular-nums">
+          <div className="flex items-center gap-1">
             <span>{format(days)}</span>
-            <span className="mt-1 text-[10px] font-barlow uppercase tracking-[0.2em] text-gray-300">
-              Tage
-            </span>
+            <span className="text-xs text-gray-300">d</span>
           </div>
-          <span className="text-accent-gold/80">:</span>
-          <div className="flex flex-col items-center">
+          <span className="text-accent-gold">:</span>
+          <div className="flex items-center gap-1">
             <span>{format(hours)}</span>
-            <span className="mt-1 text-[10px] font-barlow uppercase tracking-[0.2em] text-gray-300">
-              Stunden
-            </span>
+            <span className="text-xs text-gray-300">h</span>
           </div>
-          <span className="text-accent-gold/80">:</span>
-          <div className="flex flex-col items-center">
+          <span className="text-accent-gold">:</span>
+          <div className="flex items-center gap-1">
             <span>{format(minutes)}</span>
-            <span className="mt-1 text-[10px] font-barlow uppercase tracking-[0.2em] text-gray-300">
-              Minuten
-            </span>
+            <span className="text-xs text-gray-300">m</span>
           </div>
-          <span className="text-accent-gold/80">:</span>
-          <div className="flex flex-col items-center">
+          <span className="text-accent-gold">:</span>
+          <div className="flex items-center gap-1">
             <span>{format(seconds)}</span>
-            <span className="mt-1 text-[10px] font-barlow uppercase tracking-[0.2em] text-gray-300">
-              Sekunden
-            </span>
+            <span className="text-xs text-gray-300">s</span>
           </div>
         </div>
       </div>
+      <span className="font-barlow font-bold uppercase tracking-wide text-accent-gold text-sm">
+        Launch-Day
+      </span>
+    </motion.div>
+  );
+}
 
-      {/* Hinweistext ohne Button – der Haupt-Discord-Button bleibt im Hero-Footer */}
-      <div className="mt-3">
-        <p className="font-libre text-gray-200 text-sm leading-relaxed">
-          Du willst nicht warten? Komm auf unseren Discord und tausche dich
-          jetzt schon mit der Community aus!
+interface HeroContentBoxProps {
+  content: HeroContentType;
+}
+
+function HeroContentBox({ content }: HeroContentBoxProps) {
+  const getContent = () => {
+    switch (content) {
+      case "membership":
+        return {
+          title: "Mitglied werden",
+          text: "Um Table-Heroes Mitglied zu werden musst Du dich vorab registrieren und erhälst Zugriff auf das Spieler-Dashboard. Dort hast Du die Möglichkeit aktuelle Kampagnen einzusehen, dich auf diese zu bewerben oder Dein Dashboard einzurichten. Aktuell ist noch keine Registrierung möglich bis zum Release.",
+        };
+      case "updates":
+      default:
+        return {
+          title: "Das Abenteuer beginnt bald",
+          text: "Registrierungen sind erst ab dem Launch-Tag möglich. Komm vorab auf unseren Discord!",
+          additionalText: "Du willst nicht warten? Komm auf unseren Discord und tausche dich jetzt schon mit der Community aus!",
+        };
+    }
+  };
+
+  const contentData = getContent();
+
+  return (
+    <motion.div
+      key={content}
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      className="rounded-2xl shadow-2xl flex flex-col justify-center gap-4 w-full max-w-3xl min-h-[400px] py-16 px-12"
+      style={{
+        willChange: "transform, opacity",
+        backgroundImage: "url('/images/scroll-paper.png')",
+        backgroundSize: "100% 100%",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+      }}
+    >
+      <div>
+        <h3 className="font-barlow font-semibold uppercase tracking-wide text-slate-900 text-sm drop-shadow-sm">
+          {contentData.title}
+        </h3>
+        <p className="mt-2 font-libre text-slate-800 text-sm leading-relaxed drop-shadow-sm">
+          {contentData.text}
         </p>
       </div>
+
+      {contentData.additionalText && (
+        <div className="mt-3">
+          <p className="font-libre text-slate-700 text-sm leading-relaxed drop-shadow-sm">
+            {contentData.additionalText}
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 }

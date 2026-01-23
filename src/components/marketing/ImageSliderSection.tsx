@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ImageCarousel3D } from "@/src/components/ui/ImageCarousel3D";
 
 const SLIDE_INTERVAL_MS = 6000;
 
@@ -35,29 +35,7 @@ const SLIDES: Slide[] = [
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
 
 export function ImageSliderSection() {
-  const [index, setIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (SLIDES.length <= 3) return;
-
-    const interval = setInterval(() => {
-      // Auto-Advance im 3er-Schritt
-      setIndex((prev) => (prev + 3) % SLIDES.length);
-    }, SLIDE_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const goTo = (target: number) => {
-    const next = (target + SLIDES.length) % SLIDES.length;
-    setIndex(next);
-  };
-
-  const visibleSlides = Array.from({ length: 3 }).map((_, i) => {
-    const slideIndex = (index + i) % SLIDES.length;
-    return { slide: SLIDES[slideIndex], slideIndex };
-  });
 
   return (
     <section
@@ -87,83 +65,14 @@ export function ImageSliderSection() {
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-hero-border bg-background-card/80 shadow-2xl z-20">
-          {/* Slider mit 3 gleichzeitigen Bildern */}
-          <div className="relative h-[260px] md:h-[320px] lg:h-[360px]">
-            <AnimatePresence initial={false} mode="wait">
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="absolute inset-0 flex items-stretch justify-center gap-2 md:gap-4 px-4 md:px-6"
-              >
-                {visibleSlides.map(({ slide, slideIndex }) => (
-                  <button
-                    key={slide.src}
-                    type="button"
-                    onClick={() => setLightboxIndex(slideIndex)}
-                    className="relative flex-1 group overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-gold/80"
-                    aria-label="Bild vergrößern"
-                  >
-                    <div className="relative h-full w-full">
-                      <Image
-                        src={slide.src}
-                        alt={slide.alt}
-                        fill
-                        className="object-cover"
-                        priority={false}
-                        sizes="(min-width: 1024px) 33vw, 100vw"
-                        quality={85}
-                      />
-                      {/* leichter Overlay für Hover-Effekt */}
-                      <div className="absolute inset-0 bg-emerald-950/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </button>
-                ))}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Navigation: Pfeile */}
-          <button
-            type="button"
-            onClick={() => goTo(index - 3)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-background-card border border-hero-border text-accent-gold hover:bg-background-card/80 transition-colors"
-            aria-label="Vorheriges Bild"
-          >
-            <ChevronLeft className="h-5 w-5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo(index + 3)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-background-card border border-hero-border text-accent-gold hover:bg-background-card/80 transition-colors"
-            aria-label="Nächstes Bild"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden />
-          </button>
-
-          {/* Dots */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-            {SLIDES.map((slide, i) => {
-              const isActive = i === index;
-              return (
-                <button
-                  key={slide.src}
-                  type="button"
-                  onClick={() => goTo(i)}
-                  className={[
-                    "h-2.5 w-2.5 rounded-full border border-accent-gold/70 transition-colors",
-                    isActive
-                      ? "bg-accent-gold"
-                      : "bg-background-card hover:bg-accent-gold/70",
-                  ].join(" ")}
-                  aria-label={`Bild ${i + 1} anzeigen`}
-                />
-              );
-            })}
-          </div>
+        {/* 3D Carousel */}
+        <div className="relative rounded-2xl bg-background-card/80 shadow-2xl z-20 p-8">
+          <ImageCarousel3D
+            images={SLIDES}
+            autoCarousel={true}
+            autoInterval={3000}
+            onImageClick={setLightboxIndex}
+          />
         </div>
       </div>
 

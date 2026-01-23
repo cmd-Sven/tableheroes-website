@@ -9,22 +9,22 @@ type GameItem = {
 };
 
 const GAME_SYSTEMS: GameItem[] = [
-  { name: "Dungeons & Dragons", logo: "/images/logos/dnd-logo.png" },
+  { name: "Dungeons & Dragons", logo: "/images/logos/dnd_logo.jpg" },
   { name: "Call of Cthulhu", logo: "/images/logos/cthulhu-logo.png" },
-  { name: "Pathfinder 2e", logo: "/images/logos/pathfinder2e-logo.png" },
-  { name: "Shadowrun", logo: "/images/logos/shadowrun-logo.png" },
+  { name: "Pathfinder 2e", logo: "/images/logos/pathfinder2-logo.jpg" },
+  { name: "Shadowrun", logo: "/images/logos/shadowrun-5-logo.png" },
   {
     name: "Vampire: The Masquerade",
-    logo: "/images/logos/vampire-masquerade-logo.png",
+    logo: "/images/logos/vampire-logo.jpg",
   },
-  { name: "Star Wars: Edge of the Empire", logo: "/images/logos/sw-edge-logo.png" },
+  { name: "Star Wars: Edge of the Empire", logo: "/images/logos/star_wars-logo.jpg" },
 ];
 
 const TOOLS: GameItem[] = [
-  { name: "Dungeon Alchemist", logo: "/images/logos/dungeon-alchemist.png" },
-  { name: "Inkarnate", logo: "/images/logos/inkarnate.png" },
-  { name: "Foundry VTT", logo: "/images/logos/foundry-logo.png" },
-  { name: "The Forge", logo: "/images/logos/the-forge.png" },
+  { name: "Dungeon Alchemist", logo: "/images/logos/DungeonAlchemist.webp" },
+  { name: "Inkarnate", logo: "/images/logos/inkarnate.webp" },
+  { name: "Foundry VTT", logo: "/images/logos/Foundry.png" },
+  { name: "The Forge", logo: "/images/logos/The Forge.webp" },
   { name: "Roll20", logo: "/images/logos/roll20-logo.png" },
 ];
 

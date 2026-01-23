@@ -7,6 +7,7 @@ import {
   CampaignListAnimation,
   type SessionTicket,
 } from "@/src/components/marketing/CampaignListAnimation";
+import { FireEffect } from "@/src/components/marketing/FireEffect";
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
 
@@ -233,6 +234,40 @@ export function ActiveCampaignsSection() {
         <CampaignListAnimation tickets={finalTickets} />
       </div>
 
+      {/* Vertikal zentrierte Wand-Fackeln links und rechts mit Feuer-Effekt */}
+      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 z-20 hidden lg:block">
+        <div className="relative">
+          <Image
+            src="/images/wall-torch.png"
+            alt=""
+            width={192}
+            height={384}
+            className="w-24 lg:w-48 xl:w-56 h-auto object-contain"
+            style={{ height: "auto" }}
+          />
+          {/* Feuer-Effekt - Positioniert bei ca. 10% von oben (Brennschale) */}
+          <div className="absolute top-[10%] left-0 right-0 -mt-24" style={{ height: "12em" }}>
+            <FireEffect />
+          </div>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 z-20 hidden lg:block">
+        <div className="relative">
+          <Image
+            src="/images/wall-torch.png"
+            alt=""
+            width={192}
+            height={384}
+            className="w-24 lg:w-48 xl:w-56 h-auto object-contain"
+            style={{ height: "auto" }}
+          />
+          {/* Feuer-Effekt - Positioniert bei ca. 10% von oben (Brennschale) */}
+          <div className="absolute top-[10%] left-0 right-0 -mt-24" style={{ height: "12em" }}>
+            <FireEffect />
+          </div>
+        </div>
+      </div>
+
       {/* Dekorative Eck-Grafiken: Skull in allen vier Ecken */}
       {/* Oben Links: Skull (horizontal und vertikal gespiegelt) */}
       <div className="pointer-events-none absolute top-0 left-0 z-30 hidden md:block">
@@ -349,6 +384,7 @@ export function ActiveCampaignsSection() {
             transform: translate3d(0, 0, 0) scale(0.95);
           }
         }
+
       `}</style>
     </section>
   );
