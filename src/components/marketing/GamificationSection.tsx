@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, Variants } from "framer-motion";
-import { Trophy, Coins, Gift } from "lucide-react";
+import Image from "next/image";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -70,14 +70,11 @@ export function GamificationSection() {
           >
             {/* Säule 1: Punkte sammeln */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -85,29 +82,35 @@ export function GamificationSection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <Coins className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/points-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Punkte für Präsenz
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Für jede Teilnahme an Spieleabenden – ob online oder vor Ort –
+                  sammelst du wertvolle Punkte. Je mehr du spielst, desto mehr
+                  Belohnungen warten auf dich.
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Punkte für Präsenz
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Für jede Teilnahme an Spieleabenden – ob online oder vor Ort –
-                sammelst du wertvolle Punkte. Je mehr du spielst, desto mehr
-                Belohnungen warten auf dich.
-              </p>
             </motion.div>
 
             {/* Säule 2: Achievements */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -115,29 +118,35 @@ export function GamificationSection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <Trophy className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/ehre-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Ruhm & Ehre
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Erreiche besondere Achievements für außergewöhnliche Aktionen
+                  oder langjährige Treue. Zeige deine Erfolge und werde zur
+                  Legende.
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Ruhm & Ehre
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Erreiche besondere Achievements für außergewöhnliche Aktionen
-                oder langjährige Treue. Zeige deine Erfolge und werde zur
-                Legende.
-              </p>
             </motion.div>
 
             {/* Säule 3: Goodies */}
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50/80 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
               variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -145,17 +154,26 @@ export function GamificationSection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <Gift className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/blackmarket-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Der Schwarzmarkt
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Tausche deine gesammelten Punkte gegen physische Goodies wie
+                  Würfel und Sticker oder digitale Pakete mit Maps und
+                  Abenteuer-PDFs.
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Der Schwarzmarkt
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Tausche deine gesammelten Punkte gegen physische Goodies wie
-                Würfel und Sticker oder digitale Pakete mit Maps und
-                Abenteuer-PDFs.
-              </p>
             </motion.div>
           </motion.div>
         </motion.div>

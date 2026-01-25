@@ -222,16 +222,37 @@ export function ActiveCampaignsSection() {
       }}
     >
       <div className="relative mx-auto max-w-6xl px-6 py-16">
-        <div className="text-center md:text-left">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block mt-8">
-            Aktuelle Runden in Osnabrück &amp; Online
-          </h2>
-          <p className="font-libre text-gray-200 leading-relaxed max-w-2xl">
-            Hier findest du unsere laufenden Abenteuer. Egal ob Anfänger oder Veteran – such dir einen Platz am Tisch.
-          </p>
+        <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
+          <div className="text-center md:text-left flex-1">
+            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block mt-8">
+              Aktuelle Runden in Osnabrück &amp; Online
+            </h2>
+            <p className="font-libre text-gray-200 leading-relaxed max-w-2xl">
+              Hier findest du unsere laufenden Abenteuer. Egal ob Anfänger oder Veteran – such dir einen Platz am Tisch.
+            </p>
+          </div>
+
+          {finalTickets.length === 0 && (
+            <div
+              className="px-8 py-4 text-center flex items-center justify-center flex-shrink-0"
+              style={{
+                backgroundImage: "url('/images/comingSoon-note.webp')",
+                backgroundSize: "100% 100%",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                borderRadius: "4px",
+                minHeight: "250px",
+                minWidth: "250px",
+              }}
+            >
+              <p className="font-libre text-slate-900">
+                Termine demnächst<br />verfügbar!
+              </p>
+            </div>
+          )}
         </div>
 
-        <CampaignListAnimation tickets={finalTickets} />
+        {finalTickets.length > 0 && <CampaignListAnimation tickets={finalTickets} />}
       </div>
 
       {/* Vertikal zentrierte Wand-Fackeln links und rechts mit Feuer-Effekt */}

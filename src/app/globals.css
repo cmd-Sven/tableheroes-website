@@ -101,3 +101,16 @@ body {
   backface-visibility: hidden;
   transform: rotateY(180deg);
 }
+
+/* Community Card with Wood Background */
+.community-card {
+  background-image: url('/images/card-bg-greenWood.webp');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: background-image 0.3s ease;
+}
+
+.community-card:hover {
+  background-image: url('/images/card-bg-greenWood-Hover.webp');
+}

@@ -75,7 +75,7 @@ export function SubNavbar({ activeContent, onContentChange }: SubNavbarProps) {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <div className="relative w-[180px] sm:w-[200px] md:w-[220px]">
+              <div className="relative w-[140px] sm:w-[160px] md:w-[180px]">
                 <Image
                   src="/images/button-green-wood.png"
                   alt=""
@@ -95,10 +95,10 @@ export function SubNavbar({ activeContent, onContentChange }: SubNavbarProps) {
                   style={{ height: "auto" }}
                 />
                 <span
-                  className={`absolute inset-0 flex items-center justify-center font-barlow font-bold uppercase tracking-wide text-xs sm:text-sm md:text-base ${
+                  className={`absolute inset-0 flex items-center justify-center font-barlow font-bold uppercase tracking-wide text-[10px] sm:text-xs md:text-sm ${
                     isActive ? "text-accent-gold" : "text-white"
                   }`}
-                  style={{ padding: "10px" }}
+                  style={{ padding: "8px" }}
                 >
                   {item.label}
                 </span>

@@ -1,9 +1,30 @@
 "use client";
 
-import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
-import { useRef } from "react";
+import { motion, useScroll, useTransform, useSpring, MotionValue, Variants } from "framer-motion";
+import { useRef, useState } from "react";
 import Image from "next/image";
-import { Calendar, Heart, MessageCircle } from "lucide-react";
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: "easeOut",
+    },
+  },
+};
 
 export function CommunitySection() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -116,15 +137,19 @@ export function CommunitySection() {
             ewig würfelst.
           </p>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
+          <motion.div
+            className="mt-8 grid gap-6 md:grid-cols-3"
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+          >
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
+              variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -132,28 +157,35 @@ export function CommunitySection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <Heart className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/party-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Regelmäßige Spielrunden und Events.
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Jede Woche mehrere Runden Pen & Paper. Für Neulinge, alte Hasen
+                  und Enthusiasten. Hier kommt jeder auf seine Kosten. Als
+                  Highlight haben wir auch besondere Runden zu Halloween oder
+                  anderen feierlichen Anlässen.
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Regelmäßige Spielrunden und Events.
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Jede Woche mehrere Runden Pen & Paper. Für Neulinge, alte Hasen
-                und Enthusiasten. Hier kommt jeder auf seine Kosten. Als
-                Highlight haben wir auch besondere Runden zu Halloween oder
-                anderen feierlichen Anlässen.
-              </p>
             </motion.div>
 
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
+              variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -161,28 +193,35 @@ export function CommunitySection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <Calendar className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/bogen-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Tutorials & One-Shots
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Erstmal rein schnuppern? Mit passenden Tutorial Runden bieten
+                  wir viel Infostoff über Discord oder regelmäßigen
+                  Online-Terminen wo du all Deine Fragen loswerden kannst. Du hast
+                  nicht viel Zeit? Dann probiere doch ein One Shot Abenteuer aus!
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Tutorials & One-Shots
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Erstmal rein schnuppern? Mit passenden Tutorial Runden bieten
-                wir viel Infostoff über Discord oder regelmäßigen
-                Online-Terminen wo du all Deine Fragen loswerden kannst. Du hast
-                nicht viel Zeit? Dann probiere doch ein One Shot Abenteuer aus!
-              </p>
             </motion.div>
 
             <motion.div
-              className="relative rounded-md border border-amber-700/50 bg-stone-50 p-6 shadow-lg cursor-pointer"
+              className="community-card relative cursor-pointer"
+              variants={itemVariants}
               whileHover={{
                 scale: 1.03,
                 y: -10,
-                boxShadow:
-                  "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
-                borderColor: "rgba(217, 119, 6, 0.8)",
               }}
               transition={{
                 type: "spring",
@@ -190,18 +229,27 @@ export function CommunitySection() {
                 damping: 20,
               }}
             >
-              <div className="mb-4 grid h-10 w-10 place-items-center rounded-md border border-amber-700/30 bg-amber-50">
-                <MessageCircle className="h-5 w-5 text-amber-800" aria-hidden />
+              <div className="p-10 relative">
+                <Image
+                  src="/images/icons/chat-icon.webp"
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
+                  style={{ height: "auto" }}
+                />
+                <div className="flex items-start gap-4 mb-4" style={{ marginLeft: "100px", marginTop: "10px" }}>
+                  <h3 className="font-cinzel font-bold text-xl text-white">
+                    Discord Community
+                  </h3>
+                </div>
+                <p className="font-libre text-white leading-relaxed">
+                  Finde Mitspieler, teile Builds und tausch dich über deine
+                  Lieblingssysteme aus. Auf unseren Discord findet ihr Infos und Links zu wichtigen Themen rund um Euer Spiel oder nehmt an unseren Diskussionen oder Text-Adventures teil!
+                </p>
               </div>
-              <h3 className="font-cinzel font-bold text-xl text-stone-900 mb-2">
-                Discord Community
-              </h3>
-              <p className="font-libre text-stone-700 leading-relaxed">
-                Finde Mitspieler, teile Builds und tausch dich über deine
-                Lieblingssysteme aus. Auf unseren Discord findet ihr Infos und Links zu wichtigen Themen rund um Euer Spiel oder nehmt an unseren Diskussionen oder Text-Adventures teil!
-              </p>
             </motion.div>
-          </div>
+          </motion.div>
         </motion.div>
       </div>
 

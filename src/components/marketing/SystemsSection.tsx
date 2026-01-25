@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 
 type GameItem = {
   name: string;
@@ -28,11 +28,36 @@ const TOOLS: GameItem[] = [
   { name: "Roll20", logo: "/images/logos/roll20-logo.png" },
 ];
 
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
+
 function ItemCard({ item }: { item: GameItem }) {
   const hasLogo = Boolean(item.logo);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-amber-700/50 bg-background-card/90 p-4 shadow-lg">
+    <motion.div
+      className="flex flex-col items-center justify-center gap-2 rounded-md border border-amber-700/50 bg-background-card/90 p-4 shadow-lg"
+      variants={itemVariants}
+    >
       {hasLogo ? (
         <div className="relative h-12 w-24 md:h-14 md:w-28 flex items-center justify-center">
           <Image
@@ -54,7 +79,7 @@ function ItemCard({ item }: { item: GameItem }) {
       <span className="font-libre text-xs md:text-sm text-gray-100 text-center">
         {item.name}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -83,11 +108,17 @@ export function SystemsSection() {
             <h3 className="font-cinzel text-xl font-bold mb-6 text-amber-500">
               Spielsysteme
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <motion.div
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+            >
               {GAME_SYSTEMS.map((item) => (
                 <ItemCard key={item.name} item={item} />
               ))}
-            </div>
+            </motion.div>
           </div>
 
           {/* Gruppe 2: Tools und Software */}
@@ -95,11 +126,17 @@ export function SystemsSection() {
             <h3 className="font-cinzel text-xl font-bold mb-6 text-amber-500">
               Tools und Software
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <motion.div
+              className="grid grid-cols-2 md:grid-cols-5 gap-4"
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+            >
               {TOOLS.map((item) => (
                 <ItemCard key={item.name} item={item} />
               ))}
-            </div>
+            </motion.div>
           </div>
         </motion.div>
       </div>
