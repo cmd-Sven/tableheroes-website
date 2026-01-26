@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { a } from "framer-motion/client";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -83,7 +82,7 @@ export function FaqSection() {
       }}
     >
       {/* Goldene, sich wiederholende Border oben */}
-      <div className="pointer-events-none absolute top-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{
@@ -96,15 +95,16 @@ export function FaqSection() {
       </div>
 
       <div className="relative mx-auto max-w-6xl px-6 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8">
+        <div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 text-center"
+          >
             Häufige Fragen
-          </h2>
+          </motion.h2>
 
           <div className="mt-8 space-y-3">
             {faqs.map((item, index) => (
@@ -121,11 +121,11 @@ export function FaqSection() {
             Du hast noch Fragen? Schreib uns – wir bauen TableHeroes gemeinsam
             mit der Community.
           </p>
-        </motion.div>
+        </div>
       </div>
 
       {/* Goldene, sich wiederholende Border unten */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{

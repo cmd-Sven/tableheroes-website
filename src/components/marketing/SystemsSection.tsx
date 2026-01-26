@@ -55,7 +55,10 @@ function ItemCard({ item }: { item: GameItem }) {
 
   return (
     <motion.div
-      className="flex flex-col items-center justify-center gap-2 rounded-md border border-amber-700/50 bg-background-card/90 p-4 shadow-lg"
+      className="flex flex-col items-center justify-center gap-2 rounded-md bg-background-card p-4 shadow-lg"
+      style={{
+        border: "3px solid rgba(139, 69, 19, 0.5)",
+      }}
       variants={itemVariants}
     >
       {hasLogo ? (
@@ -88,20 +91,33 @@ export function SystemsSection() {
     <section
       id="systems"
       className="relative scroll-mt-20 bg-background-dark"
+      style={{
+        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+      }}
     >
       <div className="mx-auto max-w-6xl px-6 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8">
+        <div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 text-center"
+          >
             Was und wie wir spielen
-          </h2>
-          <p className="font-libre text-gray-200 leading-relaxed mb-10">
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="font-libre text-gray-200 leading-relaxed mb-10 text-center max-w-3xl mx-auto"
+          >
             Systeme, Settings und Tools – so bringen wir unsere Abenteuer an den Tisch.
-          </p>
+          </motion.p>
 
           {/* Gruppe 1: Spielsysteme */}
           <div className="mb-10">
@@ -138,10 +154,10 @@ export function SystemsSection() {
               ))}
             </motion.div>
           </div>
-        </motion.div>
+        </div>
       </div>
       {/* Goldene, sich wiederholende Border zwischen Sektionen */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{

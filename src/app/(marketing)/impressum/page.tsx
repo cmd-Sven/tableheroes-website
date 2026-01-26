@@ -28,9 +28,9 @@ export default function ImpressumPage() {
               </h2>
               <p>
                 <strong>TableHeroes</strong><br />
-                Max Mustermann<br />
-                Musterstraße 123<br />
-                49074 Osnabrück
+                Sven Sieber<br />
+                Ostlandweg 16<br />
+                49009 Osnabrück
               </p>
             </section>
 
@@ -42,10 +42,10 @@ export default function ImpressumPage() {
               <p>
                 <strong>E-Mail:</strong>{" "}
                 <a
-                  href="mailto:kontakt@tableheroes.de"
+                  href="mailto:designer@sven-sieber.de"
                   className="text-hero-vibrant hover:text-accent-gold transition-colors"
                 >
-                  kontakt@tableheroes.de
+                  designer@sven-sieber.de
                 </a>
                 <br />
                 <strong>Discord:</strong>{" "}
@@ -66,9 +66,9 @@ export default function ImpressumPage() {
                 Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV
               </h2>
               <p>
-                Max Mustermann<br />
-                Musterstraße 123<br />
-                49074 Osnabrück
+                Sven Sieber<br />
+                Ostlandweg 16<br />
+                49009 Osnabrück
               </p>
             </section>
 
@@ -110,14 +110,6 @@ export default function ImpressumPage() {
               </p>
             </section>
 
-            {/* Hinweis */}
-            <section className="mt-12 p-6 rounded-md border border-accent-gold/30 bg-yellow-950/20">
-              <p className="text-sm text-gray-300">
-                <strong className="text-accent-gold">Hinweis:</strong> Dies ist ein Platzhalter-Impressum. 
-                Bitte ersetzen Sie die Angaben durch Ihre tatsächlichen Daten, bevor Sie die Website 
-                öffentlich betreiben.
-              </p>
-            </section>
           </div>
         </div>
       </div>

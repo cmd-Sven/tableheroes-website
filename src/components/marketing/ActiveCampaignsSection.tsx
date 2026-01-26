@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { supabase } from "@/src/lib/supabaseClient";
 import {
   CampaignListAnimation,
@@ -222,19 +223,31 @@ export function ActiveCampaignsSection() {
       }}
     >
       <div className="relative mx-auto max-w-6xl px-6 py-16">
-        <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
-          <div className="text-center md:text-left flex-1">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 inline-block mt-8">
+        <div className="flex flex-col items-center gap-6">
+          <div className="text-center w-full">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5 }}
+              className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block"
+            >
               Aktuelle Runden in Osnabrück &amp; Online
-            </h2>
-            <p className="font-libre text-gray-200 leading-relaxed max-w-2xl">
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="font-libre text-gray-200 leading-relaxed max-w-3xl mx-auto"
+            >
               Hier findest du unsere laufenden Abenteuer. Egal ob Anfänger oder Veteran – such dir einen Platz am Tisch.
-            </p>
+            </motion.p>
           </div>
 
           {finalTickets.length === 0 && (
             <div
-              className="px-8 py-4 text-center flex items-center justify-center flex-shrink-0"
+              className="px-8 py-4 text-center flex items-center justify-center"
               style={{
                 backgroundImage: "url('/images/comingSoon-note.webp')",
                 backgroundSize: "100% 100%",
@@ -358,7 +371,7 @@ export function ActiveCampaignsSection() {
       </div>
 
       {/* Goldene, sich wiederholende Border zwischen Sektionen */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{

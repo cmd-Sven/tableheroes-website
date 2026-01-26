@@ -38,15 +38,27 @@ export function ImageSliderSection() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   return (
-    <section
-      className="relative scroll-mt-20 bg-background-dark overflow-hidden"
-      style={{
-        backgroundImage: "url('/images/dragon-town.jpg')",
-        backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
-      }}
-    >
+    <section className="relative scroll-mt-20 bg-background-dark overflow-hidden">
+      {/* Hintergrundbild mit Ken Burns Effekt (langsames Hereinzoomen) */}
+      <motion.div
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: "url('/images/dragon-town.jpg')",
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+        }}
+        animate={{
+          scale: [1, 1.15],
+        }}
+        transition={{
+          duration: 30,
+          ease: "linear",
+          repeat: Infinity,
+          repeatType: "reverse",
+        }}
+      />
+      
       {/* Dunkle Maske über dem Hintergrundbild mit radialem Verlauf (Vignette) */}
       <div
         className="absolute inset-0 pointer-events-none z-0"
@@ -57,12 +69,24 @@ export function ImageSliderSection() {
       
       <div className="relative mx-auto max-w-6xl px-6 py-16 z-10">
         <div className="text-center mb-10">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block"
+          >
             Impressionen aus unseren Abenteuern
-          </h2>
-          <p className="font-libre text-gray-200 leading-relaxed max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="font-libre text-gray-200 leading-relaxed max-w-2xl mx-auto"
+          >
             Ein Blick hinter die Kulissen unserer Spielrunden und Community-Events.
-          </p>
+          </motion.p>
         </div>
 
         {/* 3D Carousel */}

@@ -121,21 +121,28 @@ export function CommunitySection() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="font-barlow font-semibold text-2xl text-white border-b border-hero-border pb-2 mb-4 mt-8">
+        <div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="font-barlow font-semibold text-2xl text-white border-b border-hero-border pb-2 mb-4 mt-8 text-center"
+          >
             Das Herz von TableHeroes: Unsere Community
-          </h2>
-          <p className="font-libre text-emerald-50 leading-relaxed">
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="font-libre text-emerald-50 leading-relaxed text-center max-w-3xl mx-auto"
+          >
             Bei uns geht es um Menschen, nicht um Plattformen. Wir treffen uns
             regelmäßig in Osnabrück, organisieren Events und tauschen uns auf
             Discord aus. Komm dazu – egal ob du neu im Hobby bist oder schon
             ewig würfelst.
-          </p>
+          </motion.p>
 
           <motion.div
             className="mt-8 grid gap-6 md:grid-cols-3"
@@ -250,11 +257,11 @@ export function CommunitySection() {
               </div>
             </motion.div>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Goldene, sich wiederholende Border zwischen Sektionen */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{

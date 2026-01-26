@@ -324,15 +324,15 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
                 />
               </motion.div>
 
-              <motion.div
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1, duration: 0.8, ease: "easeOut" }}
-                className="mt-3 font-barlow font-semibold uppercase tracking-[0.25em] text-white/80 text-xs md:text-sm"
+                className="mt-3 font-barlow font-extrabold text-3xl tracking-wide text-hero-vibrant"
                 style={{ willChange: "transform, opacity" }}
               >
                 Pen &amp; Paper Community Osnabrück, zu Tisch oder Online.
-              </motion.div>
+              </motion.h1>
 
               {/* Claim-Text direkt unter dem Untertitel, mittig und in Fließtext-Größe */}
               <p className="mt-4 font-libre text-gray-100 leading-relaxed text-sm md:text-base max-w-xl">

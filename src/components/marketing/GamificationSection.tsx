@@ -47,19 +47,26 @@ export function GamificationSection() {
       />
       
       <div className="relative mx-auto max-w-6xl px-6 z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 text-center md:text-left mt-8">
+        <div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 text-center"
+          >
             Deine Reise als Held
-          </h2>
-          <p className="font-libre text-gray-200 leading-relaxed text-center md:text-left max-w-3xl mb-8">
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="font-libre text-gray-200 leading-relaxed text-center max-w-3xl mx-auto mb-8"
+          >
             Bei TableHeroes zählt jede Aktion. Werde Teil der Legende und lass
             dich für dein Spiel belohnen.
-          </p>
+          </motion.p>
 
           <motion.div
             className="mt-8 grid gap-6 md:grid-cols-3"
@@ -176,11 +183,11 @@ export function GamificationSection() {
               </div>
             </motion.div>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Goldene, sich wiederholende Border zwischen Sektionen */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 z-20">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4" style={{ zIndex: 4 }}>
         <div
           className="w-full h-full"
           style={{

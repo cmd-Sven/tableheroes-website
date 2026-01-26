@@ -4,15 +4,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn } from "lucide-react";
 import { HeroButton } from "@/src/components/ui/HeroButton";
+import { FireEffect } from "@/src/components/marketing/FireEffect";
 
 export function Footer() {
   return (
-    <footer className="bg-background-dark border-t border-hero-border/30">
+    <div className="relative">
       {/* Top Section - Contact Banner */}
       <div
-        className="relative border-b border-hero-border/30 overflow-hidden"
+        className="relative overflow-visible"
         style={{
-          backgroundImage: "url('/images/contact_image.jpg')",
+          backgroundImage: "url('/images/nachthimmel-bg.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",
@@ -21,13 +22,14 @@ export function Footer() {
       >
         {/* Dunkler Overlay für bessere Lesbarkeit mit radialem Verlauf (Vignette) */}
         <div
-          className="absolute inset-0 pointer-events-none z-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background: "radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%)",
+            zIndex: 1,
           }}
         />
         
-        <div className="relative container mx-auto max-w-7xl px-6 py-12 z-10">
+        <div className="relative container mx-auto max-w-7xl px-6" style={{ zIndex: 10, paddingTop: "48px", paddingBottom: "348px" }}>
           <div className="flex flex-col items-center text-center gap-6">
             <div>
               <h2 className="font-barlow font-bold text-2xl uppercase text-white mb-2">
@@ -59,7 +61,36 @@ export function Footer() {
       </div>
 
       {/* Bottom Section - Navigation & Socials */}
-      <div className="container mx-auto max-w-7xl px-6 py-12">
+      <footer className="bg-[#051a02] relative" style={{ zIndex: 3 }}>
+        {/* Image Overlay - 90% in Kontakt-Sektion, 10% in Footer */}
+        {/* Bild am Anfang des Footers, mit translateY(-90%) verschoben */}
+        <div
+          className="absolute top-0 left-0 w-full pointer-events-none"
+          style={{
+            height: "650px",
+            transform: "translateY(-90%)",
+            zIndex: 5,
+            backgroundImage: "url('/images/camp-footer-top.png')",
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        >
+          {/* Feuer-Effekt auf dem Divider-Bild */}
+          <div
+            className="absolute top-1/2 pointer-events-none -ml-[110px] mt-[180px] opacity-90"
+            style={{
+              left: "83%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 6,
+            }}
+          >
+            <div className="scale-[1.2] origin-bottom">
+              <FireEffect />
+            </div>
+          </div>
+        </div>
+        <div className="container mx-auto max-w-7xl px-6 py-12 relative" style={{ zIndex: 10 }}>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Column 1 - Brand */}
           <div>
@@ -105,7 +136,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/login"
+                  href="/maintenance"
                   className="flex items-center gap-2 font-libre text-gray-400 text-sm hover:text-hero-vibrant transition-colors"
                 >
                   <LogIn className="h-4 w-4" />
@@ -176,14 +207,15 @@ export function Footer() {
         </div>
 
         {/* Copyright */}
-        <div className="mt-12 pt-8 border-t border-hero-border/20 text-center">
+        <div className="mt-12 pt-8 text-center">
           <p className="font-libre text-gray-500 text-sm">
             © <span suppressHydrationWarning>{new Date().getFullYear()}</span> TableHeroes — 
             Deine Pen &amp; Paper Community in Osnabrück
           </p>
         </div>
-      </div>
-    </footer>
+        </div>
+      </footer>
+    </div>
   );
 }
 
