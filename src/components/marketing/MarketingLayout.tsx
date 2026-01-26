@@ -12,6 +12,7 @@ import {
   Users,
   ArrowLeft,
   Trophy,
+  Images,
 } from "lucide-react";
 import { Footer } from "@/src/components/layout/Footer";
 
@@ -33,6 +34,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       { id: "features", label: "Plattform", Icon: Sparkles },
       { id: "gamification", label: "Deine Reise als Held", Icon: Trophy },
       { id: "systems", label: "Systeme", Icon: BookOpen },
+      { id: "impressions", label: "Impressionen", Icon: Images },
       { id: "faq", label: "FAQ", Icon: HelpCircle },
     ],
     []

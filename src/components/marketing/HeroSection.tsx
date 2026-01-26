@@ -272,7 +272,7 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
   return (
     <section
       id="hero"
-      className="relative h-[calc(60vh+100px)] md:h-[calc(80vh+100px)] flex items-center justify-center overflow-visible scroll-mt-20 isolate"
+      className="relative min-h-[calc(100vh+200px)] md:min-h-0 md:h-[calc(80vh+100px)] flex items-center justify-center overflow-visible scroll-mt-20 isolate"
       style={{ contain: "strict" }}
     >
       {/* Countdown oben mittig */}
@@ -297,53 +297,51 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5 }}
-          className="grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-center"
+          className="flex flex-col md:grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-center"
           style={{ willChange: "transform, opacity" }}
         >
-          <div>
-            {/* Logo + Untertitel Block */}
-            <div className="mb-6 flex flex-col items-center text-center">
-              <motion.div
-                initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="flex items-center justify-center"
-                style={{
-                  willChange: "transform, opacity",
-                  filter: "drop-shadow(0 0 15px rgba(255, 165, 0, 0.2))",
-                }}
-              >
-                <Image
-                  src="/images/tableHeroes-logo.png"
-                  alt="TableHeroes Logo"
-                  width={520}
-                  height={160}
-                  priority
-                  className="w-64 md:w-[500px] lg:w-[520px]"
-                  style={{ height: "auto" }}
-                />
-              </motion.div>
+          {/* Logo + Untertitel Block - Mobile: nach Countdown */}
+          <div className="flex flex-col items-center text-center order-2 md:order-1">
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="flex items-center justify-center"
+              style={{
+                willChange: "transform, opacity",
+                filter: "drop-shadow(0 0 15px rgba(255, 165, 0, 0.2))",
+              }}
+            >
+              <Image
+                src="/images/tableHeroes-logo.png"
+                alt="TableHeroes Logo"
+                width={520}
+                height={160}
+                priority
+                className="w-64 md:w-[500px] lg:w-[520px]"
+                style={{ height: "auto" }}
+              />
+            </motion.div>
 
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1, duration: 0.8, ease: "easeOut" }}
-                className="mt-3 font-barlow font-extrabold text-3xl tracking-wide text-hero-vibrant"
-                style={{ willChange: "transform, opacity" }}
-              >
-                Pen &amp; Paper Community Osnabrück, zu Tisch oder Online.
-              </motion.h1>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1, duration: 0.8, ease: "easeOut" }}
+              className="mt-3 font-barlow font-extrabold text-2xl md:text-3xl tracking-wide text-hero-vibrant"
+              style={{ willChange: "transform, opacity" }}
+            >
+              Pen &amp; Paper Community Osnabrück, zu Tisch oder Online.
+            </motion.h1>
 
-              {/* Claim-Text direkt unter dem Untertitel, mittig und in Fließtext-Größe */}
-              <p className="mt-4 font-libre text-gray-100 leading-relaxed text-sm md:text-base max-w-xl">
-                Wir bringen Spieler und Spielleiter zusammen. Digital organisiert, analog erlebt. Finde deine
-                Gruppe und werde Teil der TableHeroes-Gemeinschaft.
-              </p>
-            </div>
+            {/* Claim-Text direkt unter dem Untertitel, mittig und in Fließtext-Größe */}
+            <p className="mt-4 font-libre text-gray-100 leading-relaxed text-sm md:text-base max-w-xl">
+              Wir bringen Spieler und Spielleiter zusammen. Digital organisiert, analog erlebt. Finde deine
+              Gruppe und werde Teil der TableHeroes-Gemeinschaft.
+            </p>
           </div>
 
-          {/* Container für Pergament-Box und Feder */}
-          <div className="relative">
+          {/* Container für Pergament-Box und Feder - Mobile: nach H1/Text */}
+          <div className="relative order-3 md:order-2">
             <AnimatePresence mode="wait">
               <HeroContentBox key={heroContent} content={heroContent} />
             </AnimatePresence>
@@ -366,9 +364,9 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
               <Image
                 src="/images/feder-frei.png"
                 alt=""
-                width={64}
-                height={64}
-                className="w-12 h-auto object-contain"
+                width={90}
+                height={90}
+                className="w-[90px] h-auto object-contain"
                 style={{ height: "auto" }}
                 priority={false}
               />
@@ -523,7 +521,7 @@ function LaunchCountdown() {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2"
+      className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 w-full"
     >
       <div className="px-6 py-2 rounded-full bg-[#215210] shadow-[0_0_15px_rgba(57,255,20,0.4)]">
         <div className="flex items-center gap-3 font-mono font-bold text-base md:text-lg text-white tabular-nums">
@@ -586,7 +584,7 @@ function HeroContentBox({ content }: HeroContentBoxProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
       transition={{ duration: 0.4, ease: "easeInOut" }}
-      className="rounded-2xl shadow-2xl flex flex-col justify-center gap-4 w-full max-w-3xl min-h-[400px] py-16 px-12"
+      className="rounded-2xl shadow-2xl flex flex-col justify-center gap-4 w-full max-w-3xl min-h-[300px] md:min-h-[400px] py-12 px-8 md:py-16 md:px-12"
       style={{
         willChange: "transform, opacity",
         backgroundImage: "url('/images/scroll-paper.png')",

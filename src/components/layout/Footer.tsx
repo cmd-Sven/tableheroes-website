@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn } from "lucide-react";
 import { HeroButton } from "@/src/components/ui/HeroButton";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
+import { TwinklingStars } from "@/src/components/marketing/TwinklingStars";
 
 export function Footer() {
   return (
@@ -28,6 +29,9 @@ export function Footer() {
             zIndex: 1,
           }}
         />
+        
+        {/* Animierte glitzernde Sterne */}
+        <TwinklingStars />
         
         <div className="relative container mx-auto max-w-7xl px-6" style={{ zIndex: 10, paddingTop: "48px", paddingBottom: "348px" }}>
           <div className="flex flex-col items-center text-center gap-6">
@@ -76,9 +80,9 @@ export function Footer() {
             backgroundPosition: "center",
           }}
         >
-          {/* Feuer-Effekt auf dem Divider-Bild */}
+          {/* Feuer-Effekt auf dem Divider-Bild - nur Desktop */}
           <div
-            className="absolute top-1/2 pointer-events-none -ml-[110px] mt-[180px] opacity-90"
+            className="hidden md:block absolute top-1/2 pointer-events-none -ml-[110px] mt-[180px] opacity-90"
             style={{
               left: "83%",
               transform: "translate(-50%, -50%)",

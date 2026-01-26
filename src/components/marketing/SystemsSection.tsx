@@ -55,8 +55,9 @@ function ItemCard({ item }: { item: GameItem }) {
 
   return (
     <motion.div
-      className="flex flex-col items-center justify-center gap-2 rounded-md bg-background-card p-4 shadow-lg"
+      className="flex flex-col items-center justify-center gap-2 rounded-md p-4 shadow-lg"
       style={{
+        backgroundColor: "#132e1b",
         border: "3px solid rgba(139, 69, 19, 0.5)",
       }}
       variants={itemVariants}

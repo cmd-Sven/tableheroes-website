@@ -38,7 +38,7 @@ export function ImageSliderSection() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   return (
-    <section className="relative scroll-mt-20 bg-background-dark overflow-hidden">
+    <section id="impressions" className="relative scroll-mt-20 bg-background-dark overflow-hidden">
       {/* Hintergrundbild mit Ken Burns Effekt (langsames Hereinzoomen) */}
       <motion.div
         className="absolute inset-0 z-0"
