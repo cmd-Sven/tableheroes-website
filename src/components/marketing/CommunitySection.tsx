@@ -167,7 +167,7 @@ export function CommunitySection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/party-icon.webp"
-                  alt=""
+                  alt="Icon für Spielrunden und Events"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
@@ -203,7 +203,7 @@ export function CommunitySection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/bogen-icon.webp"
-                  alt=""
+                  alt="Icon für Kampagnen und Abenteuer"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
@@ -239,7 +239,7 @@ export function CommunitySection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/chat-icon.webp"
-                  alt=""
+                  alt="Icon für Community und Austausch"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"

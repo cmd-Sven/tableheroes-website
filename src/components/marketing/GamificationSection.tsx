@@ -92,7 +92,7 @@ export function GamificationSection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/points-icon.webp"
-                  alt=""
+                  alt="Icon für Punkte und Belohnungen"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
@@ -128,7 +128,7 @@ export function GamificationSection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/ehre-icon.webp"
-                  alt=""
+                  alt="Icon für Ruhm und Ehre"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"
@@ -164,7 +164,7 @@ export function GamificationSection() {
               <div className="p-10 relative">
                 <Image
                   src="/images/icons/blackmarket-icon.webp"
-                  alt=""
+                  alt="Icon für Marktplatz und Belohnungen"
                   width={120}
                   height={120}
                   className="absolute -top-5 -left-5 max-w-[120px] max-h-[120px] w-auto h-auto z-10"

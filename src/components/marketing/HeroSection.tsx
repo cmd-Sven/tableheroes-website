@@ -571,6 +571,7 @@ function HeroContentBox({ content }: HeroContentBoxProps) {
           title: "Das Abenteuer beginnt bald",
           text: "Registrierungen sind erst ab dem Launch-Tag möglich. Komm vorab auf unseren Discord!",
           additionalText: "Du willst nicht warten? Komm auf unseren Discord und tausche dich jetzt schon mit der Community aus!",
+          membershipNote: "Exklusiv für registrierte Mitglieder",
         };
     }
   };
@@ -606,6 +607,14 @@ function HeroContentBox({ content }: HeroContentBoxProps) {
         <div className="mt-3">
           <p className="font-libre text-slate-700 text-sm leading-relaxed drop-shadow-sm">
             {contentData.additionalText}
+          </p>
+        </div>
+      )}
+
+      {contentData.membershipNote && (
+        <div className="mt-4 pt-3 border-t border-slate-300/30">
+          <p className="font-barlow font-semibold text-slate-600 text-xs uppercase tracking-wide drop-shadow-sm">
+            {contentData.membershipNote}
           </p>
         </div>
       )}

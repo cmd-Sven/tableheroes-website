@@ -106,6 +106,21 @@ export function FaqSection() {
             Häufige Fragen
           </motion.h2>
 
+          {/* Membership-Hinweis */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mb-8 text-center"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-950/60 border border-accent-gold/40">
+              <span className="font-barlow font-semibold text-xs uppercase tracking-wide text-accent-gold">
+                Exklusiv für registrierte Mitglieder
+              </span>
+            </div>
+          </motion.div>
+
           <div className="mt-8 space-y-3">
             {faqs.map((item, index) => (
               <FaqItem

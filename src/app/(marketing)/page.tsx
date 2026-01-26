@@ -17,7 +17,7 @@ export default function MarketingLandingPage() {
   const [heroContent, setHeroContent] = useState<HeroContentType>("updates");
 
   return (
-    <>
+    <main>
       <HeroSection heroContent={heroContent} />
 
       {/* Sub-Navigation Bar */}
@@ -43,6 +43,6 @@ export default function MarketingLandingPage() {
 
       {/* FAQ */}
       <FaqSection />
-    </>
+    </main>
   );
 }
