@@ -13,7 +13,10 @@ import {
   ArrowLeft,
   Trophy,
   Images,
+  Menu,
+  X,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Footer } from "@/src/components/layout/Footer";
 
 type NavItem = {
@@ -41,6 +44,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
   );
 
   const [activeId, setActiveId] = useState<string>("hero");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     // Only setup ScrollSpy on Homepage
@@ -75,10 +79,96 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setIsMobileMenuOpen(false); // Menü schließen nach Klick
   }
 
   return (
     <div className="min-h-screen bg-background-dark">
+      {/* Mobile Burger Menu Button - nur auf Homepage */}
+      {isHomePage && (
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="fixed top-4 right-4 z-[60] md:hidden p-2 rounded-md border border-hero-border/40 bg-background-card text-gray-200 shadow-lg transition-colors hover:border-hero-vibrant hover:text-hero-vibrant"
+          aria-label="Menü öffnen"
+          aria-expanded={isMobileMenuOpen}
+        >
+          {isMobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
+      )}
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isHomePage && isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/80 z-[55] md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            
+            {/* Menu Panel */}
+            <motion.nav
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-64 bg-background-card border-l border-hero-border z-[60] md:hidden overflow-y-auto"
+              aria-label="Mobile Navigation"
+            >
+              <div className="p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="font-barlow font-bold text-lg uppercase text-hero-vibrant">
+                    Navigation
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1 rounded-md text-gray-400 hover:text-white transition-colors"
+                    aria-label="Menü schließen"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                <ul className="space-y-2">
+                  {items.map(({ id, label, Icon }) => {
+                    const isActive = activeId === id;
+                    return (
+                      <li key={id}>
+                        <button
+                          type="button"
+                          onClick={() => scrollTo(id)}
+                          className={[
+                            "w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors",
+                            isActive
+                              ? "bg-hero-dark/50 border border-hero-vibrant/40 text-hero-vibrant"
+                              : "text-gray-300 hover:bg-background-dark hover:text-hero-vibrant border border-transparent",
+                          ].join(" ")}
+                        >
+                          <Icon className="h-5 w-5 flex-shrink-0" aria-hidden />
+                          <span className="font-barlow font-semibold uppercase text-sm">
+                            {label}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Conditional Navigation: Anchor Links on Home, Back Button on Sub-Pages */}
       {isHomePage ? (
         /* Right-side vertical navigation (Home Page Only) */

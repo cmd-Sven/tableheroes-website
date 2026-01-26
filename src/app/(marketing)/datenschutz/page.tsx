@@ -57,16 +57,26 @@ export default function DatenschutzPage() {
               </p>
               <p className="mt-4">
                 <strong>TableHeroes</strong><br />
-                Max Mustermann<br />
-                Musterstraße 123<br />
-                49074 Osnabrück<br />
+                Sven Sieber<br />
+                Ostlandweg 16<br />
+                49009 Osnabrück<br />
                 <br />
                 E-Mail:{" "}
                 <a
-                  href="mailto:kontakt@tableheroes.de"
+                  href="mailto:designer@sven-sieber.de"
                   className="text-hero-vibrant hover:text-accent-gold transition-colors"
                 >
-                  kontakt@tableheroes.de
+                  designer@sven-sieber.de
+                </a>
+                <br />
+                Discord:{" "}
+                <a
+                  href="https://discord.gg/JzfXw9b7v7"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-hero-vibrant hover:text-accent-gold transition-colors"
+                >
+                  discord.gg/JzfXw9b7v7
                 </a>
               </p>
             </section>
@@ -166,10 +176,10 @@ export default function DatenschutzPage() {
               <p className="mt-4">
                 Zur Ausübung Ihrer Rechte wenden Sie sich bitte an:{" "}
                 <a
-                  href="mailto:kontakt@tableheroes.de"
+                  href="mailto:designer@sven-sieber.de"
                   className="text-hero-vibrant hover:text-accent-gold transition-colors"
                 >
-                  kontakt@tableheroes.de
+                  designer@sven-sieber.de
                 </a>
               </p>
             </section>
@@ -249,15 +259,6 @@ export default function DatenschutzPage() {
               </p>
             </section>
 
-            {/* Hinweis */}
-            <section className="mt-12 p-6 rounded-md border border-accent-gold/30 bg-yellow-950/20">
-              <p className="text-sm text-gray-300">
-                <strong className="text-accent-gold">Hinweis:</strong> Dies ist eine 
-                Platzhalter-Datenschutzerklärung. Bitte lassen Sie diese von einem Rechtsanwalt 
-                überprüfen und an Ihre spezifischen Gegebenheiten anpassen, bevor Sie die Website 
-                öffentlich betreiben.
-              </p>
-            </section>
           </div>
         </div>
       </div>
