@@ -1,5 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { getFactionById } from "../../../factions-actions";
+import { getFactionById, getFactions } from "../../../factions-actions";
+import { getAllLocations } from "../../../location-actions";
 import { redirect } from "next/navigation";
 import { FactionForm } from "@/src/components/dashboard/campaigns/factions/FactionForm";
 
@@ -58,28 +59,32 @@ export default async function FactionEditPage({ params }: Props) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
-  // 6. Load locations for dropdown
-  const { data: locationsRaw } = await (supabase.from("world_lore") as any)
-    .select("id, name, type")
-    .eq("campaign_id", campaignId)
-    .in("type", ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"])
-    .order("name", { ascending: true });
-
-  const locations = locationsRaw as { id: string; name: string | null; type: string | null }[] | null;
+  // 6. Load locations and factions
+  const locations: any[] = (await getAllLocations(campaignId)) || [];
+  const factions: any[] = (await getFactions(campaignId)) || [];
 
   // Transform locations to ensure no null values
-  const typedLocations = (locations || []).map(loc => ({
-    ...loc,
+  const typedLocations = locations.map((loc) => ({
+    id: loc.id,
     name: loc.name || "Unbenannter Ort",
-    type: loc.type || "Location"
+    type: loc.type || "Ort",
+  }));
+
+  // Transform factions
+  const typedFactions = factions.map((f) => ({
+    id: f.id,
+    name: f.name,
   }));
 
   return (
-    <FactionForm
-      campaignId={campaignId}
-      initialData={faction as any}
-      locations={typedLocations as any}
-    />
+    <div className="container mx-auto p-6">
+      <FactionForm
+        campaignId={campaignId}
+        initialData={faction as any}
+        locations={typedLocations}
+        factions={typedFactions}
+      />
+    </div>
   );
 }
 

@@ -98,33 +98,145 @@ export async function createNPC(formData: {
   });
 
   // 4. Validate location_ids exist if provided
+  // Rekursive Hilfsfunktion, um Parent-Orte zu validieren/erstellen
+  const validateOrCreateLocation = async (
+    locationId: string,
+    campaignId: string,
+    depth: number = 0
+  ): Promise<{ id: string; campaign_id: string }> => {
+    // Schutz vor Endlosschleifen
+    if (depth > 10) {
+      throw new Error("Zu viele verschachtelte Parent-Orte. Bitte prüfe die Hierarchie.");
+    }
+
+    // 4.a Primär: Versuch, den Ort aus der "locations"-Tabelle zu laden
+    const { data: location, error: locationError } = await (supabase.from("locations") as any)
+      .select("id, campaign_id, name")
+      .eq("id", locationId)
+      .maybeSingle();
+
+    if (location && location.campaign_id === campaignId) {
+      return location as { id: string; campaign_id: string };
+    }
+
+    // 4.b Fallback: Falls kein Eintrag in "locations" existiert, prüfe world_lore
+    const { data: lore, error: loreError } = await (supabase.from("world_lore") as any)
+      .select("id, campaign_id, name, type, description, parent_id")
+      .eq("id", locationId)
+      .maybeSingle();
+
+    if (!lore || lore.campaign_id !== campaignId) {
+      console.error(`❌ [validateOrCreateLocation] Location not found:`, {
+        locationId,
+        depth,
+        locationError,
+        loreError,
+        loreFound: !!lore,
+      });
+      throw new Error(`Der Ort mit der ID "${locationId}" existiert nicht in dieser Kampagne.`);
+    }
+
+    // 4.c Rekursiv: Validiere/Erstelle Parent-Ort, falls vorhanden
+    let validatedParentLocationId: string | null = null;
+    if (lore.parent_id) {
+      try {
+        const parentLocation = await validateOrCreateLocation(lore.parent_id, campaignId, depth + 1);
+        validatedParentLocationId = parentLocation.id;
+        console.log(`✅ [validateOrCreateLocation] Parent-Ort validiert/erstellt:`, {
+          parentId: validatedParentLocationId,
+          childId: locationId,
+          depth,
+        });
+      } catch (parentError) {
+        console.warn(`⚠️ [validateOrCreateLocation] Parent-Ort konnte nicht validiert werden:`, {
+          parentId: lore.parent_id,
+          childId: locationId,
+          error: parentError instanceof Error ? parentError.message : String(parentError),
+          depth,
+        });
+        // Setze parent_location_id auf null, um die Transaktion nicht abzubrechen
+        validatedParentLocationId = null;
+      }
+    }
+
+    // 4.d Erstelle Location-Eintrag aus world_lore
+    const { data: createdLocation, error: createError } = await (supabase.from("locations") as any)
+      .insert({
+        id: lore.id,
+        campaign_id: lore.campaign_id,
+        name: lore.name,
+        type: lore.type,
+        description: lore.description || null,
+        parent_location_id: validatedParentLocationId, // Verwende validierte Parent-ID oder null
+        lore_id: lore.id,
+      })
+      .select("id, campaign_id")
+      .single();
+
+    if (createError || !createdLocation) {
+      console.error(`❌ [validateOrCreateLocation] Failed to create locations entry:`, {
+        locationId,
+        parentLocationId: validatedParentLocationId,
+        createError,
+        depth,
+      });
+
+      // Prüfe, ob es ein Foreign-Key-Fehler ist (Parent-Problem)
+      if (createError?.code === "23503" || createError?.message?.includes("foreign key")) {
+        throw new Error(
+          `Der Ort "${lore.name}" oder sein übergeordneter Ort ist ungültig. Bitte prüfe die Orts-Hierarchie.`
+        );
+      }
+
+      throw new Error(
+        `Fehler beim Erstellen des Ortes "${lore.name}": ${createError?.message || "Unbekannter Fehler"}`
+      );
+    }
+
+    console.log(`✅ [validateOrCreateLocation] Location erstellt:`, {
+      locationId: createdLocation.id,
+      name: lore.name,
+      parentLocationId: validatedParentLocationId,
+      depth,
+    });
+
+    return createdLocation as { id: string; campaign_id: string };
+  };
+
   const validateLocation = async (locationId: string | null, fieldName: string): Promise<string | null> => {
     if (!locationId) return null;
 
-    const { data: location, error: locationError } = await (supabase.from("locations") as any)
-      .select("id, campaign_id")
-      .eq("id", locationId)
-      .single();
+    console.log("🔍 [createNPC] validateLocation input:", {
+      fieldName,
+      rawLocationId: locationId,
+    });
 
-    if (locationError || !location) {
-      console.error(`❌ [createNPC] Invalid ${fieldName}:`, {
+    try {
+      const effectiveLocation = await validateOrCreateLocation(locationId, formData.campaign_id, 0);
+
+      // Zusätzliche Validierung: Location muss zur gleichen Kampagne gehören
+      if (effectiveLocation.campaign_id !== formData.campaign_id) {
+        console.error(`❌ [createNPC] Location belongs to different campaign:`, {
+          locationCampaignId: effectiveLocation.campaign_id,
+          npcCampaignId: formData.campaign_id,
+        });
+        throw new Error(`Der ausgewählte Ort gehört zu einer anderen Kampagne.`);
+      }
+
+      console.log(`✅ [createNPC] ${fieldName} validated:`, effectiveLocation.id);
+      return effectiveLocation.id;
+    } catch (error) {
+      console.error(`❌ [createNPC] Location validation failed for ${fieldName}:`, {
         locationId,
-        error: locationError,
+        error: error instanceof Error ? error.message : String(error),
       });
-      throw new Error(`Ungültiger ${fieldName === "current_location_id" ? "Aufenthaltsort" : "Heimatort"} ausgewählt. Bitte wähle einen gültigen Ort aus der Liste.`);
-    }
 
-    // Zusätzliche Validierung: Location muss zur gleichen Kampagne gehören
-    if (location.campaign_id !== formData.campaign_id) {
-      console.error(`❌ [createNPC] Location belongs to different campaign:`, {
-        locationCampaignId: location.campaign_id,
-        npcCampaignId: formData.campaign_id,
-      });
-      throw new Error(`Der ausgewählte Ort gehört zu einer anderen Kampagne.`);
+      // Verbesserte Fehlermeldung
+      const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+      throw new Error(
+        `Ungültiger ${fieldName === "current_location_id" ? "Aufenthaltsort" : "Heimatort"}: ${errorMessage}`
+      );
     }
-
-    console.log(`✅ [createNPC] ${fieldName} validated:`, location.id);
-    return location.id;
   };
 
   const validatedCurrentLocationId = await validateLocation(normalizedCurrentLocationId, "current_location_id");
@@ -542,6 +654,76 @@ export async function toggleNPCReveal(npcId: string, currentState: boolean) {
 }
 
 // ============================================================================
+// Onboarding: Toggle allow_pc_onboarding (GM only)
+// Tabelle: npcs, Spalte: allow_pc_onboarding, ID: npcs.id
+// ============================================================================
+export async function updateNPCAllowPcOnboarding(npcId: string, allow: boolean) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: npc, error: fetchError } = await (supabase.from("npcs") as any)
+    .select("id, campaign_id, allow_pc_onboarding, campaigns!inner(gm_id)")
+    .eq("id", npcId)
+    .single();
+
+  if (fetchError) {
+    console.error("[updateNPCAllowPcOnboarding] Fetch npc error:", fetchError);
+    throw new Error("NPC nicht gefunden oder kein Zugriff.");
+  }
+  if (!npc) throw new Error("NPC nicht gefunden.");
+  const campaigns = (npc as any).campaigns;
+  if (!campaigns || campaigns.gm_id !== user.id) {
+    throw new Error("Nur der GM kann die Onboarding-Einstellung ändern.");
+  }
+
+  const { data: updated, error } = await (supabase.from("npcs") as any)
+    .update({ allow_pc_onboarding: allow })
+    .eq("id", npcId)
+    .select("id, allow_pc_onboarding")
+    .single();
+
+  if (error) {
+    console.error("[updateNPCAllowPcOnboarding] Update error:", error);
+    throw new Error(error.message || "Speichern fehlgeschlagen.");
+  }
+  if (!updated || (updated as any).allow_pc_onboarding !== allow) {
+    console.error("[updateNPCAllowPcOnboarding] Update nicht bestätigt:", { npcId, allow, updated });
+    throw new Error("Update konnte nicht bestätigt werden. Bitte Seite neu laden und erneut versuchen.");
+  }
+  revalidatePath(`/dashboard/campaigns/${(npc as any).campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${(npc as any).campaign_id}?tab=settings`);
+}
+
+// ============================================================================
+// Get NPCs by Faction for Onboarding (is_revealed OR allow_pc_onboarding)
+// ============================================================================
+export async function getNPCsByFactionForOnboarding(campaignId: string, factionId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: npcs, error } = await (supabase.from("npcs") as any)
+    .select("id, name, title, role")
+    .eq("campaign_id", campaignId)
+    .eq("faction_id", factionId)
+    .or("is_revealed.eq.true,allow_pc_onboarding.eq.true")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("getNPCsByFactionForOnboarding Error:", error);
+    return [];
+  }
+  return (npcs || []) as { id: string; name: string; title: string | null; role: string | null }[];
+}
+
+// ============================================================================
 // Get NPCs (with Faction Join, Quests, Favorites)
 // ============================================================================
 // ============================================================================
@@ -691,12 +873,19 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
     const activeQuests = getActiveQuests(npc);
     const hasActive = hasActiveQuest(npc);
 
+    // Questgeber: NPC hat mindestens eine aktive Quest als Geber (status = 'Active')
+    const activeQuestsAsGiver = questsAsGiver.filter((q: any) => q && q.status === "Active");
+    const hasActiveQuestAsGiver = activeQuestsAsGiver.length > 0;
+    const activeQuestTitlesAsGiver = activeQuestsAsGiver.map((q: any) => q.title).filter(Boolean) as string[];
+
     // Debug: Log processed quest data
     if (process.env.NODE_ENV === "development") {
       console.log(`🔍 [getNPCs] NPC ${npc.name} Processed:`, {
         activeQuestsCount: activeQuests.length,
         activeQuests,
         has_active_quest: hasActive,
+        has_active_quest_as_giver: hasActiveQuestAsGiver,
+        active_quest_titles_as_giver: activeQuestTitlesAsGiver,
       });
     }
 
@@ -705,6 +894,8 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
       is_favorite: favoriteIds.has(npc.id),
       active_quests: activeQuests,
       has_active_quest: hasActive,
+      has_active_quest_as_giver: hasActiveQuestAsGiver,
+      active_quest_titles_as_giver: activeQuestTitlesAsGiver,
       // Keep original quest data for debugging (with both naming conventions for compatibility)
       quests_as_giver: questsAsGiver, // Alias for consistency with frontend
       quests_as_participant: questsAsParticipant, // Alias for consistency with frontend

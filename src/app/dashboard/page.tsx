@@ -1,8 +1,44 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { Plus, Map as MapIcon, Search, Sword, Bell, UserPlus, AlertCircle, Users as UsersIcon } from "lucide-react";
+import {
+  Plus,
+  Map as MapIcon,
+  Bell,
+  UserPlus,
+  AlertCircle,
+  Users as UsersIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { AcceptanceNotification } from "./AcceptanceNotification";
 import { CampaignCard } from "@/src/components/dashboard/CampaignCard";
+import { getRankFromPoints } from "@/src/lib/utils/rank-utils";
+import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
+import {
+  getRandomLoreSnippet,
+  getDailyComic,
+} from "@/src/lib/actions/dashboard-widgets";
+import { getNewsForDashboard } from "@/src/lib/actions/news-actions";
+import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
+import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
+import type { InboxMessage } from "@/src/components/dashboard/MessageInbox";
+
+type UserProfile = {
+  username: string | null;
+  primary_role: string;
+  avatar_url?: string | null;
+  avatar_shape?: "circle" | "square" | null;
+  created_at?: string | null;
+  total_points?: number | null;
+  profile_background?: string | null;
+  profile_background_url?: string | null;
+  show_rank?: boolean | null;
+  show_points?: boolean | null;
+  profile_achievement_mode?: "newest" | "specific" | null;
+  selected_achievement_id?: string | null;
+  slogan?: string | null;
+  show_slogan?: boolean | null;
+  /** Altes Format: string[] (Reihenfolge), neues Format: { id, x_pos, y_pos, width }[] */
+  dashboard_layout?: unknown;
+  privacy_public_profile?: boolean | null;
+};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -12,39 +48,220 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  // Profil für Begrüßung und Rolle
   const { data: profileRaw } = await (supabase.from("users") as any)
-    .select("username, primary_role")
+    .select("*")
     .eq("id", user.id)
     .single();
 
-  // Typ-Sicherung gegen 'never' - Der 'unknown' Cast bricht die 'never' Vererbung auf
-  const profile = profileRaw as unknown as { 
-    username: string | null; 
-    primary_role: string; 
-  } | null;
-
+  const profile = profileRaw as unknown as UserProfile | null;
   const isGM =
     profile?.primary_role === "GameMaster" || profile?.primary_role === "Admin";
 
+  const totalPoints = Number(profile?.total_points) || 0;
+  const rank = (profile as any)?.current_rank ?? getRankFromPoints(totalPoints);
+  const favoriteAchievements: {
+    id: string;
+    name: string;
+    icon?: string | null;
+  }[] = [];
+
+  if (!isGM) {
+    const playerData = await loadPlayerDashboardData(user.id);
+    const achievementMode = profile?.profile_achievement_mode ?? "newest";
+    const favAchievementId = profile?.selected_achievement_id ?? null;
+    const favoriteAchievementsResolved =
+      achievementMode === "specific" && favAchievementId
+        ? playerData.achievements.filter((a) => a.id === favAchievementId)
+        : playerData.achievements.slice(0, 3);
+    const profileHeader = {
+      username:
+        (profile as { display_name?: string | null })?.display_name ??
+        profile?.username ??
+        null,
+      avatarUrl: profile?.avatar_url ?? null,
+      avatarShape: (profile?.avatar_shape as "circle" | "square") ?? "circle",
+      backgroundType: (profile?.profile_background_url ? "image" : "color") as
+        | "color"
+        | "image",
+      backgroundColor: profile?.profile_background ?? null,
+      backgroundImageUrl: profile?.profile_background_url ?? null,
+      memberSince: profile?.created_at ?? null,
+      rank,
+      totalPoints,
+      favoriteAchievements: favoriteAchievementsResolved,
+      showRank: profile?.show_rank ?? true,
+      showPoints: profile?.show_points ?? true,
+      slogan: profile?.slogan ?? null,
+      showSlogan: !!profile?.show_slogan,
+    };
+    return (
+      <div className="space-y-8">
+        <DashboardClient
+          profileHeader={profileHeader}
+          dashboardLayout={
+            Array.isArray(profile?.dashboard_layout)
+              ? (profile.dashboard_layout as
+                  | import("@/src/lib/utils/layout-engine").LayoutItem[]
+                  | string[])
+              : undefined
+          }
+          newAcceptances={playerData.newAcceptances}
+          totalPoints={playerData.totalPoints}
+          achievements={playerData.achievements}
+          membershipsWithGm={playerData.membershipsWithGm}
+          heroCharacters={playerData.heroCharacters}
+          inboxMessages={playerData.inboxMessages}
+          discoverableCampaigns={playerData.discoverableCampaigns}
+          randomLoreSnippet={playerData.randomLoreSnippet}
+          dailyComic={playerData.dailyComic}
+          dashboardNews={playerData.dashboardNews}
+          hasNewNews={playerData.hasNewNews}
+          hasNewAchievements={playerData.hasNewAchievements}
+          hasNewLore={playerData.hasNewLore}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
-          Willkommen zurück, {profile?.username || "Held"}
+          Willkommen zurück,{" "}
+          {(profile as { display_name?: string | null })?.display_name ||
+            profile?.username ||
+            "Abenteurer"}
         </h1>
         <p className="mt-2 font-libre text-gray-400">
-          {isGM
-            ? "Verwalte deine Welten und führe deine Spieler ins Abenteuer."
-            : "Bereit für das nächste Abenteuer? Hier findest du deine Gruppen."}
+          Verwalte deine Welten und führe deine Spieler ins Abenteuer.
         </p>
       </div>
-
-      {/* Content Area Based on Role */}
-      {isGM ? <GameMasterView userId={user.id} /> : <PlayerView userId={user.id} />}
+      <GameMasterView userId={user.id} />
     </div>
   );
+}
+
+async function loadPlayerDashboardData(userId: string) {
+  const supabase = await createClient();
+  let totalPoints = 0;
+  try {
+    const { data } = await (supabase.from("users") as any)
+      .select("total_points")
+      .eq("id", userId)
+      .single();
+    totalPoints = Number((data as any)?.total_points) || 0;
+  } catch {
+    totalPoints = 0;
+  }
+  const earnedAchievementsResult = await getUserAchievements(userId);
+  const achievements = earnedAchievementsResult.achievements.map((a) => ({
+    id: a.id,
+    name: a.name,
+    icon: a.image_url ?? null,
+    image_url: a.image_url ?? null,
+  }));
+  const hasNewAchievements = earnedAchievementsResult.hasNewContent;
+
+  const { data: membershipsRaw } = await (
+    supabase.from("campaign_members") as any
+  )
+    .select(
+      `
+      campaign_id,
+      status,
+      character_id,
+      campaigns ( id, name, system, banner_url, gm_id ),
+      characters ( id, name, class, race, level, avatar_url, status )
+    `
+    )
+    .eq("user_id", userId)
+    .eq("status", "Accepted");
+
+  const memberships = (membershipsRaw as any[]) || [];
+  const gmIds = [
+    ...new Set(memberships.map((m: any) => m.campaigns?.gm_id).filter(Boolean)),
+  ];
+  let gmById: Record<string, string> = {};
+  if (gmIds.length > 0) {
+    const { data: gmUsers } = await (supabase.from("users") as any)
+      .select("id, username")
+      .in("id", gmIds);
+    gmById = Object.fromEntries(
+      ((gmUsers as any[]) || []).map((u: any) => [
+        u.id,
+        u.username || "Spielleiter",
+      ])
+    );
+  }
+
+  const membershipsWithGm = memberships.map((m: any) => ({
+    campaign: m.campaigns,
+    character: m.characters
+      ? {
+          id: m.characters.id,
+          name: m.characters.name,
+          class: m.characters.class ?? "",
+          race: m.characters.race ?? "",
+          level: m.characters.level ?? 1,
+          avatar_url: m.characters.avatar_url ?? null,
+        }
+      : null,
+    gmName: m.campaigns?.gm_id
+      ? gmById[m.campaigns.gm_id] ?? "Spielleiter"
+      : "Spielleiter",
+  }));
+
+  const heroCharacters: HeroSliderCharacter[] = memberships
+    .filter((m: any) => m.characters?.name)
+    .map((m: any) => ({
+      id: m.characters.id,
+      name: m.characters.name,
+      class: m.characters.class ?? "",
+      race: m.characters.race ?? "",
+      level: m.characters.level ?? 1,
+      avatar_url: m.characters.avatar_url ?? null,
+      campaignId: m.campaigns.id,
+      campaignName: m.campaigns.name ?? "Kampagne",
+      status: (m.characters.status as string) ?? undefined,
+    }));
+
+  const inboxMessages: InboxMessage[] = [];
+
+  const { data: newAcceptancesRaw } = await (
+    supabase.from("campaign_members") as any
+  )
+    .select("id, campaign_id, campaigns!inner(id, name)")
+    .eq("user_id", userId)
+    .eq("status", "Accepted")
+    .eq("has_seen_acceptance", false);
+  const newAcceptances = ((newAcceptancesRaw as any[]) || []).map((a: any) => ({
+    id: a.id,
+    campaignId: a.campaigns.id,
+    campaignName: a.campaigns.name,
+  }));
+
+  const discoverableCampaigns = await getDiscoverableCampaigns();
+  const [loreResult, dailyComic, newsResult] = await Promise.all([
+    getRandomLoreSnippet(userId),
+    getDailyComic(),
+    getNewsForDashboard(userId),
+  ]);
+
+  return {
+    totalPoints,
+    achievements,
+    membershipsWithGm,
+    heroCharacters,
+    inboxMessages,
+    newAcceptances,
+    discoverableCampaigns,
+    randomLoreSnippet: loreResult.snippet,
+    dailyComic,
+    dashboardNews: newsResult.posts,
+    hasNewNews: newsResult.hasNewContent,
+    hasNewAchievements,
+    hasNewLore: loreResult.hasNewContent,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -64,17 +281,24 @@ async function GameMasterView({ userId }: { userId: string }) {
   const hasCampaigns = campaigns && campaigns.length > 0;
 
   // Fetch pending applications for GM's campaigns
-  const { data: pendingApplications } = await (supabase.from("campaign_members") as any)
-    .select(`
+  const { data: pendingApplications } = await (
+    supabase.from("campaign_members") as any
+  )
+    .select(
+      `
       id,
       campaign_id,
       campaigns!inner(id, name, gm_id)
-    `)
+    `
+    )
     .eq("campaigns.gm_id", userId)
     .eq("status", "Applied");
 
   // Group applications by campaign
-  const applicationsByCampaign = new Map<string, { id: string; name: string; count: number }>();
+  const applicationsByCampaign = new Map<
+    string,
+    { id: string; name: string; count: number }
+  >();
   if (pendingApplications) {
     pendingApplications.forEach((app: any) => {
       const campaign = app.campaigns;
@@ -101,7 +325,7 @@ async function GameMasterView({ userId }: { userId: string }) {
       {totalPendingCount > 0 && (
         <div className="rounded-lg border-l-4 border-l-yellow-500 bg-yellow-950/20 border border-yellow-900/50 p-6">
           <div className="flex items-start gap-4">
-            <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-yellow-900/50 border border-yellow-700">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-yellow-900/50 border border-yellow-700">
               <Bell className="h-5 w-5 text-yellow-400 animate-pulse" />
             </div>
             <div className="flex-1">
@@ -110,23 +334,36 @@ async function GameMasterView({ userId }: { userId: string }) {
                 Offene Bewerbungen
               </h3>
               <div className="space-y-2 mb-4">
-                {Array.from(applicationsByCampaign.values()).map((campaign: any) => (
-                  <p key={campaign.id} className="font-libre text-sm text-gray-200">
-                    Du hast <strong className="text-yellow-400">{campaign.count} neue {campaign.count === 1 ? 'Bewerbung' : 'Bewerbungen'}</strong> für <strong className="text-white">{campaign.name}</strong>.
-                  </p>
-                ))}
+                {Array.from(applicationsByCampaign.values()).map(
+                  (campaign: any) => (
+                    <p
+                      key={campaign.id}
+                      className="font-libre text-sm text-gray-200"
+                    >
+                      Du hast{" "}
+                      <strong className="text-yellow-400">
+                        {campaign.count} neue{" "}
+                        {campaign.count === 1 ? "Bewerbung" : "Bewerbungen"}
+                      </strong>{" "}
+                      für{" "}
+                      <strong className="text-white">{campaign.name}</strong>.
+                    </p>
+                  )
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {Array.from(applicationsByCampaign.values()).map((campaign: any) => (
-                  <Link
-                    key={campaign.id}
-                    href={`/dashboard/campaigns/${campaign.id}#members`}
-                    className="inline-flex items-center gap-2 rounded-md border border-yellow-700 bg-yellow-900/50 px-4 py-2 font-barlow font-bold uppercase text-xs text-yellow-400 hover:bg-yellow-900 transition-colors"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Zu {campaign.name}
-                  </Link>
-                ))}
+                {Array.from(applicationsByCampaign.values()).map(
+                  (campaign: any) => (
+                    <Link
+                      key={campaign.id}
+                      href={`/dashboard/campaigns/${campaign.id}#members`}
+                      className="inline-flex items-center gap-2 rounded-md border border-yellow-700 bg-yellow-900/50 px-4 py-2 font-barlow font-bold uppercase text-xs text-yellow-400 hover:bg-yellow-900 transition-colors"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Zu {campaign.name}
+                    </Link>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -174,8 +411,8 @@ async function GameMasterView({ userId }: { userId: string }) {
           Meine Spieler-Charaktere
         </h2>
         <p className="font-libre text-gray-400">
-          Auch Spielleiter sind manchmal Helden. (Hier erscheinen deine Charaktere
-          in anderen Runden).
+          Auch Spielleiter sind manchmal Helden. (Hier erscheinen deine
+          Charaktere in anderen Runden).
         </p>
       </div>
     </div>
@@ -198,297 +435,3 @@ async function getDiscoverableCampaigns() {
   const campaigns = (campaignsRaw as any[]) || [];
   return campaigns;
 }
-
-// ----------------------------------------------------------------------------
-// PLAYER VIEW
-// ----------------------------------------------------------------------------
-async function PlayerView({ userId }: { userId: string }) {
-  const supabase = await createClient();
-  
-  // Fetch campaigns joined as player with character info
-  const { data: membershipsRaw } = await (supabase.from("campaign_members") as any)
-    .select(`
-      campaign_id,
-      status,
-      character_id,
-      campaigns (
-        id,
-        name,
-        system,
-        banner_url
-      ),
-      characters (
-        id,
-        name,
-        class,
-        race,
-        level,
-        avatar_url,
-        status
-      )
-    `)
-    .eq("user_id", userId)
-    .eq("status", "Accepted");
-
-  // Expliziter Cast gegen 'never'
-  const memberships = (membershipsRaw as any[]) || [];
-
-  const hasMemberships = memberships && memberships.length > 0;
-
-  // Fetch new acceptances (unseen notifications)
-  const { data: newAcceptancesRaw } = await (supabase.from("campaign_members") as any)
-    .select(`
-      id,
-      campaign_id,
-      campaigns!inner(id, name)
-    `)
-    .eq("user_id", userId)
-    .eq("status", "Accepted")
-    .eq("has_seen_acceptance", false);
-
-  // Expliziter Cast gegen 'never'
-  const newAcceptances = (newAcceptancesRaw as any[]) || [];
-
-  // Fetch public campaigns for discovery
-  const discoverableCampaigns = await getDiscoverableCampaigns();
-
-  return (
-    <div className="space-y-8">
-      {/* Player Acceptance Notifications */}
-      {newAcceptances && newAcceptances.length > 0 && (
-        <div className="space-y-4">
-          {newAcceptances.map((acceptance: any) => (
-            <AcceptanceNotification
-              key={acceptance.id}
-              memberId={acceptance.id}
-              campaignId={acceptance.campaigns.id}
-              campaignName={acceptance.campaigns.name}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Scenario A: No Active Adventures (New User) */}
-      {!hasMemberships ? (
-        <>
-          <div>
-            <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2 mb-2">
-              Finde dein Abenteuer
-            </h2>
-            <p className="font-libre text-gray-400">
-              Entdecke laufende Runden und bewirb dich für die nächste Session.
-            </p>
-          </div>
-
-          {discoverableCampaigns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-16 text-center">
-              <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-background-dark border border-hero-border">
-                <Sword className="h-8 w-8 text-accent-gold" />
-              </div>
-              <h3 className="mb-2 font-cinzel font-bold text-xl text-white">
-                Noch keine offenen Runden
-              </h3>
-              <p className="max-w-sm font-libre text-gray-400">
-                Aktuell sind keine Kampagnen verfügbar. Schau später wieder vorbei!
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {discoverableCampaigns.map((campaign: any) => (
-                <CampaignTicketCard key={campaign.id} campaign={campaign} />
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          {/* Scenario B: User HAS active adventures */}
-          <div>
-            <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2">
-              Aktive Abenteuer
-            </h2>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {memberships.map((m: any) => {
-              const campaign = m.campaigns;
-              const character = m.characters;
-              
-              return (
-                <div
-                  key={campaign.id}
-                  className="rounded-md border border-hero-border bg-background-card p-6 shadow-lg hover:border-hero-vibrant transition-colors group"
-                >
-                  {/* Campaign Info */}
-                  <div className="mb-4">
-                    <h3 className="font-cinzel font-bold text-xl text-white mb-2 group-hover:text-accent-gold transition-colors">
-                      {campaign.name || "Unbenannt"}
-                    </h3>
-                    <p className="font-barlow font-bold text-gray-500 uppercase text-xs mb-2">
-                      {campaign.system || "System offen"}
-                    </p>
-                    <p className="font-libre text-xs text-gray-500 italic">
-                      Nächste Session: [Platzhalter]
-                    </p>
-                  </div>
-
-                  {/* Character Info */}
-                  <div className="pt-4 border-t border-hero-border/30">
-                    {character && character.name ? (
-                      <div className="flex items-start gap-3">
-                        {/* Avatar */}
-                        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                          {character.avatar_url ? (
-                            <img
-                              src={character.avatar_url}
-                              alt={character.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center bg-hero-dark text-white font-bold text-lg">
-                              {character.name[0]?.toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                        {/* Character Details */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-cinzel font-bold text-sm text-accent-gold mb-1">
-                            {character.name}
-                          </p>
-                          <p className="font-libre text-xs text-gray-400">
-                            Lvl {character.level || 1} • {character.race} • {character.class}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-hero-dark/50 border border-hero-border flex items-center justify-center">
-                          <Sword className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <p className="font-libre text-sm text-gray-500 italic">
-                          Charakter noch nicht erstellt
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Link */}
-                  <div className="mt-4 pt-4 border-t border-hero-border/30">
-                    <Link
-                      href={`/dashboard/campaigns/${campaign.id}`}
-                      className="text-sm font-barlow font-bold uppercase text-hero-vibrant hover:text-white transition-colors"
-                    >
-                      Zum Abenteuer &rarr;
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Other Running Campaigns Section (Below Active Adventures) */}
-          {discoverableCampaigns.length > 0 && (
-            <div className="mt-12">
-              <div className="mb-4">
-                <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2">
-                  Andere laufende Runden
-                </h2>
-                <p className="mt-2 font-libre text-sm text-gray-400">
-                  Entdecke weitere Abenteuer aus der Community.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {discoverableCampaigns.map((campaign: any) => (
-                  <CampaignTicketCard key={campaign.id} campaign={campaign} compact />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// CAMPAIGN TICKET CARD (Reusable Component)
-// ----------------------------------------------------------------------------
-function CampaignTicketCard({
-  campaign,
-  compact = false,
-}: {
-  campaign: {
-    id: string;
-    name: string;
-    system: string | null;
-    banner_url: string | null;
-    description: string | null;
-    mode: string | null;
-    frequency: string | null;
-  };
-  compact?: boolean;
-}) {
-  return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="group block overflow-hidden rounded-lg border border-hero-border bg-background-card shadow-lg transition-all hover:scale-[1.02] hover:border-hero-vibrant"
-    >
-      {/* Banner Image */}
-      <div
-        className={`relative overflow-hidden bg-gradient-to-br from-hero-dark to-background-dark ${
-          compact ? "h-32" : "h-48"
-        }`}
-        style={{
-          backgroundImage: campaign.banner_url
-            ? `url(${campaign.banner_url})`
-            : undefined,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/60 to-transparent" />
-        <div className="absolute top-3 left-3">
-          <span className="inline-block rounded bg-hero-dark/90 px-2 py-1 font-barlow font-bold uppercase text-xs text-white shadow-lg">
-            {campaign.system || "System"}
-          </span>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className={compact ? "p-4" : "p-6"}>
-        <h3
-          className={`font-cinzel font-bold ${
-            compact ? "text-lg" : "text-xl"
-          } text-accent-gold mb-2 group-hover:text-white transition-colors line-clamp-2`}
-        >
-          {campaign.name}
-        </h3>
-
-        {!compact && campaign.description && (
-          <p className="font-libre text-sm text-gray-400 leading-relaxed mb-4 line-clamp-2">
-            {campaign.description}
-          </p>
-        )}
-
-        {campaign.frequency && (
-          <p className="font-barlow text-xs text-gray-500 uppercase mb-4">
-            {campaign.frequency}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between">
-          <span className="font-barlow font-bold uppercase text-xs text-hero-vibrant group-hover:text-white transition-colors">
-            Ansehen &rarr;
-          </span>
-          {campaign.mode && (
-            <span className="rounded bg-background-dark px-2 py-1 font-barlow text-xs text-gray-500">
-              {campaign.mode}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-

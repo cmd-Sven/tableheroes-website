@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { Plus, Shield, Search, Filter, X } from "lucide-react";
 import { FactionGridCard } from "@/src/components/dashboard/FactionGridCard";
 import { FactionDetailModal } from "@/src/components/dashboard/FactionDetailModal";
-import { CreateFactionModal } from "@/src/components/dashboard/CreateFactionModal";
 import { deleteFaction, toggleFactionReveal } from "./factions-actions";
 import { VALID_FACTION_TYPES } from "@/src/lib/faction-types";
+import { HeroButton } from "@/src/components/ui/HeroButton";
 
 type Faction = {
   id: string;
@@ -36,15 +37,10 @@ type Props = {
 };
 
 export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Props) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [selectedFaction, setSelectedFaction] = useState<Faction | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-  };
 
   const handleDelete = async (faction: Faction) => {
     try {
@@ -111,13 +107,14 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
           Fraktionen ({factions.length})
         </h2>
         {isGM && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
+          <HeroButton
+            href={`/dashboard/campaigns/${campaignId}/factions/new`}
+            size="sm"
+            ariaLabel="Neue Fraktion erstellen"
+            className="button-glint"
           >
-            <Plus className="h-4 w-4" />
             Neue Fraktion
-          </button>
+          </HeroButton>
         )}
       </div>
 
@@ -223,13 +220,13 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
                   : "Der Spielleiter hat noch keine Fraktionen für dich sichtbar gemacht."}
               </p>
               {isGM && (
-                <button
-                  onClick={() => setIsModalOpen(true)}
+                <Link
+                  href={`/dashboard/campaigns/${campaignId}/factions/new`}
                   className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-white hover:bg-hero-dark transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Erste Fraktion erstellen
-                </button>
+                </Link>
               )}
             </>
           )}
@@ -249,16 +246,6 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
             />
           ))}
         </div>
-      )}
-
-      {/* Create Modal (GM Only) - Nur für Erstellen, nicht für Bearbeiten */}
-      {isGM && (
-        <CreateFactionModal
-          campaignId={campaignId}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          existingFaction={null}
-        />
       )}
 
       {/* Detail Modal */}

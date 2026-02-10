@@ -67,13 +67,12 @@ export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
   };
 
   return (
-    <div className={`ml-${depth * 4}`}>
+    <div className="ml-0">
       <article
-        className={`rounded-lg border bg-background-card p-4 transition-all mb-2 ${
-          lore.is_revealed
-            ? "border-hero-vibrant shadow-lg shadow-hero-vibrant/10"
-            : "border-hero-dark"
+        className={`gothic-dashboard-card p-4 transition-all mb-4 ${
+          lore.is_revealed ? "ring-1 ring-hero-vibrant/60" : ""
         }`}
+        style={{ marginLeft: depth * 16 }}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
@@ -94,8 +93,8 @@ export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <Book className="h-4 w-4 text-accent-gold flex-shrink-0" />
-                <h3 className="font-cinzel font-bold text-lg text-white truncate">
+                <Book className="h-4 w-4 text-accent-gold flex-shrink-0 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]" />
+                <h3 className="font-cinzel font-bold text-lg text-accent-gold truncate drop-shadow-[0_0_8px_rgba(0,0,0,0.9)]">
                   {lore.name}
                 </h3>
               </div>
@@ -119,7 +118,7 @@ export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
 
               {/* Description */}
               {lore.description && (
-                <p className="font-libre text-sm text-gray-300 leading-relaxed line-clamp-2">
+                <p className="font-libre text-sm text-emerald-50 leading-relaxed line-clamp-2 drop-shadow-[0_0_6px_rgba(0,0,0,0.9)]">
                   {lore.description}
                 </p>
               )}

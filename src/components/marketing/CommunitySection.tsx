@@ -122,15 +122,17 @@ export function CommunitySection() {
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-16">
         <div>
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.5 }}
-            className="font-barlow font-semibold text-2xl text-white border-b border-hero-border pb-2 mb-4 mt-8 text-center"
-          >
-            Das Herz von TableHeroes: Unsere Community
-          </motion.h2>
+          <div className="text-center">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5 }}
+              className="font-barlow font-semibold text-2xl text-white border-b border-hero-border pb-2 mb-4 mt-8 inline-block"
+            >
+              Das Herz von TableHeroes: Unsere Community
+            </motion.h2>
+          </div>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}

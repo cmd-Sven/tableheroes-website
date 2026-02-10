@@ -11,9 +11,13 @@ type Props = {
   factions: Array<{ id: string; name: string }>;
   locations: Array<{ id: string; name: string; type: string }>;
   world: any;
+  /** Vorbefüllung aus GM Inbox (Spieler-NPC-Wunsch) */
+  prefillName?: string;
+  prefillRole?: string;
+  prefillDescription?: string;
 };
 
-export function AIGenerationWizardEmbedded({ campaignId, factions, locations, world }: Props) {
+export function AIGenerationWizardEmbedded({ campaignId, factions, locations, world, prefillName, prefillRole, prefillDescription }: Props) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -64,6 +68,9 @@ export function AIGenerationWizardEmbedded({ campaignId, factions, locations, wo
               onClose={handleClose}
               onSuccess={handleSuccess}
               embedded={true}
+              prefillName={prefillName}
+              prefillRole={prefillRole}
+              prefillDescription={prefillDescription}
             />
           </div>
           {/* World Context Sidebar */}

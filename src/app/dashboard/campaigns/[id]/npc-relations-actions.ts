@@ -18,7 +18,7 @@ import { NarrativeHook } from "@/src/types/npc";
 export async function createNPCRelationFromHook(
   campaignId: string,
   sourceNpcId: string,
-  targetNpcId: string,
+  targetName: string, // Name des Hooks (z.B. "Sandra"), nicht mehr targetNpcId
   hook: NarrativeHook
 ) {
   const supabase = await createClient();
@@ -42,41 +42,93 @@ export async function createNPCRelationFromHook(
     throw new Error("Nur der GM kann NPC-Relationen anlegen.");
   }
 
-  // 3. Verifiziere, dass beide NPCs existieren
+  // 3. Verifiziere, dass der Source-NPC existiert
   const { data: sourceNPC } = await (supabase.from("npcs") as any)
     .select("id, campaign_id")
     .eq("id", sourceNpcId)
     .single();
 
-  const { data: targetNPC } = await (supabase.from("npcs") as any)
-    .select("id, campaign_id")
-    .eq("id", targetNpcId)
-    .single();
-
-  if (!sourceNPC || !targetNPC) {
-    throw new Error("Einer der NPCs existiert nicht.");
+  if (!sourceNPC) {
+    throw new Error("Der Source-NPC existiert nicht.");
   }
 
-  if (sourceNPC.campaign_id !== campaignId || targetNPC.campaign_id !== campaignId) {
-    throw new Error("NPCs gehören nicht zur gleichen Kampagne.");
+  if (sourceNPC.campaign_id !== campaignId) {
+    throw new Error("NPC gehört nicht zur gleichen Kampagne.");
   }
 
-  // 4. Erstelle Relation in npc_relations (ZWINGEND ERFORDERLICH)
-  // npc_id_1 = Ursprungs-NPC (z.B. Garrik), npc_id_2 = Neuer NPC (z.B. Kara)
+  // 4. Prüfe, ob Relation bereits existiert (Duplicate Check)
+  const { data: existingRelation } = await (supabase.from("npc_relations") as any)
+    .select("id, relation_type")
+    .eq("campaign_id", campaignId)
+    .eq("npc_id_1", sourceNpcId)
+    .eq("target_name", targetName.trim())
+    .eq("relation_type", hook.role)
+    .maybeSingle();
+
+  if (existingRelation) {
+    console.log("ℹ️ [createNPCRelationFromHook] Relation existiert bereits:", {
+      campaignId,
+      sourceNpcId,
+      targetName,
+      relationType: hook.role,
+    });
+
+    const { data: relation } = await (supabase.from("npc_relations") as any)
+      .select()
+      .eq("id", existingRelation.id)
+      .single();
+
+    return {
+      success: true,
+      alreadyExisted: true,
+      relation,
+    };
+  }
+
+  // 5. Erstelle Relation in npc_relations
+  // npc_id_1 = Ursprungs-NPC (z.B. Garrik), target_name = Name des Hooks (z.B. "Sandra")
   // WICHTIG: Hook-Löschung darf NUR nach erfolgreicher Relation-Erstellung erfolgen!
   try {
     const { error: relError, data: insertedRelation } = await (supabase.from("npc_relations") as any)
       .insert({
         campaign_id: campaignId, // WICHTIG: campaign_id muss explizit gesetzt werden
         npc_id_1: sourceNpcId,
-        npc_id_2: targetNpcId,
+        target_name: targetName.trim(),
         relation_type: hook.role,
         description: hook.description || null,
       })
       .select()
       .single();
 
+    // Error 23505 = Unique Constraint Violation (PostgreSQL)
     if (relError) {
+      // Prüfe auf Unique Constraint Violation
+      if (relError.code === "23505" || relError.message?.includes("unique constraint") || relError.message?.includes("duplicate key")) {
+        console.log("ℹ️ [createNPCRelationFromHook] Unique Constraint - Relation existiert bereits:", {
+          campaignId,
+          sourceNpcId,
+          targetName,
+          relationType: hook.role,
+        });
+
+        // Lade die existierende Relation
+        const { data: existing } = await (supabase.from("npc_relations") as any)
+          .select()
+          .eq("campaign_id", campaignId)
+          .eq("npc_id_1", sourceNpcId)
+          .eq("target_name", targetName.trim())
+          .eq("relation_type", hook.role)
+          .maybeSingle();
+
+        if (existing) {
+          return {
+            success: true,
+            alreadyExisted: true,
+            relation: existing,
+          };
+        }
+      }
+
       console.error("❌ [createNPCRelationFromHook] Relation Error:", relError);
       // FEHLER: Relation konnte nicht erstellt werden - Hook bleibt erhalten
       throw new Error(`Fehler beim Erstellen der Relation: ${relError.message}. Der Hook bleibt erhalten, damit Sie es erneut versuchen können.`);
@@ -90,11 +142,11 @@ export async function createNPCRelationFromHook(
       id: insertedRelation.id,
       campaign_id: insertedRelation.campaign_id,
       npc_id_1: insertedRelation.npc_id_1,
-      npc_id_2: insertedRelation.npc_id_2,
+      target_name: insertedRelation.target_name,
       relation_type: insertedRelation.relation_type,
     });
 
-    // 5. NUR WENN RELATION ERFOLGREICH: Entferne Hook aus narrative_hooks des Ursprungs-NPCs
+    // 6. NUR WENN RELATION ERFOLGREICH: Entferne Hook aus narrative_hooks des Ursprungs-NPCs
     const { data: npc } = await (supabase.from("npcs") as any)
       .select("narrative_hooks")
       .eq("id", sourceNpcId)
@@ -121,15 +173,20 @@ export async function createNPCRelationFromHook(
         console.warn("⚠️ Relation wurde erstellt, aber Hook konnte nicht entfernt werden:", updateError.message);
       }
     }
+
+    return {
+      success: true,
+      alreadyExisted: false,
+      relation: insertedRelation,
+    };
   } catch (error) {
     // Bei jedem Fehler: Hook bleibt erhalten, damit User es erneut versuchen kann
     console.error("❌ [createNPCRelationFromHook] Fehler:", error);
     throw error instanceof Error ? error : new Error("Unbekannter Fehler beim Erstellen der Relation.");
   }
 
-  // 6. Revalidate
+  // 7. Revalidate
   revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
-  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${targetNpcId}`);
 }
 
 // ============================================================================
@@ -147,51 +204,92 @@ export async function getNPCRelations(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Lade alle Relationen, bei denen die NPC-ID vorkommt (als npc_id_1 oder npc_id_2)
-  // Verwende separate Queries für bessere Kompatibilität
+  // 2. Lade alle Relationen, bei denen die NPC-ID als npc_id_1 ODER npc_id_2 vorkommt
+  // Nutze .or() für optimierte bidirektionale Abfrage
   const { data: relations, error } = await (supabase.from("npc_relations") as any)
-    .select("id, npc_id_1, npc_id_2, relation_type, description")
-    .or(`npc_id_1.eq.${npcId},npc_id_2.eq.${npcId}`)
-    .eq("campaign_id", campaignId);
+    .select("id, npc_id_1, target_name, relation_type, description, npc_id_2")
+    .eq("campaign_id", campaignId)
+    .or(`npc_id_1.eq.${npcId},npc_id_2.eq.${npcId}`);
 
   if (error) {
     console.error("❌ [getNPCRelations] Error:", error);
     throw new Error(`Fehler beim Laden der Relationen: ${error.message}`);
   }
 
-  // 3. Lade die Partner-NPCs separat
-  const partnerIds = new Set<string>();
-  (relations || []).forEach((rel: any) => {
-    if (rel.npc_id_1 === npcId) {
-      partnerIds.add(rel.npc_id_2);
-    } else {
-      partnerIds.add(rel.npc_id_1);
-    }
-  });
-
-  // Lade alle Partner-NPCs in einem Query
-  const { data: partnerNPCs } = await (supabase.from("npcs") as any)
-    .select("id, name")
-    .in("id", Array.from(partnerIds));
-
-  const partnerMap = new Map(
-    (partnerNPCs || []).map((npc: any) => [npc.id, npc.name])
+  // Entferne Duplikate basierend auf Relation-ID (falls vorhanden)
+  const uniqueRelations = Array.from(
+    new Map((relations || []).map((rel: any) => [rel.id, rel])).values()
   );
 
-  // 4. Normalisiere die Daten: Bestimme den Partner-NPC und die Relation aus Sicht des aktuellen NPCs
-  const normalizedRelations = (relations || []).map((rel: any) => {
-    const isNpc1 = rel.npc_id_1 === npcId;
-    const partnerId = isNpc1 ? rel.npc_id_2 : rel.npc_id_1;
-    const partnerName = partnerMap.get(partnerId) || "Unbekannt";
+  // 3. Normalisiere die Daten: Unterscheide zwischen target_name (Hook) und npc_id_2 (existierender NPC)
+  // PRIORITÄT: npc_id_2 (echter NPC) > target_name (Hook)
+  // Wenn beides vorhanden ist, zeige nur die echte NPC-Relation, nicht den Hook
+  const normalizedRelations = uniqueRelations.map((rel: any) => {
+    const isCurrentNpcNpc1 = rel.npc_id_1 === npcId;
+    
+    // PRIORITÄT: Falls npc_id_2 vorhanden ist, behandle als echte NPC-Relation (NICHT als Hook)
+    if (rel.npc_id_2) {
+      const partnerId = isCurrentNpcNpc1 ? rel.npc_id_2 : rel.npc_id_1;
+      return {
+        id: rel.id,
+        partnerId: partnerId,
+        partnerName: "Unbekannt", // Wird später geladen, falls nötig
+        relationType: rel.relation_type,
+        description: rel.description,
+        isHook: false, // Echter NPC, kein Hook
+      };
+    }
+    
+    // Nur wenn KEIN npc_id_2 vorhanden ist, nutze target_name als Hook
+    if (rel.target_name) {
+      return {
+        id: rel.id,
+        partnerId: null, // Hook hat noch keine NPC-ID
+        partnerName: rel.target_name,
+        relationType: rel.relation_type,
+        description: rel.description,
+        isHook: true, // Flag, um zu markieren, dass dies ein Hook ist
+      };
+    }
 
+    // Fallback: Wenn weder target_name noch npc_id_2 vorhanden
     return {
       id: rel.id,
-      partnerId,
-      partnerName,
+      partnerId: null,
+      partnerName: "Unbekannt",
       relationType: rel.relation_type,
       description: rel.description,
+      isHook: false,
     };
   });
+
+  // 4. Lade NPC-Daten (Name + Avatar) für Relationen mit npc_id_2 (falls vorhanden)
+  const relationsWithNpcId = normalizedRelations.filter((rel: any) => rel.partnerId && !rel.isHook);
+  if (relationsWithNpcId.length > 0) {
+    const partnerIds = relationsWithNpcId.map((rel: any) => rel.partnerId).filter(Boolean);
+    if (partnerIds.length > 0) {
+      const { data: partnerNPCs } = await (supabase.from("npcs") as any)
+        .select("id, name, image_url")
+        .in("id", partnerIds);
+
+      const partnerMap = new Map<string, { name: string; image_url: string | null }>(
+        (partnerNPCs || []).map((npc: any) => [npc.id, { name: npc.name, image_url: npc.image_url }])
+      );
+
+      // Aktualisiere die Namen und Avatare für Relationen mit npc_id_2
+      normalizedRelations.forEach((rel: any) => {
+        if (rel.partnerId && !rel.isHook) {
+          const partnerData = partnerMap.get(rel.partnerId);
+          if (partnerData) {
+            rel.partnerName = partnerData.name;
+            rel.partnerImageUrl = partnerData.image_url;
+          } else {
+            rel.partnerName = "Unbekannt";
+          }
+        }
+      });
+    }
+  }
 
   return normalizedRelations;
 }
@@ -232,13 +330,15 @@ export async function findNPCByName(
 
 // ============================================================================
 // Create NPC Relation manually (für "Heilung" fehlender Relationen)
+// Unterstützt jetzt sowohl targetNpcId (für existierende NPCs) als auch targetName (für Hooks)
 // ============================================================================
 export async function createNPCRelationManually(
   campaignId: string,
   sourceNpcId: string,
-  targetNpcId: string,
+  targetNpcId: string | null, // Optional: ID des Ziel-NPCs (wenn existierend)
   relationType: string,
-  description?: string | null
+  description?: string | null,
+  targetName?: string | null // Optional: Name des Hooks (wenn noch kein NPC existiert)
 ) {
   const supabase = await createClient();
 
@@ -261,89 +361,229 @@ export async function createNPCRelationManually(
     throw new Error("Nur der GM kann NPC-Relationen anlegen.");
   }
 
-  // 3. Verifiziere, dass beide NPCs existieren
+  // 3. Verifiziere, dass der Source-NPC existiert
   const { data: sourceNPC } = await (supabase.from("npcs") as any)
     .select("id, campaign_id")
     .eq("id", sourceNpcId)
     .single();
 
-  const { data: targetNPC } = await (supabase.from("npcs") as any)
-    .select("id, campaign_id")
-    .eq("id", targetNpcId)
-    .single();
-
-  if (!sourceNPC || !targetNPC) {
-    throw new Error("Einer der NPCs existiert nicht.");
+  if (!sourceNPC) {
+    throw new Error("Der Source-NPC existiert nicht.");
   }
 
-  if (sourceNPC.campaign_id !== campaignId || targetNPC.campaign_id !== campaignId) {
-    throw new Error("NPCs gehören nicht zur gleichen Kampagne.");
+  if (sourceNPC.campaign_id !== campaignId) {
+    throw new Error("NPC gehört nicht zur gleichen Kampagne.");
   }
 
-  // 4. Prüfe, ob Relation bereits existiert
-  const { data: existingRelation } = await (supabase.from("npc_relations") as any)
-    .select("id, relation_type")
-    .or(`and(npc_id_1.eq.${sourceNpcId},npc_id_2.eq.${targetNpcId}),and(npc_id_1.eq.${targetNpcId},npc_id_2.eq.${sourceNpcId})`)
-    .eq("campaign_id", campaignId)
-    .maybeSingle();
+  // 3a. SELBST-BEZIEHUNGS-CHECK: Verhindere, dass ein NPC mit sich selbst verknüpft wird
+  if (targetNpcId && targetNpcId === sourceNpcId) {
+    throw new Error("Ein NPC kann nicht mit sich selbst verknüpft werden.");
+  }
 
-  // Wenn Relation bereits existiert: Aktualisiere sie mit dem neuen Typ oder gib sie zurück
-  if (existingRelation) {
-    // Prüfe, ob der Typ sich geändert hat
-    if (existingRelation.relation_type !== relationType) {
-      // Aktualisiere die bestehende Relation
-      const { error: updateError, data: updatedRelation } = await (supabase.from("npc_relations") as any)
-        .update({
-          relation_type: relationType,
-          description: description || null,
-        })
-        .eq("id", existingRelation.id)
-        .select()
-        .single();
+  // 4. Bestimme, ob wir target_name oder targetNpcId verwenden
+  // Hinweis: Auch wenn ein targetNpcId gesetzt ist, wollen wir nach Möglichkeit IMMER ein target_name speichern,
+  // damit Datenmodelle mit NOT NULL auf target_name kompatibel bleiben. Daher nutzen wir den Namen des Ziel-NPCs als Fallback.
+  let targetNPC: { id: string; campaign_id: string; name?: string | null } | null = null;
+  const hasExplicitTargetName = !!(targetName && targetName.trim() !== "");
+  let finalTargetName: string | null = hasExplicitTargetName ? targetName!.trim() : null;
+  const useTargetName = !targetNpcId && !!finalTargetName;
 
-      if (updateError) {
-        console.error("❌ [createNPCRelationManually] Update Error:", updateError);
-        throw new Error(`Fehler beim Aktualisieren der Relation: ${updateError.message}`);
-      }
+  // 4a. Wenn targetNpcId vorhanden ist, verifiziere dass der Target-NPC existiert
+  if (targetNpcId && !useTargetName) {
+    const { data: targetNPCRaw } = await (supabase.from("npcs") as any)
+      .select("id, campaign_id, name")
+      .eq("id", targetNpcId)
+      .single();
 
-      // Revalidate
-      revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
-      revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${targetNpcId}`);
+    targetNPC = targetNPCRaw as { id: string; campaign_id: string; name?: string | null } | null;
 
-      return updatedRelation;
-    } else {
-      // Relation existiert bereits mit demselben Typ - gib sie still zurück
-      const { data: relation } = await (supabase.from("npc_relations") as any)
-        .select()
-        .eq("id", existingRelation.id)
-        .single();
+    if (!targetNPC) {
+      throw new Error("Der Target-NPC existiert nicht.");
+    }
 
-      return relation;
+    if (targetNPC.campaign_id !== campaignId) {
+      throw new Error("NPCs gehören nicht zur gleichen Kampagne.");
+    }
+
+    // Fallback: Wenn kein expliziter targetName übergeben wurde, nutze den Namen des Ziel-NPCs
+    if (!finalTargetName && targetNPC.name && targetNPC.name.trim() !== "") {
+      finalTargetName = targetNPC.name.trim();
     }
   }
 
-  // 5. Erstelle neue Relation
+  // 5. Prüfe, ob Relation bereits existiert
+  let existingRelation: any = null;
+  
+  if (useTargetName) {
+    // Suche nach Relation mit target_name
+    const { data: existing } = await (supabase.from("npc_relations") as any)
+      .select("id, relation_type")
+      .eq("campaign_id", campaignId)
+      .eq("npc_id_1", sourceNpcId)
+      .eq("target_name", finalTargetName)
+      .eq("relation_type", relationType)
+      .maybeSingle();
+    
+    existingRelation = existing;
+  } else if (targetNpcId) {
+    // Legacy: Suche nach Relation mit npc_id_2 (falls das Feld noch existiert)
+    // Falls nicht, wird diese Query fehlschlagen, aber wir fangen es ab
+    try {
+      const { data: existing } = await (supabase.from("npc_relations") as any)
+        .select("id, relation_type")
+        .eq("campaign_id", campaignId)
+        .eq("npc_id_1", sourceNpcId)
+        .eq("npc_id_2", targetNpcId)
+        .eq("relation_type", relationType)
+        .maybeSingle();
+      
+      existingRelation = existing;
+    } catch (error) {
+      // Falls npc_id_2 nicht mehr existiert, ignorieren wir diesen Check
+      console.warn("⚠️ [createNPCRelationManually] npc_id_2 field may not exist, skipping duplicate check");
+    }
+  }
+
+  // 5a. Falls bereits eine Relation mit GLEICHEM Typ existiert → nichts neu anlegen
+  if (existingRelation && existingRelation.relation_type === relationType) {
+    const { data: relation } = await (supabase.from("npc_relations") as any)
+      .select()
+      .eq("id", existingRelation.id)
+      .single();
+
+    console.log("ℹ️ [createNPCRelationManually] Relation existiert bereits, kein neuer Eintrag nötig:", {
+      campaignId,
+      sourceNpcId,
+      targetNpcId,
+      targetName: finalTargetName,
+      relationType,
+    });
+
+    return {
+      success: true,
+      alreadyExisted: true,
+      relation,
+    };
+  }
+
+  // 5b. Falls Relation existiert, aber mit anderem Typ → aktualisieren
+  if (existingRelation && existingRelation.relation_type !== relationType) {
+    const { error: updateError, data: updatedRelation } = await (supabase.from("npc_relations") as any)
+      .update({
+        relation_type: relationType,
+        description: description || null,
+      })
+      .eq("id", existingRelation.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("❌ [createNPCRelationManually] Update Error:", updateError);
+      throw new Error(`Fehler beim Aktualisieren der Relation: ${updateError.message}`);
+    }
+
+    // Revalidate
+    revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
+    if (targetNpcId) {
+      revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${targetNpcId}`);
+    }
+
+    return {
+      success: true,
+      alreadyExisted: false,
+      relation: updatedRelation,
+    };
+  }
+
+  // 6. Erstelle neue Relation
+  const insertPayload: any = {
+    campaign_id: campaignId,
+    npc_id_1: sourceNpcId,
+    relation_type: relationType,
+    description: description || null,
+  };
+
+  // Wenn wir einen Namen haben (explizit oder über den Ziel-NPC), setzen wir target_name IMMER,
+  // damit NOT-NULL-Constraints auf der Spalte nicht verletzt werden.
+  if (finalTargetName && finalTargetName.trim() !== "") {
+    insertPayload.target_name = finalTargetName.trim();
+  }
+
+  if (targetNpcId) {
+    // Legacy-Feld: npc_id_2, falls im Schema noch vorhanden
+    insertPayload.npc_id_2 = targetNpcId;
+  } else if (!finalTargetName) {
+    // Weder NPC-ID noch Name vorhanden -> unvollständige Daten
+    throw new Error("Entweder ein Ziel-NPC oder ein Zielname (target_name) muss angegeben werden.");
+  }
+
   const { error: relError, data: insertedRelation } = await (supabase.from("npc_relations") as any)
-    .insert({
-      campaign_id: campaignId,
-      npc_id_1: sourceNpcId,
-      npc_id_2: targetNpcId,
-      relation_type: relationType,
-      description: description || null,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
+  // Error 23505 = Unique Constraint Violation (PostgreSQL)
   if (relError) {
+    // Prüfe auf Unique Constraint Violation
+    if (relError.code === "23505" || relError.message?.includes("unique constraint") || relError.message?.includes("duplicate key")) {
+      console.log("ℹ️ [createNPCRelationManually] Unique Constraint - Relation existiert bereits:", {
+        campaignId,
+        sourceNpcId,
+        targetNpcId,
+        targetName: finalTargetName,
+        relationType,
+      });
+
+      // Lade die existierende Relation
+      let existing: any = null;
+      if (useTargetName) {
+        const { data } = await (supabase.from("npc_relations") as any)
+          .select()
+          .eq("campaign_id", campaignId)
+          .eq("npc_id_1", sourceNpcId)
+          .eq("target_name", finalTargetName)
+          .eq("relation_type", relationType)
+          .maybeSingle();
+        existing = data;
+      } else if (targetNpcId) {
+        try {
+          const { data } = await (supabase.from("npc_relations") as any)
+            .select()
+            .eq("campaign_id", campaignId)
+            .eq("npc_id_1", sourceNpcId)
+            .eq("npc_id_2", targetNpcId)
+            .eq("relation_type", relationType)
+            .maybeSingle();
+          existing = data;
+        } catch (error) {
+          // Ignoriere Fehler, falls npc_id_2 nicht existiert
+        }
+      }
+
+      if (existing) {
+        return {
+          success: true,
+          alreadyExisted: true,
+          relation: existing,
+        };
+      }
+    }
+
     console.error("❌ [createNPCRelationManually] Relation Error:", relError);
     throw new Error(`Fehler beim Erstellen der Relation: ${relError.message}`);
   }
 
-  // 6. Revalidate
+  // 7. Revalidate
   revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
-  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${targetNpcId}`);
+  if (targetNpcId) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${targetNpcId}`);
+  }
 
-  return insertedRelation;
+  return {
+    success: true,
+    alreadyExisted: false,
+    relation: insertedRelation,
+  };
 }
 
 // ============================================================================
@@ -412,7 +652,7 @@ export async function deleteNPCRelation(
 
   // 2. Lade Relation, um Kampagne & beteiligte NPCs zu kennen
   const { data: relation, error: loadError } = await (supabase.from("npc_relations") as any)
-    .select("id, campaign_id, npc_id_1, npc_id_2")
+    .select("id, campaign_id, npc_id_1, target_name, npc_id_2")
     .eq("id", relationId)
     .single();
 
@@ -448,15 +688,19 @@ export async function deleteNPCRelation(
     throw new Error(`Fehler beim Löschen der Relation: ${deleteError.message}`);
   }
 
-  // 5. Revalidate beide beteiligten NPC-Seiten
+  // 5. Revalidate beteiligte NPC-Seite (nur npc_id_1, da target_name kein NPC ist)
   revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${relation.npc_id_1}`);
-  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${relation.npc_id_2}`);
+  // Legacy: Falls npc_id_2 noch existiert, revalidate auch diese Seite
+  if (relation.npc_id_2) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${relation.npc_id_2}`);
+  }
 
   return true;
 }
 
 // ============================================================================
-// Check if relation exists between two NPCs
+// Check if relation exists between two NPCs (für existierende NPCs)
+// Prüft beide Richtungen: npc_id_1 -> npc_id_2 und npc_id_2 -> npc_id_1
 // ============================================================================
 export async function checkNPCRelationExists(
   campaignId: string,
@@ -471,15 +715,81 @@ export async function checkNPCRelationExists(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Prüfe beide Richtungen (npc_id_1/npc_id_2 und umgekehrt)
+  // 2. Prüfe, ob Relation existiert (beide Richtungen: npc_id_1 -> npc_id_2 und npc_id_2 -> npc_id_1)
+  try {
+    // Richtung 1: npc_id_1 = npcId1, npc_id_2 = npcId2
+    const { data: relation1, error: error1 } = await (supabase.from("npc_relations") as any)
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("npc_id_1", npcId1)
+      .eq("npc_id_2", npcId2)
+      .maybeSingle();
+
+    if (relation1) {
+      return true;
+    }
+
+    // Richtung 2: npc_id_1 = npcId2, npc_id_2 = npcId1 (Symmetrie)
+    const { data: relation2, error: error2 } = await (supabase.from("npc_relations") as any)
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("npc_id_1", npcId2)
+      .eq("npc_id_2", npcId1)
+      .maybeSingle();
+
+    if (relation2) {
+      return true;
+    }
+
+    // Prüfe auf Fehler (nur wenn beide Queries fehlschlagen)
+    if (error1 && error2) {
+      // Falls npc_id_2 nicht mehr existiert, gibt es keinen Fehler, sondern einfach kein Ergebnis
+      if (
+        (error1.code === "42703" || error1.message?.includes("column") || error1.message?.includes("does not exist")) &&
+        (error2.code === "42703" || error2.message?.includes("column") || error2.message?.includes("does not exist"))
+      ) {
+        console.warn("⚠️ [checkNPCRelationExists] npc_id_2 field may not exist, returning false");
+        return false;
+      }
+      console.error("❌ [checkNPCRelationExists] Error:", error1 || error2);
+      return false;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("❌ [checkNPCRelationExists] Error:", error);
+    return false;
+  }
+}
+
+// ============================================================================
+// Check if hook relation exists (für Hooks mit target_name)
+// ============================================================================
+export async function checkNPCHookRelationExists(
+  campaignId: string,
+  npcId: string,
+  targetName: string,
+  relationType: string
+): Promise<boolean> {
+  const supabase = await createClient();
+
+  // 1. Auth Check
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  // 2. Prüfe, ob Hook-Relation existiert
   const { data: relation, error } = await (supabase.from("npc_relations") as any)
     .select("id")
-    .or(`and(npc_id_1.eq.${npcId1},npc_id_2.eq.${npcId2}),and(npc_id_1.eq.${npcId2},npc_id_2.eq.${npcId1})`)
     .eq("campaign_id", campaignId)
+    .eq("npc_id_1", npcId)
+    .eq("target_name", targetName.trim())
+    .eq("relation_type", relationType)
     .maybeSingle();
 
   if (error) {
-    console.error("❌ [checkNPCRelationExists] Error:", error);
+    console.error("❌ [checkNPCHookRelationExists] Error:", error);
     return false;
   }
 
@@ -781,3 +1091,293 @@ export async function suggestInferenceRelationsForTarget(
   return uniqueSuggestions;
 }
 
+// ============================================================================
+// Promote Hook to Full NPC
+// ============================================================================
+/**
+ * Wandelt einen Text-Hook (target_name) in einen vollwertigen NPC um.
+ * 
+ * Ablauf:
+ * 1. Erstellt den neuen NPC in der Tabelle `npcs`
+ * 2. Findet alle Relationen mit `target_name` = hookName und `npc_id_1` = sourceNpcId
+ * 3. Aktualisiert diese Relationen: Setzt `npc_id_2` auf die neue NPC-ID
+ * 4. Entfernt `target_name` aus den Relationen (optional, kann als Fallback behalten werden)
+ */
+export async function promoteHookToNPC(
+  campaignId: string,
+  sourceNpcId: string,
+  hookName: string,
+  npcData: {
+    name: string;
+    title?: string;
+    description?: string;
+    race?: string;
+    role?: string;
+    status?: string;
+    alignment?: string;
+    appearance?: string;
+    personality_traits?: string;
+    gm_notes?: string;
+    faction_id?: string | null;
+    current_location_id?: string | null;
+    home_location_id?: string | null;
+    is_revealed?: boolean;
+    image_url?: string;
+  }
+) {
+  const supabase = await createClient();
+
+  // 1. Auth Check
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  // 2. GM Check
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann Hooks zu NPCs umwandeln.");
+  }
+
+  // 3. Verifiziere, dass der Source-NPC existiert
+  const { data: sourceNPC } = await (supabase.from("npcs") as any)
+    .select("id, campaign_id, name")
+    .eq("id", sourceNpcId)
+    .single();
+
+  if (!sourceNPC) {
+    throw new Error("Der Source-NPC existiert nicht.");
+  }
+
+  if (sourceNPC.campaign_id !== campaignId) {
+    throw new Error("NPC gehört nicht zur gleichen Kampagne.");
+  }
+
+  // 4. Prüfe, ob bereits ein NPC mit diesem Namen existiert
+  const { data: existingNPC } = await (supabase.from("npcs") as any)
+    .select("id, name")
+    .eq("campaign_id", campaignId)
+    .ilike("name", npcData.name.trim())
+    .maybeSingle();
+
+  if (existingNPC) {
+    throw new Error(`Ein NPC mit dem Namen "${npcData.name}" existiert bereits in dieser Kampagne.`);
+  }
+
+  // 5. Get world_id for this campaign
+  const { data: world } = await (supabase.from("worlds") as any)
+    .select("id")
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (!world) {
+    throw new Error("Für diese Kampagne existiert noch keine Welt. Bitte erstelle zuerst eine Welt.");
+  }
+
+  // 6. Erstelle den neuen NPC
+  const { error: createError, data: createdNPC } = await (supabase.from("npcs") as any)
+    .insert({
+      campaign_id: campaignId,
+      world_id: world.id,
+      name: npcData.name.trim(),
+      title: npcData.title || null,
+      description: npcData.description || null,
+      race: npcData.race || null,
+      role: npcData.role || null,
+      status: npcData.status || "Alive",
+      alignment: npcData.alignment || null,
+      appearance: npcData.appearance || null,
+      personality_traits: npcData.personality_traits || null,
+      gm_notes: npcData.gm_notes || null,
+      faction_id: npcData.faction_id || null,
+      current_location_id: npcData.current_location_id || null,
+      home_location_id: npcData.home_location_id || null,
+      is_revealed: npcData.is_revealed ?? false,
+      image_url: npcData.image_url || null,
+    })
+    .select()
+    .single();
+
+  if (createError || !createdNPC) {
+    console.error("❌ [promoteHookToNPC] NPC Creation Error:", createError);
+    throw new Error(`Fehler beim Erstellen des NPCs: ${createError?.message || "Unbekannter Fehler"}`);
+  }
+
+  console.log("✅ [promoteHookToNPC] NPC erfolgreich erstellt:", {
+    npcId: createdNPC.id,
+    name: createdNPC.name,
+  });
+
+  // 7. Finde alle Relationen mit target_name = hookName und npc_id_1 = sourceNpcId
+  const { data: hookRelations, error: relationsError } = await (supabase.from("npc_relations") as any)
+    .select("id, relation_type, description, target_name")
+    .eq("campaign_id", campaignId)
+    .eq("npc_id_1", sourceNpcId)
+    .eq("target_name", hookName.trim())
+    .maybeSingle(); // Verwende maybeSingle, da es mehrere geben könnte
+
+  // 8. Aktualisiere alle gefundenen Relationen
+  if (hookRelations) {
+    // Falls es nur eine Relation gibt (maybeSingle gibt ein Objekt zurück)
+    const relationsToUpdate = Array.isArray(hookRelations) ? hookRelations : [hookRelations];
+
+    for (const relation of relationsToUpdate) {
+      const { error: updateError } = await (supabase.from("npc_relations") as any)
+        .update({
+          npc_id_2: createdNPC.id, // Setze npc_id_2 auf die neue NPC-ID
+          target_name: null, // Entferne target_name, da jetzt npc_id_2 vorhanden ist
+        })
+        .eq("id", relation.id);
+
+      if (updateError) {
+        console.error("❌ [promoteHookToNPC] Relation Update Error:", updateError);
+        // Warnung, aber kein Fehler - NPC wurde bereits erstellt
+        console.warn(`⚠️ NPC wurde erstellt, aber Relation ${relation.id} konnte nicht aktualisiert werden:`, updateError.message);
+      } else {
+        console.log("✅ [promoteHookToNPC] Relation aktualisiert:", {
+          relationId: relation.id,
+          npc_id_2: createdNPC.id,
+        });
+      }
+    }
+  } else {
+    // Falls keine Relation gefunden wurde, aber maybeSingle null zurückgibt, prüfe mit select
+    const { data: allRelations, error: allRelationsError } = await (supabase.from("npc_relations") as any)
+      .select("id, relation_type, description, target_name")
+      .eq("campaign_id", campaignId)
+      .eq("npc_id_1", sourceNpcId)
+      .eq("target_name", hookName.trim());
+
+    if (!allRelationsError && allRelations && allRelations.length > 0) {
+      for (const relation of allRelations) {
+        const { error: updateError } = await (supabase.from("npc_relations") as any)
+          .update({
+            npc_id_2: createdNPC.id,
+            target_name: null,
+          })
+          .eq("id", relation.id);
+
+        if (updateError) {
+          console.error("❌ [promoteHookToNPC] Relation Update Error:", updateError);
+          console.warn(`⚠️ NPC wurde erstellt, aber Relation ${relation.id} konnte nicht aktualisiert werden:`, updateError.message);
+        } else {
+          console.log("✅ [promoteHookToNPC] Relation aktualisiert:", {
+            relationId: relation.id,
+            npc_id_2: createdNPC.id,
+          });
+        }
+      }
+    } else {
+      console.warn("⚠️ [promoteHookToNPC] Keine Relationen mit target_name gefunden:", {
+        sourceNpcId,
+        hookName,
+      });
+    }
+  }
+
+  // 9. Revalidate
+  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${createdNPC.id}`);
+
+  return {
+    success: true,
+    npc: createdNPC,
+    message: `${npcData.name} wurde erfolgreich in der Welt manifestiert und mit ${sourceNPC.name} verknüpft!`,
+  };
+}
+
+// ============================================================================
+// Update Hook Relations to NPC (nur Relationen aktualisieren, NPC existiert bereits)
+// ============================================================================
+/**
+ * Aktualisiert alle Hook-Relationen (target_name) zu einer vollwertigen NPC-Relation (npc_id_2).
+ * Wird verwendet, wenn der NPC bereits erstellt wurde (z.B. durch den Wizard).
+ */
+export async function updateHookRelationsToNPC(
+  campaignId: string,
+  sourceNpcId: string,
+  hookName: string,
+  newNpcId: string
+) {
+  const supabase = await createClient();
+
+  // 1. Auth Check
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  // 2. GM Check
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann Hook-Relationen aktualisieren.");
+  }
+
+  // 3. Finde alle Relationen mit target_name = hookName und npc_id_1 = sourceNpcId
+  const { data: hookRelations, error: relationsError } = await (supabase.from("npc_relations") as any)
+    .select("id, relation_type, description, target_name")
+    .eq("campaign_id", campaignId)
+    .eq("npc_id_1", sourceNpcId)
+    .eq("target_name", hookName.trim());
+
+  if (relationsError) {
+    console.error("❌ [updateHookRelationsToNPC] Relations Query Error:", relationsError);
+    throw new Error(`Fehler beim Laden der Hook-Relationen: ${relationsError.message}`);
+  }
+
+  if (!hookRelations || hookRelations.length === 0) {
+    console.warn("⚠️ [updateHookRelationsToNPC] Keine Hook-Relationen gefunden:", {
+      sourceNpcId,
+      hookName,
+    });
+    return {
+      success: true,
+      updatedCount: 0,
+      message: "Keine Hook-Relationen gefunden, die aktualisiert werden müssen.",
+    };
+  }
+
+  // 4. Aktualisiere alle gefundenen Relationen
+  let updatedCount = 0;
+  for (const relation of hookRelations) {
+    const { error: updateError } = await (supabase.from("npc_relations") as any)
+      .update({
+        npc_id_2: newNpcId, // Setze npc_id_2 auf die neue NPC-ID
+        target_name: null, // Entferne target_name, da jetzt npc_id_2 vorhanden ist
+      })
+      .eq("id", relation.id);
+
+    if (updateError) {
+      console.error("❌ [updateHookRelationsToNPC] Relation Update Error:", updateError);
+      console.warn(`⚠️ Relation ${relation.id} konnte nicht aktualisiert werden:`, updateError.message);
+    } else {
+      updatedCount++;
+      console.log("✅ [updateHookRelationsToNPC] Relation aktualisiert:", {
+        relationId: relation.id,
+        npc_id_2: newNpcId,
+      });
+    }
+  }
+
+  // 5. Revalidate
+  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${sourceNpcId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/npcs/${newNpcId}`);
+
+  return {
+    success: true,
+    updatedCount,
+    message: `${updatedCount} Hook-Relation${updatedCount === 1 ? "" : "en"} wurde${updatedCount === 1 ? "" : "n"} erfolgreich aktualisiert.`,
+  };
+}

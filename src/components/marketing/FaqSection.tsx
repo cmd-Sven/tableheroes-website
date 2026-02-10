@@ -96,30 +96,17 @@ export function FaqSection() {
 
       <div className="relative mx-auto max-w-6xl px-6 py-16">
         <div>
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.5 }}
-            className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 text-center"
-          >
-            Häufige Fragen
-          </motion.h2>
-
-          {/* Membership-Hinweis */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mb-8 text-center"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-950/60 border border-accent-gold/40">
-              <span className="font-barlow font-semibold text-xs uppercase tracking-wide text-accent-gold">
-                Exklusiv für registrierte Mitglieder
-              </span>
-            </div>
-          </motion.div>
+          <div className="text-center">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5 }}
+              className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block"
+            >
+              Häufige Fragen
+            </motion.h2>
+          </div>
 
           <div className="mt-8 space-y-3">
             {faqs.map((item, index) => (

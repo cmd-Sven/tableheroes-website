@@ -189,6 +189,50 @@ export async function updateLoreEntry(
 }
 
 // ============================================================================
+// Onboarding: Toggle allow_pc_origin (GM only) – Heimatort im Charakter-Wizard
+// Tabelle: world_lore, Spalte: allow_pc_origin, ID: world_lore.id
+// ============================================================================
+export async function updateLoreAllowPcOrigin(loreId: string, allow: boolean) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: lore, error: fetchError } = await (supabase.from("world_lore") as any)
+    .select("id, campaign_id, allow_pc_origin, campaigns!inner(gm_id)")
+    .eq("id", loreId)
+    .single();
+
+  if (fetchError) {
+    console.error("[updateLoreAllowPcOrigin] Fetch lore error:", fetchError);
+    throw new Error("Lore-Eintrag nicht gefunden oder kein Zugriff.");
+  }
+  if (!lore) throw new Error("Lore-Eintrag nicht gefunden.");
+  const campaigns = lore.campaigns as any;
+  if (campaigns.gm_id !== user.id) {
+    throw new Error("Nur der GM kann die Onboarding-Einstellung ändern.");
+  }
+
+  const { data: updated, error } = await (supabase.from("world_lore") as any)
+    .update({ allow_pc_origin: allow })
+    .eq("id", loreId)
+    .select("id, allow_pc_origin")
+    .single();
+
+  if (error) {
+    console.error("[updateLoreAllowPcOrigin] Update error:", error);
+    throw new Error(error.message || "Speichern fehlgeschlagen.");
+  }
+  if (!updated || (updated as any).allow_pc_origin !== allow) {
+    console.error("[updateLoreAllowPcOrigin] Update nicht bestätigt:", { loreId, allow, updated });
+    throw new Error("Update konnte nicht bestätigt werden. Bitte Seite neu laden und erneut versuchen.");
+  }
+  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}`);
+}
+
+// ============================================================================
 // Delete Lore Entry
 // ============================================================================
 export async function deleteLoreEntry(loreId: string) {
@@ -370,6 +414,34 @@ export async function getLoreById(loreId: string) {
   }
 
   return lore;
+}
+
+// ============================================================================
+// Get Child Locations for Onboarding (Gebäude/Institutionen unter einem Ort)
+// ============================================================================
+const BUILDING_LOCATION_TYPES = ["Gebäude", "Tempel", "Dungeon", "Akademie", "Markt", "Laden"];
+
+export async function getChildLocationsForOnboarding(campaignId: string, parentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: children, error } = await (supabase.from("world_lore") as any)
+    .select("id, name, type")
+    .eq("campaign_id", campaignId)
+    .eq("parent_id", parentId)
+    .eq("allow_pc_origin", true)
+    .in("type", BUILDING_LOCATION_TYPES)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("getChildLocationsForOnboarding Error:", error);
+    return [];
+  }
+  return (children || []) as { id: string; name: string; type: string }[];
 }
 
 // ============================================================================

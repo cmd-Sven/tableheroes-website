@@ -15,6 +15,7 @@ import {
   Images,
   Menu,
   X,
+  Newspaper,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Footer } from "@/src/components/layout/Footer";
@@ -33,6 +34,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
     () => [
       { id: "hero", label: "Start", Icon: Home },
       { id: "campaigns", label: "Runden", Icon: Flag },
+      { id: "news", label: "News", Icon: Newspaper },
       { id: "community", label: "Community", Icon: Users },
       { id: "features", label: "Plattform", Icon: Sparkles },
       { id: "gamification", label: "Deine Reise als Held", Icon: Trophy },
@@ -114,7 +116,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
               className="fixed inset-0 bg-black/80 z-[55] md:hidden"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            
+
             {/* Menu Panel */}
             <motion.nav
               initial={{ x: "100%" }}
@@ -138,7 +140,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-                
+
                 <ul className="space-y-2">
                   {items.map(({ id, label, Icon }) => {
                     const isActive = activeId === id;
@@ -230,7 +232,6 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           Zurück
         </Link>
       )}
-
 
       <div className="relative">{children}</div>
 

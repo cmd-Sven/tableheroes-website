@@ -1,5 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { getNPCById } from "../../npc-actions";
+import { getNPCById, getNPCs } from "../../npc-actions";
 import { redirect, notFound } from "next/navigation";
 import { NPCDetailPage } from "@/src/components/dashboard/campaigns/NPCDetailPage";
 import { getFactions } from "../../factions-actions";
@@ -88,6 +88,34 @@ export default async function NPCDetailPageRoute({ params }: Props) {
       type: entry.type,
     }));
 
+  // 9. Für Quest-Modal von NPC-Seite: NPC-Liste und Mitglieder laden (nur wenn GM)
+  let npcsForQuest: Array<{ id: string; name: string; title: string | null; role: string | null }> = [];
+  let membersForQuest: Array<{ id: string; character_id: string | null; user?: { username: string } | null; character_data?: any; characters?: any }> = [];
+  if (isGM) {
+    const npcsRaw = await getNPCs(campaignId, user.id, true);
+    npcsForQuest = (npcsRaw || []).map((n: any) => ({
+      id: n.id,
+      name: n.name,
+      title: n.title || null,
+      role: n.role || null,
+    }));
+    const { data: membersRaw } = await (supabase.from("campaign_members") as any)
+      .select(`
+        id,
+        character_id,
+        users:user_id (username),
+        characters:character_id (id, name, class, race, level, status)
+      `)
+      .eq("campaign_id", campaignId)
+      .eq("status", "Accepted");
+    membersForQuest = (membersRaw || []).map((m: any) => ({
+      id: m.id,
+      character_id: m.character_id,
+      user: m.users ? { username: m.users.username } : null,
+      character_data: m.characters || null,
+    }));
+  }
+
   return (
     <NPCDetailPage
       npc={npc}
@@ -97,6 +125,8 @@ export default async function NPCDetailPageRoute({ params }: Props) {
       userId={user.id}
       factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
       locations={locations}
+      npcsForQuest={npcsForQuest}
+      membersForQuest={membersForQuest}
     />
   );
 }

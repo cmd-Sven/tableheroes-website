@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-// TODO: Admin-Mail hier anpassen
+// TODO: Admin-Mail hier anpassen (optional, falls Wartungsmodus aus DB nicht greift)
 const ADMIN_EMAIL = "DEINE_EMAIL@BEISPIEL.DE";
 
 export async function middleware(request: NextRequest) {
@@ -64,42 +64,81 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // ------------------------------------------------------------
-  // 1. Statische Ausnahmen (öffentlich zugänglich)
+  // Öffentliche Routen (immer erlauben)
   // ------------------------------------------------------------
   const isRoot = path === "/";
+  const isLogin =
+    path === "/login" || path === "/register" || path === "/signup";
   const isMaintenance = path === "/maintenance";
   const isNextAsset = path.startsWith("/_next");
   const isImagesAsset = path.startsWith("/images");
   const isFavicon = path === "/favicon.ico";
+  const isApi = path.startsWith("/api");
 
-  // Admin-Hintertür: Admin darf alles sehen
-  if (user && user.email === ADMIN_EMAIL) {
+  if (
+    isRoot ||
+    isLogin ||
+    isMaintenance ||
+    isNextAsset ||
+    isImagesAsset ||
+    isFavicon ||
+    isApi
+  ) {
     return response;
   }
 
-  // Öffentliche Routen (Landingpage, Maintenance & Assets) immer erlauben
-  if (isRoot || isMaintenance || isNextAsset || isImagesAsset || isFavicon) {
+  // ------------------------------------------------------------
+  // Dashboard: Auth + Wartungsmodus (nur Admin bei Wartung)
+  // ------------------------------------------------------------
+  if (path.startsWith("/dashboard")) {
+    if (!user) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", path);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Optional: Admin-Hintertür per E-Mail (überschreibt DB-Wartung)
+    if (user.email === ADMIN_EMAIL) {
+      return response;
+    }
+
+    // Wartungsmodus aus site_settings: nur Admins dürfen ins Dashboard
+    try {
+      const { data: settingsRow } = await (supabase as any)
+        .from("site_settings")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .maybeSingle();
+      const maintenanceActive =
+        (settingsRow as any)?.value === "true" ||
+        (settingsRow as any)?.value === true;
+
+      if (maintenanceActive) {
+        const { data: profileRow } = await (supabase as any)
+          .from("users")
+          .select("primary_role")
+          .eq("id", user.id)
+          .maybeSingle();
+        const role = (profileRow as any)?.primary_role ?? "Player";
+        if (role !== "Admin") {
+          return NextResponse.redirect(
+            new URL("/?error=maintenance", request.url)
+          );
+        }
+      }
+    } catch {
+      // Tabelle site_settings fehlt oder RLS: Wartungsmodus ignoriert
+    }
+
     return response;
   }
 
-  // Alle anderen Routen werden auf die Maintenance-Seite umgeleitet
-  return NextResponse.redirect(new URL("/maintenance", request.url));
+  // Alle anderen Routen: durchlassen (z. B. weitere App-Routen)
+  return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - direkte Bilddateien (per Erweiterung)
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-
-
-
-
-

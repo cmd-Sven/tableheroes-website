@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Cinzel, Libre_Baskerville } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 // 1. Schriften konfigurieren
@@ -22,13 +23,30 @@ const libre = Libre_Baskerville({
 });
 
 export const metadata: Metadata = {
-  title: "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
-  description: "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
-  keywords: ["Pen and Paper Osnabrück", "TTRPG Tool Deutschland", "Rollenspiel Community Osnabrück", "Tabletop RPG", "TTRPG", "Community", "Gamification", "Osnabrück", "Rollenspiel", "D&D", "Pathfinder", "Kampagnen Manager"],
+  title:
+    "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+  description:
+    "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
+  keywords: [
+    "Pen and Paper Osnabrück",
+    "TTRPG Tool Deutschland",
+    "Rollenspiel Community Osnabrück",
+    "Tabletop RPG",
+    "TTRPG",
+    "Community",
+    "Gamification",
+    "Osnabrück",
+    "Rollenspiel",
+    "D&D",
+    "Pathfinder",
+    "Kampagnen Manager",
+  ],
   authors: [{ name: "TableHeroes" }],
   openGraph: {
-    title: "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
-    description: "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
+    title:
+      "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+    description:
+      "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
     url: "https://tableheroes.de",
     siteName: "TableHeroes",
     images: [
@@ -44,8 +62,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
-    description: "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
+    title:
+      "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+    description:
+      "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
     images: ["/images/tableHeroes-logo.png"],
   },
   robots: {
@@ -76,7 +96,8 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "TableHeroes",
-    description: "Community-Plattform für TTRPG-Spieler in Osnabrück mit geschlossener Mitglieder-Area und proprietärem Spielleiter-Tool.",
+    description:
+      "Community-Plattform für TTRPG-Spieler in Osnabrück mit geschlossener Mitglieder-Area und proprietärem Spielleiter-Tool.",
     url: "https://tableheroes.de",
     areaServed: {
       "@type": "City",
@@ -99,7 +120,8 @@ export default function RootLayout({
     name: "TableHeroes",
     applicationCategory: "GameApplication",
     operatingSystem: "Web-based",
-    description: "Die ultimative TTRPG-Plattform für Pen and Paper Abenteuer, Community-Management und Gamification.",
+    description:
+      "Die ultimative TTRPG-Plattform für Pen and Paper Abenteuer, Community-Management und Gamification.",
     url: "https://tableheroes.de",
     publisher: {
       "@type": "Organization",
@@ -118,14 +140,18 @@ export default function RootLayout({
       availability: "https://schema.org/MembersOnly",
       description: "Exklusiv für registrierte Mitglieder",
     },
-    keywords: "Pen and Paper Osnabrück, TTRPG Tool Deutschland, Rollenspiel Community Osnabrück",
+    keywords:
+      "Pen and Paper Osnabrück, TTRPG Tool Deutschland, Rollenspiel Community Osnabrück",
   };
 
   return (
     <html lang="de" suppressHydrationWarning>
       <head>
         {/* Google Search Console Verification */}
-        <meta name="google-site-verification" content="mzY6Ev9823X7RLOEqJb2k8TutAYQdf6XL9vYk4FK4v4" />
+        <meta
+          name="google-site-verification"
+          content="mzY6Ev9823X7RLOEqJb2k8TutAYQdf6XL9vYk4FK4v4"
+        />
       </head>
       {/* JSON-LD Strukturierte Daten */}
       <script
@@ -134,7 +160,9 @@ export default function RootLayout({
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(softwareApplicationSchema),
+        }}
       />
       {/* 2. Variablen in den Body injizieren */}
       <body
@@ -142,6 +170,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

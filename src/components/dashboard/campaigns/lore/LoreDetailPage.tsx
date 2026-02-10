@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
+import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
 import { NPCCarousel } from "@/src/components/dashboard/campaigns/npcs/NPCCarousel";
 import { LoreHierarchyManager } from "./LoreHierarchyManager";
 import { LoreHeader } from "./LoreHeader";
@@ -50,6 +54,10 @@ export function LoreDetailPage({
   parentOptions = [],
   orphanedEntries = []
 }: Props) {
+  const router = useRouter();
+  const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
+  const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
+
   // Safe check: Ensure lore exists
   if (!initialLore || !initialLore.name) {
     return (
@@ -127,11 +135,24 @@ export function LoreDetailPage({
           >
             <div className="absolute inset-0 bg-black/40 pointer-events-none" />
             <div className="relative z-10">
+              {isGM && (
+                <div className="mb-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsSecretModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    ✨ Plot-Geheimnis mit KI weben
+                  </button>
+                </div>
+              )}
               <SecretsManager
                 entityId={lore.id}
                 entityType="lore"
                 campaignId={campaignId}
                 isGM={isGM}
+                refreshKey={secretsRefreshKey}
               />
             </div>
           </div>
@@ -147,6 +168,23 @@ export function LoreDetailPage({
       )}
       {(locationNPCs?.guests?.length ?? 0) > 0 && (
         <NPCCarousel residents={locationNPCs?.guests || []} isGM={isGM} campaignId={campaignId} title="Aktuelle Gäste" />
+      )}
+
+      {/* Universal Secret AI Modal */}
+      {isGM && (
+        <UniversalSecretModal
+          entityId={lore.id}
+          entityType="lore"
+          campaignId={campaignId}
+          entityName={lore.name}
+          isOpen={isSecretModalOpen}
+          onClose={() => setIsSecretModalOpen(false)}
+          onCreated={() => {
+            // Trigger refresh der Secrets-Liste
+            setSecretsRefreshKey((prev) => prev + 1);
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

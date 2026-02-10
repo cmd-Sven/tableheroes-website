@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, User, Shield, Trash2, Eye, EyeOff, Star, AlertCircle } from "lucide-react";
+import { Info, User, Shield, Trash2, Eye, EyeOff, Star, AlertCircle, ScrollText } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useTransition } from "react";
@@ -23,7 +23,9 @@ type NPC = {
   is_revealed: boolean;
   is_favorite?: boolean;
   has_active_quest?: boolean;
+  has_active_quest_as_giver?: boolean;
   active_quests?: Quest[];
+  active_quest_titles_as_giver?: string[];
   factions?: {
     id: string;
     name: string;
@@ -108,9 +110,11 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
       transition={{ duration: 0.3 }}
       onClick={handleCardClick}
       className={`group relative h-full flex flex-col rounded-lg border-2 overflow-hidden transition-all duration-300 ease-in-out hover:scale-[1.02] hover:shadow-xl cursor-pointer ${
-        npc.has_active_quest
-          ? "border-green-500 hover:border-green-400"
-          : "border-transparent hover:border-[#C5A572]"
+        npc.has_active_quest_as_giver
+          ? "border-accent-gold/60 hover:border-accent-gold shadow-[0_0_20px_rgba(202,185,38,0.25)]"
+          : npc.has_active_quest
+            ? "border-green-500 hover:border-green-400"
+            : "border-transparent hover:border-[#C5A572]"
       } ${!npc.is_revealed && isGM ? "opacity-75 grayscale" : ""}`}
       style={{
         backgroundImage: "url('/images/grunge-paper-background.jpg')",
@@ -135,8 +139,8 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
           <Star className={`h-4 w-4 ${npc.is_favorite ? "fill-current" : ""}`} />
         </button>
 
-        {/* Active Quest Icon */}
-        {npc.has_active_quest && npc.active_quests && npc.active_quests.length > 0 && (
+        {/* Active Quest Icon (Giver) – links neben Favoriten */}
+        {npc.has_active_quest && npc.active_quests && npc.active_quests.length > 0 && !npc.has_active_quest_as_giver && (
           <Link
             href={`/dashboard/campaigns/${campaignId}?tab=quests&questId=${npc.active_quests[0].id}`}
             onClick={(e) => e.stopPropagation()}
@@ -148,9 +152,22 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
         )}
       </div>
 
-      {/* GM Action Bar */}
-      {isGM && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 z-30 bg-white/90 backdrop-blur-sm rounded-md p-1 shadow-md">
+      {/* Oben rechts: Questgeber-Indikator (gold, Glow) + GM Action Bar */}
+      <div className="absolute top-2 right-2 flex items-center gap-1.5 z-30">
+        {npc.has_active_quest_as_giver && (
+          <div
+            className="flex items-center justify-center w-9 h-9 rounded-md bg-accent-gold/20 border border-accent-gold/50 text-accent-gold shadow-[0_0_12px_rgba(202,185,38,0.5)]"
+            title={
+              npc.active_quest_titles_as_giver && npc.active_quest_titles_as_giver.length > 0
+                ? `Aktive Quest(s): ${npc.active_quest_titles_as_giver.join(", ")}`
+                : "Vergibt aktive Quest(s)"
+            }
+          >
+            <ScrollText className="h-5 w-5" aria-hidden />
+          </div>
+        )}
+        {isGM && (
+        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-md p-1 shadow-md">
           {onToggleVisibility && (
             <button
               onClick={(e) => {
@@ -180,7 +197,8 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
             </button>
           )}
         </div>
-      )}
+        )}
+      </div>
       {/* Header */}
       <div className="flex-none p-4 border-b border-gray-400/30 relative z-10">
         <div className="flex items-start justify-between gap-2 mb-2">

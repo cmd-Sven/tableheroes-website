@@ -10,13 +10,18 @@ import {
   toggleSecretForCharacter,
   getCampaignCharacters,
 } from "@/src/app/dashboard/campaigns/[id]/secrets-actions";
+import { SecretDetailModal } from "./SecretDetailModal";
 
 type Secret = {
   id: string;
   title: string | null;
   content: string;
+  meaning: string | null;
+  secret_type: string | null;
+  discovery_dc: number | null;
   skill_check: string | null;
   is_revealed: boolean;
+  is_ai_generated?: boolean;
   character_ids: string[];
   created_at?: string;
   updated_at?: string;
@@ -33,9 +38,10 @@ type Props = {
   entityType: string;
   campaignId: string;
   isGM: boolean;
+  refreshKey?: number; // Optional: Wird geändert, um Daten neu zu laden
 };
 
-export function SecretsManager({ entityId, entityType, campaignId, isGM }: Props) {
+export function SecretsManager({ entityId, entityType, campaignId, isGM, refreshKey }: Props) {
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -45,23 +51,26 @@ export function SecretsManager({ entityId, entityType, campaignId, isGM }: Props
   const [newSecretContent, setNewSecretContent] = useState("");
   const [newSecretSkillCheck, setNewSecretSkillCheck] = useState("");
   const [openShareMenu, setOpenShareMenu] = useState<string | null>(null);
+  const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
 
-  // Load secrets and characters on mount
+  // Load secrets and characters on mount or when refreshKey changes
   useEffect(() => {
     loadData();
-  }, [entityId, entityType]);
+  }, [entityId, entityType, refreshKey]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
+      console.log("🔍 [SecretsManager] Loading secrets for:", { entityId, entityType, campaignId });
       const [secretsData, charactersData] = await Promise.all([
         getSecrets(entityId, entityType),
         isGM ? getCampaignCharacters(campaignId) : Promise.resolve([]),
       ]);
+      console.log("✅ [SecretsManager] Loaded secrets:", secretsData?.length || 0, "secrets");
       setSecrets(secretsData as Secret[]);
       setCharacters(charactersData as Character[]);
     } catch (error: any) {
-      console.error("Error loading secrets:", error);
+      console.error("❌ [SecretsManager] Error loading secrets:", error);
       alert(error.message || "Fehler beim Laden der Secrets.");
     } finally {
       setIsLoading(false);
@@ -256,18 +265,19 @@ export function SecretsManager({ entityId, entityType, campaignId, isGM }: Props
             return (
               <div
                 key={secret.id}
-                className="group"
+                className="group cursor-pointer"
                 style={{ perspective: "1000px" }}
+                onClick={() => setSelectedSecret(secret)}
               >
                 {/* 3D Flip Card Container */}
-                <div className="relative w-full h-0 pb-[140%] flip-card-container">
+                <div className="relative w-full h-0 pb-[140%] flip-card-container transition-transform hover:scale-105">
                   {/* Front Side - Title Only */}
-                  <div className={`absolute inset-0 rounded-lg border-2 p-4 bg-white flip-card-front flex flex-col items-center justify-center ${
+                  <div className={`absolute inset-0 rounded-lg border-2 p-4 bg-white flip-card-front flex flex-col items-center justify-center transition-all ${
                     isPrivate
-                      ? "border-purple-500/50"
+                      ? "border-purple-500/50 group-hover:border-purple-500 group-hover:shadow-lg group-hover:shadow-purple-500/20"
                       : isGlobal
-                      ? "border-hero-border"
-                      : "border-hero-border"
+                      ? "border-hero-border group-hover:border-accent-gold group-hover:shadow-lg group-hover:shadow-accent-gold/20"
+                      : "border-hero-border group-hover:border-accent-gold group-hover:shadow-lg group-hover:shadow-accent-gold/20"
                   }`}
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -309,12 +319,12 @@ export function SecretsManager({ entityId, entityType, campaignId, isGM }: Props
 
                   {/* Back Side - Description */}
                   <div 
-                    className={`absolute inset-0 rounded-lg border-2 p-4 flip-card-back flex flex-col ${
+                    className={`absolute inset-0 rounded-lg border-2 p-4 flip-card-back flex flex-col transition-all ${
                       isPrivate
-                        ? "border-purple-500/50"
+                        ? "border-purple-500/50 group-hover:border-purple-500 group-hover:shadow-lg group-hover:shadow-purple-500/20"
                         : isGlobal
-                        ? "border-hero-border"
-                        : "border-hero-border"
+                        ? "border-hero-border group-hover:border-accent-gold group-hover:shadow-lg group-hover:shadow-accent-gold/20"
+                        : "border-hero-border group-hover:border-accent-gold group-hover:shadow-lg group-hover:shadow-accent-gold/20"
                     }`}
                     style={{
                       backgroundImage: "url('/images/grunge-paper-background.jpg')",
@@ -437,6 +447,20 @@ export function SecretsManager({ entityId, entityType, campaignId, isGM }: Props
             );
           })}
         </div>
+      )}
+
+      {/* Secret Detail Modal */}
+      {selectedSecret && (
+        <SecretDetailModal
+          secret={selectedSecret}
+          isOpen={!!selectedSecret}
+          onClose={() => setSelectedSecret(null)}
+          onUpdated={() => {
+            loadData();
+            setSelectedSecret(null);
+          }}
+          isGM={isGM}
+        />
       )}
     </div>
   );

@@ -159,6 +159,11 @@ export const FactionAIResponseSchema = z.object({
   description: z.string(),
   gm_notes: z.string().optional().nullable(),
   headquarters_location_name_suggestion: z.string().optional().nullable(),
+  // Neue, erweiterte Fraktionsfelder für KI-Antworten
+  appearance: z.string().optional().nullable(),
+  structure: z.string().optional().nullable(),
+  philosophy: z.string().optional().nullable(),
+  important_npcs_info: z.string().optional().nullable(),
 });
 
 export type FactionAIResponse = z.infer<typeof FactionAIResponseSchema>;

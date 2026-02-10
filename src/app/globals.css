@@ -114,3 +114,48 @@ body {
 .community-card:hover {
   background-image: url('/images/card-bg-greenWood-Hover.webp');
 }
+
+/* Gothic Dashboard Card: Holz + goldener Rahmen */
+.gothic-dashboard-card {
+  background-color: #051a02;
+  background-image:
+    url('/images/border_top-bottom_gold.png'),
+    url('/images/border_top-bottom_gold.png'),
+    url('/images/border_left-right_gold.png'),
+    url('/images/border_left-right_gold.png'),
+    url('/images/card-bg-greenWood.webp');
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y, no-repeat;
+  background-position: top center, bottom center, center left, center right, center;
+  background-size: 100px auto, 100px auto, auto 100px, auto 100px, cover;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Gothic Modal: Pergament-Oberfläche */
+.gothic-modal-surface {
+  background-image: url('/images/scroll-paper.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Gothic Sidebar: dunkler Marmor */
+.gothic-sidebar {
+  background-color: #051a02;
+  background-image: url('/images/dark-marmor.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Dashboard Card: Marmor-Altar (dunkler Marmor, goldener Rand, Schatten) */
+.card-marble {
+  background-color: rgb(9 9 11); /* zinc-950 */
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgba(255, 255, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 120% at 80% 80%, rgba(255, 255, 255, 0.04) 0%, transparent 40%);
+  background-repeat: no-repeat;
+  border: 1px solid rgba(202, 185, 38, 0.1); /* border-hero-gold/10 = accent-gold/10 */
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+}

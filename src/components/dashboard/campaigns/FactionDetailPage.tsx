@@ -17,6 +17,8 @@ import {
   Scroll,
   Plus,
   Loader2,
+  UserPlus,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -30,7 +32,10 @@ import {
   createFactionLore,
 } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
+import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
+import { AIGenerationWizard } from "@/src/components/dashboard/campaigns/npcs/AIGenerationWizard";
+import { Sparkles } from "lucide-react";
 
 type Location = {
   id: string;
@@ -69,6 +74,10 @@ type Faction = {
   gm_notes: string | null;
   player_notes: string | null;
   is_revealed: boolean;
+  appearance?: string | null;
+  structure?: string | null;
+  philosophy?: string | null;
+  important_npcs_info?: string | null;
   locations?: Location | null;
   lore_entry?: LoreEntry | null;
   npcs?: NPC[];
@@ -189,6 +198,7 @@ export function FactionDetailPage({
   isGM,
   userId,
   locations = [],
+  npcs = [],
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -202,6 +212,10 @@ export function FactionDetailPage({
   const [isEditingPlayerNotes, setIsEditingPlayerNotes] = useState(false);
   const [gmNotes, setGmNotes] = useState(faction.gm_notes || "");
   const [playerNotes, setPlayerNotes] = useState(faction.player_notes || "");
+  const [showNPCWizard, setShowNPCWizard] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<{ name: string; description: string } | null>(null);
+  const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
+  const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
 
   const handleSaveField = (field: string) => {
     startTransition(async () => {
@@ -384,9 +398,88 @@ export function FactionDetailPage({
     return colors[type] || "bg-slate-800/50 text-slate-300 border-slate-600";
   };
 
-  const visibleNPCs = (faction.npcs || []).filter(
-    (npc) => isGM || npc.is_revealed || npc.user_id === userId
+  const parseImportantMembers = (
+    text: string | null | undefined
+  ): Array<{ name: string; description: string }> => {
+    if (!text) return [];
+
+    const members: Array<{ name: string; description: string }> = [];
+
+    // 1) Primär: Globales Regex, das auch mehrere Personen im Fließtext erkennt
+    // Muster: "Name - Beschreibung." oder "Name: Beschreibung?"
+    const matches = [
+      ...(text.matchAll(
+        /([^–—\-:]+?)\s*[:\-–—]\s*([^.!?\n]+[.!?\n]?)/g
+      ) as Iterable<RegExpMatchArray>),
+    ];
+
+    for (const match of matches) {
+      const name = match[1]?.trim();
+      const description = match[2]?.trim();
+      if (name && name.length > 1) {
+        members.push({ name, description: description || "" });
+      }
+    }
+
+    // 2) Falls das obige Muster nichts gefunden hat: Fallback auf alte, einfachere Logik
+    if (members.length === 0) {
+      const rawSegments = text
+        .split(/\r?\n|•|\*|;/)
+        .map((seg) => seg.trim())
+        .filter((seg) => seg.length > 0);
+
+      for (const segment of rawSegments) {
+        const simpleMatch = segment.match(/^([^–—\-:]+)[:\-–—]\s*(.+)$/);
+        let name: string;
+        let description: string;
+
+        if (simpleMatch) {
+          name = simpleMatch[1].trim();
+          description = simpleMatch[2].trim();
+        } else {
+          name = segment;
+          description = "";
+        }
+
+        if (name.length > 1) {
+          members.push({ name, description });
+        }
+      }
+    }
+
+    // 3) Wenn immer noch nichts gefunden wurde: Fallback auf "Unbekannte Person"
+    if (members.length === 0) {
+      members.push({
+        name: "Unbekannte Person",
+        description: text.trim(),
+      });
+    }
+
+    return members;
+  };
+
+  const importantMembers = parseImportantMembers(faction.important_npcs_info);
+
+  // Existierende NPCs der Kampagne (für Abgleich)
+  const existingNPCsLower = new Set(
+    (npcs || []).map((n) => n.name.toLowerCase().trim()).filter((n) => n.length > 0)
   );
+
+  const isMemberExisting = (memberName: string) => {
+    const norm = memberName.toLowerCase().trim();
+    if (!norm) return false;
+    for (const npcName of existingNPCsLower) {
+      if (npcName === norm || npcName.includes(norm) || norm.includes(npcName)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handlePromoteMember = (member: { name: string; description: string }) => {
+    setSelectedMember(member);
+    setShowNPCWizard(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -698,6 +791,141 @@ export function FactionDetailPage({
             </div>
           </div>
 
+          {/* Erweiterte Fraktions-Details: Erscheinungsbild / Struktur / Philosophie / Wichtige Persönlichkeiten */}
+          {(faction.appearance || faction.structure || faction.philosophy || faction.important_npcs_info) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+              {/* Erscheinungsbild / Identität & Heraldik */}
+              {faction.appearance && faction.appearance.trim() !== "" && (
+                <div
+                  className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+                  style={{
+                    border: "2px solid rgba(202, 185, 38, 0.5)",
+                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                  <div className="relative z-10">
+                    <h2 className="font-cinzel font-bold text-xl text-accent-gold mb-3 border-b border-hero-border pb-2">
+                      Identität & Heraldik
+                    </h2>
+                    <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
+                      {faction.appearance}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Philosophie / Kodex & Weltbild */}
+              {faction.philosophy && faction.philosophy.trim() !== "" && (
+                <div
+                  className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+                  style={{
+                    border: "2px solid rgba(202, 185, 38, 0.5)",
+                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                  <div className="relative z-10">
+                    <h2 className="font-cinzel font-bold text-xl text-accent-gold mb-3 border-b border-hero-border pb-2">
+                      Kodex & Weltbild
+                    </h2>
+                    <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
+                      {faction.philosophy}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Struktur / Organisation */}
+              {faction.structure && faction.structure.trim() !== "" && (
+                <div
+                  className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+                  style={{
+                    border: "2px solid rgba(202, 185, 38, 0.5)",
+                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                  <div className="relative z-10">
+                    <h2 className="font-cinzel font-bold text-xl text-accent-gold mb-3 border-b border-hero-border pb-2">
+                      Organisation
+                    </h2>
+                    <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
+                      {faction.structure}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Wichtige Persönlichkeiten / Mitglieder-Schmiede */}
+              {importantMembers.length > 0 && (
+                <div
+                  className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+                  style={{
+                    border: "2px solid rgba(202, 185, 38, 0.5)",
+                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                  <div className="relative z-10 space-y-3">
+                    <h2 className="font-cinzel font-bold text-xl text-accent-gold mb-1 border-b border-hero-border pb-2 flex items-center gap-2">
+                      <Users className="h-5 w-5 text-accent-gold" />
+                      Wichtige Persönlichkeiten
+                    </h2>
+                    <p className="font-libre text-emerald-50 text-sm">
+                      Diese Personen wurden im Fraktionstext erwähnt und können als eigenständige NPCs angelegt werden:
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {importantMembers.map((member, idx) => {
+                        const exists = isMemberExisting(member.name);
+                        return (
+                          <div
+                            key={`${member.name}-${idx}`}
+                            className="flex items-center gap-2 bg-slate-900/40 border border-hero-border/60 rounded-full px-3 py-1.5"
+                          >
+                            <span className="font-cinzel text-sm text-accent-gold">
+                              {member.name}
+                            </span>
+                            {exists ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-300 text-xs font-barlow uppercase">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Bereits als NPC vorhanden
+                              </span>
+                            ) : (
+                              isGM && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePromoteMember(member)}
+                                  className="inline-flex items-center gap-1 rounded border border-accent-gold/60 bg-hero-dark/60 px-2 py-0.5 font-barlow text-[11px] uppercase text-accent-gold hover:bg-accent-gold/30 transition-colors"
+                                  title={`${member.name} als NPC anlegen`}
+                                >
+                                  <UserPlus className="h-3 w-3" />
+                                  NPC anlegen
+                                </button>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Secrets Manager */}
           <div
             className="rounded-lg relative overflow-hidden shadow-xl transition-shadow duration-300"
@@ -715,18 +943,31 @@ export function FactionDetailPage({
               <GothicSpotlightDescription
                 backgroundImageUrl={faction.image_url || undefined}
               >
+                {isGM && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsSecretModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      ✨ Plot-Geheimnis mit KI weben
+                    </button>
+                  </div>
+                )}
                 <SecretsManager
                   entityId={faction.id}
                   entityType="faction"
                   campaignId={campaignId}
                   isGM={isGM}
+                  refreshKey={secretsRefreshKey}
                 />
               </GothicSpotlightDescription>
             </div>
           </div>
 
           {/* Members Section */}
-          {visibleNPCs.length > 0 && (
+          {faction.npcs && faction.npcs.length > 0 && (
             <div
               className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
               style={{
@@ -742,10 +983,10 @@ export function FactionDetailPage({
               <div className="relative z-10">
                 <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
                   <Users className="h-6 w-6" />
-                  Mitglieder ({visibleNPCs.length})
+                  Mitglieder ({faction.npcs.length})
                 </h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {visibleNPCs.map((npc) => (
+                  {faction.npcs.map((npc) => (
                     <Link
                       key={npc.id}
                       href={`/dashboard/campaigns/${campaignId}/npcs/${npc.id}`}
@@ -935,6 +1176,53 @@ export function FactionDetailPage({
           </div>
         </div>
       </div>
+
+      {/* NPC-AI-Wizard für wichtige Mitglieder */}
+      {showNPCWizard && selectedMember && (
+        <AIGenerationWizard
+          campaignId={campaignId}
+          factions={[{ id: faction.id, name: faction.name }]}
+          locations={locations}
+          onClose={() => {
+            setShowNPCWizard(false);
+            setSelectedMember(null);
+          }}
+          onSuccess={() => {
+            setShowNPCWizard(false);
+            setSelectedMember(null);
+            router.refresh();
+          }}
+          hookContext={{
+            hook: {
+              name: selectedMember.name || undefined,
+              role: "Wichtiges Mitglied der Fraktion",
+              description: `Dieser Charakter ist ein wichtiges Mitglied der Fraktion ${faction.name}. Hintergrund: ${
+                selectedMember.description || faction.important_npcs_info || ""
+              }`,
+              is_alive: true,
+            },
+          }}
+          defaultFactionId={faction.id}
+          defaultBriefingPrefix={`Dieser Charakter ist ein wichtiges Mitglied der Fraktion ${faction.name}.`}
+        />
+      )}
+
+      {/* Universal Secret AI Modal */}
+      {isGM && (
+        <UniversalSecretModal
+          entityId={faction.id}
+          entityType="faction"
+          campaignId={campaignId}
+          entityName={faction.name}
+          isOpen={isSecretModalOpen}
+          onClose={() => setIsSecretModalOpen(false)}
+          onCreated={() => {
+            // Trigger refresh der Secrets-Liste
+            setSecretsRefreshKey((prev) => prev + 1);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

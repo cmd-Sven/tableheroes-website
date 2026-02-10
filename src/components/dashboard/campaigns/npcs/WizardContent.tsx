@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { X, ChevronLeft, Sparkles, Loader2, CheckCircle2, ArrowRight, Eye, HeartPulse, Scroll } from "lucide-react";
 import { ContextNPCsWidget, type InferenceSuggestion } from "./NPCForm";
 import { SmartLocationCombobox } from "./SmartLocationCombobox";
@@ -31,6 +31,7 @@ type WizardData = {
   selectedContextNPCs: Array<{ npcId: string; relationType: string }>;
   inferenceSuggestions: Record<string, InferenceSuggestion[]>;
   selectedInferenceSuggestions: Set<string>;
+  processedHooks?: Set<string>; // Set von Hook-Namen, die bereits verarbeitet wurden
   worldEntities?: {
     locations: WorldEntity[];
     factions: WorldEntity[];
@@ -589,6 +590,10 @@ export function WizardContent({
                       (c) => c.name.toLowerCase().trim() === npc.name.toLowerCase().trim()
                     );
                     const isExisting = npc.existsInCampaign || !!existingNPC;
+                    const hookKey = npc.name.toLowerCase().trim();
+                    const isProcessed = wizardData.processedHooks?.has
+                      ? wizardData.processedHooks.has(hookKey)
+                      : false;
                     
                     return (
                       <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-hero-border bg-hero-dark/30">
@@ -627,12 +632,22 @@ export function WizardContent({
                         ) : (
                           <button
                             type="button"
+                            disabled={isProcessed}
                             onClick={() => {
-                              alert(`"${npc.name}" wird als NPC-Hook markiert. Du kannst ihn später im Wizard erstellen.`);
+                              // Lokalen Hook-Status aktualisieren, damit der Button seinen Zustand ändert
+                              const next = new Set(wizardData.processedHooks ?? new Set<string>());
+                              next.add(hookKey);
+                              updateWizardData({
+                                processedHooks: next as any,
+                              });
                             }}
-                            className="ml-4 px-4 py-2 rounded border border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant font-barlow font-bold text-sm uppercase hover:bg-hero-vibrant/30 transition-colors"
+                            className={`ml-4 px-4 py-2 rounded font-barlow font-bold text-sm uppercase transition-colors border ${
+                              isProcessed
+                                ? "border-emerald-500 text-emerald-300 bg-transparent cursor-default"
+                                : "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant hover:bg-hero-vibrant/30"
+                            }`}
                           >
-                            [+] Als Hook anlegen
+                            {isProcessed ? "✅ Hook angelegt" : "[+] Als Hook anlegen"}
                           </button>
                         )}
                       </div>

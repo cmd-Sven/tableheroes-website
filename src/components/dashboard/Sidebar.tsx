@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useParams, useSearchParams } from "next/navigation";
+import {
+  usePathname,
+  useParams,
+  useSearchParams,
+  useRouter,
+} from "next/navigation";
 import {
   Home,
   Map,
@@ -23,30 +28,66 @@ import {
   Shield,
   FileText,
   ArrowLeft,
+  Inbox,
+  Award,
+  Trophy,
+  Megaphone,
+  Newspaper,
+  Hammer,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
+import { toggleMaintenanceMode } from "@/src/lib/actions/admin-actions";
 
 type SidebarProps = {
   user: {
+    id?: string;
     username: string | null;
     avatar_url: string | null;
     email: string | undefined;
     primary_role: string | null;
+    role?: string | null;
+    display_name?: string | null;
   };
   initialCollapsed?: boolean;
+  /** Anzahl ausstehender Bewerbungen (für GM) – wird am GM-Inbox-Link als Badge angezeigt */
+  pendingApplicationsCount?: number;
+  /** Wartungsmodus aktiv (nur für Admins) */
+  maintenanceMode?: boolean;
 };
 
-export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
+export function Sidebar({
+  user,
+  initialCollapsed = false,
+  pendingApplicationsCount = 0,
+  maintenanceMode = false,
+}: SidebarProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false); // Mobile menu
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
+  const [maintenanceToggling, setMaintenanceToggling] = useState(false);
   const pathname = usePathname();
   const params = useParams();
   const searchParams = useSearchParams();
-  const role = user.primary_role || "Player";
+  const role = user.primary_role || user?.role || "Player";
+  const isAdmin =
+    user?.role === "Admin" ||
+    user?.primary_role === "Admin" ||
+    user?.username === "Gamemaster";
+
+  // Debug: Rollen-Anzeige (F12 → Konsole)
+  useEffect(() => {
+    console.log("DEBUG SIDEBAR:", {
+      role: user?.role,
+      primary: user?.primary_role,
+      username: user?.username,
+      isAdmin,
+    });
+  }, [user?.role, user?.primary_role, user?.username, isAdmin]);
 
   // Check if we're inside a campaign route
-  const isInCampaign = params?.id && pathname?.startsWith("/dashboard/campaigns/");
+  const isInCampaign =
+    params?.id && pathname?.startsWith("/dashboard/campaigns/");
   const campaignId = isInCampaign ? (params.id as string) : null;
   const currentTab = searchParams?.get("tab") || "overview";
 
@@ -77,22 +118,109 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
 
   // Mode A: General Dashboard Navigation (Default)
   const generalNav = [
-    { href: "/dashboard", label: "Meine Kampagnen", icon: Map },
+    { href: "/dashboard", label: "Mein Dashboard", icon: Home },
+    { href: "/dashboard/my-campaigns", label: "Meine Kampagnen", icon: Map },
     { href: "/dashboard/characters", label: "Charaktere", icon: Users },
+    { href: "/dashboard/achievements", label: "Achievements", icon: Award },
+    { href: "/dashboard/news", label: "News-Archiv", icon: Newspaper },
+    ...(role === "GameMaster"
+      ? [
+          {
+            href: "/dashboard/gm/achievements",
+            label: "Achievement anlegen (GM)",
+            icon: Trophy,
+          },
+        ]
+      : []),
   ];
+
+  // Admin-Sektion: ausschließlich über isAdmin steuern
+  const adminItems = isAdmin
+    ? [
+        {
+          href: "/dashboard/admin/users",
+          label: "Nutzer-Verwaltung",
+          icon: Users,
+        },
+        {
+          href: "/dashboard/admin/news",
+          label: "Plattform-News",
+          icon: Newspaper,
+        },
+        {
+          href: "/dashboard/gm/achievements",
+          label: "Achievement-Studio",
+          icon: Trophy,
+        },
+      ]
+    : [];
+
+  async function handleToggleMaintenance() {
+    setMaintenanceToggling(true);
+    try {
+      await toggleMaintenanceMode();
+      router.refresh();
+    } finally {
+      setMaintenanceToggling(false);
+    }
+  }
 
   // Campaign-specific Navigation (only visible when in campaign)
   const campaignNav = campaignId
     ? [
-        { href: `/dashboard/campaigns/${campaignId}?tab=overview`, label: "Übersicht", icon: Home, tab: "overview" },
-        { href: `/dashboard/campaigns/${campaignId}?tab=sessions`, label: "Sessions", icon: Calendar, tab: "sessions" },
-        { href: `/dashboard/campaigns/${campaignId}?tab=lore`, label: "Welt & Lore", icon: Book, tab: "lore" },
-        { href: `/dashboard/campaigns/${campaignId}?tab=npcs`, label: "NPCs & Fraktionen", icon: User, tab: "npcs" },
-        { href: `/dashboard/campaigns/${campaignId}?tab=quests`, label: "Quests", icon: ScrollText, tab: "quests" },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=overview`,
+          label: "Übersicht",
+          icon: Home,
+          tab: "overview",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=sessions`,
+          label: "Sessions",
+          icon: Calendar,
+          tab: "sessions",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=lore`,
+          label: "Welt & Lore",
+          icon: Book,
+          tab: "lore",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=npcs`,
+          label: "NPCs & Fraktionen",
+          icon: User,
+          tab: "npcs",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=quests`,
+          label: "Quests",
+          icon: ScrollText,
+          tab: "quests",
+        },
         ...(role === "GameMaster" || role === "Admin"
-          ? [{ href: `/dashboard/campaigns/${campaignId}?tab=members`, label: "Mitglieder", icon: Users, tab: "members" }]
+          ? [
+              {
+                href: `/dashboard/campaigns/${campaignId}?tab=members`,
+                label: "Mitglieder",
+                icon: Users,
+                tab: "members",
+              },
+              {
+                href: `/dashboard/campaigns/${campaignId}/gm-inbox`,
+                label: "GM Inbox",
+                icon: Inbox,
+                tab: undefined,
+                badge: pendingApplicationsCount,
+              },
+              {
+                href: `/dashboard/campaigns/${campaignId}?tab=settings`,
+                label: "Einstellungen",
+                icon: Settings,
+                tab: "settings",
+              },
+            ]
           : []),
-        { href: `/dashboard/campaigns/${campaignId}?tab=settings`, label: "Einstellungen", icon: Settings, tab: "settings" },
       ]
     : [];
 
@@ -114,14 +242,17 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
     icon: Icon,
     isActive,
     tab,
+    badge,
   }: {
     href: string;
     label: string;
     icon: any;
     isActive?: boolean;
     tab?: string;
+    badge?: number;
   }) {
     const active = isActive || (tab && currentTab === tab);
+    const showBadge = typeof badge === "number" && badge > 0;
     return (
       <Link
         href={href}
@@ -138,7 +269,21 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
             active ? "text-accent-gold" : "text-gray-500"
           }`}
         />
-        {!isCollapsed && <span>{label}</span>}
+        {!isCollapsed && (
+          <>
+            <span className="flex-1">{label}</span>
+            {showBadge && (
+              <span className="bg-red-500 text-white text-xs rounded-full min-w-5 px-2 py-0.5 text-center font-barlow font-bold">
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
+          </>
+        )}
+        {isCollapsed && showBadge && (
+          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+            {badge > 9 ? "9+" : badge}
+          </span>
+        )}
         {isCollapsed && (
           <span className="absolute left-full ml-2 z-50 hidden rounded bg-black border border-gray-700 px-2 py-1 text-xs font-barlow font-bold uppercase text-white shadow-lg group-hover:block whitespace-nowrap">
             {label}
@@ -162,23 +307,32 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 transform bg-black border-r border-gray-700 transition-all duration-200 ease-in-out md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 transform gothic-sidebar border-r border-hero-border shadow-2xl shadow-black/70 transition-all duration-200 ease-in-out md:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } ${isCollapsed ? "w-16" : "w-64"}`}
       >
-        <div className="flex h-full flex-col">
+        <div className="flex h-full flex-col relative">
           {/* Logo Header */}
-          <div className={`flex h-16 items-center gap-2 border-b border-gray-700 px-6 ${isCollapsed ? "justify-center px-2" : ""}`}>
-            <Sparkles className="h-6 w-6 text-accent-gold flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="font-barlow font-bold text-xl uppercase tracking-wide text-hero-vibrant">
-                TableHeroes
-              </span>
-            )}
+          <div
+            className={`flex h-16 items-center gap-2 border-b border-hero-border/60 bg-black/70 backdrop-blur-sm px-6 ${
+              isCollapsed ? "justify-center px-2" : ""
+            }`}
+          >
+            <Image
+              src="/images/tableHeroes-logo.png"
+              alt="TableHeroes"
+              width={200}
+              height={40}
+              className={`h-auto flex-shrink-0 ${
+                isCollapsed ? "w-10" : "w-40"
+              }`}
+              style={{ height: "auto" }}
+              priority={false}
+            />
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
+          <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto bg-black/70">
             {/* Mode B: Campaign Mode - Back Button */}
             {isInCampaign && (
               <div className="mb-4">
@@ -219,8 +373,55 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
                     label={item.label}
                     icon={item.icon}
                     isActive={pathname === item.href}
+                    badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* ADMINISTRATION: nur sichtbar wenn isAdmin */}
+            {!isInCampaign && isAdmin && (
+              <div className="space-y-1 mt-6 pt-6">
+                <hr className="border-hero-border/60 mb-4 mx-3" />
+                {!isCollapsed && (
+                  <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-accent-gold/90 tracking-wider">
+                    ADMINISTRATION
+                  </p>
+                )}
+                {adminItems.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={pathname === item.href}
+                  />
+                ))}
+                {!isCollapsed && (
+                  <div className="px-3 py-2 flex items-center justify-between gap-2 rounded-md hover:bg-hero-dark/10">
+                    <span className="flex items-center gap-2 text-xs font-barlow font-bold uppercase text-gray-500">
+                      <Hammer className="h-4 w-4 text-accent-gold/70" />
+                      Wartungsmodus
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleToggleMaintenance}
+                      disabled={maintenanceToggling}
+                      className={`relative h-6 w-10 rounded-full transition-colors shrink-0 ${
+                        maintenanceMode
+                          ? "bg-accent-gold/70"
+                          : "bg-hero-dark border border-hero-border"
+                      } ${maintenanceToggling ? "opacity-60" : ""}`}
+                      title={maintenanceMode ? "Wartung aus" : "Wartung an"}
+                    >
+                      <span
+                        className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                          maintenanceMode ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -239,28 +440,40 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
                     label={item.label}
                     icon={item.icon}
                     tab={item.tab}
-                    isActive={false}
+                    isActive={
+                      item.href?.includes("/gm-inbox")
+                        ? pathname.includes("/gm-inbox")
+                        : false
+                    }
+                    badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
                   />
                 ))}
               </div>
             )}
 
-            {/* Settings (Always at bottom) */}
-            <div className="space-y-1 mt-6 pt-6 border-t border-gray-700">
-              {settingsNav.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  isActive={pathname === item.href && !isInCampaign}
-                />
-              ))}
-            </div>
+            {/* Einstellungen & System: bleibt unten, wenn nicht in Kampagne */}
+            {!isInCampaign && (
+              <div className="space-y-1 mt-auto pt-6 border-t border-hero-border/60">
+                {!isCollapsed && (
+                  <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">
+                    System
+                  </p>
+                )}
+                {settingsNav.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={pathname === item.href}
+                  />
+                ))}
+              </div>
+            )}
           </nav>
 
           {/* Toggle Collapse Button */}
-          <div className="border-t border-gray-700 p-2">
+          <div className="border-t border-hero-border/60 bg-black/70 p-2">
             <button
               onClick={toggleCollapse}
               className="w-full flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant transition-colors"
@@ -275,8 +488,12 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
           </div>
 
           {/* User Footer */}
-          <div className="border-t border-gray-700 bg-black p-4">
-            <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
+          <div className="border-t border-hero-border/60 bg-black/80 p-4">
+            <div
+              className={`flex items-center gap-3 ${
+                isCollapsed ? "justify-center" : ""
+              }`}
+            >
               <div className="relative h-10 w-10 overflow-hidden rounded-full border border-hero-border bg-background-dark flex-shrink-0">
                 {user.avatar_url ? (
                   <Image
@@ -287,15 +504,19 @@ export function Sidebar({ user, initialCollapsed = false }: SidebarProps) {
                   />
                 ) : (
                   <div className="grid h-full w-full place-items-center bg-hero-dark text-white font-bold">
-                    {(user.username?.[0] || user.email?.[0] || "U").toUpperCase()}
+                    {(
+                      user.username?.[0] ||
+                      user.email?.[0] ||
+                      "U"
+                    ).toUpperCase()}
                   </div>
                 )}
               </div>
               {!isCollapsed && (
                 <div className="flex-1 overflow-hidden min-w-0">
                   <p className="truncate font-barlow font-bold text-sm text-white flex items-center gap-1">
-                    {role === "GameMaster" || role === "Admin" ? "👑" : "🛡️"}{" "}
-                    {user.username || "Held"}
+                    {role === "GameMaster" || isAdmin ? "👑" : "🛡️"}{" "}
+                    {user.display_name || user.username || "Abenteurer"}
                   </p>
                   <p className="truncate font-libre text-xs text-gray-500">
                     {user.email}

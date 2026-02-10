@@ -55,6 +55,7 @@ type Quest = {
 type Props = {
   campaignId: string;
   initialData?: Quest | null;
+  defaultQuestGiverId?: string;
   npcs: Array<{ id: string; name: string; title: string | null; role: string | null }>;
   locations: Array<{ id: string; name: string; type: string }>;
   characters?: Character[];
@@ -85,7 +86,7 @@ type Participant = {
   role_description: string;
 };
 
-export function QuestForm({ campaignId, initialData, npcs, locations, characters = [], members = [], onSuccess }: Props) {
+export function QuestForm({ campaignId, initialData, defaultQuestGiverId, npcs, locations, characters = [], members = [], onSuccess }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -130,7 +131,7 @@ export function QuestForm({ campaignId, initialData, npcs, locations, characters
         title: "",
         type: "Side Quest",
         status: "Active",
-        quest_giver_id: "",
+        quest_giver_id: defaultQuestGiverId || "",
         location_id: "",
         assigned_character_id: "",
         description: "",
@@ -141,7 +142,7 @@ export function QuestForm({ campaignId, initialData, npcs, locations, characters
       setQuestTargetType("group");
       setParticipants([]);
     }
-  }, [initialData]);
+  }, [initialData, defaultQuestGiverId]);
 
   const loadParticipants = async () => {
     if (!initialData?.id) return;

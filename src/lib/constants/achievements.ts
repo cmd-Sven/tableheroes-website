@@ -1,0 +1,83 @@
+/** Bekannte Achievement-Namen (müssen in Tabelle achievements existieren). */
+export const ACHIEVEMENT_NAMES = {
+  SLOGAN_SCHMIED: "Slogan-Schmied",
+  ERSTER_ATEMZUG: "Der erste Atemzug",
+  NEUES_GESICHT: "Ein neues Gesicht",
+  PIZZA_BESTECHUNG: "Pizza-Bestechung",
+  SCHAUSPIEL_LEGENDE: "Schauspiel-Legende",
+} as const;
+
+/** Alle 30 Achievements für GM-Vergabe (Name = Anzeige in DB). */
+export const ALL_ACHIEVEMENT_NAMES: readonly string[] = [
+  "Slogan-Schmied",
+  "Der erste Atemzug",
+  "Ein neues Gesicht",
+  "Pizza-Bestechung",
+  "Schauspiel-Legende",
+  "Quest-Meister",
+  "Lore-Wächter",
+  "NPC-Flüsterer",
+  "Session-Held",
+  "Würfel-Glück",
+  "Team-Player",
+  "Erzähler",
+  "Taktiker",
+  "Entdecker",
+  "Diplomat",
+  "Schatzsucher",
+  "Kartenzeichner",
+  "Weltenschmied",
+  "Charakter-Veteran",
+  "Kampagnen-Gründer",
+  "Treuer Begleiter",
+  "Kritiker-Würze",
+  "Nachtwache",
+  "Geschichten-Sammler",
+  "Rollen-Spieler",
+  "Impro-König",
+  "Regel-Wächter",
+  "Atmosphären-Zauberer",
+  "Epischer Moment",
+  "Community-Stern",
+];
+
+/**
+ * Zuordnung Achievement-Name (DB) → Dateiname in /images/achievement/.
+ * Wird genutzt, wenn in der DB kein icon gesetzt ist (z. B. für Seed-Achievements).
+ */
+export const ACHIEVEMENT_IMAGE_FILENAMES: Record<string, string> = {
+  "Slogan-Schmied": "Schmiedemeister.png",
+  "Der erste Atemzug": "heroischer Held.png",
+  "Ein neues Gesicht": "Fröhlich und unschuldig durch die Welt.png",
+  "Pizza-Bestechung": "Kochexperte.png",
+  "Schauspiel-Legende": "Verführerisch.png",
+  "Quest-Meister": "Quest erledigt.png",
+  "Lore-Wächter": "Bücherwurm.png",
+  "NPC-Flüsterer": "Beziehungsexperte.png",
+  "Session-Held": "Pünktlichkeit ist wichtig.png",
+  "Würfel-Glück": "Natürliche 20.png",
+  "Team-Player": "Trinkfest und standhaft.png",
+  Erzähler: "barden zum schweigen gebracht.png",
+  Taktiker: "Taktiker.png",
+  Entdecker: "Geiriger-Abenteurer.png",
+  Diplomat: "Experte-Einschüchtern.png",
+  Schatzsucher: "MEgaschatz.png",
+  Kartenzeichner: "Steinliebhaber.png",
+  Weltenschmied: "Schmiedemeister.png",
+  "Charakter-Veteran": "heroischer Held.png",
+  "Kampagnen-Gründer": "Edles Streitross.png",
+  "Treuer Begleiter": "Tierliebhaber.png",
+  "Kritiker-Würze": "NArrenkönig.png",
+  Nachtwache: "Regelhüter.png",
+  "Geschichten-Sammler": "Bücherwurm.png",
+  "Rollen-Spieler": "Modebewusst.png",
+  "Impro-König": "NArrenkönig.png",
+  "Regel-Wächter": "Regelhüter.png",
+  "Atmosphären-Zauberer": "Nerkomantie ist cool.png",
+  "Epischer Moment": "heroischer Held.png",
+  "Community-Stern": "Zu Schön fürs Abenteuer.png",
+  // Dateiname im Ordner: "zuviel Gepäck.png" (klein geschrieben)
+  "Zuviel Gepäck": "zuviel Gepäck.png",
+  "zuviel Gepäck": "zuviel Gepäck.png",
+  "Zu viel Gepäck": "zuviel Gepäck.png",
+};

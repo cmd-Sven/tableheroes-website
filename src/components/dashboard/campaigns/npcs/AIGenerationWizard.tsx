@@ -3,7 +3,7 @@
 import React, { useState, useTransition, useEffect, useCallback } from "react";
 import { generateNPC, analyzeWorldContext, analyzeBriefingForNPCs } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
 import { createNPC, getNPCsByContext, getNPCsForAnalysis, getNPCNarrativeHooks } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
-import { createNPCRelationManually, createNPCRelation } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
+import { createNPCRelationManually, createNPCRelation, createNPCRelationFromHook, updateHookRelationsToNPC } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
 import { createLocationQuick, getLocationDetailsForAI } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { createFactionQuick, getFactionDetailsForAI } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { createSecret } from "@/src/app/dashboard/campaigns/[id]/secrets-actions";
@@ -34,6 +34,7 @@ type WizardData = {
   selectedContextNPCs: Array<{ npcId: string; relationType: string }>;
   inferenceSuggestions: Record<string, InferenceSuggestion[]>;
   selectedInferenceSuggestions: Set<string>;
+  processedHooks?: Set<string>; // Set von Hook-Namen, die bereits verarbeitet wurden
   worldEntities?: {
     locations: WorldEntity[];
     factions: WorldEntity[];
@@ -78,7 +79,7 @@ type WizardData = {
 
 type Props = {
   campaignId: string;
-  factions: Array<{ id: string; name: string }>;
+  factions: Array<{ id: string; name: string; appearance?: string | null; structure?: string | null; philosophy?: string | null }>;
   locations: Array<{ id: string; name: string; type: string }>;
   onClose: () => void;
   onSuccess?: () => void;
@@ -93,9 +94,30 @@ type Props = {
     };
   };
   embedded?: boolean;
+  // Optional: Standard-Fraktion für neue NPCs (z.B. aus Fraktions-Detailansicht)
+  defaultFactionId?: string;
+  // Optional: zusätzlicher Prefix für das Briefing (z.B. Fraktions-Kontext)
+  defaultBriefingPrefix?: string;
+  /** Vorbefüllung aus GM Inbox (Spieler-NPC-Wunsch) */
+  prefillName?: string;
+  prefillRole?: string;
+  prefillDescription?: string;
 };
 
-export function AIGenerationWizard({ campaignId, factions, locations, onClose, onSuccess, hookContext, embedded = false }: Props) {
+export function AIGenerationWizard({
+  campaignId,
+  factions,
+  locations,
+  onClose,
+  onSuccess,
+  hookContext,
+  embedded = false,
+  defaultFactionId,
+  defaultBriefingPrefix,
+  prefillName,
+  prefillRole,
+  prefillDescription,
+}: Props) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isPending, startTransition] = useTransition();
@@ -137,11 +159,13 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
     setFactionsList(factions);
   }, [factions]);
 
-  // Initialize wizard data with hook context if provided
+  // Initialize wizard data with hook context or GM-Inbox-Prefill if provided
   const getInitialWizardData = (): WizardData => {
     const hookName = hookContext?.hook?.name && hookContext.hook.name.trim().toLowerCase() !== "unbekannt" 
       ? hookContext.hook.name 
       : "";
+    const prefillNameTrim = (prefillName ?? "").trim();
+    const name = hookName || prefillNameTrim || "";
     
     const initialContextNPCs: Array<{ npcId: string; relationType: string }> = [];
     if (hookContext?.sourceNPCId && hookContext?.hook?.role) {
@@ -152,19 +176,39 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
       });
     }
 
+    // Erstelle Kontext-Notiz für Hook-Promotion oder GM-Inbox-Prefill
+    let initialBriefing = "";
+    if (hookContext?.sourceNPCName && hookContext?.hook?.role && hookName) {
+      initialBriefing = `Dieser Charakter ist ${hookContext.hook.role} von ${hookContext.sourceNPCName}.`;
+      if (hookContext.hook.description) {
+        initialBriefing += ` ${hookContext.hook.description}`;
+      }
+    }
+    if (prefillDescription?.trim()) {
+      initialBriefing = initialBriefing ? `${initialBriefing} ${prefillDescription.trim()}` : prefillDescription.trim();
+    }
+
+    // Optionaler zusätzlicher Briefing-Prefix (z.B. Fraktions-Kontext)
+    if (defaultBriefingPrefix) {
+      initialBriefing = `${defaultBriefingPrefix.trim()}${initialBriefing ? " " + initialBriefing : ""}`;
+    }
+
+    const role = hookContext?.hook?.role || (prefillRole ?? "").trim() || "";
+
     return {
-      name: hookName,
+      name,
       race: "",
-      role: hookContext?.hook?.role || "",
+      role,
       status: hookContext?.hook?.is_alive !== false ? "Alive" : "Deceased",
       alignment: "",
-      briefing: "",
-      faction_id: "",
+      briefing: initialBriefing,
+      faction_id: defaultFactionId || "",
       current_location_id: "",
       home_location_id: "",
       selectedContextNPCs: initialContextNPCs,
       inferenceSuggestions: {},
       selectedInferenceSuggestions: new Set(),
+      processedHooks: new Set<string>(), // Initialisiere processedHooks als leeres Set
     };
   };
 
@@ -231,7 +275,28 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
     setIsTransitioning(true);
     setTransitionMessage("Sammle Informationen...");
     
-    if (wizardData.briefing && wizardData.briefing.trim()) {
+    // Fraktions-Kontext (falls Fraktion ausgewählt)
+    let enrichedBriefing = wizardData.briefing || "";
+    if (wizardData.faction_id) {
+      const selectedFaction = factionsList.find((f: any) => f.id === wizardData.faction_id);
+      if (selectedFaction) {
+        const parts: string[] = [];
+        parts.push(`FRAKTIONS-KONTEXT: Der NPC ist Mitglied der Fraktion "${selectedFaction.name}".`);
+        if (selectedFaction.appearance) {
+          parts.push(`Erscheinungsbild der Fraktion: ${selectedFaction.appearance}`);
+        }
+        if (selectedFaction.philosophy) {
+          parts.push(`Philosophie/Ziele der Fraktion: ${selectedFaction.philosophy}`);
+        }
+        if (selectedFaction.structure) {
+          parts.push(`Organisationsstruktur der Fraktion: ${selectedFaction.structure}`);
+        }
+        const factionContextBlock = parts.join(" ");
+        enrichedBriefing = `${factionContextBlock}${enrichedBriefing ? "\n\n" + enrichedBriefing : ""}`;
+      }
+    }
+
+    if (enrichedBriefing && enrichedBriefing.trim()) {
       setIsAnalyzingWorld(true);
       setIsAnalyzingBriefing(true);
       setTransitionMessage("KI analysiert deine Vorgaben...");
@@ -239,7 +304,7 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
         const [worldAnalysis, npcAnalysis] = await Promise.all([
           analyzeWorldContext(
             campaignId,
-            wizardData.briefing,
+            enrichedBriefing,
             locationsList.map((loc: any) => ({ id: loc.id, name: loc.name, type: loc.type })),
             factionsList.map((f: any) => ({ id: f.id, name: f.name, type: undefined }))
           ),
@@ -247,7 +312,7 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
             const existingNPCs = await getNPCsForAnalysis(campaignId);
             return await analyzeBriefingForNPCs(
               campaignId,
-              wizardData.briefing,
+              enrichedBriefing,
               (existingNPCs as any[]).map((npc: any) => ({ id: npc.id, name: npc.name })),
               wizardData.faction_id || null,
               wizardData.name || null
@@ -717,20 +782,47 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
           await Promise.all(secretPromises);
         }
 
-        if (hookContext?.sourceNPCId) {
+        if (hookContext?.sourceNPCId && hookContext.hook) {
           const sourceNPCAlreadyInRelations = wizardData.selectedContextNPCs.some(
             (ctx: any) => ctx.npcId === hookContext.sourceNPCId
           );
           
           if (!sourceNPCAlreadyInRelations && hookContext.hook?.role) {
             try {
-              await createNPCRelationManually(
+              // Verwende createNPCRelationFromHook für Hook-Relationen (nutzt target_name)
+              const hookName = hookContext.hook.name || wizardData.name;
+              const hookPayload = {
+                name: hookContext.hook.name,
+                role: hookContext.hook.role,
+                description: hookContext.hook.description ?? "",
+                is_alive: hookContext.hook.is_alive ?? true,
+              };
+              const result = await createNPCRelationFromHook(
                 campaignId,
                 hookContext.sourceNPCId,
-                createdNPC.id,
-                hookContext.hook.role,
-                `Erstellt aus Story-Hook: ${hookContext.hook.description || ""}`
+                hookName, // target_name = Name des Hooks (z.B. "Sandra")
+                hookPayload
               );
+
+              // Prüfe, ob die Relation bereits existierte
+              if (result.alreadyExisted) {
+                console.log("ℹ️ [AIGenerationWizard] Hook-Relation existierte bereits:", hookName);
+              }
+
+              // Wenn der NPC erfolgreich erstellt wurde, aktualisiere die Hook-Relationen
+              // (konvertiere target_name zu npc_id_2)
+              try {
+                const updateResult = await updateHookRelationsToNPC(
+                  campaignId,
+                  hookContext.sourceNPCId,
+                  hookName,
+                  createdNPC.id
+                );
+                console.log("✅ [AIGenerationWizard] Hook-Relationen aktualisiert:", updateResult);
+              } catch (updateError) {
+                // Warnung, aber kein Fehler - NPC wurde bereits erstellt
+                console.warn("⚠️ [AIGenerationWizard] Hook-Relationen-Update fehlgeschlagen:", updateError);
+              }
             } catch (error) {
               console.error("Fehler beim Erstellen der Hook-Relation:", error);
             }
@@ -826,9 +918,29 @@ export function AIGenerationWizard({ campaignId, factions, locations, onClose, o
 
   if (!embedded) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-dark/95 p-4">
-        <div className="relative w-full max-w-5xl max-h-[90vh] bg-background-card rounded-lg overflow-hidden flex flex-col shadow-2xl border border-hero-border">
-          {content}
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          className="relative w-full max-w-5xl h-[90vh] max-h-[90vh] rounded-lg overflow-hidden flex flex-col shadow-2xl border-2 border-accent-gold/50"
+          style={{
+            backgroundColor: "#18181b",
+            backgroundImage: "url('/images/scroll-paper.png')",
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        >
+          {/* Dunkle Ebene für Kontrast und Lesbarkeit */}
+          <div
+            className="absolute inset-0 bg-black/50 pointer-events-none"
+            aria-hidden="true"
+          />
+          <div className="relative z-10 flex flex-col flex-1 min-h-0 overflow-hidden text-gray-100">
+            {content}
+          </div>
         </div>
       </div>
     );

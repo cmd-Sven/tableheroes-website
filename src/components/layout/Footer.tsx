@@ -66,6 +66,15 @@ export function Footer() {
 
       {/* Bottom Section - Navigation & Socials */}
       <footer className="bg-[#051a02] relative" style={{ zIndex: 3 }}>
+        {/* Hintergrund-Layer nur für den grünen Footer mit Fade nach oben */}
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            backgroundColor: "#051a02",
+            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 20%, black 100%)",
+            maskImage: "linear-gradient(to bottom, transparent 0%, black 20%, black 100%)",
+          }}
+        />
         {/* Image Overlay - 90% in Kontakt-Sektion, 10% in Footer */}
         {/* Bild am Anfang des Footers, mit translateY(-90%) verschoben */}
         <div
@@ -94,7 +103,10 @@ export function Footer() {
             </div>
           </div>
         </div>
-        <div className="container mx-auto max-w-7xl px-6 py-12 relative" style={{ zIndex: 10 }}>
+        <div
+          className="container mx-auto max-w-7xl px-6 pb-[198px] relative"
+          style={{ zIndex: 10, paddingTop: "168px" }} // Ursprünglich ca. 48px (pt-12) + 120px zusätzlicher Shift
+        >
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Column 1 - Brand */}
           <div>

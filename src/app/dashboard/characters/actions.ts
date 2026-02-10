@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 /**
  * @deprecated Diese Funktion ist veraltet. Charaktere können nur noch innerhalb einer Kampagne erstellt werden.
  * Nutze stattdessen `submitCharacterApplication` aus `application-actions.ts`.
- * 
+ *
  * Diese Funktion wurde abgesichert, um zu verhindern, dass kontextlose Charaktere erstellt werden.
  */
 export async function createCharacter(formData: FormData) {
@@ -39,7 +39,9 @@ export async function createCharacter(formData: FormData) {
 
   // HARTE VALIDIERUNG: Charaktere können nur innerhalb einer Kampagne erstellt werden
   if (!campaign_id) {
-    throw new Error("Charaktere können nur innerhalb einer Kampagne erstellt werden. Bitte bewerbe dich zuerst bei einer Kampagne.");
+    throw new Error(
+      "Charaktere können nur innerhalb einer Kampagne erstellt werden. Bitte bewerbe dich zuerst bei einer Kampagne.",
+    );
   }
 
   // Insert character
@@ -86,10 +88,9 @@ export async function deleteCharacter(characterId: string) {
   const character = characterRaw as { user_id: string } | null;
 
   if (!character || character.user_id !== user.id) {
-    throw new Error("Unauthorized: Not your character.");
+    throw new Error("Keine Berechtigung: Dieser Charakter gehört dir nicht.");
   }
 
-  // Delete character
   const { error } = await (supabase.from("characters") as any)
     .delete()
     .eq("id", characterId);
@@ -99,6 +100,5 @@ export async function deleteCharacter(characterId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
-

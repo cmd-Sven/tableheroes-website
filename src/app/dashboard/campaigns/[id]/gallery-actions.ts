@@ -4,16 +4,16 @@ import { createClient } from "@/src/lib/supabase/server";
 
 /**
  * Server Action: Get Campaign Gallery Images
- * 
+ *
  * Sammelt alle öffentlichen Bilder (is_revealed === true) aus:
  * - world_lore (image_url)
  * - npcs (image_url)
  * - factions (image_url)
- * 
+ *
  * Nur für Spieler sichtbare Einträge werden zurückgegeben.
  */
 
-export type GalleryImage = {
+type GalleryImage = {
   id: string;
   url: string;
   altText: string;
@@ -21,7 +21,7 @@ export type GalleryImage = {
 };
 
 export async function getCampaignGalleryImages(
-  campaignId: string
+  campaignId: string,
 ): Promise<GalleryImage[]> {
   const supabase = await createClient();
 
@@ -41,7 +41,9 @@ export async function getCampaignGalleryImages(
     .not("image_url", "is", null);
 
   // Expliziter Cast gegen 'never'
-  const loreEntries = loreEntriesRaw as { id: string; name: string; image_url: string }[] | null;
+  const loreEntries = loreEntriesRaw as
+    | { id: string; name: string; image_url: string }[]
+    | null;
 
   if (loreEntries) {
     loreEntries.forEach((entry) => {
@@ -64,7 +66,9 @@ export async function getCampaignGalleryImages(
     .not("image_url", "is", null);
 
   // Expliziter Cast gegen 'never'
-  const npcs = npcsRaw as { id: string; name: string; image_url: string }[] | null;
+  const npcs = npcsRaw as
+    | { id: string; name: string; image_url: string }[]
+    | null;
 
   if (npcs) {
     npcs.forEach((npc) => {
@@ -87,7 +91,9 @@ export async function getCampaignGalleryImages(
     .not("image_url", "is", null);
 
   // Expliziter Cast gegen 'never'
-  const factions = factionsRaw as { id: string; name: string; image_url: string }[] | null;
+  const factions = factionsRaw as
+    | { id: string; name: string; image_url: string }[]
+    | null;
 
   if (factions) {
     factions.forEach((faction) => {
@@ -104,5 +110,3 @@ export async function getCampaignGalleryImages(
 
   return galleryImages;
 }
-
-

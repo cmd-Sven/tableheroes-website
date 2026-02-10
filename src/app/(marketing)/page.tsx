@@ -10,6 +10,7 @@ import { GamificationSection } from "@/src/components/marketing/GamificationSect
 import { SystemsSection } from "@/src/components/marketing/SystemsSection";
 import { ImageSliderSection } from "@/src/components/marketing/ImageSliderSection";
 import { FaqSection } from "@/src/components/marketing/FaqSection";
+import { NewsSection } from "@/src/components/landing/NewsSection";
 
 type HeroContentType = "updates" | "membership" | "discord" | "login";
 
@@ -25,6 +26,9 @@ export default function MarketingLandingPage() {
 
       {/* Active Campaigns - direkt nach Hero für maximale Visibility */}
       <ActiveCampaignsSection />
+
+      {/* Öffentliche Neuigkeiten (Landingpage) */}
+      <NewsSection />
 
       {/* Community - das Herz von TableHeroes */}
       <CommunitySection />

@@ -72,8 +72,8 @@ export async function getLocationDetailsForAI(locationId: string, campaignId: st
     throw new Error("Nur der GM kann Location-Details für die KI-Generierung laden.");
   }
 
-  // 3. Fetch Location with Lore relation (inkl. GM-Notizen)
-  const { data: location, error } = await (supabase.from("locations") as any)
+  // 3. Primärer Versuch: Location aus der "locations"-Tabelle inkl. Lore-Relation laden
+  const { data: location, error: locationError } = await (supabase.from("locations") as any)
     .select(`
       *,
       lore:lore_id (
@@ -86,14 +86,75 @@ export async function getLocationDetailsForAI(locationId: string, campaignId: st
       )
     `)
     .eq("id", locationId)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    console.error("❌ [getLocationDetailsForAI] Error:", error);
+  if (locationError) {
+    console.error("❌ [getLocationDetailsForAI] locations error:", locationError);
+    // Wir gehen trotzdem in den Fallback, falls nötig.
+  }
+
+  if (location) {
+    console.log("✅ [getLocationDetailsForAI] Loaded location context from 'locations' table:", {
+      locationId,
+      campaignId,
+      source: "locations",
+    });
+    return location;
+  }
+
+  // 4. Fallback: Direkt aus "world_lore" lesen, falls noch kein Eintrag in "locations" existiert
+  const { data: lore, error: loreError } = await (supabase.from("world_lore") as any)
+    .select("id, campaign_id, name, type, description, gm_notes, image_url")
+    .eq("id", locationId)
+    .maybeSingle();
+
+  if (loreError) {
+    console.error("❌ [getLocationDetailsForAI] world_lore error:", loreError);
     return null;
   }
 
-  return location;
+  if (!lore) {
+    console.log("⚠️ [getLocationDetailsForAI] No location found in 'locations' or 'world_lore':", {
+      locationId,
+      campaignId,
+    });
+    return null;
+  }
+
+  if (lore.campaign_id !== campaignId) {
+    console.warn("⚠️ [getLocationDetailsForAI] world_lore entry belongs to different campaign:", {
+      locationId,
+      loreCampaignId: lore.campaign_id,
+      requestedCampaignId: campaignId,
+    });
+    return null;
+  }
+
+  // 5. Mapping: world_lore-Eintrag in eine strukturähnliche Form wie die "locations"-Abfrage bringen
+  const mappedFromLore = {
+    id: lore.id,
+    campaign_id: lore.campaign_id,
+    name: lore.name,
+    type: lore.type,
+    description: lore.description,
+    // Simulierter Lore-Join, damit generateNPC den Kontext konsistent nutzen kann
+    lore: {
+      id: lore.id,
+      name: lore.name,
+      type: lore.type,
+      description: lore.description,
+      gm_notes: (lore as any).gm_notes ?? null,
+      image_url: (lore as any).image_url ?? null,
+    },
+  };
+
+  console.log("✅ [getLocationDetailsForAI] Loaded location context from 'world_lore' fallback:", {
+    locationId,
+    campaignId,
+    source: "world_lore",
+  });
+
+  return mappedFromLore as any;
 }
 
 // ============================================================================
@@ -367,93 +428,267 @@ export async function createLocationQuick(formData: {
     throw new Error("Nur der GM kann Orte erstellen.");
   }
 
-  // 3. Validate parent_location_id if provided
+  // 3. Validate parent_location_id if provided (mit Fallback zu world_lore)
+  let validatedParentLocationId: string | null = null;
   if (formData.parent_location_id) {
+    // 3.a Primär: Prüfe, ob Parent in locations existiert
     const { data: parentLocation } = await (supabase.from("locations") as any)
       .select("id, campaign_id")
       .eq("id", formData.parent_location_id)
-      .single();
+      .maybeSingle();
 
-    if (!parentLocation || parentLocation.campaign_id !== formData.campaign_id) {
-      throw new Error("Ungültiger Parent-Ort.");
-    }
-  }
-
-  // 4. Find parent_lore_id if parent_location_id is provided
-  let parent_lore_id: string | null = null;
-  if (formData.parent_location_id) {
-    // Find the lore entry that corresponds to this location
-    const { data: parentLore } = await (supabase.from("world_lore") as any)
-      .select("id")
-      .eq("id", formData.parent_location_id) // locations.id === world_lore.id
-      .single();
-    
-    if (parentLore) {
-      parent_lore_id = parentLore.id;
+    if (parentLocation && parentLocation.campaign_id === formData.campaign_id) {
+      validatedParentLocationId = parentLocation.id;
     } else {
-      // Fallback: Check if location has lore_id field
-      const { data: parentLocation } = await (supabase.from("locations") as any)
-        .select("lore_id")
+      // 3.b Fallback: Prüfe, ob Parent in world_lore existiert
+      const { data: parentLore } = await (supabase.from("world_lore") as any)
+        .select("id, campaign_id, name, type, description, parent_id")
         .eq("id", formData.parent_location_id)
-        .single();
-      
-      if (parentLocation?.lore_id) {
-        parent_lore_id = parentLocation.lore_id;
+        .maybeSingle();
+
+      if (parentLore && parentLore.campaign_id === formData.campaign_id) {
+        // Rekursiv: Erstelle Parent-Ort, falls er noch nicht in locations existiert
+        try {
+          // Prüfe, ob Parent bereits in locations existiert (nochmal, falls er zwischenzeitlich erstellt wurde)
+          const { data: existingParent } = await (supabase.from("locations") as any)
+            .select("id, campaign_id")
+            .eq("id", formData.parent_location_id)
+            .maybeSingle();
+
+          if (existingParent) {
+            validatedParentLocationId = existingParent.id;
+          } else {
+            // Erstelle Parent-Ort rekursiv (mit seinem eigenen Parent, falls vorhanden)
+            let parentParentLocationId: string | null = null;
+            if (parentLore.parent_id) {
+              // Rekursiver Aufruf für den Parent des Parents (max. 1 Ebene tief, um Endlosschleifen zu vermeiden)
+              const { data: parentParentLore } = await (supabase.from("world_lore") as any)
+                .select("id, campaign_id")
+                .eq("id", parentLore.parent_id)
+                .maybeSingle();
+
+              if (parentParentLore) {
+                // Prüfe, ob Parent-Parent bereits in locations existiert
+                const { data: existingParentParent } = await (supabase.from("locations") as any)
+                  .select("id")
+                  .eq("id", parentLore.parent_id)
+                  .maybeSingle();
+
+                if (existingParentParent) {
+                  parentParentLocationId = existingParentParent.id;
+                } else {
+                  // Erstelle Parent-Parent (ohne weitere Rekursion)
+                  const { data: createdParentParent, error: createParentParentError } = await (supabase.from("locations") as any)
+                    .insert({
+                      id: parentParentLore.id,
+                      campaign_id: parentParentLore.campaign_id,
+                      name: (parentParentLore as any).name || "Unbekannt",
+                      type: (parentParentLore as any).type || "Ort",
+                      description: (parentParentLore as any).description || null,
+                      parent_location_id: null, // Keine weitere Rekursion
+                      lore_id: parentParentLore.id,
+                    })
+                    .select("id")
+                    .single();
+
+                  if (!createParentParentError && createdParentParent) {
+                    parentParentLocationId = createdParentParent.id;
+                  }
+                }
+              }
+            }
+
+            // Erstelle Parent-Ort
+            const { data: createdParent, error: createParentError } = await (supabase.from("locations") as any)
+              .insert({
+                id: parentLore.id,
+                campaign_id: parentLore.campaign_id,
+                name: parentLore.name,
+                type: parentLore.type,
+                description: parentLore.description || null,
+                parent_location_id: parentParentLocationId,
+                lore_id: parentLore.id,
+              })
+              .select("id, campaign_id")
+              .single();
+
+            if (createParentError || !createdParent) {
+              console.warn("⚠️ [createLocationQuick] Parent-Ort konnte nicht erstellt werden:", {
+                parentId: formData.parent_location_id,
+                error: createParentError,
+              });
+              // Setze auf null, um die Transaktion nicht abzubrechen
+              validatedParentLocationId = null;
+            } else {
+              validatedParentLocationId = createdParent.id;
+              console.log("✅ [createLocationQuick] Parent-Ort erstellt:", {
+                parentId: validatedParentLocationId,
+                name: parentLore.name,
+              });
+            }
+          }
+        } catch (parentError) {
+          console.warn("⚠️ [createLocationQuick] Fehler beim Erstellen des Parent-Orts:", {
+            parentId: formData.parent_location_id,
+            error: parentError instanceof Error ? parentError.message : String(parentError),
+          });
+          // Setze auf null, um die Transaktion nicht abzubrechen
+          validatedParentLocationId = null;
+        }
+      } else {
+        console.warn("⚠️ [createLocationQuick] Parent-Ort nicht gefunden:", {
+          parentId: formData.parent_location_id,
+        });
+        // Setze auf null, um die Transaktion nicht abzubrechen
+        validatedParentLocationId = null;
       }
     }
   }
 
-  // 4.1. If no parent_location_id, try to find a "Welt" entry as default parent
-  if (!parent_lore_id) {
-    const { data: worldEntry } = await (supabase.from("world_lore") as any)
+  // 4. Prüfe, ob Location bereits existiert (in locations oder world_lore)
+  const { data: existingLocation } = await (supabase.from("locations") as any)
+    .select("id, name, type, campaign_id")
+    .eq("campaign_id", formData.campaign_id)
+    .ilike("name", formData.name.trim())
+    .maybeSingle();
+
+  if (existingLocation) {
+    console.log("ℹ️ [createLocationQuick] Location existiert bereits:", {
+      id: existingLocation.id,
+      name: existingLocation.name,
+    });
+    revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+    return {
+      id: existingLocation.id,
+      name: existingLocation.name,
+      type: existingLocation.type,
+    };
+  }
+
+  // 5. Prüfe, ob Location in world_lore existiert (ohne locations-Eintrag)
+  const { data: existingLore } = await (supabase.from("world_lore") as any)
+    .select("id, campaign_id, name, type, description, parent_id")
+    .eq("campaign_id", formData.campaign_id)
+    .ilike("name", formData.name.trim())
+    .maybeSingle();
+
+  let loreEntryId: string;
+  if (existingLore) {
+    // Verwende bestehenden Lore-Eintrag
+    loreEntryId = existingLore.id;
+    console.log("ℹ️ [createLocationQuick] Verwende bestehenden Lore-Eintrag:", {
+      id: loreEntryId,
+      name: existingLore.name,
+    });
+  } else {
+    // 6. Find parent_lore_id if parent_location_id is provided
+    let parent_lore_id: string | null = null;
+    if (validatedParentLocationId) {
+      // Find the lore entry that corresponds to this location
+      const { data: parentLore } = await (supabase.from("world_lore") as any)
+        .select("id")
+        .eq("id", validatedParentLocationId) // locations.id === world_lore.id
+        .maybeSingle();
+      
+      if (parentLore) {
+        parent_lore_id = parentLore.id;
+      } else {
+        // Fallback: Check if location has lore_id field
+        const { data: parentLocation } = await (supabase.from("locations") as any)
+          .select("lore_id")
+          .eq("id", validatedParentLocationId)
+          .maybeSingle();
+        
+        if (parentLocation?.lore_id) {
+          parent_lore_id = parentLocation.lore_id;
+        }
+      }
+    }
+
+    // 6.1. If no parent_location_id, try to find a "Welt" entry as default parent
+    if (!parent_lore_id) {
+      const { data: worldEntry } = await (supabase.from("world_lore") as any)
+        .select("id")
+        .eq("campaign_id", formData.campaign_id)
+        .eq("type", "Welt")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (worldEntry) {
+        parent_lore_id = worldEntry.id;
+      }
+    }
+
+    // 7. Create Lore Entry (nur wenn noch nicht vorhanden)
+    const { data: loreEntry, error: loreError } = await (supabase.from("world_lore") as any)
+      .insert({
+        campaign_id: formData.campaign_id,
+        name: formData.name.trim(),
+        type: formData.type,
+        parent_id: parent_lore_id, // Set parent_id in world_lore
+        description: formData.description || null,
+        is_revealed: false, // Standardmäßig verborgen
+      })
       .select("id")
-      .eq("campaign_id", formData.campaign_id)
-      .eq("type", "Welt")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    
-    if (worldEntry) {
-      parent_lore_id = worldEntry.id;
+      .single();
+
+    if (loreError) {
+      console.error("❌ [createLocationQuick] Lore Error:", loreError);
+      // Prüfe, ob es ein Unique Constraint Fehler ist (Location existiert bereits)
+      if (loreError.code === "23505" || loreError.message?.includes("unique constraint")) {
+        // Versuche, den bestehenden Eintrag zu finden
+        const { data: existingLoreRetry } = await (supabase.from("world_lore") as any)
+          .select("id, campaign_id, name, type")
+          .eq("campaign_id", formData.campaign_id)
+          .ilike("name", formData.name.trim())
+          .maybeSingle();
+        
+        if (existingLoreRetry) {
+          loreEntryId = existingLoreRetry.id;
+          console.log("ℹ️ [createLocationQuick] Verwende bestehenden Lore-Eintrag (nach Unique Constraint):", {
+            id: loreEntryId,
+          });
+        } else {
+          throw new Error(`Fehler beim Erstellen des Lore-Eintrags: ${loreError.message}`);
+        }
+      } else {
+        throw new Error(`Fehler beim Erstellen des Lore-Eintrags: ${loreError.message}`);
+      }
+    } else {
+      loreEntryId = loreEntry.id;
     }
   }
 
-  // 5. Create Lore Entry first (for consistency)
-  const { data: loreEntry, error: loreError } = await (supabase.from("world_lore") as any)
-    .insert({
-      campaign_id: formData.campaign_id,
-      name: formData.name,
-      type: formData.type,
-      parent_id: parent_lore_id, // Set parent_id in world_lore
-      description: formData.description || null,
-      is_revealed: false, // Standardmäßig verborgen
-    })
-    .select("id")
-    .single();
-
-  if (loreError) {
-    console.error("❌ [createLocationQuick] Lore Error:", loreError);
-    throw new Error(`Fehler beim Erstellen des Lore-Eintrags: ${loreError.message}`);
-  }
-
-  // 5. Create Location entry (using same ID as lore entry)
+  // 8. Create Location entry (using same ID as lore entry)
+  // Verwende validatedParentLocationId statt formData.parent_location_id
   const { data: location, error: locationError } = await (supabase.from("locations") as any)
     .insert({
-      id: loreEntry.id,
-      campaign_id: formData.campaign_id,
-      name: formData.name,
+      id: loreEntryId,
+      campaign_id: formData.campaign_id, // WICHTIG: campaign_id explizit setzen
+      name: formData.name.trim(),
       type: formData.type,
       description: formData.description || null,
-      parent_location_id: formData.parent_location_id || null,
-      lore_id: loreEntry.id,
+      parent_location_id: validatedParentLocationId, // Verwende validierte Parent-ID
+      lore_id: loreEntryId,
     })
     .select("id, name, type")
     .single();
 
   if (locationError) {
     console.error("❌ [createLocationQuick] Location Error:", locationError);
+    
+    // Prüfe, ob es ein Foreign-Key-Fehler ist (Parent-Problem)
+    if (locationError.code === "23503" || locationError.message?.includes("foreign key")) {
+      // Try to clean up lore entry
+      await (supabase.from("world_lore") as any).delete().eq("id", loreEntryId);
+      throw new Error(
+        `Der Ort "${formData.name}" oder sein übergeordneter Ort ist ungültig. Bitte prüfe die Orts-Hierarchie.`
+      );
+    }
+    
     // Try to clean up lore entry
-    await (supabase.from("world_lore") as any).delete().eq("id", loreEntry.id);
+    await (supabase.from("world_lore") as any).delete().eq("id", loreEntryId);
     throw new Error(`Fehler beim Erstellen des Ortes: ${locationError.message}`);
   }
 

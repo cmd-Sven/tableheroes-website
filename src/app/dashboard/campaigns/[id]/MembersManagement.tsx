@@ -1,9 +1,31 @@
 "use client";
 
-import { Check, X, UserX, Shield, Sparkles, FileEdit, Eye, Settings } from "lucide-react";
-import { acceptApplication, rejectApplication, removeMember } from "./actions";
-import { useState } from "react";
+import {
+  Check,
+  X,
+  UserX,
+  Shield,
+  Sparkles,
+  FileEdit,
+  Eye,
+  Settings,
+  Award,
+} from "lucide-react";
+import {
+  acceptApplication,
+  rejectApplication,
+  removeMember,
+  updateMemberRank,
+} from "./actions";
+import { approveCharacter, rejectCharacter } from "./character-actions";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { IntegrationReportModal } from "./IntegrationReportModal";
+import {
+  getAllAchievements,
+  awardAchievementAsGm,
+} from "@/src/lib/actions/achievement-actions";
+import { getAchievementImageSrc } from "@/src/types/achievement";
 import { CharacterApplicationForm } from "@/src/components/dashboard/CharacterApplicationForm";
 import { GMCharacterReview } from "@/src/components/dashboard/GMCharacterReview";
 import { CharacterChangesView } from "@/src/components/dashboard/CharacterChangesView";
@@ -18,6 +40,7 @@ type Member = {
   user: {
     username: string;
     avatar_url: string | null;
+    current_rank?: string | null;
   };
   character?: {
     id: string;
@@ -33,7 +56,12 @@ type Member = {
 
 type Faction = { id: string; name: string };
 type Location = { id: string; name: string };
-type NPC = { id: string; name: string; faction_id?: string | null; factions?: { name: string } | null };
+type NPC = {
+  id: string;
+  name: string;
+  faction_id?: string | null;
+  factions?: { name: string } | null;
+};
 
 type MembersManagementProps = {
   campaignId: string;
@@ -65,21 +93,78 @@ export function MembersManagement({
     suggestedNPCs?: string[];
     suggestedLocations?: string[];
   } | null>(null);
-  const [selectedCharacterForReview, setSelectedCharacterForReview] = useState<Member | null>(null);
-  const [selectedCharacterForChanges, setSelectedCharacterForChanges] = useState<Member | null>(null);
-  const [selectedCharacterForEdit, setSelectedCharacterForEdit] = useState<Member | null>(null);
+  const [selectedCharacterForReview, setSelectedCharacterForReview] =
+    useState<Member | null>(null);
+  const [selectedCharacterForChanges, setSelectedCharacterForChanges] =
+    useState<Member | null>(null);
+  const [selectedCharacterForEdit, setSelectedCharacterForEdit] =
+    useState<Member | null>(null);
+  const [selectedMemberForAchievement, setSelectedMemberForAchievement] =
+    useState<Member | null>(null);
+  const [allAchievements, setAllAchievements] = useState<
+    {
+      id: string;
+      name: string;
+      points_awarded: number;
+      image_url?: string | null;
+      description?: string | null;
+      is_custom?: boolean;
+    }[]
+  >([]);
+  const [achievementSearch, setAchievementSearch] = useState("");
+  const [loadingAchievements, setLoadingAchievements] = useState(false);
+  const [awardingAchievement, setAwardingAchievement] = useState(false);
+
+  const RANK_TITLES = [
+    "Rang 1",
+    "Rang 2",
+    "Rang 3",
+    "Rang 4",
+    "Rang 5",
+    "Rang 6",
+    "Rang 7",
+    "Rang 8",
+    "Rang 9",
+    "Rang 10",
+    "Rang 11",
+    "Rang 12",
+    "Rang 13",
+    "Rang 14",
+    "Rang 15",
+    "Rang 16",
+    "Rang 17",
+    "Rang 18",
+    "Rang 19",
+    "Rang 20",
+  ];
+
+  useEffect(() => {
+    if (selectedMemberForAchievement && allAchievements.length === 0) {
+      setLoadingAchievements(true);
+      getAllAchievements().then((list) => {
+        setAllAchievements(list);
+        setLoadingAchievements(false);
+      });
+    }
+  }, [selectedMemberForAchievement]);
 
   // Debug: Log character data in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔍 MembersManagement - Pending Applications:', pendingApplications);
+  if (process.env.NODE_ENV === "development") {
+    console.log(
+      "🔍 MembersManagement - Pending Applications:",
+      pendingApplications
+    );
     if (pendingApplications.length > 0) {
-      console.log('🎭 Character Data Check:', pendingApplications.map(app => ({
-        user: app.user?.username,
-        has_character: !!app.character,
-        character_id: app.character_id,
-        character_name: app.character?.name,
-        character_data: app.character
-      })));
+      console.log(
+        "🎭 Character Data Check:",
+        pendingApplications.map((app) => ({
+          user: app.user?.username,
+          has_character: !!app.character,
+          character_id: app.character_id,
+          character_name: app.character?.name,
+          character_data: app.character,
+        }))
+      );
     }
   }
 
@@ -87,9 +172,15 @@ export function MembersManagement({
     if (isProcessing) return;
     setIsProcessing(true);
     try {
+      // Bewerbung aus characters (Pending_Approval) → approveCharacter
+      if (memberId.startsWith("char-")) {
+        const characterId = memberId.slice(5);
+        await approveCharacter(characterId, campaignId);
+        window.location.reload();
+        return;
+      }
       const result = await acceptApplication(memberId, campaignId);
-      // Show integration report if available
-      if (result && typeof result === 'object' && 'characterName' in result) {
+      if (result && typeof result === "object" && "characterName" in result) {
         setIntegrationReport({
           characterName: result.characterName as string,
           questTitle: result.questTitle as string | undefined,
@@ -111,6 +202,11 @@ export function MembersManagement({
     if (!confirm("Bewerbung wirklich ablehnen?")) return;
     setIsProcessing(true);
     try {
+      if (memberId.startsWith("char-")) {
+        await rejectCharacter(memberId.slice(5), campaignId);
+        window.location.reload();
+        return;
+      }
       await rejectApplication(memberId, campaignId);
       window.location.reload();
     } catch (err) {
@@ -205,7 +301,8 @@ export function MembersManagement({
                 ) : app.character_id ? (
                   <div className="mb-3 rounded bg-yellow-950/10 p-3 border border-yellow-900/30">
                     <p className="font-libre text-xs text-yellow-400">
-                      ⚠️ Charakter wird geladen... (ID: {app.character_id?.slice(0, 8)})
+                      ⚠️ Charakter wird geladen... (ID:{" "}
+                      {app.character_id?.slice(0, 8)})
                     </p>
                   </div>
                 ) : (
@@ -264,8 +361,12 @@ export function MembersManagement({
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-barlow font-bold text-white">{member.user.username}</p>
-                    <p className="font-libre text-xs text-blue-400">Erstellt gerade den Charakter...</p>
+                    <p className="font-barlow font-bold text-white">
+                      {member.user.username}
+                    </p>
+                    <p className="font-libre text-xs text-blue-400">
+                      Erstellt gerade den Charakter...
+                    </p>
                   </div>
                   <button
                     onClick={() => {
@@ -298,7 +399,9 @@ export function MembersManagement({
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-barlow font-bold text-white">{member.user.username}</p>
+                    <p className="font-barlow font-bold text-white">
+                      {member.user.username}
+                    </p>
                     <p className="font-libre text-xs text-purple-400">
                       Status: {member.character?.status || member.status}
                     </p>
@@ -329,7 +432,8 @@ export function MembersManagement({
         </h3>
         {acceptedMembers.length === 0 ? (
           <p className="font-libre text-sm text-gray-400 text-center py-6 border border-hero-border/30 rounded bg-background-dark">
-            Die Taverne ist noch leer. Akzeptiere Bewerbungen, um deine Gruppe zu bilden.
+            Die Taverne ist noch leer. Akzeptiere Bewerbungen, um deine Gruppe
+            zu bilden.
           </p>
         ) : (
           <div className="space-y-2">
@@ -367,12 +471,54 @@ export function MembersManagement({
                         </div>
                       </div>
                     ) : (
-                      <p className="font-libre text-xs text-gray-500">Noch kein Charakter</p>
+                      <p className="font-libre text-xs text-gray-500">
+                        Noch kein Charakter
+                      </p>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {isGM && (
+                    <>
+                      <select
+                        className="rounded-md border border-hero-border bg-background-dark px-2 py-1 text-xs font-barlow uppercase text-gray-300 hover:border-hero-vibrant focus:border-hero-vibrant outline-none"
+                        defaultValue={member.user.current_rank ?? ""}
+                        onChange={async (e) => {
+                          const newRank = e.target.value;
+                          try {
+                            await updateMemberRank(
+                              campaignId,
+                              member.user_id,
+                              newRank === "" ? "" : newRank
+                            );
+                            toast.success("Rang aktualisiert.");
+                          } catch (err) {
+                            const msg =
+                              err instanceof Error
+                                ? err.message
+                                : "Rang konnte nicht aktualisiert werden.";
+                            toast.error(msg);
+                          }
+                        }}
+                      >
+                        <option value="">Kein Rang</option>
+                        {RANK_TITLES.map((title) => (
+                          <option key={title} value={title}>
+                            {title}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setSelectedMemberForAchievement(member)}
+                        disabled={isProcessing}
+                        className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors disabled:opacity-50"
+                        title="Achievement verleihen"
+                      >
+                        <Award className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
                   {isGM && member.character && member.character.id && (
                     <button
                       onClick={() => setSelectedCharacterForEdit(member)}
@@ -384,7 +530,9 @@ export function MembersManagement({
                     </button>
                   )}
                   <button
-                    onClick={() => handleRemove(member.id, member.user.username)}
+                    onClick={() =>
+                      handleRemove(member.id, member.user.username)
+                    }
                     disabled={isProcessing}
                     className="rounded-md p-2 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition-colors disabled:opacity-50"
                     title="Aus Kampagne entfernen"
@@ -399,51 +547,55 @@ export function MembersManagement({
       </div>
 
       {/* Character Review Modal (GM) */}
-      {isGM && selectedCharacterForReview && selectedCharacterForReview.character && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-4xl rounded-lg border border-hero-dark bg-background-card shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex-none p-6 border-b border-hero-dark">
-              <div className="flex items-center justify-between">
-                <h2 className="font-barlow font-bold text-2xl uppercase text-hero-vibrant">
-                  Charakter-Review
-                </h2>
-                <button
-                  onClick={() => setSelectedCharacterForReview(null)}
-                  className="rounded-md p-2 text-gray-400 hover:bg-background-dark hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+      {isGM &&
+        selectedCharacterForReview &&
+        selectedCharacterForReview.character && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-4xl rounded-lg border border-hero-dark bg-background-card shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+              <div className="flex-none p-6 border-b border-hero-dark">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-barlow font-bold text-2xl uppercase text-hero-vibrant">
+                    Charakter-Review
+                  </h2>
+                  <button
+                    onClick={() => setSelectedCharacterForReview(null)}
+                    className="rounded-md p-2 text-gray-400 hover:bg-background-dark hover:text-white transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <GMCharacterReview
+                  campaignId={campaignId}
+                  character={selectedCharacterForReview.character as any}
+                  factions={factions}
+                  locations={locations}
+                  npcs={npcs as any}
+                  onResolve={() => {
+                    setSelectedCharacterForReview(null);
+                    window.location.reload();
+                  }}
+                />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-6">
-              <GMCharacterReview
-                campaignId={campaignId}
-                character={selectedCharacterForReview.character as any}
-                factions={factions}
-                locations={locations}
-                npcs={npcs as any}
-                onResolve={() => {
-                  setSelectedCharacterForReview(null);
-                  window.location.reload();
-                }}
-              />
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Character Changes View (Player) */}
-      {!isGM && selectedCharacterForChanges && selectedCharacterForChanges.character && (
-        <CharacterChangesView
-          campaignId={campaignId}
-          character={selectedCharacterForChanges.character as any}
-          onResolve={() => {
-            setSelectedCharacterForChanges(null);
-            window.location.reload();
-          }}
-          onBack={() => setSelectedCharacterForChanges(null)}
-        />
-      )}
+      {!isGM &&
+        selectedCharacterForChanges &&
+        selectedCharacterForChanges.character && (
+          <CharacterChangesView
+            campaignId={campaignId}
+            character={selectedCharacterForChanges.character as any}
+            onResolve={() => {
+              setSelectedCharacterForChanges(null);
+              window.location.reload();
+            }}
+            onBack={() => setSelectedCharacterForChanges(null)}
+          />
+        )}
 
       {/* Integration Report Modal */}
       {integrationReport && (
@@ -461,16 +613,135 @@ export function MembersManagement({
       )}
 
       {/* GM Character Editor Modal */}
-      {isGM && selectedCharacterForEdit && selectedCharacterForEdit.character && (
-        <GMCharacterEditor
-          isOpen={!!selectedCharacterForEdit}
-          onClose={() => setSelectedCharacterForEdit(null)}
-          character={selectedCharacterForEdit.character as any}
-          campaignId={campaignId}
-          npcs={npcs as any}
-        />
+      {isGM &&
+        selectedCharacterForEdit &&
+        selectedCharacterForEdit.character && (
+          <GMCharacterEditor
+            isOpen={!!selectedCharacterForEdit}
+            onClose={() => setSelectedCharacterForEdit(null)}
+            character={selectedCharacterForEdit.character as any}
+            campaignId={campaignId}
+            npcs={npcs as any}
+          />
+        )}
+
+      {/* GM: Achievement verleihen Modal */}
+      {isGM && selectedMemberForAchievement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-lg border border-hero-dark bg-background-card shadow-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex-none p-4 border-b border-hero-dark flex items-center justify-between">
+              <h2 className="font-barlow font-bold text-xl uppercase text-hero-vibrant">
+                Achievement verleihen
+              </h2>
+              <button
+                onClick={() => {
+                  setSelectedMemberForAchievement(null);
+                  setAllAchievements([]);
+                }}
+                className="rounded-md p-2 text-gray-400 hover:bg-background-dark hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="px-4 py-2 font-libre text-sm text-gray-400 border-b border-hero-border/50">
+              An{" "}
+              <strong className="text-white">
+                {selectedMemberForAchievement.user.username}
+              </strong>
+            </p>
+            <div className="flex-none px-4 py-2 border-b border-hero-border/50">
+              <input
+                type="text"
+                placeholder="Achievement suchen…"
+                value={achievementSearch}
+                onChange={(e) => setAchievementSearch(e.target.value)}
+                className="w-full rounded border border-hero-border bg-background-dark px-3 py-2 font-libre text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingAchievements ? (
+                <p className="font-libre text-gray-500 text-center py-8">
+                  Lade Achievements…
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {allAchievements
+                    .filter(
+                      (ach) =>
+                        !achievementSearch.trim() ||
+                        ach.name
+                          .toLowerCase()
+                          .includes(achievementSearch.trim().toLowerCase())
+                    )
+                    .map((ach) => (
+                      <button
+                        key={ach.id}
+                        type="button"
+                        disabled={awardingAchievement}
+                        onClick={async () => {
+                          setAwardingAchievement(true);
+                          try {
+                            const result = await awardAchievementAsGm(
+                              selectedMemberForAchievement.user_id,
+                              ach.name,
+                              campaignId
+                            );
+                            if (result.success) {
+                              toast.success(
+                                `„${ach.name}“ an ${selectedMemberForAchievement.user.username} verliehen.`
+                              );
+                              setSelectedMemberForAchievement(null);
+                              setAllAchievements([]);
+                              window.location.reload();
+                            } else {
+                              toast.error(
+                                result.error ?? "Vergabe fehlgeschlagen."
+                              );
+                            }
+                          } finally {
+                            setAwardingAchievement(false);
+                          }
+                        }}
+                        className="group relative flex flex-col items-center rounded border border-hero-border/40 bg-hero-dark/30 p-3 font-libre text-gray-200 hover:border-accent-gold/50 hover:bg-accent-gold/10 transition-colors disabled:opacity-50"
+                        title={
+                          (ach.description ?? "").trim()
+                            ? `${ach.description} · +${ach.points_awarded} Pkt`
+                            : `${ach.name} · +${ach.points_awarded} Pkt`
+                        }
+                      >
+                        <div className="h-12 w-12 shrink-0 flex items-center justify-center rounded overflow-hidden bg-hero-dark/50 mb-1">
+                          {(() => {
+                            const src = getAchievementImageSrc(ach.image_url);
+                            return src ? (
+                              <img
+                                src={src}
+                                alt=""
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <Award className="h-6 w-6 text-accent-gold/70" />
+                            );
+                          })()}
+                        </div>
+                        <span className="text-xs text-center line-clamp-2 w-full">
+                          {ach.name}
+                        </span>
+                        <span className="text-[10px] font-barlow text-accent-gold mt-0.5">
+                          +{ach.points_awarded} Pkt
+                        </span>
+                        {(ach.description ?? "").trim() && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded bg-background-card border border-hero-border text-xs text-gray-300 whitespace-normal max-w-[200px] opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 shadow-lg">
+                            {ach.description}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
-

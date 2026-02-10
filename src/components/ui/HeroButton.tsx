@@ -8,10 +8,12 @@ interface HeroButtonProps {
   href?: string;
   onClick?: () => void;
   type?: "button" | "submit" | "reset";
+  form?: string;
   className?: string;
   ariaLabel?: string;
   target?: "_blank" | "_self";
   rel?: string;
+  size?: "sm" | "md" | "lg";
 }
 
 export function HeroButton({
@@ -23,12 +25,21 @@ export function HeroButton({
   ariaLabel,
   target,
   rel,
+  form,
+  size = "md",
 }: HeroButtonProps) {
   const baseClasses = "group relative inline-flex items-center justify-center";
   const combinedClasses = `${baseClasses} ${className}`;
 
+  const sizeClasses =
+    size === "sm"
+      ? "w-[160px] sm:w-[180px] md:w-[200px]"
+      : size === "lg"
+      ? "w-[240px] sm:w-[260px] md:w-[280px]"
+      : "w-[200px] sm:w-[240px] md:w-[260px]";
+
   const buttonContent = (
-    <div className="relative w-[200px] sm:w-[240px] md:w-[260px]">
+    <div className={`relative ${sizeClasses}`}>
       <Image
         src="/images/button-green-wood.png"
         alt=""
@@ -78,6 +89,7 @@ export function HeroButton({
       type={type}
       onClick={onClick}
       className={combinedClasses}
+        form={form}
       aria-label={ariaLabel}
     >
       {buttonContent}

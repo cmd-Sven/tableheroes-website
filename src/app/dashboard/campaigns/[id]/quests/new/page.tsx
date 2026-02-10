@@ -6,10 +6,12 @@ import { getLoreEntries } from "../../lore-actions";
 
 type Props = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ quest_giver_id?: string }>;
 };
 
-export default async function CreateQuestPage({ params }: Props) {
+export default async function CreateQuestPage({ params, searchParams }: Props) {
   const { id: campaignId } = await params;
+  const { quest_giver_id: questGiverIdFromQuery } = await searchParams;
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -79,6 +81,7 @@ export default async function CreateQuestPage({ params }: Props) {
     <div className="container mx-auto p-6">
       <QuestForm
         campaignId={campaignId}
+        defaultQuestGiverId={questGiverIdFromQuery || undefined}
         npcs={(npcs || []).map((npc: any) => ({
           id: npc.id,
           name: npc.name,

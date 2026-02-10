@@ -9,6 +9,7 @@ import {
   LoreEntrySchema,
   FactionAIResponseSchema,
 } from "@/src/lib/validations/schemas";
+import { getNPCRelations } from "./npc-relations-actions";
 
 // Initialisiere OpenAI (API-Key wird aus OPENAI_API_KEY Umgebungsvariable gelesen)
 const openai = new OpenAI({
@@ -382,7 +383,12 @@ async function verifyGM(campaignId: string) {
 export async function generateQuest(
   campaignId: string,
   contextIds: { questGiverId?: string; locationId?: string; targetCharacterId?: string },
-  userPrompt: string
+  userPrompt: string,
+  priorities?: {
+    include: string[];
+    prioritize: string[];
+    anchors: Array<{ id: string; type: string; label: string; summary: string }>;
+  }
 ) {
   const supabase = await verifyGM(campaignId);
   let specificContext = "";
@@ -406,6 +412,32 @@ export async function generateQuest(
     const loc = locRaw as { name: string | null; type: string | null; description: string | null } | null;
     if (loc) {
       specificContext += `\n- ORT: ${loc.name}${loc.type ? ` (${loc.type})` : ""}${loc.description ? `. Info: ${loc.description}` : ""}`;
+    }
+  }
+
+  let anchorsSection = "";
+  let focusSection = "";
+  if (priorities && priorities.anchors.length > 0) {
+    const included = priorities.include || [];
+    const prioritized = priorities.prioritize || [];
+    const includedAnchors = priorities.anchors.filter((a) => included.includes(a.id));
+    const prioritizedAnchors = priorities.anchors.filter((a) => prioritized.includes(a.id));
+
+    if (includedAnchors.length > 0) {
+      anchorsSection = "\n\n=== ERZÄHLERISCHE ANKER (EINBEZOGEN) ===\nErstelle eine Quest, die auf folgenden Elementen basiert:\n";
+      includedAnchors.forEach((a) => {
+        anchorsSection += `- [${a.type}] ${a.label}: ${a.summary}\n`;
+      });
+    }
+    if (prioritizedAnchors.length > 0) {
+      focusSection = "\n\n!!! FOKUSSIERE DICH MASSGEBLICH AUF: !!!\n";
+      prioritizedAnchors.forEach((a) => {
+        focusSection += `!!! ${a.label}: ${a.summary} !!!\n`;
+      });
+      const rivalCount = prioritizedAnchors.filter((a) => a.type === "faction_rival" || a.type === "faction").length;
+      if (rivalCount >= 2) {
+        focusSection += "\nWICHTIG: Zwei oder mehr Fraktionen sind priorisiert. Entwirf eine KONKURRENZ-QUEST-STRUKTUR: Was passiert, wenn die Spieler für Seite A oder Seite B arbeiten? Liefer einen Entwurf für die Gegen-Quest im Feld 'rival_quest_hook' (2-4 Sätze).\n";
+      }
     }
   }
 
@@ -473,6 +505,8 @@ HINTERGRUNDGESCHICHTE: ${charData.biography || "Keine Biografie vorhanden."}`;
     ${worldContext}
     ${specificContext}
     ${characterContext}
+    ${anchorsSection}
+    ${focusSection}
 
     ${isPersonalQuest ? `
     ANWEISUNG FÜR PERSÖNLICHE QUEST:
@@ -487,6 +521,8 @@ HINTERGRUNDGESCHICHTE: ${charData.biography || "Keine Biografie vorhanden."}`;
     - Wenn du einen existierenden Ort aus "EXISTIERENDE ORTE" verwendest, schreibe dessen Namen EXAKT so in 'suggested_location_name'.
     - Wenn du neue NPCs/Orte erfindest, lasse diese Felder leer.
     ${isPersonalQuest ? "- Wenn möglich, nutze bekannte Beziehungen des Charakters als Quest-Geber oder Teilnehmer." : ""}
+    - Gib immer ein Array 'objectives' mit 3-6 konkreten Quest-Zielen (Strings) zurück.
+    - Wenn zwei rivalisierende Fraktionen im Fokus sind, fülle 'rival_quest_hook' mit einem kurzen Entwurf für die Gegen-Quest (2-4 Sätze). Sonst leerer String.
 
     ANFORDERUNGEN:
     - Valid JSON. Sprache: Deutsch.
@@ -496,12 +532,21 @@ HINTERGRUNDGESCHICHTE: ${charData.biography || "Keine Biografie vorhanden."}`;
       "gm_notes": "string", 
       "rewards": "string", 
       "type": "string",
+      "objectives": ["string", "string", ...],
+      "rival_quest_hook": "string (nur bei Konkurrenz-Quest, sonst leer)",
       "suggested_quest_giver_name": "string (Exakter Name aus EXISTIERENDE NPCs oder leer)",
       "suggested_location_name": "string (Exakter Name aus EXISTIERENDE ORTE oder leer)"
     }
   `;
 
   const aiResponse = await callOpenAI(systemPrompt, userPrompt);
+
+  if (!Array.isArray(aiResponse.objectives)) {
+    aiResponse.objectives = [];
+  }
+  if (typeof aiResponse.rival_quest_hook !== "string") {
+    aiResponse.rival_quest_hook = "";
+  }
 
   // Fuzzy Matching: Versuche NPC und Location IDs zu finden
   if (aiResponse.suggested_quest_giver_name) {
@@ -557,6 +602,774 @@ HINTERGRUNDGESCHICHTE: ${charData.biography || "Keine Biografie vorhanden."}`;
   }
 
   return aiResponse;
+}
+
+// ------------------------------------------------------------------
+// 1b. UNIVERSAL SECRET GENERATOR ("AI Secret Architect")
+// ------------------------------------------------------------------
+export async function generateSecret(
+  campaignId: string,
+  entityId: string,
+  entityType: "npc" | "faction" | "lore",
+  contextSecrets?: Array<{ id: string; isPrioritized: boolean }>
+): Promise<{
+  title: string;
+  content: string;
+  meaning: string;
+  secret_type: string;
+  discovery_dc: number;
+}> {
+  const supabase = await verifyGM(campaignId);
+  const worldContext = await getWorldContext(supabase, campaignId);
+
+  let entitySheet = "";
+  let specificContext = "";
+  let entityName = "";
+
+  if (entityType === "npc") {
+    // NPC: Lade Stammdaten, Fraktion, Standort, Beziehungen
+    const { data: npcRaw, error: npcError } = await (supabase.from("npcs") as any)
+      .select(
+        `
+        id,
+        name,
+        race,
+        alignment,
+        description,
+        gm_notes,
+        faction_id,
+        current_location_id
+      `
+      )
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+
+    if (npcError || !npcRaw) {
+      throw new Error("NPC für Secret-Generierung nicht gefunden.");
+    }
+
+    const npc = npcRaw as {
+      id: string;
+      name: string;
+      race: string | null;
+      alignment: string | null;
+      description: string | null;
+      gm_notes: string | null;
+      faction_id: string | null;
+      current_location_id: string | null;
+    };
+
+    entityName = npc.name;
+    entitySheet = `\n=== NPC STAMMBLATT ===
+Name: ${npc.name}
+Rasse: ${npc.race || "Unbekannt"}
+Gesinnung: ${npc.alignment || "Unbekannt"}
+Öffentliche Beschreibung: ${npc.description || "Keine öffentliche Beschreibung hinterlegt."}
+GM-Notizen (intern): ${npc.gm_notes || "Keine GM-Notizen hinterlegt."}
+`;
+
+    // Fraktion laden
+    if (npc.faction_id) {
+      const { data: factionRaw } = await (supabase.from("factions") as any)
+        .select("name, type, description, philosophy, appearance")
+        .eq("id", npc.faction_id)
+        .maybeSingle();
+
+      if (factionRaw) {
+        specificContext += `\n=== FRAKTION DES NPC ===
+Name: ${factionRaw.name || "Unbekannt"}${factionRaw.type ? ` (${factionRaw.type})` : ""}
+Philosophie: ${factionRaw.philosophy || "Keine explizite Philosophie hinterlegt."}
+Erscheinungsbild: ${factionRaw.appearance || "Kein spezielles Erscheinungsbild hinterlegt."}
+Beschreibung: ${factionRaw.description || "Keine Fraktionsbeschreibung hinterlegt."}
+`;
+      }
+    }
+
+    // Standort laden
+    if (npc.current_location_id) {
+      const { data: locationRaw } = await (supabase.from("locations") as any)
+        .select("name, type, description")
+        .eq("id", npc.current_location_id)
+        .maybeSingle();
+
+      if (locationRaw) {
+        specificContext += `\n=== STANDORT DES NPC ===
+Ort: ${locationRaw.name || "Unbekannt"}${locationRaw.type ? ` (${locationRaw.type})` : ""}
+Beschreibung: ${locationRaw.description || "Keine Ortsbeschreibung hinterlegt."}
+`;
+      }
+    }
+
+    // NPC-Beziehungen laden
+    let partnerNpcIds: string[] = [];
+    try {
+      const relations = await getNPCRelations(campaignId, entityId);
+      const realRelations = (relations || []).filter((rel: any) => !rel.isHook && rel.partnerName);
+
+      if (realRelations.length > 0) {
+        specificContext += "\n=== BEZIEHUNGEN DES NPC ===\n";
+        for (const rel of realRelations) {
+          specificContext += `- ${rel.partnerName}: ${rel.relationType}${rel.description ? ` (${rel.description})` : ""}\n`;
+          if (rel.partnerId) partnerNpcIds.push(rel.partnerId);
+        }
+      }
+    } catch (error) {
+      console.warn("[generateSecret] Konnte NPC-Beziehungen nicht laden:", error);
+    }
+
+    // Verwandte Geheimnisse: Partner-NPCs (entity_type=npc) + Fraktion (entity_type=faction)
+    const partnerSecretsList: { entity_id: string; entity_type: string; title: string | null; content: string }[] = [];
+
+    if (partnerNpcIds.length > 0) {
+      const { data: npcSecrets } = await (supabase.from("secrets") as any)
+        .select("entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "npc")
+        .in("entity_id", partnerNpcIds);
+      if (npcSecrets?.length) partnerSecretsList.push(...npcSecrets);
+    }
+
+    if (npc.faction_id) {
+      const { data: factionSecrets } = await (supabase.from("secrets") as any)
+        .select("entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "faction")
+        .eq("entity_id", npc.faction_id);
+      if (factionSecrets?.length) partnerSecretsList.push(...factionSecrets);
+    }
+
+    if (partnerSecretsList.length > 0) {
+      const npcIds = partnerNpcIds;
+      const factionIds = npc.faction_id ? [npc.faction_id] : [];
+      const { data: npcNames } = npcIds.length > 0
+        ? await (supabase.from("npcs") as any).select("id, name").in("id", npcIds)
+        : { data: [] };
+      const { data: factionNames } = factionIds.length > 0
+        ? await (supabase.from("factions") as any).select("id, name").in("id", factionIds)
+        : { data: [] };
+
+      const nameById: Record<string, string> = {};
+      (npcNames || []).forEach((n: any) => { nameById[n.id] = n.name; });
+      (factionNames || []).forEach((f: any) => { nameById[f.id] = f.name; });
+
+      specificContext += "\n=== BEKANNTE SCHATTEN (EXISTIERENDE GEHEIMNISSE) ===\n";
+      specificContext += "Geheimnisse von Personen oder Organisationen, die mit diesem NPC verknüpft sind:\n\n";
+      for (const s of partnerSecretsList) {
+        const ownerName = nameById[s.entity_id] || (s.entity_type === "npc" ? "Ein Bekannter" : "Seine Fraktion");
+        specificContext += `- [${ownerName}] "${s.title || "Geheimnis"}: ${(s.content || "").substring(0, 200)}${(s.content || "").length > 200 ? "..." : ""}"\n`;
+      }
+    }
+
+  } else if (entityType === "faction") {
+    // FACTION: Lade Ziele, Philosophie, Feindbilder, Mitglieder
+    const { data: factionRaw, error: factionError } = await (supabase.from("factions") as any)
+      .select(
+        `
+        id,
+        name,
+        type,
+        description,
+        philosophy,
+        structure,
+        gm_notes,
+        appearance
+      `
+      )
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+
+    if (factionError || !factionRaw) {
+      throw new Error("Fraktion für Secret-Generierung nicht gefunden.");
+    }
+
+    const faction = factionRaw as {
+      id: string;
+      name: string;
+      type: string | null;
+      description: string | null;
+      philosophy: string | null;
+      structure: string | null;
+      gm_notes: string | null;
+      appearance: string | null;
+    };
+
+    entityName = faction.name;
+    entitySheet = `\n=== FRAKTION STAMMBLATT ===
+Name: ${faction.name}
+Typ: ${faction.type || "Unbekannt"}
+Beschreibung: ${faction.description || "Keine Beschreibung hinterlegt."}
+Philosophie: ${faction.philosophy || "Keine explizite Philosophie hinterlegt."}
+Struktur: ${faction.structure || "Keine Struktur-Beschreibung hinterlegt."}
+Erscheinungsbild: ${faction.appearance || "Kein spezielles Erscheinungsbild hinterlegt."}
+GM-Notizen (intern): ${faction.gm_notes || "Keine GM-Notizen hinterlegt."}
+`;
+
+    // Lade Fraktions-Beziehungen (Feindbilder, Verbündete)
+    const { data: factionRelations } = await (supabase.from("faction_relations") as any)
+      .select(`
+        id,
+        faction_id_1,
+        faction_id_2,
+        relation_type,
+        description,
+        faction_1:faction_id_1!inner (
+          id,
+          name
+        ),
+        faction_2:faction_id_2!inner (
+          id,
+          name
+        )
+      `)
+      .eq("campaign_id", campaignId)
+      .or(`faction_id_1.eq.${entityId},faction_id_2.eq.${entityId}`)
+      .limit(10);
+
+    if (factionRelations && factionRelations.length > 0) {
+      specificContext += "\n=== FRAKTIONS-BEZIEHUNGEN ===\n";
+      for (const rel of factionRelations) {
+        const isFaction1 = rel.faction_id_1 === entityId;
+        const partnerFaction = isFaction1 ? rel.faction_2 : rel.faction_1;
+        if (partnerFaction) {
+          specificContext += `- ${partnerFaction.name}: ${rel.relation_type}${rel.description ? ` (${rel.description})` : ""}\n`;
+        }
+      }
+    }
+
+    // Verwandte Geheimnisse: Alle Geheimnisse der NPCs, die dieser Fraktion angehören
+    const { data: memberNpcs } = await (supabase.from("npcs") as any)
+      .select("id, name")
+      .eq("campaign_id", campaignId)
+      .eq("faction_id", entityId)
+      .limit(20);
+
+    if (memberNpcs && memberNpcs.length > 0) {
+      const memberIds = memberNpcs.map((n: any) => n.id);
+      const { data: memberSecrets } = await (supabase.from("secrets") as any)
+        .select("entity_id, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "npc")
+        .in("entity_id", memberIds);
+
+      if (memberSecrets && memberSecrets.length > 0) {
+        const nameById: Record<string, string> = {};
+        memberNpcs.forEach((n: any) => { nameById[n.id] = n.name; });
+        specificContext += "\n=== BEKANNTE SCHATTEN (EXISTIERENDE GEHEIMNISSE) ===\n";
+        specificContext += "Geheimnisse von Mitgliedern dieser Fraktion:\n\n";
+        for (const s of memberSecrets) {
+          const ownerName = nameById[s.entity_id] || "Mitglied";
+          specificContext += `- [${ownerName}] "${s.title || "Geheimnis"}: ${(s.content || "").substring(0, 200)}${(s.content || "").length > 200 ? "..." : ""}"\n`;
+        }
+      }
+    }
+
+  } else {
+    // LORE: Lade historische Ereignisse, verwandte Orte, GM-Notizen
+    const { data: loreRaw, error: loreError } = await (supabase.from("world_lore") as any)
+      .select(
+        `
+        id,
+        name,
+        type,
+        description,
+        gm_notes,
+        parent_id
+      `
+      )
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+
+    if (loreError || !loreRaw) {
+      throw new Error("Lore-Eintrag für Secret-Generierung nicht gefunden.");
+    }
+
+    const lore = loreRaw as {
+      id: string;
+      name: string;
+      type: string | null;
+      description: string | null;
+      gm_notes: string | null;
+      parent_id: string | null;
+    };
+
+    entityName = lore.name;
+    entitySheet = `\n=== LORE STAMMBLATT ===
+Name: ${lore.name}
+Typ: ${lore.type || "Unbekannt"}
+Beschreibung: ${lore.description || "Keine Beschreibung hinterlegt."}
+GM-Notizen (intern): ${lore.gm_notes || "Keine GM-Notizen hinterlegt."}
+`;
+
+    // Lade verwandte historische Ereignisse (gleicher Typ oder Parent)
+    if (lore.type) {
+      const { data: relatedLore } = await (supabase.from("world_lore") as any)
+        .select("id, name, type, description")
+        .eq("campaign_id", campaignId)
+        .eq("type", lore.type)
+        .neq("id", entityId)
+        .limit(5);
+
+      if (relatedLore && relatedLore.length > 0) {
+        specificContext += `\n=== VERWANDTE ${lore.type.toUpperCase()} ===\n`;
+        for (const related of relatedLore) {
+          specificContext += `- ${related.name}: ${related.description?.substring(0, 100) || "Keine Beschreibung"}\n`;
+        }
+      }
+    }
+  }
+
+  // Lade ausgewählte Kontext-Geheimnisse (falls vorhanden)
+  let selectedContextSection = "";
+  if (contextSecrets && contextSecrets.length > 0) {
+    const secretIds = contextSecrets.map((cs) => cs.id);
+    const { data: selectedSecrets } = await (supabase.from("secrets") as any)
+      .select("id, entity_id, entity_type, title, content")
+      .eq("campaign_id", campaignId)
+      .in("id", secretIds);
+
+    if (selectedSecrets && selectedSecrets.length > 0) {
+      // Lade Entitäts-Namen für bessere Kontextualisierung
+      const entityIds = [...new Set(selectedSecrets.map((s: any) => s.entity_id))];
+      const npcIds = entityIds.filter((id) => selectedSecrets.some((s: any) => s.entity_id === id && s.entity_type === "npc"));
+      const factionIds = entityIds.filter((id) => selectedSecrets.some((s: any) => s.entity_id === id && s.entity_type === "faction"));
+
+      const nameById: Record<string, string> = {};
+      if (npcIds.length > 0) {
+        const { data: npcs } = await (supabase.from("npcs") as any)
+          .select("id, name")
+          .in("id", npcIds);
+        if (npcs) npcs.forEach((n: any) => { nameById[n.id] = n.name; });
+      }
+      if (factionIds.length > 0) {
+        const { data: factions } = await (supabase.from("factions") as any)
+          .select("id, name")
+          .in("id", factionIds);
+        if (factions) factions.forEach((f: any) => { nameById[f.id] = f.name; });
+      }
+
+      selectedContextSection = "\n=== AUSGEWÄHLTE KONTEXT-GEHEIMNISSE ===\n";
+      selectedContextSection += "Der Game Master hat explizit diese Geheimnisse aus dem Umfeld ausgewählt, die beim Weben des neuen Geheimnisses berücksichtigt werden sollen:\n\n";
+
+      // Priorisierte Geheimnisse zuerst
+      const prioritized = contextSecrets.filter((cs) => cs.isPrioritized);
+      const normal = contextSecrets.filter((cs) => !cs.isPrioritized);
+
+      for (const cs of prioritized) {
+        const secret = selectedSecrets.find((s: any) => s.id === cs.id);
+        if (secret) {
+          const ownerName = nameById[secret.entity_id] || (secret.entity_type === "npc" ? "Ein Bekannter" : "Eine Fraktion");
+          selectedContextSection += `!!! DIESES GEHEIMNIS IST DER ANKERPUNKT: [${ownerName}] "${secret.title || "Geheimnis"}: ${secret.content}" !!!\n`;
+          selectedContextSection += "→ Das neue Geheimnis MUSS eine direkte Verbindung zu diesem Ankerpunkt herstellen (Ergänzung, Folge, Gegensatz oder Beweisstück).\n\n";
+        }
+      }
+
+      // Normale ausgewählte Geheimnisse
+      for (const cs of normal) {
+        const secret = selectedSecrets.find((s: any) => s.id === cs.id);
+        if (secret) {
+          const ownerName = nameById[secret.entity_id] || (secret.entity_type === "npc" ? "Ein Bekannter" : "Eine Fraktion");
+          selectedContextSection += `- [${ownerName}] "${secret.title || "Geheimnis"}: ${secret.content.substring(0, 300)}${secret.content.length > 300 ? "..." : ""}"\n`;
+        }
+      }
+
+      selectedContextSection += "\nWICHTIG: Nutze diese ausgewählten Geheimnisse als Basis für das neue Geheimnis. Verknüpfe es kausal oder thematisch mit ihnen.\n";
+    }
+  }
+
+  const systemPrompt = `
+Du bist der "AI Secret Architect" eines TTRPG-Game Masters.
+Deine Aufgabe ist es, ein starkes, plotrelevantes Geheimnis für eine bestehende Entität (${entityType === "npc" ? "NPC" : entityType === "faction" ? "Fraktion" : "Lore-Eintrag"}) zu weben.
+
+WICHTIG:
+- Das Geheimnis muss mindestens ZWEI der verfügbaren Kontexte aktiv verknüpfen.
+- Das Geheimnis soll HOOKS für zukünftige Szenen liefern (Konflikt, Dilemma, Verrat, verborgenes Wissen, historische Wahrheit).
+- Es darf KEINE offenen Widersprüche zum Weltkontext enthalten.
+
+BEKANNTE SCHATTEN (EXISTIERENDE GEHEIMNISSE):
+Falls im folgenden Kontext eine Sektion "BEKANNTE SCHATTEN (EXISTIERENDE GEHEIMNISSE)" mit Geheimnissen von verknüpften Personen oder Organisationen steht: Nutze diese bestehenden Informationen, um eine Verbindung oder einen Konflikt zu weben. Das neue Geheimnis soll entweder eine Ergänzung, ein gegensätzliches Puzzleteil oder eine direkte Folge der vorhandenen Geheimnisse sein.
+Beispiel: Wenn der Mentor ein Geheimnis über einen Verrat hat, könnte die Schülerin ein Geheimnis über ein Beweisstück haben, das sie gefunden hat. So entsteht ein organisches Netzwerk an Intrigen, bei dem Geheimnisse aufeinander aufbauen.
+
+${worldContext}
+${entitySheet}
+${specificContext}
+${selectedContextSection}
+
+DEFINITIONEN:
+- "title": kurzer, prägnanter Titel (max. 80 Zeichen), z.B. "Schuldpakt mit den Hafenschatten" oder "Die wahre Geschichte von X".
+- "content": vollständige Beschreibung des Geheimnisses in 3–8 Sätzen.
+- "meaning": 2–3 Sätze, was dieses Geheimnis KONKRET für die Kampagne bedeutet (Gefahr, Chance, Twist, historische Bedeutung).
+- "secret_type": eine Kategorie wie "Dilemma", "Verrat", "Wissen", "Prophezeiung", "Trauma", "Schuld", "Schutz", "Historische Wahrheit".
+- "discovery_dc": Schwierigkeit (10–25) für die Entdeckung dieses Geheimnisses (z.B. über Nachforschungen, Proben, soziale Szenen).
+
+ANFORDERUNGEN:
+- Sprache: Deutsch.
+- Das Geheimnis soll konkret spielbar sein, keine vagen Allgemeinplätze.
+- discovery_dc MUSS eine GANZE ZAHL zwischen 10 und 25 sein.
+- Nutze IMMER mindestens zwei der verfügbaren Kontexte und verknüpfe sie kausal.
+
+Antworte NUR mit gültigem JSON im Format:
+{
+  "title": "string",
+  "content": "string",
+  "meaning": "string",
+  "secret_type": "string",
+  "discovery_dc": 17
+}
+`;
+
+  const userPrompt = `Erzeuge ein tief vernetztes Geheimnis für ${entityType === "npc" ? "den NPC" : entityType === "faction" ? "die Fraktion" : "den Lore-Eintrag"} "${entityName}", das sich organisch aus den gegebenen Informationen ergibt.`;
+
+  const raw = await callOpenAI(systemPrompt, userPrompt);
+
+  let title = String(raw.title || "").trim();
+  let content = String(raw.content || "").trim();
+  let meaning = String(raw.meaning || "").trim();
+  let secret_type = String(raw.secret_type || "").trim() || "Wissen";
+  let discovery_dc = Number(raw.discovery_dc ?? 15);
+
+  if (!title) {
+    title = `Verborgenes Geheimnis von ${entityName}`;
+  }
+  if (!content) {
+    content = "Dieses Geheimnis konnte nicht eindeutig generiert werden. Bitte generiere es erneut oder formuliere es manuell.";
+  }
+  if (!meaning) {
+    meaning = "Die genaue Bedeutung dieses Geheimnisses für den Plot sollte vom Game Master manuell ergänzt werden.";
+  }
+
+  if (Number.isNaN(discovery_dc)) {
+    discovery_dc = 15;
+  }
+  // Clamp auf 10–25
+  discovery_dc = Math.max(10, Math.min(25, Math.round(discovery_dc)));
+
+  return {
+    title,
+    content,
+    meaning,
+    secret_type,
+    discovery_dc,
+  };
+}
+
+// ------------------------------------------------------------------
+// 1c. CONSPIRACY ENGINE ("Zufällige Verschwörung")
+// ------------------------------------------------------------------
+export async function generateConspiracy(
+  campaignId: string,
+  entityId: string,
+  entityType: "npc" | "faction" | "lore",
+  radius: "LOKAL" | "FRAKTION" | "STADT" | "REGION" | "WELT"
+): Promise<{
+  title: string;
+  content: string;
+  meaning: string;
+  secret_type: string;
+  discovery_dc: number;
+  selectedSecrets: Array<{ id: string; entity_name: string; title: string | null; content: string }>;
+}> {
+  const supabase = await verifyGM(campaignId);
+  const worldContext = await getWorldContext(supabase, campaignId);
+
+  let entitySheet = "";
+  let entityName = "";
+  let candidateSecrets: Array<{
+    id: string;
+    entity_id: string;
+    entity_type: string;
+    title: string | null;
+    content: string;
+    entity_name?: string;
+  }> = [];
+
+  // Lade Basis-Entität
+  if (entityType === "npc") {
+    const { data: npcRaw } = await (supabase.from("npcs") as any)
+      .select("id, name, faction_id, current_location_id")
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (!npcRaw) throw new Error("NPC nicht gefunden.");
+    entityName = npcRaw.name;
+
+    // Radius-basierte Geheimnis-Sammlung
+    if (radius === "LOKAL") {
+      // Direkte Beziehungen
+      const { data: relations } = await (supabase.from("npc_relations") as any)
+        .select("npc_id_1, npc_id_2")
+        .eq("campaign_id", campaignId)
+        .or(`npc_id_1.eq.${entityId},npc_id_2.eq.${entityId}`)
+        .limit(10);
+      const partnerIds = relations
+        ?.map((rel: any) => (rel.npc_id_1 === entityId ? rel.npc_id_2 : rel.npc_id_1))
+        .filter((id: string) => id !== entityId) || [];
+      if (partnerIds.length > 0) {
+        const { data: secrets } = await (supabase.from("secrets") as any)
+          .select("id, entity_id, entity_type, title, content")
+          .eq("campaign_id", campaignId)
+          .eq("entity_type", "npc")
+          .in("entity_id", [...partnerIds, entityId]);
+        if (secrets) candidateSecrets.push(...secrets);
+      }
+    } else if (radius === "FRAKTION" && npcRaw.faction_id) {
+      // Alle NPCs der Fraktion
+      const { data: factionNPCs } = await (supabase.from("npcs") as any)
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .eq("faction_id", npcRaw.faction_id)
+        .limit(30);
+      const factionNpcIds = factionNPCs?.map((n: any) => n.id) || [];
+      if (factionNpcIds.length > 0) {
+        const { data: secrets } = await (supabase.from("secrets") as any)
+          .select("id, entity_id, entity_type, title, content")
+          .eq("campaign_id", campaignId)
+          .eq("entity_type", "npc")
+          .in("entity_id", factionNpcIds);
+        if (secrets) candidateSecrets.push(...secrets);
+      }
+      // Fraktions-Geheimnisse
+      const { data: factionSecrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "faction")
+        .eq("entity_id", npcRaw.faction_id);
+      if (factionSecrets) candidateSecrets.push(...factionSecrets);
+    } else if (radius === "STADT" && npcRaw.current_location_id) {
+      // NPCs am gleichen Standort
+      const { data: locationNPCs } = await (supabase.from("npcs") as any)
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .eq("current_location_id", npcRaw.current_location_id)
+        .limit(30);
+      const locationNpcIds = locationNPCs?.map((n: any) => n.id) || [];
+      if (locationNpcIds.length > 0) {
+        const { data: secrets } = await (supabase.from("secrets") as any)
+          .select("id, entity_id, entity_type, title, content")
+          .eq("campaign_id", campaignId)
+          .eq("entity_type", "npc")
+          .in("entity_id", locationNpcIds);
+        if (secrets) candidateSecrets.push(...secrets);
+      }
+      // Lore am gleichen Standort
+      const { data: locationLore } = await (supabase.from("world_lore") as any)
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .eq("location_id", npcRaw.current_location_id)
+        .limit(10);
+      const locationLoreIds = locationLore?.map((l: any) => l.id) || [];
+      if (locationLoreIds.length > 0) {
+        const { data: secrets } = await (supabase.from("secrets") as any)
+          .select("id, entity_id, entity_type, title, content")
+          .eq("campaign_id", campaignId)
+          .eq("entity_type", "lore")
+          .in("entity_id", locationLoreIds);
+        if (secrets) candidateSecrets.push(...secrets);
+      }
+    } else if (radius === "REGION") {
+      // Alle Geheimnisse der Kampagne (vereinfacht: Region = Kampagne)
+      const { data: secrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .limit(100);
+      if (secrets) candidateSecrets.push(...secrets);
+    } else if (radius === "WELT") {
+      // Alle Geheimnisse der Kampagne
+      const { data: secrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .limit(200);
+      if (secrets) candidateSecrets.push(...secrets);
+    }
+  } else if (entityType === "faction") {
+    const { data: factionRaw } = await (supabase.from("factions") as any)
+      .select("id, name")
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (!factionRaw) throw new Error("Fraktion nicht gefunden.");
+    entityName = factionRaw.name;
+
+    if (radius === "FRAKTION" || radius === "LOKAL") {
+      // Mitglieder-NPCs
+      const { data: memberNPCs } = await (supabase.from("npcs") as any)
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .eq("faction_id", entityId)
+        .limit(30);
+      const memberIds = memberNPCs?.map((n: any) => n.id) || [];
+      if (memberIds.length > 0) {
+        const { data: secrets } = await (supabase.from("secrets") as any)
+          .select("id, entity_id, entity_type, title, content")
+          .eq("campaign_id", campaignId)
+          .eq("entity_type", "npc")
+          .in("entity_id", memberIds);
+        if (secrets) candidateSecrets.push(...secrets);
+      }
+      // Fraktions-Geheimnisse
+      const { data: factionSecrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "faction")
+        .eq("entity_id", entityId);
+      if (factionSecrets) candidateSecrets.push(...factionSecrets);
+    } else if (radius === "STADT" || radius === "REGION" || radius === "WELT") {
+      const { data: secrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .limit(radius === "WELT" ? 200 : 100);
+      if (secrets) candidateSecrets.push(...secrets);
+    }
+  } else {
+    // LORE
+    const { data: loreRaw } = await (supabase.from("world_lore") as any)
+      .select("id, name, location_id")
+      .eq("id", entityId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (!loreRaw) throw new Error("Lore-Eintrag nicht gefunden.");
+    entityName = loreRaw.name;
+
+    if (radius === "STADT" && loreRaw.location_id) {
+      const { data: locationSecrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .or(`entity_type.eq.npc,entity_type.eq.lore`)
+        .limit(50);
+      // Filtere nach location_id (vereinfacht: alle)
+      if (locationSecrets) candidateSecrets.push(...locationSecrets);
+    } else {
+      const { data: secrets } = await (supabase.from("secrets") as any)
+        .select("id, entity_id, entity_type, title, content")
+        .eq("campaign_id", campaignId)
+        .limit(radius === "WELT" ? 200 : 100);
+      if (secrets) candidateSecrets.push(...secrets);
+    }
+  }
+
+  // Entferne Duplikate und wähle 2-3 zufällig aus
+  const uniqueSecrets = Array.from(
+    new Map(candidateSecrets.map((s) => [s.id, s])).values()
+  );
+  if (uniqueSecrets.length === 0) {
+    throw new Error(`Keine Geheimnisse im Radius "${radius}" gefunden.`);
+  }
+
+  const count = Math.min(3, Math.max(2, uniqueSecrets.length));
+  const shuffled = [...uniqueSecrets].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, count);
+
+  // Lade Entitäts-Namen
+  const entityIds = [...new Set(selected.map((s) => s.entity_id))];
+  const npcIds = entityIds.filter((id) => selected.some((s) => s.entity_id === id && s.entity_type === "npc"));
+  const factionIds = entityIds.filter((id) => selected.some((s) => s.entity_id === id && s.entity_type === "faction"));
+  const loreIds = entityIds.filter((id) => selected.some((s) => s.entity_id === id && s.entity_type === "lore"));
+
+  const nameById: Record<string, string> = {};
+  if (npcIds.length > 0) {
+    const { data: npcs } = await (supabase.from("npcs") as any).select("id, name").in("id", npcIds);
+    if (npcs) npcs.forEach((n: any) => { nameById[n.id] = n.name; });
+  }
+  if (factionIds.length > 0) {
+    const { data: factions } = await (supabase.from("factions") as any).select("id, name").in("id", factionIds);
+    if (factions) factions.forEach((f: any) => { nameById[f.id] = f.name; });
+  }
+  if (loreIds.length > 0) {
+    const { data: lore } = await (supabase.from("world_lore") as any).select("id, name").in("id", loreIds);
+    if (lore) lore.forEach((l: any) => { nameById[l.id] = l.name; });
+  }
+
+  const selectedWithNames = selected.map((s) => ({
+    id: s.id,
+    entity_name: nameById[s.entity_id] || (s.entity_type === "npc" ? "Unbekannter NPC" : s.entity_type === "faction" ? "Unbekannte Fraktion" : "Unbekanntes Lore"),
+    title: s.title,
+    content: s.content,
+  }));
+
+  // Baue Conspiracy-Prompt
+  const conspiracySecretsText = selectedWithNames
+    .map((s, idx) => {
+      return `[Fragment ${idx + 1}] ${s.entity_name}: "${s.title || "Geheimnis"}"\n   ${s.content.substring(0, 400)}${s.content.length > 400 ? "..." : ""}`;
+    })
+    .join("\n\n");
+
+  const systemPrompt = `
+Du bist der Architekt einer Verschwörung in einem TTRPG-Setting.
+Deine Aufgabe ist es, aus scheinbar unzusammenhängenden Geheimnissen eine verborgene, größere Wahrheit zu weben.
+
+${worldContext}
+
+=== AUSGEWÄHLTE FRAGMENTE (SCHEINBAR UNZUSAMMENHÄNGEND) ===
+Hier sind ${selectedWithNames.length} zufällig ausgewählte Geheimnisse aus dem Radius "${radius}":
+
+${conspiracySecretsText}
+
+=== AUFGABE ===
+Erstelle ein NEUES Geheimnis für ${entityType === "npc" ? "den NPC" : entityType === "faction" ? "die Fraktion" : "den Lore-Eintrag"} "${entityName}", das diese Fragmente logisch (oder auf schockierende Weise) miteinander verbindet.
+
+Das neue Geheimnis soll:
+- Eine verborgene Wahrheit offenbaren, die zeigt, dass diese Einzelelemente Teil eines größeren Musters sind.
+- Einen kausalen oder thematischen Zusammenhang zwischen den Fragmenten herstellen.
+- Den gewählten Radius respektieren: Ein lokales Geheimnis sollte keine weltbewegenden Folgen haben, eine weltweite Verschwörung hingegen schon.
+- Konkret spielbar sein (keine vagen Allgemeinplätze).
+
+DEFINITIONEN:
+- "title": kurzer, prägnanter Titel (max. 80 Zeichen), z.B. "Das Netzwerk der Schatten" oder "Die verborgene Verbindung".
+- "content": vollständige Beschreibung der Verschwörung in 4–10 Sätzen, die zeigt, wie die Fragmente zusammenhängen.
+- "meaning": 2–3 Sätze, was diese Verschwörung KONKRET für die Kampagne bedeutet.
+- "secret_type": eine Kategorie wie "Verschwörung", "Netzwerk", "Verbindung", "Wahrheit", "Muster".
+- "discovery_dc": Schwierigkeit (10–25) für die Entdeckung dieser Verschwörung.
+
+ANFORDERUNGEN:
+- Sprache: Deutsch.
+- discovery_dc MUSS eine GANZE ZAHL zwischen 10 und 25 sein.
+- Das Geheimnis muss ALLE ${selectedWithNames.length} Fragmente in die Erklärung einbeziehen.
+
+Antworte NUR mit gültigem JSON im Format:
+{
+  "title": "string",
+  "content": "string",
+  "meaning": "string",
+  "secret_type": "string",
+  "discovery_dc": 17
+}
+`;
+
+  const userPrompt = `Erzeuge eine Verschwörung, die die ${selectedWithNames.length} Fragmente zu einem größeren Muster verbindet.`;
+
+  const raw = await callOpenAI(systemPrompt, userPrompt);
+
+  let title = String(raw.title || "").trim();
+  let content = String(raw.content || "").trim();
+  let meaning = String(raw.meaning || "").trim();
+  let secret_type = String(raw.secret_type || "").trim() || "Verschwörung";
+  let discovery_dc = Number(raw.discovery_dc ?? 15);
+
+  if (!title) {
+    title = `Verschwörung um ${entityName}`;
+  }
+  if (!content) {
+    content = "Diese Verschwörung konnte nicht eindeutig generiert werden. Bitte generiere sie erneut.";
+  }
+  if (!meaning) {
+    meaning = "Die genaue Bedeutung dieser Verschwörung sollte vom Game Master manuell ergänzt werden.";
+  }
+
+  if (Number.isNaN(discovery_dc)) {
+    discovery_dc = 15;
+  }
+  discovery_dc = Math.max(10, Math.min(25, Math.round(discovery_dc)));
+
+  return {
+    title,
+    content,
+    meaning,
+    secret_type,
+    discovery_dc,
+    selectedSecrets: selectedWithNames,
+  };
 }
 
 // ------------------------------------------------------------------
@@ -636,7 +1449,7 @@ export async function generateNPC(
     locationContext += "\n";
   }
 
-  // Baue Faction-Kontext mit GM-Notizen auf
+  // Baue Faction-Kontext mit GM-Notizen und Deep-Integration-Infos auf
   let factionContext = "";
   if (factionDetails) {
     factionContext = "\nFRAKTIONS-KONTEXT (inkl. GM-Notizen für Secret-Generierung):\n";
@@ -693,6 +1506,11 @@ export async function generateNPC(
     ${contextNPCsInfo}
     ${locationContext}
     ${factionContext}
+
+    FALLS EIN FRAKTIONS-KONTEXT ANGEGEBEN IST (obiger Block):
+    - **Erscheinungsbild:** Integriere explizit Uniformen, Wappen, Farben oder Slogans der Fraktion in das Aussehen des NPCs (appearance).
+    - **Persönlichkeit:** Die Persönlichkeit des NPCs (personality_traits, gm_notes) soll die Philosophie/Ziele der Fraktion widerspiegeln – entweder als loyale Verkörperung oder als bewusst begründete Abweichung.
+    - **Rolle:** Weise dem NPC eine Rolle/Position zu, die zur beschriebenen Organisationsstruktur der Fraktion passt (z.B. Offizier, Rekrut, Spion, Quartiermeister o.Ä.).
 
     ${contextNPCsInfo ? `
     KONTEXT-BEZIEHUNGEN (KRITISCH):
@@ -944,6 +1762,28 @@ export async function generateFaction(campaignId: string, userPrompt: string) {
     - 'type' MUSS einer dieser Werte sein: ${VALID_FACTION_TYPES.join(", ")}
     - 'current_status' MUSS einer dieser Werte sein: ${VALID_RELATIONSHIPS.join(", ")} oder leer lassen.
 
+    ERWEITERTE IDENTITÄT DER FRAKTION:
+    - 'appearance': Beschreibe detailliert Wappen, Uniformfarben, Symbole, Slogans und optische Erkennungsmerkmale.
+      * Welche Farben dominieren?
+      * Wie sieht das Wappen aus?
+      * Welche typischen Kleidungsstücke/Uniformen tragen Mitglieder?
+      * Gibt es Parolen, Losungen oder Glaubenssätze, die oft gerufen/rezitiert werden?
+    - 'structure': Wie ist die Fraktion organisiert?
+      * z.B. streng militärische Hierarchie, lose Zellenstruktur, geheimer Zirkel, bürokratischer Apparat, Kasten-System.
+      * Nenne typische Ränge oder Funktionen, falls passend.
+    - 'philosophy': Was sind die tieferen Ziele, Dogmen oder die Weltanschauung der Fraktion?
+      * Was glauben sie? Wofür kämpfen sie? Welche Opfer sind sie bereit zu bringen?
+      * Wie sehen sie andere Fraktionen / die Welt?
+    - 'important_npcs_info': Kurze Beschreibungen von 2–3 weiteren wichtigen Rollen innerhalb der Fraktion.
+      * KEINE vollen NPC-Profile, sondern Rollensteckbriefe.
+      * WICHTIGES FORMAT (Markdown-Liste, damit der Parser mehrere Personen sicher erkennt):
+        - Nutze für JEDEN NPC eine NEUE ZEILE im Format:
+          "- Name - Kurze Beschreibung"
+        - Beispiele:
+          "- Hochinquisitor Seran - fanatischer Anführer der inneren Zirkel, überwacht innere Reinheit."
+          "- Quartiermeisterin Lira - kontrolliert alle Ressourcen und Bestechungen im Hafenviertel."
+        - Verwende IMMER dieses Muster mit führendem '-' und genau einem '-' zwischen Name und Beschreibung.
+
     ANFORDERUNGEN:
     - Valid JSON. Sprache: Deutsch.
     
@@ -951,9 +1791,13 @@ export async function generateFaction(campaignId: string, userPrompt: string) {
       "name": "string", 
       "type": "string (MUSS einer sein: ${VALID_FACTION_TYPES.join(", ")})", 
       "current_status": "string (MUSS einer sein: ${VALID_RELATIONSHIPS.join(", ")} oder leer)", 
-      "description": "string (Beschreibung für Spieler)", 
-      "gm_notes": "string (Interne Notizen, Geheimnisse)",
-      "headquarters_location_name_suggestion": "string (Exakter Name aus VERFÜGBARE ORTE oder leer)"
+      "description": "string (kurze Beschreibung für Spieler, 2–4 Sätze)", 
+      "gm_notes": "string (Interne Notizen, Geheimnisse, Plot-Ideen)",
+      "headquarters_location_name_suggestion": "string (Exakter Name aus VERFÜGBARE ORTE oder leer)",
+      "appearance": "string (Detaillierte Beschreibung von Wappen, Uniformfarben, Slogans und optischen Erkennungsmerkmalen)",
+      "structure": "string (Beschreibung der inneren Struktur und Hierarchie der Fraktion)",
+      "philosophy": "string (Ziele, Dogmen, Weltanschauung der Fraktion)",
+      "important_npcs_info": "string (2–3 weitere wichtige Rollen mit kurzen Beschreibungen, als Markdown-Liste im Format: '- Name - Kurze Beschreibung' pro Zeile)"
     }
   `;
 

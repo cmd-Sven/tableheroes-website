@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, User, Search, Filter, X } from "lucide-react";
+import { Plus, User, Search, Filter, X, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { NPCGridCard } from "@/src/components/dashboard/NPCGridCard";
 import { deleteNPC, toggleNPCReveal } from "./npc-actions";
@@ -43,6 +43,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
   const [factionFilter, setFactionFilter] = useState<string>("Alle");
   const [statusFilter, setStatusFilter] = useState<string>("Alle");
   const [raceFilter, setRaceFilter] = useState<string>("Alle");
+  const [onlyQuestGivers, setOnlyQuestGivers] = useState(false);
 
   const handleDelete = async (npc: NPC) => {
     try {
@@ -90,6 +91,11 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
       filtered = filtered.filter((n) => n.race === raceFilter);
     }
 
+    // Nur Questgeber: nur NPCs mit mindestens einer aktiven Quest als Geber
+    if (onlyQuestGivers) {
+      filtered = filtered.filter((n) => (n as any).has_active_quest_as_giver === true);
+    }
+
     // Apply search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -125,7 +131,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
     });
 
     return filtered;
-  }, [npcs, factionFilter, statusFilter, raceFilter, searchQuery, isGM]);
+  }, [npcs, factionFilter, statusFilter, raceFilter, searchQuery, onlyQuestGivers, isGM]);
 
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card p-6">
@@ -169,7 +175,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Faction Filter */}
           <div>
             <label className="mb-1 block font-barlow font-bold text-xs uppercase text-gray-400">
@@ -226,6 +232,20 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
               ))}
             </select>
           </div>
+
+          {/* Nur Questgeber */}
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer h-[34px] font-barlow font-bold text-xs uppercase text-gray-400 hover:text-accent-gold transition-colors">
+              <input
+                type="checkbox"
+                checked={onlyQuestGivers}
+                onChange={(e) => setOnlyQuestGivers(e.target.checked)}
+                className="w-4 h-4 rounded border-hero-dark bg-slate-900 text-accent-gold focus:ring-accent-gold focus:ring-2"
+              />
+              <ScrollText className="h-4 w-4 text-accent-gold" />
+              Nur Questgeber
+            </label>
+          </div>
         </div>
       </div>
 
@@ -241,7 +261,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
       {/* Empty State */}
       {filteredAndSortedNPCs.length === 0 ? (
         <div className="text-center py-12">
-          {searchQuery || factionFilter !== "Alle" || statusFilter !== "Alle" || raceFilter !== "Alle" ? (
+          {searchQuery || factionFilter !== "Alle" || statusFilter !== "Alle" || raceFilter !== "Alle" || onlyQuestGivers ? (
             <>
               <User className="h-12 w-12 text-gray-600 mx-auto mb-3" />
               <p className="font-cinzel text-lg text-accent-gold mb-2">
@@ -252,13 +272,14 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
                   ? "Versuche andere Suchbegriffe."
                   : "Versuche andere Filter."}
               </p>
-              {(searchQuery || factionFilter !== "Alle" || statusFilter !== "Alle" || raceFilter !== "Alle") && (
+              {(searchQuery || factionFilter !== "Alle" || statusFilter !== "Alle" || raceFilter !== "Alle" || onlyQuestGivers) && (
                 <button
                   onClick={() => {
                     setSearchQuery("");
                     setFactionFilter("Alle");
                     setStatusFilter("Alle");
                     setRaceFilter("Alle");
+                    setOnlyQuestGivers(false);
                   }}
                   className="mt-4 px-4 py-2 rounded-md border border-hero-border bg-hero-dark text-white font-barlow font-bold text-xs uppercase hover:bg-hero-vibrant transition-colors"
                 >

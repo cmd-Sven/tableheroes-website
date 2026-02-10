@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { X, User, ChevronRight, ChevronLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import { createCharacterWithRelations } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import { getNPCsByFactionForOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { getChildLocationsForOnboarding } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 
 type Faction = {
   id: string;
@@ -15,6 +17,11 @@ type Location = {
   name: string;
   type: string;
 };
+
+/** Erlaubte Heimatort-Typen (wie in DB, case-insensitive): Stadt, Region, Ort, Akademie, Tempel, Gilde */
+const LARGE_LOCATION_TYPES = ["Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde"];
+const locationTypeMatches = (type: string | null | undefined) =>
+  LARGE_LOCATION_TYPES.some((t) => String(t).toLowerCase() === String(type ?? "").toLowerCase());
 
 type NPC = {
   id: string;
@@ -32,6 +39,7 @@ type NewContact = {
   name: string;
   role: string;
   relationship_to_character: string;
+  description?: string;
   status: "Alive" | "Deceased" | "Missing" | "Unknown";
 };
 
@@ -58,6 +66,11 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   // Step B: Welt-Integration
   const [faction_id, setFactionId] = useState("");
   const [location_id, setLocationId] = useState("");
+  const [selectedOriginId, setSelectedOriginId] = useState("");
+  const [factionMembers, setFactionMembers] = useState<{ id: string; name: string; title: string | null; role: string | null }[]>([]);
+  const [childLocations, setChildLocations] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [loadingFactionMembers, setLoadingFactionMembers] = useState(false);
+  const [loadingChildLocations, setLoadingChildLocations] = useState(false);
 
   // Step C: Beziehungen
   const [existingContacts, setExistingContacts] = useState<ExistingContact[]>([]);
@@ -67,13 +80,52 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     name: "",
     role: "",
     relationship_to_character: "",
+    description: "",
     status: "Alive",
   });
 
-  // Filter revealed items (already filtered in parent, but double-check)
+  // Filter revealed items (already filtered in parent: wizardFactions / wizardLocations aus world_lore)
   const revealedFactions = factions;
   const revealedLocations = locations;
   const revealedNPCs = npcs;
+  const largeLocations = revealedLocations.filter((l) => locationTypeMatches(l.type));
+
+  // DEBUG: Wizard-Daten prüfen (F12 → Konsole)
+  useEffect(() => {
+    if (isOpen) {
+      console.log("DEBUG Wizard Data:", {
+        factions: revealedFactions,
+        locations: revealedLocations,
+        npcs: revealedNPCs,
+        wizardFactionsCount: revealedFactions.length,
+        wizardLocationsCount: revealedLocations.length,
+      });
+    }
+  }, [isOpen, revealedFactions, revealedLocations, revealedNPCs]);
+
+  // Fraktions-Kontext: NPCs der gewählten Fraktion laden (für "Bekannte Mitglieder" & Schritt 3)
+  useEffect(() => {
+    if (!faction_id) {
+      setFactionMembers([]);
+      return;
+    }
+    setLoadingFactionMembers(true);
+    getNPCsByFactionForOnboarding(campaignId, faction_id)
+      .then(setFactionMembers)
+      .finally(() => setLoadingFactionMembers(false));
+  }, [campaignId, faction_id]);
+
+  // Orts-Kontext: Gebäude/Institutionen unter gewähltem Heimatort laden
+  useEffect(() => {
+    if (!selectedOriginId) {
+      setChildLocations([]);
+      return;
+    }
+    setLoadingChildLocations(true);
+    getChildLocationsForOnboarding(campaignId, selectedOriginId)
+      .then(setChildLocations)
+      .finally(() => setLoadingChildLocations(false));
+  }, [campaignId, selectedOriginId]);
 
   const addExistingContact = () => {
     setExistingContacts([...existingContacts, { npc_id: "", relationship_type: "" }]);
@@ -95,7 +147,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
       return;
     }
     setNewContacts([...newContacts, { ...newContactForm }]);
-    setNewContactForm({ name: "", role: "", relationship_to_character: "", status: "Alive" });
+    setNewContactForm({ name: "", role: "", relationship_to_character: "", description: "", status: "Alive" });
     setShowNewContactModal(false);
   };
 
@@ -131,6 +183,9 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
       }
     });
   };
+
+  // Echtheits-Check: Wenn Arrays gefüllt, Dropdowns aber leer → Mapping der <option> prüfen (value=item.id, label=item.name)
+  console.log("DROPDOWN_CHECK - Locations:", locations, "Factions:", factions);
 
   if (!isOpen) return null;
 
@@ -288,34 +343,97 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 >
                   <option value="">-- Keine Fraktion --</option>
                   {revealedFactions
-                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
                     .map((faction) => (
                       <option key={faction.id} value={faction.id}>
-                        {faction.name} ({faction.type})
+                        {faction.name || "Unbekannte Fraktion"} ({faction.type || "—"})
+                      </option>
+                    ))}
+                </select>
+                {faction_id && (
+                  <div className="mt-3 rounded border border-hero-border/30 bg-hero-dark/20 p-3">
+                    <p className="mb-2 font-barlow font-semibold text-sm uppercase text-accent-gold">
+                      Bekannte Mitglieder
+                    </p>
+                    {loadingFactionMembers ? (
+                      <p className="font-libre text-sm text-gray-500 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Lade…
+                      </p>
+                    ) : factionMembers.length === 0 ? (
+                      <p className="font-libre text-sm text-gray-500 italic">Keine Mitglieder für Onboarding freigegeben.</p>
+                    ) : (
+                      <ul className="space-y-1 font-libre text-sm text-gray-200">
+                        {factionMembers.map((npc) => (
+                          <li key={npc.id}>
+                            {npc.name}
+                            {(npc.title || npc.role) && (
+                              <span className="text-gray-500 ml-1">({npc.title || npc.role})</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Heimatort: value = world_lore.id, label = world_lore.name (Daten aus world_lore, allow_pc_origin) */}
+              <div>
+                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                  Heimatort – Große Orte (Stadt/Region, Optional)
+                </label>
+                <select
+                  value={selectedOriginId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedOriginId(id);
+                    setLocationId(id);
+                  }}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                >
+                  <option value="">-- Kein Ort --</option>
+                  {[...largeLocations]
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name || "Unbekannter Ort"} ({location.type || "—"})
                       </option>
                     ))}
                 </select>
               </div>
 
-              <div>
-                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Heimatort (Optional)
-                </label>
-                <select
-                  value={location_id}
-                  onChange={(e) => setLocationId(e.target.value)}
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                >
-                  <option value="">-- Kein Ort --</option>
-                  {revealedLocations
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name} ({location.type})
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {selectedOriginId && (
+                <div>
+                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                    Spezifischer Startpunkt – Gebäude/Institution (Optional)
+                  </label>
+                  {loadingChildLocations ? (
+                    <p className="font-libre text-sm text-gray-500 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Lade Gebäude…
+                    </p>
+                  ) : (
+                    <select
+                      value={childLocations.some((c) => c.id === location_id) ? location_id : ""}
+                      onChange={(e) => setLocationId(e.target.value || selectedOriginId)}
+                      className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                    >
+                      <option value="">-- Nur Ort, kein Gebäude --</option>
+                      {childLocations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name || "Unbekannter Ort"} ({loc.type || "—"})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {!loadingChildLocations && childLocations.length === 0 && (
+                    <p className="mt-1 font-libre text-xs text-gray-500 italic">
+                      Keine Gebäude/Institutionen für diesen Ort freigegeben.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -325,6 +443,47 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4">
                 Beziehungen & NPCs
               </h3>
+
+              {/* Vorgeschlagene Kontakte (aus gewählter Fraktion) */}
+              {factionMembers.length > 0 && (
+                <div className="rounded border border-accent-gold/30 bg-accent-gold/5 p-4">
+                  <p className="mb-3 font-barlow font-semibold text-sm uppercase text-accent-gold">
+                    Vorgeschlagene Kontakte (deine Fraktion)
+                  </p>
+                  <p className="mb-3 font-libre text-xs text-gray-400">
+                    Diese NPCs gehören zu deiner gewählten Fraktion. Füge sie bei Bedarf als Kontakte hinzu.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {factionMembers
+                      .filter((npc) => !existingContacts.some((c) => c.npc_id === npc.id))
+                      .map((npc) => (
+                        <button
+                          key={npc.id}
+                          type="button"
+                          onClick={() => {
+                            setExistingContacts([
+                              ...existingContacts,
+                              { npc_id: npc.id, relationship_type: "Mitglied" },
+                            ]);
+                          }}
+                          className="flex items-center gap-2 rounded border border-hero-border bg-hero-dark/50 px-3 py-2 font-libre text-sm text-gray-200 hover:bg-hero-vibrant/20 hover:border-hero-vibrant transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5 text-hero-vibrant" />
+                          {npc.name}
+                          {(npc.title || npc.role) && (
+                            <span className="text-gray-500">({npc.title || npc.role})</span>
+                          )}
+                        </button>
+                      ))}
+                    {factionMembers.every((npc) => existingContacts.some((c) => c.npc_id === npc.id)) &&
+                      factionMembers.length > 0 && (
+                        <span className="font-libre text-xs text-gray-500 italic">
+                          Alle vorgeschlagenen Kontakte hinzugefügt.
+                        </span>
+                      )}
+                  </div>
+                </div>
+              )}
 
               {/* Liste 1: Bekannte Kontakte */}
               <div>
@@ -502,6 +661,18 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                       </div>
                       <div>
                         <label className="block mb-1 text-xs font-barlow font-bold uppercase text-gray-300">
+                          Beschreibung (Optional, für GM)
+                        </label>
+                        <textarea
+                          value={newContactForm.description || ""}
+                          onChange={(e) => setNewContactForm({ ...newContactForm, description: e.target.value })}
+                          rows={2}
+                          className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white outline-none transition-all focus:border-accent-gold resize-none"
+                          placeholder="Kurze Beschreibung oder Kontext für den GM"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-xs font-barlow font-bold uppercase text-gray-300">
                           Status
                         </label>
                         <select
@@ -527,7 +698,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                           type="button"
                           onClick={() => {
                             setShowNewContactModal(false);
-                            setNewContactForm({ name: "", role: "", relationship_to_character: "", status: "Alive" });
+                            setNewContactForm({ name: "", role: "", relationship_to_character: "", description: "", status: "Alive" });
                           }}
                           className="px-4 py-2 rounded border border-hero-border font-barlow font-bold uppercase text-sm text-gray-300 hover:bg-hero-dark transition-colors"
                         >

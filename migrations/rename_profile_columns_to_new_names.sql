@@ -1,0 +1,11 @@
+-- Optional: Alte Profil-Spalten in die neuen Namen umbenennen.
+-- Nur ausführen, wenn die DB noch die alten Spaltennamen hat
+-- (profile_show_rank, profile_show_points, profile_favorite_achievement_id,
+--  profile_slogan, profile_show_slogan, profile_background_image).
+
+-- ALTER TABLE public.users RENAME COLUMN profile_background_image TO profile_background_url;
+-- ALTER TABLE public.users RENAME COLUMN profile_show_rank TO show_rank;
+-- ALTER TABLE public.users RENAME COLUMN profile_show_points TO show_points;
+-- ALTER TABLE public.users RENAME COLUMN profile_favorite_achievement_id TO selected_achievement_id;
+-- ALTER TABLE public.users RENAME COLUMN profile_slogan TO slogan;
+-- ALTER TABLE public.users RENAME COLUMN profile_show_slogan TO show_slogan;

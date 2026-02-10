@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { Trash2, Loader2 } from "lucide-react";
 import { deleteCampaign } from "@/src/app/dashboard/campaigns/[id]/actions";
 import { useRouter } from "next/navigation";
+import { HeroButton } from "@/src/components/ui/HeroButton";
 
 type Campaign = {
   id: string;
@@ -42,25 +42,27 @@ export function CampaignCard({ campaign }: Props) {
 
   return (
     <div
-      className="rounded-md border border-hero-border bg-background-card p-6 shadow-lg hover:border-hero-vibrant transition-colors group relative"
+      className="gothic-dashboard-card p-6 group relative"
     >
-      <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2 group-hover:text-white transition-colors">
+      <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2 drop-shadow-[0_0_8px_rgba(0,0,0,0.8)] group-hover:text-accent-gold transition-colors">
         {campaign.name || "Unbenannt"}
       </h3>
-      <p className="font-barlow font-bold text-gray-500 uppercase text-xs mb-4">
+      <p className="font-barlow font-bold text-gray-100 uppercase text-xs mb-4 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
         {campaign.system || "System offen"} • {campaign.max_players || "?"} Plätze
       </p>
       <div className="flex gap-2 mt-4 items-center justify-between">
-        <Link
+        <HeroButton
           href={`/dashboard/campaigns/${campaign.id}`}
-          className="text-sm font-barlow font-bold uppercase text-hero-vibrant hover:text-white transition-colors"
+          size="sm"
+          ariaLabel="Kampagne verwalten"
+          className="button-glint"
         >
-          Verwalten &rarr;
-        </Link>
+          Kampagne öffnen
+        </HeroButton>
         <button
           onClick={handleDelete}
           disabled={isPending}
-          className="p-2 rounded text-red-400 hover:text-red-600 hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-full bg-black/60 border border-red-900/60 text-red-400 hover:text-red-200 hover:bg-red-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Kampagne löschen"
         >
           {isPending ? (

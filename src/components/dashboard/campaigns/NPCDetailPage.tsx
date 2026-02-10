@@ -18,6 +18,7 @@ import {
   MapPin,
   HeartPulse,
   Scroll,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,6 +42,8 @@ import {
   createNPCRelationManually,
 } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
 import { Sparkles } from "lucide-react";
+import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
+import { CreateQuestModal } from "@/src/components/dashboard/CreateQuestModal";
 
 type Quest = {
   id: string;
@@ -106,6 +109,9 @@ type Props = {
   userId: string;
   factions?: Array<{ id: string; name: string }>;
   locations?: Array<{ id: string; name: string; type: string }>;
+  /** Für Quest-Modal von NPC-Seite (nur GM) */
+  npcsForQuest?: Array<{ id: string; name: string; title: string | null; role: string | null }>;
+  membersForQuest?: Array<{ id: string; character_id: string | null; user?: { username: string } | null; character_data?: any; characters?: any }>;
 };
 
 const NPC_STATUSES = [
@@ -213,10 +219,13 @@ export function NPCDetailPage({
   canEdit,
   factions = [],
   locations = [],
+  npcsForQuest = [],
+  membersForQuest = [],
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [npc, setNpc] = useState(initialNpc);
+  const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
@@ -249,26 +258,126 @@ export function NPCDetailPage({
   const [npcsWithoutRelation, setNpcsWithoutRelation] = useState<Set<string>>(
     new Set()
   );
+  // State für Hooks, die durch Fuzzy-Matching bereits als verknüpft gelten (sollten ausgeblendet werden)
+  const [hiddenHooks, setHiddenHooks] = useState<Set<string>>(new Set());
   const [isLinkingRelation, setIsLinkingRelation] = useState<string | null>(
     null
   );
+  const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
+  const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
+
+  // Hilfsfunktion: Fuzzy-Namensvergleich für Hooks und NPCs
+  // "Meistermusikant Elara" sollte als Match für "Elara" gelten und umgekehrt
+  const fuzzyNameMatch = (hookName: string, npcName: string): boolean => {
+    const hookLower = hookName.toLowerCase().trim();
+    const npcLower = npcName.toLowerCase().trim();
+    
+    if (!hookLower || !npcLower) return false;
+    
+    // Exakte Übereinstimmung
+    if (hookLower === npcLower) return true;
+    
+    // Hook-Name enthält NPC-Name (z.B. "Meistermusikant Elara" enthält "Elara")
+    if (hookLower.includes(npcLower)) return true;
+    
+    // NPC-Name enthält Hook-Name (z.B. "Elara" enthält ... - selten, aber möglich)
+    if (npcLower.includes(hookLower)) return true;
+    
+    // Prüfe einzelne Wörter (z.B. "Elara" im Hook "Meistermusikant Elara")
+    const hookWords = hookLower.split(/\s+/);
+    const npcWords = npcLower.split(/\s+/);
+    
+    // Wenn ein Wort aus dem NPC-Namen im Hook vorkommt
+    for (const npcWord of npcWords) {
+      if (npcWord.length > 2 && hookWords.some(hw => hw === npcWord || hw.includes(npcWord) || npcWord.includes(hw))) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
 
   // Lade existierende NPCs für Smart Links und prüfe fehlende Relationen
+  // Prüfe auch, ob Hooks bereits als target_name in npc_relations verknüpft sind
   useEffect(() => {
     const loadExistingNPCs = async () => {
       if (narrativeHooks.length === 0) return;
 
       const npcMap: Record<string, { id: string; name: string }> = {};
       const withoutRelation = new Set<string>();
+      const hooksToHide = new Set<string>(); // Hooks, die durch Fuzzy-Match versteckt werden sollen
+
+      // Lade alle Relationen des aktuellen NPCs, um zu prüfen, welche Hooks/NPCs bereits verknüpft sind
+      const { getNPCRelations } = await import("@/src/app/dashboard/campaigns/[id]/npc-relations-actions");
+      let existingRelations: Array<{ partnerName: string; partnerId: string | null; isHook?: boolean }> = [];
+      try {
+        existingRelations = await getNPCRelations(campaignId, npc.id);
+      } catch (error) {
+        console.error("Fehler beim Laden der Relationen:", error);
+      }
+
+      // Erstelle Arrays von bereits verknüpften Namen (für Fuzzy-Vergleich)
+      const linkedHookNames = existingRelations
+        .filter((rel) => rel.isHook)
+        .map((rel) => rel.partnerName.toLowerCase().trim());
+
+      // Erstelle Set von bereits verknüpften NPC-IDs (npc_id_2)
+      const linkedNPCIds = new Set(
+        existingRelations
+          .filter((rel) => !rel.isHook && rel.partnerId)
+          .map((rel) => rel.partnerId!.toLowerCase().trim())
+      );
+
+      // Erstelle Array von NPC-Namen aus den Relationen (für Fuzzy-Vergleich)
+      const linkedNPCNames = existingRelations
+        .filter((rel) => !rel.isHook && rel.partnerName)
+        .map((rel) => rel.partnerName.toLowerCase().trim());
 
       for (const hook of narrativeHooks) {
         if (hook.name) {
+          const hookNameLower = hook.name.toLowerCase().trim();
+          
+          // FUZZY-CHECK: Prüfe, ob Hook bereits als target_name verknüpft ist (mit Fuzzy-Matching)
+          const isHookLinked = linkedHookNames.some(linkedName => 
+            fuzzyNameMatch(hookNameLower, linkedName)
+          );
+          
+          if (isHookLinked) {
+            // Hook ist bereits verknüpft, markiere zum Verstecken
+            hooksToHide.add(hook.name);
+            continue;
+          }
+          
+          // FUZZY-CHECK: Prüfe, ob bereits ein verknüpfter NPC-Name dem Hook entspricht
+          const isNPCAlreadyLinked = linkedNPCNames.some(linkedName => 
+            fuzzyNameMatch(hookNameLower, linkedName)
+          );
+          
+          if (isNPCAlreadyLinked) {
+            // NPC mit ähnlichem Namen ist bereits verknüpft, markiere Hook zum Verstecken
+            hooksToHide.add(hook.name);
+            continue;
+          }
+
           try {
             const existing = await findNPCByName(campaignId, hook.name);
             if (existing && existing.id && existing.name) {
+              const existingNameLower = existing.name.toLowerCase().trim();
+              
+              // FUZZY-CHECK: Prüfe, ob NPC bereits in den Relationen vorkommt (Fuzzy-Matching)
+              const isAlreadyLinkedByName = linkedNPCNames.some(linkedName => 
+                fuzzyNameMatch(existingNameLower, linkedName)
+              );
+              
+              if (isAlreadyLinkedByName || linkedNPCIds.has(existing.id.toLowerCase().trim())) {
+                // NPC ist bereits verknüpft, markiere zum Verstecken
+                hooksToHide.add(hook.name);
+                continue;
+              }
+
               npcMap[hook.name] = { id: existing.id, name: existing.name };
 
-              // Prüfe, ob Relation bereits existiert
+              // Prüfe, ob Relation bereits existiert (beide Richtungen)
               const relationExists = await checkNPCRelationExists(
                 campaignId,
                 npc.id,
@@ -287,6 +396,7 @@ export function NPCDetailPage({
 
       setExistingNPCs(npcMap);
       setNpcsWithoutRelation(withoutRelation);
+      setHiddenHooks(hooksToHide);
     };
 
     loadExistingNPCs();
@@ -1094,7 +1204,32 @@ export function NPCDetailPage({
                   wurden und als NPCs erstellt werden können.
                 </p>
                 <div className="space-y-3">
-                  {narrativeHooks.map((hook, index) => (
+                  {narrativeHooks
+                    .filter((hook) => {
+                      // Filtere Hooks heraus, die bereits verknüpft sind
+                      if (!hook.name) return true; // Zeige unbenannte Hooks immer an
+                      
+                      // FUZZY-CHECK: Prüfe, ob Hook durch Fuzzy-Matching versteckt werden soll
+                      if (hiddenHooks.has(hook.name)) {
+                        // Hook ist bereits verknüpft (Fuzzy-Match) - nicht anzeigen
+                        return false;
+                      }
+                      
+                      // Prüfe, ob Hook bereits als NPC existiert
+                      if (existingNPCs[hook.name]) {
+                        // NPC existiert - prüfe, ob er bereits verknüpft ist
+                        if (!npcsWithoutRelation.has(hook.name)) {
+                          // NPC existiert und ist bereits verknüpft - nicht anzeigen
+                          return false;
+                        }
+                        // NPC existiert, aber ist noch nicht verknüpft - anzeigen
+                        return true;
+                      }
+                      
+                      // Hook existiert noch nicht als NPC - anzeigen
+                      return true;
+                    })
+                    .map((hook, index) => (
                     <div
                       key={index}
                       className={`rounded-lg border p-4 ${
@@ -1230,6 +1365,9 @@ export function NPCDetailPage({
                 canEdit={isGM}
                 factionId={npc.faction_id ?? null}
                 currentLocationId={npc.current_location_id ?? null}
+                sourceNPCName={npc.name}
+                factions={factions}
+                locations={locations}
               />
             </GothicSpotlightDescription>
           </div>
@@ -1251,18 +1389,31 @@ export function NPCDetailPage({
               <GothicSpotlightDescription
                 backgroundImageUrl={npc.image_url || undefined}
               >
+                {isGM && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsSecretModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      ✨ Plot-Geheimnis mit KI weben
+                    </button>
+                  </div>
+                )}
                 <SecretsManager
                   entityId={npc.id}
                   entityType="npc"
                   campaignId={campaignId}
                   isGM={isGM}
+                  refreshKey={secretsRefreshKey}
                 />
               </GothicSpotlightDescription>
             </div>
           </div>
 
           {/* Quests Section */}
-          {(activeQuests.length > 0 || completedQuests.length > 0) && (
+          {(isGM || activeQuests.length > 0 || completedQuests.length > 0) && (
             <div
               className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
               style={{
@@ -1276,10 +1427,34 @@ export function NPCDetailPage({
               {/* Dark Overlay for readability */}
               <div className="absolute inset-0 bg-black/40 pointer-events-none" />
               <div className="relative z-10">
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
-                  <BookOpen className="h-6 w-6" />
-                  Quests
-                </h2>
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-hero-border">
+                  <h2 className="font-barlow font-semibold text-2xl text-accent-blood flex items-center gap-2">
+                    <BookOpen className="h-6 w-6" />
+                    Quests
+                  </h2>
+                  {isGM && (
+                    <>
+                      {npcsForQuest.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsQuestModalOpen(true)}
+                          className="inline-flex items-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          📜 Neue Quest in Auftrag geben
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/quests/new?quest_giver_id=${npc.id}`}
+                          className="inline-flex items-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          📜 Neue Quest in Auftrag geben
+                        </Link>
+                      )}
+                    </>
+                  )}
+                </div>
 
                 {activeQuests.length > 0 && (
                   <div className="mb-6">
@@ -1653,6 +1828,37 @@ export function NPCDetailPage({
             // Optional: Router refresh für vollständige Synchronisation
             router.refresh();
           }}
+        />
+      )}
+
+      {/* Universal Secret AI Modal */}
+      {isGM && (
+        <UniversalSecretModal
+          entityId={npc.id}
+          entityType="npc"
+          campaignId={campaignId}
+          entityName={npc.name}
+          isOpen={isSecretModalOpen}
+          onClose={() => setIsSecretModalOpen(false)}
+          onCreated={() => {
+            // Trigger refresh der Secrets-Liste
+            setSecretsRefreshKey((prev) => prev + 1);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {/* Quest-Modal (von NPC-Seite mit festem Questgeber) */}
+      {isGM && npcsForQuest.length > 0 && (
+        <CreateQuestModal
+          campaignId={campaignId}
+          isOpen={isQuestModalOpen}
+          onClose={() => setIsQuestModalOpen(false)}
+          npcs={npcsForQuest}
+          locations={locations}
+          members={membersForQuest}
+          defaultQuestGiverId={npc.id}
+          defaultQuestGiverName={npc.name}
         />
       )}
 

@@ -9,6 +9,8 @@ import { startSession } from "./session-actions";
 type Props = {
   campaignId: string;
   isGM: boolean;
+  /** Spieler: Nur bei Status 'Active' darf der Spieler Sessions betreten. */
+  characterStatus?: string;
   upcomingSessions: Array<{
     id: string;
     title: string | null;
@@ -20,7 +22,8 @@ type Props = {
   npcs: Array<{ id: string; name: string; title: string | null }>;
 };
 
-export function SessionsTab({ campaignId, isGM, upcomingSessions, locations, npcs }: Props) {
+export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSessions, locations, npcs }: Props) {
+  const canJoinSession = isGM || characterStatus === "Active";
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isStarting, startTransition] = useTransition();
   const router = useRouter();
@@ -120,13 +123,19 @@ export function SessionsTab({ campaignId, isGM, upcomingSessions, locations, npc
                     </span>
 
                     {isLive && (
-                      <button
-                        type="button"
-                        onClick={() => handleJoinLive(session.id)}
-                        className="inline-flex items-center gap-1 rounded bg-red-900/60 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-red-200 hover:bg-red-800/80 transition-colors animate-pulse"
-                      >
-                        🔴 Laufender Session beitreten
-                      </button>
+                      canJoinSession ? (
+                        <button
+                          type="button"
+                          onClick={() => handleJoinLive(session.id)}
+                          className="inline-flex items-center gap-1 rounded bg-red-900/60 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-red-200 hover:bg-red-800/80 transition-colors animate-pulse"
+                        >
+                          🔴 Laufender Session beitreten
+                        </button>
+                      ) : (
+                        <span className="font-libre text-[10px] text-gray-500 italic" title="Charakter muss vom GM freigeschaltet sein (Status Active).">
+                          Freischaltung ausstehend
+                        </span>
+                      )
                     )}
 
                     {isScheduled && isGM && (

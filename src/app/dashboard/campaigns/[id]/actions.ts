@@ -2,11 +2,20 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { analyzeCharacterOnboarding, generateCharacterQuest } from "./ai-actions";
+import {
+  analyzeCharacterOnboarding,
+  generateCharacterQuest,
+} from "./ai-actions";
 import { createQuest } from "./quest-actions";
-import { CampaignMembershipSchema, CampaignSchema } from "@/src/lib/validations/schemas";
+import {
+  CampaignMembershipSchema,
+  CampaignSchema,
+} from "@/src/lib/validations/schemas";
 
-export async function togglePublishStatus(campaignId: string, currentState: boolean) {
+export async function togglePublishStatus(
+  campaignId: string,
+  currentState: boolean,
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,7 +30,9 @@ export async function togglePublishStatus(campaignId: string, currentState: bool
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Unauthorized: You are not the GM of this campaign.");
@@ -43,7 +54,10 @@ export async function togglePublishStatus(campaignId: string, currentState: bool
   revalidatePath("/"); // Landing page
 }
 
-export async function updateCampaignDetails(campaignId: string, formData: FormData) {
+export async function updateCampaignDetails(
+  campaignId: string,
+  formData: FormData,
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -58,7 +72,9 @@ export async function updateCampaignDetails(campaignId: string, formData: FormDa
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Unauthorized: You are not the GM of this campaign.");
@@ -95,7 +111,11 @@ export async function updateCampaignDetails(campaignId: string, formData: FormDa
 // ============================================================================
 
 // Neue Funktion: Bewerbung mit optionalem Charakter
-export async function applyToCampaign(campaignId: string, message?: string, characterId?: string) {
+export async function applyToCampaign(
+  campaignId: string,
+  message?: string,
+  characterId?: string,
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -111,14 +131,20 @@ export async function applyToCampaign(campaignId: string, message?: string, char
       .single();
 
     // Expliziter Cast, um 'never' zu verhindern
-    const character = characterRaw as { id: string; user_id: string; campaign_id: string | null } | null;
+    const character = characterRaw as {
+      id: string;
+      user_id: string;
+      campaign_id: string | null;
+    } | null;
 
     if (!character || character.user_id !== user.id) {
       throw new Error("Nicht autorisiert: Dieser Charakter gehört dir nicht.");
     }
 
     if (character.campaign_id !== null) {
-      throw new Error("Dieser Charakter ist bereits einer Kampagne zugeordnet.");
+      throw new Error(
+        "Dieser Charakter ist bereits einer Kampagne zugeordnet.",
+      );
     }
   }
 
@@ -152,15 +178,22 @@ export async function applyToCampaign(campaignId: string, message?: string, char
   };
 
   // Zentrale Validierung mit Zod (ohne id, da diese von der DB vergeben wird)
-  const parsed = CampaignMembershipSchema.omit({ id: true }).safeParse(membershipToInsert);
+  const parsed = CampaignMembershipSchema.omit({ id: true }).safeParse(
+    membershipToInsert,
+  );
 
   if (!parsed.success) {
-    console.error("CampaignMembership Validation Error:", parsed.error.flatten());
+    console.error(
+      "CampaignMembership Validation Error:",
+      parsed.error.flatten(),
+    );
     throw new Error("Ungültige Bewerbungsdaten. Bitte versuche es erneut.");
   }
 
   // Insert application WITH optional character_id
-  const { error } = await (supabase.from("campaign_members") as any).insert(parsed.data);
+  const { error } = await (supabase.from("campaign_members") as any).insert(
+    parsed.data,
+  );
 
   if (error) {
     console.error("Apply to Campaign Error:", error);
@@ -172,7 +205,11 @@ export async function applyToCampaign(campaignId: string, message?: string, char
 }
 
 // Alte Funktion (deprecated, für Rückwärtskompatibilität)
-export async function applyToCampaignWithCharacter(campaignId: string, message: string, characterId: string) {
+export async function applyToCampaignWithCharacter(
+  campaignId: string,
+  message: string,
+  characterId: string,
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -187,7 +224,11 @@ export async function applyToCampaignWithCharacter(campaignId: string, message: 
     .single();
 
   // Expliziter Cast, um 'never' zu verhindern
-  const character = characterRaw as { id: string; user_id: string; campaign_id: string | null } | null;
+  const character = characterRaw as {
+    id: string;
+    user_id: string;
+    campaign_id: string | null;
+  } | null;
 
   if (!character || character.user_id !== user.id) {
     throw new Error("Unauthorized: Not your character.");
@@ -251,27 +292,37 @@ export async function acceptApplication(memberId: string, campaignId: string) {
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Unauthorized: You are not the GM.");
   }
 
   // Fetch the membership to get character_id
-  const { data: membershipRaw } = await (supabase.from("campaign_members") as any)
+  const { data: membershipRaw } = await (
+    supabase.from("campaign_members") as any
+  )
     .select("id, character_id, user_id")
     .eq("id", memberId)
     .single();
 
   // Expliziter Cast, um 'never' zu verhindern
-  const membership = membershipRaw as { id: string; character_id: string | null; user_id: string } | null;
+  const membership = membershipRaw as {
+    id: string;
+    character_id: string | null;
+    user_id: string;
+  } | null;
 
   if (!membership) {
     throw new Error("Membership not found.");
   }
 
   // Update membership status to "Drafting" (neuer Workflow)
-  const { error: memberError } = await (supabase.from("campaign_members") as any)
+  const { error: memberError } = await (
+    supabase.from("campaign_members") as any
+  )
     .update({ status: "Drafting" })
     .eq("id", memberId);
 
@@ -348,21 +399,30 @@ export async function acceptApplication(memberId: string, campaignId: string) {
         // KI HOOK: Automatische Quest-Generierung (RPC-basiert)
         // -----------------------------------------------------------
         // Zusätzlich zur Personal Quest: Erstelle Location, NPC und Quest via RPC
-        if (character.backstory_summary && character.backstory_summary.length > 20) {
+        if (
+          character.backstory_summary &&
+          character.backstory_summary.length > 20
+        ) {
           try {
-            console.log("Starte KI-Quest-Generierung für Character:", membership.character_id);
-            
+            console.log(
+              "Starte KI-Quest-Generierung für Character:",
+              membership.character_id,
+            );
+
             await generateCharacterQuest(
               membership.character_id,
               campaignId,
-              character.backstory_summary
+              character.backstory_summary,
             );
-            
+
             console.log("KI-Quest-Bundle erfolgreich erstellt");
           } catch (questGenError) {
             // WICHTIG: Wir fangen Fehler hier ab.
             // Wenn die KI fehlschlägt, soll der Spieler trotzdem akzeptiert bleiben!
-            console.error("Warnung: Automatische Quest-Bundle konnte nicht erstellt werden:", questGenError);
+            console.error(
+              "Warnung: Automatische Quest-Bundle konnte nicht erstellt werden:",
+              questGenError,
+            );
           }
         }
         // -----------------------------------------------------------
@@ -388,8 +448,10 @@ export async function acceptApplication(memberId: string, campaignId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/gm-inbox`);
   revalidatePath("/dashboard");
-  
+  revalidatePath("/dashboard", "layout");
+
   return { success: true };
 }
 
@@ -409,7 +471,9 @@ export async function rejectApplication(memberId: string, campaignId: string) {
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Unauthorized: You are not the GM.");
@@ -426,6 +490,10 @@ export async function rejectApplication(memberId: string, campaignId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/gm-inbox`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/gm-inbox");
 }
 
 export async function removeMember(memberId: string, campaignId: string) {
@@ -444,7 +512,9 @@ export async function removeMember(memberId: string, campaignId: string) {
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Unauthorized: You are not the GM.");
@@ -463,6 +533,46 @@ export async function removeMember(memberId: string, campaignId: string) {
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
 }
 
+export async function updateMemberRank(
+  campaignId: string,
+  targetUserId: string,
+  rank: string,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: campaignRaw } = await supabase
+    .from("campaigns")
+    .select("id, gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  const parsed = CampaignSchema.pick({
+    id: true,
+    gm_id: true,
+  }).safeParse(campaignRaw);
+
+  if (!parsed.success || parsed.data.gm_id !== user.id) {
+    throw new Error("Unauthorized: You are not the GM.");
+  }
+
+  const { error } = await (supabase.from("users") as any)
+    .update({ current_rank: rank || null })
+    .eq("id", targetUserId);
+
+  if (error) {
+    console.error("Update Member Rank Error:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath("/dashboard");
+}
+
 // ============================================================================
 // PLAYER NOTIFICATION SYSTEM
 // ============================================================================
@@ -476,7 +586,9 @@ export async function markAcceptanceAsSeen(memberId: string) {
   if (!user) throw new Error("Not authenticated");
 
   // Verify ownership (user can only mark their own acceptances as seen)
-  const { data: membershipRaw } = await (supabase.from("campaign_members") as any)
+  const { data: membershipRaw } = await (
+    supabase.from("campaign_members") as any
+  )
     .select("user_id")
     .eq("id", memberId)
     .single();
@@ -521,7 +633,11 @@ export async function deleteCampaign(campaignId: string) {
     .single();
 
   // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true, name: true }).safeParse(campaignRaw);
+  const parsed = CampaignSchema.pick({
+    id: true,
+    gm_id: true,
+    name: true,
+  }).safeParse(campaignRaw);
 
   if (!parsed.success || parsed.data.gm_id !== user.id) {
     throw new Error("Nicht autorisiert: Du bist nicht der GM dieser Kampagne.");
@@ -541,8 +657,7 @@ export async function deleteCampaign(campaignId: string) {
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/");
-  
+
   // Return success for client-side redirect handling
   return { success: true };
 }
-

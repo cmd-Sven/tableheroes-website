@@ -7,10 +7,15 @@ import { getWorldByCampaign } from "../../world-actions";
 
 type Props = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ prefill_name?: string; prefill_relationship?: string; prefill_description?: string }>;
 };
 
-export default async function CreateNPCPage({ params }: Props) {
+export default async function CreateNPCPage({ params, searchParams }: Props) {
   const { id: campaignId } = await params;
+  const search = await searchParams;
+  const prefillName = search.prefill_name ?? undefined;
+  const prefillRelationship = search.prefill_relationship ?? undefined;
+  const prefillDescription = search.prefill_description ?? undefined;
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -51,6 +56,9 @@ export default async function CreateNPCPage({ params }: Props) {
         type: String((loc as any).type || "Ort")
       }))}
       world={world}
+      prefillName={prefillName}
+      prefillRole={prefillRelationship}
+      prefillDescription={prefillDescription}
     />
   );
 }

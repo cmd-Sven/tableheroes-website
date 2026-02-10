@@ -1,8 +1,25 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { X, ScrollText, Sparkles, Plus, Trash2, User } from "lucide-react";
-import { createQuest, updateQuest, getQuestParticipants, syncQuestParticipants } from "@/src/app/dashboard/campaigns/[id]/quest-actions";
+import {
+  X,
+  ScrollText,
+  Sparkles,
+  Plus,
+  Trash2,
+  User,
+  Star,
+  Loader2,
+  Check,
+} from "lucide-react";
+import {
+  createQuest,
+  updateQuest,
+  getQuestParticipants,
+  syncQuestParticipants,
+  getQuestAnchors,
+} from "@/src/app/dashboard/campaigns/[id]/quest-actions";
+import type { QuestAnchor } from "@/src/types/quest";
 import { generateQuest } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
 
 type Character = {
@@ -41,10 +58,18 @@ type Props = {
   campaignId: string;
   isOpen: boolean;
   onClose: () => void;
-  npcs: Array<{ id: string; name: string; title: string | null; role: string | null }>;
+  npcs: Array<{
+    id: string;
+    name: string;
+    title: string | null;
+    role: string | null;
+  }>;
   locations: Array<{ id: string; name: string; type: string }>;
   characters?: Character[];
   members?: Member[];
+  /** Wenn gesetzt (z.B. von NPC-Detailseite): Questgeber fest, Anker sofort laden */
+  defaultQuestGiverId?: string;
+  defaultQuestGiverName?: string;
   existingQuest?: {
     id: string;
     title: string;
@@ -70,12 +95,20 @@ const QUEST_TYPES = [
   "Other",
 ];
 
-const QUEST_STATUSES = [
-  "Active",
-  "Completed",
-];
+const QUEST_STATUSES = ["Active", "Completed"];
 
-export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations, characters = [], members = [], existingQuest }: Props) {
+export function CreateQuestModal({
+  campaignId,
+  isOpen,
+  onClose,
+  npcs,
+  locations,
+  characters = [],
+  members = [],
+  defaultQuestGiverId,
+  defaultQuestGiverName,
+  existingQuest,
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
   const isEditMode = !!existingQuest;
@@ -98,10 +131,19 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
   });
 
   // Quest Type: "group" or "personal"
-  const [questTargetType, setQuestTargetType] = useState<"group" | "personal">("group");
+  const [questTargetType, setQuestTargetType] = useState<"group" | "personal">(
+    "group",
+  );
 
   const [aiPrompt, setAiPrompt] = useState("");
-  
+
+  // Erzählerische Anker (Priorität: ignore | include | prioritize)
+  const [questAnchors, setQuestAnchors] = useState<QuestAnchor[]>([]);
+  const [anchorPriorities, setAnchorPriorities] = useState<
+    Record<string, "ignore" | "include" | "prioritize">
+  >({});
+  const [isLoadingAnchors, setIsLoadingAnchors] = useState(false);
+
   // Beteiligte NPCs
   type Participant = {
     id?: string; // Für Edit-Mode (wenn bereits in DB)
@@ -109,6 +151,39 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
     role_description: string;
   };
   const [participants, setParticipants] = useState<Participant[]>([]);
+
+  // Lade Erzählerische Anker wenn Quest-Geber oder Ort sich ändert
+  useEffect(() => {
+    if (!isOpen || isEditMode) return;
+    const qg = formData.quest_giver_id || null;
+    const loc = formData.location_id || null;
+    if (!qg && !loc) {
+      setQuestAnchors([]);
+      setAnchorPriorities({});
+      return;
+    }
+    setIsLoadingAnchors(true);
+    getQuestAnchors(campaignId, qg, loc)
+      .then((anchors) => {
+        setQuestAnchors(anchors);
+        setAnchorPriorities({});
+      })
+      .catch(() => setQuestAnchors([]))
+      .finally(() => setIsLoadingAnchors(false));
+  }, [
+    isOpen,
+    isEditMode,
+    campaignId,
+    formData.quest_giver_id,
+    formData.location_id,
+  ]);
+
+  const setAnchorPriority = (
+    anchorId: string,
+    value: "ignore" | "include" | "prioritize",
+  ) => {
+    setAnchorPriorities((prev) => ({ ...prev, [anchorId]: value }));
+  };
 
   // Sync state when opening modal (Edit vs Create)
   useEffect(() => {
@@ -127,18 +202,20 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
           gm_notes: existingQuest.gm_notes || "",
           is_revealed: existingQuest.is_revealed || false,
         });
-        setQuestTargetType(existingQuest.assigned_character_id ? "personal" : "group");
+        setQuestTargetType(
+          existingQuest.assigned_character_id ? "personal" : "group",
+        );
         setAiPrompt("");
-        
+
         // Lade bestehende Teilnehmer
         loadParticipants();
       } else {
-        // CREATE MODE: Formular leeren
+        // CREATE MODE: Leeren, ggf. festen Questgeber setzen (von NPC-Seite)
         setFormData({
           title: "",
           type: "Side Quest",
           status: "Active",
-          quest_giver_id: "",
+          quest_giver_id: defaultQuestGiverId || "",
           location_id: "",
           assigned_character_id: "",
           description: "",
@@ -151,7 +228,7 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
         setParticipants([]);
       }
     }
-  }, [isOpen, existingQuest]);
+  }, [isOpen, existingQuest, defaultQuestGiverId]);
 
   const loadParticipants = async () => {
     if (!existingQuest?.id) return;
@@ -162,7 +239,7 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
           id: p.id,
           npc_id: p.npc_id,
           role_description: p.role_description || "",
-        }))
+        })),
       );
     } catch (error: any) {
       console.error("Error loading participants:", error);
@@ -177,7 +254,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
     setParticipants(participants.filter((_, i) => i !== index));
   };
 
-  const updateParticipant = (index: number, field: "npc_id" | "role_description", value: string) => {
+  const updateParticipant = (
+    index: number,
+    field: "npc_id" | "role_description",
+    value: string,
+  ) => {
     const updated = [...participants];
     updated[index] = { ...updated[index], [field]: value };
     setParticipants(updated);
@@ -192,7 +273,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
     setIsGenerating(true);
     try {
       // Übergebe die bereits ausgewählten IDs an die KI
-      const contextIds: { questGiverId?: string; locationId?: string; targetCharacterId?: string } = {};
+      const contextIds: {
+        questGiverId?: string;
+        locationId?: string;
+        targetCharacterId?: string;
+      } = {};
       if (formData.quest_giver_id) {
         contextIds.questGiverId = formData.quest_giver_id;
       }
@@ -203,24 +288,63 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
         contextIds.targetCharacterId = formData.assigned_character_id;
       }
 
-      // KI-Generierung mit Kontext
-      const generated = await generateQuest(campaignId, contextIds, aiPrompt);
+      const includeIds = Object.entries(anchorPriorities)
+        .filter(([, v]) => v === "include" || v === "prioritize")
+        .map(([id]) => id);
+      const prioritizeIds = Object.entries(anchorPriorities)
+        .filter(([, v]) => v === "prioritize")
+        .map(([id]) => id);
+      const priorities =
+        questAnchors.length > 0 &&
+        (includeIds.length > 0 || prioritizeIds.length > 0)
+          ? {
+              include: includeIds,
+              prioritize: prioritizeIds,
+              anchors: questAnchors,
+            }
+          : undefined;
 
-      // Fill form with generated data
-      // Validierung: Stelle sicher, dass der Typ aus QUEST_TYPES ist
-      const validType = QUEST_TYPES.includes(generated.type) ? generated.type : "Side Quest";
-      
+      const generated = await generateQuest(
+        campaignId,
+        contextIds,
+        aiPrompt,
+        priorities,
+      );
+
+      const validType = QUEST_TYPES.includes(generated.type)
+        ? generated.type
+        : "Side Quest";
+      const objectives = Array.isArray(generated.objectives)
+        ? generated.objectives
+        : [];
+      const rivalHook =
+        typeof generated.rival_quest_hook === "string"
+          ? generated.rival_quest_hook
+          : "";
+      let gmNotes = generated.gm_notes || "";
+      if (objectives.length > 0) {
+        gmNotes =
+          (gmNotes ? gmNotes + "\n\n" : "") +
+          "Ziele:\n" +
+          objectives.map((o: string) => `- ${o}`).join("\n");
+      }
+      if (rivalHook.trim()) {
+        gmNotes =
+          (gmNotes ? gmNotes + "\n\n" : "") +
+          "Gegen-Quest-Hook (Konkurrenz):\n" +
+          rivalHook.trim();
+      }
+
       setFormData({
         ...formData,
         title: generated.title || "",
         type: validType,
         description: generated.description || "",
         rewards: generated.rewards || "",
-        gm_notes: generated.gm_notes || "",
-        // Automatisch verknüpfte IDs setzen (wenn vom Backend gefunden)
-        quest_giver_id: generated.quest_giver_id || formData.quest_giver_id || "",
+        gm_notes: gmNotes,
+        quest_giver_id:
+          generated.quest_giver_id || formData.quest_giver_id || "",
         location_id: generated.location_id || formData.location_id || "",
-        // assigned_character_id bleibt wie ausgewählt (wird nicht von KI überschrieben)
       });
     } catch (error: any) {
       console.error(error);
@@ -235,18 +359,21 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
     startTransition(async () => {
       try {
         // FIX: TypeScript erwartet 'undefined' für optionale Strings, nicht 'null'.
-      const payload = {
-        title: formData.title,
-        type: formData.type,
-        status: formData.status,
-        quest_giver_id: formData.quest_giver_id || null,
-        location_id: formData.location_id || null,
-        assigned_character_id: questTargetType === "personal" ? (formData.assigned_character_id || null) : null,
-        description: formData.description || undefined,
-        rewards: formData.rewards || undefined,
-        gm_notes: formData.gm_notes || undefined,
-        is_revealed: formData.is_revealed,
-      };
+        const payload = {
+          title: formData.title,
+          type: formData.type,
+          status: formData.status,
+          quest_giver_id: formData.quest_giver_id || null,
+          location_id: formData.location_id || null,
+          assigned_character_id:
+            questTargetType === "personal"
+              ? formData.assigned_character_id || null
+              : null,
+          description: formData.description || undefined,
+          rewards: formData.rewards || undefined,
+          gm_notes: formData.gm_notes || undefined,
+          is_revealed: formData.is_revealed,
+        };
 
         let questId: string;
         if (isEditMode && existingQuest) {
@@ -267,9 +394,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
             npc_id: p.npc_id,
             role_description: p.role_description || null,
           }));
-        
+
         await syncQuestParticipants(questId, validParticipants);
-        
+
         onClose();
       } catch (error: any) {
         console.error(error);
@@ -290,7 +417,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               <ScrollText className="h-6 w-6 text-accent-gold" />
             </div>
             <h2 className="font-cinzel font-bold text-2xl text-white">
-              {isEditMode ? "Quest bearbeiten" : "Neue Quest erstellen"}
+              {isEditMode
+                ? "Quest bearbeiten"
+                : defaultQuestGiverName
+                ? `Neue Quest für ${defaultQuestGiverName} entwerfen`
+                : "Neue Quest erstellen"}
             </h2>
           </div>
           <button
@@ -303,7 +434,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
         </div>
 
         {/* Body (Scrollable) */}
-        <form id="quest-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        <form
+          id="quest-form"
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-5"
+        >
           {/* AI Generation Section */}
           {!isEditMode && (
             <div className="rounded border border-accent-gold/30 bg-gradient-to-br from-yellow-950/20 to-background-dark p-4 mb-6">
@@ -313,6 +448,7 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                   Quest mit KI entwerfen
                 </h3>
               </div>
+
               <div className="space-y-3">
                 <textarea
                   value={aiPrompt}
@@ -330,7 +466,8 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                   {isGenerating ? "Generiere..." : "✨ Quest mit KI entwerfen"}
                 </button>
                 <p className="text-xs text-gray-500 font-libre">
-                  Tipp: Wähle zuerst einen Quest-Geber oder Ort aus, um der KI mehr Kontext zu geben.
+                  Tipp: Wähle zuerst einen Quest-Geber oder Ort aus.
+                  Priorisierte Anker werden als Haupt-Plot-Punkte markiert.
                 </p>
               </div>
             </div>
@@ -379,7 +516,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               type="text"
               required
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold focus:ring-1 focus:ring-accent-gold"
               placeholder="z.B. Das gestohlene Artefakt"
             />
@@ -393,7 +532,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               </label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
                 className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
               >
                 {QUEST_TYPES.map((type) => (
@@ -410,7 +551,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
                 className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
               >
                 {QUEST_STATUSES.map((status) => (
@@ -428,24 +571,47 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
                 Quest-Geber
               </label>
-              <select
-                value={formData.quest_giver_id}
-                onChange={(e) => setFormData({ ...formData, quest_giver_id: e.target.value })}
-                className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-              >
-                <option value="">-- Kein Quest-Geber --</option>
-                {npcs
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((npc) => (
-                    <option key={npc.id} value={npc.id}>
-                      {npc.name}{npc.title ? ` (${npc.title})` : npc.role ? ` (${npc.role})` : ""}
-                    </option>
-                  ))}
-              </select>
-              {npcs.length === 0 && (
-                <p className="mt-1 text-xs text-gray-500 font-libre">
-                  Noch keine NPCs vorhanden. Erstelle zuerst NPCs im Tab "NPCs".
-                </p>
+              {defaultQuestGiverId && defaultQuestGiverName ? (
+                <div className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white flex items-center gap-2">
+                  <User className="h-4 w-4 text-accent-gold shrink-0" />
+                  <span className="text-hero-vibrant font-semibold">
+                    {defaultQuestGiverName}
+                  </span>
+                  <span className="text-gray-400 text-sm">(fest)</span>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={formData.quest_giver_id}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        quest_giver_id: e.target.value,
+                      })
+                    }
+                    className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                  >
+                    <option value="">-- Kein Quest-Geber --</option>
+                    {npcs
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.name}
+                          {n.title
+                            ? ` (${n.title})`
+                            : n.role
+                            ? ` (${n.role})`
+                            : ""}
+                        </option>
+                      ))}
+                  </select>
+                  {npcs.length === 0 && (
+                    <p className="mt-1 text-xs text-gray-500 font-libre">
+                      Noch keine NPCs vorhanden. Erstelle zuerst NPCs im Tab
+                      "NPCs".
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -455,7 +621,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               </label>
               <select
                 value={formData.location_id}
-                onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, location_id: e.target.value })
+                }
                 className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
               >
                 <option value="">-- Kein Ort --</option>
@@ -469,11 +637,111 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               </select>
               {locations.length === 0 && (
                 <p className="mt-1 text-xs text-gray-500 font-libre">
-                  Noch keine Orte vorhanden. Erstelle zuerst Orte im Tab "Welt & Lore".
+                  Noch keine Orte vorhanden. Erstelle zuerst Orte im Tab "Welt &
+                  Lore".
                 </p>
               )}
             </div>
           </div>
+
+          {/* Erzählerische Anker (KI-Kontext) – unter Quest-Geber & Ort */}
+          {(formData.quest_giver_id || formData.location_id) && (
+            <div className="rounded border border-hero-border/50 bg-background-dark/60 p-4">
+              <h4 className="font-barlow font-semibold text-sm uppercase text-accent-gold mb-2">
+                Erzählerische Anker (KI-Kontext)
+              </h4>
+              <p className="text-xs text-gray-400 font-libre mb-3">
+                Wähle, welche Infos einbezogen oder priorisiert werden sollen:
+                Einbeziehen (Check) oder Priorisieren (Stern).
+              </p>
+              {isLoadingAnchors ? (
+                <div className="flex items-center gap-2 py-6 text-gray-400">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm font-libre">Lade Anker…</span>
+                </div>
+              ) : questAnchors.length === 0 ? (
+                <p className="text-xs text-gray-500 font-libre italic py-4">
+                  Keine Anker gefunden für diesen Quest-Geber bzw. Ort.
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {questAnchors.map((anchor) => {
+                    const priority = anchorPriorities[anchor.id] ?? "ignore";
+                    const isPrioritized = priority === "prioritize";
+                    const isIncluded = priority === "include" || isPrioritized;
+                    return (
+                      <div
+                        key={anchor.id}
+                        className="flex items-start gap-3 rounded border border-hero-border/40 p-3 bg-zinc-900/50"
+                        style={{
+                          boxShadow: isPrioritized
+                            ? "0 0 12px rgba(202, 185, 38, 0.25)"
+                            : undefined,
+                        }}
+                      >
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAnchorPriority(
+                                anchor.id,
+                                isIncluded && !isPrioritized
+                                  ? "ignore"
+                                  : "include",
+                              )
+                            }
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-barlow uppercase transition-colors ${
+                              priority === "include"
+                                ? "bg-hero-dark text-hero-vibrant border border-hero-border"
+                                : "bg-gray-800/50 text-gray-400 hover:text-hero-vibrant border border-transparent"
+                            }`}
+                            title="Einbeziehen (wird als Kontext mitgesendet)"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Einbeziehen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAnchorPriority(
+                                anchor.id,
+                                isPrioritized ? "include" : "prioritize",
+                              )
+                            }
+                            disabled={priority === "ignore"}
+                            className={`p-1.5 rounded transition-colors ${
+                              isPrioritized
+                                ? "text-accent-gold"
+                                : "text-gray-500 hover:text-accent-gold/70"
+                            } ${
+                              priority === "ignore"
+                                ? "opacity-40 cursor-not-allowed"
+                                : ""
+                            }`}
+                            title="Priorisieren (Haupt-Plot-Punkt)"
+                          >
+                            <Star
+                              className={`h-5 w-5 ${
+                                isPrioritized ? "fill-current" : ""
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-barlow font-bold text-sm text-accent-gold block mb-1">
+                            {anchor.label}
+                          </span>
+                          <p className="text-xs text-gray-400 font-libre line-clamp-2">
+                            {anchor.summary}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Assigned Character (Personal Quest) - Only show when "Personal" is selected */}
           {questTargetType === "personal" && (
@@ -484,7 +752,12 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               <select
                 required={questTargetType === "personal"}
                 value={formData.assigned_character_id}
-                onChange={(e) => setFormData({ ...formData, assigned_character_id: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    assigned_character_id: e.target.value,
+                  })
+                }
                 className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold focus:ring-1 focus:ring-accent-gold"
               >
                 <option value="">-- Charakter auswählen --</option>
@@ -493,17 +766,29 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                   members
                     // Filter: Zeige jeden Member, der technisch einen Charakter hat
                     .filter((m) => {
-                      const char = (m as any).character_data || (m as any).characters || (m as any).character;
+                      const char =
+                        (m as any).character_data ||
+                        (m as any).characters ||
+                        (m as any).character;
                       // Zeige jeden Member, der technisch einen Charakter hat
                       return m.character_id && char;
                     })
                     .map((m) => {
                       // Safe Access für Name und Username
-                      const char = (m as any).character_data || (m as any).characters || (m as any).character;
+                      const char =
+                        (m as any).character_data ||
+                        (m as any).characters ||
+                        (m as any).character;
                       const charName = char?.name || "Unbekannter Charakter";
-                      const userName = m.user?.username || (m as any).users?.username || "Spieler";
+                      const userName =
+                        m.user?.username ||
+                        (m as any).users?.username ||
+                        "Spieler";
                       return (
-                        <option key={m.character_id} value={m.character_id || ""}>
+                        <option
+                          key={m.character_id}
+                          value={m.character_id || ""}
+                        >
                           {charName} ({userName})
                         </option>
                       );
@@ -520,7 +805,8 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                 )}
               </select>
               <p className="mt-1 text-xs text-gray-500 font-libre">
-                Die KI wird eine maßgeschneiderte Quest basierend auf der Biografie und den Beziehungen dieses Charakters erstellen.
+                Die KI wird eine maßgeschneiderte Quest basierend auf der
+                Biografie und den Beziehungen dieses Charakters erstellen.
               </p>
             </div>
           )}
@@ -553,7 +839,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                     (npc) =>
                       npc.id !== formData.quest_giver_id &&
                       (participant.npc_id === npc.id ||
-                        !participants.some((p, i) => i !== index && p.npc_id === npc.id))
+                        !participants.some(
+                          (p, i) => i !== index && p.npc_id === npc.id,
+                        )),
                   );
 
                   return (
@@ -568,7 +856,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                           </label>
                           <select
                             value={participant.npc_id}
-                            onChange={(e) => updateParticipant(index, "npc_id", e.target.value)}
+                            onChange={(e) =>
+                              updateParticipant(index, "npc_id", e.target.value)
+                            }
                             className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white outline-none transition-all focus:border-accent-gold"
                             required
                           >
@@ -578,7 +868,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                               .map((npc) => (
                                 <option key={npc.id} value={npc.id}>
                                   {npc.name}
-                                  {npc.title ? ` (${npc.title})` : npc.role ? ` (${npc.role})` : ""}
+                                  {npc.title
+                                    ? ` (${npc.title})`
+                                    : npc.role
+                                    ? ` (${npc.role})`
+                                    : ""}
                                 </option>
                               ))}
                           </select>
@@ -590,7 +884,13 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
                           <input
                             type="text"
                             value={participant.role_description}
-                            onChange={(e) => updateParticipant(index, "role_description", e.target.value)}
+                            onChange={(e) =>
+                              updateParticipant(
+                                index,
+                                "role_description",
+                                e.target.value,
+                              )
+                            }
                             placeholder="z.B. Informant, Händler"
                             className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white outline-none transition-all focus:border-accent-gold"
                           />
@@ -618,7 +918,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={4}
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-blue resize-none"
               placeholder="Was sehen die Spieler auf den ersten Blick?"
@@ -633,7 +935,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
             <input
               type="text"
               value={formData.rewards}
-              onChange={(e) => setFormData({ ...formData, rewards: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, rewards: e.target.value })
+              }
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
               placeholder="z.B. 100 Gold, 1 Seltenes Item, 500 XP"
             />
@@ -646,7 +950,9 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
             </label>
             <textarea
               value={formData.gm_notes}
-              onChange={(e) => setFormData({ ...formData, gm_notes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, gm_notes: e.target.value })
+              }
               rows={3}
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold border-l-4 border-l-accent-gold resize-none"
               placeholder="Geheimnisse, Hooks für die KI, wahre Absichten..."
@@ -659,14 +965,18 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               type="checkbox"
               id="is_revealed"
               checked={formData.is_revealed}
-              onChange={(e) => setFormData({ ...formData, is_revealed: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, is_revealed: e.target.checked })
+              }
               className="h-5 w-5 rounded border-hero-dark bg-slate-800 text-hero-vibrant focus:ring-2 focus:ring-hero-vibrant cursor-pointer"
             />
-            <label htmlFor="is_revealed" className="font-libre text-sm text-gray-300 cursor-pointer select-none">
+            <label
+              htmlFor="is_revealed"
+              className="font-libre text-sm text-gray-300 cursor-pointer select-none"
+            >
               Für Spieler sichtbar (Kann jederzeit geändert werden)
             </label>
           </div>
-
         </form>
 
         {/* Footer (Fixed) */}
@@ -686,7 +996,11 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
               disabled={isPending || isGenerating}
               className="rounded bg-hero-gold px-6 py-2 font-barlow font-bold uppercase text-black transition-colors hover:bg-yellow-500 disabled:opacity-50 shadow-lg shadow-hero-gold/20"
             >
-              {isPending ? "Speichern..." : isEditMode ? "Änderungen speichern" : "Quest erstellen"}
+              {isPending
+                ? "Speichern..."
+                : isEditMode
+                ? "Änderungen speichern"
+                : "Quest erstellen"}
             </button>
           </div>
         </div>
@@ -694,4 +1008,3 @@ export function CreateQuestModal({ campaignId, isOpen, onClose, npcs, locations,
     </div>
   );
 }
-

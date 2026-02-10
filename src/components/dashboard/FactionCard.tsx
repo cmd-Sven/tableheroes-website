@@ -74,19 +74,13 @@ export function FactionCard({ faction, isGM, onEdit }: Props) {
   };
 
   return (
-    <article
-      className={`rounded-lg border bg-background-card p-6 transition-all ${
-        faction.is_revealed
-          ? "border-hero-vibrant shadow-lg shadow-hero-vibrant/10"
-          : "border-hero-dark"
-      }`}
-    >
+    <article className={`gothic-dashboard-card p-6 transition-all ${faction.is_revealed ? "ring-1 ring-hero-vibrant/60" : ""}`}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <Shield className="h-5 w-5 text-accent-gold flex-shrink-0" />
-            <h3 className="font-cinzel font-bold text-xl text-white truncate">
+            <Shield className="h-5 w-5 text-accent-gold flex-shrink-0 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]" />
+            <h3 className="font-cinzel font-bold text-xl text-accent-gold truncate drop-shadow-[0_0_8px_rgba(0,0,0,0.9)]">
               {faction.name}
             </h3>
           </div>
@@ -112,7 +106,7 @@ export function FactionCard({ faction, isGM, onEdit }: Props) {
             )}
 
             {/* Member Count */}
-            <div className="flex items-center gap-1 text-gray-400">
+            <div className="flex items-center gap-1 text-emerald-50 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
               <Users className="h-3 w-3" />
               <span className="text-xs font-barlow font-bold">
                 {faction.member_count} {faction.member_count === 1 ? "Mitglied" : "Mitglieder"}
@@ -159,7 +153,7 @@ export function FactionCard({ faction, isGM, onEdit }: Props) {
       {/* Description */}
       {faction.description && (
         <div className="mb-3">
-          <p className="font-libre text-sm text-gray-300 leading-relaxed">
+          <p className="font-libre text-sm text-emerald-50 leading-relaxed drop-shadow-[0_0_6px_rgba(0,0,0,0.9)]">
             {faction.description}
           </p>
         </div>

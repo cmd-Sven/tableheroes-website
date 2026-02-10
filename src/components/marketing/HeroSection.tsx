@@ -477,6 +477,8 @@ type Countdown = {
   seconds: number;
 };
 
+const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
+
 function useLaunchCountdown(): Countdown {
   const [timeLeft, setTimeLeft] = useState<Countdown>({
     days: 0,
@@ -486,7 +488,7 @@ function useLaunchCountdown(): Countdown {
   });
 
   useEffect(() => {
-    const target = new Date("2026-02-09T18:00:00+01:00").getTime();
+    const target = Date.now() + FOUR_DAYS_MS;
 
     const update = () => {
       const now = Date.now();

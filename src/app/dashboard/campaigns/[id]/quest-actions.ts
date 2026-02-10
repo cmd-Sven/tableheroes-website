@@ -2,10 +2,11 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { QuestAnchor } from "@/src/types/quest";
 
 /**
  * Server Actions für Quests (Journal)
- * 
+ *
  * Unterstützt:
  * - Create Quest (with NPC/Location links)
  * - Update Quest
@@ -52,7 +53,17 @@ export async function createQuest(formData: {
     throw new Error("Nur der GM kann Quests erstellen.");
   }
 
-  // 3. Insert Quest
+  // 3. Questgeber ist Pflicht
+  if (
+    !formData.quest_giver_id ||
+    String(formData.quest_giver_id).trim() === ""
+  ) {
+    throw new Error(
+      "Jede Quest muss einen Questgeber haben. Bitte wähle einen NPC aus.",
+    );
+  }
+
+  // 4. Insert Quest
   const { data: quest, error } = await (supabase.from("quests") as any)
     .insert({
       campaign_id: formData.campaign_id,
@@ -95,7 +106,7 @@ export async function updateQuest(
     rewards?: string;
     gm_notes?: string;
     is_revealed?: boolean;
-  }
+  },
 ) {
   const supabase = await createClient();
 
@@ -123,13 +134,20 @@ export async function updateQuest(
   if (updates.title !== undefined) cleanUpdates.title = updates.title;
   if (updates.type !== undefined) cleanUpdates.type = updates.type;
   if (updates.status !== undefined) cleanUpdates.status = updates.status;
-  if (updates.quest_giver_id !== undefined) cleanUpdates.quest_giver_id = updates.quest_giver_id || null;
-  if (updates.location_id !== undefined) cleanUpdates.location_id = updates.location_id || null;
-  if (updates.assigned_character_id !== undefined) cleanUpdates.assigned_character_id = updates.assigned_character_id || null;
-  if (updates.description !== undefined) cleanUpdates.description = updates.description || undefined;
-  if (updates.rewards !== undefined) cleanUpdates.rewards = updates.rewards || undefined;
-  if (updates.gm_notes !== undefined) cleanUpdates.gm_notes = updates.gm_notes || undefined;
-  if (updates.is_revealed !== undefined) cleanUpdates.is_revealed = updates.is_revealed;
+  if (updates.quest_giver_id !== undefined)
+    cleanUpdates.quest_giver_id = updates.quest_giver_id || null;
+  if (updates.location_id !== undefined)
+    cleanUpdates.location_id = updates.location_id || null;
+  if (updates.assigned_character_id !== undefined)
+    cleanUpdates.assigned_character_id = updates.assigned_character_id || null;
+  if (updates.description !== undefined)
+    cleanUpdates.description = updates.description || undefined;
+  if (updates.rewards !== undefined)
+    cleanUpdates.rewards = updates.rewards || undefined;
+  if (updates.gm_notes !== undefined)
+    cleanUpdates.gm_notes = updates.gm_notes || undefined;
+  if (updates.is_revealed !== undefined)
+    cleanUpdates.is_revealed = updates.is_revealed;
 
   // 4. Update
   const { error } = await (supabase.from("quests") as any)
@@ -170,7 +188,9 @@ export async function deleteQuest(questId: string) {
   }
 
   // 3. Delete
-  const { error } = await (supabase.from("quests") as any).delete().eq("id", questId);
+  const { error } = await (supabase.from("quests") as any)
+    .delete()
+    .eq("id", questId);
 
   if (error) {
     console.error("Delete Quest Error:", error);
@@ -183,7 +203,10 @@ export async function deleteQuest(questId: string) {
 // ============================================================================
 // Toggle Reveal Status
 // ============================================================================
-export async function toggleQuestReveal(questId: string, currentState: boolean) {
+export async function toggleQuestReveal(
+  questId: string,
+  currentState: boolean,
+) {
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -265,7 +288,8 @@ export async function getQuests(campaignId: string) {
   // Fetch quests with NPC, Location, and assigned Character data joined
   // RLS will filter based on user role (GM sees all, Player sees only revealed)
   const { data: quests, error } = await (supabase.from("quests") as any)
-    .select(`
+    .select(
+      `
       *,
       quest_giver:npcs (
         id,
@@ -285,7 +309,8 @@ export async function getQuests(campaignId: string) {
         level,
         avatar_url
       )
-    `)
+    `,
+    )
     .eq("campaign_id", campaignId)
     .order("created_at", { ascending: false });
 
@@ -302,7 +327,11 @@ export async function getQuests(campaignId: string) {
 // ============================================================================
 
 // Add Quest Participant
-export async function addQuestParticipant(questId: string, npcId: string, role: string | null) {
+export async function addQuestParticipant(
+  questId: string,
+  npcId: string,
+  role: string | null,
+) {
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -336,7 +365,9 @@ export async function addQuestParticipant(questId: string, npcId: string, role: 
   }
 
   // 4. Insert Participant
-  const { data: participant, error } = await (supabase.from("quest_participants") as any)
+  const { data: participant, error } = await (
+    supabase.from("quest_participants") as any
+  )
     .insert({
       quest_id: questId,
       npc_id: npcId,
@@ -365,7 +396,9 @@ export async function deleteQuestParticipant(participantId: string) {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   // 2. Fetch Participant and Quest to verify GM ownership
-  const { data: participant } = await (supabase.from("quest_participants") as any)
+  const { data: participant } = await (
+    supabase.from("quest_participants") as any
+  )
     .select("quest_id, quests!inner(campaign_id, campaigns!inner(gm_id))")
     .eq("id", participantId)
     .single();
@@ -403,7 +436,8 @@ export async function getQuestById(questId: string) {
 
   // 2. Fetch Quest with all related data
   const { data: quest, error } = await (supabase.from("quests") as any)
-    .select(`
+    .select(
+      `
       *,
       quest_giver:npcs (
         id,
@@ -424,7 +458,8 @@ export async function getQuestById(questId: string) {
         level,
         avatar_url
       )
-    `)
+    `,
+    )
     .eq("id", questId)
     .single();
 
@@ -447,8 +482,11 @@ export async function getQuestParticipants(questId: string) {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   // 2. Fetch Participants with NPC data
-  const { data: participants, error } = await (supabase.from("quest_participants") as any)
-    .select(`
+  const { data: participants, error } = await (
+    supabase.from("quest_participants") as any
+  )
+    .select(
+      `
       id,
       npc_id,
       role_description,
@@ -458,7 +496,8 @@ export async function getQuestParticipants(questId: string) {
         title,
         role
       )
-    `)
+    `,
+    )
     .eq("quest_id", questId)
     .order("created_at", { ascending: true });
 
@@ -473,7 +512,7 @@ export async function getQuestParticipants(questId: string) {
 // Sync Quest Participants (for Create/Update Quest)
 export async function syncQuestParticipants(
   questId: string,
-  participants: Array<{ npc_id: string; role_description: string | null }>
+  participants: Array<{ npc_id: string; role_description: string | null }>,
 ) {
   const supabase = await createClient();
 
@@ -505,11 +544,18 @@ export async function syncQuestParticipants(
   const newNPCIds = new Set(participants.map((p: any) => p.npc_id));
 
   // 4. Delete removed participants
-  const toDelete = (existing || []).filter((p: any) => !newNPCIds.has(p.npc_id));
+  const toDelete = (existing || []).filter(
+    (p: any) => !newNPCIds.has(p.npc_id),
+  );
   if (toDelete.length > 0) {
-    const { error: deleteError } = await (supabase.from("quest_participants") as any)
+    const { error: deleteError } = await (
+      supabase.from("quest_participants") as any
+    )
       .delete()
-      .in("id", toDelete.map((p: any) => p.id));
+      .in(
+        "id",
+        toDelete.map((p: any) => p.id),
+      );
 
     if (deleteError) {
       console.error("Delete Participants Error:", deleteError);
@@ -519,11 +565,15 @@ export async function syncQuestParticipants(
 
   // 5. Insert/Update participants
   for (const participant of participants) {
-    const existingParticipant = (existing as any[])?.find((p: any) => p.npc_id === participant.npc_id);
-    
+    const existingParticipant = (existing as any[])?.find(
+      (p: any) => p.npc_id === participant.npc_id,
+    );
+
     if (existingParticipant) {
       // Update existing
-      const { error: updateError } = await (supabase.from("quest_participants") as any)
+      const { error: updateError } = await (
+        supabase.from("quest_participants") as any
+      )
         .update({ role_description: participant.role_description || null })
         .eq("id", existingParticipant.id);
 
@@ -533,12 +583,13 @@ export async function syncQuestParticipants(
       }
     } else {
       // Insert new
-      const { error: insertError } = await (supabase.from("quest_participants") as any)
-        .insert({
-          quest_id: questId,
-          npc_id: participant.npc_id,
-          role_description: participant.role_description || null,
-        });
+      const { error: insertError } = await (
+        supabase.from("quest_participants") as any
+      ).insert({
+        quest_id: questId,
+        npc_id: participant.npc_id,
+        role_description: participant.role_description || null,
+      });
 
       if (insertError) {
         console.error("Insert Participant Error:", insertError);
@@ -550,5 +601,172 @@ export async function syncQuestParticipants(
   revalidatePath(`/dashboard/campaigns/${quest.campaign_id}`);
 }
 
+// ============================================================================
+// Get Quest Anchors (Erzählerische Anker für KI-Quest-Generierung)
+// ============================================================================
+export async function getQuestAnchors(
+  campaignId: string,
+  questGiverId?: string | null,
+  locationId?: string | null,
+): Promise<QuestAnchor[]> {
+  const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
 
+  const anchors: QuestAnchor[] = [];
+
+  if (questGiverId) {
+    const { data: npc } = await (supabase.from("npcs") as any)
+      .select("id, name, faction_id, current_location_id")
+      .eq("id", questGiverId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+
+    if (npc) {
+      const locId = locationId || npc.current_location_id;
+
+      const { data: secrets } = await (supabase.from("secrets") as any)
+        .select("id, title, content")
+        .eq("campaign_id", campaignId)
+        .eq("entity_type", "npc")
+        .eq("entity_id", questGiverId);
+
+      if (secrets) {
+        secrets.forEach((s: any) => {
+          anchors.push({
+            id: `secret:${s.id}`,
+            type: "npc_secret",
+            label: s.title || "Geheimnis",
+            summary:
+              (s.content || "").substring(0, 180) +
+              ((s.content || "").length > 180 ? "…" : ""),
+          });
+        });
+      }
+
+      const { data: relations } = await (supabase.from("npc_relations") as any)
+        .select("id, npc_id_1, npc_id_2, relation_type, description")
+        .eq("campaign_id", campaignId)
+        .or(`npc_id_1.eq.${questGiverId},npc_id_2.eq.${questGiverId}`);
+
+      if (relations && relations.length > 0) {
+        const partnerIds = relations
+          .map((r: any) =>
+            r.npc_id_1 === questGiverId ? r.npc_id_2 : r.npc_id_1,
+          )
+          .filter(Boolean);
+        const { data: partnerNPCs } = await (supabase.from("npcs") as any)
+          .select("id, name")
+          .in("id", partnerIds);
+        const nameById: Record<string, string> = {};
+        (partnerNPCs || []).forEach((n: any) => {
+          nameById[n.id] = n.name;
+        });
+
+        relations.forEach((r: any) => {
+          const pid = r.npc_id_1 === questGiverId ? r.npc_id_2 : r.npc_id_1;
+          if (!pid) return;
+          anchors.push({
+            id: `relation:${r.id}`,
+            type: "npc_relation",
+            label: `${nameById[pid] || "Unbekannt"} – ${r.relation_type}`,
+            summary: r.description || `${r.relation_type}`,
+          });
+        });
+      }
+
+      if (npc.faction_id) {
+        const { data: faction } = await (supabase.from("factions") as any)
+          .select("id, name, description")
+          .eq("id", npc.faction_id)
+          .maybeSingle();
+        if (faction) {
+          anchors.push({
+            id: `faction:${faction.id}`,
+            type: "faction",
+            label: faction.name,
+            summary:
+              (faction.description || "").substring(0, 150) +
+              ((faction.description || "").length > 150 ? "…" : ""),
+          });
+        }
+
+        const { data: factionRels } = await (
+          supabase.from("faction_relations") as any
+        )
+          .select("faction_id_1, faction_id_2, relation_type, description")
+          .eq("campaign_id", campaignId)
+          .or(
+            `faction_id_1.eq.${npc.faction_id},faction_id_2.eq.${npc.faction_id}`,
+          )
+          .limit(10);
+
+        if (factionRels) {
+          const rivalIds = factionRels
+            .map((fr: any) =>
+              fr.faction_id_1 === npc.faction_id
+                ? fr.faction_id_2
+                : fr.faction_id_1,
+            )
+            .filter(Boolean);
+          if (rivalIds.length > 0) {
+            const { data: rivals } = await (supabase.from("factions") as any)
+              .select("id, name, description")
+              .in("id", rivalIds);
+            (rivals || []).forEach((f: any) => {
+              anchors.push({
+                id: `faction_rival:${f.id}`,
+                type: "faction_rival",
+                label: `${f.name} (Rivale)`,
+                summary:
+                  (f.description || "").substring(0, 120) +
+                  ((f.description || "").length > 120 ? "…" : ""),
+              });
+            });
+          }
+        }
+      }
+
+      const { data: loreEntries } = await (supabase.from("world_lore") as any)
+        .select("id, name, type, description")
+        .eq("campaign_id", campaignId)
+        .limit(15);
+      if (loreEntries) {
+        loreEntries.forEach((l: any) => {
+          anchors.push({
+            id: `lore:${l.id}`,
+            type: "lore",
+            label: `${l.name} (${l.type || "Lore"})`,
+            summary:
+              (l.description || "").substring(0, 120) +
+              ((l.description || "").length > 120 ? "…" : ""),
+          });
+        });
+      }
+    }
+  }
+
+  if (!questGiverId && locationId) {
+    const { data: loreEntries } = await (supabase.from("world_lore") as any)
+      .select("id, name, type, description")
+      .eq("campaign_id", campaignId)
+      .limit(15);
+    if (loreEntries) {
+      loreEntries.forEach((l: any) => {
+        anchors.push({
+          id: `lore:${l.id}`,
+          type: "lore",
+          label: `${l.name} (${l.type || "Lore"})`,
+          summary:
+            (l.description || "").substring(0, 120) +
+            ((l.description || "").length > 120 ? "…" : ""),
+        });
+      });
+    }
+  }
+
+  return anchors;
+}
