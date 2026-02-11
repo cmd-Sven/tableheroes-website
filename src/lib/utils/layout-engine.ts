@@ -1,6 +1,6 @@
 /**
- * Layout-Engine für das feste 3x3 Dashboard-Grid.
- * 9 Slots: x_pos 0..2, y_pos 0..2. Karten haben width 1 oder 2 (col-span).
+ * Layout-Engine für das Dashboard-Grid (3 Spalten, dynamische Zeilen).
+ * Slots: x_pos 0..2, y_pos 0..MAX_ROWS-1. Karten haben width 1 oder 2 (col-span).
  * width=2 bei x_pos=2 ist ungültig (würde über Rand gehen).
  */
 
@@ -12,13 +12,13 @@ export type LayoutItem = {
 };
 
 export const COLS = 3;
-export const ROWS = 3;
+export const MAX_ROWS = 6;
 
-/** Prüft, ob ein LayoutItem gültig ist (x + width <= 3, y 0..2). */
+/** Prüft, ob ein LayoutItem gültig ist (x + width <= 3, y 0..MAX_ROWS-1). */
 export function isValidItem(item: LayoutItem): boolean {
   if (item.width !== 1 && item.width !== 2) return false;
   if (item.x_pos < 0 || item.x_pos >= COLS) return false;
-  if (item.y_pos < 0 || item.y_pos >= ROWS) return false;
+  if (item.y_pos < 0 || item.y_pos >= MAX_ROWS) return false;
   if (item.x_pos + item.width > COLS) return false;
   return true;
 }
@@ -36,15 +36,19 @@ export function getOccupiedCells(layout: LayoutItem[]): Map<string, string> {
   return map;
 }
 
-/** Gibt die Anzahl Zeilen zurück (immer 3 im festen Grid). */
-export function getGridRows(_layout?: LayoutItem[]): number {
-  return ROWS;
+/** Gibt die Anzahl belegter Zeilen zurück (min. 1, basierend auf dem Layout). */
+export function getGridRows(layout?: LayoutItem[]): number {
+  if (!layout || layout.length === 0) return 1;
+  const maxY = Math.max(...layout.map((i) => i.y_pos));
+  return maxY + 1;
 }
 
-/** Alle 9 Slot-Positionen (row, col) des festen 3x3-Grids. */
-export function getAllSlotPositions(): { row: number; col: number }[] {
+/** Alle Slot-Positionen (row, col) für das aktive Grid (basierend auf belegten Zeilen + 1 Extrazeile im Editiermodus). */
+export function getAllSlotPositions(layout?: LayoutItem[]): { row: number; col: number }[] {
+  const rows = layout ? getGridRows(layout) + 1 : MAX_ROWS;
+  const effectiveRows = Math.min(rows, MAX_ROWS);
   const slots: { row: number; col: number }[] = [];
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < effectiveRows; r++) {
     for (let c = 0; c < COLS; c++) {
       slots.push({ row: r, col: c });
     }
@@ -52,13 +56,15 @@ export function getAllSlotPositions(): { row: number; col: number }[] {
   return slots;
 }
 
-/** Leere Slots (row, col) im 3x3-Grid, die von keiner Karte belegt sind. */
+/** Leere Slots (row, col) im Grid, die von keiner Karte belegt sind. */
 export function getEmptySlots(
   layout: LayoutItem[]
 ): { row: number; col: number }[] {
   const occupied = getOccupiedCells(layout);
+  const rows = getGridRows(layout) + 1;
+  const effectiveRows = Math.min(rows, MAX_ROWS);
   const slots: { row: number; col: number }[] = [];
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < effectiveRows; r++) {
     for (let c = 0; c < COLS; c++) {
       if (!occupied.has(`${r},${c}`)) slots.push({ row: r, col: c });
     }
@@ -104,7 +110,7 @@ export function canPlaceAt(
   col: number,
   width: 1 | 2
 ): boolean {
-  if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return false;
+  if (row < 0 || row >= MAX_ROWS || col < 0 || col >= COLS) return false;
   if (width === 2 && col === 2) return false;
   if (width === 2 && col + 2 > COLS) return false;
   const occupied = getOccupiedCells(layout);
@@ -127,7 +133,8 @@ export function resolveDropTarget(
   dropRow: number,
   dropCol: number
 ): { row: number; col: number } {
-  const row = Math.max(0, Math.min(ROWS - 1, dropRow));
+  const maxRow = Math.max(getGridRows(layout), Math.min(MAX_ROWS - 1, dropRow + 1));
+  const row = Math.max(0, Math.min(maxRow - 1, dropRow));
   let col = dropCol;
   if (width === 2 && col === 2) col = 1;
   col = Math.max(0, Math.min(COLS - (width === 2 ? 2 : 1), col));
@@ -181,7 +188,7 @@ export function flowLayoutFromOrder(
   let col = 0;
   for (const id of order) {
     const w = widths[id] ?? 1;
-    if (row >= ROWS) break;
+    if (row >= MAX_ROWS) break;
     if (w === 2 && (col === 2 || col === 1)) {
       row++;
       col = 0;
@@ -189,7 +196,7 @@ export function flowLayoutFromOrder(
       row++;
       col = 0;
     }
-    if (row >= ROWS) break;
+    if (row >= MAX_ROWS) break;
     result.push({ id, x_pos: col, y_pos: row, width: w });
     col += w;
     if (col >= COLS) {
@@ -201,13 +208,13 @@ export function flowLayoutFromOrder(
 }
 
 /**
- * Klemmt alle Positionen auf das 3x3-Grid (y 0..2, x 0..2).
+ * Klemmt alle Positionen auf das Grid (y 0..MAX_ROWS-1, x 0..2).
  * width=2 bei x=2 wird auf x=1 gesetzt.
  */
 export function clampLayoutToGrid(layout: LayoutItem[]): LayoutItem[] {
   return layout.map((item) => {
     let x = Math.max(0, Math.min(COLS - 1, item.x_pos));
-    let y = Math.max(0, Math.min(ROWS - 1, item.y_pos));
+    let y = Math.max(0, Math.min(MAX_ROWS - 1, item.y_pos));
     if (item.width === 2 && x === 2) x = 1;
     return { ...item, x_pos: x, y_pos: y };
   });

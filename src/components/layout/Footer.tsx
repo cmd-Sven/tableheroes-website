@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn } from "lucide-react";
+import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn, Heart } from "lucide-react";
 import { HeroButton } from "@/src/components/ui/HeroButton";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
 import { TwinklingStars } from "@/src/components/marketing/TwinklingStars";
@@ -157,6 +157,15 @@ export function Footer() {
                 >
                   <LogIn className="h-4 w-4" />
                   Login
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/support"
+                  className="flex items-center gap-2 font-libre text-gray-400 text-sm hover:text-accent-gold transition-colors"
+                >
+                  <Heart className="h-4 w-4" />
+                  Unterstützung
                 </Link>
               </li>
             </ul>

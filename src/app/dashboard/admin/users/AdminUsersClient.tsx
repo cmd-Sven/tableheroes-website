@@ -15,6 +15,10 @@ import {
   Shield,
   Crown,
   User as UserIcon,
+  Info,
+  Swords,
+  Star,
+  Medal,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +30,10 @@ type UserRow = {
   created_at: string | null;
   primary_role?: string | null;
   role?: string | null;
+  experience_level?: string | null;
+  previous_games?: string | null;
+  motivation?: string | null;
+  codex_agreed?: boolean | null;
 };
 
 type Props = {
@@ -33,9 +41,150 @@ type Props = {
   approvedUsers: UserRow[];
 };
 
+function ExperienceBadge({ level }: { level: string | null | undefined }) {
+  if (!level) return null;
+  if (level === "Neuling") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-700/60 bg-amber-950/30 px-2 py-0.5 text-[10px] font-barlow font-bold uppercase text-amber-400">
+        <Swords className="h-3 w-3" /> Neuling
+      </span>
+    );
+  }
+  if (level === "Erfahren") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-gray-400/60 bg-gray-700/30 px-2 py-0.5 text-[10px] font-barlow font-bold uppercase text-gray-200">
+        <Star className="h-3 w-3" /> Erfahren
+      </span>
+    );
+  }
+  if (level === "Veteran") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-accent-gold/60 bg-accent-gold/10 px-2 py-0.5 text-[10px] font-barlow font-bold uppercase text-accent-gold">
+        <Medal className="h-3 w-3" /> Veteran
+      </span>
+    );
+  }
+  return null;
+}
+
+function OnboardingDetailModal({
+  user,
+  onClose,
+}: {
+  user: UserRow;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg border border-hero-border bg-background-card p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-barlow font-bold text-xl text-white uppercase">
+            Bewerbung von {user.username || user.email || "Unbekannt"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:text-white hover:bg-hero-dark transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Experience */}
+          <div>
+            <p className="font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
+              Erfahrungslevel
+            </p>
+            <ExperienceBadge level={user.experience_level} />
+            {!user.experience_level && (
+              <span className="font-libre text-sm text-gray-500 italic">
+                Nicht angegeben
+              </span>
+            )}
+          </div>
+
+          {/* Previous Games */}
+          <div>
+            <p className="font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
+              Bisherige Spiele
+            </p>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+              {user.previous_games || (
+                <span className="italic text-gray-500">Nicht angegeben</span>
+              )}
+            </p>
+          </div>
+
+          {/* Motivation */}
+          <div>
+            <p className="font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
+              Motivation
+            </p>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+              {user.motivation || (
+                <span className="italic text-gray-500">Nicht angegeben</span>
+              )}
+            </p>
+          </div>
+
+          {/* Kodex */}
+          <div>
+            <p className="font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
+              Kodex akzeptiert
+            </p>
+            <p
+              className={`font-barlow font-bold text-sm ${
+                user.codex_agreed ? "text-hero-vibrant" : "text-red-400"
+              }`}
+            >
+              {user.codex_agreed ? "Ja" : "Nein"}
+            </p>
+          </div>
+
+          {/* Registriert am */}
+          <div>
+            <p className="font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
+              Registriert am
+            </p>
+            <p className="font-libre text-sm text-gray-300">
+              {user.created_at
+                ? new Date(user.created_at).toLocaleDateString("de-DE", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "—"}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-hero-border bg-background-dark px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-300 hover:bg-hero-dark transition-colors"
+          >
+            Schließen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
   const router = useRouter();
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
+  const [detailUser, setDetailUser] = React.useState<UserRow | null>(null);
 
   async function handleApprove(id: string) {
     setLoadingId(id);
@@ -143,6 +292,9 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                     E-Mail / Name
                   </th>
                   <th className="px-4 py-3 font-barlow font-bold uppercase text-accent-gold">
+                    Erfahrung
+                  </th>
+                  <th className="px-4 py-3 font-barlow font-bold uppercase text-accent-gold">
                     Rolle
                   </th>
                   <th className="px-4 py-3 font-barlow font-bold uppercase text-accent-gold">
@@ -168,6 +320,12 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-200">
+                      <ExperienceBadge level={u.experience_level} />
+                      {!u.experience_level && (
+                        <span className="text-gray-500 text-xs italic">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-200">
                       {getRoleBadge(u)}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
@@ -177,6 +335,15 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDetailUser(u)}
+                          className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-accent-gold hover:bg-accent-gold/20"
+                          title="Bewerbung ansehen"
+                        >
+                          <Info className="h-4 w-4" />
+                          Details
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleApprove(u.id)}
@@ -310,6 +477,14 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
           )}
         </div>
       </section>
+
+      {/* Onboarding-Detail-Modal */}
+      {detailUser && (
+        <OnboardingDetailModal
+          user={detailUser}
+          onClose={() => setDetailUser(null)}
+        />
+      )}
     </div>
   );
 }

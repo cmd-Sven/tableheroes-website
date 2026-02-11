@@ -3,7 +3,11 @@
 import { createClient } from "@/src/lib/supabase/server";
 import fs from "fs";
 import path from "path";
-import type { LoreSnippet } from "@/src/lib/types/dashboard-widgets";
+import type {
+  LoreSnippet,
+  UpcomingSession,
+  SessionParticipant,
+} from "@/src/lib/types/dashboard-widgets";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
@@ -118,4 +122,122 @@ export async function getDailyComic(): Promise<{
     filename,
     src: `/images/comic/${encodeURIComponent(filename)}`,
   };
+}
+
+// ============================================================================
+// Upcoming Sessions for Dashboard
+// ============================================================================
+
+/**
+ * Lädt die nächsten geplanten & live Sessions über alle Kampagnen des Users.
+ * Enthält Teilnehmer mit Charakter-Daten (Avatar, Klasse, Level).
+ */
+export async function getUpcomingSessionsForUser(
+  userId: string
+): Promise<UpcomingSession[]> {
+  const supabase = await createClient();
+
+  // 1. Alle Kampagnen des Users (als Spieler oder GM)
+  const { data: memberRows } = await (
+    supabase.from("campaign_members") as any
+  )
+    .select("campaign_id")
+    .eq("user_id", userId)
+    .eq("status", "Accepted");
+
+  const memberCampaignIds = (
+    (memberRows as any[]) || []
+  ).map((m: any) => m.campaign_id as string);
+
+  // Auch GM-Kampagnen einbeziehen
+  const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
+    .select("id")
+    .eq("gm_id", userId);
+
+  const gmCampaignIds = (
+    (gmCampaignRows as any[]) || []
+  ).map((c: any) => c.id as string);
+
+  const allCampaignIds = [...new Set([...memberCampaignIds, ...gmCampaignIds])];
+  if (allCampaignIds.length === 0) return [];
+
+  // 2. Upcoming Sessions laden (Scheduled oder Live)
+  const { data: sessionsRaw } = await (supabase.from("sessions") as any)
+    .select("id, title, start_time, status, campaign_id")
+    .in("campaign_id", allCampaignIds)
+    .in("status", ["Scheduled", "Live"])
+    .order("start_time", { ascending: true })
+    .limit(6);
+
+  const sessions = (sessionsRaw as any[]) || [];
+  if (sessions.length === 0) return [];
+
+  // 3. Kampagnen-Details laden
+  const sessionCampaignIds = [
+    ...new Set(sessions.map((s: any) => s.campaign_id)),
+  ];
+  const { data: campaignsRaw } = await (supabase.from("campaigns") as any)
+    .select("id, name, banner_url")
+    .in("id", sessionCampaignIds);
+
+  const campaignsById = new Map<
+    string,
+    { name: string; banner_url: string | null }
+  >();
+  for (const c of (campaignsRaw as any[]) || []) {
+    campaignsById.set(c.id, { name: c.name, banner_url: c.banner_url });
+  }
+
+  // 4. Teilnehmer je Kampagne laden (Accepted Members + deren Charaktere)
+  const { data: allMembersRaw } = await (
+    supabase.from("campaign_members") as any
+  )
+    .select(
+      `
+      campaign_id,
+      user_id,
+      users ( id, username, avatar_url ),
+      characters ( id, name, class, level, avatar_url )
+    `
+    )
+    .in("campaign_id", sessionCampaignIds)
+    .eq("status", "Accepted");
+
+  // Gruppiere Teilnehmer nach campaign_id
+  const participantsByCampaign = new Map<string, SessionParticipant[]>();
+  for (const row of (allMembersRaw as any[]) || []) {
+    const cId = row.campaign_id as string;
+    if (!participantsByCampaign.has(cId)) {
+      participantsByCampaign.set(cId, []);
+    }
+    const user = row.users as any;
+    const char = row.characters as any;
+
+    participantsByCampaign.get(cId)!.push({
+      userId: row.user_id,
+      username: user?.username ?? "Unbekannt",
+      avatarUrl: user?.avatar_url ?? null,
+      characterName: char?.name ?? null,
+      characterClass: char?.class ?? null,
+      characterLevel: char?.level ?? null,
+      characterAvatarUrl: char?.avatar_url ?? null,
+    });
+  }
+
+  // 5. Sessions zusammenbauen
+  const result: UpcomingSession[] = sessions.map((s: any) => {
+    const campaign = campaignsById.get(s.campaign_id);
+    return {
+      id: s.id,
+      title: s.title,
+      startTime: s.start_time,
+      status: s.status,
+      campaignId: s.campaign_id,
+      campaignName: campaign?.name ?? "Kampagne",
+      campaignBannerUrl: campaign?.banner_url ?? null,
+      participants: participantsByCampaign.get(s.campaign_id) ?? [],
+    };
+  });
+
+  return result;
 }

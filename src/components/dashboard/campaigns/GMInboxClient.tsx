@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
 import {
   User,
@@ -11,6 +11,11 @@ import {
   XCircle,
 } from "lucide-react";
 import type { PlayerNpcRequest } from "@/src/types/player-npc-request";
+import { approveCharacter } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import {
+  acceptApplication,
+  rejectApplication,
+} from "@/src/app/dashboard/campaigns/[id]/actions";
 
 type PendingCharacter = {
   id: string;
@@ -39,28 +44,19 @@ type Props = {
   campaignId: string;
   pendingApplications: PendingApplicationItem[];
   pendingCharacters: PendingCharacter[];
-  onApproveCharacter: (
-    characterId: string,
-    campaignId: string,
-  ) => Promise<void>;
-  onAcceptApplication: (memberId: string, campaignId: string) => Promise<void>;
-  onRejectApplication: (memberId: string, campaignId: string) => Promise<void>;
 };
 
 export function GMInboxClient({
   campaignId,
   pendingApplications,
   pendingCharacters,
-  onApproveCharacter,
-  onAcceptApplication,
-  onRejectApplication,
 }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const handleApproveCharacter = (characterId: string) => {
     startTransition(async () => {
       try {
-        await onApproveCharacter(characterId, campaignId);
+        await approveCharacter(characterId, campaignId);
         window.location.reload();
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Freischalten.");
@@ -71,7 +67,7 @@ export function GMInboxClient({
   const handleAcceptApplication = (memberId: string) => {
     startTransition(async () => {
       try {
-        await onAcceptApplication(memberId, campaignId);
+        await acceptApplication(memberId, campaignId);
         window.location.reload();
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Annehmen.");
@@ -83,7 +79,7 @@ export function GMInboxClient({
     if (!confirm("Bewerbung wirklich ablehnen?")) return;
     startTransition(async () => {
       try {
-        await onRejectApplication(memberId, campaignId);
+        await rejectApplication(memberId, campaignId);
         window.location.reload();
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Ablehnen.");

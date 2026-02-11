@@ -74,6 +74,8 @@ export async function middleware(request: NextRequest) {
   const isImagesAsset = path.startsWith("/images");
   const isFavicon = path === "/favicon.ico";
   const isApi = path.startsWith("/api");
+  const isOnboarding = path === "/onboarding";
+  const isKodex = path === "/kodex";
 
   if (
     isRoot ||
@@ -82,8 +84,44 @@ export async function middleware(request: NextRequest) {
     isNextAsset ||
     isImagesAsset ||
     isFavicon ||
-    isApi
+    isApi ||
+    isKodex
   ) {
+    return response;
+  }
+
+  // ------------------------------------------------------------
+  // Onboarding: Eingeloggte User ohne codex_agreed → /onboarding
+  // /onboarding selbst immer erlauben für eingeloggte User
+  // ------------------------------------------------------------
+  if (user && !isOnboarding && path.startsWith("/dashboard")) {
+    try {
+      const { data: profileRow } = await (supabase as any)
+        .from("users")
+        .select("codex_agreed, status")
+        .eq("id", user.id)
+        .maybeSingle();
+      const codexAgreed = (profileRow as any)?.codex_agreed === true;
+      const userStatus = (profileRow as any)?.status as string | undefined;
+
+      if (!codexAgreed) {
+        return NextResponse.redirect(new URL("/onboarding", request.url));
+      }
+
+      // Onboarding abgeschlossen aber noch nicht freigegeben → /onboarding (Pending-Hinweis)
+      if (codexAgreed && userStatus !== "approved") {
+        return NextResponse.redirect(new URL("/onboarding", request.url));
+      }
+    } catch {
+      // Fehler ignorieren – Spalte existiert ggf. noch nicht
+    }
+  }
+
+  // /onboarding nur für eingeloggte User
+  if (isOnboarding) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
     return response;
   }
 

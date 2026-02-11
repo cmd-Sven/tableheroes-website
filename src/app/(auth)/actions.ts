@@ -50,5 +50,5 @@ export async function signup(formData: FormData): Promise<string | undefined> {
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect("/onboarding");
 }

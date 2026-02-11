@@ -306,9 +306,16 @@ export default async function PublicCampaignPage({ params }: Props) {
               <h2 className="font-barlow font-bold text-2xl text-accent-blood uppercase mb-4 border-b border-hero-border pb-2">
                 Die Geschichte
               </h2>
-              <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {campaign.description || "Die Legende beginnt..."}
-              </p>
+              {campaign.description ? (
+                <div
+                  className="campaign-description-prose font-libre text-gray-200 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: campaign.description }}
+                />
+              ) : (
+                <p className="font-libre text-gray-200 leading-relaxed italic">
+                  Die Legende beginnt...
+                </p>
+              )}
             </section>
 
             {/* Die Helden (Character Roster) */}

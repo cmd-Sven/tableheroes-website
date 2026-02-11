@@ -2,9 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPendingApprovalCharactersWithRequests } from "../player-npc-requests-actions";
-import { approveCharacter } from "../character-actions";
 import { GMInboxClient } from "@/src/components/dashboard/campaigns/GMInboxClient";
-import { acceptApplication, rejectApplication } from "../actions";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -82,11 +80,6 @@ export default async function GMInboxPage({ params }: Props) {
         campaignId={campaignId}
         pendingApplications={pendingApplications}
         pendingCharacters={pendingCharacters}
-        onApproveCharacter={approveCharacter}
-        onAcceptApplication={async (memberId, cId) => {
-          await acceptApplication(memberId, cId);
-        }}
-        onRejectApplication={rejectApplication}
       />
     </div>
   );

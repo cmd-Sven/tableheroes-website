@@ -25,6 +25,7 @@ import { Plus } from "lucide-react";
 import { CharacterCreatorButton } from "./CharacterCreatorButton";
 import { CharacterSheet } from "@/src/components/dashboard/campaigns/CharacterSheet";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
+import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
 import { getCampaignGalleryImages } from "./gallery-actions";
 import { getWorldByCampaign } from "./world-actions";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
@@ -796,15 +797,29 @@ export default async function CampaignDetailPage({
             </div>
           )}
 
-        {/* Description */}
-        <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-          <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-dark pb-2">
-            Beschreibung
-          </h2>
-          <p className="font-libre text-gray-300 leading-relaxed whitespace-pre-wrap">
-            {campaign.description || "Keine Beschreibung vorhanden."}
-          </p>
-        </div>
+        {/* Description – GM gets Rich-Text Editor, Players get rendered HTML */}
+        {isGM ? (
+          <CampaignDescriptionEditor
+            campaignId={id}
+            initialContent={campaign.description || ""}
+          />
+        ) : (
+          <div className="rounded-lg border border-hero-dark bg-background-card p-6">
+            <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-dark pb-2">
+              Beschreibung
+            </h2>
+            {campaign.description ? (
+              <div
+                className="campaign-description-prose font-libre text-gray-300 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: campaign.description }}
+              />
+            ) : (
+              <p className="font-libre text-gray-500 italic">
+                Keine Beschreibung vorhanden.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Campaign Details bearbeiten (GM Only) */}
         {isGM && (

@@ -10,13 +10,15 @@ import {
   Star,
   BookOpen,
   Smile,
+  Calendar,
+  Heart,
 } from "lucide-react";
 import { markWidgetAsRead } from "@/src/lib/actions/user-actions";
 import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import type { LayoutItem } from "@/src/lib/utils/layout-engine";
-import { MessageInbox } from "@/src/components/dashboard/MessageInbox";
+import { MessageWidget } from "@/src/components/dashboard/MessageWidget";
 import {
   HeroSlider,
   type HeroSliderCharacter,
@@ -28,9 +30,11 @@ import { OpenCampaignsCard } from "@/src/components/dashboard/OpenCampaignsCard"
 import { LoreSnippetCard } from "@/src/components/dashboard/LoreSnippetCard";
 import { DailyComicCard } from "@/src/components/dashboard/DailyComicCard";
 import { NewsInfoCard } from "@/src/components/dashboard/NewsInfoCard";
+import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
+import { SupportCard } from "@/src/components/dashboard/SupportCard";
 import { AcceptanceNotification } from "@/src/app/dashboard/AcceptanceNotification";
-import type { InboxMessage } from "@/src/components/dashboard/MessageInbox";
-import type { LoreSnippet } from "@/src/lib/types/dashboard-widgets";
+import type { PlayerMessage } from "@/src/lib/actions/message-actions";
+import type { LoreSnippet, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
 
 export type ProfileHeaderData = {
@@ -87,7 +91,7 @@ type Props = {
   achievements: { id: string; name: string; icon?: string | null }[];
   membershipsWithGm: MembershipWithGm[];
   heroCharacters: HeroSliderCharacter[];
-  inboxMessages: InboxMessage[];
+  playerMessages: PlayerMessage[];
   discoverableCampaigns: DiscoverableCampaign[];
   randomLoreSnippet: LoreSnippet | null;
   dailyComic: { src: string | null };
@@ -95,6 +99,9 @@ type Props = {
   hasNewNews: boolean;
   hasNewAchievements: boolean;
   hasNewLore: boolean;
+  upcomingSessions: UpcomingSession[];
+  isBacker?: boolean;
+  backerSince?: string | null;
 };
 
 export function DashboardClient({
@@ -105,7 +112,7 @@ export function DashboardClient({
   achievements,
   membershipsWithGm,
   heroCharacters,
-  inboxMessages,
+  playerMessages,
   discoverableCampaigns,
   randomLoreSnippet,
   dailyComic,
@@ -113,6 +120,9 @@ export function DashboardClient({
   hasNewNews,
   hasNewAchievements,
   hasNewLore,
+  upcomingSessions,
+  isBacker,
+  backerSince,
 }: Props) {
   const router = useRouter();
   const handleMarkNewsRead = async () => {
@@ -129,6 +139,13 @@ export function DashboardClient({
   };
 
   const cards = [
+    {
+      id: "upcoming-sessions",
+      title: "Nächste Termine",
+      icon: <Calendar className="h-5 w-5" />,
+      content: <UpcomingSessionsCard sessions={upcomingSessions} />,
+      colSpan: 1 as const,
+    },
     {
       id: "points",
       title: "Punkte",
@@ -171,11 +188,7 @@ export function DashboardClient({
       id: "inbox",
       title: "Nachrichten",
       icon: <Inbox className="h-5 w-5" />,
-      content: (
-        <div className="w-full p-4">
-          <MessageInbox messages={inboxMessages} maxItems={3} />
-        </div>
-      ),
+      content: <MessageWidget messages={playerMessages} maxItems={5} />,
       colSpan: 1 as const,
     },
     {
@@ -211,10 +224,17 @@ export function DashboardClient({
       content: <DailyComicCard src={dailyComic.src} />,
       colSpan: 1 as const,
     },
+    {
+      id: "support",
+      title: "Unterstützung",
+      icon: <Heart className="h-5 w-5" />,
+      content: <SupportCard isBacker={isBacker} backerSince={backerSince} />,
+      colSpan: 1 as const,
+    },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className={`space-y-8 ${isBacker ? "backer-shimmer" : ""}`}>
       <PlayerHeader {...profileHeader} />
 
       {newAcceptances.length > 0 && (

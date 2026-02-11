@@ -94,6 +94,10 @@ export async function getAllUsersForAdmin(): Promise<
     primary_role: string | null;
     role: string | null;
     created_at: string | null;
+    experience_level: string | null;
+    previous_games: string | null;
+    motivation: string | null;
+    codex_agreed: boolean | null;
   }[]
 > {
   const supabase = await createClient();
@@ -109,7 +113,9 @@ export async function getAllUsersForAdmin(): Promise<
   if ((profile as any)?.primary_role !== "Admin") return [];
 
   const { data, error } = await (supabase.from("users") as any)
-    .select("id, email, username, status, primary_role, role, created_at")
+    .select(
+      "id, email, username, status, primary_role, role, created_at, experience_level, previous_games, motivation, codex_agreed"
+    )
     .order("created_at", { ascending: false });
   if (error) return [];
   return (data as any[]) || [];

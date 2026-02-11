@@ -29,6 +29,7 @@ type CampaignWithRelations = {
   name: string | null;
   system: string | null;
   max_players: number | null;
+  gm_id: string | null;
   mode: string | null;
   banner_url: string | null;
   gm: UserRow | null;
@@ -50,6 +51,7 @@ export function ActiveCampaignsSection() {
           .select(
             `
         id,
+        gm_id,
         name,
         system,
         max_players,
@@ -125,29 +127,32 @@ export function ActiveCampaignsSection() {
         for (const item of top3) {
           const { campaign: c, dateObj } = item;
 
-          // Slots fetch (immer noch in Loop, bei 3 Items okay)
+          // Slots: Nur bestätigte Spieler zählen (Status "Accepted"), GM nicht mitzählen
           let currentPlayers = 0;
-          const { count, error: countError } = await supabase
-            .from("campaign_members")
-            .select("id", { count: "exact", head: true })
+          const { data: memberRows, error: membersError } = await (supabase
+            .from("campaign_members") as any)
+            .select("user_id, status")
             .eq("campaign_id", c.id)
             .eq("status", "Accepted");
 
-          if (countError) {
+          if (membersError) {
             console.error(
-              `❌ Count Error for Campaign ${c.id}:`,
-              countError
+              `❌ Member Fetch Error for Campaign ${c.id}:`,
+              membersError
             );
+          } else if (Array.isArray(memberRows)) {
+            currentPlayers = memberRows.filter((row: any) => {
+              const userId = row.user_id as string | null;
+              return userId && userId !== c.gm_id;
+            }).length;
           }
 
-          if (count !== null) currentPlayers = count;
           const max = c.max_players || 0;
-          const freeSlots = Math.max(0, max - currentPlayers);
 
           // Debug Logging in Development
           if (process.env.NODE_ENV === "development") {
             console.log(
-              `🎟️ Campaign "${c.name}": ${currentPlayers}/${max} occupied, ${freeSlots} free slots`
+              `🎟️ Campaign "${c.name}": ${currentPlayers}/${max} Plätze belegt`
             );
           }
 
@@ -155,10 +160,10 @@ export function ActiveCampaignsSection() {
           let slotsLabel = "";
           if (max === 0) {
             slotsLabel = "Auf Anfrage";
-          } else if (freeSlots === 0) {
-            slotsLabel = `Voll (${max}/${max})`;
+          } else if (currentPlayers >= max) {
+            slotsLabel = "Ausgebucht";
           } else {
-            slotsLabel = `${freeSlots}/${max} Plätze frei`;
+            slotsLabel = `${currentPlayers} / ${max} Plätze belegt`;
           }
 
           const dateFormatter = new Intl.DateTimeFormat("de-DE", {
@@ -184,6 +189,8 @@ export function ActiveCampaignsSection() {
             dateString: dateFormatter.format(dateObj),
             timeString: `${timeFormatter.format(dateObj)} Uhr`,
             slotsLabel,
+            currentPlayers,
+            maxPlayers: max,
           });
         }
 

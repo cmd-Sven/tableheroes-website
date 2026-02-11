@@ -17,6 +17,7 @@ import {
 } from "@/src/lib/utils/layout-engine";
 
 export const DEFAULT_CARD_ORDER = [
+  "upcoming-sessions",
   "points",
   "achievements",
   "my-campaigns",
@@ -25,6 +26,7 @@ export const DEFAULT_CARD_ORDER = [
   "news",
   "lore-snippet",
   "daily-comic",
+  "support",
 ];
 
 export type CardItem = {
@@ -113,11 +115,16 @@ function normalizeInitialLayout(
       occupied.add(`${item.y_pos},${item.x_pos}`);
       if (item.width === 2) occupied.add(`${item.y_pos},${item.x_pos + 1}`);
     });
+    // Berechne die benötigten Zeilen: bestehende + genug für fehlende Karten
+    const maxExistingRow = valid.length > 0
+      ? Math.max(...valid.map((v) => v.y_pos))
+      : -1;
+    const searchRows = maxExistingRow + 1 + Math.ceil(missing.length / 3) + 1;
     const appended: LayoutItem[] = [];
     for (const c of missing) {
       const w = widths[c.id] ?? 1;
       let placed = false;
-      for (let r = 0; r < 3 && !placed; r++) {
+      for (let r = 0; r < searchRows && !placed; r++) {
         for (let c2 = 0; c2 <= 3 - w && !placed; c2++) {
           const keys =
             w === 2 ? [`${r},${c2}`, `${r},${c2 + 1}`] : [`${r},${c2}`];
@@ -246,7 +253,7 @@ export function DraggableCardGrid({
 
   if (readOnly) {
     const flat: React.ReactNode[] = [];
-    for (let r = 0; r < rows; r++) {
+    for (let r = 0; r < Math.max(rows, 1); r++) {
       for (let c = 0; c < 3; c++) {
         const card = getCardAt(layout, r, c);
         if (card) {
@@ -277,7 +284,7 @@ export function DraggableCardGrid({
     return <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{flat}</div>;
   }
 
-  const slotPositions = getAllSlotPositions();
+  const slotPositions = getAllSlotPositions(layout);
 
   return (
     <div className="space-y-6">
@@ -321,7 +328,7 @@ export function DraggableCardGrid({
       <div
         className="grid grid-cols-3 gap-6 relative"
         style={{
-          gridTemplateRows: "repeat(3, minmax(140px, auto))",
+          gridTemplateRows: `repeat(${Math.max(rows + 1, 1)}, minmax(140px, auto))`,
         }}
         onDragLeave={handleDragLeave}
       >

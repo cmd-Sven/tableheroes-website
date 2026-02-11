@@ -661,3 +661,55 @@ export async function deleteCampaign(campaignId: string) {
   // Return success for client-side redirect handling
   return { success: true };
 }
+
+// ============================================================================
+// Update Campaign Description (Rich-Text HTML)
+// ============================================================================
+
+export async function updateCampaignDescription(
+  campaignId: string,
+  htmlContent: string,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Nicht authentifiziert." };
+
+  // GM-Check
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign || campaign.gm_id !== user.id) {
+    return { success: false, error: "Nur der Spielleiter kann die Beschreibung bearbeiten." };
+  }
+
+  // Serverseitige Sanitization (XSS-Schutz)
+  const sanitizeHtml = (await import("sanitize-html")).default;
+  const clean = sanitizeHtml(htmlContent, {
+    allowedTags: [
+      "h1", "h2", "h3", "p", "br",
+      "strong", "b", "em", "i",
+      "ul", "ol", "li",
+      "blockquote",
+    ],
+    allowedAttributes: {},
+    allowedClasses: {},
+  });
+
+  const { error } = await (supabase.from("campaigns") as any)
+    .update({ description: clean })
+    .eq("id", campaignId);
+
+  if (error) {
+    console.error("[updateCampaignDescription]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { success: true };
+}

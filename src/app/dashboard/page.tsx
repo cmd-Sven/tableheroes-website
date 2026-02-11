@@ -1,24 +1,21 @@
 import { createClient } from "@/src/lib/supabase/server";
-import {
-  Plus,
-  Map as MapIcon,
-  Bell,
-  UserPlus,
-  AlertCircle,
-  Users as UsersIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { CampaignCard } from "@/src/components/dashboard/CampaignCard";
 import { getRankFromPoints } from "@/src/lib/utils/rank-utils";
 import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
 import {
   getRandomLoreSnippet,
   getDailyComic,
+  getUpcomingSessionsForUser,
 } from "@/src/lib/actions/dashboard-widgets";
 import { getNewsForDashboard } from "@/src/lib/actions/news-actions";
+import {
+  getGMNotifications,
+  getGMRecipients,
+  getPlayerMessages,
+} from "@/src/lib/actions/message-actions";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
+import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
+import type { PendingApplication } from "@/src/components/dashboard/GMNotificationsWidget";
 import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
-import type { InboxMessage } from "@/src/components/dashboard/MessageInbox";
 
 type UserProfile = {
   username: string | null;
@@ -38,6 +35,8 @@ type UserProfile = {
   /** Altes Format: string[] (Reihenfolge), neues Format: { id, x_pos, y_pos, width }[] */
   dashboard_layout?: unknown;
   privacy_public_profile?: boolean | null;
+  is_backer?: boolean | null;
+  backer_since?: string | null;
 };
 
 export default async function DashboardPage() {
@@ -110,7 +109,7 @@ export default async function DashboardPage() {
           achievements={playerData.achievements}
           membershipsWithGm={playerData.membershipsWithGm}
           heroCharacters={playerData.heroCharacters}
-          inboxMessages={playerData.inboxMessages}
+          playerMessages={playerData.playerMessages}
           discoverableCampaigns={playerData.discoverableCampaigns}
           randomLoreSnippet={playerData.randomLoreSnippet}
           dailyComic={playerData.dailyComic}
@@ -118,26 +117,31 @@ export default async function DashboardPage() {
           hasNewNews={playerData.hasNewNews}
           hasNewAchievements={playerData.hasNewAchievements}
           hasNewLore={playerData.hasNewLore}
+          upcomingSessions={playerData.upcomingSessions}
+          isBacker={!!profile?.is_backer}
+          backerSince={profile?.backer_since ?? null}
         />
       </div>
     );
   }
 
+  const gmData = await loadGMDashboardData(user.id);
+  const gmDisplayName =
+    (profile as { display_name?: string | null })?.display_name ||
+    profile?.username ||
+    "Abenteurer";
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
-          Willkommen zurück,{" "}
-          {(profile as { display_name?: string | null })?.display_name ||
-            profile?.username ||
-            "Abenteurer"}
-        </h1>
-        <p className="mt-2 font-libre text-gray-400">
-          Verwalte deine Welten und führe deine Spieler ins Abenteuer.
-        </p>
-      </div>
-      <GameMasterView userId={user.id} />
-    </div>
+    <GMDashboardClient
+      displayName={gmDisplayName}
+      campaigns={gmData.campaigns}
+      pendingApplications={gmData.pendingApplications}
+      upcomingSessions={gmData.upcomingSessions}
+      dashboardNews={gmData.dashboardNews}
+      dailyComic={gmData.dailyComic}
+      gmNotifications={gmData.gmNotifications}
+      gmRecipientCampaigns={gmData.gmRecipientCampaigns}
+    />
   );
 }
 
@@ -225,8 +229,6 @@ async function loadPlayerDashboardData(userId: string) {
       status: (m.characters.status as string) ?? undefined,
     }));
 
-  const inboxMessages: InboxMessage[] = [];
-
   const { data: newAcceptancesRaw } = await (
     supabase.from("campaign_members") as any
   )
@@ -241,18 +243,21 @@ async function loadPlayerDashboardData(userId: string) {
   }));
 
   const discoverableCampaigns = await getDiscoverableCampaigns();
-  const [loreResult, dailyComic, newsResult] = await Promise.all([
-    getRandomLoreSnippet(userId),
-    getDailyComic(),
-    getNewsForDashboard(userId),
-  ]);
+  const [loreResult, dailyComic, newsResult, upcomingSessions, playerMessages] =
+    await Promise.all([
+      getRandomLoreSnippet(userId),
+      getDailyComic(),
+      getNewsForDashboard(userId),
+      getUpcomingSessionsForUser(userId),
+      getPlayerMessages(userId),
+    ]);
 
   return {
     totalPoints,
     achievements,
     membershipsWithGm,
     heroCharacters,
-    inboxMessages,
+    playerMessages,
     newAcceptances,
     discoverableCampaigns,
     randomLoreSnippet: loreResult.snippet,
@@ -261,162 +266,93 @@ async function loadPlayerDashboardData(userId: string) {
     hasNewNews: newsResult.hasNewContent,
     hasNewAchievements,
     hasNewLore: loreResult.hasNewContent,
+    upcomingSessions,
   };
 }
 
 // ----------------------------------------------------------------------------
-// GM VIEW
+// GM DATA LOADER
 // ----------------------------------------------------------------------------
-async function GameMasterView({ userId }: { userId: string }) {
+async function loadGMDashboardData(userId: string) {
   const supabase = await createClient();
-  // Fetch active GM campaigns
-  const { data: campaignsRaw } = await (supabase.from("campaigns") as any)
-    .select("id, name, system, max_players")
-    .eq("gm_id", userId)
-    .order("created_at", { ascending: false });
 
-  // Expliziter Cast gegen 'never'
-  const campaigns = (campaignsRaw as any[]) || [];
+  // Alle Daten parallel laden für maximale Performance
+  const [
+    campaignsRes,
+    applicationsRes,
+    newsResult,
+    dailyComic,
+    upcomingSessions,
+    gmNotifications,
+    gmRecipientCampaigns,
+  ] = await Promise.all([
+    // 1. GM-Kampagnen
+    (supabase.from("campaigns") as any)
+      .select("id, name, system, max_players")
+      .eq("gm_id", userId)
+      .order("created_at", { ascending: false }),
 
-  const hasCampaigns = campaigns && campaigns.length > 0;
-
-  // Fetch pending applications for GM's campaigns
-  const { data: pendingApplications } = await (
-    supabase.from("campaign_members") as any
-  )
-    .select(
+    // 2. Offene Bewerbungen MIT User-Daten
+    (supabase.from("campaign_members") as any)
+      .select(
+        `
+        id,
+        campaign_id,
+        user_id,
+        created_at,
+        campaigns!inner ( id, name, gm_id ),
+        users ( id, username, avatar_url )
       `
-      id,
-      campaign_id,
-      campaigns!inner(id, name, gm_id)
-    `
-    )
-    .eq("campaigns.gm_id", userId)
-    .eq("status", "Applied");
+      )
+      .eq("campaigns.gm_id", userId)
+      .eq("status", "Applied")
+      .order("created_at", { ascending: false }),
 
-  // Group applications by campaign
-  const applicationsByCampaign = new Map<
-    string,
-    { id: string; name: string; count: number }
-  >();
-  if (pendingApplications) {
-    pendingApplications.forEach((app: any) => {
-      const campaign = app.campaigns;
-      if (campaign) {
-        const existing = applicationsByCampaign.get(campaign.id);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          applicationsByCampaign.set(campaign.id, {
-            id: campaign.id,
-            name: campaign.name,
-            count: 1,
-          });
-        }
-      }
-    });
-  }
+    // 3. News
+    getNewsForDashboard(userId),
 
-  const totalPendingCount = pendingApplications?.length || 0;
+    // 4. Daily Comic
+    getDailyComic(),
 
-  return (
-    <div className="space-y-8">
-      {/* GM Action Center (Notification Widget) */}
-      {totalPendingCount > 0 && (
-        <div className="rounded-lg border-l-4 border-l-yellow-500 bg-yellow-950/20 border border-yellow-900/50 p-6">
-          <div className="flex items-start gap-4">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-yellow-900/50 border border-yellow-700">
-              <Bell className="h-5 w-5 text-yellow-400 animate-pulse" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-barlow font-bold text-lg text-yellow-400 uppercase mb-2 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Offene Bewerbungen
-              </h3>
-              <div className="space-y-2 mb-4">
-                {Array.from(applicationsByCampaign.values()).map(
-                  (campaign: any) => (
-                    <p
-                      key={campaign.id}
-                      className="font-libre text-sm text-gray-200"
-                    >
-                      Du hast{" "}
-                      <strong className="text-yellow-400">
-                        {campaign.count} neue{" "}
-                        {campaign.count === 1 ? "Bewerbung" : "Bewerbungen"}
-                      </strong>{" "}
-                      für{" "}
-                      <strong className="text-white">{campaign.name}</strong>.
-                    </p>
-                  )
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(applicationsByCampaign.values()).map(
-                  (campaign: any) => (
-                    <Link
-                      key={campaign.id}
-                      href={`/dashboard/campaigns/${campaign.id}#members`}
-                      className="inline-flex items-center gap-2 rounded-md border border-yellow-700 bg-yellow-900/50 px-4 py-2 font-barlow font-bold uppercase text-xs text-yellow-400 hover:bg-yellow-900 transition-colors"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Zu {campaign.name}
-                    </Link>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+    // 5. Upcoming Sessions
+    getUpcomingSessionsForUser(userId),
 
-      {/* Top Row: Active Campaigns */}
-      <div className="flex items-center justify-between">
-        <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2">
-          Aktive Kampagnen
-        </h2>
-        <Link
-          href="/dashboard/campaigns/new"
-          className="inline-flex items-center gap-2 rounded-md border border-hero-border bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-white text-sm shadow-lg transition-transform hover:scale-105 hover:bg-hero-vibrant"
-        >
-          <Plus className="h-4 w-4" />
-          Neue Kampagne
-        </Link>
-      </div>
+    // 6. GM Notifications (System-Meldungen)
+    getGMNotifications(userId),
 
-      {!hasCampaigns ? (
-        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-16 text-center">
-          <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-background-dark border border-hero-border">
-            <MapIcon className="h-8 w-8 text-hero-vibrant" />
-          </div>
-          <h3 className="mb-2 font-cinzel font-bold text-xl text-white">
-            Erschaffe deine Welt
-          </h3>
-          <p className="max-w-sm font-libre text-gray-400">
-            Du hast noch keine Kampagne erstellt. Starte jetzt und lade deine
-            Spieler ein.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {campaigns.map((c: any) => (
-            <CampaignCard key={c.id} campaign={c} />
-          ))}
-        </div>
-      )}
+    // 7. GM Recipients (für Messenger)
+    getGMRecipients(userId),
+  ]);
 
-      {/* Bottom Row: My Player Characters (Optional placeholder) */}
-      <div className="mt-12">
-        <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2 mb-4">
-          Meine Spieler-Charaktere
-        </h2>
-        <p className="font-libre text-gray-400">
-          Auch Spielleiter sind manchmal Helden. (Hier erscheinen deine
-          Charaktere in anderen Runden).
-        </p>
-      </div>
-    </div>
-  );
+  const campaigns = ((campaignsRes.data as any[]) || []).map((c: any) => ({
+    id: c.id as string,
+    name: (c.name as string | null) ?? null,
+    system: (c.system as string | null) ?? null,
+    max_players: (c.max_players as number | null) ?? null,
+  }));
+
+  // Bewerbungen in das Format für GMNotificationsWidget mappen
+  const pendingApplications: PendingApplication[] = (
+    (applicationsRes.data as any[]) || []
+  ).map((app: any) => ({
+    id: app.id as string,
+    userId: (app.user_id as string) ?? "",
+    username: (app.users as any)?.username ?? "Unbekannt",
+    avatarUrl: (app.users as any)?.avatar_url ?? null,
+    campaignId: (app.campaigns as any)?.id ?? app.campaign_id,
+    campaignName: (app.campaigns as any)?.name ?? "Kampagne",
+    appliedAt: (app.created_at as string | null) ?? null,
+  }));
+
+  return {
+    campaigns,
+    pendingApplications,
+    dashboardNews: newsResult.posts,
+    dailyComic,
+    upcomingSessions,
+    gmNotifications,
+    gmRecipientCampaigns,
+  };
 }
 
 // ----------------------------------------------------------------------------
