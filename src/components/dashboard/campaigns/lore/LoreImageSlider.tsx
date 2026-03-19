@@ -8,6 +8,55 @@ type AdditionalImage = {
   description: string;
 };
 
+/** Header-Variante: volle Breite, min 400px Höhe, Bild mittig oben (object-top) */
+export function LoreHeaderImageSlider({ images }: { images: AdditionalImage[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+        setFade(true);
+      }, 300);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [images.length]);
+
+  if (images.length === 0) return null;
+  const currentImage = images[currentIndex];
+
+  return (
+    <div className="absolute inset-0">
+      <Image
+        src={currentImage.url}
+        alt={currentImage.description || `Bild ${currentIndex + 1}`}
+        fill
+        className={`object-cover object-top transition-opacity duration-300 ${fade ? "opacity-100" : "opacity-0"}`}
+        sizes="100vw"
+        priority
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+      {images.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {images.map((_, index) => (
+            <div
+              key={index}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                index === currentIndex ? "w-8 bg-hero-vibrant" : "w-2 bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Props = {
   images: AdditionalImage[];
 };

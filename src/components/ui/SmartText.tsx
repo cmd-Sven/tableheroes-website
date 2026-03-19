@@ -1,0 +1,203 @@
+"use client";
+
+import React, { useMemo } from "react";
+import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+export type EntityForSmartText = {
+  id: string;
+  name: string;
+  type: "npc" | "location" | "faction";
+};
+
+type SmartTextProps = {
+  text: string;
+  entities: EntityForSmartText[];
+  campaignId?: string | null;
+  worldId?: string | null;
+  emptyMessage?: string;
+  className?: string;
+};
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildEntityUrl(
+  entity: EntityForSmartText,
+  campaignId: string | null | undefined,
+  worldId: string | null | undefined
+): string | null {
+  if (entity.type === "npc") {
+    if (campaignId) return `/dashboard/campaigns/${campaignId}/npcs/${entity.id}`;
+    if (worldId) return `/dashboard/worlds/${worldId}/npcs/${entity.id}`;
+  }
+  if (entity.type === "location") {
+    if (campaignId) return `/dashboard/campaigns/${campaignId}/lore/${entity.id}`;
+    if (worldId) return `/dashboard/worlds/${worldId}/lore/${entity.id}`;
+  }
+  if (entity.type === "faction") {
+    if (campaignId) return `/dashboard/campaigns/${campaignId}/factions/${entity.id}`;
+  }
+  return null;
+}
+
+function processTextWithEntities(
+  text: string,
+  entities: EntityForSmartText[],
+  campaignId: string | null | undefined,
+  worldId: string | null | undefined
+): React.ReactNode[] {
+  if (!entities.length) return [text];
+
+  const sortedEntities = [...entities].sort(
+    (a, b) => b.name.length - a.name.length
+  );
+  const pattern = sortedEntities
+    .map((e) => escapeRegex(e.name))
+    .join("|");
+  const regex = new RegExp(
+    `(?:^|(?<=[^\\w]))(?:${pattern})(?=(?:[^\\w]|$))`,
+    "gi"
+  );
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  const re = new RegExp(regex.source, "g");
+
+  while ((m = re.exec(text)) !== null) {
+    const matched = m[0];
+    const lower = matched.toLowerCase();
+    const entity = sortedEntities.find(
+      (e) => e.name.toLowerCase() === lower
+    );
+    if (entity) {
+      const url = buildEntityUrl(entity, campaignId, worldId);
+      if (url) {
+        if (m.index > lastIndex) {
+          parts.push(text.slice(lastIndex, m.index));
+        }
+        parts.push(
+          <Link
+            key={`${entity.id}-${m.index}`}
+            href={url}
+            className="text-hero-vibrant underline hover:text-hero-vibrant/90"
+          >
+            {matched}
+          </Link>
+        );
+        lastIndex = m.index + matched.length;
+      }
+    }
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length ? parts : [text];
+}
+
+function processChildren(
+  children: React.ReactNode,
+  entities: EntityForSmartText[],
+  campaignId: string | null | undefined,
+  worldId: string | null | undefined,
+  insideLink: boolean
+): React.ReactNode {
+  if (insideLink) return children;
+
+  return React.Children.map(children, (child) => {
+    if (typeof child === "string") {
+      return processTextWithEntities(
+        child,
+        entities,
+        campaignId,
+        worldId
+      );
+    }
+    if (React.isValidElement(child)) {
+      const el = child as React.ReactElement<{ children?: React.ReactNode }>;
+      const type = typeof el.type === "string" ? el.type : "";
+      if (type === "a") {
+        return child;
+      }
+      if (el.props?.children != null) {
+        return React.cloneElement(el, {
+          children: processChildren(
+            el.props.children,
+            entities,
+            campaignId,
+            worldId,
+            type === "a"
+          ),
+        });
+      }
+    }
+    return child;
+  });
+}
+
+export function SmartText({
+  text,
+  entities,
+  campaignId,
+  worldId,
+  emptyMessage = "Keine Beschreibung vorhanden.",
+  className = "",
+}: SmartTextProps) {
+  const trimmed = (text || "").trim();
+
+  const components = useMemo(() => {
+    if (!entities.length) return undefined;
+    const createProcessor = (tag: string) => {
+      const Comp = tag as keyof React.JSX.IntrinsicElements;
+      return ({ children }: { children?: React.ReactNode }) =>
+        React.createElement(
+          Comp,
+          {},
+          processChildren(children, entities, campaignId, worldId, false)
+        );
+    };
+    return {
+      p: createProcessor("p"),
+      li: createProcessor("li"),
+      td: createProcessor("td"),
+      th: createProcessor("th"),
+      h1: createProcessor("h1"),
+      h2: createProcessor("h2"),
+      h3: createProcessor("h3"),
+      blockquote: createProcessor("blockquote"),
+    };
+  }, [entities, campaignId, worldId]);
+
+  if (!trimmed) {
+    return (
+      <p
+        className={`font-libre text-[#e5e5e5]/70 leading-relaxed italic ${className}`}
+      >
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className={`font-libre text-[#e5e5e5] leading-relaxed prose prose-invert max-w-none
+        prose-p:my-2 prose-p:leading-relaxed
+        prose-headings:font-barlow prose-headings:text-accent-blood prose-headings:border-b prose-headings:border-hero-border prose-headings:pb-2 prose-headings:mb-2 prose-headings:mt-4
+        prose-h1:text-2xl prose-h1:font-semibold
+        prose-h2:text-xl prose-h2:font-semibold
+        prose-h3:text-lg prose-h3:font-medium prose-h3:text-accent-gold
+        prose-strong:text-white prose-strong:font-bold
+        prose-em:text-gray-300 prose-em:italic
+        prose-ul:my-3 prose-ul:list-disc prose-ul:pl-6 prose-ul:space-y-1
+        prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-6 prose-ol:space-y-1
+        prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
+        prose-a:text-hero-vibrant prose-a:hover:underline
+        ${className}`}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{trimmed}</ReactMarkdown>
+    </div>
+  );
+}

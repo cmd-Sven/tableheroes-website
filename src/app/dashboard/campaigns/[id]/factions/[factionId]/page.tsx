@@ -1,10 +1,13 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { getFactionById } from "../../factions-actions";
+import { getFactionById, getFactionRelations } from "../../factions-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FactionDetailPage } from "@/src/components/dashboard/campaigns/FactionDetailPage";
 import { getNPCs } from "../../npc-actions";
 import { getLoreEntries } from "../../lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
+import { getCampaignNote } from "../../campaign-notes-actions";
 
 type Props = {
   params: Promise<{ id: string; factionId: string }>;
@@ -22,12 +25,11 @@ export default async function FactionDetailPageRoute({ params }: Props) {
 
   // 2. Check if user has access to campaign
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, world_id")
     .eq("id", campaignId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
 
   if (!campaign) redirect("/dashboard");
 
@@ -68,30 +70,32 @@ export default async function FactionDetailPageRoute({ params }: Props) {
     );
   }
 
-  // 6. Verify Faction belongs to this campaign
-  if ((faction as any).campaign_id !== campaignId) {
+  // 6. Verify Faction belongs to this campaign's world
+  if (!campaign.world_id || (faction as any).world_id !== campaign.world_id) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
-  // 7. Filter NPCs based on access (for players, only show revealed NPCs or own NPCs)
+  // 7. Filter NPCs by campaign_visibility (for players, only show revealed or own)
   let visibleNPCs = (faction as any).npcs || [];
   if (!isGM) {
+    const npcVisibility = await getVisibilityForCampaign(campaignId, "npc");
     visibleNPCs = visibleNPCs.filter(
-      (npc: any) => npc.is_revealed === true || npc.user_id === user.id
+      (npc: any) => npcVisibility[npc.id] === true || npc.user_id === user.id
     );
   }
 
-  // 8. Load NPCs and Locations for dropdowns
+  // 8. Spieler-Notiz für diese Kampagne laden (campaign_notes)
+  const campaignNote = await getCampaignNote(campaignId, "faction", factionId);
+  const initialCampaignPlayerNote = campaignNote?.content ?? "";
+
+  // 9. Load NPCs, Locations and Faction Relations
   const allNPCs = await getNPCs(campaignId, user.id, isGM);
   const loreEntries = await getLoreEntries(campaignId);
-  
+  const initialRelations = await getFactionRelations(campaignId, factionId);
+
   // Filter locations (geographical types)
   const locations = loreEntries
-    .filter((entry: any) =>
-      ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(
-        entry.type
-      )
-    )
+    .filter((entry: any) => isLocationType(entry.type))
     .map((entry: any) => ({
       id: entry.id,
       name: entry.name,
@@ -102,8 +106,11 @@ export default async function FactionDetailPageRoute({ params }: Props) {
     <FactionDetailPage
       faction={{ ...faction, npcs: visibleNPCs } as any}
       campaignId={campaignId}
+      worldId={(faction as { world_id?: string }).world_id}
       isGM={isGM}
       userId={user.id}
+      initialCampaignPlayerNote={initialCampaignPlayerNote}
+      initialRelations={initialRelations}
       npcs={allNPCs.map((npc: any) => ({ id: npc.id, name: npc.name }))}
       locations={locations}
     />

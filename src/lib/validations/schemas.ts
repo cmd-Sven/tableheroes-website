@@ -152,6 +152,11 @@ export type LoreEntry = z.infer<typeof LoreEntrySchema>;
 // Faction AI Response Schema
 // ============================================================================
 
+const FactionPlannedMemberSchema = z.object({
+  name: z.string(),
+  role: z.string(),
+});
+
 export const FactionAIResponseSchema = z.object({
   name: z.string(),
   type: z.string(),
@@ -159,11 +164,12 @@ export const FactionAIResponseSchema = z.object({
   description: z.string(),
   gm_notes: z.string().optional().nullable(),
   headquarters_location_name_suggestion: z.string().optional().nullable(),
-  // Neue, erweiterte Fraktionsfelder für KI-Antworten
   appearance: z.string().optional().nullable(),
   structure: z.string().optional().nullable(),
   philosophy: z.string().optional().nullable(),
   important_npcs_info: z.string().optional().nullable(),
+  /** Bis zu 3 geplante Mitglieder (Name + Rolle) für die NPC-TODO-Liste auf der Detailseite */
+  planned_members: z.array(FactionPlannedMemberSchema).max(3).optional(),
 });
 
 export type FactionAIResponse = z.infer<typeof FactionAIResponseSchema>;

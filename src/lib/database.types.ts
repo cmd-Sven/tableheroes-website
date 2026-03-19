@@ -12,6 +12,26 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      worlds: {
+        Row: {
+          id: string;
+          created_at: string | null;
+          gm_id: string;
+          name: string;
+          description: string | null;
+          cosmology_type: string | null;
+          magic_level: string | null;
+          genre_style: string | null;
+          current_year: string | null;
+          calendar_system: string | null;
+          currency: string | null;
+          dominant_races: string[] | null;
+          blueprint: Json | null;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: unknown[];
+      };
       campaigns: {
         Row: {
           id: string;

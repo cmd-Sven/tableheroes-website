@@ -123,7 +123,6 @@ export function ApplicationReviewView({
         description: details.description,
         current_status: details.alignment,
         gm_notes: `Ziele: ${details.goals}`,
-        is_revealed: false,
       });
 
       onResolve();
@@ -151,7 +150,6 @@ export function ApplicationReviewView({
         type: details.type,
         description: details.description,
         gm_notes: `Atmosphäre: ${details.atmosphere}`,
-        is_revealed: false,
       });
 
       onResolve();
@@ -187,7 +185,6 @@ export function ApplicationReviewView({
         title: person.relation,
         description: details.description,
         gm_notes: `${details.secret_notes}\n\nAussehen: ${details.appearance}`,
-        is_revealed: false,
       });
 
       onResolve();

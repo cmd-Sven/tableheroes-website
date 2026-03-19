@@ -5,6 +5,7 @@ import { QuestForm } from "@/src/components/dashboard/campaigns/quests/QuestForm
 import { getQuestById } from "@/src/app/dashboard/campaigns/[id]/quest-actions";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {
   params: Promise<{ id: string; questId: string }>;
@@ -63,11 +64,7 @@ export default async function EditQuestPage({ params }: Props) {
   const loreEntries = await getLoreEntries(campaignId);
   
   const locations = (loreEntries || [])
-    .filter((entry: any) =>
-      ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(
-        entry.type
-      )
-    )
+    .filter((entry: any) => isLocationType(entry.type))
     .map((entry: any) => ({
       id: entry.id,
       name: entry.name,

@@ -71,6 +71,46 @@ export default async function EditLorePage({ params }: Props) {
     type: entry.type,
   }));
 
+  // 7. Gottheits-/Religionsdaten laden
+  let initialDeityFields: {
+    epithet?: string | null;
+    symbol_description?: string | null;
+    symbol_image_url?: string | null;
+    domain?: string | null;
+    dark_side?: string | null;
+  } | null = null;
+  let initialReligionDeityId: string | null = null;
+
+  if ((lore as any).type === "Gottheit" && (lore as any).world_id) {
+    try {
+      const worldId = (lore as any).world_id as string;
+      const { data: deity } = await (supabase.from("deities") as any)
+        .select("epithet, symbol_description, symbol_image_url, domain, dark_side")
+        .eq("world_id", worldId)
+        .eq("name", (lore as any).name)
+        .maybeSingle();
+      if (deity) {
+        initialDeityFields = deity as any;
+      }
+    } catch (error) {
+      console.error("Error loading deity fields for campaign edit:", error);
+    }
+  } else if ((lore as any).type === "Religion" && (lore as any).world_id) {
+    try {
+      const worldId = (lore as any).world_id as string;
+      const { data: religion } = await (supabase.from("religions") as any)
+        .select("deity_id")
+        .eq("world_id", worldId)
+        .eq("name", (lore as any).name)
+        .maybeSingle();
+      if (religion && (religion as any).deity_id) {
+        initialReligionDeityId = String((religion as any).deity_id);
+      }
+    } catch (error) {
+      console.error("Error loading religion deity for campaign edit:", error);
+    }
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-4">
@@ -86,6 +126,8 @@ export default async function EditLorePage({ params }: Props) {
         initialData={lore as any} 
         parentOptions={parentOptions}
         world={world ? { id: (world as any).id, name: (world as any).name } : null}
+        initialDeityFields={initialDeityFields}
+        initialReligionDeityId={initialReligionDeityId}
       />
     </div>
   );

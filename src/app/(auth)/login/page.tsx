@@ -12,7 +12,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-md border border-hero-border bg-hero-dark px-4 py-3 font-barlow font-bold uppercase text-white shadow-lg transition-transform hover:bg-hero-vibrant hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full rounded-md border border-accent-gold/60 bg-hero-dark px-4 py-3 font-barlow font-bold uppercase text-white shadow-lg transition-transform hover:bg-hero-vibrant hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
       suppressHydrationWarning={true}
     >
       {pending ? "Laden..." : "Login"}
@@ -34,36 +34,36 @@ export default function LoginPage() {
   return (
     <>
       <h1 className="mb-6 font-barlow font-extrabold text-3xl uppercase text-white text-center">
-        Willkommen zurück, <span className="text-hero-vibrant">Held.</span>
+        Willkommen zurück, <span className="text-accent-gold">Held.</span>
       </h1>
 
       <form action={handleSubmit} className="space-y-4" suppressHydrationWarning={true}>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-200/80" />
           <input
             name="email"
             type="email"
             placeholder="E-Mail Adresse"
             required
-            className="w-full rounded bg-slate-900 border border-hero-dark p-3 pl-10 text-white placeholder-gray-500 focus:border-hero-vibrant outline-none transition-colors"
+            className="w-full rounded bg-black/30 border border-amber-900/50 p-3 pl-10 text-white placeholder-amber-200/60 focus:border-accent-gold outline-none transition-colors"
             suppressHydrationWarning={true}
           />
         </div>
 
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-200/80" />
           <input
             name="password"
             type="password"
             placeholder="Passwort"
             required
-            className="w-full rounded bg-slate-900 border border-hero-dark p-3 pl-10 text-white placeholder-gray-500 focus:border-hero-vibrant outline-none transition-colors"
+            className="w-full rounded bg-black/30 border border-amber-900/50 p-3 pl-10 text-white placeholder-amber-200/60 focus:border-accent-gold outline-none transition-colors"
             suppressHydrationWarning={true}
           />
         </div>
 
         {errorMessage && (
-          <div className="text-accent-blood text-sm font-bold text-center bg-red-950/20 p-2 rounded border border-red-900/50">
+          <div className="text-amber-100 text-sm font-bold text-center bg-red-950/40 p-2 rounded border border-red-800/60">
             {errorMessage}
           </div>
         )}
@@ -74,7 +74,7 @@ export default function LoginPage() {
       <div className="mt-6 text-center">
         <a
           href="/signup"
-          className="font-libre text-sm text-gray-400 hover:text-hero-vibrant transition-colors"
+          className="font-libre text-sm text-amber-200/90 hover:text-accent-gold transition-colors"
         >
           Noch keinen Account? Registrieren
         </a>

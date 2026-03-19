@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   Shield,
@@ -19,6 +19,7 @@ import {
   Loader2,
   UserPlus,
   CheckCircle2,
+  Handshake,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -30,10 +31,16 @@ import {
   toggleFactionReveal,
   deleteFaction,
   createFactionLore,
+  deleteFactionRelation,
+  updateFactionPlannedMemberNpcId,
 } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
+import { upsertCampaignNote } from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
 import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
+import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
+import { SmartText } from "@/src/components/ui/SmartText";
+import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import { AIGenerationWizard } from "@/src/components/dashboard/campaigns/npcs/AIGenerationWizard";
 import { Sparkles } from "lucide-react";
 
@@ -72,22 +79,35 @@ type Faction = {
   location_id: string | null;
   lore_id: string | null;
   gm_notes: string | null;
-  player_notes: string | null;
   is_revealed: boolean;
   appearance?: string | null;
   structure?: string | null;
   philosophy?: string | null;
   important_npcs_info?: string | null;
+  planned_members?: Array<{ name: string; role: string; npc_id?: string | null }>;
   locations?: Location | null;
   lore_entry?: LoreEntry | null;
   npcs?: NPC[];
 };
 
+type FactionRelationDisplay = {
+  id: string;
+  partnerFactionId: string;
+  partnerFactionName: string;
+  relationType: string;
+  description: string | null;
+};
+
 type Props = {
   faction: Faction;
   campaignId: string;
+  worldId?: string | null;
   isGM: boolean;
   userId: string;
+  /** Isolierte Spieler-Notiz für diese Kampagne (aus campaign_notes). */
+  initialCampaignPlayerNote?: string;
+  /** Beziehungen zu anderen Fraktionen (aus faction_relations). */
+  initialRelations?: FactionRelationDisplay[];
   npcs?: Array<{ id: string; name: string }>;
   locations?: Array<{ id: string; name: string; type: string }>;
 };
@@ -195,14 +215,19 @@ const FACTION_STATUSES = [
 export function FactionDetailPage({
   faction: initialFaction,
   campaignId,
+  worldId,
   isGM,
   userId,
+  initialCampaignPlayerNote = "",
+  initialRelations = [],
   locations = [],
   npcs = [],
 }: Props) {
   const router = useRouter();
+  const { entities } = useWorldEntities(worldId ?? (initialFaction as { world_id?: string }).world_id);
   const [isPending, startTransition] = useTransition();
   const [faction, setFaction] = useState(initialFaction);
+  const [relations, setRelations] = useState<FactionRelationDisplay[]>(initialRelations);
 
   // Editing states
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -211,11 +236,17 @@ export function FactionDetailPage({
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
   const [isEditingPlayerNotes, setIsEditingPlayerNotes] = useState(false);
   const [gmNotes, setGmNotes] = useState(faction.gm_notes || "");
-  const [playerNotes, setPlayerNotes] = useState(faction.player_notes || "");
+  const [playerNotes, setPlayerNotes] = useState(initialCampaignPlayerNote);
   const [showNPCWizard, setShowNPCWizard] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{ name: string; description: string } | null>(null);
+  const plannedMemberWizardIndexRef = useRef<number | null>(null);
+  const [plannedMemberWizardPrefill, setPlannedMemberWizardPrefill] = useState<{ name: string; role: string } | null>(null);
   const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
   const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
+
+  useEffect(() => {
+    setRelations(initialRelations);
+  }, [initialRelations]);
 
   const handleSaveField = (field: string) => {
     startTransition(async () => {
@@ -290,7 +321,7 @@ export function FactionDetailPage({
   const handleSavePlayerNotes = () => {
     startTransition(async () => {
       try {
-        await updateFactionNotes(faction.id, { player_notes: playerNotes });
+        await upsertCampaignNote(campaignId, "faction", faction.id, playerNotes);
         setIsEditingPlayerNotes(false);
         router.refresh();
       } catch (error) {
@@ -306,7 +337,7 @@ export function FactionDetailPage({
   const handleToggleVisibility = () => {
     startTransition(async () => {
       try {
-        await toggleFactionReveal(faction.id, faction.is_revealed);
+        await toggleFactionReveal(campaignId, faction.id, faction.is_revealed);
         setFaction((prev) => ({ ...prev, is_revealed: !prev.is_revealed }));
         router.refresh();
       } catch (error) {
@@ -365,6 +396,23 @@ export function FactionDetailPage({
           error instanceof Error
             ? error.message
             : "Fehler beim Erstellen des Lore-Eintrags.";
+        alert(errorMessage);
+      }
+    });
+  };
+
+  const handleDeleteRelation = (relationId: string) => {
+    if (!confirm("Diese Beziehung wirklich entfernen?")) return;
+    startTransition(async () => {
+      try {
+        await deleteFactionRelation(relationId, campaignId);
+        setRelations((prev) => prev.filter((r) => r.id !== relationId));
+        router.refresh();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Fehler beim Entfernen der Beziehung.";
         alert(errorMessage);
       }
     });
@@ -770,24 +818,100 @@ export function FactionDetailPage({
                   canEdit={isGM}
                   isPending={isPending}
                   editComponent={
-                    <textarea
+                    <MarkdownEditor
                       value={editValues.description || ""}
-                      onChange={(e) =>
-                        setEditValues({
-                          ...editValues,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full rounded border border-hero-dark bg-slate-900/50 p-3 font-libre text-[#e5e5e5] leading-relaxed outline-none focus:border-hero-vibrant resize-none min-h-[200px]"
-                      placeholder="Beschreibung..."
+                      onChange={(v) => setEditValues({ ...editValues, description: v })}
+                      minHeight="min-h-[450px]"
+                      entities={entities}
+                      campaignId={campaignId}
+                      worldId={worldId ?? (faction as { world_id?: string }).world_id}
                     />
                   }
                 >
-                  <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
-                    {faction.description || "Keine Beschreibung vorhanden."}
-                  </p>
+                  <SmartText
+                    text={faction.description || ""}
+                    entities={entities}
+                    campaignId={campaignId}
+                    worldId={worldId ?? (faction as { world_id?: string }).world_id}
+                    emptyMessage="Keine Beschreibung vorhanden."
+                  />
                 </InlineEditField>
               </GothicSpotlightDescription>
+            </div>
+          </div>
+
+          {/* Diplomatie: Beziehungen zu anderen Fraktionen */}
+          <div
+            className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+            style={{
+              border: "2px solid rgba(202, 185, 38, 0.5)",
+              backgroundImage: "url('/images/grunge-paper-background.jpg')",
+              backgroundSize: "cover",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+            }}
+          >
+            <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+            <div className="relative z-10">
+              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                <Handshake className="h-6 w-6" />
+                Diplomatie
+              </h2>
+              {relations.length > 0 ? (
+                <div className="space-y-3">
+                  {relations.map((rel) => (
+                    <div
+                      key={rel.id}
+                      className="flex flex-wrap items-start justify-between gap-2 rounded border border-hero-border bg-hero-dark/30 p-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/factions/${rel.partnerFactionId}`}
+                          className="font-cinzel font-bold text-accent-gold hover:underline"
+                        >
+                          {rel.partnerFactionName}
+                        </Link>
+                        <span
+                          className={`ml-2 px-2 py-0.5 rounded text-xs font-barlow font-bold uppercase border ${getStatusBadgeColor(
+                            rel.relationType
+                          )}`}
+                        >
+                          {rel.relationType}
+                        </span>
+                        {rel.description && rel.description.trim() !== "" && (
+                          <p className="font-libre text-sm text-gray-400 mt-1 whitespace-pre-wrap">
+                            {rel.description}
+                          </p>
+                        )}
+                      </div>
+                      {isGM && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRelation(rel.id)}
+                          disabled={isPending}
+                          className="p-1.5 rounded text-red-400 hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                          title="Beziehung entfernen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-libre text-sm text-gray-400 italic">
+                  Noch keine Beziehungen zu anderen Fraktionen definiert.
+                </p>
+              )}
+              {isGM && (
+                <Link
+                  href={`/dashboard/campaigns/${campaignId}/factions/${faction.id}/edit`}
+                  className="mt-4 inline-flex items-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-4 py-2 font-barlow font-bold text-sm uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  Beziehungen bearbeiten
+                </Link>
+              )}
             </div>
           </div>
 
@@ -965,6 +1089,75 @@ export function FactionDetailPage({
               </GothicSpotlightDescription>
             </div>
           </div>
+
+          {/* Mitglieder (TODO) – geplante NPCs aus dem Formular, vom GM hier erstellbar */}
+          {isGM && (() => {
+            const plannedRaw = faction.planned_members ?? [];
+            const existingNpcNames = new Set(
+              (faction.npcs ?? []).map((n) => (n.name || "").trim().toLowerCase())
+            );
+            const planned = plannedRaw.filter((p) => {
+              if (p.npc_id) return true;
+              const nameNorm = (p.name || "").trim().toLowerCase();
+              if (!nameNorm) return false;
+              // Wenn bereits ein NPC mit diesem Namen Mitglied ist, nicht mehr als TODO anzeigen
+              if (existingNpcNames.has(nameNorm)) return false;
+              return true;
+            });
+            if (planned.every((p) => p.npc_id)) return null;
+            return (
+              <div
+                className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
+                style={{
+                  border: "2px solid rgba(202, 185, 38, 0.5)",
+                  backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                  backgroundSize: "cover",
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "center",
+                }}
+              >
+                <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+                <div className="relative z-10">
+                  <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                    <UserPlus className="h-6 w-6" />
+                    Mitglieder (TODO)
+                  </h2>
+                  <p className="font-libre text-sm text-gray-400 mb-4">
+                    Diese Einträge hast du im Formular angelegt. Erstelle daraus NPCs – sie werden der Fraktion automatisch zugeordnet.
+                  </p>
+                  <div className="space-y-2">
+                    {planned.map((member, idx) =>
+                      member.npc_id ? null : (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded border border-hero-border bg-hero-dark/50 p-3"
+                        >
+                          <div>
+                            <span className="font-cinzel font-bold text-white">{member.name || "Unbenannt"}</span>
+                            <span className="ml-2 font-libre text-sm text-gray-400">({member.role})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              plannedMemberWizardIndexRef.current = idx;
+                              setPlannedMemberWizardPrefill({ name: member.name || "", role: member.role || "Mitglied" });
+                              setSelectedMember(null);
+                              setShowNPCWizard(true);
+                            }}
+                            disabled={isPending}
+                            className="inline-flex items-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors disabled:opacity-50"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            NPC generieren
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Members Section */}
           {faction.npcs && faction.npcs.length > 0 && (
@@ -1147,7 +1340,7 @@ export function FactionDetailPage({
                     <button
                       onClick={() => {
                         setIsEditingPlayerNotes(false);
-                        setPlayerNotes(faction.player_notes || "");
+                        setPlayerNotes(initialCampaignPlayerNote);
                       }}
                       className="p-1.5 rounded text-red-400 hover:bg-red-900/30 transition-colors"
                       title="Abbrechen"
@@ -1169,7 +1362,7 @@ export function FactionDetailPage({
                 />
               ) : (
                 <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-                  {faction.player_notes || "Keine Spieler-Notizen vorhanden."}
+                  {playerNotes || "Keine Spieler-Notizen vorhanden."}
                 </p>
               )}
             </div>
@@ -1177,8 +1370,8 @@ export function FactionDetailPage({
         </div>
       </div>
 
-      {/* NPC-AI-Wizard für wichtige Mitglieder */}
-      {showNPCWizard && selectedMember && (
+      {/* NPC-AI-Wizard (aus TODO oder aus Wichtige Persönlichkeiten) */}
+      {showNPCWizard && (selectedMember || plannedMemberWizardPrefill) && (
         <AIGenerationWizard
           campaignId={campaignId}
           factions={[{ id: faction.id, name: faction.name }]}
@@ -1186,24 +1379,52 @@ export function FactionDetailPage({
           onClose={() => {
             setShowNPCWizard(false);
             setSelectedMember(null);
+            setPlannedMemberWizardPrefill(null);
+            plannedMemberWizardIndexRef.current = null;
           }}
-          onSuccess={() => {
-            setShowNPCWizard(false);
-            setSelectedMember(null);
-            router.refresh();
+          onSuccess={(npcId) => {
+            const idx = plannedMemberWizardIndexRef.current;
+            if (idx != null && npcId) {
+              startTransition(() => {
+                updateFactionPlannedMemberNpcId(faction.id, idx, npcId)
+                  .then(() => {
+                    plannedMemberWizardIndexRef.current = null;
+                    setPlannedMemberWizardPrefill(null);
+                    setShowNPCWizard(false);
+                    setSelectedMember(null);
+                    router.refresh();
+                  })
+                  .catch((err) => {
+                    alert(err instanceof Error ? err.message : "Verknüpfung mit Fraktion fehlgeschlagen.");
+                  });
+              });
+            } else {
+              setShowNPCWizard(false);
+              setSelectedMember(null);
+              setPlannedMemberWizardPrefill(null);
+              plannedMemberWizardIndexRef.current = null;
+              router.refresh();
+            }
           }}
-          hookContext={{
-            hook: {
-              name: selectedMember.name || undefined,
-              role: "Wichtiges Mitglied der Fraktion",
-              description: `Dieser Charakter ist ein wichtiges Mitglied der Fraktion ${faction.name}. Hintergrund: ${
-                selectedMember.description || faction.important_npcs_info || ""
-              }`,
-              is_alive: true,
-            },
-          }}
+          hookContext={
+            selectedMember
+              ? {
+                  hook: {
+                    name: selectedMember.name || undefined,
+                    role: "Wichtiges Mitglied der Fraktion",
+                    description: `Dieser Charakter ist ein wichtiges Mitglied der Fraktion ${faction.name}. Hintergrund: ${
+                      selectedMember.description || faction.important_npcs_info || ""
+                    }`,
+                    is_alive: true,
+                  },
+                }
+              : undefined
+          }
           defaultFactionId={faction.id}
           defaultBriefingPrefix={`Dieser Charakter ist ein wichtiges Mitglied der Fraktion ${faction.name}.`}
+          prefillName={plannedMemberWizardPrefill?.name ?? selectedMember?.name}
+          prefillRole={plannedMemberWizardPrefill?.role ?? (selectedMember ? "Wichtiges Mitglied der Fraktion" : undefined)}
+          prefillDescription={selectedMember?.description}
         />
       )}
 

@@ -30,12 +30,16 @@ import {
   toggleNPCReveal,
   deleteNPC,
 } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { upsertCampaignNote } from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { updateNPCCurrentLocation } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
 import { NarrativeHook } from "@/src/types/npc";
 import { NPCHookWizard } from "@/src/components/dashboard/campaigns/npcs/NPCHookWizard";
 import { NPCRelationsList } from "@/src/components/dashboard/campaigns/npcs/NPCRelationsList";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
+import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
+import { SmartText } from "@/src/components/ui/SmartText";
+import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import {
   findNPCByName,
   checkNPCRelationExists,
@@ -66,7 +70,6 @@ type NPC = {
   appearance: string | null;
   personality_traits: string | null;
   gm_notes: string | null;
-  player_notes: string | null;
   image_url: string | null;
   is_revealed: boolean;
   is_favorite?: boolean;
@@ -104,9 +107,12 @@ type NPC = {
 type Props = {
   npc: NPC;
   campaignId: string;
+  worldId?: string | null;
   isGM: boolean;
   canEdit: boolean;
   userId: string;
+  /** Isolierte Spieler-Notiz für diese Kampagne (aus campaign_notes). */
+  initialCampaignPlayerNote?: string;
   factions?: Array<{ id: string; name: string }>;
   locations?: Array<{ id: string; name: string; type: string }>;
   /** Für Quest-Modal von NPC-Seite (nur GM) */
@@ -215,14 +221,18 @@ function InlineEditField({
 export function NPCDetailPage({
   npc: initialNpc,
   campaignId,
+  worldId,
   isGM,
   canEdit,
+  userId,
+  initialCampaignPlayerNote = "",
   factions = [],
   locations = [],
   npcsForQuest = [],
   membersForQuest = [],
 }: Props) {
   const router = useRouter();
+  const { entities } = useWorldEntities(worldId ?? (initialNpc as { world_id?: string }).world_id);
   const [isPending, startTransition] = useTransition();
   const [npc, setNpc] = useState(initialNpc);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
@@ -239,7 +249,7 @@ export function NPCDetailPage({
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
   const [isEditingPlayerNotes, setIsEditingPlayerNotes] = useState(false);
   const [gmNotes, setGmNotes] = useState(npc.gm_notes || "");
-  const [playerNotes, setPlayerNotes] = useState(npc.player_notes || "");
+  const [playerNotes, setPlayerNotes] = useState(initialCampaignPlayerNote ?? "");
   const [selectedHook, setSelectedHook] = useState<NarrativeHook | null>(null);
   const [hookSuccessFeedback, setHookSuccessFeedback] = useState<string | null>(
     null
@@ -499,7 +509,7 @@ export function NPCDetailPage({
   const handleSavePlayerNotes = () => {
     startTransition(async () => {
       try {
-        await updateNPCNotes(npc.id, { player_notes: playerNotes });
+        await upsertCampaignNote(campaignId, "npc", npc.id, playerNotes);
         setIsEditingPlayerNotes(false);
         router.refresh();
       } catch (error) {
@@ -515,7 +525,7 @@ export function NPCDetailPage({
   const handleToggleVisibility = () => {
     startTransition(async () => {
       try {
-        await toggleNPCReveal(npc.id, isRevealed);
+        await toggleNPCReveal(campaignId, npc.id, isRevealed);
         setIsRevealed(!isRevealed);
         router.refresh();
       } catch (error) {
@@ -1082,22 +1092,23 @@ export function NPCDetailPage({
                   canEdit={canEdit}
                   isPending={isPending}
                   editComponent={
-                    <textarea
+                    <MarkdownEditor
                       value={editValues.description || ""}
-                      onChange={(e) =>
-                        setEditValues({
-                          ...editValues,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full rounded border border-hero-dark bg-slate-900/50 p-3 font-libre text-[#e5e5e5] leading-relaxed outline-none focus:border-hero-vibrant resize-none min-h-[200px]"
-                      placeholder="Beschreibung..."
+                      onChange={(v) => setEditValues({ ...editValues, description: v })}
+                      minHeight="min-h-[450px]"
+                      entities={entities}
+                      campaignId={campaignId}
+                      worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     />
                   }
                 >
-                  <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
-                    {npc.description || "Keine Beschreibung vorhanden."}
-                  </p>
+                  <SmartText
+                    text={npc.description || ""}
+                    entities={entities}
+                    campaignId={campaignId}
+                    worldId={worldId ?? (npc as { world_id?: string }).world_id}
+                    emptyMessage="Keine Beschreibung vorhanden."
+                  />
                 </InlineEditField>
               </GothicSpotlightDescription>
             )}
@@ -1118,22 +1129,24 @@ export function NPCDetailPage({
                   canEdit={canEdit}
                   isPending={isPending}
                   editComponent={
-                    <textarea
+                    <MarkdownEditor
                       value={editValues.appearance || ""}
-                      onChange={(e) =>
-                        setEditValues({
-                          ...editValues,
-                          appearance: e.target.value,
-                        })
-                      }
-                      className="w-full rounded border border-hero-dark bg-slate-900/50 p-3 font-libre text-[#e5e5e5] leading-relaxed outline-none focus:border-hero-vibrant resize-none min-h-[200px]"
-                      placeholder="Aussehen beschreiben..."
+                      onChange={(v) => setEditValues({ ...editValues, appearance: v })}
+                      minHeight="min-h-[450px]"
+                      placeholder="Aussehen beschreiben… (Markdown möglich)"
+                      entities={entities}
+                      campaignId={campaignId}
+                      worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     />
                   }
                 >
-                  <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
-                    {npc.appearance || "Keine Beschreibung vorhanden."}
-                  </p>
+                  <SmartText
+                    text={npc.appearance || ""}
+                    entities={entities}
+                    campaignId={campaignId}
+                    worldId={worldId ?? (npc as { world_id?: string }).world_id}
+                    emptyMessage="Keine Beschreibung vorhanden."
+                  />
                 </InlineEditField>
               </GothicSpotlightDescription>
             )}
@@ -1159,22 +1172,24 @@ export function NPCDetailPage({
                   canEdit={canEdit}
                   isPending={isPending}
                   editComponent={
-                    <textarea
+                    <MarkdownEditor
                       value={editValues.personality_traits || ""}
-                      onChange={(e) =>
-                        setEditValues({
-                          ...editValues,
-                          personality_traits: e.target.value,
-                        })
-                      }
-                      className="w-full rounded border border-hero-dark bg-slate-900/50 p-3 font-libre text-[#e5e5e5] leading-relaxed outline-none focus:border-hero-vibrant resize-none min-h-[200px]"
-                      placeholder="Persönlichkeit beschreiben..."
+                      onChange={(v) => setEditValues({ ...editValues, personality_traits: v })}
+                      minHeight="min-h-[450px]"
+                      placeholder="Persönlichkeit beschreiben… (Markdown möglich)"
+                      entities={entities}
+                      campaignId={campaignId}
+                      worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     />
                   }
                 >
-                  <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
-                    {npc.personality_traits || "Keine Beschreibung vorhanden."}
-                  </p>
+                  <SmartText
+                    text={npc.personality_traits || ""}
+                    entities={entities}
+                    campaignId={campaignId}
+                    worldId={worldId ?? (npc as { world_id?: string }).world_id}
+                    emptyMessage="Keine Beschreibung vorhanden."
+                  />
                 </InlineEditField>
               </GothicSpotlightDescription>
             )}
@@ -1632,15 +1647,18 @@ export function NPCDetailPage({
               </div>
             )}
 
-          {/* Proben & Informationen (nur für GM) */}
+          {/* Ergebnisse für Spielerproben (nur für GM) – was Spieler bei Würfen entdecken */}
           {isGM && npc.check_results && npc.check_results.length > 0 && (
             <div className="rounded-lg border-2 border-accent-gold/50 bg-slate-900/80 p-6 relative">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-accent-gold/30">
+              <div className="flex items-center gap-2 mb-1 pb-3 border-b border-accent-gold/30">
                 <Eye className="h-5 w-5 text-accent-gold" />
                 <h2 className="font-barlow font-bold text-xl uppercase text-accent-gold">
-                  Proben & Informationen
+                  Ergebnisse für Spielerproben
                 </h2>
               </div>
+              <p className="font-libre text-sm text-gray-400 mb-4">
+                Was Spieler mit ihren Charakteren bei Würfen (z. B. Wahrnehmung, Motiv erkennen) über diesen NPC entdecken können – nutze diese Texte je nach Wurfergebnis.
+              </p>
 
               <div className="space-y-6">
                 {(() => {
@@ -1761,7 +1779,7 @@ export function NPCDetailPage({
                   <button
                     onClick={() => {
                       setIsEditingPlayerNotes(false);
-                      setPlayerNotes(npc.player_notes || "");
+                      setPlayerNotes(initialCampaignPlayerNote ?? "");
                     }}
                     className="p-1.5 rounded text-red-400 hover:bg-red-900/30 transition-colors"
                     title="Abbrechen"
@@ -1787,7 +1805,7 @@ export function NPCDetailPage({
                   isPending ? "opacity-50" : ""
                 }`}
               >
-                {npc.player_notes || "Keine Spieler-Notizen vorhanden."}
+                {playerNotes || "Keine Spieler-Notizen vorhanden."}
               </p>
             )}
           </div>

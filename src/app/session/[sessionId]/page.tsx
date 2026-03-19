@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
+import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 
 type Props = {
   params: Promise<{ sessionId: string }>;
@@ -86,10 +87,20 @@ export default async function SessionPage({ params }: Props) {
       ?.map((row: any) => row.characters)
       .filter((c: any) => !!c) || [];
 
-  // 5. Load all campaign NPCs
-  const { data: allCampaignNpcs } = await (supabase.from("npcs") as any)
-    .select("id, name, title, description, image_url, is_revealed")
-    .eq("campaign_id", (session as any).campaign_id);
+  // 5. Load campaign NPCs (Sichtbarkeit aus campaign_visibility)
+  const npcsFromCampaign = await getNPCs(
+    (session as any).campaign_id,
+    user.id,
+    isGM
+  );
+  const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({
+    id: npc.id,
+    name: npc.name,
+    title: npc.title ?? null,
+    description: npc.description ?? null,
+    image_url: npc.image_url ?? null,
+    is_revealed: npc.is_revealed ?? false,
+  }));
 
   // 6. Load Active, Revealed Quests for this campaign
   const { data: activeQuests } = await (supabase.from("quests") as any)

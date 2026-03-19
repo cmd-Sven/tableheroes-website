@@ -1198,7 +1198,6 @@ export async function promoteHookToNPC(
       faction_id: npcData.faction_id || null,
       current_location_id: npcData.current_location_id || null,
       home_location_id: npcData.home_location_id || null,
-      is_revealed: npcData.is_revealed ?? false,
       image_url: npcData.image_url || null,
     })
     .select()

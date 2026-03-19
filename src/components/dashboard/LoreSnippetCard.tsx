@@ -61,8 +61,10 @@ export function LoreSnippetCard({
 
   return (
     <div className="w-full p-4" ref={ref}>
-      <div
-        className={`relative rounded-lg border border-hero-border/40 bg-hero-dark/20 overflow-hidden ${
+      <Link
+        href={loreUrl}
+        onClick={() => onMarkAsRead?.()}
+        className={`block relative rounded-lg border border-hero-border/40 bg-hero-dark/20 overflow-hidden hover:border-hero-vibrant/50 hover:bg-hero-dark/30 transition-colors group ${
           hasNewContent ? NEW_GLOW_STYLE : ""
         }`}
         style={{
@@ -75,26 +77,18 @@ export function LoreSnippetCard({
             NEU
           </span>
         )}
-        <div className="p-4 space-y-3">
-          <h3 className="font-cinzel font-bold text-lg text-accent-gold">
+        <div className="p-4">
+          <h3 className="font-cinzel font-bold text-lg text-accent-gold group-hover:text-hero-vibrant transition-colors">
             {snippet.name}
           </h3>
-          <p className="font-libre text-sm text-gray-300 leading-relaxed line-clamp-4">
+          <p className="font-libre text-sm text-gray-300 leading-relaxed line-clamp-2 mt-1">
             {snippet.teaser}
           </p>
-          <p className="font-barlow text-xs uppercase text-gray-500">
+          <p className="font-barlow text-[10px] uppercase text-gray-500 mt-2">
             {snippet.campaignName}
           </p>
-          <Link
-            href={loreUrl}
-            onClick={() => onMarkAsRead?.()}
-            className="inline-flex items-center gap-2 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-barlow font-bold text-xs uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors"
-          >
-            <BookOpen className="h-4 w-4" />
-            Mehr lesen
-          </Link>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }

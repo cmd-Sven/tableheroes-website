@@ -122,7 +122,6 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
         type: "Location",
         description: result.description || undefined,
         gm_notes: result.gm_notes || undefined,
-        is_revealed: false,
       });
 
       // Auto-select it
@@ -160,7 +159,6 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
             title: result.title || undefined,
             description: result.description || undefined,
             gm_notes: result.gm_notes || undefined,
-            is_revealed: false,
           });
           generatedNPCs.push(newNPC.id);
         } catch (err) {

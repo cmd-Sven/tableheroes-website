@@ -18,14 +18,12 @@ export default async function FactionEditPage({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  // 2. Check if user has access to campaign
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, world_id")
     .eq("id", campaignId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
 
   if (!campaign) redirect("/dashboard");
 
@@ -55,7 +53,7 @@ export default async function FactionEditPage({ params }: Props) {
     );
   }
 
-  if ((faction as any).campaign_id !== campaignId) {
+  if (!campaign.world_id || (faction as any).world_id !== campaign.world_id) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 

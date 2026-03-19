@@ -13,7 +13,27 @@ export type DiscoverableCampaign = {
   description: string | null;
   mode: string | null;
   frequency: string | null;
+  schedule_day: number | null;
+  schedule_time: string | null;
+  schedule_interval: string | null;
 };
+
+const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const INTERVAL_LABELS: Record<string, string> = {
+  weekly: "Jeden",
+  biweekly: "Alle 2 Wochen,",
+  monthly: "Monatlich,",
+};
+
+function formatSchedule(c: DiscoverableCampaign): string | null {
+  if (c.schedule_interval && c.schedule_day !== null && c.schedule_day !== undefined && c.schedule_time) {
+    const prefix = INTERVAL_LABELS[c.schedule_interval] ?? "";
+    const day = DAY_NAMES[c.schedule_day] ?? "";
+    const time = c.schedule_time.slice(0, 5);
+    return `${prefix} ${day}, ${time} Uhr`.trim();
+  }
+  return c.frequency || null;
+}
 
 type Props = {
   discoverableCampaigns: DiscoverableCampaign[];
@@ -66,8 +86,8 @@ function CampaignTicketCard({
             {campaign.description}
           </p>
         )}
-        {campaign.frequency && (
-          <p className="font-barlow text-xs text-gray-500 uppercase mb-2">{campaign.frequency}</p>
+        {formatSchedule(campaign) && (
+          <p className="font-barlow text-xs text-gray-500 uppercase mb-2">{formatSchedule(campaign)}</p>
         )}
         <div className="flex items-center justify-between">
           <span className="font-barlow font-bold uppercase text-xs text-hero-vibrant group-hover:text-white transition-colors">

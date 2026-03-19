@@ -1,7 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Map, Sword } from "lucide-react";
+import { Map as MapIcon, Sword } from "lucide-react";
 import Image from "next/image";
 
 type MembershipWithGm = {
@@ -60,7 +60,7 @@ export default async function MyCampaignsPage() {
         {campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-16 text-center">
             <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-background-dark border border-hero-border">
-              <Map className="h-8 w-8 text-hero-vibrant" />
+              <MapIcon className="h-8 w-8 text-hero-vibrant" />
             </div>
             <h3 className="mb-2 font-cinzel font-bold text-xl text-white">
               Noch keine Kampagnen
@@ -94,7 +94,7 @@ export default async function MyCampaignsPage() {
                   </div>
                 ) : (
                   <div className="h-32 w-full bg-hero-dark/50 flex items-center justify-center">
-                    <Map className="h-10 w-10 text-hero-vibrant/50" />
+                    <MapIcon className="h-10 w-10 text-hero-vibrant/50" />
                   </div>
                 )}
                 <div className="p-4">
@@ -116,19 +116,55 @@ export default async function MyCampaignsPage() {
   const { data: membershipsRaw } = await (
     supabase.from("campaign_members") as any
   )
-    .select(
-      `
-      campaign_id,
-      status,
-      character_id,
-      campaigns ( id, name, system, banner_url, gm_id ),
-      characters ( id, name, class, race, level, avatar_url, status )
-    `,
-    )
+    .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
     .eq("user_id", user.id)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved"]);
 
   const memberships = (membershipsRaw as any[]) || [];
+  let characterIds = [...new Set(memberships.map((m: any) => m.character_id).filter(Boolean))];
+
+  // Fallback: Wenn character_id fehlt, Charakter aus characters (user_id + campaign_id) laden
+  const membershipsWithoutChar = memberships.filter((m: any) => !m.character_id && m.campaign_id);
+  if (membershipsWithoutChar.length > 0) {
+    const campaignIds = [...new Set(membershipsWithoutChar.map((m: any) => m.campaign_id))];
+    const { data: fallbackChars } = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, avatar_url, campaign_id")
+      .eq("user_id", user.id)
+      .in("campaign_id", campaignIds)
+      .in("status", ["Active", "Alive"]);
+    for (const m of membershipsWithoutChar) {
+      const char = (fallbackChars as any[])?.find((c: any) => c.campaign_id === m.campaign_id);
+      if (char) {
+        (m as any).character_id = char.id;
+        characterIds.push(char.id);
+      }
+    }
+    characterIds = [...new Set(characterIds)];
+  }
+
+  let characterMap = new Map<string, { id: string; name: string; class: string; race: string; level: number; avatar_url: string | null }>();
+  if (characterIds.length > 0) {
+    const { data: charRows } = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, avatar_url")
+      .in("id", characterIds);
+    characterMap = new Map(
+      ((charRows as any[]) || []).map((c: any) => [
+        c.id,
+        {
+          id: c.id,
+          name: c.name ?? "",
+          class: c.class ?? "",
+          race: c.race ?? "",
+          level: c.level ?? 1,
+          avatar_url: c.avatar_url ?? null,
+        },
+      ])
+    );
+  }
+  const membershipsWithChars = memberships.map((m: any) => ({
+    ...m,
+    characters: m.character_id ? characterMap.get(m.character_id) ?? null : null,
+  }));
   const gmIds = [
     ...new Set(memberships.map((m: any) => m.campaigns?.gm_id).filter(Boolean)),
   ];
@@ -145,7 +181,7 @@ export default async function MyCampaignsPage() {
     );
   }
 
-  const membershipsWithGm: MembershipWithGm[] = memberships.map((m: any) => ({
+  const membershipsWithGm: MembershipWithGm[] = membershipsWithChars.map((m: any) => ({
     campaign: m.campaigns,
     character: m.characters
       ? {

@@ -3,6 +3,7 @@
 import { Info, User, Shield, Trash2, Eye, EyeOff, Star, AlertCircle, ScrollText } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { useTransition } from "react";
 import { toggleNPCFavorite } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 
@@ -21,6 +22,7 @@ type NPC = {
   status: string | null;
   description: string | null;
   is_revealed: boolean;
+  image_url?: string | null;
   is_favorite?: boolean;
   has_active_quest?: boolean;
   has_active_quest_as_giver?: boolean;
@@ -35,13 +37,22 @@ type NPC = {
 
 type Props = {
   npc: NPC;
-  campaignId: string;
+  /** Kampagnen-Kontext (Detail-Link, Quests, Sichtbarkeit). */
+  campaignId?: string;
+  /** Welt-Kontext (GM-Zentrale: Link zur Detailseite, Bearbeiten nur von dort). */
+  worldId?: string;
   isGM?: boolean;
   onDelete?: (npc: NPC) => void;
   onToggleVisibility?: (npc: NPC) => void;
 };
 
-export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleVisibility }: Props) {
+export function NPCGridCard({ npc, campaignId, worldId, isGM = false, onDelete, onToggleVisibility }: Props) {
+  const detailHref = worldId
+    ? `/dashboard/worlds/${worldId}/npcs/${npc.id}`
+    : campaignId
+      ? `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`
+      : "#";
+  const showVisibilityToggle = Boolean(campaignId && isGM && onToggleVisibility);
   const [isPending, startTransition] = useTransition();
 
   // Debug: Log Quest data (only in development)
@@ -68,11 +79,12 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
 
   const handleQuestClick = (e: React.MouseEvent, questId: string) => {
     e.stopPropagation();
-    window.location.href = `/dashboard/campaigns/${campaignId}?tab=quests&questId=${questId}`;
+    if (campaignId) window.location.href = `/dashboard/campaigns/${campaignId}?tab=quests&questId=${questId}`;
   };
 
   const handleCardClick = () => {
-    window.location.href = `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`;
+    if (worldId) window.location.href = `/dashboard/worlds/${worldId}/npcs/${npc.id}`;
+    else if (campaignId) window.location.href = `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`;
   };
   // Status Badge Color
   const getStatusBadgeColor = (status: string | null) => {
@@ -142,7 +154,7 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
         {/* Active Quest Icon (Giver) – links neben Favoriten */}
         {npc.has_active_quest && npc.active_quests && npc.active_quests.length > 0 && !npc.has_active_quest_as_giver && (
           <Link
-            href={`/dashboard/campaigns/${campaignId}?tab=quests&questId=${npc.active_quests[0].id}`}
+            href={campaignId ? `/dashboard/campaigns/${campaignId}?tab=quests&questId=${npc.active_quests[0].id}` : "#"}
             onClick={(e) => e.stopPropagation()}
             className="p-1.5 rounded bg-green-500/90 text-white hover:bg-green-600 transition-colors"
             title={`Aktive Quest: ${npc.active_quests[0].title}`}
@@ -168,7 +180,7 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
         )}
         {isGM && (
         <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-md p-1 shadow-md">
-          {onToggleVisibility && (
+          {showVisibilityToggle && onToggleVisibility && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -203,7 +215,18 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
       <div className="flex-none p-4 border-b border-gray-400/30 relative z-10">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <User className="h-5 w-5 text-gray-700 flex-shrink-0" />
+            {npc.image_url ? (
+              <div className="relative h-10 w-10 rounded-full overflow-hidden border border-gray-400 shrink-0 bg-gray-200">
+                <Image
+                  src={npc.image_url}
+                  alt={npc.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <User className="h-5 w-5 text-gray-700 shrink-0" />
+            )}
             <h3 className="font-cinzel font-bold text-lg text-gray-900 line-clamp-2">
               {npc.name}
             </h3>
@@ -266,7 +289,7 @@ export function NPCGridCard({ npc, campaignId, isGM = false, onDelete, onToggleV
 
         {/* Details Link */}
         <Link
-          href={`/dashboard/campaigns/${campaignId}/npcs/${npc.id}`}
+          href={detailHref}
           onClick={(e) => e.stopPropagation()}
           className="mt-auto w-full flex items-center justify-center gap-2 rounded border-2 border-gray-700 bg-gray-800/80 px-3 py-2 font-barlow font-bold text-xs uppercase text-gray-100 hover:bg-[#C5A572] hover:border-[#C5A572] transition-colors"
         >

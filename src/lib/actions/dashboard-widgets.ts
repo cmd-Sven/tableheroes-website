@@ -8,14 +8,15 @@ import type {
   UpcomingSession,
   SessionParticipant,
 } from "@/src/lib/types/dashboard-widgets";
+import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
 const IMAGE_EXTENSIONS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
 
 /**
- * Lädt einen zufälligen Lore-Eintrag aus world_lore, der is_revealed === true ist
- * und zu einer Kampagne gehört, in der der Spieler Mitglied ist.
+ * Lädt einen zufälligen Lore-Eintrag, der für den Spieler in einer seiner Kampagnen
+ * sichtbar ist (campaign_visibility.is_revealed).
  * hasNewContent: true, wenn der Eintrag jünger ist als last_lore_view.
  */
 export async function getRandomLoreSnippet(userId: string): Promise<{
@@ -33,7 +34,7 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
   const { data: memberships } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved"]);
 
   const campaignIds = [
     ...new Set(
@@ -44,25 +45,38 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
   ];
   if (campaignIds.length === 0) return { snippet: null, hasNewContent: false };
 
-  const { data: loreRows } = await (supabase.from("world_lore") as any)
-    .select("id, name, description, campaign_id, updated_at, created_at")
-    .in("campaign_id", campaignIds)
-    .eq("is_revealed", true)
-    .limit(50);
+  const { data: campaigns } = await (supabase.from("campaigns") as any)
+    .select("id, name, world_id")
+    .in("id", campaignIds)
+    .not("world_id", "is", null);
 
-  const list = (loreRows as any[]) || [];
-  if (list.length === 0) return { snippet: null, hasNewContent: false };
+  const allRevealed: Array<{ id: string; name: string; description: string | null; updated_at: string | null; created_at: string | null; campaign_id: string; campaign_name: string }> = [];
 
-  const picked = list[Math.floor(Math.random() * list.length)];
-  const campaignId = picked.campaign_id;
+  for (const camp of campaigns || []) {
+    const visibility = await getVisibilityForCampaign(camp.id, "lore");
+    const revealedIds = Object.entries(visibility)
+      .filter(([, v]) => v)
+      .map(([entityId]) => entityId);
+    if (revealedIds.length === 0) continue;
+    const { data: loreRows } = await (supabase.from("world_lore") as any)
+      .select("id, name, description, updated_at, created_at")
+      .in("id", revealedIds)
+      .limit(50);
+    (loreRows || []).forEach((row: any) => {
+      allRevealed.push({
+        ...row,
+        campaign_id: camp.id,
+        campaign_name: camp.name,
+      });
+    });
+  }
+
+  if (allRevealed.length === 0) return { snippet: null, hasNewContent: false };
+
+  const picked = allRevealed[Math.floor(Math.random() * allRevealed.length)];
   const contentAt = picked.updated_at ?? picked.created_at ?? null;
   const hasNewContent =
     !!contentAt && (!lastView || new Date(contentAt) > new Date(lastView));
-
-  const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("name")
-    .eq("id", campaignId)
-    .single();
 
   const rawDescription = picked.description ?? "";
   const teaser =
@@ -74,8 +88,8 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
     id: picked.id,
     name: picked.name ?? "Lore",
     teaser: teaser || "Keine Beschreibung.",
-    campaignId,
-    campaignName: (campaign as any)?.name ?? "Kampagne",
+    campaignId: picked.campaign_id,
+    campaignName: picked.campaign_name ?? "Kampagne",
   };
   return { snippet, hasNewContent };
 }

@@ -107,6 +107,208 @@ export async function updateCampaignDetails(
 }
 
 // ============================================================================
+// RECURRING SESSION SCHEDULE
+// ============================================================================
+
+export async function updateCampaignSchedule(
+  campaignId: string,
+  formData: FormData,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
+    campaignRaw,
+  );
+
+  if (!parsed.success || parsed.data.gm_id !== user.id) {
+    throw new Error("Unauthorized: You are not the GM of this campaign.");
+  }
+
+  const intervalVal = formData.get("schedule_interval") as string;
+  const dayVal = formData.get("schedule_day") as string;
+  const timeVal = formData.get("schedule_time") as string;
+  const durationVal = formData.get("schedule_duration_hours") as string;
+  const frequencyNote = formData.get("frequency") as string;
+
+  const scheduleInterval = intervalVal || null;
+  const scheduleDay =
+    scheduleInterval && dayVal !== "" ? parseInt(dayVal, 10) : null;
+  const scheduleTime = scheduleInterval && timeVal ? timeVal : null;
+  const scheduleDuration =
+    scheduleInterval && durationVal ? parseInt(durationVal, 10) : 4;
+
+  const { error } = await (supabase.from("campaigns") as any)
+    .update({
+      schedule_interval: scheduleInterval,
+      schedule_day: scheduleDay,
+      schedule_time: scheduleTime,
+      schedule_duration_hours: scheduleDuration,
+      frequency: frequencyNote || null,
+    })
+    .eq("id", campaignId);
+
+  if (error) {
+    console.error("Update Campaign Schedule Error:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}`);
+}
+
+export async function generateRecurringSessions(
+  campaignId: string,
+  weeksAhead = 8,
+): Promise<{ created: number; skipped: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select(
+      "id, gm_id, schedule_day, schedule_time, schedule_interval, schedule_duration_hours",
+    )
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Unauthorized: You are not the GM of this campaign.");
+  }
+
+  const {
+    schedule_day,
+    schedule_time,
+    schedule_interval,
+    schedule_duration_hours,
+  } = campaign as {
+    schedule_day: number | null;
+    schedule_time: string | null;
+    schedule_interval: string | null;
+    schedule_duration_hours: number | null;
+  };
+
+  if (
+    schedule_day === null ||
+    schedule_day === undefined ||
+    !schedule_time ||
+    !schedule_interval
+  ) {
+    throw new Error(
+      "Kein vollständiger Spielplan konfiguriert. Bitte Wochentag, Uhrzeit und Intervall einstellen.",
+    );
+  }
+
+  const duration = schedule_duration_hours ?? 4;
+  const [hours, minutes] = schedule_time.split(":").map(Number);
+
+  // Existing sessions for deduplication (only future ones)
+  const now = new Date();
+  const { data: existingSessions } = await (supabase.from("sessions") as any)
+    .select("start_time")
+    .eq("campaign_id", campaignId)
+    .gte("start_time", now.toISOString());
+
+  const existingDates = new Set(
+    ((existingSessions as any[]) ?? []).map((s: any) => {
+      const d = new Date(s.start_time);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }),
+  );
+
+  const sessionsToInsert: Array<{
+    campaign_id: string;
+    title: string;
+    type: string;
+    start_time: string;
+    end_time: string;
+    status: string;
+  }> = [];
+
+  // Find the next occurrence of schedule_day starting from today
+  const cursor = new Date();
+  cursor.setHours(hours, minutes, 0, 0);
+
+  // Advance to next schedule_day
+  const currentDay = cursor.getDay();
+  let daysUntilTarget = (schedule_day - currentDay + 7) % 7;
+  if (daysUntilTarget === 0 && cursor <= now) {
+    daysUntilTarget = 7;
+  }
+  cursor.setDate(cursor.getDate() + daysUntilTarget);
+
+  const stepDays =
+    schedule_interval === "weekly"
+      ? 7
+      : schedule_interval === "biweekly"
+        ? 14
+        : 28;
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + weeksAhead * 7);
+
+  const dayNames = [
+    "Sonntag",
+    "Montag",
+    "Dienstag",
+    "Mittwoch",
+    "Donnerstag",
+    "Freitag",
+    "Samstag",
+  ];
+
+  while (cursor <= endDate) {
+    const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+
+    if (!existingDates.has(dateKey)) {
+      const startTime = new Date(cursor);
+      const endTime = new Date(cursor);
+      endTime.setHours(endTime.getHours() + duration);
+
+      sessionsToInsert.push({
+        campaign_id: campaignId,
+        title: `Session – ${dayNames[schedule_day]}`,
+        type: "GameSession",
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        status: "Scheduled",
+      });
+    }
+
+    cursor.setDate(cursor.getDate() + stepDays);
+  }
+
+  let created = 0;
+  if (sessionsToInsert.length > 0) {
+    const { error } = await (supabase.from("sessions") as any).insert(
+      sessionsToInsert,
+    );
+    if (error) {
+      console.error("Generate Recurring Sessions Error:", error);
+      throw new Error(error.message);
+    }
+    created = sessionsToInsert.length;
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath("/");
+
+  return { created, skipped: existingDates.size };
+}
+
+// ============================================================================
 // APPLICATION SYSTEM
 // ============================================================================
 
@@ -611,6 +813,74 @@ export async function markAcceptanceAsSeen(memberId: string) {
   }
 
   revalidatePath("/dashboard");
+}
+
+// ============================================================================
+// REPAIR: campaign_members.character_id für akzeptierte Mitglieder
+// ============================================================================
+
+/**
+ * GM: Verknüpft fehlenden Charakter mit campaign_members (user_id + campaign_id).
+ * Findet Charakter mit status Active/Alive/Approved und setzt character_id.
+ */
+export async function repairMemberCharacterLink(
+  campaignId: string,
+  userId: string,
+  memberId: string
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+    throw new Error("Nur der GM kann die Verknüpfung reparieren.");
+  }
+
+  let { data: char } = await (supabase.from("characters") as any)
+    .select("id, name")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId)
+    .in("status", ["Active", "Alive", "Approved", "In_Review"])
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!char) {
+    const res = await (supabase.from("characters") as any)
+      .select("id, name")
+      .eq("user_id", userId)
+      .in("status", ["Active", "Alive", "Approved", "In_Review"])
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    char = res.data;
+  }
+
+  if (!char) {
+    throw new Error("Kein freigegebener Charakter für diesen Spieler gefunden.");
+  }
+
+  const { data: updated, error } = await (supabase.from("campaign_members") as any)
+    .update({ character_id: (char as { id: string }).id })
+    .eq("id", memberId)
+    .eq("campaign_id", campaignId)
+    .select("id, character_id");
+
+  if (error) throw new Error(error.message);
+  if (!updated || updated.length === 0) {
+    throw new Error("Verknüpfung konnte nicht gespeichert werden (keine Zeile aktualisiert).");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  return { success: true, characterId: (char as { id: string }).id };
 }
 
 // ============================================================================

@@ -126,7 +126,7 @@ export default async function ProfilePage({ params }: Props) {
     }));
 
   const { data: discoverableRaw } = await (supabase.from("campaigns") as any)
-    .select("id, name, system, banner_url, description, mode, frequency")
+    .select("id, name, system, banner_url, description, mode, frequency, schedule_day, schedule_time, schedule_interval")
     .eq("status", "Active")
     .eq("is_published", true)
     .order("created_at", { ascending: false })

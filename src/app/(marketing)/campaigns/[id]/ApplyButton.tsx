@@ -1,32 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import Link from "next/link";
 import { applyToCampaign } from "@/src/app/dashboard/campaigns/[id]/actions";
-import { CharacterCreator } from "@/src/components/dashboard/CharacterCreator";
 import { Loader2 } from "lucide-react";
-
-type Faction = {
-  id: string;
-  name: string;
-  type: string;
-  is_revealed?: boolean;
-};
-
-type Location = {
-  id: string;
-  name: string;
-  type: string;
-  is_revealed?: boolean;
-};
-
-type NPC = {
-  id: string;
-  name: string;
-  title: string | null;
-  role: string | null;
-  is_revealed?: boolean;
-};
 
 type Props = {
   campaignId: string;
@@ -34,21 +11,16 @@ type Props = {
   userHasCharacter?: boolean;
   userCharacterName?: string | null;
   characterStatus?: string | null;
-  factions?: Faction[];
-  locations?: Location[];
-  npcs?: NPC[];
 };
 
-export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = false, userCharacterName = null, characterStatus = null, factions = [], locations = [], npcs = [] }: Props) {
+export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = false, userCharacterName = null, characterStatus = null }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [showCharacterCreator, setShowCharacterCreator] = useState(false);
-  const router = useRouter();
 
   const handleApply = () => {
     startTransition(async () => {
       try {
         await applyToCampaign(campaignId);
-        router.refresh();
+        window.location.reload();
       } catch (error: any) {
         alert(error.message || "Fehler bei der Bewerbung.");
       }
@@ -125,27 +97,12 @@ export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = f
   // Status: Drafting -> Zeige Button zum Fortsetzen (wie Accepted ohne Charakter)
   if (membershipStatus === "drafting") {
     return (
-      <>
-        <button
-          onClick={() => setShowCharacterCreator(true)}
-          className="w-full rounded-md border border-hero-border bg-hero-vibrant px-4 py-3 font-barlow font-bold uppercase text-white text-center shadow-lg hover:bg-hero-dark transition-colors"
-        >
-          Charakterentwurf fortsetzen
-        </button>
-        {showCharacterCreator && (
-          <CharacterCreator
-            campaignId={campaignId}
-            isOpen={showCharacterCreator}
-            onClose={() => {
-              setShowCharacterCreator(false);
-              router.refresh();
-            }}
-            factions={factions}
-            locations={locations}
-            npcs={npcs}
-          />
-        )}
-      </>
+      <Link
+        href={`/dashboard/campaigns/${campaignId}/character/new`}
+        className="block w-full rounded-md border border-hero-border bg-hero-vibrant px-4 py-3 font-barlow font-bold uppercase text-white text-center shadow-lg hover:bg-hero-dark transition-colors"
+      >
+        Charakterentwurf fortsetzen
+      </Link>
     );
   }
 
@@ -159,31 +116,18 @@ export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = f
     if (canCreateCharacter) {
       return (
         <>
-          <button
-            onClick={() => setShowCharacterCreator(true)}
-            className="w-full rounded-md border border-hero-border bg-hero-vibrant px-4 py-3 font-barlow font-bold uppercase text-white text-center shadow-lg hover:bg-hero-dark transition-colors"
+          <Link
+            href={`/dashboard/campaigns/${campaignId}/character/new`}
+            className="block w-full rounded-md border border-hero-border bg-hero-vibrant px-4 py-3 font-barlow font-bold uppercase text-white text-center shadow-lg hover:bg-hero-dark transition-colors"
           >
             {userHasCharacter && (characterStatus === "Dead" || characterStatus === "Archived")
               ? "Neuen Charakter erstellen"
               : "Charakter erstellen"}
-          </button>
+          </Link>
           {userHasCharacter && (characterStatus === "Dead" || characterStatus === "Archived") && (
             <p className="mt-2 text-xs font-libre text-yellow-400 text-center">
               Dein vorheriger Charakter ist {characterStatus === "Dead" ? "verstorben" : "archiviert"}. Du kannst einen neuen erstellen.
             </p>
-          )}
-          {showCharacterCreator && (
-            <CharacterCreator
-              campaignId={campaignId}
-              isOpen={showCharacterCreator}
-              onClose={() => {
-                setShowCharacterCreator(false);
-                router.refresh();
-              }}
-              factions={factions}
-              locations={locations}
-              npcs={npcs}
-            />
           )}
         </>
       );

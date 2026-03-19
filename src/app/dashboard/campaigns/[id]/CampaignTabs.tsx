@@ -45,7 +45,7 @@ export function CampaignTabs({
     ...(factionsContent ? [{ id: "factions", key: "factions" as TabKey, label: "Fraktionen", icon: Shield }] : []),
     ...(loreContent ? [{ id: "lore", key: "lore" as TabKey, label: "Welt & Lore", icon: Book }] : []),
     ...(questContent ? [{ id: "quests", key: "quests" as TabKey, label: "Quests", icon: ScrollText }] : []),
-    ...(isGM ? [{ id: "members", key: "members" as TabKey, label: "Mitglieder", icon: Users, badge: pendingCount }] : []),
+    ...(isGM ? [{ id: "members", key: "members" as TabKey, label: "Teilnehmer", icon: Users, badge: pendingCount }] : []),
   ];
 
   return (

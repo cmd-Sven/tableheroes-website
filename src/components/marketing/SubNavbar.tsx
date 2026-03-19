@@ -16,7 +16,7 @@ export function SubNavbar({ activeContent, onContentChange }: SubNavbarProps) {
     { id: "updates" as HeroContentType, label: "Updates / News" },
     { id: "membership" as HeroContentType, label: "Mitglied werden" },
     { id: "discord" as HeroContentType, label: "Zum Discord", href: "https://discord.gg/JzfXw9b7v7", external: true },
-    { id: "login" as HeroContentType, label: "Login / Registrieren", href: "/maintenance" },
+    { id: "login" as HeroContentType, label: "Login / Registrieren", href: "/login" },
   ];
 
   return (

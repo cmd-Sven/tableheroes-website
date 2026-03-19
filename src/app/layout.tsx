@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Barlow_Condensed, Cinzel, Libre_Baskerville } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -153,22 +154,25 @@ export default function RootLayout({
           content="mzY6Ev9823X7RLOEqJb2k8TutAYQdf6XL9vYk4FK4v4"
         />
       </head>
-      {/* JSON-LD Strukturierte Daten */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(softwareApplicationSchema),
-        }}
-      />
-      {/* 2. Variablen in den Body injizieren */}
       <body
         className={`${barlow.variable} ${cinzel.variable} ${libre.variable} font-libre bg-background-dark text-gray-100`}
         suppressHydrationWarning={true}
       >
+        {/* JSON-LD nur im body (vermeidet "script outside main document") */}
+        <Script
+          id="json-ld-organization"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <Script
+          id="json-ld-software"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(softwareApplicationSchema),
+          }}
+        />
         {children}
         <Toaster richColors position="top-right" />
       </body>

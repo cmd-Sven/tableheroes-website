@@ -18,7 +18,7 @@ import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import type { LayoutItem } from "@/src/lib/utils/layout-engine";
-import { MessageWidget } from "@/src/components/dashboard/MessageWidget";
+import { InboxCard } from "@/src/components/dashboard/InboxCard";
 import {
   HeroSlider,
   type HeroSliderCharacter,
@@ -36,6 +36,7 @@ import { AcceptanceNotification } from "@/src/app/dashboard/AcceptanceNotificati
 import type { PlayerMessage } from "@/src/lib/actions/message-actions";
 import type { LoreSnippet, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
+import type { PointLogEntry } from "@/src/lib/actions/point-actions";
 
 export type ProfileHeaderData = {
   username: string | null;
@@ -80,6 +81,9 @@ export type DiscoverableCampaign = {
   description: string | null;
   mode: string | null;
   frequency: string | null;
+  schedule_day: number | null;
+  schedule_time: string | null;
+  schedule_interval: string | null;
 };
 
 type Props = {
@@ -92,6 +96,7 @@ type Props = {
   membershipsWithGm: MembershipWithGm[];
   heroCharacters: HeroSliderCharacter[];
   playerMessages: PlayerMessage[];
+  unreadInboxMessages: PlayerMessage[];
   discoverableCampaigns: DiscoverableCampaign[];
   randomLoreSnippet: LoreSnippet | null;
   dailyComic: { src: string | null };
@@ -102,6 +107,7 @@ type Props = {
   upcomingSessions: UpcomingSession[];
   isBacker?: boolean;
   backerSince?: string | null;
+  pointsHistory: PointLogEntry[];
 };
 
 export function DashboardClient({
@@ -113,6 +119,7 @@ export function DashboardClient({
   membershipsWithGm,
   heroCharacters,
   playerMessages,
+  unreadInboxMessages = [],
   discoverableCampaigns,
   randomLoreSnippet,
   dailyComic,
@@ -123,6 +130,7 @@ export function DashboardClient({
   upcomingSessions,
   isBacker,
   backerSince,
+  pointsHistory,
 }: Props) {
   const router = useRouter();
   const handleMarkNewsRead = async () => {
@@ -150,7 +158,7 @@ export function DashboardClient({
       id: "points",
       title: "Punkte",
       icon: <Star className="h-5 w-5" />,
-      content: <PointsCard totalPoints={totalPoints} />,
+      content: <PointsCard totalPoints={totalPoints} pointsHistory={pointsHistory} />,
       colSpan: 1 as const,
     },
     {
@@ -188,7 +196,7 @@ export function DashboardClient({
       id: "inbox",
       title: "Nachrichten",
       icon: <Inbox className="h-5 w-5" />,
-      content: <MessageWidget messages={playerMessages} maxItems={5} />,
+      content: <InboxCard messages={unreadInboxMessages} />,
       colSpan: 1 as const,
     },
     {

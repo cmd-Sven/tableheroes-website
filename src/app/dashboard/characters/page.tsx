@@ -21,24 +21,8 @@ export default async function MyCharactersPage() {
     );
   }
 
-  const { data: characters, error } = await supabase
-    .from("characters")
-    .select(
-      `
-      id,
-      name,
-      status,
-      level,
-      class,
-      race,
-      biography,
-      campaigns (
-        id,
-        name,
-        system
-      )
-    `,
-    )
+  const { data: charactersRaw, error } = await (supabase.from("characters") as any)
+    .select("id, name, status, level, class, race, biography, campaign_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -46,16 +30,28 @@ export default async function MyCharactersPage() {
     console.error("Error fetching characters:", error);
   }
 
-  const characterList = (characters || []) as Array<{
-    id: string;
-    name: string;
-    status: string | null;
-    level: number;
-    class: string;
-    race: string;
-    biography: string | null;
-    campaigns: { id: string; name: string; system: string | null } | null;
-  }>;
+  const chars = (charactersRaw as any[]) || [];
+  const campaignIds = [...new Set(chars.map((c: any) => c.campaign_id).filter(Boolean))];
+  let campaignMap = new Map<string, { id: string; name: string; system: string | null }>();
+  if (campaignIds.length > 0) {
+    const { data: campRows } = await (supabase.from("campaigns") as any)
+      .select("id, name, system")
+      .in("id", campaignIds);
+    campaignMap = new Map(
+      ((campRows as any[]) || []).map((c: any) => [c.id, { id: c.id, name: c.name ?? "", system: c.system ?? null }])
+    );
+  }
+
+  const characterList = chars.map((char: any) => ({
+    id: char.id,
+    name: char.name,
+    status: char.status,
+    level: char.level ?? 1,
+    class: char.class ?? "",
+    race: char.race ?? "",
+    biography: char.biography ?? null,
+    campaigns: char.campaign_id ? campaignMap.get(char.campaign_id) ?? null : null,
+  }));
 
   return (
     <div className="space-y-8">

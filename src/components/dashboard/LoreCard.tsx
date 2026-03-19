@@ -18,12 +18,13 @@ type LoreEntry = {
 
 type Props = {
   lore: LoreEntry;
+  campaignId?: string;
   isGM: boolean;
   onEdit: (lore: LoreEntry) => void;
   depth?: number;
 };
 
-export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
+export function LoreCard({ lore, campaignId, isGM, onEdit, depth = 0 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showGMNotes, setShowGMNotes] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -31,9 +32,10 @@ export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
   const hasChildren = lore.children && lore.children.length > 0;
 
   const handleToggleReveal = () => {
+    if (!campaignId) return;
     startTransition(async () => {
       try {
-        await toggleLoreReveal(lore.id, lore.is_revealed);
+        await toggleLoreReveal(campaignId, lore.id, lore.is_revealed);
       } catch (error: any) {
         alert(error.message);
       }
@@ -196,6 +198,7 @@ export function LoreCard({ lore, isGM, onEdit, depth = 0 }: Props) {
             <LoreCard
               key={child.id}
               lore={child}
+              campaignId={campaignId}
               isGM={isGM}
               onEdit={onEdit}
               depth={depth + 1}

@@ -1,24 +1,50 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { BUILDING_LOCATION_TYPES } from "@/src/lib/lore-types";
 import { revalidatePath } from "next/cache";
+import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visibility-actions";
 
 /**
  * Server Actions für World Lore (Hierarchical)
- * 
- * Unterstützt:
- * - Create Lore Entry (with optional parent_id)
- * - Update Lore Entry
- * - Delete Lore Entry (cascading)
- * - Toggle Reveal Status
- * - Get All Lore Entries (flat list for tree reconstruction)
+ * world_id kommt immer aus der Kampagne (campaign.world_id).
  */
+
+type AdditionalImageItem = { url: string; description: string };
+
+/** Normalisiert additional_images für JSONB: Array beibehalten, String parsen, sonst null. */
+function normalizeAdditionalImages(
+  value: unknown
+): Array<AdditionalImageItem> | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    const arr = value
+      .map((item) => ({
+        url: typeof (item as any)?.url === "string" ? (item as any).url : "",
+        description: typeof (item as any)?.description === "string" ? (item as any).description : "",
+      }))
+      .filter((item) => item.url.trim() !== "");
+    return arr.length > 0 ? arr : null;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? normalizeAdditionalImages(parsed) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 // ============================================================================
 // Create Lore Entry
 // ============================================================================
+export type StoryLegendSection = { dc: number; skill: string; content: string; is_revealed: boolean };
+
 export async function createLoreEntry(formData: {
-  campaign_id: string;
+  campaign_id?: string;
+  world_id?: string;
   name: string;
   type: string;
   parent_id?: string | null;
@@ -26,55 +52,109 @@ export async function createLoreEntry(formData: {
   additional_images?: Array<{ url: string; description: string }> | null;
   description?: string;
   gm_notes?: string;
-  is_revealed?: boolean;
+  allow_pc_origin?: boolean;
+  stories_and_legends?: StoryLegendSection[] | null;
+  /** Verknüpfte Religionen (world_lore.religion_ids) */
+  religion_ids?: string[] | null;
+  /** Verknüpfte Sprachen (world_lore.language_ids) */
+  language_ids?: string[] | null;
+  /** Verknüpfte Rassen (world_lore.race_ids) – primär für Kulturen */
+  race_ids?: string[] | null;
+  /** Zugeordnete Kultur (world_lore.culture_id) – primär für Orte/Regionen */
+  culture_id?: string | null;
+  /** Unterarten / Unterrassen (world_lore.race_subtypes) */
+  race_subtypes?: string | null;
+  /** Besondere Merkmale (world_lore.race_traits) */
+  race_traits?: string | null;
 }) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. GM Check
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
-    .eq("id", formData.campaign_id)
-    .single();
+  let worldId: string;
+  let campaignId: string | null = formData.campaign_id || null;
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
-
-  if (!campaign || campaign.gm_id !== user.id) {
-    throw new Error("Nur der GM kann Lore-Einträge erstellen.");
+  if (formData.world_id) {
+    const { data: world } = await (supabase.from("worlds") as any)
+      .select("id, gm_id")
+      .eq("id", formData.world_id)
+      .single();
+    if (!world || (world as { gm_id: string }).gm_id !== user.id) {
+      throw new Error("Nur der GM dieser Welt kann Lore erstellen.");
+    }
+    worldId = formData.world_id;
+  } else if (formData.campaign_id) {
+    const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+      .select("id, gm_id, world_id")
+      .eq("id", formData.campaign_id)
+      .single();
+    const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
+    if (!campaign || campaign.gm_id !== user.id) {
+      throw new Error("Nur der GM kann Lore-Einträge erstellen.");
+    }
+    if (!campaign.world_id) {
+      throw new Error("Diese Kampagne hat keine Basis-Welt. Bitte Welt in den Kampagnen-Einstellungen zuweisen.");
+    }
+    worldId = campaign.world_id;
+  } else {
+    throw new Error("Entweder campaign_id oder world_id angeben.");
   }
 
-  // 3. Get world_id for this campaign
-  // IMPORTANT: Every lore entry MUST have a world_id, even if parent_id is null (world root level)
-  const { data: world } = await (supabase.from("worlds") as any)
-    .select("id")
-    .eq("campaign_id", formData.campaign_id)
-    .single();
+  const additionalImages = normalizeAdditionalImages(formData.additional_images);
 
-  if (!world) {
-    throw new Error("Für diese Kampagne existiert noch keine Welt. Bitte erstelle zuerst eine Welt.");
+  const insertPayload: Record<string, unknown> = {
+    world_id: worldId,
+    name: formData.name,
+    type: formData.type,
+    parent_id: formData.parent_id || null,
+    image_url: formData.image_url || null,
+    additional_images: additionalImages,
+    description: formData.description || null,
+    gm_notes: formData.gm_notes || null,
+    allow_pc_origin: formData.allow_pc_origin ?? false,
+  };
+  if (Array.isArray(formData.religion_ids)) {
+    insertPayload.religion_ids = formData.religion_ids;
+  }
+  if (Array.isArray(formData.language_ids)) {
+    insertPayload.language_ids = formData.language_ids;
+  }
+  if (Array.isArray(formData.race_ids)) {
+    insertPayload.race_ids = formData.race_ids;
+  }
+  if (formData.culture_id !== undefined) {
+    insertPayload.culture_id = formData.culture_id || null;
+  }
+  if (formData.race_subtypes !== undefined) {
+    insertPayload.race_subtypes = formData.race_subtypes || null;
+  }
+  if (formData.race_traits !== undefined) {
+    insertPayload.race_traits = formData.race_traits || null;
   }
 
-  // 4. Insert Lore Entry
-  // Note: world_id is ALWAYS set, even when parent_id is null (entry is at world root level)
+  // Für Rassen: Sprachen aus verknüpfter Kultur erben, falls keine explizit gesetzt.
+  if (
+    formData.type === "Rasse" &&
+    insertPayload.culture_id &&
+    insertPayload.language_ids === undefined
+  ) {
+    const supabase = await createClient();
+    const { data: cultureRow } = await (supabase.from("world_lore") as any)
+      .select("language_ids")
+      .eq("id", insertPayload.culture_id)
+      .maybeSingle();
+    if (cultureRow && (cultureRow as any).language_ids) {
+      insertPayload.language_ids = (cultureRow as any).language_ids;
+    }
+  }
+  if (formData.stories_and_legends != null && Array.isArray(formData.stories_and_legends)) {
+    insertPayload.stories_and_legends = formData.stories_and_legends;
+  }
   const { data: loreEntry, error } = await (supabase.from("world_lore") as any)
-    .insert({
-      campaign_id: formData.campaign_id,
-      world_id: world.id, // ALWAYS set - required for all entries
-      name: formData.name,
-      type: formData.type,
-      parent_id: formData.parent_id || null, // null = world root level
-      image_url: formData.image_url || null,
-      additional_images: formData.additional_images || null,
-      description: formData.description || null,
-      gm_notes: formData.gm_notes || null,
-      is_revealed: formData.is_revealed ?? false,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
@@ -83,13 +163,13 @@ export async function createLoreEntry(formData: {
     throw new Error(error.message);
   }
 
-  // 4. If this is a geographical location type, also insert into locations table
-  const geographicalTypes = ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"];
-  if (geographicalTypes.includes(formData.type)) {
+  // 4. If this is a location type, also insert into locations table
+  const { isLocationType } = await import("@/src/lib/lore-types");
+  if (isLocationType(formData.type)) {
     const { error: locationError } = await (supabase.from("locations") as any)
       .insert({
-        id: loreEntry.id, // Use same ID as world_lore entry
-        campaign_id: formData.campaign_id,
+        id: loreEntry.id,
+        world_id: worldId,
         name: formData.name,
         type: formData.type,
         description: formData.description || null,
@@ -105,7 +185,9 @@ export async function createLoreEntry(formData: {
     }
   }
 
-  revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+  if (campaignId) revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath("/dashboard/worlds");
+  revalidatePath("/dashboard");
   return loreEntry;
 }
 
@@ -122,7 +204,13 @@ export async function updateLoreEntry(
     additional_images?: Array<{ url: string; description: string }> | null;
     description?: string;
     gm_notes?: string;
-    is_revealed?: boolean;
+    stories_and_legends?: StoryLegendSection[] | null;
+    religion_ids?: string[] | null;
+    language_ids?: string[] | null;
+    race_ids?: string[] | null;
+    culture_id?: string | null;
+    race_subtypes?: string | null;
+    race_traits?: string | null;
   }
 ) {
   const supabase = await createClient();
@@ -133,17 +221,17 @@ export async function updateLoreEntry(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore Entry to verify GM ownership and get current type
+  // 2. Fetch Lore Entry and verify GM ownership via world
   const { data: lore } = await (supabase.from("world_lore") as any)
-    .select("campaign_id, type, campaigns!inner(gm_id)")
+    .select("world_id, type, worlds!inner(gm_id)")
     .eq("id", loreId)
     .single();
 
   if (!lore) throw new Error("Lore-Eintrag nicht gefunden.");
 
-  const campaigns = lore.campaigns as any;
-  if (campaigns.gm_id !== user.id) {
-    throw new Error("Nur der GM kann Lore-Einträge bearbeiten.");
+  const worlds = lore.worlds as { gm_id: string } | undefined;
+  if (!worlds || worlds.gm_id !== user.id) {
+    throw new Error("Nur der GM der Welt kann Lore-Einträge bearbeiten.");
   }
 
   // 3. Prevent circular references (if changing parent)
@@ -151,9 +239,13 @@ export async function updateLoreEntry(
     throw new Error("Ein Eintrag kann nicht sein eigenes Elternelement sein.");
   }
 
-  // 4. Update world_lore
+  const updatePayload: Record<string, unknown> = { ...updates };
+  if ("additional_images" in updates) {
+    updatePayload.additional_images = normalizeAdditionalImages(updates.additional_images);
+  }
+
   const { error } = await (supabase.from("world_lore") as any)
-    .update(updates)
+    .update(updatePayload)
     .eq("id", loreId);
 
   if (error) {
@@ -161,10 +253,10 @@ export async function updateLoreEntry(
     throw new Error(error.message);
   }
 
-  // 5. Sync to locations table if this is a geographical type
-  const geographicalTypes = ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"];
+  // 5. Sync to locations table if this is a location type
+  const { isLocationType } = await import("@/src/lib/lore-types");
   const currentType = updates.type || lore.type;
-  if (geographicalTypes.includes(currentType)) {
+  if (isLocationType(currentType)) {
     const locationUpdates: any = {};
     if (updates.name !== undefined) locationUpdates.name = updates.name;
     if (updates.type !== undefined) locationUpdates.type = updates.type;
@@ -185,7 +277,8 @@ export async function updateLoreEntry(
     }
   }
 
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}`);
+  revalidatePath("/dashboard/worlds");
+  revalidatePath("/dashboard");
 }
 
 // ============================================================================
@@ -201,7 +294,7 @@ export async function updateLoreAllowPcOrigin(loreId: string, allow: boolean) {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: lore, error: fetchError } = await (supabase.from("world_lore") as any)
-    .select("id, campaign_id, allow_pc_origin, campaigns!inner(gm_id)")
+    .select("id, world_id, allow_pc_origin, worlds!inner(gm_id)")
     .eq("id", loreId)
     .single();
 
@@ -210,9 +303,9 @@ export async function updateLoreAllowPcOrigin(loreId: string, allow: boolean) {
     throw new Error("Lore-Eintrag nicht gefunden oder kein Zugriff.");
   }
   if (!lore) throw new Error("Lore-Eintrag nicht gefunden.");
-  const campaigns = lore.campaigns as any;
-  if (campaigns.gm_id !== user.id) {
-    throw new Error("Nur der GM kann die Onboarding-Einstellung ändern.");
+  const worlds = lore.worlds as { gm_id: string } | undefined;
+  if (!worlds || worlds.gm_id !== user.id) {
+    throw new Error("Nur der GM der Welt kann die Onboarding-Einstellung ändern.");
   }
 
   const { data: updated, error } = await (supabase.from("world_lore") as any)
@@ -229,7 +322,8 @@ export async function updateLoreAllowPcOrigin(loreId: string, allow: boolean) {
     console.error("[updateLoreAllowPcOrigin] Update nicht bestätigt:", { loreId, allow, updated });
     throw new Error("Update konnte nicht bestätigt werden. Bitte Seite neu laden und erneut versuchen.");
   }
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}`);
+  revalidatePath("/dashboard/worlds");
+  revalidatePath("/dashboard");
 }
 
 // ============================================================================
@@ -244,17 +338,17 @@ export async function deleteLoreEntry(loreId: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore Entry to verify GM ownership and get type
+  // 2. Fetch Lore Entry and verify GM ownership via world
   const { data: lore } = await (supabase.from("world_lore") as any)
-    .select("campaign_id, type, campaigns!inner(gm_id)")
+    .select("world_id, type, worlds!inner(gm_id)")
     .eq("id", loreId)
     .single();
 
   if (!lore) throw new Error("Lore-Eintrag nicht gefunden.");
 
-  const campaigns = lore.campaigns as any;
-  if (campaigns.gm_id !== user.id) {
-    throw new Error("Nur der GM kann Lore-Einträge löschen.");
+  const worlds = lore.worlds as { gm_id: string } | undefined;
+  if (!worlds || worlds.gm_id !== user.id) {
+    throw new Error("Nur der GM der Welt kann Lore-Einträge löschen.");
   }
 
   // 3. Check for children
@@ -268,16 +362,15 @@ export async function deleteLoreEntry(loreId: string) {
     );
   }
 
-  // 4. Delete from locations table first (if geographical type)
-  const geographicalTypes = ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"];
-  if (geographicalTypes.includes(lore.type)) {
+  // 4. Delete from locations table first (if location type)
+  const { isLocationType } = await import("@/src/lib/lore-types");
+  if (isLocationType(lore.type)) {
     const { error: locationDeleteError } = await (supabase.from("locations") as any)
       .delete()
       .eq("id", loreId);
 
     if (locationDeleteError) {
       console.error("⚠️ [deleteLoreEntry] Failed to delete from locations table:", locationDeleteError);
-      // Continue with world_lore deletion anyway
     } else {
       console.log("✅ [deleteLoreEntry] Location deleted from locations table:", loreId);
     }
@@ -291,92 +384,123 @@ export async function deleteLoreEntry(loreId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}`);
+  revalidatePath("/dashboard/worlds");
+  revalidatePath("/dashboard");
 }
 
 // ============================================================================
-// Toggle Reveal Status
+// Toggle Reveal Status (pro Kampagne via campaign_visibility)
 // ============================================================================
-export async function toggleLoreReveal(loreId: string, currentState: boolean) {
+export async function toggleLoreReveal(campaignId: string, loreId: string, currentRevealed: boolean) {
+  await setCampaignVisibility(campaignId, "lore", loreId, !currentRevealed);
+}
+
+// ============================================================================
+// Get All Lore Entries by World (GM-Zentrale: keine Kampagne, keine Filterung)
+// ============================================================================
+export async function getLoreEntriesByWorld(worldId: string) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore Entry to verify GM ownership
-  const { data: lore } = await (supabase.from("world_lore") as any)
-    .select("campaign_id, campaigns!inner(gm_id)")
-    .eq("id", loreId)
+  const { data: world } = await (supabase.from("worlds") as any)
+    .select("id, gm_id")
+    .eq("id", worldId)
     .single();
 
-  if (!lore) throw new Error("Lore-Eintrag nicht gefunden.");
-
-  const campaigns = lore.campaigns as any;
-  if (campaigns.gm_id !== user.id) {
-    throw new Error("Nur der GM kann die Sichtbarkeit ändern.");
+  if (!world || (world as { gm_id: string }).gm_id !== user.id) {
+    throw new Error("Nur der GM dieser Welt kann Lore laden.");
   }
 
-  // 3. Toggle
-  const { error } = await (supabase.from("world_lore") as any)
-    .update({ is_revealed: !currentState })
-    .eq("id", loreId);
+  const { data: lore, error } = await (supabase.from("world_lore") as any)
+    .select("*")
+    .eq("world_id", worldId)
+    .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Toggle Lore Reveal Error:", error);
-    throw new Error(error.message);
+    console.error("Fetch Lore Entries by World Error:", error);
+    return [];
   }
 
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}`);
+  return (lore || []).map((entry: any) => ({
+    ...entry,
+    is_revealed: false,
+  }));
 }
 
 // ============================================================================
-// Get All Lore Entries (Flat list for tree reconstruction in UI)
+// Get All Lore Entries (by campaign: world_id from campaign; GM/Player access)
 // ============================================================================
 export async function getLoreEntries(campaignId: string) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch all lore entries for this campaign
-  // RLS will filter based on user role (GM sees all, Player sees only revealed)
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
+  if (!campaign) throw new Error("Kampagne nicht gefunden.");
+  if (!campaign.world_id) return [];
+
+  const isGM = campaign.gm_id === user.id;
+  if (!isGM) {
+    const { data: member } = await (supabase.from("campaign_members") as any)
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", user.id)
+      .in("status", ["Accepted", "Active", "Drafting", "In_Review"])
+      .maybeSingle();
+    if (!member) return [];
+  }
+
   const { data: lore, error } = await (supabase.from("world_lore") as any)
     .select("*")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", campaign.world_id)
     .order("created_at", { ascending: true });
 
   if (error) {
     console.error("Fetch Lore Entries Error:", error);
+    console.error("Fehlerinhalt:", JSON.stringify(error, null, 2));
     return [];
   }
 
-  // 3. Fetch user's favorites
+  const visibility = await getVisibilityForCampaign(campaignId, "lore");
+  let list = (lore || []).map((entry: any) => ({
+    ...entry,
+    is_revealed: visibility[entry.id] ?? false,
+  }));
+
+  if (!isGM) {
+    list = list.filter((e: any) => e.is_revealed);
+  }
+
+  // Fetch user's favorites
   const { data: favorites } = await (supabase.from("lore_favorites") as any)
     .select("lore_id")
     .eq("user_id", user.id);
 
   const favoriteIds = new Set((favorites || []).map((f: { lore_id: string }) => f.lore_id));
 
-  // 4. Fetch recent secrets for each lore entry (for UPDATE badge)
-  const loreIds = (lore || []).map((l: any) => l.id);
+  const loreIds = list.map((l: any) => l.id);
   const { data: recentSecrets } = await (supabase.from("secrets") as any)
     .select("entity_id, created_at")
     .eq("entity_type", "lore")
     .in("entity_id", loreIds)
-    .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()); // Last 48 hours
+    .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString());
 
   const loreWithRecentSecrets = new Set(
     (recentSecrets || []).map((s: { entity_id: string }) => s.entity_id)
   );
 
-  // 5. Enrich lore entries with favorite status and recent secret flag
-  const enrichedLore = (lore || []).map((entry: any) => {
+  const enrichedLore = list.map((entry: any) => {
     const hasRecentSecret = loreWithRecentSecrets.has(entry.id);
     const isNew = entry.created_at
       ? (Date.now() - new Date(entry.created_at).getTime()) / (1000 * 60 * 60) < 48
@@ -385,33 +509,55 @@ export async function getLoreEntries(campaignId: string) {
     return {
       ...entry,
       is_favorite: favoriteIds.has(entry.id),
-      has_recent_secret: hasRecentSecret && !isNew, // Only show UPDATE if not NEW
+      has_recent_secret: hasRecentSecret && !isNew,
     };
   });
 
   return enrichedLore;
 }
 
-// Get Single Lore Entry by ID
+// Get Single Lore Entry by ID (Zugriff: GM der Welt oder Spieler in Kampagne mit dieser Welt)
 export async function getLoreById(loreId: string) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore Entry
   const { data: lore, error } = await (supabase.from("world_lore") as any)
     .select("*")
     .eq("id", loreId)
     .single();
 
-  if (error) {
+  if (error || !lore) {
     console.error("Fetch Lore Error:", error);
-    throw new Error(error.message || "Lore-Eintrag nicht gefunden.");
+    throw new Error(error?.message || "Lore-Eintrag nicht gefunden.");
   }
+
+  // GM-Check separat (worlds-Tabelle hat eigene RLS)
+  const { data: worldRow } = await (supabase.from("worlds") as any)
+    .select("gm_id")
+    .eq("id", lore.world_id)
+    .maybeSingle();
+
+  if (worldRow && (worldRow as any).gm_id === user.id) {
+    return lore;
+  }
+
+  // Spieler: Mitgliedschaft prüfen
+  const { data: campaignsWithWorld } = await (supabase.from("campaigns") as any)
+    .select("id")
+    .eq("world_id", lore.world_id);
+  const campaignIds = (campaignsWithWorld || []).map((c: { id: string }) => c.id);
+  if (campaignIds.length === 0) throw new Error("Lore-Eintrag nicht gefunden.");
+  const { data: membership } = await (supabase.from("campaign_members") as any)
+    .select("id")
+    .eq("user_id", user.id)
+    .in("campaign_id", campaignIds)
+    .in("status", ["Accepted", "Active", "Drafting", "In_Review"])
+    .maybeSingle();
+  if (!membership) throw new Error("Kein Zugriff auf diesen Lore-Eintrag.");
 
   return lore;
 }
@@ -419,8 +565,6 @@ export async function getLoreById(loreId: string) {
 // ============================================================================
 // Get Child Locations for Onboarding (Gebäude/Institutionen unter einem Ort)
 // ============================================================================
-const BUILDING_LOCATION_TYPES = ["Gebäude", "Tempel", "Dungeon", "Akademie", "Markt", "Laden"];
-
 export async function getChildLocationsForOnboarding(campaignId: string, parentId: string) {
   const supabase = await createClient();
 
@@ -429,12 +573,19 @@ export async function getChildLocationsForOnboarding(campaignId: string, parentI
   } = await supabase.auth.getUser();
   if (!user) return [];
 
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaign = campaignRaw as { world_id: string | null } | null;
+  if (!campaign?.world_id) return [];
+
   const { data: children, error } = await (supabase.from("world_lore") as any)
     .select("id, name, type")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", campaign.world_id)
     .eq("parent_id", parentId)
     .eq("allow_pc_origin", true)
-    .in("type", BUILDING_LOCATION_TYPES)
+    .in("type", [...BUILDING_LOCATION_TYPES])
     .order("name", { ascending: true });
 
   if (error) {
@@ -446,26 +597,24 @@ export async function getChildLocationsForOnboarding(campaignId: string, parentI
 
 // ============================================================================
 // Get Child Lore Entries (Sub-regions/places)
+// Optional campaignId: wenn gesetzt, wird is_revealed aus campaign_visibility gemerged.
 // ============================================================================
-export async function getChildLoreEntries(parentId: string) {
+export async function getChildLoreEntries(parentId: string, campaignId?: string) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch user's favorite lore IDs
   const { data: favorites } = await (supabase.from("lore_favorites") as any)
     .select("lore_id")
     .eq("user_id", user.id);
 
   const favoriteIds = new Set((favorites || []).map((f: { lore_id: string }) => f.lore_id));
 
-  // 3. Fetch Child Lore Entries
   const { data: children, error } = await (supabase.from("world_lore") as any)
-    .select("id, name, type, image_url, is_revealed, created_at, published_at")
+    .select("id, name, type, image_url, created_at, published_at")
     .eq("parent_id", parentId)
     .order("name", { ascending: true });
 
@@ -474,8 +623,18 @@ export async function getChildLoreEntries(parentId: string) {
     return [];
   }
 
-  // 4. Fetch recent secret discoveries for child entries
-  const childIds = (children || []).map((c: any) => c.id);
+  let list = (children || []) as any[];
+  if (campaignId) {
+    const visibility = await getVisibilityForCampaign(campaignId, "lore");
+    list = list.map((entry: any) => ({
+      ...entry,
+      is_revealed: visibility[entry.id] ?? false,
+    }));
+  } else {
+    list = list.map((entry: any) => ({ ...entry, is_revealed: false }));
+  }
+
+  const childIds = list.map((c: any) => c.id);
   let latestSecretDiscoveredAt: Record<string, string> = {};
 
   if (childIds.length > 0) {
@@ -495,8 +654,7 @@ export async function getChildLoreEntries(parentId: string) {
     }
   }
 
-  // 5. Enrich child entries with favorite status and recent secret flag
-  return (children || []).map((entry: any) => {
+  return list.map((entry: any) => {
     const hasRecentSecret = latestSecretDiscoveredAt[entry.id]
       ? (Date.now() - new Date(latestSecretDiscoveredAt[entry.id]).getTime()) / (1000 * 60 * 60) < 48
       : false;
@@ -514,6 +672,90 @@ export async function getChildLoreEntries(parentId: string) {
 }
 
 // ============================================================================
+// Get Lore Entries for Parent Selection (by world - für World Lore Detail)
+// ============================================================================
+export async function getLoreEntriesForParentByWorld(worldId: string, excludeId?: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: world } = await (supabase.from("worlds") as any)
+    .select("id, gm_id")
+    .eq("id", worldId)
+    .single();
+  if (!world || (world as { gm_id: string }).gm_id !== user.id) return [];
+
+  let query = (supabase.from("world_lore") as any)
+    .select("id, name, type")
+    .eq("world_id", worldId)
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (excludeId) query = query.neq("id", excludeId);
+
+  const { data: lore, error } = await query;
+  if (error) {
+    console.error("getLoreEntriesForParentByWorld Error:", error);
+    return [];
+  }
+
+  if (excludeId) {
+    const descendants: string[] = [];
+    let currentLevel = [excludeId];
+    while (currentLevel.length > 0) {
+      const { data: children } = await (supabase.from("world_lore") as any)
+        .select("id")
+        .in("parent_id", currentLevel);
+      if (children?.length) {
+        const ids = (children as any[]).map((c: any) => c.id);
+        descendants.push(...ids);
+        currentLevel = ids;
+      } else break;
+    }
+    if (descendants.length) {
+      return (lore || []).filter((l: any) => !descendants.includes(l.id));
+    }
+  }
+  return lore || [];
+}
+
+// ============================================================================
+// Get Orphaned Lore Entries (by world - für World Lore Detail)
+// ============================================================================
+export async function getOrphanedLoreEntriesByWorld(worldId: string, excludeId?: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: world } = await (supabase.from("worlds") as any)
+    .select("id, gm_id")
+    .eq("id", worldId)
+    .single();
+  if (!world || (world as { gm_id: string }).gm_id !== user.id) return [];
+
+  let query = (supabase.from("world_lore") as any)
+    .select("id, name, type, image_url")
+    .eq("world_id", worldId)
+    .is("parent_id", null)
+    .order("name", { ascending: true });
+
+  if (excludeId) query = query.neq("id", excludeId);
+
+  const { data: lore, error } = await query;
+  if (error) {
+    console.error("getOrphanedLoreEntriesByWorld Error:", error);
+    return [];
+  }
+  return lore ?? [];
+}
+
+// ============================================================================
 // Get Lore Entries for Parent Selection (all types, excluding current entry and its children)
 // ============================================================================
 export async function getLoreEntriesForParent(campaignId: string, excludeId?: string) {
@@ -525,10 +767,16 @@ export async function getLoreEntriesForParent(campaignId: string, excludeId?: st
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch all Lore Entries (excluding current entry)
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaign = campaignRaw as { world_id: string | null } | null;
+  if (!campaign?.world_id) return [];
+
   let query = (supabase.from("world_lore") as any)
     .select("id, name, type")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", campaign.world_id)
     .order("type", { ascending: true })
     .order("name", { ascending: true });
 
@@ -582,10 +830,16 @@ export async function getOrphanedLoreEntries(campaignId: string, excludeId?: str
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore Entries without parent_id (orphaned)
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaign = campaignRaw as { world_id: string | null } | null;
+  if (!campaign?.world_id) return [];
+
   let query = (supabase.from("world_lore") as any)
     .select("id, name, type, image_url")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", campaign.world_id)
     .is("parent_id", null)
     .order("name", { ascending: true });
 
@@ -648,9 +902,8 @@ export async function toggleLoreFavorite(loreId: string, isFavorite: boolean) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch Lore to get campaign_id
   const { data: lore } = await (supabase.from("world_lore") as any)
-    .select("campaign_id")
+    .select("id")
     .eq("id", loreId)
     .single();
 
@@ -681,8 +934,8 @@ export async function toggleLoreFavorite(loreId: string, isFavorite: boolean) {
     }
   }
 
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}?tab=lore`);
-  revalidatePath(`/dashboard/campaigns/${lore.campaign_id}/lore/${loreId}`);
+  revalidatePath("/dashboard/worlds");
+  revalidatePath("/dashboard");
 }
 
 

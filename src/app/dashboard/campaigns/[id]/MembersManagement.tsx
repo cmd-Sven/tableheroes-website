@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Check,
   X,
@@ -10,14 +11,19 @@ import {
   Eye,
   Settings,
   Award,
+  Info,
 } from "lucide-react";
 import {
   acceptApplication,
   rejectApplication,
   removeMember,
   updateMemberRank,
+  repairMemberCharacterLink,
 } from "./actions";
-import { approveCharacter, rejectCharacter } from "./character-actions";
+import {
+  approveCharacter,
+  rejectCharacter,
+} from "./character-actions";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { IntegrationReportModal } from "./IntegrationReportModal";
@@ -29,7 +35,8 @@ import { getAchievementImageSrc } from "@/src/types/achievement";
 import { CharacterApplicationForm } from "@/src/components/dashboard/CharacterApplicationForm";
 import { GMCharacterReview } from "@/src/components/dashboard/GMCharacterReview";
 import { CharacterChangesView } from "@/src/components/dashboard/CharacterChangesView";
-import { GMCharacterEditor } from "@/src/components/dashboard/campaigns/GMCharacterEditor";
+import { MemberDetailManager } from "@/src/components/campaigns/MemberDetailManager";
+import { getMemberDetails, type MemberDetailData } from "@/src/lib/actions/point-actions";
 
 type Member = {
   id: string;
@@ -97,8 +104,6 @@ export function MembersManagement({
     useState<Member | null>(null);
   const [selectedCharacterForChanges, setSelectedCharacterForChanges] =
     useState<Member | null>(null);
-  const [selectedCharacterForEdit, setSelectedCharacterForEdit] =
-    useState<Member | null>(null);
   const [selectedMemberForAchievement, setSelectedMemberForAchievement] =
     useState<Member | null>(null);
   const [allAchievements, setAllAchievements] = useState<
@@ -114,6 +119,9 @@ export function MembersManagement({
   const [achievementSearch, setAchievementSearch] = useState("");
   const [loadingAchievements, setLoadingAchievements] = useState(false);
   const [awardingAchievement, setAwardingAchievement] = useState(false);
+  const [selectedMemberForDetails, setSelectedMemberForDetails] =
+    useState<MemberDetailData | null>(null);
+  const [loadingMemberDetails, setLoadingMemberDetails] = useState(false);
 
   const RANK_TITLES = [
     "Rang 1",
@@ -228,10 +236,26 @@ export function MembersManagement({
     }
   }
 
+  async function handleOpenMemberDetails(userId: string) {
+    setLoadingMemberDetails(true);
+    try {
+      const result = await getMemberDetails(userId, campaignId);
+      if (result.success && result.data) {
+        setSelectedMemberForDetails(result.data);
+      } else {
+        toast.error(result.error ?? "Fehler beim Laden der Details.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler beim Laden.");
+    } finally {
+      setLoadingMemberDetails(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card p-6">
       <h2 className="font-barlow font-bold text-xl text-white uppercase mb-6 border-b border-hero-dark pb-2">
-        Mitglieder & Bewerbungen
+        Teilnehmer & Bewerbungen
       </h2>
 
       {/* Pending Applications */}
@@ -517,18 +541,49 @@ export function MembersManagement({
                       >
                         <Award className="h-5 w-5" />
                       </button>
+                      <button
+                        onClick={() => handleOpenMemberDetails(member.user_id)}
+                        disabled={isProcessing || loadingMemberDetails}
+                        className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-hero-vibrant transition-colors disabled:opacity-50"
+                        title="Spieler-Details"
+                      >
+                        <Info className="h-5 w-5" />
+                      </button>
                     </>
                   )}
-                  {isGM && member.character && member.character.id && (
-                    <button
-                      onClick={() => setSelectedCharacterForEdit(member)}
-                      disabled={isProcessing}
-                      className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors disabled:opacity-50"
-                      title="Charakter verwalten"
-                    >
-                      <Settings className="h-5 w-5" />
-                    </button>
-                  )}
+                  {isGM &&
+                    (member.character?.id ? (
+                      <Link
+                        href={`/dashboard/campaigns/${campaignId}/characters/${member.character.id}`}
+                        className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors"
+                        title="Charakter verwalten"
+                      >
+                        <Settings className="h-5 w-5" />
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          if (isProcessing) return;
+                          setIsProcessing(true);
+                          try {
+                            const res = await repairMemberCharacterLink(campaignId, member.user_id, member.id);
+                            if (res?.success) {
+                              toast.success("Charakter verknüpft. Seite wird neu geladen.");
+                              window.location.reload();
+                            }
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Fehler");
+                          } finally {
+                            setIsProcessing(false);
+                          }
+                        }}
+                        disabled={isProcessing}
+                        className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors disabled:opacity-50"
+                        title="Charakter verwalten / Ruf einstellen"
+                      >
+                        <Settings className="h-5 w-5" />
+                      </button>
+                    ))}
                   <button
                     onClick={() =>
                       handleRemove(member.id, member.user.username)
@@ -611,19 +666,6 @@ export function MembersManagement({
           suggestedLocations={integrationReport.suggestedLocations}
         />
       )}
-
-      {/* GM Character Editor Modal */}
-      {isGM &&
-        selectedCharacterForEdit &&
-        selectedCharacterForEdit.character && (
-          <GMCharacterEditor
-            isOpen={!!selectedCharacterForEdit}
-            onClose={() => setSelectedCharacterForEdit(null)}
-            character={selectedCharacterForEdit.character as any}
-            campaignId={campaignId}
-            npcs={npcs as any}
-          />
-        )}
 
       {/* GM: Achievement verleihen Modal */}
       {isGM && selectedMemberForAchievement && (
@@ -741,6 +783,15 @@ export function MembersManagement({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Member Details Modal (GM) */}
+      {isGM && selectedMemberForDetails && (
+        <MemberDetailManager
+          member={selectedMemberForDetails}
+          campaignId={campaignId}
+          onClose={() => setSelectedMemberForDetails(null)}
+        />
       )}
     </div>
   );

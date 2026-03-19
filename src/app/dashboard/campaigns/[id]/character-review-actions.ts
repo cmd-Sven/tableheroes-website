@@ -164,7 +164,6 @@ export async function approveCharacter(characterId: string, campaignId: string) 
         type: "Location",
         parent_id: character.current_location_id,
         description: `Detail-Ort in ${parentLocation?.name || "unbekannter Region"}`,
-        is_revealed: false,
       })
       .select()
       .single();
@@ -203,7 +202,6 @@ export async function approveCharacter(characterId: string, campaignId: string) 
             name: person.name,
             title: person.relation,
             description: `Wichtige Person für ${character.name}`,
-            is_revealed: false,
           })
           .select()
           .single();
@@ -242,11 +240,13 @@ export async function approveCharacter(characterId: string, campaignId: string) 
     throw new Error(statusError.message);
   }
 
-  // Update campaign_members Status
+  // Update campaign_members: character_id + Status Approved
+  // WICHTIG: Nach user_id filtern, da character_id evtl. nie gesetzt wurde (z.B. bei submitCharacterApplication-Bug)
+  const userId = character.user_id;
   const { error: memberError } = await (supabase.from("campaign_members") as any)
-    .update({ status: "Approved" })
-    .eq("character_id", characterId)
-    .eq("campaign_id", campaignId);
+    .update({ character_id: characterId, status: "Approved" })
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId);
 
   if (memberError) {
     console.error("Update Member Status Error:", memberError);
@@ -300,7 +300,6 @@ export async function acceptProposedChanges(characterId: string, campaignId: str
         type: "Location",
         parent_id: character.current_location_id,
         description: `Detail-Ort in ${parentLocation?.name || "unbekannter Region"}`,
-        is_revealed: false,
       })
       .select()
       .single();
@@ -339,7 +338,6 @@ export async function acceptProposedChanges(characterId: string, campaignId: str
             name: person.name,
             title: person.relation,
             description: `Wichtige Person für ${character.name}`,
-            is_revealed: false,
           })
           .select()
           .single();
@@ -378,11 +376,12 @@ export async function acceptProposedChanges(characterId: string, campaignId: str
     throw new Error(error.message);
   }
 
-  // Update campaign_members Status
+  // Update campaign_members: character_id + Status Approved (nach user_id filtern)
+  const userId = character.user_id;
   const { error: memberError } = await (supabase.from("campaign_members") as any)
-    .update({ status: "Approved" })
-    .eq("character_id", characterId)
-    .eq("campaign_id", campaignId);
+    .update({ character_id: characterId, status: "Approved" })
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId);
 
   if (memberError) {
     console.error("Update Member Status Error:", memberError);

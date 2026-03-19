@@ -15,7 +15,6 @@ import {
 import { ApplyButton } from "./ApplyButton";
 import { CampaignMembershipSchema, CampaignSchema } from "@/src/lib/validations/schemas";
 import { z } from "zod";
-
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -39,13 +38,9 @@ export default async function PublicCampaignPage({ params }: Props) {
 
   const supabase = await createClient();
 
-  // Fetch Campaign (only if published)
-  const { data: campaignRaw, error } = await supabase
-    .from("campaigns")
-    .select(`
-      *,
-      gm:users!campaigns_gm_id_fkey(username, avatar_url)
-    `)
+  // Fetch Campaign (only if published) — OHNE users-Join (FK zeigt auf auth.users)
+  const { data: campaignRaw, error } = await (supabase.from("campaigns") as any)
+    .select("*")
     .eq("id", id)
     .eq("is_published", true)
     .single();
@@ -54,10 +49,25 @@ export default async function PublicCampaignPage({ params }: Props) {
     notFound();
   }
 
+  // GM-Daten separat laden (public.users)
+  let gmData: { username: string | null; avatar_url: string | null } | null = null;
+  if (campaignRaw.gm_id) {
+    const { data: gmRow } = await (supabase.from("users") as any)
+      .select("username, avatar_url")
+      .eq("id", campaignRaw.gm_id)
+      .single();
+    gmData = gmRow ?? null;
+  }
+
+  const campaignWithGm = { ...campaignRaw, gm: gmData };
+
   // Validierung mit Zod (erweitertes Schema für Public Page mit zusätzlichen Feldern)
   const PublicCampaignSchema = CampaignSchema.extend({
     banner_url: z.string().url().or(z.literal("")).optional().nullable(),
     frequency: z.string().optional().nullable(),
+    schedule_day: z.number().min(0).max(6).optional().nullable(),
+    schedule_time: z.string().optional().nullable(),
+    schedule_interval: z.enum(["weekly", "biweekly", "monthly"]).optional().nullable(),
     mode: z.string().optional().nullable(),
     looking_for: z.string().optional().nullable(),
     house_rules: z.string().optional().nullable(),
@@ -67,7 +77,10 @@ export default async function PublicCampaignPage({ params }: Props) {
     }).nullable().optional(),
   });
 
-  const campaignParsed = PublicCampaignSchema.safeParse(campaignRaw);
+  const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+  const INTERVAL_LABELS: Record<string, string> = { weekly: "Jeden", biweekly: "Alle 2 Wochen,", monthly: "Monatlich," };
+
+  const campaignParsed = PublicCampaignSchema.safeParse(campaignWithGm);
   
   if (!campaignParsed.success) {
     console.error("Campaign Validation Error:", campaignParsed.error.format());
@@ -76,37 +89,45 @@ export default async function PublicCampaignPage({ params }: Props) {
 
   const campaign = campaignParsed.data;
 
-  // Fetch Accepted Members with their Characters
-  const { data: acceptedMembers, error: membersError } = await supabase
-    .from("campaign_members")
-    .select(`
-      id,
-      users (
-        id,
-        username,
-        avatar_url
-      ),
-      characters (
-        id,
-        name,
-        class,
-        race,
-        level,
-        avatar_url
-      )
-    `)
+  // Fetch Accepted Members (ohne deep joins – FK zu characters fehlt)
+  const { data: membersRaw } = await (supabase.from("campaign_members") as any)
+    .select("id, user_id, character_id")
     .eq("campaign_id", id)
     .eq("status", "Accepted")
     .order("created_at", { ascending: true });
 
-  if (membersError) {
-    console.error("Fetch Accepted Members Error:", membersError);
+  const memberRows = (membersRaw as any[]) ?? [];
+
+  // User- und Character-Daten separat laden
+  const memberUserIds = [...new Set(memberRows.map((m: any) => m.user_id).filter(Boolean))] as string[];
+  const memberCharIds = [...new Set(memberRows.map((m: any) => m.character_id).filter(Boolean))] as string[];
+
+  const userMap = new Map<string, { id: string; username: string | null; avatar_url: string | null }>();
+  const charMap = new Map<string, { id: string; name: string | null; class: string | null; race: string | null; level: number | null; avatar_url: string | null }>();
+
+  if (memberUserIds.length > 0) {
+    const { data: usersData } = await (supabase.from("users") as any)
+      .select("id, username, avatar_url")
+      .in("id", memberUserIds);
+    for (const u of (usersData as any[]) ?? []) {
+      userMap.set(u.id, u);
+    }
   }
 
-  // Debug logging in development
-  if (process.env.NODE_ENV === "development" && acceptedMembers) {
-    console.log("🎭 Public Page - Accepted Members:", acceptedMembers);
+  if (memberCharIds.length > 0) {
+    const { data: charsData } = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, avatar_url")
+      .in("id", memberCharIds);
+    for (const c of (charsData as any[]) ?? []) {
+      charMap.set(c.id, c);
+    }
   }
+
+  const acceptedMembers = memberRows.map((m: any) => ({
+    id: m.id,
+    users: userMap.get(m.user_id) ?? null,
+    characters: m.character_id ? charMap.get(m.character_id) ?? null : null,
+  }));
 
   // Fetch Next Session
   const { data: sessionsRaw } = await supabase
@@ -134,42 +155,19 @@ export default async function PublicCampaignPage({ params }: Props) {
   let characterStatus: string | null = null;
   
   if (user) {
-    const { data: membershipRaw } = await supabase
-      .from("campaign_members")
-      .select("status, character_id, characters(name, status)")
+    // Membership OHNE characters-Join (FK fehlt) laden
+    const { data: membershipRaw } = await (supabase.from("campaign_members") as any)
+      .select("status, character_id")
       .eq("campaign_id", id)
       .eq("user_id", user.id)
       .single();
 
-    // Type-Cast hinzufügen, um 'never' zu verhindern
     const typedMembership = membershipRaw as { 
       status: string; 
       character_id: string | null;
-      characters: { name: string | null; status: string | null } | null 
     } | null;
 
     if (typedMembership) {
-      // Zentrale Validierung des Membership-Kerns (ohne Join-Felder)
-      const parsed = CampaignMembershipSchema.pick({
-        campaign_id: true,
-        user_id: true,
-        status: true,
-        character_id: true,
-        role: true,
-        application_message: true,
-      }).safeParse({
-        campaign_id: id,
-        user_id: user.id,
-        status: typedMembership.status,
-        character_id: typedMembership.character_id,
-        role: "Player",
-        application_message: null,
-      });
-
-      if (!parsed.success) {
-        console.error("Membership validation failed on public page:", parsed.error.flatten());
-      }
-
       const status = typedMembership.status;
       if (status === "Accepted") {
         membershipStatus = "accepted";
@@ -186,42 +184,19 @@ export default async function PublicCampaignPage({ params }: Props) {
       }
 
       userHasCharacter = !!typedMembership.character_id;
-      if (typedMembership.characters && typeof typedMembership.characters === "object" && "name" in typedMembership.characters) {
-        userCharacterName = typedMembership.characters.name ?? null;
-        characterStatus = typedMembership.characters.status ?? null;
+
+      // Character-Daten separat laden wenn vorhanden
+      if (typedMembership.character_id) {
+        const { data: charRow } = await (supabase.from("characters") as any)
+          .select("name, status")
+          .eq("id", typedMembership.character_id)
+          .single();
+        if (charRow) {
+          userCharacterName = (charRow as any).name ?? null;
+          characterStatus = (charRow as any).status ?? null;
+        }
       }
     }
-  }
-
-  // 3. Fetch revealed data for Character Creator (only if user is accepted)
-  let revealedFactions: any[] = [];
-  let revealedLocations: any[] = [];
-  let revealedNPCs: any[] = [];
-
-  if (user && membershipStatus === "accepted") {
-    // Fetch factions
-    const { data: factions } = await supabase
-      .from("factions")
-      .select("id, name, type, is_revealed")
-      .eq("campaign_id", id)
-      .eq("is_revealed", true);
-    revealedFactions = factions || [];
-
-    // Fetch locations
-    const { data: locations } = await supabase
-      .from("world_lore")
-      .select("id, name, type, is_revealed")
-      .eq("campaign_id", id)
-      .eq("is_revealed", true);
-    revealedLocations = locations || [];
-
-    // Fetch NPCs
-    const { data: npcs } = await supabase
-      .from("npcs")
-      .select("id, name, title, role, is_revealed")
-      .eq("campaign_id", id)
-      .eq("is_revealed", true);
-    revealedNPCs = npcs || [];
   }
 
   return (
@@ -278,12 +253,21 @@ export default async function PublicCampaignPage({ params }: Props) {
       <div className="border-b border-hero-dark bg-background-card/80 backdrop-blur">
         <div className="container mx-auto max-w-7xl px-6 py-4">
           <div className="flex flex-wrap items-center gap-6 text-sm">
-            {campaign.frequency && (
-              <div className="flex items-center gap-2 font-libre text-gray-300">
-                <Clock className="h-4 w-4 text-accent-gold" />
-                <span>{campaign.frequency}</span>
-              </div>
-            )}
+            {(() => {
+              const scheduleLabel =
+                campaign.schedule_interval &&
+                campaign.schedule_day !== null &&
+                campaign.schedule_day !== undefined &&
+                campaign.schedule_time
+                  ? `${INTERVAL_LABELS[campaign.schedule_interval] ?? ""} ${DAY_NAMES[campaign.schedule_day] ?? ""}, ${campaign.schedule_time.slice(0, 5)} Uhr`.trim()
+                  : campaign.frequency || null;
+              return scheduleLabel ? (
+                <div className="flex items-center gap-2 font-libre text-gray-300">
+                  <Clock className="h-4 w-4 text-accent-gold" />
+                  <span>{scheduleLabel}</span>
+                </div>
+              ) : null;
+            })()}
             <div className="flex items-center gap-2 font-libre text-gray-300">
               <MapPin className="h-4 w-4 text-accent-gold" />
               <span>{campaign.mode || "Online"}</span>
@@ -484,9 +468,6 @@ export default async function PublicCampaignPage({ params }: Props) {
                   userHasCharacter={userHasCharacter}
                   userCharacterName={userCharacterName}
                   characterStatus={characterStatus}
-                  factions={revealedFactions}
-                  locations={revealedLocations}
-                  npcs={revealedNPCs}
                 />
               ) : (
                 <Link

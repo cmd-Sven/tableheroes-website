@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import { togglePublishStatus, updateCampaignDetails } from "./actions";
 import { MembersManagement } from "./MembersManagement";
+import { GroupRewardForm } from "@/src/components/campaigns/GroupRewardForm";
 import { getNPCs } from "./npc-actions";
 import { getFactionsWithMembers } from "./factions-actions";
 import { getLoreEntries } from "./lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
 import { getQuests } from "./quest-actions";
 import { NPCsManagement } from "./NPCsManagement";
 import { FactionsManagement } from "./FactionsManagement";
@@ -26,13 +28,17 @@ import { CharacterCreatorButton } from "./CharacterCreatorButton";
 import { CharacterSheet } from "@/src/components/dashboard/campaigns/CharacterSheet";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
 import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
+import { CampaignScheduleForm } from "@/src/components/dashboard/campaigns/CampaignScheduleForm";
 import { getCampaignGalleryImages } from "./gallery-actions";
-import { getWorldByCampaign } from "./world-actions";
+import { getWorldByCampaign, getWorldsByGm } from "./world-actions";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 import { OnboardingSettings } from "@/src/components/dashboard/campaigns/OnboardingSettings";
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
 import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlider";
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
+import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
+import { getCharacterWizardLoreData } from "./character-actions";
+import { getCharacterFactionReputations } from "./reputation-actions";
 import type {
   DiscoveryItem,
   PartyMember,
@@ -42,6 +48,8 @@ type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function CampaignDetailPage({
   params,
@@ -109,21 +117,27 @@ export default async function CampaignDetailPage({
     isGM,
   });
 
-  // Fetch World for this campaign
-  const { data: worldRaw, error: worldError } = await (
-    supabase.from("worlds") as any
-  )
-    .select("*")
-    .eq("campaign_id", id)
-    .single();
+  // Welt über campaign.world_id (welt-zentrisch)
+  let world: any = null;
+  const campaignWorldId = (campaign as any).world_id;
+  if (campaignWorldId) {
+    const { data: worldRaw, error: worldError } = await (
+      supabase.from("worlds") as any
+    )
+      .select("*")
+      .eq("id", campaignWorldId)
+      .single();
+    if (worldError && worldError.code !== "PGRST116") {
+      console.error("Error fetching world:", worldError);
+    } else {
+      world = worldRaw;
+    }
+  }
 
-  const world = worldRaw as any;
-
-  // If no world exists (PGRST116 = no rows returned), world will be null
-  // This is expected behavior - we'll show the WorldRequiredBlocker
-  // Only treat as error if it's not a "no rows" error
-  if (worldError && worldError.code !== "PGRST116") {
-    console.error("Error fetching world:", worldError);
+  // Welten des GMs für Welt-Zuweisung (wenn Kampagne noch keine world_id hat)
+  let gmWorlds: { id: string; name: string; description: string | null }[] = [];
+  if (isGM && !world) {
+    gmWorlds = await getWorldsByGm(user.id);
   }
 
   // Check user's membership status (for non-GM users)
@@ -137,6 +151,7 @@ export default async function CampaignDetailPage({
     | "Pending" = "none";
   let userHasCharacter = false;
   let isAcceptedMember = false;
+  let isDeadOrArchived = false;
   let membership: any = null;
 
   if (!isGM) {
@@ -146,24 +161,30 @@ export default async function CampaignDetailPage({
     const { data: membershipData, error: membershipError } = await (
       supabase.from("campaign_members") as any
     )
-      .select("status, character_id, characters(status)")
+      .select("status, character_id")
       .eq("campaign_id", id)
       .eq("user_id", user.id)
       .single();
 
-    console.log("🔍 [DashboardPage] Membership Query Result:", {
-      membership: membershipData,
-      error: membershipError,
-    });
+    if (membershipError) {
+      console.error("🔍 [DashboardPage] Membership query error:", membershipError);
+    }
 
     if (membershipData) {
       membership = membershipData;
       userMembershipStatus = membership.status as any;
       userHasCharacter = !!membership.character_id;
 
-      // Check if character is Dead or Archived (allows new character creation)
-      const characterStatus = (membership.characters as any)?.status;
-      const isDeadOrArchived =
+      // Charakter-Status separat laden (kein Join – FK kann fehlen)
+      let characterStatus: string | null = null;
+      if (membership.character_id) {
+        const { data: charRow } = await (supabase.from("characters") as any)
+          .select("status")
+          .eq("id", membership.character_id)
+          .single();
+        characterStatus = (charRow as { status: string } | null)?.status ?? null;
+      }
+      isDeadOrArchived =
         characterStatus === "Dead" || characterStatus === "Archived";
 
       // User has access if status is Accepted, Drafting, or In_Review
@@ -260,66 +281,18 @@ export default async function CampaignDetailPage({
     } else {
       // Player: Load with filters
 
-      // Factions: is_revealed ODER allow_pc_join_on_creation (für Wizard)
+      // Factions: alle laden, Sichtbarkeit aus campaign_visibility; für Anzeige: is_revealed ODER allow_pc_join_on_creation
       console.log("🔍 [DashboardPage] Fetching Factions for campaign:", id);
-      const { data: factionsData, error: factionsError } = await (
-        supabase.from("factions") as any
-      )
-        .select("*")
-        .eq("campaign_id", id)
-        .or("is_revealed.eq.true,allow_pc_join_on_creation.eq.true");
-
-      if (factionsError) {
-        console.error(
-          "❌ [DashboardPage] Fetch Factions Error:",
-          factionsError,
-        );
-      } else {
-        console.log(
-          "✅ [DashboardPage] Factions loaded:",
-          (factionsData || []).length,
-          "factions",
-        );
-        // Calculate member count for each faction
-        const factionsWithCounts = await Promise.all(
-          (factionsData || []).map(async (faction: any) => {
-            const { count } = await (supabase.from("npcs") as any)
-              .select("id", { count: "exact", head: true })
-              .eq("faction_id", faction.id)
-              .or(`is_revealed.eq.true,user_id.eq.${user.id}`); // Only count visible NPCs
-
-            return {
-              ...faction,
-              member_count: count || 0,
-            };
-          }),
-        );
-        factions = factionsWithCounts;
-      }
-
-      // Lore (world_lore): is_revealed ODER allow_pc_origin (für Wizard-Heimatorte)
-      console.log(
-        "🔍 [DashboardPage] Fetching Lore (world_lore) for campaign:",
-        id,
+      factions = await getFactionsWithMembers(id);
+      factions = factions.filter(
+        (f: any) => f.is_revealed === true || f.allow_pc_join_on_creation === true
       );
-      const { data: loreData, error: loreError } = await (
-        supabase.from("world_lore") as any
-      )
-        .select("*")
-        .eq("campaign_id", id)
-        .or("is_revealed.eq.true,allow_pc_origin.eq.true")
-        .order("created_at", { ascending: true });
+      console.log("✅ [DashboardPage] Factions loaded:", factions.length, "factions");
 
-      if (loreError) {
-        console.error("❌ [DashboardPage] Fetch Lore Error:", loreError);
-      } else {
-        loreEntries = loreData || [];
-        console.log(
-          "✅ [DashboardPage] Lore loaded:",
-          loreEntries.length,
-          "entries",
-        );
-      }
+      // Lore: über getLoreEntries (filtert nach campaign_visibility.is_revealed)
+      console.log("🔍 [DashboardPage] Fetching Lore for campaign:", id);
+      loreEntries = await getLoreEntries(id);
+      console.log("✅ [DashboardPage] Lore loaded:", loreEntries.length, "entries");
 
       // Quests: is_revealed === true (RLS should handle this, but we can also filter)
       console.log("🔍 [DashboardPage] Fetching Quests for campaign:", id);
@@ -346,12 +319,11 @@ export default async function CampaignDetailPage({
   if (isGM) {
     // Offene Bewerbungen: Primär aus `characters` (Status Pending_Approval).
     // Nicht nur campaign_members – Spieler-Charaktere hängen in characters.
+    // Ohne users-Join (characters.user_id → auth.users), stattdessen profiles separat laden
     const { data: pendingChars, error: pendingCharsError } = await (
       supabase.from("characters") as any
     )
-      .select(
-        "id, user_id, name, class, race, level, status, biography, avatar_url, users:user_id(id, username, avatar_url)",
-      )
+      .select("id, user_id, name, class, race, level, status, biography, avatar_url")
       .eq("campaign_id", id)
       .eq("status", "Pending_Approval")
       .order("created_at", { ascending: true });
@@ -360,19 +332,44 @@ export default async function CampaignDetailPage({
       console.error("❌ Fetch Pending Characters Error:", pendingCharsError);
     }
 
-    const pendingFromCharacters = (pendingChars || []).map((c: any) => ({
+    let userMap = new Map<string, { id: string; username: string; avatar_url: string | null }>();
+    if ((pendingChars || []).length > 0) {
+      const userIds = [...new Set((pendingChars || []).map((c: any) => c.user_id).filter(Boolean))];
+      const { data: userRows } = await (supabase.from("users") as any)
+        .select("id, username, avatar_url")
+        .in("id", userIds);
+      userMap = new Map(
+        ((userRows as any[]) || []).map((u: any) => [
+          u.id,
+          { id: u.id, username: u.username ?? "Unbekannt", avatar_url: u.avatar_url ?? null },
+        ])
+      );
+      if (userMap.size === 0 && userIds.length > 0) {
+        const { data: profileRows } = await (supabase.from("profiles") as any)
+          .select("id, username")
+          .in("id", userIds);
+        userMap = new Map(
+          ((profileRows as any[]) || []).map((p: any) => [
+            p.id,
+            { id: p.id, username: p.username ?? "Unbekannt", avatar_url: null },
+          ])
+        );
+      }
+    }
+
+    const pendingFromCharacters = (pendingChars || []).map((c: any) => {
+      const u = userMap.get(c.user_id) ?? { id: c.user_id ?? "", username: "Unbekannt", avatar_url: null };
+      return {
       id: `char-${c.id}`,
       user_id: c.user_id,
       character_id: c.id,
       status: "Applied",
       application_message: null,
-      user: c.users
-        ? {
-            id: c.users.id,
-            username: c.users.username ?? "Unbekannt",
-            avatar_url: c.users.avatar_url,
-          }
-        : { id: "", username: "Unbekannt", avatar_url: null },
+      user: {
+        id: u.id,
+        username: u.username,
+        avatar_url: u.avatar_url,
+      },
       character: {
         id: c.id,
         name: c.name,
@@ -383,7 +380,8 @@ export default async function CampaignDetailPage({
         biography: c.biography ?? null,
         avatar_url: c.avatar_url ?? null,
       },
-    }));
+    };
+    });
     const userIdsWithPendingChar = new Set(
       pendingFromCharacters.map((a: any) => a.user_id),
     );
@@ -421,74 +419,17 @@ export default async function CampaignDetailPage({
   }
 
   if (isGM) {
-    // Alle Mitglieder aus campaign_members (für Drafting, In_Review, Accepted)
-    const { data: members, error: membersError } = await (
-      supabase.from("campaign_members") as any
-    )
-      .select(
-        `
-        id,
-        user_id,
-        character_id,
-        status,
-        application_message,
-        users (
-          id,
-          username,
-          avatar_url,
-          email,
-          current_rank
-        ),
-        characters (
-          id,
-          name,
-          class,
-          race,
-          level,
-          status,
-          biography,
-          avatar_url,
-          character_relationships (
-            id,
-            relationship_type,
-            description,
-            npcs (
-              id,
-              name,
-              role,
-              title
-            )
-          )
-        )
-      `,
-      )
-      .eq("campaign_id", id)
-      .order("created_at", { ascending: true });
-
-    if (membersError) {
-      console.error("❌ Fetch Members Error:", membersError);
-    }
-
-    if (process.env.NODE_ENV === "development" && members) {
-      console.log("✅ Fetched Members:", members);
-    }
-
-    if (members) {
-      const mappedMembers = (members || []).map((m: any) => ({
-        ...m,
-        user: m.users,
-        character: m.characters,
-      }));
-
-      draftingMembers = mappedMembers.filter(
-        (m: any) => m.status === "Drafting",
-      );
-      inReviewMembers = mappedMembers.filter(
-        (m: any) => m.status === "In_Review" || m.status === "Changes_Proposed",
-      );
-      acceptedMembers = mappedMembers.filter(
-        (m: any) => m.status === "Accepted" || m.status === "Approved",
-      );
+    try {
+      const { getGmCampaignMembersWithCharacters } = await import("./members-actions");
+      const { drafting, inReview, accepted } = await getGmCampaignMembersWithCharacters(id);
+      draftingMembers = drafting as any[];
+      inReviewMembers = inReview as any[];
+      acceptedMembers = accepted as any[];
+    } catch (err) {
+      console.error("❌ getGmCampaignMembersWithCharacters:", err);
+      draftingMembers = [];
+      inReviewMembers = [];
+      acceptedMembers = [];
     }
   }
 
@@ -511,66 +452,88 @@ export default async function CampaignDetailPage({
   }
 
   // ============================================================================
-  // LOAD CHARACTER DATA (if user has character) – robust: maybeSingle, Joins, Fehler abfangen
+  // LOAD CHARACTER DATA (if user has character) – inkl. Kultur, Sprachen, Fraktion, Ort
   // ============================================================================
   let myCharacter: any = null;
   if (!isGM) {
     try {
       const characterId = membership?.character_id ?? null;
-      const selectBase = `
-        *,
-        character_relationships (
-          relationship_type,
-          description,
-          npcs (
-            id,
-            name,
-            role,
-            title
-          )
-        )
-      `;
+      let characterData: any = null;
       if (characterId) {
-        const { data: characterData, error: characterError } = await (
-          supabase.from("characters") as any
-        )
-          .select(selectBase)
+        const res = await (supabase.from("characters") as any)
+          .select("*")
           .eq("id", characterId)
           .maybeSingle();
-
-        if (characterError) {
-          console.warn(
-            "[DashboardPage] Character load error (non-fatal):",
-            characterError.message || characterError.code,
-          );
-        }
-        if (characterData) {
-          myCharacter = characterData;
-        }
+        characterData = res.data;
+        if (res.error) console.warn("[DashboardPage] Character load error:", res.error.message);
       } else {
-        const { data: characterData, error: characterError } = await (
-          supabase.from("characters") as any
-        )
-          .select(selectBase)
+        const res = await (supabase.from("characters") as any)
+          .select("*")
           .eq("user_id", user.id)
           .eq("campaign_id", id)
           .maybeSingle();
+        characterData = res.data;
+        if (res.error) console.warn("[DashboardPage] Character load error:", res.error.message);
+      }
+      // Beziehungen separat laden (kein Join – Schema-Cache-Probleme)
+      if (characterData) {
+        const charId = characterData.id;
+        const { data: relRows } = await (supabase.from("character_relationships") as any)
+          .select("relationship_type, description, npc_id")
+          .eq("character_id", charId);
+        const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
+        let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
+        if (npcIds.length > 0) {
+          const { data: npcRows } = await (supabase.from("npcs") as any)
+            .select("id, name, role, title")
+            .in("id", npcIds);
+          npcMap = new Map(((npcRows as any[]) ?? []).map((n: any) => [n.id, { id: n.id, name: n.name, role: n.role, title: n.title }]));
+        }
+        (characterData as any).character_relationships = ((relRows as any[]) ?? []).map((r: any) => ({
+          relationship_type: r.relationship_type,
+          description: r.description,
+          npcs: r.npc_id ? npcMap.get(r.npc_id) ?? null : null,
+        }));
+      }
+      if (characterData) {
+        // Namen für Kultur, Fraktion, Ort auflösen
+        const cultureId = characterData.culture_lore_id;
+        const factionId = characterData.faction_membership;
+        const locationId = characterData.current_location_id;
+        const langIds = (characterData.languages as string[]) ?? [];
 
-        if (characterError) {
-          console.warn(
-            "[DashboardPage] Character load error (non-fatal):",
-            characterError.message || characterError.code,
-          );
+        if (cultureId) {
+          const { data: cultureRow } = await (supabase.from("world_lore") as any)
+            .select("name")
+            .eq("id", cultureId)
+            .single();
+          (characterData as any).culture_name = (cultureRow as { name: string } | null)?.name ?? null;
         }
-        if (characterData) {
-          myCharacter = characterData;
+        if (factionId) {
+          const { data: factionRow } = await (supabase.from("factions") as any)
+            .select("name")
+            .eq("id", factionId)
+            .single();
+          (characterData as any).faction_name = (factionRow as { name: string } | null)?.name ?? null;
         }
+        if (locationId) {
+          const { data: locRow } = await (supabase.from("world_lore") as any)
+            .select("name")
+            .eq("id", locationId)
+            .single();
+          (characterData as any).location_name = (locRow as { name: string } | null)?.name ?? null;
+        }
+        if (langIds.length > 0) {
+          const { data: langRows } = await (supabase.from("world_lore") as any)
+            .select("id, name")
+            .in("id", langIds);
+          const langMap = new Map(((langRows as { id: string; name: string }[]) ?? []).map((l) => [l.id, l.name]));
+          (characterData as any).language_names = langIds.map((lid: string) => langMap.get(lid) ?? lid);
+        }
+        myCharacter = characterData;
       }
     } catch (err) {
-      console.warn(
-        "[DashboardPage] Character load exception (non-fatal):",
-        err,
-      );
+      console.warn("[DashboardPage] Character load exception:", err);
       myCharacter = null;
     }
   }
@@ -583,27 +546,7 @@ export default async function CampaignDetailPage({
   const myCharacterId = membership?.character_id ?? null;
 
   if (!isGM && hasAccess) {
-    const [loreRes, factionsRes, npcsRes] = await Promise.all([
-      (supabase.from("world_lore") as any)
-        .select("id, name, type, description, image_url, created_at")
-        .eq("campaign_id", id)
-        .eq("is_revealed", true)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      (supabase.from("factions") as any)
-        .select("id, name, type, description, created_at")
-        .eq("campaign_id", id)
-        .eq("is_revealed", true)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      (supabase.from("npcs") as any)
-        .select("id, name, title, description, created_at")
-        .eq("campaign_id", id)
-        .eq("is_revealed", true)
-        .order("created_at", { ascending: false })
-        .limit(8),
-    ]);
-    const loreItems: DiscoveryItem[] = (loreRes.data || []).map((e: any) => ({
+    const loreItems: DiscoveryItem[] = (loreEntries || []).slice(0, 8).map((e: any) => ({
       id: e.id,
       name: e.name,
       kind: "lore" as const,
@@ -612,18 +555,16 @@ export default async function CampaignDetailPage({
       type: e.type,
       created_at: e.created_at,
     }));
-    const factionItems: DiscoveryItem[] = (factionsRes.data || []).map(
-      (e: any) => ({
-        id: e.id,
-        name: e.name,
-        kind: "faction" as const,
-        description: e.description ?? null,
-        image_url: null,
-        type: e.type,
-        created_at: e.created_at,
-      }),
-    );
-    const npcItems: DiscoveryItem[] = (npcsRes.data || []).map((e: any) => ({
+    const factionItems: DiscoveryItem[] = (factions || []).slice(0, 8).map((e: any) => ({
+      id: e.id,
+      name: e.name,
+      kind: "faction" as const,
+      description: e.description ?? null,
+      image_url: null,
+      type: e.type,
+      created_at: e.created_at,
+    }));
+    const npcItems: DiscoveryItem[] = (npcs || []).slice(0, 8).map((e: any) => ({
       id: e.id,
       name: e.name,
       kind: "npc" as const,
@@ -640,16 +581,25 @@ export default async function CampaignDetailPage({
       .slice(0, 8);
 
     const { data: partyCharacters } = await (supabase.from("characters") as any)
-      .select("id, name, class, race, level, users(avatar_url)")
+      .select("id, name, class, race, level, culture_lore_id, users(avatar_url)")
       .eq("campaign_id", id)
       .eq("status", "Active")
       .neq("id", myCharacterId || "");
+    const cultureIds = [...new Set((partyCharacters || []).map((c: any) => c.culture_lore_id).filter(Boolean))];
+    let cultureMap = new Map<string, string>();
+    if (cultureIds.length > 0) {
+      const { data: cultureRows } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .in("id", cultureIds);
+      cultureMap = new Map(((cultureRows as { id: string; name: string }[]) ?? []).map((l) => [l.id, l.name]));
+    }
     party = (partyCharacters || []).map((c: any) => ({
       id: c.id,
       name: c.name,
       class: c.class ?? "",
       race: c.race ?? "",
       level: c.level ?? 1,
+      culture: c.culture_lore_id ? (cultureMap.get(c.culture_lore_id) ?? "") : "",
       avatar_url: c.users?.avatar_url ?? null,
     }));
   }
@@ -674,21 +624,62 @@ export default async function CampaignDetailPage({
       (t) => String(t).toLowerCase() === String(type ?? "").toLowerCase(),
     );
 
-  const wizardFactions = isGM
-    ? factions
-    : (factions || []).filter((f: any) => f.allow_pc_join_on_creation === true);
-  const wizardLocations = (loreEntries || []).filter(
-    (e: any) =>
-      typeMatchesGeographic(e.type) &&
-      (isGM || e.allow_pc_origin === true || e.is_revealed === true),
-  );
+  let wizardFactions: any[] = [];
+  let wizardLocations: any[] = [];
 
-  // Debug: Leere Arrays = RLS oder Abfrage prüfen (F12 → Konsole)
+  if (isGM) {
+    wizardFactions = factions;
+    wizardLocations = (loreEntries || []).filter((e: any) => typeMatchesGeographic(e.type));
+  } else if (campaignWorldId) {
+    // Fraktionen: select("*") um PostgREST Schema-Cache-Probleme zu vermeiden,
+    // dann im Code nach allow_pc_join_on_creation filtern.
+    const { data: allWorldFactions, error: pcFErr } = await (supabase.from("factions") as any)
+      .select("*")
+      .eq("world_id", campaignWorldId);
+    if (pcFErr) console.error("❌ wizardFactions query error:", JSON.stringify(pcFErr));
+    wizardFactions = ((allWorldFactions || []) as any[]).filter(
+      (f: any) => f.allow_pc_join_on_creation === true
+    );
+    console.log("✅ wizardFactions:", wizardFactions.length, wizardFactions.map((f: any) => f.name));
+
+    // Orte: select("*") und im Code nach allow_pc_origin filtern
+    const { data: allWorldLore, error: pcLErr } = await (supabase.from("world_lore") as any)
+      .select("*")
+      .eq("world_id", campaignWorldId);
+    if (pcLErr) console.error("❌ wizardLocations query error:", JSON.stringify(pcLErr));
+    wizardLocations = ((allWorldLore || []) as any[]).filter(
+      (e: any) => typeMatchesGeographic(e.type) && e.allow_pc_origin === true
+    );
+    console.log("✅ wizardLocations:", wizardLocations.length, wizardLocations.map((l: any) => l.name));
+  } else {
+    console.log("⚠️ wizardFactions/wizardLocations: kein campaignWorldId, isGM=", isGM);
+  }
+
   if (!isGM) {
     console.log("SPIELER_DATEN_CHECK:", {
       locations: wizardLocations,
       factions: wizardFactions,
     });
+  }
+
+  // Kulturen, Sprachen & Ruf für Charakter-Bearbeitung (Spieler mit Charakter)
+  let wizardCultures: { id: string; name: string }[] = [];
+  let wizardLanguages: { id: string; name: string }[] = [];
+  let characterReputations: { id: string; faction_id: string; faction_name: string; reputation: number; rank: string | null }[] = [];
+  if (!isGM && myCharacter) {
+    const [loreData, repData] = await Promise.all([
+      getCharacterWizardLoreData(id),
+      getCharacterFactionReputations(myCharacter.id, id),
+    ]);
+    wizardCultures = loreData.cultures.map((c) => ({ id: c.id, name: c.name }));
+    wizardLanguages = loreData.languages.map((l) => ({ id: l.id, name: l.name }));
+    characterReputations = repData.map((r) => ({
+      id: r.id,
+      faction_id: r.faction_id,
+      faction_name: r.faction_name,
+      reputation: r.reputation,
+      rank: r.rank ?? null,
+    }));
   }
 
   // ============================================================================
@@ -707,10 +698,7 @@ export default async function CampaignDetailPage({
         {/* Character Creation Button (for Accepted Players or Drafting) */}
         {!isGM &&
           ((userMembershipStatus === "Accepted" &&
-            (!userHasCharacter ||
-              (membership &&
-                ((membership.characters as any)?.status === "Dead" ||
-                  (membership.characters as any)?.status === "Archived")))) ||
+            (!userHasCharacter || isDeadOrArchived)) ||
             userMembershipStatus === "Drafting") && (
             <div className="rounded-lg border border-hero-vibrant bg-gradient-to-br from-hero-dark/50 to-background-card p-6">
               <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-border pb-2 flex items-center gap-2">
@@ -724,12 +712,7 @@ export default async function CampaignDetailPage({
                   ? "Setze deinen Charakterentwurf fort und vervollständige ihn."
                   : "Du wurdest als Spieler akzeptiert! Erstelle jetzt deinen Charakter für diese Kampagne."}
               </p>
-              <CharacterCreatorButton
-                campaignId={id}
-                factions={wizardFactions}
-                locations={wizardLocations}
-                npcs={npcs}
-              />
+              <CharacterCreatorButton campaignId={id} />
             </div>
           )}
 
@@ -856,25 +839,6 @@ export default async function CampaignDetailPage({
                 </p>
               </div>
 
-              {/* Frequency */}
-              <div>
-                <label
-                  htmlFor="frequency"
-                  className="block mb-2 font-barlow font-bold uppercase text-xs text-gray-300"
-                >
-                  Spielrhythmus
-                </label>
-                <input
-                  type="text"
-                  id="frequency"
-                  name="frequency"
-                  defaultValue={campaign.frequency || ""}
-                  placeholder="z.B. Wöchentlich, Freitags 19 Uhr"
-                  className="w-full rounded bg-slate-900 border border-hero-dark p-2.5 text-sm text-white focus:border-hero-vibrant outline-none"
-                  suppressHydrationWarning={true}
-                />
-              </div>
-
               {/* Looking For */}
               <div>
                 <label
@@ -923,6 +887,18 @@ export default async function CampaignDetailPage({
               </button>
             </form>
           </div>
+        )}
+
+        {/* Spielplan & Termine (GM Only) */}
+        {isGM && (
+          <CampaignScheduleForm
+            campaignId={id}
+            initialInterval={campaign.schedule_interval ?? null}
+            initialDay={campaign.schedule_day ?? null}
+            initialTime={campaign.schedule_time ?? null}
+            initialDuration={campaign.schedule_duration_hours ?? null}
+            initialFrequencyNote={campaign.frequency ?? null}
+          />
         )}
       </div>
 
@@ -1040,21 +1016,7 @@ export default async function CampaignDetailPage({
       characterStatus={!isGM ? (myCharacter as any)?.status : undefined}
       upcomingSessions={(upcomingSessions || []) as any}
       locations={loreEntries
-        .filter((l: any) =>
-          [
-            "Stadt",
-            "Region",
-            "Ort",
-            "Insel",
-            "Gebäude",
-            "Tempel",
-            "Land",
-            "Dungeon",
-            "Akademie",
-            "Markt",
-            "Laden",
-          ].includes(l.type),
-        )
+        .filter((l: any) => isLocationType(l.type))
         .map((l: any) => ({ id: l.id, name: l.name, type: l.type }))
         .sort((a: any, b: any) => a.name.localeCompare(b.name))}
       npcs={npcs}
@@ -1062,10 +1024,11 @@ export default async function CampaignDetailPage({
   );
 
   const NPCsTab = !world ? (
-    <WorldRequiredBlocker campaignId={id} isGM={isGM} />
+    <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
     <NPCsManagement
       campaignId={id}
+      worldId={campaignWorldId ?? undefined}
       npcs={npcs}
       factions={factions}
       isGM={isGM}
@@ -1073,10 +1036,11 @@ export default async function CampaignDetailPage({
   );
 
   const FactionsTab = !world ? (
-    <WorldRequiredBlocker campaignId={id} isGM={isGM} />
+    <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
     <FactionsManagement
       campaignId={id}
+      worldId={campaignWorldId ?? undefined}
       factions={factions}
       npcs={npcs}
       isGM={isGM}
@@ -1084,9 +1048,9 @@ export default async function CampaignDetailPage({
   );
 
   const LoreTab = !world ? (
-    <WorldRequiredBlocker campaignId={id} isGM={isGM} />
+    <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
-    <LoreManagement campaignId={id} loreEntries={loreEntries} isGM={isGM} />
+    <LoreManagement campaignId={id} worldId={campaignWorldId ?? undefined} loreEntries={loreEntries} isGM={isGM} />
   );
 
   // Extract characters from accepted members for personal quests
@@ -1111,21 +1075,7 @@ export default async function CampaignDetailPage({
         role: npc.role,
       }))}
       locations={loreEntries
-        .filter((l: any) =>
-          [
-            "Stadt",
-            "Region",
-            "Ort",
-            "Insel",
-            "Gebäude",
-            "Tempel",
-            "Land",
-            "Dungeon",
-            "Akademie",
-            "Markt",
-            "Laden",
-          ].includes(l.type),
-        )
+        .filter((l: any) => isLocationType(l.type))
         .map((l: any) => ({ id: l.id, name: l.name, type: l.type }))
         .sort((a: any, b: any) => a.name.localeCompare(b.name))}
       characters={availableCharacters}
@@ -1135,20 +1085,31 @@ export default async function CampaignDetailPage({
   );
 
   const MembersTab = (
-    <MembersManagement
-      campaignId={id}
-      pendingApplications={pendingApplications}
-      draftingMembers={draftingMembers}
-      inReviewMembers={inReviewMembers}
-      acceptedMembers={acceptedMembers}
-      isGM={isGM}
-      factions={factions.filter((f: any) => f.is_revealed)}
-      locations={loreEntries.filter(
-        (l: any) =>
-          l.is_revealed && ["Stadt", "Region", "Dorf"].includes(l.type),
+    <div className="space-y-6">
+      {/* Group Reward Form (GM Only) */}
+      {isGM && acceptedMembers.length > 0 && (
+        <GroupRewardForm
+          campaignId={id}
+          memberCount={acceptedMembers.length}
+        />
       )}
-      npcs={npcs.filter((n: any) => n.is_revealed)}
-    />
+
+      {/* Members Management */}
+      <MembersManagement
+        campaignId={id}
+        pendingApplications={pendingApplications}
+        draftingMembers={draftingMembers}
+        inReviewMembers={inReviewMembers}
+        acceptedMembers={acceptedMembers}
+        isGM={isGM}
+        factions={factions.filter((f: any) => f.is_revealed)}
+        locations={loreEntries.filter(
+          (l: any) =>
+            l.is_revealed && ["Stadt", "Region", "Dorf"].includes(l.type),
+        )}
+        npcs={npcs.filter((n: any) => n.is_revealed)}
+      />
+    </div>
   );
 
   // Sichere Fallbacks für Einstellungen/Onboarding
@@ -1196,23 +1157,6 @@ export default async function CampaignDetailPage({
               </div>
               <div>
                 <label
-                  htmlFor="settings_frequency"
-                  className="block mb-2 font-barlow font-bold uppercase text-xs text-gray-300"
-                >
-                  Spielrhythmus
-                </label>
-                <input
-                  type="text"
-                  id="settings_frequency"
-                  name="frequency"
-                  defaultValue={campaign.frequency || ""}
-                  placeholder="z.B. Wöchentlich, Freitags 19 Uhr"
-                  className="w-full rounded bg-slate-900 border border-hero-dark p-2.5 text-sm text-white focus:border-hero-vibrant outline-none"
-                  suppressHydrationWarning={true}
-                />
-              </div>
-              <div>
-                <label
                   htmlFor="settings_looking_for"
                   className="block mb-2 font-barlow font-bold uppercase text-xs text-gray-300"
                 >
@@ -1254,6 +1198,16 @@ export default async function CampaignDetailPage({
               </button>
             </form>
           </div>
+
+          {/* Spielplan & Termine */}
+          <CampaignScheduleForm
+            campaignId={id}
+            initialInterval={campaign.schedule_interval ?? null}
+            initialDay={campaign.schedule_day ?? null}
+            initialTime={campaign.schedule_time ?? null}
+            initialDuration={campaign.schedule_duration_hours ?? null}
+            initialFrequencyNote={campaign.frequency ?? null}
+          />
         </div>
         <div className="space-y-6">
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
@@ -1327,15 +1281,11 @@ export default async function CampaignDetailPage({
   );
 
   // Spieler-Übersicht (Home-Base): DiscoverySlider, Mein Charakter, PartyOverview
-  const relationships = (myCharacter as any)?.character_relationships ?? [];
   const PlayerOverviewContent = (
     <div className="space-y-8">
       {!isGM &&
         ((userMembershipStatus === "Accepted" &&
-          (!userHasCharacter ||
-            (membership &&
-              ((membership.characters as any)?.status === "Dead" ||
-                (membership.characters as any)?.status === "Archived")))) ||
+          (!userHasCharacter || isDeadOrArchived)) ||
           userMembershipStatus === "Drafting") && (
           <div className="rounded-lg border border-hero-vibrant bg-gradient-to-br from-hero-dark/50 to-background-card p-6">
             <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-border pb-2 flex items-center gap-2">
@@ -1349,95 +1299,31 @@ export default async function CampaignDetailPage({
                 ? "Setze deinen Charakterentwurf fort und vervollständige ihn."
                 : "Du wurdest als Spieler akzeptiert! Erstelle jetzt deinen Charakter für diese Kampagne."}
             </p>
-            <CharacterCreatorButton
-              campaignId={id}
-              factions={wizardFactions}
-              locations={wizardLocations}
-              npcs={npcs}
-            />
+            <CharacterCreatorButton campaignId={id} />
           </div>
         )}
       <DiscoverySlider items={allDiscoveries} />
-      <section className="rounded-lg border border-hero-dark bg-background-card p-6">
-        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
-          <User className="h-6 w-6 text-accent-gold" />
-          Mein Charakter
-        </h2>
-        {myCharacter ? (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-barlow font-bold uppercase text-gray-500">
-                  Name
-                </p>
-                <p className="font-libre text-white font-semibold">
-                  {myCharacter.name}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-barlow font-bold uppercase text-gray-500">
-                  Klasse · Rasse
-                </p>
-                <p className="font-libre text-gray-200">
-                  {myCharacter.class} · {myCharacter.race}
-                  {myCharacter.level != null && ` (Stufe ${myCharacter.level})`}
-                </p>
-              </div>
-            </div>
-            {myCharacter.biography && (
-              <div>
-                <p className="text-xs font-barlow font-bold uppercase text-gray-500 mb-1">
-                  Biografie
-                </p>
-                <p className="font-libre text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {myCharacter.biography}
-                </p>
-              </div>
-            )}
-            {relationships.length > 0 && (
-              <div>
-                <p className="text-xs font-barlow font-bold uppercase text-gray-500 mb-2">
-                  Beziehungen
-                </p>
-                <ul className="space-y-2">
-                  {relationships.map((rel: any, idx: number) => (
-                    <li
-                      key={idx}
-                      className="flex items-center gap-2 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 font-libre text-sm text-gray-200"
-                    >
-                      <span className="font-semibold text-white">
-                        {rel.npcs?.name ?? "Unbekannt"}
-                      </span>
-                      <span className="text-gray-500">·</span>
-                      <span>{rel.relationship_type}</span>
-                      {rel.description && (
-                        <>
-                          <span className="text-gray-500">·</span>
-                          <span className="text-gray-400 italic">
-                            {rel.description}
-                          </span>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <Link
-              href={`/dashboard/campaigns/${id}?tab=character`}
-              className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors"
-            >
-              <User className="h-4 w-4" />
-              Charakterblatt anzeigen
-            </Link>
-          </div>
-        ) : (
+      {myCharacter ? (
+        <MyCharacterSection
+          campaignId={id}
+          character={myCharacter}
+          cultures={wizardCultures}
+          languages={wizardLanguages}
+          factions={wizardFactions.map((f: any) => ({ id: f.id, name: f.name }))}
+          locations={wizardLocations.map((l: any) => ({ id: l.id, name: l.name, type: l.type ?? "" }))}
+          factionReputations={characterReputations}
+        />
+      ) : (
+        <section className="rounded-lg border border-hero-dark bg-background-card p-6">
+          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+            <User className="h-6 w-6 text-accent-gold" />
+            Mein Charakter
+          </h2>
           <p className="font-libre text-gray-500 italic">
-            Du hast noch keinen Charakter für diese Kampagne. Erstelle einen
-            über die Box oben.
+            Du hast noch keinen Charakter für diese Kampagne. Erstelle einen über die Box oben.
           </p>
-        )}
-      </section>
+        </section>
+      )}
       <PartyOverview party={party} />
     </div>
   );

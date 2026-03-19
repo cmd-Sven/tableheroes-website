@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Edit2, Save, X, Loader2 } from "lucide-react";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { GothicSpotlightDescription } from "./GothicSpotlightDescription";
+import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
+import { SmartText } from "@/src/components/ui/SmartText";
+import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 
 // Inline Edit Field Component
 type InlineEditFieldProps = {
@@ -84,13 +87,16 @@ function InlineEditField({
 }
 
 type Props = {
-  lore: { id: string; description: string | null; image_url: string | null };
+  lore: { id: string; description: string | null; image_url: string | null; world_id?: string };
+  campaignId?: string | null;
   isGM: boolean;
   onUpdate?: () => void;
 };
 
-export function LoreDescription({ lore, isGM, onUpdate }: Props) {
+export function LoreDescription({ lore, campaignId, isGM, onUpdate }: Props) {
   const router = useRouter();
+  const worldId = lore.world_id ?? null;
+  const { entities } = useWorldEntities(worldId);
   const [isPending, startTransition] = useTransition();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
@@ -142,17 +148,23 @@ export function LoreDescription({ lore, isGM, onUpdate }: Props) {
           canEdit={isGM}
           isPending={isPending}
           editComponent={
-            <textarea
+            <MarkdownEditor
               value={editValues.description || ""}
-              onChange={(e) => setEditValues({ ...editValues, description: e.target.value })}
-              className="w-full rounded border border-hero-dark bg-slate-900/50 p-3 font-libre text-[#e5e5e5] leading-relaxed outline-none focus:border-hero-vibrant resize-none min-h-[300px]"
-              placeholder="Beschreibung..."
+              onChange={(v) => setEditValues({ ...editValues, description: v })}
+              minHeight="min-h-[450px]"
+              entities={entities}
+              campaignId={campaignId}
+              worldId={worldId}
             />
           }
         >
-          <p className="font-libre text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
-            {lore.description || "Keine Beschreibung vorhanden."}
-          </p>
+          <SmartText
+            text={lore.description || ""}
+            entities={entities}
+            campaignId={campaignId}
+            worldId={worldId}
+            emptyMessage="Keine Beschreibung vorhanden."
+          />
         </InlineEditField>
       </GothicSpotlightDescription>
     </div>

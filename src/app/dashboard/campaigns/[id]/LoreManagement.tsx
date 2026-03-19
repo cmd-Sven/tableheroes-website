@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import { Plus, Book, Filter, Map as MapIcon, Sparkles, Loader2, Search, X } from "lucide-react";
+import { Book, Filter, Map as MapIcon, Search, X } from "lucide-react";
+import Link from "next/link";
 import { LoreGridCard } from "@/src/components/dashboard/LoreGridCard";
-import { generateWorldSkeleton } from "./ai-actions";
-import { applyWorldSkeleton } from "./world-skeleton-actions";
 import { deleteLoreEntry, toggleLoreReveal } from "./lore-actions";
 import { VALID_LORE_TYPES, TYPE_MAPPING } from "@/src/lib/lore-types";
-import Link from "next/link";
-import { GraphicButton } from "@/src/components/dashboard/campaigns/lore/GraphicButton";
 
 type LoreEntry = {
   id: string;
@@ -24,6 +21,8 @@ type LoreEntry = {
 
 type Props = {
   campaignId: string;
+  /** Welt-ID der Kampagne – für GM-Link „Zum Welt-Editor“. */
+  worldId?: string;
   loreEntries: LoreEntry[];
   isGM: boolean;
 };
@@ -40,12 +39,10 @@ const FILTER_CATEGORIES = [
   "Other",
 ] as const;
 
-export function LoreManagement({ campaignId, loreEntries, isGM }: Props) {
+export function LoreManagement({ campaignId, worldId, loreEntries, isGM }: Props) {
   const [activeFilter, setActiveFilter] = useState<string>("Alle");
   const [searchQuery, setSearchQuery] = useState("");
   const [specificTypeFilter, setSpecificTypeFilter] = useState<string | null>(null);
-  const [isGenerating, startTransition] = useTransition();
-  const [theme, setTheme] = useState("");
 
   const handleDelete = async (lore: LoreEntry) => {
     try {
@@ -57,7 +54,7 @@ export function LoreManagement({ campaignId, loreEntries, isGM }: Props) {
 
   const handleToggleVisibility = async (lore: LoreEntry) => {
     try {
-      await toggleLoreReveal(lore.id, lore.is_revealed);
+      await toggleLoreReveal(campaignId, lore.id, lore.is_revealed);
     } catch (error: any) {
       alert(error.message || "Fehler beim Ändern der Sichtbarkeit.");
     }
@@ -147,26 +144,24 @@ export function LoreManagement({ campaignId, loreEntries, isGM }: Props) {
           <Book className="h-5 w-5 text-accent-gold" />
           Welt & Lore ({loreEntries.length})
         </h2>
-        {isGM && (
-          <GraphicButton
-            href={`/dashboard/campaigns/${campaignId}/lore/new`}
-            imagePath="/images/button-green-wood.png"
-            hoverImagePath="/images/button-green-wood_hover.png"
-            width={192}
-            height={68}
-          >
-            + Neuer Eintrag
-          </GraphicButton>
-        )}
       </div>
 
-      {/* Info Box (GM Only) */}
+      {/* Info Box (GM Only): Sichtbarkeit pro Kampagne, Erstellung in der Welt-Verwaltung */}
       {isGM && (
         <div className="mb-6 rounded border border-blue-700/30 bg-blue-900/20 p-4">
-          <p className="font-libre text-sm text-blue-300 leading-relaxed">
-            <strong className="font-bold">Hierarchische Welt-Struktur:</strong> Erstelle Orte, Geschichte, Religionen und mehr. 
-            Nutze "Gehört zu..." um eine Hierarchie aufzubauen (z.B. Königreich → Stadt → Taverne).
+          <p className="font-libre text-sm text-blue-300 leading-relaxed mb-3">
+            <strong className="font-bold">Sichtbarkeit für diese Kampagne:</strong> Schalte Einträge mit dem Auge-Symbol für Spieler frei.
+            Neue Orte und Lore legst du in der <strong>Welt-Verwaltung</strong> an.
           </p>
+          {worldId && (
+            <Link
+              href={`/dashboard/worlds/${worldId}/lore`}
+              className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-dark transition-colors"
+            >
+              <Book className="h-4 w-4" />
+              Zum Welt-Editor
+            </Link>
+          )}
         </div>
       )}
 
@@ -295,89 +290,16 @@ export function LoreManagement({ campaignId, loreEntries, isGM }: Props) {
                 </p>
               </div>
 
-              {/* Option A: Manual */}
-              <div className="rounded-lg border-2 border-hero-vibrant/50 bg-hero-vibrant/5 p-6">
-                <Link
-                  href={`/dashboard/campaigns/${campaignId}/lore/new`}
-                  className="w-full flex items-center justify-center gap-2 rounded border border-hero-border bg-hero-vibrant px-6 py-3 font-barlow font-bold uppercase text-sm text-white hover:bg-hero-dark transition-colors"
-                >
-                  <Plus className="h-5 w-5" />
-                  ✍️ Ersten Ort manuell anlegen
-                </Link>
-              </div>
-
-              {/* Divider */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-px bg-hero-border"></div>
-                <span className="font-barlow font-bold text-xs uppercase text-gray-500">
-                  — ODER —
-                </span>
-                <div className="flex-1 h-px bg-hero-border"></div>
-              </div>
-
-              {/* Option B: AI Kickstart */}
-              <div className="rounded-lg border-2 border-accent-gold/50 bg-accent-gold/5 p-6 space-y-4">
-                <div className="text-center">
-                  <p className="font-libre text-sm text-gray-300 mb-2">
-                    Lass dir von der KI unter die Arme greifen.
-                  </p>
-                  <p className="font-libre text-xs text-gray-500">
-                    Die KI generiert ein Grundgerüst aus Fraktionen, Orten und NPCs basierend auf deinem Thema.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block mb-2 font-barlow font-bold text-sm uppercase text-gray-300">
-                    Thema (z.B. Düstere Gassen, Hohe See, Verlorene Zivilisation...)
-                  </label>
-                  <input
-                    type="text"
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
-                    placeholder="z.B. Düstere Gassen, Hohe See, Verlorene Zivilisation"
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-3 text-white placeholder-gray-500 focus:border-accent-gold outline-none font-libre"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    if (!theme.trim()) {
-                      alert("Bitte gib ein Thema ein.");
-                      return;
-                    }
-                    startTransition(async () => {
-                      try {
-                        const skeleton = await generateWorldSkeleton(campaignId, theme);
-                        const result = await applyWorldSkeleton(campaignId, skeleton);
-                        alert(
-                          `World Skeleton erstellt!\n` +
-                          `✅ ${result.factions} Fraktionen\n` +
-                          `✅ ${result.locations} Orte\n` +
-                          `✅ ${result.npcs} NPCs`
-                        );
-                        window.location.reload();
-                      } catch (error: any) {
-                        console.error(error);
-                        alert(error.message || "Fehler bei der Generierung.");
-                      }
-                    });
-                  }}
-                  disabled={!theme.trim() || isGenerating}
-                  className="w-full flex items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-6 py-3 font-barlow font-bold uppercase text-sm text-accent-gold transition-colors hover:bg-accent-gold/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Generiere...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-5 w-5" />
-                      💥 Welt-Grundgerüst generieren
-                    </>
-                  )}
-                </button>
-              </div>
+              <p className="font-libre text-gray-400 mb-4">
+                Neue Einträge legst du in der <strong>Welt-Verwaltung</strong> an: Dashboard → Welten → deine Welt auswählen → Lore / Orte verwalten.
+              </p>
+              <Link
+                href="/dashboard/worlds"
+                className="inline-flex items-center gap-2 rounded border border-hero-border bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-vibrant/30 transition-colors"
+              >
+                <MapIcon className="h-4 w-4" />
+                Zur Welt-Verwaltung
+              </Link>
             </div>
           ) : (
             // Player Empty State (Simple)
@@ -403,6 +325,7 @@ export function LoreManagement({ campaignId, loreEntries, isGM }: Props) {
               isGM={isGM}
               onDelete={isGM ? (handleDelete as any) : undefined}
               onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}
+              detailHref={undefined}
             />
           ))}
         </div>

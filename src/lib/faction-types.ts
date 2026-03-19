@@ -30,5 +30,32 @@ export const VALID_RELATIONSHIPS = [
   'Im Krieg',
 ] as const;
 
+/**
+ * Rollen für geplante Fraktions-Mitglieder (NPC-TODO)
+ */
+export const FACTION_MEMBER_ROLES = [
+  'Anführer',
+  'Oberhaupt',
+  'Zunftmeister',
+  'Erzmagier',
+  'Mitglied',
+  'Rekrut',
+  'Novize',
+  'Kommandant',
+  'Captain',
+  'Soldat',
+  'Wachmann',
+  'Gelehrter',
+  'Archivar',
+  'Handwerker',
+  'Kammermeister',
+  'Notar',
+  'Schreiber',
+  'Angestellter',
+  'Agent',
+  'Krieger',
+  'Meister',
+] as const;
+
 
 

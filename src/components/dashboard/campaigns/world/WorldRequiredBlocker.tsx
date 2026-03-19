@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { Globe, AlertTriangle } from "lucide-react";
 import { WorldSetupForm } from "./WorldSetupForm";
 
+type World = { id: string; name: string; description: string | null };
+
 type Props = {
   campaignId: string;
   isGM: boolean;
+  /** Vom Server geladene Welten des GMs (für Welt-Zuweisung) */
+  worlds?: World[];
 };
 
-export function WorldRequiredBlocker({ campaignId, isGM }: Props) {
+export function WorldRequiredBlocker({ campaignId, isGM, worlds = [] }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -45,10 +49,9 @@ export function WorldRequiredBlocker({ campaignId, isGM }: Props) {
     return (
       <WorldSetupForm
         campaignId={campaignId}
+        worlds={worlds}
         onSuccess={() => {
           setShowForm(false);
-          // Refresh the page to re-fetch world data
-          // The WorldRequiredBlocker will automatically disappear when world exists
           router.refresh();
         }}
         onCancel={() => setShowForm(false)}

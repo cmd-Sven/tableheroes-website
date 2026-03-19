@@ -102,38 +102,28 @@ export async function getLocationDetailsForAI(locationId: string, campaignId: st
     return location;
   }
 
-  // 4. Fallback: Direkt aus "world_lore" lesen, falls noch kein Eintrag in "locations" existiert
+  const { data: campaignRow } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaignWorldId = (campaignRow as { world_id: string | null } | null)?.world_id ?? null;
+
   const { data: lore, error: loreError } = await (supabase.from("world_lore") as any)
-    .select("id, campaign_id, name, type, description, gm_notes, image_url")
+    .select("id, world_id, name, type, description, gm_notes, image_url")
     .eq("id", locationId)
     .maybeSingle();
 
-  if (loreError) {
-    console.error("❌ [getLocationDetailsForAI] world_lore error:", loreError);
+  if (loreError || !lore) {
     return null;
   }
 
-  if (!lore) {
-    console.log("⚠️ [getLocationDetailsForAI] No location found in 'locations' or 'world_lore':", {
-      locationId,
-      campaignId,
-    });
+  if (!campaignWorldId || lore.world_id !== campaignWorldId) {
     return null;
   }
 
-  if (lore.campaign_id !== campaignId) {
-    console.warn("⚠️ [getLocationDetailsForAI] world_lore entry belongs to different campaign:", {
-      locationId,
-      loreCampaignId: lore.campaign_id,
-      requestedCampaignId: campaignId,
-    });
-    return null;
-  }
-
-  // 5. Mapping: world_lore-Eintrag in eine strukturähnliche Form wie die "locations"-Abfrage bringen
   const mappedFromLore = {
     id: lore.id,
-    campaign_id: lore.campaign_id,
+    world_id: lore.world_id,
     name: lore.name,
     type: lore.type,
     description: lore.description,
@@ -179,21 +169,27 @@ export async function getNPCsByLocation(
 
   const favoriteIds = new Set((favorites || []).map((f: { npc_id: string }) => f.npc_id));
 
-  // 3. Fetch NPCs with home_location_id === locationId (Ansässige NPCs)
+  const { data: campaignRow } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const worldId = (campaignRow as { world_id: string | null } | null)?.world_id;
+  if (!worldId) {
+    return { residents: [], guests: [] };
+  }
+
   const { data: residents, error: residentsError } = await (supabase.from("npcs") as any)
     .select("id, name, image_url, role, status")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", worldId)
     .eq("home_location_id", locationId);
 
   if (residentsError) {
-    console.error("❌ [getNPCsByLocation] Residents Error:", residentsError);
     throw new Error(`Fehler beim Laden der ansässigen NPCs: ${residentsError.message}`);
   }
 
-  // 4. Fetch NPCs with current_location_id === locationId AND home_location_id !== locationId (Aktuelle Gäste)
   const { data: guests, error: guestsError } = await (supabase.from("npcs") as any)
     .select("id, name, image_url, role, status")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", worldId)
     .eq("current_location_id", locationId)
     .neq("home_location_id", locationId);
 
@@ -229,48 +225,39 @@ export async function updateNPCCurrentLocation(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Fetch NPC to verify GM ownership
   const { data: npc } = await (supabase.from("npcs") as any)
-    .select("campaign_id, campaigns!inner(gm_id)")
+    .select("world_id, worlds!inner(gm_id)")
     .eq("id", npcId)
     .single();
 
   if (!npc) throw new Error("NPC nicht gefunden.");
 
-  const campaigns = npc.campaigns as any;
-  if (campaigns.gm_id !== user.id) {
-    throw new Error("Nur der GM kann den Aufenthaltsort ändern.");
+  const worlds = npc.worlds as { gm_id: string } | undefined;
+  if (!worlds || worlds.gm_id !== user.id) {
+    throw new Error("Nur der GM der Welt kann den Aufenthaltsort ändern.");
   }
 
-  // 3. Validate location_id if provided
   if (newLocationId) {
     const { data: location, error: locationError } = await (supabase.from("locations") as any)
-      .select("id, campaign_id")
+      .select("id, world_id")
       .eq("id", newLocationId)
       .single();
 
-    if (locationError || !location) {
-      throw new Error(`Ungültiger Ort ausgewählt.`);
-    }
-
-    if (location.campaign_id !== npc.campaign_id) {
-      throw new Error(`Der ausgewählte Ort gehört zu einer anderen Kampagne.`);
+    if (locationError || !location || location.world_id !== npc.world_id) {
+      throw new Error(`Ungültiger Ort oder Ort gehört zu einer anderen Welt.`);
     }
   }
 
-  // 4. Update NPC
   const { error: updateError } = await (supabase.from("npcs") as any)
     .update({ current_location_id: newLocationId })
     .eq("id", npcId);
 
   if (updateError) {
-    console.error("❌ [updateNPCCurrentLocation] Error:", updateError);
     throw new Error(`Fehler beim Aktualisieren: ${updateError.message}`);
   }
 
-  // 5. Revalidate
-  revalidatePath(`/dashboard/campaigns/${npc.campaign_id}/npcs/${npcId}`);
-  revalidatePath(`/dashboard/campaigns/${npc.campaign_id}/locations/${newLocationId || ""}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/campaigns");
 
   return { success: true };
 }
@@ -284,19 +271,25 @@ export async function getLocationStats(
 ) {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Rekursiv alle Unter-Locations finden
+  const { data: campaignRow } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  const worldId = (campaignRow as { world_id: string | null } | null)?.world_id;
+  if (!worldId) {
+    return { residentsCount: 0, guestsCount: 0 };
+  }
+
   const getAllSubLocations = async (parentId: string): Promise<string[]> => {
     try {
-      // Versuche, Unter-Locations zu finden (falls parent_location_id existiert)
       const { data: subLocations, error } = await (supabase.from("locations") as any)
         .select("id")
-        .eq("campaign_id", campaignId)
+        .eq("world_id", worldId)
         .eq("parent_location_id", parentId);
 
       // Wenn parent_location_id nicht existiert, wird ein Fehler geworfen
@@ -323,10 +316,9 @@ export async function getLocationStats(
   // Entferne Duplikate
   const uniqueLocationIds = Array.from(new Set(allLocationIds));
 
-  // 4. Zähle NPCs in allen Locations (Residents)
   const { data: allResidents, error: residentsError } = await (supabase.from("npcs") as any)
     .select("id")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", worldId)
     .in("home_location_id", uniqueLocationIds);
 
   if (residentsError) {
@@ -334,11 +326,9 @@ export async function getLocationStats(
     throw new Error(`Fehler beim Zählen der ansässigen NPCs: ${residentsError.message}`);
   }
 
-  // 5. Zähle NPCs in allen Locations (Guests)
-  // Für Guests: current_location_id muss in der Liste sein, aber home_location_id nicht
   const { data: allGuests, error: guestsError } = await (supabase.from("npcs") as any)
     .select("id, home_location_id")
-    .eq("campaign_id", campaignId)
+    .eq("world_id", worldId)
     .in("current_location_id", uniqueLocationIds);
 
   if (guestsError) {
@@ -369,24 +359,20 @@ export async function getAllLocations(campaignId: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Get world_id for this campaign
-  const { data: world } = await (supabase.from("worlds") as any)
-    .select("id")
-    .eq("campaign_id", campaignId)
+  const { data: campaignRow } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
     .single();
-
-  if (!world) {
-    throw new Error("Für diese Kampagne existiert noch keine Welt. Bitte erstelle zuerst eine Welt.");
+  const worldId = (campaignRow as { world_id: string | null } | null)?.world_id;
+  if (!worldId) {
+    return [];
   }
 
-  // 3. Fetch all locations from world_lore (geographical types) that belong to this world
-  const geographicalTypes = ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden", "Dorf", "Festung", "Ruine", "Palast"];
-  
+  const { LOCATION_TYPES } = await import("@/src/lib/lore-types");
   const { data: locations, error } = await (supabase.from("world_lore") as any)
     .select("id, name, type")
-    .eq("campaign_id", campaignId)
-    .eq("world_id", world.id)
-    .in("type", geographicalTypes)
+    .eq("world_id", worldId)
+    .in("type", LOCATION_TYPES)
     .order("name");
 
   if (error) {
@@ -394,6 +380,35 @@ export async function getAllLocations(campaignId: string) {
     throw new Error(`Fehler beim Laden der Locations: ${error.message}`);
   }
 
+  return locations || [];
+}
+
+/** Alle Orte einer Welt (für GM-Zentrale, ohne Kampagne). */
+export async function getAllLocationsByWorld(worldId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: world } = await (supabase.from("worlds") as any)
+    .select("id, gm_id")
+    .eq("id", worldId)
+    .single();
+  if (!world || (world as { gm_id: string }).gm_id !== user.id) return [];
+
+  const { LOCATION_TYPES } = await import("@/src/lib/lore-types");
+  const { data: locations, error } = await (supabase.from("world_lore") as any)
+    .select("id, name, type")
+    .eq("world_id", worldId)
+    .in("type", LOCATION_TYPES)
+    .order("name");
+
+  if (error) {
+    console.error("getAllLocationsByWorld Error:", error);
+    return [];
+  }
   return locations || [];
 }
 
@@ -415,60 +430,54 @@ export async function createLocationQuick(formData: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. GM Check
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, world_id")
     .eq("id", formData.campaign_id)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
 
   if (!campaign || campaign.gm_id !== user.id) {
     throw new Error("Nur der GM kann Orte erstellen.");
   }
+  if (!campaign.world_id) {
+    throw new Error("Diese Kampagne hat keine Basis-Welt. Bitte weise eine Welt zu.");
+  }
+  const worldId = campaign.world_id;
 
-  // 3. Validate parent_location_id if provided (mit Fallback zu world_lore)
   let validatedParentLocationId: string | null = null;
   if (formData.parent_location_id) {
-    // 3.a Primär: Prüfe, ob Parent in locations existiert
     const { data: parentLocation } = await (supabase.from("locations") as any)
-      .select("id, campaign_id")
+      .select("id, world_id")
       .eq("id", formData.parent_location_id)
       .maybeSingle();
 
-    if (parentLocation && parentLocation.campaign_id === formData.campaign_id) {
+    if (parentLocation && parentLocation.world_id === worldId) {
       validatedParentLocationId = parentLocation.id;
     } else {
-      // 3.b Fallback: Prüfe, ob Parent in world_lore existiert
       const { data: parentLore } = await (supabase.from("world_lore") as any)
-        .select("id, campaign_id, name, type, description, parent_id")
+        .select("id, world_id, name, type, description, parent_id")
         .eq("id", formData.parent_location_id)
         .maybeSingle();
 
-      if (parentLore && parentLore.campaign_id === formData.campaign_id) {
-        // Rekursiv: Erstelle Parent-Ort, falls er noch nicht in locations existiert
+      if (parentLore && parentLore.world_id === worldId) {
         try {
-          // Prüfe, ob Parent bereits in locations existiert (nochmal, falls er zwischenzeitlich erstellt wurde)
           const { data: existingParent } = await (supabase.from("locations") as any)
-            .select("id, campaign_id")
+            .select("id")
             .eq("id", formData.parent_location_id)
             .maybeSingle();
 
           if (existingParent) {
             validatedParentLocationId = existingParent.id;
           } else {
-            // Erstelle Parent-Ort rekursiv (mit seinem eigenen Parent, falls vorhanden)
             let parentParentLocationId: string | null = null;
             if (parentLore.parent_id) {
-              // Rekursiver Aufruf für den Parent des Parents (max. 1 Ebene tief, um Endlosschleifen zu vermeiden)
               const { data: parentParentLore } = await (supabase.from("world_lore") as any)
-                .select("id, campaign_id")
+                .select("id, world_id, name, type, description")
                 .eq("id", parentLore.parent_id)
                 .maybeSingle();
 
-              if (parentParentLore) {
-                // Prüfe, ob Parent-Parent bereits in locations existiert
+              if (parentParentLore && parentParentLore.world_id === worldId) {
                 const { data: existingParentParent } = await (supabase.from("locations") as any)
                   .select("id")
                   .eq("id", parentLore.parent_id)
@@ -477,16 +486,14 @@ export async function createLocationQuick(formData: {
                 if (existingParentParent) {
                   parentParentLocationId = existingParentParent.id;
                 } else {
-                  // Erstelle Parent-Parent (ohne weitere Rekursion)
                   const { data: createdParentParent, error: createParentParentError } = await (supabase.from("locations") as any)
                     .insert({
                       id: parentParentLore.id,
-                      campaign_id: parentParentLore.campaign_id,
+                      world_id: worldId,
                       name: (parentParentLore as any).name || "Unbekannt",
                       type: (parentParentLore as any).type || "Ort",
                       description: (parentParentLore as any).description || null,
-                      parent_location_id: null, // Keine weitere Rekursion
-                      lore_id: parentParentLore.id,
+                      parent_location_id: null,
                     })
                     .select("id")
                     .single();
@@ -498,18 +505,16 @@ export async function createLocationQuick(formData: {
               }
             }
 
-            // Erstelle Parent-Ort
             const { data: createdParent, error: createParentError } = await (supabase.from("locations") as any)
               .insert({
                 id: parentLore.id,
-                campaign_id: parentLore.campaign_id,
+                world_id: worldId,
                 name: parentLore.name,
                 type: parentLore.type,
                 description: parentLore.description || null,
                 parent_location_id: parentParentLocationId,
-                lore_id: parentLore.id,
               })
-              .select("id, campaign_id")
+              .select("id")
               .single();
 
             if (createParentError || !createdParent) {
@@ -545,19 +550,15 @@ export async function createLocationQuick(formData: {
     }
   }
 
-  // 4. Prüfe, ob Location bereits existiert (in locations oder world_lore)
   const { data: existingLocation } = await (supabase.from("locations") as any)
-    .select("id, name, type, campaign_id")
-    .eq("campaign_id", formData.campaign_id)
+    .select("id, name, type")
+    .eq("world_id", worldId)
     .ilike("name", formData.name.trim())
     .maybeSingle();
 
   if (existingLocation) {
-    console.log("ℹ️ [createLocationQuick] Location existiert bereits:", {
-      id: existingLocation.id,
-      name: existingLocation.name,
-    });
-    revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/campaigns");
     return {
       id: existingLocation.id,
       name: existingLocation.name,
@@ -565,10 +566,9 @@ export async function createLocationQuick(formData: {
     };
   }
 
-  // 5. Prüfe, ob Location in world_lore existiert (ohne locations-Eintrag)
   const { data: existingLore } = await (supabase.from("world_lore") as any)
-    .select("id, campaign_id, name, type, description, parent_id")
-    .eq("campaign_id", formData.campaign_id)
+    .select("id, world_id, name, type, description, parent_id")
+    .eq("world_id", worldId)
     .ilike("name", formData.name.trim())
     .maybeSingle();
 
@@ -605,42 +605,36 @@ export async function createLocationQuick(formData: {
       }
     }
 
-    // 6.1. If no parent_location_id, try to find a "Welt" entry as default parent
     if (!parent_lore_id) {
       const { data: worldEntry } = await (supabase.from("world_lore") as any)
         .select("id")
-        .eq("campaign_id", formData.campaign_id)
+        .eq("world_id", worldId)
         .eq("type", "Welt")
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
-      
+
       if (worldEntry) {
         parent_lore_id = worldEntry.id;
       }
     }
 
-    // 7. Create Lore Entry (nur wenn noch nicht vorhanden)
     const { data: loreEntry, error: loreError } = await (supabase.from("world_lore") as any)
       .insert({
-        campaign_id: formData.campaign_id,
+        world_id: worldId,
         name: formData.name.trim(),
         type: formData.type,
-        parent_id: parent_lore_id, // Set parent_id in world_lore
+        parent_id: parent_lore_id,
         description: formData.description || null,
-        is_revealed: false, // Standardmäßig verborgen
       })
       .select("id")
       .single();
 
     if (loreError) {
-      console.error("❌ [createLocationQuick] Lore Error:", loreError);
-      // Prüfe, ob es ein Unique Constraint Fehler ist (Location existiert bereits)
       if (loreError.code === "23505" || loreError.message?.includes("unique constraint")) {
-        // Versuche, den bestehenden Eintrag zu finden
         const { data: existingLoreRetry } = await (supabase.from("world_lore") as any)
-          .select("id, campaign_id, name, type")
-          .eq("campaign_id", formData.campaign_id)
+          .select("id, name, type")
+          .eq("world_id", worldId)
           .ilike("name", formData.name.trim())
           .maybeSingle();
         
@@ -660,17 +654,14 @@ export async function createLocationQuick(formData: {
     }
   }
 
-  // 8. Create Location entry (using same ID as lore entry)
-  // Verwende validatedParentLocationId statt formData.parent_location_id
   const { data: location, error: locationError } = await (supabase.from("locations") as any)
     .insert({
       id: loreEntryId,
-      campaign_id: formData.campaign_id, // WICHTIG: campaign_id explizit setzen
+      world_id: worldId,
       name: formData.name.trim(),
       type: formData.type,
       description: formData.description || null,
-      parent_location_id: validatedParentLocationId, // Verwende validierte Parent-ID
-      lore_id: loreEntryId,
+      parent_location_id: validatedParentLocationId,
     })
     .select("id, name, type")
     .single();
@@ -692,7 +683,8 @@ export async function createLocationQuick(formData: {
     throw new Error(`Fehler beim Erstellen des Ortes: ${locationError.message}`);
   }
 
-  revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/campaigns");
   return location;
 }
 

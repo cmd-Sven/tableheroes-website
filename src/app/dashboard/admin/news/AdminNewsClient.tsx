@@ -13,7 +13,7 @@ import {
   type NewsPost,
   type NewsPostInsert,
 } from "@/src/lib/constants/news";
-import { Trash2, Edit, X } from "lucide-react";
+import { Trash2, Edit, X, Loader2, AlertTriangle } from "lucide-react";
 
 const NEWS_IMAGE_BASE = "/images/news/";
 const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
@@ -29,6 +29,8 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<NewsPostInsert>({
     title: "",
     category: "Web-Update",
@@ -105,21 +107,72 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Diesen News-Post wirklich löschen?")) return;
-    setSaving(true);
+    setDeletingId(id);
     try {
       const result = await deleteNewsPost(id);
       if (result.success) {
         toast.success("News gelöscht.");
+        setConfirmDeleteId(null);
         router.refresh();
       } else toast.error(result.error);
     } finally {
-      setSaving(false);
+      setDeletingId(null);
     }
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative rounded-lg border border-red-900/50 bg-background-card p-6 shadow-2xl max-w-md w-full mx-4">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-950/50 border border-red-900/50">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-barlow font-bold text-lg text-white mb-2">
+                  Beitrag unwiderruflich löschen?
+                </h3>
+                <p className="font-libre text-sm text-gray-400 leading-relaxed">
+                  Willst du diesen News-Post wirklich löschen? Diese Aktion kann
+                  nicht rückgängig gemacht werden.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => handleDelete(confirmDeleteId)}
+                disabled={!!deletingId}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded border border-red-900/50 bg-red-950/30 px-4 py-2 font-barlow font-bold uppercase text-sm text-red-400 hover:bg-red-950/50 transition-colors disabled:opacity-50"
+              >
+                {deletingId === confirmDeleteId ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Löschen…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Löschen
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={!!deletingId}
+                className="flex-1 rounded border border-hero-border bg-hero-dark/50 px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-8">
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
@@ -348,12 +401,16 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(post.id)}
-                    disabled={saving}
+                    onClick={() => setConfirmDeleteId(post.id)}
+                    disabled={saving || !!deletingId}
                     className="rounded p-2 text-gray-400 hover:bg-red-900/30 hover:text-red-400 transition-colors disabled:opacity-50"
                     title="Löschen"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {deletingId === post.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </li>
@@ -361,6 +418,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
           </ul>
         )}
       </section>
-    </div>
+      </div>
+    </>
   );
 }

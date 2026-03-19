@@ -4,6 +4,9 @@ import { redirect, notFound } from "next/navigation";
 import { NPCDetailPage } from "@/src/components/dashboard/campaigns/NPCDetailPage";
 import { getFactions } from "../../factions-actions";
 import { getLoreEntries } from "../../lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
+import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
+import { getCampaignNote } from "../../campaign-notes-actions";
 
 type Props = {
   params: Promise<{ id: string; npcId: string }>;
@@ -66,29 +69,39 @@ export default async function NPCDetailPageRoute({ params }: Props) {
     notFound();
   }
 
-  // 7. Verify NPC belongs to this campaign
-  if ((npc as any).campaign_id !== campaignId) {
+  // 7. Verify NPC belongs to campaign's world; für Spieler: nur bei campaign_visibility sichtbar
+  const { data: camp } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  if (!camp?.world_id || (npc as any).world_id !== camp.world_id) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
+  if (!isGM && !isAdmin) {
+    const visibility = await getVisibilityForCampaign(campaignId, "npc");
+    if (!visibility[npcId] && (npc as any).user_id !== user.id) {
+      redirect(`/dashboard/campaigns/${campaignId}?tab=npcs`);
+    }
+  }
 
-  // 8. Load factions and locations for dropdowns
+  // 8. Spieler-Notiz für diese Kampagne laden (isolierte campaign_notes)
+  const campaignNote = await getCampaignNote(campaignId, "npc", npcId);
+  const initialCampaignPlayerNote = campaignNote?.content ?? "";
+
+  // 9. Load factions and locations for dropdowns
   const factions = await getFactions(campaignId);
   const loreEntries = await getLoreEntries(campaignId);
   
   // Filter locations (geographical types)
   const locations = (loreEntries || [])
-    .filter((entry: any) =>
-      ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(
-        entry.type
-      )
-    )
+    .filter((entry: any) => isLocationType(entry.type))
     .map((entry: any) => ({
       id: entry.id,
       name: entry.name,
       type: entry.type,
     }));
 
-  // 9. Für Quest-Modal von NPC-Seite: NPC-Liste und Mitglieder laden (nur wenn GM)
+  // 10. Für Quest-Modal von NPC-Seite: NPC-Liste und Mitglieder laden (nur wenn GM)
   let npcsForQuest: Array<{ id: string; name: string; title: string | null; role: string | null }> = [];
   let membersForQuest: Array<{ id: string; character_id: string | null; user?: { username: string } | null; character_data?: any; characters?: any }> = [];
   if (isGM) {
@@ -120,9 +133,11 @@ export default async function NPCDetailPageRoute({ params }: Props) {
     <NPCDetailPage
       npc={npc}
       campaignId={campaignId}
+      worldId={(npc as { world_id?: string }).world_id}
       isGM={isGM}
       canEdit={canEdit}
       userId={user.id}
+      initialCampaignPlayerNote={initialCampaignPlayerNote}
       factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
       locations={locations}
       npcsForQuest={npcsForQuest}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Shield, Search, Filter, X } from "lucide-react";
+import { Plus, Shield, Search, Filter, X, Globe } from "lucide-react";
 import { FactionGridCard } from "@/src/components/dashboard/FactionGridCard";
 import { FactionDetailModal } from "@/src/components/dashboard/FactionDetailModal";
 import { deleteFaction, toggleFactionReveal } from "./factions-actions";
@@ -29,14 +29,29 @@ type NPC = {
   faction_id: string | null;
 };
 
+export type PlayerFactionReputation = {
+  faction_id: string;
+  faction_name: string;
+  reputation: number;
+  rank: string | null;
+};
+
 type Props = {
   campaignId: string;
+  worldId?: string;
   factions: Faction[];
   npcs?: NPC[];
   isGM: boolean;
+  playerFactionReputations?: PlayerFactionReputation[];
 };
 
-export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Props) {
+function getReputationColor(reputation: number): string {
+  if (reputation > 0) return "text-hero-vibrant";
+  if (reputation < 0) return "text-accent-blood";
+  return "text-gray-400";
+}
+
+export function FactionsManagement({ campaignId, worldId, factions, npcs = [], isGM, playerFactionReputations = [] }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [selectedFaction, setSelectedFaction] = useState<Faction | null>(null);
@@ -52,7 +67,7 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
 
   const handleToggleVisibility = async (faction: Faction) => {
     try {
-      await toggleFactionReveal(faction.id, faction.is_revealed);
+      await toggleFactionReveal(campaignId, faction.id, faction.is_revealed);
     } catch (error: any) {
       alert(error.message || "Fehler beim Ändern der Sichtbarkeit.");
     }
@@ -106,7 +121,7 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
           <Shield className="h-5 w-5 text-accent-gold" />
           Fraktionen ({factions.length})
         </h2>
-        {isGM && (
+        {isGM && !worldId && (
           <HeroButton
             href={`/dashboard/campaigns/${campaignId}/factions/new`}
             size="sm"
@@ -116,14 +131,51 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
             Neue Fraktion
           </HeroButton>
         )}
+        {isGM && worldId && (
+          <Link
+            href={`/dashboard/worlds/${worldId}/factions`}
+            className="inline-flex items-center gap-2 rounded bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
+          >
+            <Globe className="h-4 w-4" />
+            Fraktionen in der Welt verwalten
+          </Link>
+        )}
       </div>
+
+      {/* Spieler: Dein Ruf bei Fraktionen (nur lesbar) */}
+      {!isGM && playerFactionReputations.length > 0 && (
+        <div className="mb-6 rounded border border-hero-border bg-background-dark/50 p-4">
+          <h3 className="font-barlow font-semibold text-accent-gold mb-3 flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Dein Ruf bei Fraktionen
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {playerFactionReputations.map((r) => (
+              <div
+                key={r.faction_id}
+                className="inline-flex items-center gap-2 rounded-md border border-hero-dark bg-background-card px-3 py-2"
+              >
+                <span className="font-libre text-sm text-gray-300">{r.faction_name}</span>
+                <span className={`font-barlow font-bold ${getReputationColor(r.reputation)}`}>
+                  {r.reputation > 0 ? "+" : ""}{r.reputation}
+                </span>
+                {r.rank && (
+                  <span className="font-libre text-xs text-gray-500">({r.rank})</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Info Box (GM Only) */}
       {isGM && (
         <div className="mb-6 rounded border border-blue-700/30 bg-blue-900/20 p-4">
           <p className="font-libre text-sm text-blue-300 leading-relaxed">
-            <strong className="font-bold">Fraktionen visualisieren Beziehungen:</strong> Erstelle Gilden, Orden, Königreiche oder Kulte. 
-            Wenn du einen NPC erstellst, kannst du ihn einer Fraktion zuordnen – so behältst du den Überblick über Loyalitäten und Intrigen.
+            <strong className="font-bold">Fraktionen visualisieren Beziehungen:</strong>{" "}
+            {worldId
+              ? "Fraktionen legst du in der Welt-Zentrale an. Hier schaltest du sie pro Kampagne für Spieler frei (Auge-Symbol)."
+              : "Erstelle Gilden, Orden, Königreiche oder Kulte. Wenn du einen NPC erstellst, kannst du ihn einer Fraktion zuordnen – so behältst du den Überblick über Loyalitäten und Intrigen."}
           </p>
         </div>
       )}
@@ -216,10 +268,12 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
               </p>
               <p className="font-libre text-sm text-gray-400 mb-4">
                 {isGM 
-                  ? "Erstelle deine erste Fraktion, um Beziehungen und Konflikte zu visualisieren."
+                  ? (worldId
+                      ? "Fraktionen legst du in der Welt-Zentrale an. Über den Button oben gelangst du dorthin."
+                      : "Erstelle deine erste Fraktion, um Beziehungen und Konflikte zu visualisieren.")
                   : "Der Spielleiter hat noch keine Fraktionen für dich sichtbar gemacht."}
               </p>
-              {isGM && (
+              {isGM && !worldId && (
                 <Link
                   href={`/dashboard/campaigns/${campaignId}/factions/new`}
                   className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-white hover:bg-hero-dark transition-colors"
@@ -228,23 +282,36 @@ export function FactionsManagement({ campaignId, factions, npcs = [], isGM }: Pr
                   Erste Fraktion erstellen
                 </Link>
               )}
+              {isGM && worldId && (
+                <Link
+                  href={`/dashboard/worlds/${worldId}/factions`}
+                  className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-white hover:bg-hero-dark transition-colors"
+                >
+                  <Globe className="h-4 w-4" />
+                  Zur Welt-Zentrale (Fraktionen)
+                </Link>
+              )}
             </>
           )}
         </div>
       ) : (
         /* Faction Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredFactions.map((faction) => (
-            <FactionGridCard
-              key={faction.id}
-              faction={faction as any}
-              campaignId={campaignId}
-              onInfoClick={handleInfoClick as any}
-              isGM={isGM}
-              onDelete={isGM ? (handleDelete as any) : undefined}
-              onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}
-            />
-          ))}
+          {filteredFactions.map((faction) => {
+            const rep = playerFactionReputations.find((r) => r.faction_id === faction.id);
+            return (
+              <FactionGridCard
+                key={faction.id}
+                faction={faction as any}
+                campaignId={campaignId}
+                onInfoClick={handleInfoClick as any}
+                isGM={isGM}
+                onDelete={isGM ? (handleDelete as any) : undefined}
+                onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}
+                playerReputation={rep ? rep.reputation : undefined}
+              />
+            );
+          })}
         </div>
       )}
 

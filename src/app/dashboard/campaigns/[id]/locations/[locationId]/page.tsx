@@ -4,6 +4,7 @@ import { getLocationById, getNPCsByLocation, getLocationStats } from "../../loca
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Users, Home, MapPin } from "lucide-react";
+import { MarkdownDisplay } from "@/src/components/ui/MarkdownDisplay";
 
 type Props = {
   params: Promise<{ id: string; locationId: string }>;
@@ -86,9 +87,7 @@ export default async function LocationDetailPage({ params }: Props) {
             <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
               Beschreibung
             </h2>
-            <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-              {location.description}
-            </p>
+            <MarkdownDisplay content={location.description} />
           </div>
         )}
 

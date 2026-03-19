@@ -12,19 +12,13 @@ import { FireEffect } from "@/src/components/marketing/FireEffect";
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
 
-// DB Types (manuell gemappt aus Query-Result)
-type UserRow = {
-  username: string | null;
-  avatar_url: string | null;
-};
-
 type SessionRow = {
   id: string;
   start_time: string | null;
   status: string | null;
 };
 
-type CampaignWithRelations = {
+type CampaignRow = {
   id: string;
   name: string | null;
   system: string | null;
@@ -32,8 +26,6 @@ type CampaignWithRelations = {
   gm_id: string | null;
   mode: string | null;
   banner_url: string | null;
-  gm: UserRow | null;
-  sessions: SessionRow[];
 };
 
 export function ActiveCampaignsSection() {
@@ -45,53 +37,52 @@ export function ActiveCampaignsSection() {
 
     const load = async () => {
       try {
-        // 1. Fetch Campaigns + GM + Sessions
-        const { data, error } = await supabase
+        // 1. Kampagnen laden (OHNE sessions-Join – FK fehlt im Schema)
+        const { data: campData, error: campError } = await supabase
           .from("campaigns")
-          .select(
-            `
-        id,
-        gm_id,
-        name,
-        system,
-        max_players,
-        mode,
-        banner_url,
-        gm:users!gm_id (username, avatar_url),
-        sessions (id, start_time, status)
-      `
-          )
-          .eq("status", "Active")
+          .select("id, gm_id, name, system, max_players, mode, banner_url")
           .eq("is_published", true)
           .order("created_at", { ascending: false });
 
-        if (error) {
-          console.error("ActiveCampaignsSection Fetch Error:", error.message);
-          if (isMounted) {
-            setTickets([]);
-            setIsLoading(false);
-          }
+        if (campError) {
+          console.error("ActiveCampaignsSection Fetch Error:", campError.message);
+          if (isMounted) { setTickets([]); setIsLoading(false); }
           return;
         }
 
-        if (!data) {
-          if (isMounted) {
-            setTickets([]);
-            setIsLoading(false);
-          }
+        if (!campData || campData.length === 0) {
+          if (isMounted) { setTickets([]); setIsLoading(false); }
           return;
         }
 
-        // Casten, weil Supabase Types manchmal tricky sind bei Deep Joins
-        const campaigns = data as unknown as CampaignWithRelations[];
+        const campaigns = campData as CampaignRow[];
+        const campaignIds = campaigns.map((c) => c.id);
 
+        // 2. Sessions separat laden
+        const { data: sessData, error: sessError } = await supabase
+          .from("sessions")
+          .select("id, campaign_id, start_time, status")
+          .in("campaign_id", campaignIds);
+
+        if (sessError) {
+          console.error("ActiveCampaignsSection Sessions Error:", sessError.message);
+        }
+
+        const allSessions = (sessData ?? []) as (SessionRow & { campaign_id: string })[];
         const now = new Date();
 
-        // 2. JS-Logik: Nächste Session finden & Sortieren
+        // Sessions nach Kampagne gruppieren & nächste zukünftige Session finden
+        const sessionMap = new Map<string, SessionRow[]>();
+        for (const s of allSessions) {
+          const arr = sessionMap.get(s.campaign_id) ?? [];
+          arr.push(s);
+          sessionMap.set(s.campaign_id, arr);
+        }
+
         const relevantCampaigns = campaigns
           .map((c) => {
-            if (!c.sessions) return null;
-            const futureSessions = c.sessions
+            const sessions = sessionMap.get(c.id) ?? [];
+            const futureSessions = sessions
               .filter((s) => s.start_time && new Date(s.start_time) > now)
               .sort(
                 (a, b) =>
@@ -107,27 +98,49 @@ export function ActiveCampaignsSection() {
               dateObj: new Date(futureSessions[0].start_time!),
             };
           })
-          .filter((item) => item !== null) as {
-          campaign: CampaignWithRelations;
+          .filter(Boolean) as {
+          campaign: CampaignRow;
           nextSession: SessionRow;
           dateObj: Date;
         }[];
 
-        // Sort by Date Ascending
         relevantCampaigns.sort(
           (a, b) => a.dateObj.getTime() - b.dateObj.getTime()
         );
 
-        // Limit 3
         const top3 = relevantCampaigns.slice(0, 3);
 
-        // Final Mapping & Async Member Count fetching
+        // 3. GM-User-Daten separat laden
+        const gmIds = [...new Set(top3.map((t) => t.campaign.gm_id).filter(Boolean))] as string[];
+        const gmMap = new Map<string, { username: string | null; avatar_url: string | null }>();
+        if (gmIds.length > 0) {
+          const { data: gmRows } = await supabase
+            .from("users")
+            .select("id, username, avatar_url")
+            .in("id", gmIds);
+          for (const gm of gmRows ?? []) {
+            gmMap.set((gm as any).id, { username: (gm as any).username, avatar_url: (gm as any).avatar_url });
+          }
+        }
+
+        // 4. Member-Counts & Ticket-Aufbau
         const finalTickets: SessionTicket[] = [];
+
+        const dateFormatter = new Intl.DateTimeFormat("de-DE", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          timeZone: "Europe/Berlin",
+        });
+        const timeFormatter = new Intl.DateTimeFormat("de-DE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Berlin",
+        });
 
         for (const item of top3) {
           const { campaign: c, dateObj } = item;
 
-          // Slots: Nur bestätigte Spieler zählen (Status "Accepted"), GM nicht mitzählen
           let currentPlayers = 0;
           const { data: memberRows, error: membersError } = await (supabase
             .from("campaign_members") as any)
@@ -136,10 +149,7 @@ export function ActiveCampaignsSection() {
             .eq("status", "Accepted");
 
           if (membersError) {
-            console.error(
-              `❌ Member Fetch Error for Campaign ${c.id}:`,
-              membersError
-            );
+            console.error(`Member Fetch Error for Campaign ${c.id}:`, membersError);
           } else if (Array.isArray(memberRows)) {
             currentPlayers = memberRows.filter((row: any) => {
               const userId = row.user_id as string | null;
@@ -149,14 +159,6 @@ export function ActiveCampaignsSection() {
 
           const max = c.max_players || 0;
 
-          // Debug Logging in Development
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `🎟️ Campaign "${c.name}": ${currentPlayers}/${max} Plätze belegt`
-            );
-          }
-
-          // Visual Label mit Farbcodierung
           let slotsLabel = "";
           if (max === 0) {
             slotsLabel = "Auf Anfrage";
@@ -166,24 +168,14 @@ export function ActiveCampaignsSection() {
             slotsLabel = `${currentPlayers} / ${max} Plätze belegt`;
           }
 
-          const dateFormatter = new Intl.DateTimeFormat("de-DE", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-            timeZone: "Europe/Berlin",
-          });
-          const timeFormatter = new Intl.DateTimeFormat("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Europe/Berlin",
-          });
+          const gm = gmMap.get(c.gm_id ?? "");
 
           finalTickets.push({
             campaignId: c.id,
             campaignName: c.name || "Unbenanntes Abenteuer",
             gameSystem: c.system || "System offen",
-            gmUsername: c.gm?.username || "Unbekannt",
-            gmAvatarUrl: c.gm?.avatar_url || null,
+            gmUsername: gm?.username || "Unbekannt",
+            gmAvatarUrl: gm?.avatar_url || null,
             bannerUrl: c.banner_url || null,
             location: c.mode || "Online",
             dateString: dateFormatter.format(dateObj),

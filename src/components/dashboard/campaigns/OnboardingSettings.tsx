@@ -6,6 +6,7 @@ import { Users, MapPin, Loader2, Check, User, AlertCircle, Search, Save } from "
 import { updateFactionAllowPcJoin } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { updateLoreAllowPcOrigin } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { updateNPCAllowPcOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { BUILDING_LOCATION_TYPES, LARGE_LOCATION_TYPES } from "@/src/lib/lore-types";
 
 type Faction = { id: string; name: string; type?: string; allow_pc_join_on_creation?: boolean };
 type Location = { id: string; name: string; type: string; parent_id?: string | null; allow_pc_origin?: boolean };
@@ -23,9 +24,6 @@ type Props = {
   locations: Location[];
   npcs?: NPC[];
 };
-
-const LARGE_LOCATION_TYPES = ["Stadt", "Region", "Ort", "Land", "Insel"];
-const BUILDING_LOCATION_TYPES = ["Gebäude", "Tempel", "Dungeon", "Akademie", "Markt", "Laden"];
 
 type CategoryFilter = "all" | "factions" | "locations" | "npcs";
 
@@ -98,14 +96,14 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
   const largeLocations = useMemo(
     () =>
       [...locations]
-        .filter((l) => LARGE_LOCATION_TYPES.includes(l.type))
+        .filter((l) => LARGE_LOCATION_TYPES.includes(l.type as any))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [locations]
   );
   const buildingLocations = useMemo(
     () =>
       [...locations]
-        .filter((l) => BUILDING_LOCATION_TYPES.includes(l.type))
+        .filter((l) => (BUILDING_LOCATION_TYPES as readonly string[]).includes(l.type))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [locations]
   );

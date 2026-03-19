@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import { User, Eye, EyeOff, Edit2, Trash2, AlertCircle, Shield } from "lucide-react";
 import { deleteNPC, toggleNPCReveal } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 
@@ -11,6 +12,7 @@ type NPC = {
   description: string | null;
   gm_notes: string | null;
   is_revealed: boolean;
+  image_url?: string | null;
   factions?: {
     id: string;
     name: string;
@@ -20,18 +22,20 @@ type NPC = {
 
 type Props = {
   npc: NPC;
+  campaignId?: string;
   isGM: boolean;
   onEdit: (npc: NPC) => void;
 };
 
-export function NPCCard({ npc, isGM, onEdit }: Props) {
+export function NPCCard({ npc, campaignId, isGM, onEdit }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showGMNotes, setShowGMNotes] = useState(false);
 
   const handleToggleReveal = () => {
+    if (!campaignId) return;
     startTransition(async () => {
       try {
-        await toggleNPCReveal(npc.id, npc.is_revealed);
+        await toggleNPCReveal(campaignId, npc.id, npc.is_revealed);
       } catch (error: any) {
         alert(error.message);
       }
@@ -53,35 +57,50 @@ export function NPCCard({ npc, isGM, onEdit }: Props) {
     <article className={`gothic-dashboard-card p-6 transition-all ${npc.is_revealed ? "ring-1 ring-hero-vibrant/60" : ""}`}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <User className="h-5 w-5 text-accent-gold flex-shrink-0 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]" />
-            <h3 className="font-cinzel font-bold text-xl text-accent-gold truncate drop-shadow-[0_0_8px_rgba(0,0,0,0.9)]">
-              {npc.name}
-            </h3>
-          </div>
-
-          {/* Title/Role */}
-          {npc.title && (
-            <p className="font-barlow text-sm text-emerald-100 uppercase tracking-wide mb-2 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
-              {npc.title}
-            </p>
-          )}
-
-          {/* Faction Badge */}
-          {npc.factions && (
-            <div className="flex items-center gap-1.5 text-xs font-libre text-emerald-50 mt-2 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
-              <Shield className="h-3 w-3 text-accent-gold" />
-              <span>
-                Mitglied der <span className="text-accent-gold font-semibold">{npc.factions.name}</span>
-              </span>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {npc.image_url ? (
+            <div className="relative h-14 w-14 shrink-0 rounded-lg overflow-hidden border border-hero-border bg-hero-dark/50">
+              <Image
+                src={npc.image_url}
+                alt={npc.name}
+                fill
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <div className="grid h-14 w-14 place-items-center rounded-lg bg-hero-dark/50 border border-hero-border shrink-0">
+              <User className="h-8 w-8 text-accent-gold drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]" />
             </div>
           )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="font-cinzel font-bold text-xl text-accent-gold truncate drop-shadow-[0_0_8px_rgba(0,0,0,0.9)]">
+                {npc.name}
+              </h3>
+            </div>
+
+            {/* Title/Role */}
+            {npc.title && (
+              <p className="font-barlow text-sm text-emerald-100 uppercase tracking-wide mb-2 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
+                {npc.title}
+              </p>
+            )}
+
+            {/* Faction Badge */}
+            {npc.factions && (
+              <div className="flex items-center gap-1.5 text-xs font-libre text-emerald-50 mt-2 drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]">
+                <Shield className="h-3 w-3 text-accent-gold" />
+                <span>
+                  Mitglied der <span className="text-accent-gold font-semibold">{npc.factions.name}</span>
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* GM Actions */}
         {isGM && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleToggleReveal}
               disabled={isPending}

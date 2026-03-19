@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { QuestForm } from "@/src/components/dashboard/campaigns/quests/QuestForm";
 import { getNPCs } from "../../npc-actions";
 import { getLoreEntries } from "../../lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -38,11 +39,7 @@ export default async function CreateQuestPage({ params, searchParams }: Props) {
   
   // Filter locations (geographical types)
   const locations = (loreEntries || [])
-    .filter((entry: any) =>
-      ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(
-        entry.type
-      )
-    )
+    .filter((entry: any) => isLocationType(entry.type))
     .map((entry: any) => ({
       id: entry.id,
       name: entry.name,

@@ -68,7 +68,7 @@ export function CheckResultsEditor({ checkResults, onChange, isGM = true }: Prop
   };
 
   const handleDelete = (index: number) => {
-    if (confirm("Möchtest du diese Probe wirklich löschen?")) {
+    if (confirm("Möchtest du diese Ergebnis-Stufe wirklich löschen?")) {
       const updated = [...checkResults];
       updated.splice(index, 1);
       onChange(updated);
@@ -95,25 +95,30 @@ export function CheckResultsEditor({ checkResults, onChange, isGM = true }: Prop
 
   return (
     <div className="rounded-lg border-2 border-accent-gold/50 bg-slate-900/80 p-6 space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-barlow font-bold text-xl uppercase text-accent-gold flex items-center gap-2">
-          <Eye className="h-5 w-5" />
-          Proben & Informationen
-        </h3>
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2 rounded border border-hero-vibrant bg-hero-vibrant/10 text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors font-barlow font-bold text-sm uppercase"
-        >
-          <Plus className="h-4 w-4" />
-          Weitere Probe hinzufügen
-        </button>
+      <div className="mb-2">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-barlow font-bold text-xl uppercase text-accent-gold flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Ergebnisse für Spielerproben
+          </h3>
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="flex items-center gap-2 px-4 py-2 rounded border border-hero-vibrant bg-hero-vibrant/10 text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors font-barlow font-bold text-sm uppercase"
+          >
+            <Plus className="h-4 w-4" />
+            Weitere Stufe hinzufügen
+          </button>
+        </div>
+        <p className="font-libre text-sm text-gray-400">
+          Mögliche Ergebnisse für den GM: Was Spieler mit ihren Charakteren bei Würfen auf Wahrnehmung, Motiv erkennen oder Wissen über diesen NPC entdecken können (z. B. bei DC 12 / DC 18 / kritischem Erfolg). Der NPC würfelt nicht – die Spieler.
+        </p>
       </div>
 
       {checkResults.length === 0 ? (
         <div className="text-center py-8 text-gray-400 font-libre">
-          <p>Noch keine Proben-Ergebnisse vorhanden.</p>
-          <p className="text-sm mt-2">Klicke auf "Weitere Probe hinzufügen", um eine neue Probe zu erstellen.</p>
+          <p>Noch keine Ergebnisse für Spielerproben definiert.</p>
+          <p className="text-sm mt-2">Füge DC-Stufen hinzu, die der GM nutzen kann, wenn Spieler gegen diesen NPC würfeln.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -191,7 +196,7 @@ export function CheckResultsEditor({ checkResults, onChange, isGM = true }: Prop
 
                           <div>
                             <label className="block mb-1 font-barlow font-semibold text-xs uppercase text-gray-300">
-                              Ergebnis
+                              Was der Spielercharakter bei diesem Wurf erfährt
                             </label>
                             <textarea
                               value={editingResult.result}
@@ -203,7 +208,7 @@ export function CheckResultsEditor({ checkResults, onChange, isGM = true }: Prop
                               }
                               rows={3}
                               className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold resize-none"
-                              placeholder="Beschreibung des Ergebnisses bei diesem DC..."
+                              placeholder="z. B. Bemerkt die Narbe über dem linken Auge und die Wachtuniform. Bei kritischem Erfolg: erkennt das Abzeichen der Stadtwache."
                             />
                           </div>
 

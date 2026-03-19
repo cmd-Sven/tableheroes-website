@@ -96,19 +96,20 @@ export async function submitCharacterApplication(data: SubmitCharacterApplicatio
 
   if (error) {
     console.error("Create Character Application Error:", error);
+    console.error("Fehlerinhalt:", JSON.stringify(error, null, 2));
     throw new Error(error.message);
   }
 
-  // Update campaign_members Status zu "In_Review"
-  // (Die Bewerbung existiert bereits mit Status "Drafting")
+  // Update campaign_members: character_id setzen + Status "In_Review"
+  // WICHTIG: Nach user_id filtern, da character_id beim Apply noch null war
   const { error: applicationError } = await (supabase.from("campaign_members") as any)
-    .update({ status: "In_Review" })
+    .update({ status: "In_Review", character_id: character.id })
     .eq("campaign_id", data.campaignId)
-    .eq("user_id", user.id)
-    .eq("character_id", character.id);
+    .eq("user_id", user.id);
 
   if (applicationError) {
     console.error("Create Application Error:", applicationError);
+    console.error("Fehlerinhalt:", JSON.stringify(applicationError, null, 2));
     throw new Error(applicationError.message);
   }
 

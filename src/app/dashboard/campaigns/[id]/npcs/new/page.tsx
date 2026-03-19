@@ -24,19 +24,28 @@ export default async function CreateNPCPage({ params, searchParams }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  // 2. Check if user is GM
+  // 2. Check if user is GM und ob Kampagne eine Welt hat
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, world_id")
     .eq("id", campaignId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
 
   if (!campaign) redirect("/dashboard");
   if (campaign.gm_id !== user.id) redirect(`/dashboard/campaigns/${campaignId}`);
 
-  // 3. Load world data
+  // GM: NPCs werden in der Welt angelegt – Redirect zur Welt-NPC-Wizard-Seite (NarrativeNPCWizard)
+  if (campaign.world_id) {
+    const q = new URLSearchParams();
+    if (prefillName) q.set("prefill_name", prefillName);
+    if (prefillRelationship) q.set("prefill_relationship", prefillRelationship);
+    if (prefillDescription) q.set("prefill_description", prefillDescription);
+    const query = q.toString();
+    redirect(`/dashboard/worlds/${campaign.world_id}/npcs/create${query ? `?${query}` : ""}`);
+  }
+
+  // 3. Load world data (Fallback ohne world_id)
   const world = await getWorldByCampaign(campaignId);
 
   // 4. Load factions and locations

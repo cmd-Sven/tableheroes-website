@@ -15,12 +15,13 @@ export default async function AdminNewsPage() {
   if (!user) redirect("/");
 
   const { data: profile } = await (supabase.from("users") as any)
-    .select("primary_role")
+    .select("primary_role, is_super_admin")
     .eq("id", user.id)
     .single();
 
-  const role = (profile as { primary_role?: string } | null)?.primary_role;
-  if (role !== "Admin") {
+  const role = (profile as { primary_role?: string; is_super_admin?: boolean } | null)?.primary_role;
+  const isSuperAdmin = (profile as { primary_role?: string; is_super_admin?: boolean } | null)?.is_super_admin;
+  if (role !== "Admin" && !isSuperAdmin) {
     redirect("/dashboard");
   }
 

@@ -380,14 +380,8 @@ export async function sendMessage(
 // ============================================================================
 
 /**
- * Setzt `read_at` auf now() für eine Nachricht.
- *
- * - Direktnachrichten: Update nur wenn recipient_id == user.id
- * - Broadcasts (recipient_id IS NULL): Erstelle/Update einen Eintrag in
- *   `message_reads` ODER setze direkt read_at (falls kein separater Tracker).
- *
- * Aktuell: Einfaches Update auf der messages-Zeile, mit separatem Handling
- * für direct vs. broadcast.
+ * Setzt `is_read = true` und `read_at = now()` für eine Nachricht.
+ * Nur erlaubt, wenn der User Empfänger ist (recipient_id = user.id) oder bei Broadcast.
  */
 export async function markMessageAsRead(
   messageId: string
@@ -401,7 +395,6 @@ export async function markMessageAsRead(
 
   const now = new Date().toISOString();
 
-  // Zuerst die Nachricht laden, um den Typ zu prüfen
   const { data: message } = await (supabase.from("messages") as any)
     .select("id, recipient_id, read_at, type")
     .eq("id", messageId)
@@ -411,19 +404,18 @@ export async function markMessageAsRead(
     return { success: false, error: "Nachricht nicht gefunden." };
   }
 
-  // Schon gelesen? Dann nichts tun.
   if (message.read_at) {
     return { success: true };
   }
 
-  // Direktnachricht: Nur updaten wenn der User der Empfänger ist
+  // Direktnachricht: Nur wenn recipient_id === user.id
   if (message.recipient_id) {
     if (message.recipient_id !== user.id) {
       return { success: false, error: "Keine Berechtigung." };
     }
 
     const { error } = await (supabase.from("messages") as any)
-      .update({ read_at: now })
+      .update({ read_at: now, is_read: true })
       .eq("id", messageId)
       .eq("recipient_id", user.id);
 
@@ -432,10 +424,8 @@ export async function markMessageAsRead(
       return { success: false, error: error.message };
     }
   } else {
-    // Broadcast: read_at direkt auf der Zeile setzen
-    // (Hinweis: bei mehreren Empfängern wäre eine message_reads-Tabelle besser)
     const { error } = await (supabase.from("messages") as any)
-      .update({ read_at: now })
+      .update({ read_at: now, is_read: true })
       .eq("id", messageId)
       .is("recipient_id", null);
 
@@ -446,6 +436,7 @@ export async function markMessageAsRead(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/messages");
   return { success: true };
 }
 
@@ -558,5 +549,123 @@ export async function getPlayerMessages(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  return mapped.slice(0, 20);
+  // Auto-Cleanup: Gelesene Nachrichten älter als 30 Tage ausblenden
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const filtered = mapped.filter((m) => {
+    if (!m.readAt) return true;
+    return new Date(m.createdAt) >= thirtyDaysAgo;
+  });
+
+  return filtered.slice(0, 50);
+}
+
+// ============================================================================
+// 6. Unread Inbox (für Dashboard-Card, max 3)
+// ============================================================================
+
+/**
+ * Lädt nur ungelesene Nachrichten für den User (recipient_id = userId oder Broadcast in seiner Kampagne).
+ * Max 3 Einträge für die Inbox-Card.
+ * Gelesene Nachrichten älter als 30 Tage werden ignoriert.
+ */
+export async function getUnreadInboxMessages(
+  userId: string
+): Promise<PlayerMessage[]> {
+  const all = await getPlayerMessages(userId);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const unread = all.filter((m) => {
+    if (m.readAt) return false;
+    return new Date(m.createdAt) >= thirtyDaysAgo;
+  });
+  return unread.slice(0, 3);
+}
+
+// ============================================================================
+// 7. Delete Message
+// ============================================================================
+
+/**
+ * Löscht eine Nachricht. Nur erlaubt wenn recipient_id === user.id (Empfänger darf seine Kopie löschen).
+ * Bei Broadcast (recipient_id null) wird nicht gelöscht – nur Direktnachrichten.
+ */
+export async function deleteMessage(
+  messageId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Nicht authentifiziert." };
+
+  const { data: message } = await (supabase.from("messages") as any)
+    .select("id, recipient_id")
+    .eq("id", messageId)
+    .maybeSingle();
+
+  if (!message) {
+    return { success: false, error: "Nachricht nicht gefunden." };
+  }
+
+  // Nur eigene Nachrichten (Empfänger) dürfen gelöscht werden
+  if (message.recipient_id !== user.id) {
+    return { success: false, error: "Keine Berechtigung." };
+  }
+
+  const { error } = await (supabase.from("messages") as any)
+    .delete()
+    .eq("id", messageId)
+    .eq("recipient_id", user.id);
+
+  if (error) {
+    console.error("[deleteMessage]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/messages");
+  return { success: true };
+}
+
+/**
+ * Löscht alle gelesenen Nachrichten des Users (recipient_id = user.id).
+ */
+export async function deleteAllReadMessages(
+  userId: string
+): Promise<{ success: boolean; deleted?: number; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.id !== userId) {
+    return { success: false, error: "Nicht autorisiert." };
+  }
+
+  const { data: rows, error: selectError } = await (supabase.from("messages") as any)
+    .select("id")
+    .eq("recipient_id", userId)
+    .not("read_at", "is", null);
+
+  if (selectError) {
+    return { success: false, error: selectError.message };
+  }
+
+  const ids = ((rows as any[]) || []).map((r: any) => r.id);
+  if (ids.length === 0) {
+    return { success: true, deleted: 0 };
+  }
+
+  const { error: deleteError } = await (supabase.from("messages") as any)
+    .delete()
+    .eq("recipient_id", userId)
+    .not("read_at", "is", null);
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/messages");
+  return { success: true, deleted: ids.length };
 }

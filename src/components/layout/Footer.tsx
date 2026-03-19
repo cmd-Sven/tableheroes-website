@@ -2,38 +2,21 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, Mail, MessageCircle, Instagram, Home, Settings, LogIn, Heart } from "lucide-react";
+import { Mail, MessageCircle, Instagram, Home, Settings, LogIn, Heart } from "lucide-react";
 import { HeroButton } from "@/src/components/ui/HeroButton";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
-import { TwinklingStars } from "@/src/components/marketing/TwinklingStars";
+import { StarrySkySection } from "@/src/components/layout/StarrySkySection";
 
-export function Footer() {
+type FooterProps = {
+  /** Wenn false, wird nur der untere Footer-Bereich (Navigation, Links) gerendert – z.B. auf der Login-Seite. Default: true */
+  showStarrySection?: boolean;
+};
+
+export function Footer({ showStarrySection = true }: FooterProps) {
   return (
-    <div className="relative">
-      {/* Top Section - Contact Banner */}
-      <div
-        className="relative overflow-visible"
-        style={{
-          backgroundImage: "url('/images/nachthimmel-bg.webp')",
-          backgroundSize: "cover",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed",
-        }}
-      >
-        {/* Dunkler Overlay für bessere Lesbarkeit mit radialem Verlauf (Vignette) */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%)",
-            zIndex: 1,
-          }}
-        />
-        
-        {/* Animierte glitzernde Sterne */}
-        <TwinklingStars />
-        
-        <div className="relative container mx-auto max-w-7xl px-6" style={{ zIndex: 10, paddingTop: "48px", paddingBottom: "348px" }}>
+    <div className="relative w-full min-w-0 max-w-full">
+      {showStarrySection && (
+        <StarrySkySection className="pt-12 pb-[348px]">
           <div className="flex flex-col items-center text-center gap-6">
             <div>
               <h2 className="font-barlow font-bold text-2xl uppercase text-white mb-2">
@@ -43,7 +26,6 @@ export function Footer() {
                 Wir sind immer offen für neue Gesichter. Schreib uns einfach oder komm auf unseren Server.
               </p>
             </div>
-            
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
               <HeroButton
                 href="mailto:kontakt@tableheroes.de"
@@ -61,12 +43,45 @@ export function Footer() {
               </HeroButton>
             </div>
           </div>
-        </div>
-      </div>
+        </StarrySkySection>
+      )}
 
-      {/* Bottom Section - Navigation & Socials */}
-      <footer className="bg-[#051a02] relative" style={{ zIndex: 3 }}>
-        {/* Hintergrund-Layer nur für den grünen Footer mit Fade nach oben */}
+      {/* Bottom Section: transparent, damit StarrySkySection dahinter sichtbar bleibt; nur Lagerfeuer + Inhalt */}
+      <footer className="bg-transparent relative w-full min-w-0 max-w-full" style={{ zIndex: 3 }}>
+        {/* Lagerfeuer-Zone: nur Bild (mit weicher Maske) + Feuer; keine Sterne – Sterne liegen in StarrySkySection */}
+        <div
+          className="absolute top-0 left-0 right-0 z-0 -translate-y-[90%] pointer-events-none overflow-hidden"
+        >
+          {/* Bild-Container: volle Breite, festes Seitenverhältnis; Maske/Vignette auf w-full */}
+          <div className="relative z-10 min-w-0-force w-full">
+            <div className="min-w-0-force aspect-video w-full relative">
+              {/* Lagerfeuer-Bild mit Maskierung: weicher Übergang nach oben zu dahinterliegenden Sternen (volle Breite) */}
+              <div
+                className="absolute inset-0 z-0 w-full mask-[radial-gradient(ellipse_80%_70%_at_50%_50%,black_55%,transparent_100%)]"
+                style={{ WebkitMaskImage: "radial-gradient(ellipse 80% 70% at 50% 50%, black 55%, transparent 100%)" }}
+              >
+                <Image
+                  src="/images/camp-footer-top.png"
+                  alt=""
+                  fill
+                  priority
+                  className="w-full object-cover object-center"
+                  sizes="100vw"
+                />
+              </div>
+              {/* Animiertes Feuer: Position auf sichtbarem Lagerfeuer – ggf. nach Augenmaß anpassen (left/top %) */}
+              <div
+                className="hidden md:block absolute left-[83.75%] top-[65.125%] w-[15%] aspect-square z-20 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-90"
+                aria-hidden
+              >
+                <div className="scale-[1.2] origin-bottom w-full h-full">
+                  <FireEffect />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Grüner Hintergrund nur unten: oben transparent, damit StarrySkySection durchscheint */}
         <div
           className="absolute inset-0 -z-10"
           style={{
@@ -75,34 +90,6 @@ export function Footer() {
             maskImage: "linear-gradient(to bottom, transparent 0%, black 20%, black 100%)",
           }}
         />
-        {/* Image Overlay - 90% in Kontakt-Sektion, 10% in Footer */}
-        {/* Bild am Anfang des Footers, mit translateY(-90%) verschoben */}
-        <div
-          className="absolute top-0 left-0 w-full pointer-events-none"
-          style={{
-            height: "650px",
-            transform: "translateY(-90%)",
-            zIndex: 5,
-            backgroundImage: "url('/images/camp-footer-top.png')",
-            backgroundSize: "cover",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        >
-          {/* Feuer-Effekt auf dem Divider-Bild - nur Desktop */}
-          <div
-            className="hidden md:block absolute top-1/2 pointer-events-none -ml-[110px] mt-[180px] opacity-90"
-            style={{
-              left: "83%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 6,
-            }}
-          >
-            <div className="scale-[1.2] origin-bottom">
-              <FireEffect />
-            </div>
-          </div>
-        </div>
         <div
           className="container mx-auto max-w-7xl px-6 pb-[198px] relative"
           style={{ zIndex: 10, paddingTop: "168px" }} // Ursprünglich ca. 48px (pt-12) + 120px zusätzlicher Shift
@@ -152,7 +139,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/maintenance"
+                  href="/login"
                   className="flex items-center gap-2 font-libre text-gray-400 text-sm hover:text-hero-vibrant transition-colors"
                 >
                   <LogIn className="h-4 w-4" />

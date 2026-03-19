@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { X, Save, Plus, Trash2, Loader2 } from "lucide-react";
+import { useState, useTransition, useEffect } from "react";
+import { X, Save, Plus, Trash2, Loader2, Shield } from "lucide-react";
 import { updateCharacterByGM } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import {
+  getCharacterFactionReputations,
+  upsertCharacterFactionReputation,
+  deleteCharacterFactionReputation,
+  type FactionReputation,
+} from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
 
 type Character = {
   id: string;
@@ -32,12 +38,15 @@ type NPC = {
   title: string | null;
 };
 
+type Faction = { id: string; name: string };
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   character: Character;
   campaignId: string;
   npcs: NPC[];
+  factions?: Faction[];
 };
 
 export function GMCharacterEditor({
@@ -46,8 +55,15 @@ export function GMCharacterEditor({
   character,
   campaignId,
   npcs,
+  factions = [],
 }: Props) {
   const [isPending, startTransition] = useTransition();
+  const [reputations, setReputations] = useState<FactionReputation[]>([]);
+  const [loadingReputations, setLoadingReputations] = useState(true);
+  const [repPending, setRepPending] = useState(false);
+  const [newRepFactionId, setNewRepFactionId] = useState("");
+  const [newRepValue, setNewRepValue] = useState(0);
+  const [newRepRank, setNewRepRank] = useState("");
   const [status, setStatus] = useState(character.status || "Alive");
   const [level, setLevel] = useState(character.level || 1);
   const [biography, setBiography] = useState(character.biography || "");
@@ -66,6 +82,15 @@ export function GMCharacterEditor({
       description: rel.description || "",
     }))
   );
+
+  useEffect(() => {
+    if (isOpen && character.id) {
+      setLoadingReputations(true);
+      getCharacterFactionReputations(character.id, campaignId)
+        .then(setReputations)
+        .finally(() => setLoadingReputations(false));
+    }
+  }, [isOpen, character.id, campaignId]);
 
   if (!isOpen) return null;
 
@@ -112,6 +137,69 @@ export function GMCharacterEditor({
       }
     });
   };
+
+  const handleAddReputation = async () => {
+    if (!newRepFactionId || repPending) return;
+    setRepPending(true);
+    try {
+      await upsertCharacterFactionReputation({
+        campaign_id: campaignId,
+        character_id: character.id,
+        faction_id: newRepFactionId,
+        reputation: newRepValue,
+        rank: newRepRank.trim() || null,
+      });
+      const list = await getCharacterFactionReputations(character.id, campaignId);
+      setReputations(list);
+      setNewRepFactionId("");
+      setNewRepValue(0);
+      setNewRepRank("");
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setRepPending(false);
+    }
+  };
+
+  const handleDeleteReputation = async (repId: string) => {
+    if (repPending) return;
+    setRepPending(true);
+    try {
+      await deleteCharacterFactionReputation({ campaign_id: campaignId, reputation_id: repId });
+      setReputations((prev) => prev.filter((r) => r.id !== repId));
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setRepPending(false);
+    }
+  };
+
+  const handleUpdateReputation = async (rep: FactionReputation, updates: { reputation?: number; rank?: string | null }) => {
+    if (repPending) return;
+    setRepPending(true);
+    try {
+      await upsertCharacterFactionReputation({
+        campaign_id: campaignId,
+        character_id: character.id,
+        faction_id: rep.faction_id,
+        reputation: updates.reputation ?? rep.reputation,
+        rank: updates.rank !== undefined ? updates.rank : rep.rank,
+      });
+      setReputations((prev) =>
+        prev.map((r) =>
+          r.id === rep.id
+            ? { ...r, reputation: updates.reputation ?? r.reputation, rank: updates.rank !== undefined ? updates.rank : r.rank }
+            : r
+        )
+      );
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setRepPending(false);
+    }
+  };
+
+  const factionsWithoutRep = factions.filter((f) => !reputations.some((r) => r.faction_id === f.id));
 
   const availableNPCs = npcs.filter(
     (npc) =>
@@ -311,6 +399,114 @@ export function GMCharacterEditor({
               </div>
             )}
           </div>
+
+          {/* Ruf bei Fraktionen */}
+          {factions.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="flex items-center gap-2 font-barlow font-bold text-sm uppercase text-gray-300">
+                  <Shield className="h-4 w-4 text-accent-gold" />
+                  Ruf bei Fraktionen
+                </label>
+                {factionsWithoutRep.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={newRepFactionId}
+                      onChange={(e) => setNewRepFactionId(e.target.value)}
+                      className="rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white outline-none focus:border-accent-gold"
+                      disabled={repPending}
+                    >
+                      <option value="">-- Fraktion wählen --</option>
+                      {factionsWithoutRep.map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={newRepRank}
+                      onChange={(e) => setNewRepRank(e.target.value)}
+                      placeholder="Rang (z.B. Explorer)"
+                      className="w-28 rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white outline-none focus:border-accent-gold"
+                      disabled={repPending}
+                    />
+                    <input
+                      type="number"
+                      min={-100}
+                      max={100}
+                      value={newRepValue}
+                      onChange={(e) => setNewRepValue(parseInt(e.target.value) || 0)}
+                      className="w-20 rounded border border-hero-dark bg-slate-900/80 p-2 text-sm font-libre text-white text-center"
+                      disabled={repPending}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddReputation}
+                      disabled={!newRepFactionId || repPending}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded border border-hero-border bg-hero-dark text-xs font-barlow font-bold uppercase text-white hover:bg-hero-vibrant disabled:opacity-50"
+                    >
+                      {repPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      Hinzufügen
+                    </button>
+                  </div>
+                )}
+              </div>
+              {loadingReputations ? (
+                <p className="font-libre text-sm text-gray-500 italic py-2">Lade Ruf…</p>
+              ) : reputations.length === 0 ? (
+                <p className="font-libre text-sm text-gray-500 italic py-4 border border-hero-border/30 rounded bg-background-dark">
+                  Noch kein Ruf bei Fraktionen. Der Spieler sieht hier seine Beziehungen zu Fraktionen (z.B. nach einem Diebstahl bei Elder-Suns: negativer Ruf).
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {reputations.map((rep) => (
+                    <div
+                      key={rep.id}
+                      className="flex flex-wrap items-center gap-3 p-3 rounded border border-hero-border bg-hero-dark/30"
+                    >
+                      <span className="font-libre font-semibold text-white min-w-[120px]">{rep.faction_name}</span>
+                      <input
+                        key={`${rep.id}-rank-${rep.rank ?? ""}`}
+                        type="text"
+                        defaultValue={rep.rank ?? ""}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          if (v !== (rep.rank ?? "")) handleUpdateReputation(rep, { rank: v || null });
+                        }}
+                        placeholder="Rang (z.B. Explorer)"
+                        className="w-28 rounded border border-hero-dark bg-slate-900/80 p-1.5 text-sm font-libre text-white outline-none focus:border-accent-gold"
+                        disabled={repPending}
+                      />
+                      <input
+                        type="range"
+                        min={-100}
+                        max={100}
+                        value={rep.reputation}
+                        onChange={(e) => handleUpdateReputation(rep, { reputation: parseInt(e.target.value) || 0 })}
+                        disabled={repPending}
+                        className="flex-1 min-w-[80px] accent-hero-vibrant"
+                      />
+                      <span
+                        className={`font-barlow font-bold w-10 text-center ${
+                          rep.reputation > 0 ? "text-green-400" : rep.reputation < 0 ? "text-red-400" : "text-gray-400"
+                        }`}
+                      >
+                        {rep.reputation}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReputation(rep.id)}
+                        disabled={repPending}
+                        className="p-1.5 rounded text-red-400 hover:bg-red-900/20"
+                        title="Entfernen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

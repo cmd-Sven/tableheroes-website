@@ -3,7 +3,9 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { LoreDetailPage } from "@/src/components/dashboard/campaigns/lore/LoreDetailPage";
 import { getLoreById, getChildLoreEntries, getLoreEntriesForParent, getLoreBreadcrumb, getOrphanedLoreEntries } from "../../lore-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
 import { getNPCsByLocation } from "../../location-actions";
+import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;
@@ -57,14 +59,177 @@ export default async function LoreDetailPageRoute({ params }: Props) {
     notFound();
   }
 
-  // 5. Verify lore exists and belongs to this campaign
-  if (!lore || (lore as any).campaign_id !== campaignId) {
-    notFound();
+  if (!lore) notFound();
+
+  // 5.1 Religion-Details für Religions-Einträge laden
+  let religionDetails: any = null;
+  if ((lore as any).type === "Religion") {
+    try {
+      const { data: religion } = await (supabase.from("religions") as any)
+        .select("interpretation, priest_title, cleric_title, paladin_title, order_notes, magic_relation, relics, holidays, important_figures")
+        .eq("world_id", (lore as any).world_id)
+        .eq("name", (lore as any).name)
+        .maybeSingle();
+      if (religion) {
+        religionDetails = religion;
+      }
+    } catch (error) {
+      console.error("Error loading religion details:", error);
+    }
   }
 
-  // 6. Check visibility (for players)
-  if (!isGM && !(lore as any).is_revealed) {
-    redirect(`/dashboard/campaigns/${campaignId}?tab=lore`);
+  // 5.2 Gottheits-Details für Gottheits-Einträge laden
+  let deityDetails: any = null;
+  if ((lore as any).type === "Gottheit") {
+    try {
+      const worldId = (lore as any).world_id;
+      const { data: deity } = await (supabase.from("deities") as any)
+        .select("id, epithet, symbol_description, symbol_image_url, domain, dark_side")
+        .eq("world_id", worldId)
+        .eq("name", (lore as any).name)
+        .maybeSingle();
+      if (deity) {
+        const deityId = (deity as any).id;
+        const { data: rels } = await (supabase.from("deity_relationships") as any)
+          .select("target_deity_id, relation_type")
+          .eq("world_id", worldId)
+          .eq("source_deity_id", deityId);
+        const relations = (rels || []) as Array<{ target_deity_id: string; relation_type: string }>;
+        let targets: any[] = [];
+        if (relations.length > 0) {
+          const targetIds = Array.from(new Set(relations.map((r) => r.target_deity_id)));
+          const { data: targetRows } = await (supabase.from("deities") as any)
+            .select("id, name, epithet")
+            .in("id", targetIds);
+          targets = targetRows || [];
+        }
+        const targetMap = new Map<string, { name: string; epithet: string | null }>();
+        targets.forEach((t: any) => {
+          targetMap.set(String(t.id), {
+            name: String(t.name ?? "Unbenannt"),
+            epithet: t.epithet ?? null,
+          });
+        });
+        const mappedRelations = relations.map((r) => ({
+          relation_type: r.relation_type,
+          target_id: r.target_deity_id,
+          target_name: targetMap.get(r.target_deity_id)?.name ?? "Unbekannte Gottheit",
+          target_epithet: targetMap.get(r.target_deity_id)?.epithet ?? null,
+        }));
+        deityDetails = { ...deity, relationships: mappedRelations };
+      }
+    } catch (error) {
+      console.error("Error loading deity details:", error);
+    }
+  }
+
+  // 5. Check visibility for this campaign (Spieler nur bei campaign_visibility.is_revealed)
+  if (!isGM) {
+    const visibility = await getVisibilityForCampaign(campaignId, "lore");
+    if (!visibility[loreId]) {
+      redirect(`/dashboard/campaigns/${campaignId}?tab=lore`);
+    }
+  }
+
+  // 6. Resolve linked lore metadata (Kultur ↔ Rassen ↔ Sprachen ↔ Religionen)
+  let loreMetadata: {
+    cultureName?: string; cultureId?: string;
+    linkedRaces?: Array<{ id: string; name: string }>;
+    linkedLanguages?: Array<{ id: string; name: string }>;
+    linkedReligions?: Array<{ id: string; name: string }>;
+    raceSubtypes?: string | null;
+    raceTraits?: string | null;
+    spokenByCultures?: Array<{ id: string; name: string }>;
+    spokenByRaces?: Array<{ id: string; name: string }>;
+  } = {};
+
+  try {
+    const loreType = (lore as any).type;
+    const worldId = (lore as any).world_id;
+
+    // Helper: Resolve IDs to names from world_lore
+    const resolveIds = async (ids: string[]) => {
+      if (!ids || ids.length === 0) return [];
+      const { data } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .in("id", ids);
+      return ((data || []) as Array<{ id: string; name: string }>);
+    };
+
+    if (loreType === "Rasse") {
+      // Culture this race belongs to
+      if ((lore as any).culture_id) {
+        const { data: culture } = await (supabase.from("world_lore") as any)
+          .select("id, name")
+          .eq("id", (lore as any).culture_id)
+          .maybeSingle();
+        if (culture) {
+          loreMetadata.cultureName = (culture as any).name;
+          loreMetadata.cultureId = (culture as any).id;
+        }
+      }
+      loreMetadata.raceSubtypes = (lore as any).race_subtypes || null;
+      loreMetadata.raceTraits = (lore as any).race_traits || null;
+      loreMetadata.linkedLanguages = await resolveIds((lore as any).language_ids || []);
+      loreMetadata.linkedReligions = await resolveIds((lore as any).religion_ids || []);
+    }
+
+    if (loreType === "Kultur") {
+      // Races that belong to this culture (race.culture_id === this.id)
+      const { data: raceRows } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .eq("world_id", worldId)
+        .eq("type", "Rasse")
+        .eq("culture_id", loreId);
+      loreMetadata.linkedRaces = ((raceRows || []) as Array<{ id: string; name: string }>);
+      loreMetadata.linkedLanguages = await resolveIds((lore as any).language_ids || []);
+      loreMetadata.linkedReligions = await resolveIds((lore as any).religion_ids || []);
+    }
+
+    if (loreType === "Sprache") {
+      // Cultures that speak this language
+      const { data: cultRows } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .eq("world_id", worldId)
+        .eq("type", "Kultur")
+        .contains("language_ids", [loreId]);
+      loreMetadata.spokenByCultures = ((cultRows || []) as Array<{ id: string; name: string }>);
+
+      // Races that speak this language
+      const { data: raceRows } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .eq("world_id", worldId)
+        .eq("type", "Rasse")
+        .contains("language_ids", [loreId]);
+      loreMetadata.spokenByRaces = ((raceRows || []) as Array<{ id: string; name: string }>);
+    }
+
+    if (loreType === "Religion") {
+      const { data: cultRows } = await (supabase.from("world_lore") as any)
+        .select("id, name")
+        .eq("world_id", worldId)
+        .eq("type", "Kultur")
+        .contains("religion_ids", [loreId]);
+      loreMetadata.spokenByCultures = ((cultRows || []) as Array<{ id: string; name: string }>);
+    }
+
+    // Orte: Kultur, Sprachen, Religionen anzeigen (falls zugewiesen)
+    if (isLocationType(loreType)) {
+      if ((lore as any).culture_id) {
+        const { data: culture } = await (supabase.from("world_lore") as any)
+          .select("id, name")
+          .eq("id", (lore as any).culture_id)
+          .maybeSingle();
+        if (culture) {
+          loreMetadata.cultureName = (culture as any).name;
+          loreMetadata.cultureId = (culture as any).id;
+        }
+      }
+      loreMetadata.linkedLanguages = await resolveIds((lore as any).language_ids || []);
+      loreMetadata.linkedReligions = await resolveIds((lore as any).religion_ids || []);
+    }
+  } catch (error) {
+    console.error("Error resolving lore metadata:", error);
   }
 
   // 7. Load parent if exists
@@ -82,7 +247,6 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   }
 
   // 8. Load NPCs for this Lore entry (via Location or Faction)
-  const locationTypes = ["Ort", "Stadt", "Gebäude", "Region", "Insel", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"];
   let locationNPCs: { residents: any[]; guests: any[] } = { residents: [], guests: [] };
   
   try {
@@ -164,7 +328,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   // 9. Load child lore entries (sub-regions/places)
   let childEntries: Array<{ id: string; name: string; type: string; image_url: string | null; is_revealed: boolean }> = [];
   try {
-    childEntries = await getChildLoreEntries(loreId);
+    childEntries = await getChildLoreEntries(loreId, campaignId);
   } catch (error) {
     console.error("Error loading child lore entries:", error);
   }
@@ -213,6 +377,9 @@ export default async function LoreDetailPageRoute({ params }: Props) {
       breadcrumb={safeBreadcrumb as any}
       parentOptions={parentOptions}
       orphanedEntries={orphanedEntries}
+      religionDetails={religionDetails}
+      deityDetails={deityDetails}
+      loreMetadata={loreMetadata}
     />
   );
 }

@@ -5,6 +5,7 @@ import { NPCForm } from "@/src/components/dashboard/campaigns/npcs/NPCForm";
 import { getNPCById } from "../../../npc-actions";
 import { getFactions } from "../../../factions-actions";
 import { getLoreEntries } from "../../../lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {
   params: Promise<{ id: string; npcId: string }>;
@@ -63,11 +64,7 @@ export default async function EditNPCPage({ params }: Props) {
   const loreEntries = await getLoreEntries(campaignId);
   
   const locations = (loreEntries || [])
-    .filter((entry: any) =>
-      ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(
-        entry.type
-      )
-    )
+    .filter((entry: any) => isLocationType(entry.type))
     .map((entry: any) => ({
       id: entry.id,
       name: entry.name,

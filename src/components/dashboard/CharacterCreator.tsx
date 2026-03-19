@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { X, User, ChevronRight, ChevronLeft, Plus, Trash2, Loader2 } from "lucide-react";
-import { createCharacterWithRelations } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import { useRouter } from "next/navigation";
+import { X, User, ChevronRight, ChevronLeft, Plus, Trash2, Loader2, Info, Image } from "lucide-react";
+import { createCharacterWithRelations, getCharacterWizardLoreData } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import { getNPCsByFactionForOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { getChildLocationsForOnboarding } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 
@@ -50,16 +51,31 @@ type Props = {
   factions?: Faction[];
   locations?: Location[];
   npcs?: NPC[];
+  mode?: "modal" | "page";
 };
 
-export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], locations = [], npcs = [] }: Props) {
+export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], locations = [], npcs = [], mode = "modal" }: Props) {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [isPending, startTransition] = useTransition();
+
+  // Lore-Daten für Rasse/Kultur/Sprache
+  type WizardRace = { id: string; name: string; culture_id: string | null };
+  type WizardCulture = { id: string; name: string; race_ids: string[]; language_ids: string[] };
+  type WizardLanguage = { id: string; name: string };
+
+  const [wizardRaces, setWizardRaces] = useState<WizardRace[]>([]);
+  const [wizardCultures, setWizardCultures] = useState<WizardCulture[]>([]);
+  const [wizardLanguages, setWizardLanguages] = useState<WizardLanguage[]>([]);
+  const [loreLoading, setLoreLoading] = useState(true);
 
   // Step A: Basis-Daten
   const [name, setName] = useState("");
   const [class_name, setClassName] = useState("");
   const [race, setRace] = useState("");
+  const [raceCustom, setRaceCustom] = useState("");
+  const [selectedCultureId, setSelectedCultureId] = useState("");
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [level, setLevel] = useState(1);
   const [biography, setBiography] = useState("");
 
@@ -75,6 +91,9 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   // Step C: Beziehungen
   const [existingContacts, setExistingContacts] = useState<ExistingContact[]>([]);
   const [newContacts, setNewContacts] = useState<NewContact[]>([]);
+
+  // Step D: Avatar
+  const [avatar_url, setAvatarUrl] = useState("");
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [newContactForm, setNewContactForm] = useState<NewContact>({
     name: "",
@@ -90,18 +109,48 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const revealedNPCs = npcs;
   const largeLocations = revealedLocations.filter((l) => locationTypeMatches(l.type));
 
-  // DEBUG: Wizard-Daten prüfen (F12 → Konsole)
+  // Rassen/Kulturen/Sprachen laden
   useEffect(() => {
-    if (isOpen) {
-      console.log("DEBUG Wizard Data:", {
-        factions: revealedFactions,
-        locations: revealedLocations,
-        npcs: revealedNPCs,
-        wizardFactionsCount: revealedFactions.length,
-        wizardLocationsCount: revealedLocations.length,
-      });
-    }
-  }, [isOpen, revealedFactions, revealedLocations, revealedNPCs]);
+    if (!isOpen) return;
+    setLoreLoading(true);
+    getCharacterWizardLoreData(campaignId)
+      .then(({ races, cultures, languages }) => {
+        setWizardRaces(races);
+        setWizardCultures(cultures);
+        setWizardLanguages(languages);
+      })
+      .finally(() => setLoreLoading(false));
+  }, [isOpen, campaignId]);
+
+  // Hierarchie: Kultur → Rassen + Sprachen
+  const selectedCulture = wizardCultures.find((c) => c.id === selectedCultureId);
+
+  // Rassen der gewählten Kultur (über culture.race_ids ODER race.culture_id)
+  const racesForCulture = selectedCulture
+    ? wizardRaces.filter(
+        (r) =>
+          selectedCulture.race_ids.includes(r.id) ||
+          r.culture_id === selectedCulture.id,
+      )
+    : [];
+  const hasRacesForCulture = racesForCulture.length > 0;
+
+  const selectedRaceLoreId = race && race !== "__custom"
+    ? (racesForCulture.find((r) => r.name === race) || wizardRaces.find((r) => r.name === race))?.id ?? null
+    : null;
+
+  // Sprachen der gewählten Kultur
+  const languagesForCulture = selectedCulture
+    ? wizardLanguages.filter((l) => selectedCulture.language_ids.includes(l.id))
+    : [];
+  const availableLanguages = languagesForCulture.length > 0 ? languagesForCulture : wizardLanguages;
+
+  // Rasse + Sprachen zurücksetzen wenn Kultur wechselt
+  useEffect(() => {
+    setRace("");
+    setRaceCustom("");
+    setSelectedLanguages([]);
+  }, [selectedCultureId]);
 
   // Fraktions-Kontext: NPCs der gewählten Fraktion laden (für "Bekannte Mitglieder" & Schritt 3)
   useEffect(() => {
@@ -155,8 +204,10 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     setNewContacts(newContacts.filter((_, i) => i !== index));
   };
 
+  const effectiveRace = race === "__custom" ? raceCustom : race;
+
   const handleSubmit = () => {
-    if (!name || !class_name || !race) {
+    if (!name || !class_name || !effectiveRace) {
       alert("Bitte fülle alle Pflichtfelder aus (Name, Klasse, Rasse).");
       return;
     }
@@ -167,40 +218,53 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           campaign_id: campaignId,
           name,
           class: class_name,
-          race,
+          race: effectiveRace,
           level,
           biography: biography || null,
+          avatar_url: avatar_url.trim() || null,
           faction_id: faction_id || null,
           location_id: location_id || null,
+          culture_lore_id: selectedCultureId || null,
+          languages: selectedLanguages,
           existing_contacts: existingContacts.filter((c) => c.npc_id && c.relationship_type),
           new_contacts: newContacts,
         });
-        onClose();
-        // Reload page to show new character
-        window.location.reload();
+        if (mode === "page") {
+          router.push(`/dashboard/campaigns/${campaignId}`);
+        } else {
+          onClose();
+          window.location.reload();
+        }
       } catch (error: any) {
         alert(error.message || "Fehler beim Erstellen des Charakters.");
       }
     });
   };
 
-  // Echtheits-Check: Wenn Arrays gefüllt, Dropdowns aber leer → Mapping der <option> prüfen (value=item.id, label=item.name)
-  console.log("DROPDOWN_CHECK - Locations:", locations, "Factions:", factions);
-
-  if (!isOpen) return null;
+  if (!isOpen && mode !== "page") return null;
 
   const canGoNext = () => {
-    if (step === 1) return name && class_name && race;
-    if (step === 2) return true; // Optional fields
-    if (step === 3) return true; // Optional fields
+    if (step === 1) return name && class_name && effectiveRace;
+    if (step === 2) return true;
+    if (step === 3) return true;
+    if (step === 4) return true;
     return false;
   };
 
+  const isPageMode = mode === "page";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl rounded-lg border border-hero-gold/30 bg-background-card shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className={isPageMode ? "w-full" : "fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"}>
+      <div
+        className={`relative w-full rounded-lg border border-accent-gold/30 shadow-2xl flex flex-col overflow-hidden ${isPageMode ? "" : "max-w-4xl max-h-[90vh]"}`}
+        style={{
+          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
         {/* Header */}
-        <div className="flex-none flex items-center justify-between p-6 border-b border-hero-border/30">
+        <div className="flex-none flex items-center justify-between p-6 border-b border-accent-gold/20 bg-background-dark/80 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-hero-dark p-2">
               <User className="h-6 w-6 text-accent-gold" />
@@ -208,30 +272,32 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
             <div>
               <h2 className="font-cinzel font-bold text-2xl text-white">Charakter erstellen</h2>
               <p className="font-libre text-sm text-gray-400">
-                Schritt {step} von 3
+                Schritt {step} von 4
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-2 transition-colors hover:bg-hero-dark hover:text-white"
-            disabled={isPending}
-          >
-            <X className="h-5 w-5 text-gray-400" />
-          </button>
+          {!isPageMode && (
+            <button
+              onClick={onClose}
+              className="rounded p-2 transition-colors hover:bg-hero-dark hover:text-white"
+              disabled={isPending}
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          )}
         </div>
 
         {/* Progress Bar */}
-        <div className="flex-none px-6 py-4 border-b border-hero-border/30 bg-background-dark/50">
+        <div className="flex-none px-6 py-4 border-b border-accent-gold/20 bg-background-dark/70">
           <div className="flex items-center gap-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex-1 flex items-center">
                 <div
                   className={`flex-1 h-2 rounded ${
                     step >= s ? "bg-hero-vibrant" : "bg-hero-dark"
                   }`}
                 />
-                {s < 3 && (
+                {s < 4 && (
                   <ChevronRight
                     className={`h-4 w-4 mx-1 ${
                       step > s ? "text-hero-vibrant" : "text-gray-600"
@@ -244,7 +310,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
         </div>
 
         {/* Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 bg-background-dark/60">
           {/* Step 1: Basis-Daten */}
           {step === 1 && (
             <div className="space-y-5">
@@ -265,20 +331,144 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                    Klasse *
-                  </label>
-                  <input
-                    type="text"
-                    value={class_name}
-                    onChange={(e) => setClassName(e.target.value)}
-                    className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                    placeholder="z.B. Kleriker"
-                  />
-                </div>
+              <div>
+                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                  Klasse *
+                </label>
+                <input
+                  type="text"
+                  value={class_name}
+                  onChange={(e) => setClassName(e.target.value)}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                  placeholder="z.B. Kleriker"
+                />
+              </div>
 
+              {/* Kultur → Rasse → Sprachen (Hierarchie) */}
+              {loreLoading ? (
+                <div className="flex items-center gap-2 p-3 font-libre text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Lade Lore-Daten...
+                </div>
+              ) : wizardCultures.length > 0 ? (
+                <>
+                  {/* 1. Kultur wählen */}
+                  <div>
+                    <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                      Kultur
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedCultureId}
+                        onChange={(e) => setSelectedCultureId(e.target.value)}
+                        className="flex-1 rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                      >
+                        <option value="">-- Kultur wählen --</option>
+                        {wizardCultures
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                      </select>
+                      {selectedCultureId && (
+                        <a
+                          href={`/dashboard/campaigns/${campaignId}/lore/${selectedCultureId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 rounded border border-hero-dark bg-slate-900/80 p-3 text-gray-500 hover:text-accent-gold hover:border-accent-gold transition-colors"
+                          title={`Mehr über diese Kultur erfahren`}
+                        >
+                          <Info className="h-5 w-5" />
+                        </a>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 font-libre italic">
+                      Die Kultur bestimmt die verfügbaren Rassen und Sprachen.
+                    </p>
+                  </div>
+
+                  {/* 2. Rasse wählen (gefiltert nach Kultur) */}
+                  <div>
+                    <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                      Rasse *
+                    </label>
+                    {selectedCultureId && hasRacesForCulture ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={race}
+                          onChange={(e) => setRace(e.target.value)}
+                          className="flex-1 rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                        >
+                          <option value="">-- Rasse wählen --</option>
+                          {racesForCulture
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((r) => (
+                              <option key={r.id} value={r.name}>{r.name}</option>
+                            ))}
+                          <option value="__custom">Andere (Freitext)</option>
+                        </select>
+                        {selectedRaceLoreId && (
+                          <a
+                            href={`/dashboard/campaigns/${campaignId}/lore/${selectedRaceLoreId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 rounded border border-hero-dark bg-slate-900/80 p-3 text-gray-500 hover:text-accent-gold hover:border-accent-gold transition-colors"
+                            title={`Mehr über diese Rasse erfahren`}
+                          >
+                            <Info className="h-5 w-5" />
+                          </a>
+                        )}
+                      </div>
+                    ) : wizardRaces.length > 0 && !selectedCultureId ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={race}
+                          onChange={(e) => setRace(e.target.value)}
+                          className="flex-1 rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                        >
+                          <option value="">-- Rasse wählen --</option>
+                          {wizardRaces
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((r) => (
+                              <option key={r.id} value={r.name}>{r.name}</option>
+                            ))}
+                          <option value="__custom">Andere (Freitext)</option>
+                        </select>
+                        {selectedRaceLoreId && (
+                          <a
+                            href={`/dashboard/campaigns/${campaignId}/lore/${selectedRaceLoreId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 rounded border border-hero-dark bg-slate-900/80 p-3 text-gray-500 hover:text-accent-gold hover:border-accent-gold transition-colors"
+                            title={`Mehr über diese Rasse erfahren`}
+                          >
+                            <Info className="h-5 w-5" />
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={race === "__custom" ? raceCustom : race}
+                        onChange={(e) => {
+                          setRace("__custom");
+                          setRaceCustom(e.target.value);
+                        }}
+                        className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                        placeholder="Rasse eingeben..."
+                      />
+                    )}
+                    {race === "__custom" && selectedCultureId && hasRacesForCulture && (
+                      <input
+                        type="text"
+                        value={raceCustom}
+                        onChange={(e) => setRaceCustom(e.target.value)}
+                        className="mt-2 w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                        placeholder="Rasse eingeben..."
+                      />
+                    )}
+                  </div>
+                </>
+              ) : (
                 <div>
                   <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
                     Rasse *
@@ -291,7 +481,68 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                     placeholder="z.B. Elf"
                   />
                 </div>
-              </div>
+              )}
+
+              {/* 3. Sprachen (max 2) */}
+              {availableLanguages.length > 0 && (
+                <div>
+                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                    Sprachen (max. 2)
+                  </label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {availableLanguages
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((lang) => {
+                        const isSelected = selectedLanguages.includes(lang.name);
+                        const isDisabled = !isSelected && selectedLanguages.length >= 2;
+                        return (
+                          <div
+                            key={lang.id}
+                            className={`flex items-center rounded border p-2.5 transition-colors ${
+                              isSelected
+                                ? "border-accent-gold bg-accent-gold/10 text-white"
+                                : isDisabled
+                                  ? "border-hero-dark/50 bg-slate-900/30 text-gray-600"
+                                  : "border-hero-dark bg-slate-900/80 text-gray-300 hover:border-hero-vibrant"
+                            }`}
+                          >
+                            <label className={`flex flex-1 items-center gap-2 ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onChange={() => {
+                                  if (isSelected) {
+                                    setSelectedLanguages(selectedLanguages.filter((l) => l !== lang.name));
+                                  } else if (selectedLanguages.length < 2) {
+                                    setSelectedLanguages([...selectedLanguages, lang.name]);
+                                  }
+                                }}
+                                className="accent-accent-gold"
+                              />
+                              <span className="font-libre text-sm">{lang.name}</span>
+                            </label>
+                            <a
+                              href={`/dashboard/campaigns/${campaignId}/lore/${lang.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="ml-auto rounded p-1 text-gray-500 hover:text-accent-gold transition-colors"
+                              title={`Mehr über „${lang.name}" erfahren`}
+                            >
+                              <Info className="h-4 w-4" />
+                            </a>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  {selectedLanguages.length >= 2 && (
+                    <p className="mt-1 text-xs text-accent-gold font-libre">
+                      Maximum von 2 Sprachen erreicht.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
@@ -711,10 +962,52 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               )}
             </div>
           )}
+
+          {/* Step 4: Charakterbild / Avatar */}
+          {step === 4 && (
+            <div className="space-y-5">
+              <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4 flex items-center gap-2">
+                <Image className="h-5 w-5 text-accent-gold" />
+                Charakterbild (Optional)
+              </h3>
+              <p className="font-libre text-gray-300">
+                Füge optional ein Bild deines Charakters hinzu. Gib die vollständige URL zu einem Bild ein (z.B. von einem Bildhoster wie Imgur oder einer anderen Quelle).
+              </p>
+              <div>
+                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                  Bild-URL
+                </label>
+                <input
+                  type="url"
+                  value={avatar_url}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                  placeholder="https://example.com/charakterbild.jpg"
+                />
+                {avatar_url.trim() && (
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border-2 border-hero-border bg-hero-dark">
+                      <img
+                        src={avatar_url.trim()}
+                        alt="Vorschau"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                    <p className="font-libre text-sm text-gray-400">
+                      Vorschau deines Charakterbilds
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-accent-gold/20 bg-background-dark/80 backdrop-blur-sm">
           <div className="flex justify-between">
             <button
               type="button"
@@ -725,12 +1018,12 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               <ChevronLeft className="h-4 w-4" />
               Zurück
             </button>
-            {step < 3 ? (
+            {step < 4 ? (
               <button
                 type="button"
                 onClick={() => setStep(step + 1)}
                 disabled={!canGoNext() || isPending}
-                className="flex items-center gap-2 rounded bg-hero-gold px-6 py-2 font-barlow font-bold uppercase text-black transition-colors hover:bg-yellow-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded bg-accent-gold px-6 py-2.5 font-barlow font-bold uppercase text-background-dark transition-colors hover:bg-yellow-400 disabled:opacity-40 shadow-md"
               >
                 Weiter
                 <ChevronRight className="h-4 w-4" />
@@ -740,7 +1033,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canGoNext() || isPending}
-                className="flex items-center gap-2 rounded bg-hero-gold px-6 py-2 font-barlow font-bold uppercase text-black transition-colors hover:bg-yellow-500 disabled:opacity-50 shadow-lg shadow-hero-gold/20"
+                className="flex items-center gap-2 rounded bg-accent-gold px-6 py-2.5 font-barlow font-bold uppercase text-background-dark transition-colors hover:bg-yellow-400 disabled:opacity-40 shadow-lg shadow-accent-gold/30"
               >
                 {isPending ? (
                   <>

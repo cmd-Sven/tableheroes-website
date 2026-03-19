@@ -5,8 +5,9 @@ import { X, ChevronLeft, Sparkles, Loader2, CheckCircle2, ArrowRight, Eye, Heart
 import { ContextNPCsWidget, type InferenceSuggestion } from "./NPCForm";
 import { SmartLocationCombobox } from "./SmartLocationCombobox";
 import { SmartFactionCombobox } from "./SmartFactionCombobox";
-import { NameInput, RaceInput, RoleInput, BriefingTextarea } from "./WizardInputs";
+import { NameInput, RaceInput, RoleInput } from "./WizardInputs";
 import { CheckResultsEditor } from "./CheckResultsEditor";
+import { LOCATION_TYPES } from "@/src/lib/lore-types";
 
 // Types
 type WorldEntity = {
@@ -63,7 +64,6 @@ type WizardData = {
     gm_notes: string;
     title: string;
     image_url: string;
-    player_notes: string;
     is_revealed: boolean;
     check_results?: Array<{
       type: "Wahrnehmung" | "Motiv erkennen" | "Wissen";
@@ -102,6 +102,13 @@ const NPC_STATUSES = [
   { value: "Deceased", label: "🔴 Verstorben" },
   { value: "Missing", label: "🟡 Vermisst" },
   { value: "Unknown", label: "⚪ Unbekannt" },
+];
+
+const RELATION_TYPES = [
+  "Vater", "Mutter", "Sohn", "Tochter",
+  "Mentor", "Schüler", "Partner", "Freund", "Feind",
+  "Kollege", "Bekannter", "Vorgesetzter", "Untergebener",
+  "Andere",
 ];
 
 // Props für WizardContent
@@ -271,12 +278,15 @@ export function WizardContent({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Schritt 1: Identität */}
+        {/* Schritt 1: Identität & wichtigste Fakten (Orte + NPC-Verknüpfung + Briefing; KI erst später) */}
         {currentStep === 1 && (
           <div className="space-y-6">
             <h3 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2">
-              Identität
+              Identität & Briefing
             </h3>
+            <p className="font-libre text-gray-400 text-sm">
+              Zuerst die wichtigsten Fakten und das Briefing festlegen. Aussehen und Beschreibung erstellt die KI erst in Schritt 4.
+            </p>
 
             {/* Name & Rasse */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -348,22 +358,34 @@ export function WizardContent({
               </select>
             </div>
 
-            {/* Briefing / Charakter-Anweisungen */}
-            <div>
-              <label className="mb-2 block font-barlow font-bold text-sm uppercase text-accent-gold">
-                Briefing / Charakter-Anweisungen
-              </label>
-              <BriefingTextarea
-                value={wizardData.briefing}
-                onChange={handleBriefingChange}
-              />
-              <p className="mt-1 text-xs text-gray-500 font-libre">
-                Beschreibe wichtige Charaktereigenschaften, die die KI bei der Generierung berücksichtigen soll.
+            {/* Wichtigste Fakten: Wohnort, Aufenthaltsort, Fraktion */}
+            <div className="rounded-lg border border-hero-border bg-background-card/50 p-4 space-y-4">
+              <h4 className="font-cinzel font-bold text-accent-gold">Wichtigste Fakten</h4>
+              <p className="text-xs text-gray-400 font-libre">
+                Wohnort und Aufenthaltsort festlegen, damit die KI keine erfundenen Orte nutzt.
               </p>
-            </div>
-
-            {/* Fraktion & Orte */}
-            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SmartLocationCombobox
+                  campaignId={campaignId}
+                  locations={locationsList}
+                  value={wizardData.home_location_id}
+                  onChange={(locationId) => updateWizardData({ home_location_id: locationId })}
+                  label="Wohnort / Heimatort"
+                  onLocationCreated={(newLocation) => {
+                    setLocationsList((prev) => [...prev, newLocation]);
+                  }}
+                />
+                <SmartLocationCombobox
+                  campaignId={campaignId}
+                  locations={locationsList}
+                  value={wizardData.current_location_id}
+                  onChange={(locationId) => updateWizardData({ current_location_id: locationId })}
+                  label="Aktueller Aufenthaltsort"
+                  onLocationCreated={(newLocation) => {
+                    setLocationsList((prev) => [...prev, newLocation]);
+                  }}
+                />
+              </div>
               <SmartFactionCombobox
                 campaignId={campaignId}
                 factions={factionsList}
@@ -375,29 +397,87 @@ export function WizardContent({
                   setFactionsList((prev) => [...prev, newFaction]);
                 }}
               />
-              <SmartLocationCombobox
-                campaignId={campaignId}
-                locations={locationsList}
-                value={wizardData.current_location_id}
-                onChange={(locationId) => updateWizardData({ current_location_id: locationId })}
-                label="Aktueller Aufenthaltsort"
-                onLocationCreated={(newLocation) => {
-                  setLocationsList((prev) => [...prev, newLocation]);
-                }}
-              />
             </div>
 
-            {/* Heimatort */}
-            <SmartLocationCombobox
-              campaignId={campaignId}
-              locations={locationsList}
-              value={wizardData.home_location_id}
-              onChange={(locationId) => updateWizardData({ home_location_id: locationId })}
-              label="Heimatort / Wohnsitz"
-              onLocationCreated={(newLocation) => {
-                setLocationsList((prev) => [...prev, newLocation]);
-              }}
-            />
+            {/* Bereits existierende NPC verbinden */}
+            <div className="rounded-lg border border-hero-border bg-background-card/50 p-4 space-y-3">
+              <h4 className="font-cinzel font-bold text-accent-gold">Bereits existierenden NPC verbinden</h4>
+              <p className="text-xs text-gray-400 font-libre">
+                Optional: Verknüpfe diesen NPC mit einem bereits angelegten Charakter und gib die Beziehungsart an.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                    NPC
+                  </label>
+                  <select
+                    value={wizardData.selectedContextNPCs[0]?.npcId ?? ""}
+                    onChange={(e) => {
+                      const npcId = e.target.value;
+                      const currentRelation = wizardData.selectedContextNPCs[0]?.relationType ?? "Andere";
+                      if (!npcId) {
+                        updateWizardData({ selectedContextNPCs: [] });
+                      } else {
+                        updateWizardData({
+                          selectedContextNPCs: [{ npcId, relationType: currentRelation }],
+                        });
+                      }
+                    }}
+                    className="w-full rounded border border-hero-dark bg-slate-900 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                  >
+                    <option value="">— Kein NPC —</option>
+                    {campaignNPCs.map((npc) => (
+                      <option key={npc.id} value={npc.id}>
+                        {npc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                    Beziehungsart
+                  </label>
+                  <select
+                    value={wizardData.selectedContextNPCs[0]?.relationType ?? "Andere"}
+                    onChange={(e) => {
+                      const relationType = e.target.value;
+                      const npcId = wizardData.selectedContextNPCs[0]?.npcId;
+                      if (!npcId) return;
+                      updateWizardData({
+                        selectedContextNPCs: [{ npcId, relationType }],
+                      });
+                    }}
+                    className="w-full rounded border border-hero-dark bg-slate-900 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                  >
+                    {RELATION_TYPES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Briefing mit Anweisung */}
+            <div>
+              <label className="mb-2 block font-barlow font-bold text-sm uppercase text-accent-gold">
+                Briefing / Charakter-Anweisungen
+              </label>
+              <textarea
+                value={wizardData.briefing}
+                onChange={(e) => handleBriefingChange(e.target.value)}
+                rows={4}
+                placeholder="z.B.: Persönlichkeit (z. B. zurückhaltend, charismatisch), besondere Merkmale (Narbe, Akzent), Motivation und Ziele. Die KI nutzt das erst in Schritt 4 für Aussehen und Beschreibung."
+                className="w-full rounded border border-hero-dark bg-slate-900 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold resize-y placeholder:text-gray-500"
+              />
+              <p className="mt-1 text-xs text-gray-500 font-libre">
+                Kurz beschreiben: <strong>Persönlichkeit</strong>, <strong>besondere Merkmale</strong>, <strong>Motivation</strong>. Erst danach erstellt die KI in Schritt 4 Aussehen und Beschreibung.
+              </p>
+            </div>
+
+            {/* Hinweis: KI kommt erst in Schritt 4 */}
+            <div className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-3 text-amber-200/90 text-sm font-libre">
+              <strong className="font-barlow uppercase text-amber-400">Ablauf:</strong> Nach Schritt 2 und 3 startest du in Schritt 4 die KI-Generierung für Aussehen und Beschreibung. Vorher müssen Aufenthaltsort und Heimatort gesetzt sein.
+            </div>
           </div>
         )}
 
@@ -455,16 +535,9 @@ export function WizardContent({
                               }}
                               className="px-2 py-1 rounded border border-hero-dark bg-slate-900 text-white text-sm"
                             >
-                              <option value="Stadt">Stadt</option>
-                              <option value="Region">Region</option>
-                              <option value="Ort">Ort</option>
-                              <option value="Insel">Insel</option>
-                              <option value="Gebäude">Gebäude</option>
-                              <option value="Tempel">Tempel</option>
-                              <option value="Land">Land</option>
-                              <option value="Akademie">Akademie</option>
-                              <option value="Markt">Markt</option>
-                              <option value="Laden">Laden</option>
+                              {LOCATION_TYPES.map((t) => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
                             </select>
                           </div>
                           {loc.parent_location_name && (
@@ -557,6 +630,9 @@ export function WizardContent({
             <h3 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2">
               Soziales Umfeld
             </h3>
+            <div className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-3 text-amber-200/90 text-sm font-libre">
+              <strong className="font-barlow uppercase text-amber-400">Vor der KI-Generierung:</strong> Aufenthaltsort und Heimatort müssen festgelegt sein, damit die KI keine erfundenen Orte verwendet.
+            </div>
 
             {hookContext?.sourceNPCName && (
               <div className="rounded-lg border border-accent-gold/50 bg-accent-gold/10 p-4 mb-6">
@@ -720,27 +796,52 @@ export function WizardContent({
               </div>
             )}
 
-            {/* Weiter-Button für Schritt 3 */}
-            <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-hero-border">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                className="px-6 py-3 rounded bg-gray-700 text-white font-barlow font-bold uppercase hover:bg-gray-600 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4 inline-block mr-2" />
-                Zurück
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(4)}
-                className="px-8 py-4 rounded bg-amber-600 text-black font-barlow font-bold uppercase shadow-lg hover:bg-amber-500 hover:shadow-none transition-all group relative overflow-hidden button-glint"
-              >
-                <span className="relative z-10 flex items-center">
-                  Story generieren
-                  <ArrowRight className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </span>
-              </button>
-            </div>
+            {/* Weiter-Button für Schritt 3: nur wenn Heimatort und Aufenthaltsort gesetzt */}
+            {!wizardData.current_location_id || !wizardData.home_location_id ? (
+              <div className="mt-8 rounded-lg border border-amber-900/50 bg-amber-950/30 p-4 pt-6 border-t border-hero-border">
+                <p className="font-libre text-amber-200/90 text-sm mb-4">
+                  Bitte wähle <strong>Aufenthaltsort</strong> und <strong>Heimatort</strong>, bevor du zur KI-Generierung gehst.
+                </p>
+                <div className="flex justify-end gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(2)}
+                    className="px-6 py-3 rounded bg-gray-700 text-white font-barlow font-bold uppercase hover:bg-gray-600 transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4 inline-block mr-2" />
+                    Zurück
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="px-8 py-4 rounded bg-gray-600 text-gray-400 font-barlow font-bold uppercase cursor-not-allowed"
+                  >
+                    Story generieren (Orte fehlen)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-hero-border">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-6 py-3 rounded bg-gray-700 text-white font-barlow font-bold uppercase hover:bg-gray-600 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4 inline-block mr-2" />
+                  Zurück
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(4)}
+                  className="px-8 py-4 rounded bg-amber-600 text-black font-barlow font-bold uppercase shadow-lg hover:bg-amber-500 hover:shadow-none transition-all group relative overflow-hidden button-glint"
+                >
+                  <span className="relative z-10 flex items-center">
+                    Story generieren
+                    <ArrowRight className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -974,7 +1075,7 @@ export function WizardContent({
               </div>
             )}
 
-            {/* Proben & Informationen (check_results) */}
+            {/* Ergebnisse für Spielerproben (check_results) – GM nutzt sie bei Spielerwürfen */}
             {(wizardData.aiGenerated?.check_results && wizardData.aiGenerated.check_results.length > 0) ||
             (wizardData.finalData?.check_results && wizardData.finalData.check_results.length > 0) ? (
               <div className="mt-6">

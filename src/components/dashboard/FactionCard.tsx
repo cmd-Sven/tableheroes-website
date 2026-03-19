@@ -17,18 +17,19 @@ type Faction = {
 
 type Props = {
   faction: Faction;
+  campaignId: string;
   isGM: boolean;
   onEdit: (faction: Faction) => void;
 };
 
-export function FactionCard({ faction, isGM, onEdit }: Props) {
+export function FactionCard({ faction, campaignId, isGM, onEdit }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showGMNotes, setShowGMNotes] = useState(false);
 
   const handleToggleReveal = () => {
     startTransition(async () => {
       try {
-        await toggleFactionReveal(faction.id, faction.is_revealed);
+        await toggleFactionReveal(campaignId, faction.id, faction.is_revealed);
       } catch (error: any) {
         alert(error.message);
       }

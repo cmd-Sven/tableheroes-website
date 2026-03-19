@@ -38,6 +38,8 @@ import {
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
 import { toggleMaintenanceMode } from "@/src/lib/actions/admin-actions";
+import { getCampaignWorldId } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
+import { createClient as createBrowserSupabaseClient } from "@/src/lib/supabase/client";
 
 type SidebarProps = {
   user: {
@@ -66,10 +68,65 @@ export function Sidebar({
   const [isOpen, setIsOpen] = useState(false); // Mobile menu
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
   const [maintenanceToggling, setMaintenanceToggling] = useState(false);
+  const [campaignWorldId, setCampaignWorldId] = useState<string | null>(null);
+  const [worldHasBlueprint, setWorldHasBlueprint] = useState<boolean | null>(null);
   const pathname = usePathname();
   const params = useParams();
   const searchParams = useSearchParams();
   const role = user.primary_role || user?.role || "Player";
+
+  // campaignId BEVOR jeder Logik extrahieren (verhindert ReferenceError)
+  // params.id kann in übergeordnetem Layout fehlen → Fallback: ID aus pathname
+  const pathSegments = pathname?.split("/") ?? [];
+  const isCampaignPath = pathname?.startsWith("/dashboard/campaigns/") && pathSegments[4];
+  const campaignId: string | undefined = (params?.id as string) ?? (isCampaignPath ? pathSegments[4] : undefined);
+  const isInCampaign = !!campaignId;
+
+  // Welt-Kontext: nur wenn wir unter /dashboard/worlds/[id]/ sind; "new" und leere Werte ausschließen
+  const rawWorldSegment = pathname?.startsWith("/dashboard/worlds/") ? pathSegments[3] : undefined;
+  const worldId: string | undefined =
+    rawWorldSegment &&
+    rawWorldSegment !== "new" &&
+    rawWorldSegment !== "undefined"
+      ? rawWorldSegment
+      : undefined;
+  const isInWorld = !!worldId;
+
+  useEffect(() => {
+    if (campaignId && (role === "GameMaster" || role === "Admin")) {
+      getCampaignWorldId(campaignId).then(setCampaignWorldId);
+    } else {
+      setCampaignWorldId(null);
+    }
+  }, [campaignId, role]);
+
+  // Welt-Blueprint für Welt-Kontext laden (clientseitig, damit Sidebar weiß, ob NPCs/Lore/Fraktionen freigeschaltet werden sollen)
+  useEffect(() => {
+    if (!isInWorld || !worldId) {
+      setWorldHasBlueprint(null);
+      return;
+    }
+    const supabase = createBrowserSupabaseClient();
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("worlds")
+          .select("id, blueprint")
+          .eq("id", worldId)
+          .single();
+        if (error) {
+          console.error("Sidebar: Fehler beim Laden des World-Blueprints:", error);
+          setWorldHasBlueprint(false);
+        } else {
+          setWorldHasBlueprint(!!(data as any)?.blueprint);
+        }
+      } catch (err) {
+        console.error("Sidebar: Unerwarteter Fehler beim Laden des World-Blueprints:", err);
+        setWorldHasBlueprint(false);
+      }
+    })();
+  }, [isInWorld, worldId]);
+
   const isAdmin =
     user?.role === "Admin" ||
     user?.primary_role === "Admin" ||
@@ -85,10 +142,6 @@ export function Sidebar({
     });
   }, [user?.role, user?.primary_role, user?.username, isAdmin]);
 
-  // Check if we're inside a campaign route
-  const isInCampaign =
-    params?.id && pathname?.startsWith("/dashboard/campaigns/");
-  const campaignId = isInCampaign ? (params.id as string) : null;
   const currentTab = searchParams?.get("tab") || "overview";
 
   // Save collapsed state to cookie and sync with server + update CSS variable
@@ -120,6 +173,11 @@ export function Sidebar({
   const generalNav = [
     { href: "/dashboard", label: "Mein Dashboard", icon: Home },
     { href: "/dashboard/my-campaigns", label: "Meine Kampagnen", icon: Map },
+    ...(role === "GameMaster" || role === "Admin"
+      ? [
+          { href: "/dashboard/worlds", label: "Welten & Lore", icon: Book },
+        ]
+      : []),
     { href: "/dashboard/characters", label: "Charaktere", icon: Users },
     { href: "/dashboard/achievements", label: "Achievements", icon: Award },
     { href: "/dashboard/news", label: "News-Archiv", icon: Newspaper },
@@ -181,16 +239,22 @@ export function Sidebar({
           tab: "sessions",
         },
         {
-          href: `/dashboard/campaigns/${campaignId}?tab=lore`,
+          href: `/dashboard/campaigns/${campaignId}/lore`,
           label: "Welt & Lore",
           icon: Book,
           tab: "lore",
         },
         {
-          href: `/dashboard/campaigns/${campaignId}?tab=npcs`,
-          label: "NPCs & Fraktionen",
+          href: `/dashboard/campaigns/${campaignId}/npcs`,
+          label: "NPCs",
           icon: User,
           tab: "npcs",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}/factions`,
+          label: "Fraktionen",
+          icon: Shield,
+          tab: "factions",
         },
         {
           href: `/dashboard/campaigns/${campaignId}?tab=quests`,
@@ -200,9 +264,19 @@ export function Sidebar({
         },
         ...(role === "GameMaster" || role === "Admin"
           ? [
+              ...(campaignWorldId
+                ? [
+                    {
+                      href: `/dashboard/worlds/${campaignWorldId}`,
+                      label: "Zum Welt-Editor",
+                      icon: Book,
+                      tab: undefined as string | undefined,
+                    },
+                  ]
+                : []),
               {
                 href: `/dashboard/campaigns/${campaignId}?tab=members`,
-                label: "Mitglieder",
+                label: "Teilnehmer",
                 icon: Users,
                 tab: "members",
               },
@@ -227,6 +301,17 @@ export function Sidebar({
   const settingsNav = [
     { href: "/dashboard/settings", label: "Einstellungen", icon: Settings },
   ];
+
+  // Welt-Kontext-Navigation – gleiche Reihenfolge und Bezeichnungen wie die Tabs auf der Welt-Übersicht
+  const worldNav = worldId
+    ? [
+        { href: `/dashboard/worlds/${worldId}`, label: "Übersicht", icon: Home, tab: "overview" as string | undefined },
+        { href: `/dashboard/worlds/${worldId}/npcs`, label: "NPCs", icon: User },
+        { href: `/dashboard/worlds/${worldId}/locations`, label: "Orte", icon: Map },
+        { href: `/dashboard/worlds/${worldId}/lore`, label: "Lore", icon: Book },
+        { href: `/dashboard/worlds/${worldId}/factions`, label: "Fraktionen", icon: Shield },
+      ]
+    : [];
 
   function toggleSidebar() {
     setIsOpen(!isOpen);
@@ -333,8 +418,54 @@ export function Sidebar({
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto bg-black/70">
+            {/* Welt-Kontext: Zurück + Welt-Navigation */}
+            {isInWorld && (
+              <div className="mb-4 space-y-1">
+                <Link
+                  href="/dashboard/worlds"
+                  onClick={() => setIsOpen(false)}
+                  className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant ${
+                    isCollapsed ? "justify-center" : ""
+                  }`}
+                  title={isCollapsed ? "Zurück zu Welten" : undefined}
+                >
+                  <ArrowLeft className="h-5 w-5 flex-shrink-0 text-gray-500" />
+                  {!isCollapsed && <span>Zurück zu Welten</span>}
+                  {isCollapsed && (
+                    <span className="absolute left-full ml-2 z-50 hidden rounded bg-background-card border border-hero-dark px-2 py-1 text-xs font-barlow font-bold uppercase text-white shadow-lg group-hover:block whitespace-nowrap">
+                      Zurück zu Welten
+                    </span>
+                  )}
+                </Link>
+                {!isCollapsed && <div className="mx-3 my-2 h-px bg-hero-dark" />}
+                <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">
+                  Welt & Lore
+                </p>
+                {worldNav
+                  .filter((item) =>
+                    worldHasBlueprint ? true : item.href === `/dashboard/worlds/${worldId}`,
+                  )
+                  .map((item) => {
+                    const onOverview = pathname === `/dashboard/worlds/${worldId}`;
+                    const isActive =
+                      "tab" in item && item.tab
+                        ? onOverview && (currentTab === item.tab || (item.tab === "overview" && !currentTab))
+                        : pathname === item.href || (item.href !== `/dashboard/worlds/${worldId}` && pathname?.startsWith(item.href + "/"));
+                    return (
+                      <NavItem
+                        key={item.href + (item.tab ?? "")}
+                        href={item.href}
+                        label={item.label}
+                        icon={item.icon}
+                        isActive={isActive}
+                      />
+                    );
+                  })}
+              </div>
+            )}
+
             {/* Mode B: Campaign Mode - Back Button */}
-            {isInCampaign && (
+            {isInCampaign && !isInWorld && (
               <div className="mb-4">
                 <Link
                   href="/dashboard"
@@ -358,8 +489,8 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Mode A: General Dashboard Navigation (Default) */}
-            {!isInCampaign && (
+            {/* Mode A: General Dashboard Navigation (Default, nicht wenn in Kampagne oder Welt) */}
+            {!isInCampaign && !isInWorld && (
               <div className="space-y-1">
                 {!isCollapsed && (
                   <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">
@@ -379,8 +510,8 @@ export function Sidebar({
               </div>
             )}
 
-            {/* ADMINISTRATION: nur sichtbar wenn isAdmin */}
-            {!isInCampaign && isAdmin && (
+            {/* ADMINISTRATION: nur sichtbar wenn isAdmin, nicht in Kampagne/Welt */}
+            {!isInCampaign && !isInWorld && isAdmin && (
               <div className="space-y-1 mt-6 pt-6">
                 <hr className="border-hero-border/60 mb-4 mx-3" />
                 {!isCollapsed && (
@@ -425,8 +556,8 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Mode B: Campaign Context Section */}
-            {isInCampaign && campaignNav.length > 0 && (
+            {/* Mode B: Campaign Context Section (nur wenn in Kampagne, nicht in Welt) */}
+            {isInCampaign && !isInWorld && campaignNav.length > 0 && (
               <div className="space-y-1">
                 {!isCollapsed && (
                   <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">
@@ -441,9 +572,8 @@ export function Sidebar({
                     icon={item.icon}
                     tab={item.tab}
                     isActive={
-                      item.href?.includes("/gm-inbox")
-                        ? pathname.includes("/gm-inbox")
-                        : false
+                      pathname === item.href ||
+                      (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox"))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
                   />
@@ -451,8 +581,8 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Einstellungen & System: bleibt unten, wenn nicht in Kampagne */}
-            {!isInCampaign && (
+            {/* Einstellungen & System: bleibt unten, wenn nicht in Kampagne/Welt */}
+            {!isInCampaign && !isInWorld && (
               <div className="space-y-1 mt-auto pt-6 border-t border-hero-border/60">
                 {!isCollapsed && (
                   <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">

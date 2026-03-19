@@ -45,21 +45,24 @@ export async function getAchievementImageFilenames(): Promise<string[]> {
 /**
  * Verleiht ein Achievement an einen User (falls noch nicht vorhanden).
  * Trägt in user_achievements ein und addiert points_awarded zum total_points des Users.
+ * Erstellt automatisch einen points_log Eintrag für die Historie.
  */
 export async function awardAchievement(
   userId: string,
-  achievementName: string
+  achievementName: string,
+  grantedBy?: string | null
 ): Promise<{ awarded: boolean; error?: string }> {
   const supabase = await createClient();
 
   const { data: achievement, error: achErr } = await (
     supabase.from("achievements") as any
   )
-    .select("id, points_awarded")
+    .select("id, name, points_awarded")
     .eq("name", achievementName)
     .maybeSingle();
 
   if (achErr || !achievement) {
+    console.error("[awardAchievement] Achievement nicht gefunden:", achievementName, achErr);
     return { awarded: false, error: "Achievement nicht gefunden." };
   }
 
@@ -73,27 +76,58 @@ export async function awardAchievement(
     return { awarded: false };
   }
 
+  // 1. user_achievements Eintrag erstellen
   const { error: insertErr } = await (
     supabase.from("user_achievements") as any
   ).insert({
     user_id: userId,
     achievement_id: achievement.id,
+    awarded_at: new Date().toISOString(), // Explizit setzen für Konsistenz
   });
 
   if (insertErr) {
+    console.error("[awardAchievement] Fehler beim Insert in user_achievements:", insertErr);
     return { awarded: false, error: insertErr.message };
   }
 
+  console.log("[awardAchievement] ✓ Achievement vergeben:", achievementName, "an User:", userId);
+
   const points = Number(achievement.points_awarded) || 0;
   if (points > 0) {
+    // 2. total_points erhöhen
     const { data: userRow } = await (supabase.from("users") as any)
       .select("total_points")
       .eq("id", userId)
       .single();
     const current = Number((userRow as any)?.total_points) || 0;
-    await (supabase.from("users") as any)
-      .update({ total_points: current + points })
+    const newTotal = current + points;
+
+    const { error: updateErr } = await (supabase.from("users") as any)
+      .update({ total_points: newTotal })
       .eq("id", userId);
+
+    if (updateErr) {
+      console.error("[awardAchievement] Fehler beim Update total_points:", updateErr);
+      return { awarded: false, error: updateErr.message };
+    }
+
+    console.log("[awardAchievement] ✓ Punkte erhöht:", userId, current, "→", newTotal);
+
+    // 3. points_log Eintrag erstellen (für Historie & Goldregen)
+    const reason = `Achievement "${achievement.name}" erhalten`;
+    const { error: logErr } = await (supabase.from("points_log") as any).insert({
+      user_id: userId,
+      amount: points,
+      reason: reason,
+      created_by: grantedBy ?? null,
+      campaign_id: null,
+    });
+
+    if (logErr) {
+      console.error("[awardAchievement] Fehler beim points_log Insert:", logErr);
+    } else {
+      console.log("[awardAchievement] ✓ points_log Eintrag erstellt für User:", userId, "Betrag:", points, "Grund:", reason);
+    }
   }
 
   revalidatePath("/dashboard");
@@ -123,7 +157,8 @@ export async function awardAchievementAsGm(
     return { success: false, error: "Nur der GM kann Achievements verleihen." };
   }
 
-  const result = await awardAchievement(targetUserId, achievementName);
+  // Award achievement with GM's ID as granter
+  const result = await awardAchievement(targetUserId, achievementName, user.id);
   if (result.error) return { success: false, error: result.error };
   return { success: true };
 }
@@ -237,6 +272,7 @@ export async function getUserAchievements(userId: string): Promise<{
     name: string;
     image_url?: string | null;
     points_awarded: number;
+    description?: string | null;
   }[];
   hasNewContent: boolean;
 }> {
@@ -248,20 +284,27 @@ export async function getUserAchievements(userId: string): Promise<{
       .maybeSingle(),
     (supabase.from("user_achievements") as any)
       .select(
-        "achievement_id, created_at, achievements(id, name, image_url, icon, points_awarded)"
+        "achievement_id, awarded_at, achievements(id, name, image_url, icon, points_awarded, description)"
       )
       .eq("user_id", userId),
   ]);
-  if (dataRes.error) return { achievements: [], hasNewContent: false };
+  
+  if (dataRes.error) {
+    console.error("[getUserAchievements] Fehler beim Laden:", dataRes.error);
+    return { achievements: [], hasNewContent: false };
+  }
+  
   const list = Array.isArray(dataRes.data) ? dataRes.data : [];
+  console.log("[getUserAchievements] Raw data für User:", userId, "Anzahl Einträge:", list.length);
+  
   const lastView = (userRes.data as any)?.last_achievement_view ?? null;
   let newestAt: string | null = null;
   const achievements = list
     .map((row: any) => {
       const a = row.achievements ?? row.achievement;
-      if (row.created_at) {
-        if (!newestAt || new Date(row.created_at) > new Date(newestAt))
-          newestAt = row.created_at;
+      if (row.awarded_at) {
+        if (!newestAt || new Date(row.awarded_at) > new Date(newestAt))
+          newestAt = row.awarded_at;
       }
       return a;
     })
@@ -275,9 +318,18 @@ export async function getUserAchievements(userId: string): Promise<{
         (a.name && ACHIEVEMENT_IMAGE_FILENAMES[a.name]) ??
         null,
       points_awarded: Number(a.points_awarded) || 0,
+      description: a.description ?? null,
     }));
   const hasNewContent = newestAt
     ? !lastView || new Date(newestAt) > new Date(lastView)
     : achievements.length > 0 && !lastView;
+  
+  console.log("[getUserAchievements] Ergebnis für User:", userId, {
+    achievementsCount: achievements.length,
+    hasNewContent,
+    newestAt,
+    lastView,
+  });
+  
   return { achievements: achievements ?? [], hasNewContent };
 }

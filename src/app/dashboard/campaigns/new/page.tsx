@@ -1,8 +1,29 @@
 import { createCampaignAction } from "./actions";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { createClient } from "@/src/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { ArrowLeft, Sparkles, Globe } from "lucide-react";
 import Link from "next/link";
 
-export default function CreateCampaignPage() {
+export default async function CreateCampaignPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profileRaw } = await (supabase.from("users") as any)
+    .select("primary_role")
+    .eq("id", user.id)
+    .single();
+  const profile = profileRaw as { primary_role?: string } | null;
+  if (profile?.primary_role !== "GameMaster" && profile?.primary_role !== "Admin") {
+    redirect("/dashboard");
+  }
+
+  const { data: worldsRaw } = await (supabase.from("worlds") as any)
+    .select("id, name")
+    .eq("gm_id", user.id)
+    .order("name", { ascending: true });
+  const worlds = (worldsRaw as { id: string; name: string }[]) || [];
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       {/* Back Button */}
@@ -22,13 +43,55 @@ export default function CreateCampaignPage() {
             Neue Kampagne erstellen
           </h1>
           <p className="mt-1 font-libre text-gray-400">
-            Erschaffe eine neue Welt und lade deine Spieler ein.
+            Wähle eine Basis-Welt und lade deine Spieler ein.
           </p>
         </div>
       </div>
 
-      {/* Form */}
+      {worlds.length === 0 ? (
+        <div className="rounded-md border border-hero-dark bg-background-card p-6 text-center">
+          <Globe className="h-12 w-12 text-hero-vibrant mx-auto mb-4" />
+          <h2 className="font-barlow font-bold text-xl text-white mb-2">Zuerst eine Welt anlegen</h2>
+          <p className="font-libre text-gray-400 mb-4 max-w-md mx-auto">
+            Jede Kampagne braucht eine Basis-Welt für Lore und NPCs. Erstelle zuerst eine Welt unter Welten & Lore.
+          </p>
+          <Link
+            href="/dashboard/worlds"
+            className="inline-flex items-center gap-2 rounded-md border border-hero-border bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-white text-sm hover:bg-hero-vibrant transition-colors"
+          >
+            <Globe className="h-4 w-4" />
+            Welten & Lore
+          </Link>
+        </div>
+      ) : (
       <form action={createCampaignAction} className="space-y-6" suppressHydrationWarning={true}>
+        {/* Basis-Welt (Pflicht) */}
+        <div>
+          <label
+            htmlFor="world_id"
+            className="block mb-2 font-barlow font-bold uppercase text-sm text-gray-300"
+          >
+            Basis-Welt *
+          </label>
+          <select
+            id="world_id"
+            name="world_id"
+            required
+            className="w-full bg-slate-900 border border-hero-dark text-white rounded p-3 focus:border-hero-vibrant outline-none"
+            suppressHydrationWarning={true}
+          >
+            <option value="">-- Welt wählen --</option>
+            {worlds.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 font-libre text-xs text-gray-500">
+            Lore und NPCs dieser Kampagne gehören zur gewählten Welt.
+          </p>
+        </div>
+
         {/* Campaign Name */}
         <div>
           <label
@@ -161,6 +224,7 @@ export default function CreateCampaignPage() {
           Kampagne erstellen
         </button>
       </form>
+      )}
     </div>
   );
 }

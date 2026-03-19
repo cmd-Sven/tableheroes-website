@@ -2,8 +2,9 @@
 
 import OpenAI from "openai";
 import { createClient } from "@/src/lib/supabase/server";
-import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
-import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS } from "@/src/lib/faction-types";
+import { LOCATION_TYPES, VALID_LORE_TYPES } from "@/src/lib/lore-types";
+import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS, FACTION_MEMBER_ROLES } from "@/src/lib/faction-types";
+import type { WorldBlueprint } from "@/src/types/world";
 import {
   NPCSchema,
   LoreEntrySchema,
@@ -349,6 +350,59 @@ async function callOpenAI(systemPrompt: string, userPrompt: string) {
     console.error("OpenAI Error:", error);
     throw new Error("Fehler bei der KI-Generierung.");
   }
+}
+
+// ------------------------------------------------------------------
+// HELPER: WORLD BLUEPRINT KONTEXT
+// ------------------------------------------------------------------
+async function getWorldBlueprintContext(supabase: any, campaignId: string): Promise<string> {
+  // Kampagne -> world_id
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, name, world_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as { id: string; name: string | null; world_id: string | null } | null;
+  if (!campaign?.world_id) return "";
+
+  const { data: worldRaw } = await (supabase.from("worlds") as any)
+    .select("name, blueprint")
+    .eq("id", campaign.world_id)
+    .single();
+
+  if (!worldRaw || !(worldRaw as any).blueprint) return "";
+
+  const world = worldRaw as { name: string | null; blueprint: WorldBlueprint | null };
+  if (!world.blueprint) return "";
+
+  const bp = world.blueprint;
+
+  let ctx = "\n=== WORLD BLUEPRINT (Meta-Regeln der Welt) ===\n";
+  ctx += `Welt: ${world.name || "Unbenannt"}\n`;
+  ctx += "- Vibes:\n";
+  ctx += `  • Genre: ${bp.vibes.genre || "nicht gesetzt"}\n`;
+  ctx += `  • Tech-Level: ${bp.vibes.tech_level || "nicht gesetzt"}\n`;
+  ctx += `  • Magie: ${bp.vibes.magic_prevalence || "nicht gesetzt"}\n`;
+  ctx += "- Physik:\n";
+  ctx += `  • Weltform: ${bp.physics.shape || "nicht gesetzt"}\n`;
+  ctx += `  • Himmel/Zeit: ${bp.physics.sky_details || "nicht gesetzt"}\n`;
+  ctx += "- Kultur:\n";
+  ctx += `  • Religionstyp: ${bp.culture.religion_type || "nicht gesetzt"}\n`;
+  ctx += `  • Sprachbasis: ${bp.culture.language_base || "nicht gesetzt"}\n`;
+  ctx += `  • Hauptkonflikt: ${bp.culture.main_conflict || "nicht gesetzt"}\n`;
+  ctx += "- Alltag & Wirtschaft:\n";
+  ctx += `  • Feiertage (Kurz): ${bp.life_economy.holidays_summary || "nicht gesetzt"}\n`;
+  ctx += `  • Kalender-Monate: ${bp.life_economy.calendar_months || "nicht gesetzt"}\n`;
+  ctx += `  • Herkunft der Monatsnamen: ${bp.life_economy.month_origin || "nicht gesetzt"}\n`;
+  ctx += `  • Währung: ${bp.life_economy.currency_name || "nicht gesetzt"}\n`;
+  ctx += `  • Währungsdetails: ${bp.life_economy.currency_details || "nicht gesetzt"}\n`;
+
+  ctx += `
+NUTZUNGSREGEL:
+- Alle generierten Inhalte (NPCs, Fraktionen, Lore) MÜSSEN stilistisch und thematisch zu diesem Blueprint passen.
+- Wenn der Hauptkonflikt gesetzt ist, sollte er in Motiven, Fraktionen und Konflikten widerhallen.`;
+
+  return ctx;
 }
 
 // ------------------------------------------------------------------
@@ -806,35 +860,27 @@ Erscheinungsbild: ${faction.appearance || "Kein spezielles Erscheinungsbild hint
 GM-Notizen (intern): ${faction.gm_notes || "Keine GM-Notizen hinterlegt."}
 `;
 
-    // Lade Fraktions-Beziehungen (Feindbilder, Verbündete)
-    const { data: factionRelations } = await (supabase.from("faction_relations") as any)
-      .select(`
-        id,
-        faction_id_1,
-        faction_id_2,
-        relation_type,
-        description,
-        faction_1:faction_id_1!inner (
-          id,
-          name
-        ),
-        faction_2:faction_id_2!inner (
-          id,
-          name
-        )
-      `)
+    // Lade Fraktions-Beziehungen (ohne Join – Schema-Cache)
+    const { data: factionRelationsRaw } = await (supabase.from("faction_relations") as any)
+      .select("id, faction_id_1, faction_id_2, relation_type, description")
       .eq("campaign_id", campaignId)
       .or(`faction_id_1.eq.${entityId},faction_id_2.eq.${entityId}`)
       .limit(10);
 
-    if (factionRelations && factionRelations.length > 0) {
+    const factionRelations = (factionRelationsRaw || []) as Array<{ faction_id_1: string; faction_id_2: string; relation_type: string; description: string | null }>;
+    if (factionRelations.length > 0) {
+      const factionIds = [...new Set(factionRelations.flatMap((r) => [r.faction_id_1, r.faction_id_2]))];
+      const { data: factionRows } = await (supabase.from("factions") as any)
+        .select("id, name")
+        .in("id", factionIds);
+      const factionMap = new Map(
+        ((factionRows as { id: string; name: string }[]) ?? []).map((f) => [f.id, f.name])
+      );
       specificContext += "\n=== FRAKTIONS-BEZIEHUNGEN ===\n";
       for (const rel of factionRelations) {
-        const isFaction1 = rel.faction_id_1 === entityId;
-        const partnerFaction = isFaction1 ? rel.faction_2 : rel.faction_1;
-        if (partnerFaction) {
-          specificContext += `- ${partnerFaction.name}: ${rel.relation_type}${rel.description ? ` (${rel.description})` : ""}\n`;
-        }
+        const partnerId = rel.faction_id_1 === entityId ? rel.faction_id_2 : rel.faction_id_1;
+        const partnerName = factionMap.get(partnerId) ?? "Unbekannt";
+        specificContext += `- ${partnerName}: ${rel.relation_type}${rel.description ? ` (${rel.description})` : ""}\n`;
       }
     }
 
@@ -1389,6 +1435,7 @@ export async function generateNPC(
   const supabase = await verifyGM(campaignId);
   const rootWorldContext = await getRootWorldContext(supabase, campaignId);
   const worldContext = await getWorldContext(supabase, campaignId);
+  const blueprintContext = await getWorldBlueprintContext(supabase, campaignId);
 
   // Lade verfügbare Locations für Location-Matching
   const { data: locationsRaw } = await (supabase.from("world_lore") as any)
@@ -1491,6 +1538,7 @@ export async function generateNPC(
     Du bist Game Master. Erstelle einen NPC, der in die existierende Welt passt.
     
     ${rootWorldContext}
+    ${blueprintContext}
     ${secretContextString}
     
     WICHTIG: Nutze bevorzugt existierende Rassen, Fraktionen und Orte aus dem Kontext!
@@ -1508,7 +1556,7 @@ export async function generateNPC(
     ${factionContext}
 
     FALLS EIN FRAKTIONS-KONTEXT ANGEGEBEN IST (obiger Block):
-    - **Erscheinungsbild:** Integriere explizit Uniformen, Wappen, Farben oder Slogans der Fraktion in das Aussehen des NPCs (appearance).
+    - **Erscheinungsbild (appearance):** NUR Stichpunkte. Integriere Uniformen, Wappen, Farben oder Slogans der Fraktion als Bullet Points (z. B. • Dunkelgrüne Uniform • Silbernes Abzeichen).
     - **Persönlichkeit:** Die Persönlichkeit des NPCs (personality_traits, gm_notes) soll die Philosophie/Ziele der Fraktion widerspiegeln – entweder als loyale Verkörperung oder als bewusst begründete Abweichung.
     - **Rolle:** Weise dem NPC eine Rolle/Position zu, die zur beschriebenen Organisationsstruktur der Fraktion passt (z.B. Offizier, Rekrut, Spion, Quartiermeister o.Ä.).
 
@@ -1530,19 +1578,14 @@ export async function generateNPC(
     - Beispiel: Wenn in der Story steht "Grommashs Schwester Nilidah wurde aus der Gilde verstoßen", erstelle: { "name": "Nilidah", "role": "Schwester", "description": "Wurde aus der Gilde verstoßen", "is_alive": true }
     - Wenn keine Personen erwähnt werden, lasse 'narrative_hooks' als leeres Array.
 
-    PROBEN & INFORMATIONEN (KRITISCH - MEHRERE DC-STUFEN PRO PROBE):
-    - Erstelle für jeden der 3 Proben-Typen ("Wahrnehmung", "Motiv erkennen", "Wissen") MINDESTENS 2 DC-Stufen:
-      * **Basis-Erfolg (niedriger DC, z.B. 10-15)**: Grundlegende Information, die bei einem normalen Erfolg sichtbar wird.
-      * **Herausragender Erfolg / Krit (hoher DC, z.B. 20-25 oder is_critical: true)**: Zusätzliche, detaillierte oder versteckte Information, die nur bei einem sehr guten Wurf oder kritischen Erfolg sichtbar wird.
-    - **WICHTIG - NUTZE GM-NOTIZEN & ORT-KONTEXT:**
-      * Nutze die bereitgestellten GM-Notizen und Beschreibungen des Ortes/der Fraktion, um die Secrets zu erden.
-      * Wenn im Ort Vorurteile, Bedrohungen oder kulturelle Eigenheiten (auch geheime GM-Infos) existieren, spiegele diese in der Wahrnehmung oder dem Wissen über den NPC wider.
-      * Beispiel: Ort "Nethergard" hat GM-Notiz "Bedrohung durch Schattenmagie" → (Wahrnehmung DC 12) "Trägt ein silbernes Amulett" | (Wahrnehmung DC 20, is_critical: true) "Das Amulett vibriert leicht bei Schattenmagie - ein typisches Schutzwerkzeug der Bewohner von Nethergard".
-      * Beispiel: Fraktion "Schattenklingen" hat GM-Notiz "Versteckte Operationen gegen die Regierung" → (Motiv erkennen DC 15) "Wirkt nervös, wenn Wachen in der Nähe sind" | (Motiv erkennen DC 22, is_critical: true) "Trägt ein verstecktes Abzeichen der Schattenklingen unter der Kleidung".
-    - **Wahrnehmung (Eye)**: Äußerliche Details, Kleidung, Waffen, Narben, Tattoos, Besonderheiten. **ERDE DIES IM ORT-KONTEXT:** Nutze lokale Bedrohungen, kulturelle Eigenheiten oder Schutzmaßnahmen aus den GM-Notizen.
-    - **Motiv erkennen (HeartPulse)**: Emotionen, versteckte Absichten, Ängste, Wünsche. **ERDE DIES IM ORT/FRAKTIONS-KONTEXT:** Nutze lokale Konflikte, Fraktions-Geheimnisse oder kulturelle Spannungen aus den GM-Notizen.
-    - **Wissen (Scroll)**: Vergangenheit, Verbindungen, Geheimnisse. **ERDE DIES IM ORT/FRAKTIONS-KONTEXT:** Nutze historische Ereignisse, Fraktions-Verbindungen oder lokale Geheimnisse aus den GM-Notizen.
-    - Die Proben sollten zur Persönlichkeit, Hintergrundgeschichte UND zum lokalen Kontext (Ort/Fraktion) passen.
+    ERGEBNISSE FÜR SPIELERPROBEN (check_results) – NUR FÜR DEN GM:
+    - Diese Einträge sind **mögliche Ergebnisse, wenn SPIELER mit ihren Charakteren** (nicht der NPC!) **Wahrnehmung, Motiv erkennen oder Wissen** gegen diesen NPC würfeln. Der GM nutzt sie, um zu sagen: „Bei DC 12 bemerkst du …“, „Bei kritischem Erfolg siehst du …“.
+    - **NICHT** formulieren als würde der NPC würfeln. **IMMER** formulieren als: Was erfährt/bemerkt der **Spielercharakter** bei diesem Wurf über den NPC?
+    - Erstelle für "Wahrnehmung", "Motiv erkennen", "Wissen" je mindestens 2 DC-Stufen (z. B. DC 12 und DC 18, oder DC 15 + is_critical: true).
+    - **Wahrnehmung**: Was sieht der Spielercharakter am NPC? (Kleidung, Narben, Waffen, Besonderheiten.) Formuliere z. B.: „Der Spieler bemerkt …“ / „Bei DC 12: … die dunkelgrüne Uniform und das silberne Abzeichen.“
+    - **Motiv erkennen**: Was erkennt der Spielercharakter über Absichten/Emotionen? z. B. „Wirkt wachsam.“ / „Bei kritischem Erfolg: spürt verborgene Anspannung.“
+    - **Wissen**: Was kann der Spielercharakter über Herkunft/Verbindungen/Geschichte wissen? z. B. „Kennt die Stadtwache von …“.
+    - Nutze GM-Notizen und Ort/Fraktion-Kontext, um die Texte zu verankern. Beispiel: Ort "Nethergard" → (Wahrnehmung DC 12) "Bemerkt das silberne Amulett am Hals." | (Wahrnehmung DC 20, is_critical) "Erkennt: Das Amulett wirkt wie ein typisches Schutzwerk gegen Schattenmagie aus Nethergard."
 
     ANFORDERUNGEN:
     - Valid JSON. Sprache: Deutsch.
@@ -1555,18 +1598,18 @@ export async function generateNPC(
     - 'alignment': Muss einer dieser Werte sein: "Lawful Good", "Neutral Good", "Chaotic Good", "Lawful Neutral", "True Neutral", "Chaotic Neutral", "Lawful Evil", "Neutral Evil", "Chaotic Evil". Wähle basierend auf der Persönlichkeit und dem Hintergrund des NPCs.
     - 'race': BEVORZUGT eine Rasse aus "EXISTIERENDE RASSEN". Falls keine passt, nutze eine passende Standard-Rasse.
     - 'status': Muss einer dieser Werte sein: "Alive", "Deceased", "Missing", "Unknown". Standard: "Alive".
-    - 'appearance': Detaillierte Beschreibung des Aussehens (Kleidung, Körperbau, Besonderheiten).
+    - 'description': Atmosphärischer Einleitungstext für die Spieler. Schreibe einen flüssigen Text, den der GM vorlesen kann. Fokus auf Vibe und Ausstrahlung. KEINE Stichpunkte, kein reines Auflisten von Merkmalen. Muss harmlos und subtil sein. KEINE Geheimnisse!
+    - 'appearance': NUR Stichpunkte (Bullet Points) mit harten optischen Fakten: Größe, Haarfarbe, markante Narben/Merkmale, Kleidung. Kein Fließtext, keine Wiederholung der Beschreibung.
     - 'personality_traits': Charaktereigenschaften, Verhalten, Eigenheiten (2-3 Sätze). ${secretContext?.is_secret_antagonist ? "**WICHTIG:** Wenn der NPC ein geheimer Antagonist ist, beschreibe hier die ÖFFENTLICHE, MASKIERTE Persönlichkeit (wie er sich nach außen gibt). KEINE Geheimnisse oder versteckten Absichten!" : ""}
-    - 'description': Öffentliche Beschreibung für Spieler. Muss harmlos und subtil sein. KEINE Geheimnisse oder versteckten Absichten!
     - **STRIKTE TRENNUNG:** Verwende das Feld 'description' ausschließlich für öffentliche Infos. Alle Geheimnisse aus 'hidden_agenda' MÜSSEN in 'true_nature' fließen. Mische diese Felder NIEMALS.
     ${secretContext?.is_secret_antagonist ? `
     
     **KRITISCH - AUFSPLITTUNG DER INFORMATIONEN FÜR GEHEIME ANTAGONISTEN:**
     Wenn 'is_secret_antagonist' true ist, MUSS du die Informationen wie folgt aufteilen:
     
-    1. **'description'** (Öffentlich & Subtil):
-       - Beschreibe, wie der NPC für Spieler erscheint (oberflächlich, freundlich, harmlos).
-       - Nutze subtile Hinweise, die bei genauerer Betrachtung verdächtig wirken könnten.
+    1. **'description'** (Öffentlich & Subtil – Vorlesetext):
+       - Flüssiger Text zum Vorlesen, Fokus auf Vibe und Ausstrahlung. Wie der NPC auf Spieler wirkt (oberflächlich, freundlich, harmlos).
+       - Nutze subtile Hinweise, die bei genauerer Betrachtung verdächtig wirken könnten. Keine Stichpunkte.
        - Beispiel: "Ein freundlicher Händler, der immer ein Lächeln auf den Lippen trägt" statt "Ein böser Verräter".
        - **KRITISCH: Informationen aus 'hidden_agenda' oder Antagonist-Details dürfen NIEMALS hier erscheinen! Diese Felder sind für Spieler sichtbar.**
     
@@ -1592,7 +1635,7 @@ export async function generateNPC(
     JSON: { 
       "name": "string", 
       "title": "string (Beruf/Rolle, z.B. 'Magister der Energie', 'Schmied')", 
-      "description": "string (Kurzbeschreibung für Spieler)", 
+      "description": "string (flüssiger Vorlesetext für Spieler, Vibe und Ausstrahlung – keine Stichpunkte)", 
       "gm_notes": "string (Geheimnisse, Hintergrund)", 
       "faction_name_suggestion": "string (Exakter Name aus EXISTIERENDE FRAKTIONEN oder leer)",
       "current_location_name_suggestion": "string (Exakter Name aus VERFÜGBARE ORTE oder leer)",
@@ -1600,7 +1643,7 @@ export async function generateNPC(
       "role": "string (Beruf/Rolle, z.B. 'Magister der Energie', 'Schmied', 'Händler')",
       "status": "Alive" | "Deceased" | "Missing" | "Unknown",
       "alignment": "Lawful Good" | "Neutral Good" | "Chaotic Good" | "Lawful Neutral" | "True Neutral" | "Chaotic Neutral" | "Lawful Evil" | "Neutral Evil" | "Chaotic Evil",
-      "appearance": "string (detaillierte Beschreibung des Aussehens)",
+      "appearance": "string (NUR Stichpunkte: Größe, Haarfarbe, Narben, Kleidung – kein Fließtext)",
       "personality_traits": "string (Charaktereigenschaften, Verhalten, Eigenheiten)${secretContext?.is_secret_antagonist ? " - ÖFFENTLICHE, maskierte Persönlichkeit" : ""}",
       ${secretContext?.is_secret_antagonist ? `"true_nature": "string (Wahre, interne Persönlichkeit - nur für GM sichtbar)",
       "hidden_agenda": "string (Versteckte Agenda des NPCs)",
@@ -1616,15 +1659,31 @@ export async function generateNPC(
       "check_results": [
         {
           "type": "Wahrnehmung" | "Motiv erkennen" | "Wissen",
-          "dc": number (Schwierigkeitsgrad, z.B. 12, 15, 20, 25),
-          "result": "string (detaillierte Beschreibung des Ergebnisses bei diesem DC)",
-          "is_critical": boolean (true für kritische Erfolge oder sehr hohe DCs, false für normale Erfolge)
+          "dc": number (Schwierigkeit der Spielerprobe, z.B. 12, 18),
+          "result": "string (was der SPIELERCHARAKTER bei diesem Wurf über den NPC erfährt/bemerkt – NICHT was der NPC würfelt)",
+          "is_critical": boolean (true = Ergebnis bei kritischem Erfolg des Spielers)
         }
       ]
     }
   `;
 
   const rawResult = await callOpenAI(systemPrompt, userPrompt);
+
+  // KI liefert appearance manchmal als Array (Stichpunkte) – in String normalisieren
+  if (rawResult && typeof rawResult === "object" && Array.isArray((rawResult as any).appearance)) {
+    const arr = (rawResult as any).appearance as unknown[];
+    (rawResult as any).appearance = arr
+      .filter((x: unknown) => typeof x === "string")
+      .join("\n")
+      .trim() || null;
+  } else if (
+    rawResult &&
+    typeof rawResult === "object" &&
+    (rawResult as any).appearance != null &&
+    typeof (rawResult as any).appearance !== "string"
+  ) {
+    (rawResult as any).appearance = null;
+  }
 
   // Zentrale Zod-Validierung der KI-Antwort für NPCs
   const parsedNPC = NPCSchema.safeParse(rawResult);
@@ -1783,6 +1842,7 @@ export async function generateFaction(campaignId: string, userPrompt: string) {
           "- Hochinquisitor Seran - fanatischer Anführer der inneren Zirkel, überwacht innere Reinheit."
           "- Quartiermeisterin Lira - kontrolliert alle Ressourcen und Bestechungen im Hafenviertel."
         - Verwende IMMER dieses Muster mit führendem '-' und genau einem '-' zwischen Name und Beschreibung.
+    - 'planned_members': OPTIONAL. Maximal 3 geplante Mitglieder für die NPC-TODO-Liste. Jedes Objekt: { "name": "string", "role": "string" }. role MUSS einer sein: ${FACTION_MEMBER_ROLES.join(", ")}.
 
     ANFORDERUNGEN:
     - Valid JSON. Sprache: Deutsch.
@@ -1797,7 +1857,8 @@ export async function generateFaction(campaignId: string, userPrompt: string) {
       "appearance": "string (Detaillierte Beschreibung von Wappen, Uniformfarben, Slogans und optischen Erkennungsmerkmalen)",
       "structure": "string (Beschreibung der inneren Struktur und Hierarchie der Fraktion)",
       "philosophy": "string (Ziele, Dogmen, Weltanschauung der Fraktion)",
-      "important_npcs_info": "string (2–3 weitere wichtige Rollen mit kurzen Beschreibungen, als Markdown-Liste im Format: '- Name - Kurze Beschreibung' pro Zeile)"
+      "important_npcs_info": "string (2–3 weitere wichtige Rollen mit kurzen Beschreibungen, als Markdown-Liste im Format: '- Name - Kurze Beschreibung' pro Zeile)",
+      "planned_members": "optional, array of max 3 objects: [{ name: string, role: string }]. role MUSS einer sein: ${FACTION_MEMBER_ROLES.join(", ")}"
     }
   `;
 
@@ -1851,17 +1912,148 @@ export async function generateFaction(campaignId: string, userPrompt: string) {
 }
 
 // ------------------------------------------------------------------
+// 3b. FRAKTION GENERATOR (Welt-Kontext, ohne Kampagne)
+// ------------------------------------------------------------------
+export async function generateFactionForWorld(worldId: string, userPrompt: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: worldRaw } = await (supabase.from("worlds") as any)
+    .select("id, name, gm_id, blueprint")
+    .eq("id", worldId)
+    .single();
+
+  if (!worldRaw || (worldRaw as { gm_id: string }).gm_id !== user.id) {
+    throw new Error("Nur der GM dieser Welt kann Fraktionen per KI generieren.");
+  }
+
+  const world = worldRaw as { name: string; blueprint?: WorldBlueprint | null };
+  const { buildBlueprintContext } = await import("@/src/app/dashboard/worlds/world-npc-actions");
+  const blueprintContext = await buildBlueprintContext(world.name, world.blueprint ?? null);
+
+  const LOCATION_TYPES_FOR_HQ = ["Stadt", "Region", "Insel", "Gebäude", "Tempel", "Kathedrale", "Akademie", "Taverne", "Kaserne", "Kontor", "Hafen", "Ort", "Dorf", "Stadtteil"];
+
+  const [locationsRes, factionsRes] = await Promise.all([
+    (supabase.from("world_lore") as any)
+      .select("id, name, type")
+      .eq("world_id", worldId)
+      .in("type", LOCATION_TYPES_FOR_HQ)
+      .limit(50),
+    (supabase.from("factions") as any)
+      .select("id, name")
+      .eq("world_id", worldId)
+      .limit(30),
+  ]);
+
+  const locations = locationsRes.data ?? [];
+  const factions = factionsRes.data ?? [];
+
+  let locationsContext = "";
+  if (locations.length > 0) {
+    locationsContext = "\nVERFÜGBARE ORTE (für 'headquarters_location_name_suggestion'):\n";
+    locations.forEach((loc: any) => {
+      locationsContext += `- ${loc.name} (${loc.type})\n`;
+    });
+  }
+
+  let factionsContext = "";
+  if (factions.length > 0) {
+    factionsContext = "\nEXISTIERENDE FRAKTIONEN (berücksichtigen, keine Duplikate):\n";
+    factions.forEach((f: any) => {
+      factionsContext += `- ${f.name}\n`;
+    });
+  }
+
+  const rootWorldContext = `\n=== WELT KONTEXT ===\nWelt: ${world.name}\n${blueprintContext}\n`;
+
+  const systemPrompt = `
+    Du bist Game Master. Erstelle eine Fraktion, die in die existierende Welt passt.
+    
+    ${rootWorldContext}
+    ${factionsContext}
+    ${locationsContext}
+
+    WICHTIG:
+    - Berücksichtige existierende Fraktionen. Erstelle Rivalen, Verbündete oder unabhängige Fraktionen, die zur Welt passen.
+    - Wenn ein Ort aus "VERFÜGBARE ORTE" als Hauptquartier passt, nutze dessen Namen EXAKT für 'headquarters_location_name_suggestion'.
+    - 'type' MUSS einer dieser Werte sein: ${VALID_FACTION_TYPES.join(", ")}
+    - 'current_status' MUSS einer dieser Werte sein: ${VALID_RELATIONSHIPS.join(", ")} oder leer lassen.
+
+    ERWEITERTE IDENTITÄT DER FRAKTION:
+    - 'appearance': Beschreibe detailliert Wappen, Uniformfarben, Symbole, Slogans und optische Erkennungsmerkmale.
+    - 'structure': Wie ist die Fraktion organisiert? (Hierarchie, Ränge, Struktur)
+    - 'philosophy': Ziele, Dogmen, Weltanschauung der Fraktion.
+    - 'important_npcs_info': 2–3 weitere wichtige Rollen als Markdown-Liste im Format '- Name - Kurze Beschreibung' pro Zeile.
+    - 'planned_members': OPTIONAL. Maximal 3 geplante Mitglieder. Jedes Objekt: { "name": "string", "role": "string" }. role MUSS einer sein: ${FACTION_MEMBER_ROLES.join(", ")}.
+
+    ANFORDERUNGEN:
+    - Valid JSON. Sprache: Deutsch.
+    
+    JSON: { 
+      "name": "string", 
+      "type": "string (MUSS einer sein: ${VALID_FACTION_TYPES.join(", ")})", 
+      "current_status": "string (MUSS einer sein: ${VALID_RELATIONSHIPS.join(", ")} oder leer)", 
+      "description": "string (kurze Beschreibung für Spieler, 2–4 Sätze)", 
+      "gm_notes": "string (Interne Notizen, Geheimnisse, Plot-Ideen)",
+      "headquarters_location_name_suggestion": "string (Exakter Name aus VERFÜGBARE ORTE oder leer)",
+      "appearance": "string",
+      "structure": "string",
+      "philosophy": "string",
+      "important_npcs_info": "string (Format: '- Name - Kurze Beschreibung' pro Zeile)",
+      "planned_members": "optional, array of max 3: [{ name: string, role: string }]. role einer von: ${FACTION_MEMBER_ROLES.join(", ")}"
+    }
+  `;
+
+  const rawFaction = await callOpenAI(systemPrompt, userPrompt);
+
+  const parsedFaction = FactionAIResponseSchema.safeParse(rawFaction);
+  if (!parsedFaction.success) {
+    console.error("AI Validation Error (FactionAIResponseSchema):", parsedFaction.error.format());
+    throw new Error("Die KI hat ein ungültiges Format für die Fraktion geliefert.");
+  }
+
+  const result: any = parsedFaction.data;
+
+  if (result.headquarters_location_name_suggestion && locations.length > 0) {
+    type LocationType = { id: string; name: string | null; type: string | null };
+    const matchedLocation = (locations as LocationType[]).find(
+      (loc) => loc.name?.toLowerCase() === result.headquarters_location_name_suggestion?.toLowerCase()
+    );
+    if (matchedLocation) {
+      result.headquarters_location_id = matchedLocation.id;
+    } else {
+      const fuzzyLocation = (locations as LocationType[]).find(
+        (loc) =>
+          loc.name?.toLowerCase().includes(result.headquarters_location_name_suggestion?.toLowerCase() || "") ||
+          result.headquarters_location_name_suggestion?.toLowerCase().includes(loc.name?.toLowerCase() || "")
+      );
+      if (fuzzyLocation) {
+        result.headquarters_location_id = fuzzyLocation.id;
+      }
+    }
+  }
+
+  return result;
+}
+
+// ------------------------------------------------------------------
 // 4. LORE GENERATOR
 // ------------------------------------------------------------------
 export async function generateLore(campaignId: string, userPrompt: string) {
   const supabase = await verifyGM(campaignId);
   const rootWorldContext = await getRootWorldContext(supabase, campaignId);
   const worldContext = await getWorldContext(supabase, campaignId);
+  const blueprintContext = await getWorldBlueprintContext(supabase, campaignId);
 
   const systemPrompt = `
     Du bist Game Master. Erstelle einen Ort oder ein historisches Ereignis (Lore), der in die existierende Welt passt.
     
     ${rootWorldContext}
+    ${blueprintContext}
     
     WELT KONTEXT (Existierende Inhalte):
     ${worldContext}
@@ -2012,27 +2204,43 @@ export async function generateBackstorySuggestions(
     throw new Error("Du musst Mitglied der Kampagne sein, um Backstory-Vorschläge zu erhalten.");
   }
 
-  // 3. Fetch REVEALED entities only (SECURITY: No GM notes, no unrevealed)
-  const { data: factions } = await supabase
+  // 3. Fetch REVEALED entities only (Sichtbarkeit aus campaign_visibility)
+  const { getVisibilityForCampaign } = await import("./campaign-visibility-actions");
+  const { data: campaignRow } = await supabase.from("campaigns").select("world_id").eq("id", campaignId).single();
+  const worldId = (campaignRow as any)?.world_id ?? null;
+
+  const [loreVisibility, npcVisibility, factionVisibility] = await Promise.all([
+    getVisibilityForCampaign(campaignId, "lore"),
+    getVisibilityForCampaign(campaignId, "npc"),
+    getVisibilityForCampaign(campaignId, "faction"),
+  ]);
+
+  const { data: factionsRaw } = await supabase
     .from("factions")
-    .select("name, type, description")
+    .select("id, name, type, description")
     .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
-    .limit(10);
+    .limit(20);
+  const factions = (factionsRaw || []).filter((f: any) => factionVisibility[f.id]).slice(0, 10);
 
-  const { data: lore } = await supabase
-    .from("world_lore")
-    .select("name, type, description")
-    .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
-    .limit(10);
+  let lore: any[] = [];
+  if (worldId) {
+    const { data: loreRaw } = await supabase
+      .from("world_lore")
+      .select("id, name, type, description")
+      .eq("world_id", worldId)
+      .limit(50);
+    lore = (loreRaw || []).filter((l: any) => loreVisibility[l.id]).slice(0, 10);
+  }
 
-  const { data: npcs } = await supabase
-    .from("npcs")
-    .select("name, title, description")
-    .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
-    .limit(10);
+  let npcs: any[] = [];
+  if (worldId) {
+    const { data: npcsRaw } = await supabase
+      .from("npcs")
+      .select("id, name, title, description")
+      .eq("world_id", worldId)
+      .limit(50);
+    npcs = (npcsRaw || []).filter((n: any) => npcVisibility[n.id]).slice(0, 10);
+  }
 
   // Build context string (NO GM NOTES!)
   let contextString = "";
@@ -2481,16 +2689,14 @@ export async function generateNpcDetailsFromHook(
     
     ANFORDERUNGEN:
     - Valid JSON. Sprache: Deutsch.
-    - 'appearance': Detaillierte Beschreibung des Aussehens, die ZUR ROLLE AUS DEM HOOK passt (z.B. Heilerin = Heiler-Kleidung, Kräuter, medizinische Utensilien).
-    - 'personality_traits': Charaktereigenschaften, die die BESCHRIEBENE BEZIEHUNG widerspiegeln (z.B. "besorgte Schwester" = fürsorglich, beschützend, emotional verbunden mit ${sourceNPCName}).
-    - 'description': Kurze Spieler-Beschreibung, die die ROLLE UND BEZIEHUNG AUS DEM HOOK erwähnt, OHNE neue Fakten zu erfinden.
-
-LE UND BEZIEHUNG AUS DEM HOOK erwähnt, OHNE neue Fakten zu erfinden.
+    - 'description': Flüssiger Vorlesetext für Spieler, Vibe und Ausstrahlung. Erwähnt Rolle und Beziehung aus dem Hook. Keine Stichpunkte.
+    - 'appearance': NUR Stichpunkte (Größe, Haarfarbe, Kleidung, Merkmale) – passend zur Rolle (z.B. Heilerin = Heiler-Kleidung, Kräuter). Kein Fließtext.
+    - 'personality_traits': Charaktereigenschaften, die die BESCHRIEBENE BEZIEHUNG widerspiegeln (z.B. "besorgte Schwester" = fürsorglich, beschützend).
     
     JSON: {
-      "appearance": "string (detaillierte Beschreibung, passend zur Rolle aus dem Hook)",
-      "personality_traits": "string (Charaktereigenschaften, die die Beziehung widerspiegeln)",
-      "description": "string (kurze Beschreibung für Spieler, erwähnt Rolle und Beziehung aus Hook)"
+      "description": "string (flüssiger Vorlesetext für Spieler, Rolle und Beziehung aus Hook)",
+      "appearance": "string (NUR Stichpunkte, passend zur Rolle aus dem Hook)",
+      "personality_traits": "string (Charaktereigenschaften, die die Beziehung widerspiegeln)"
     }
   `;
 
@@ -2550,7 +2756,7 @@ export async function analyzeWorldContext(
     WICHTIG:
     - NUR Orte/Fraktionen extrahieren, die EXPLIZIT im Briefing erwähnt werden
     - Wenn ein Ort erwähnt wird, versuche zu erkennen, in welcher Region/Stadt er liegt (parent_location)
-    - Nutze die Typen aus VALID_LORE_TYPES für Orte: ${VALID_LORE_TYPES.join(", ")}
+    - Nutze die Typen aus LOCATION_TYPES für Orte: ${LOCATION_TYPES.join(", ")}
     - Nutze die Typen aus VALID_FACTION_TYPES für Fraktionen: ${VALID_FACTION_TYPES.join(", ")}
     - **KRITISCH - EINDEUTIGKEIT:** Jeder Ort/Fraktion darf NUR EINEN Typ haben. Wähle den SPEZIFISCHSTEN Typ aus der Liste.
       * Beispiel: Ein Ort kann NICHT gleichzeitig "Region" UND "Ort" sein. Wenn es eine Stadt ist, wähle "Stadt", nicht "Region".
@@ -2567,7 +2773,7 @@ export async function analyzeWorldContext(
       "locations": [
         {
           "name": "string (Name des Ortes)",
-          "type": "string (MUSS einer sein: ${VALID_LORE_TYPES.filter(t => ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"].includes(t)).join(", ")})",
+          "type": "string (MUSS einer sein: ${LOCATION_TYPES.join(", ")})",
           "parent_location_name": "string (Name des Parent-Ortes, falls erwähnt, sonst leer)"
         }
       ],

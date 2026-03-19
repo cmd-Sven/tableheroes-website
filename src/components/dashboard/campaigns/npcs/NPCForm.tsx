@@ -4,11 +4,14 @@ import React, { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Loader2 } from "lucide-react";
 import { createNPC, updateNPC, getNPCsByContext, searchAllNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { createSecret } from "@/src/app/dashboard/campaigns/[id]/secrets-actions";
+import { regenerateNPCSection, type RerollSection } from "@/src/app/dashboard/worlds/world-npc-actions";
 import { generateNPC, generateNpcDetailsFromHook } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
 import { NarrativeHook } from "@/src/types/npc";
 import Image from "next/image";
 import { Users, MapPin, UsersRound, Search, AlertCircle } from "lucide-react";
 import { AIGenerationWizard } from "./AIGenerationWizard";
+import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { CheckResultsEditor } from "./CheckResultsEditor";
 import { suggestInferenceRelationsForTarget } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
 
@@ -24,17 +27,18 @@ type NPC = {
   appearance: string | null;
   personality_traits: string | null;
   gm_notes: string | null;
-  player_notes: string | null;
   image_url: string | null;
   faction_id: string | null;
   current_location_id: string | null;
   home_location_id: string | null;
-  is_revealed: boolean;
   narrative_hooks?: NarrativeHook[] | null;
 };
 
 type Props = {
-  campaignId: string;
+  /** Kampagnen-Kontext (für Erstellen/Bearbeiten in Kampagne). */
+  campaignId?: string;
+  /** Welt-Kontext (GM-Zentrale: Erstellen/Bearbeiten nur mit world_id). */
+  worldId?: string;
   initialData?: NPC | null;
   factions: Array<{ id: string; name: string }>;
   locations: Array<{ id: string; name: string; type: string }>;
@@ -44,6 +48,16 @@ type Props = {
     sourceNPCName: string;
     hook: NarrativeHook;
   };
+  /** Optionale Vorbelegung für die Rolle (z.B. \"Gott\" aus der World-Roadmap). */
+  defaultRole?: string;
+  /** Optionale Vorbelegung für current_location_id und home_location_id (z.B. von Orts-Detailseite). */
+  defaultLocationId?: string;
+  /** Optionale Vorbelegung Name/Fraktion/Beschreibung (z.B. von Fraktions-Detail „NPC anlegen“). */
+  defaultName?: string;
+  defaultFactionId?: string;
+  defaultDescription?: string;
+  /** Vorgeschlagenes Geheimnis aus dem KI-Wizard; wird beim Erstellen gespeichert, wenn campaignId gesetzt ist. */
+  suggestedSecret?: { title: string; content: string } | null;
 };
 
 const NPC_STATUSES = [
@@ -65,12 +79,14 @@ const ALIGNMENTS = [
   "Chaotic Evil",
 ];
 
-export function NPCForm({ campaignId, initialData, hookContext, factions, locations, onSuccess, onCreated }: Props) {
+export function NPCForm({ campaignId, worldId, initialData, hookContext, factions, locations, onSuccess, onCreated, defaultRole, defaultLocationId, defaultName, defaultFactionId, defaultDescription, suggestedSecret }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const isEditMode = !!(initialData?.id && initialData.id.trim() !== "");
+  const showAdvancedSections = isEditMode || !!hookContext || !!initialData;
 
   // Context NPCs State
   const [contextNPCs, setContextNPCs] = useState<{
@@ -88,18 +104,19 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
     title: string;
     role: string;
     race: string;
+    religions: string;
+    deities: string;
+    languages: string;
     status: string;
     alignment: string;
     description: string;
     appearance: string;
     personality_traits: string;
     gm_notes: string;
-    player_notes: string;
     image_url: string;
     faction_id: string;
     current_location_id: string;
     home_location_id: string;
-    is_revealed: boolean;
     narrative_hooks: NarrativeHook[];
     is_secret_antagonist: boolean;
     hidden_agenda: string;
@@ -111,22 +128,23 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
       is_critical: boolean;
     }>;
   }>({
-    name: "",
+    name: defaultName ?? "",
     title: "",
-    role: "",
+    role: defaultRole || "",
     race: "",
+    religions: "",
+    deities: "",
+    languages: "",
     status: "Alive",
     alignment: "",
-    description: "",
+    description: defaultDescription ?? "",
     appearance: "",
     personality_traits: "",
     gm_notes: "",
-    player_notes: "",
     image_url: "",
-    faction_id: "",
-    current_location_id: "",
-    home_location_id: "",
-    is_revealed: false,
+    faction_id: defaultFactionId ?? "",
+    current_location_id: defaultLocationId ?? "",
+    home_location_id: defaultLocationId ?? "",
     narrative_hooks: [],
     is_secret_antagonist: false,
     hidden_agenda: "",
@@ -136,6 +154,11 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
 
   // Load context NPCs when location or faction changes
   useEffect(() => {
+    if (!campaignId) {
+      setContextNPCs(null);
+      setSelectedContextNPCs([]);
+      return;
+    }
     if (!isEditMode && (formData.current_location_id || formData.faction_id)) {
       setIsLoadingContext(true);
       const loadContextNPCs = async () => {
@@ -144,7 +167,7 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
             campaignId,
             formData.current_location_id || null,
             formData.faction_id || null,
-            initialData?.id || null // Exclude current NPC if editing
+            initialData?.id || null
           );
           setContextNPCs(context);
         } catch (error) {
@@ -169,18 +192,19 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
         title: initialData.title || "",
         role: initialData.role || "",
         race: initialData.race || "",
+        religions: Array.isArray((initialData as any).religions) ? ((initialData as any).religions as string[]).join(", ") : "",
+        deities: Array.isArray((initialData as any).deities) ? ((initialData as any).deities as string[]).join(", ") : "",
+        languages: Array.isArray((initialData as any).languages) ? ((initialData as any).languages as string[]).join(", ") : "",
         status: initialData.status || "Alive",
         alignment: initialData.alignment || "",
         description: initialData.description || "",
         appearance: initialData.appearance || "",
         personality_traits: initialData.personality_traits || "",
         gm_notes: initialData.gm_notes || "",
-        player_notes: initialData.player_notes || "",
         image_url: initialData.image_url || "",
         faction_id: initialData.faction_id || "",
         current_location_id: initialData.current_location_id || "",
         home_location_id: initialData.home_location_id || "",
-        is_revealed: initialData.is_revealed || false,
         narrative_hooks: initialData.narrative_hooks || [],
         is_secret_antagonist: (initialData as any).is_secret_antagonist || false,
         hidden_agenda: (initialData as any).hidden_agenda || "",
@@ -193,18 +217,19 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
         title: "",
         role: "",
         race: "",
+        religions: "",
+        deities: "",
+        languages: "",
         status: "Alive",
         alignment: "",
         description: "",
         appearance: "",
         personality_traits: "",
         gm_notes: "",
-        player_notes: "",
         image_url: "",
         faction_id: "",
         current_location_id: "",
         home_location_id: "",
-        is_revealed: false,
         narrative_hooks: [],
         is_secret_antagonist: false,
         hidden_agenda: "",
@@ -216,6 +241,25 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
 
   // handleAIGenerate wurde entfernt - jetzt wird der AIGenerationWizard verwendet
 
+  const handleRerollSection = (section: RerollSection) => {
+    if (!worldId) return;
+    setRerollSection(section);
+    regenerateNPCSection(worldId, section, {
+      name: formData.name,
+      role: formData.role || undefined,
+      description: formData.description,
+      appearance: formData.appearance,
+      personality_traits: formData.personality_traits,
+    })
+      .then((result) => {
+        if (result[section] != null) {
+          setFormData((prev) => ({ ...prev, [section]: result[section]! }));
+        }
+      })
+      .catch((e: any) => alert(e?.message || "Fehler beim Neugenerieren."))
+      .finally(() => setRerollSection(null));
+  };
+
   const handleFillDetailsFromHook = async () => {
     if (!hookContext) return;
 
@@ -223,6 +267,10 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
     const currentName = formData.name?.trim();
     if (!currentName || currentName.toLowerCase() === "unbekannt") {
       alert("Bitte geben Sie zuerst einen Namen für den NPC ein (nicht 'Unbekannt'), bevor Sie die Details mit KI füllen.");
+      return;
+    }
+    if (!campaignId) {
+      alert("Kampagne erforderlich für KI-Generierung.");
       return;
     }
 
@@ -307,18 +355,25 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
           title: formData.title || undefined,
           role: formData.role || undefined,
           race: formData.race || undefined,
+          religions: formData.religions
+            ? formData.religions.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+            : undefined,
+          deities: formData.deities
+            ? formData.deities.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+            : undefined,
+          languages: formData.languages
+            ? formData.languages.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+            : undefined,
           status: formData.status || "Alive",
           alignment: formData.alignment || undefined,
           description: formData.description || undefined,
           appearance: formData.appearance || undefined,
           personality_traits: formData.personality_traits || undefined,
           gm_notes: formData.gm_notes || undefined,
-          player_notes: formData.player_notes || undefined,
           image_url: formData.image_url || undefined,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId,
-          is_revealed: formData.is_revealed,
           narrative_hooks: formData.narrative_hooks && formData.narrative_hooks.length > 0 ? formData.narrative_hooks : undefined,
           is_secret_antagonist: formData.is_secret_antagonist,
           hidden_agenda: formData.hidden_agenda || undefined,
@@ -331,25 +386,49 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
           
           if (onSuccess) {
             onSuccess();
-          } else {
+          } else if (worldId) {
+            router.push(`/dashboard/worlds/${worldId}/npcs`);
+            router.refresh();
+          } else if (campaignId) {
             router.push(`/dashboard/campaigns/${campaignId}?tab=npcs`);
             router.refresh();
           }
         } else {
-          // CREATE MODE: Warte auf das Ergebnis und rufe onCreated mit der neuen ID auf
-          const createdNPC = await createNPC({
-            campaign_id: campaignId,
+          const createPayload: any = {
             ...payload,
-          });
+          };
+          if (worldId) {
+            createPayload.world_id = worldId;
+          } else if (campaignId) {
+            createPayload.campaign_id = campaignId;
+          }
 
-          // WICHTIG: onCreated erst aufrufen, wenn der NPC erfolgreich erstellt wurde
+          const createdNPC = await createNPC(createPayload);
+
           if (createdNPC?.id && onCreated) {
             await onCreated(createdNPC.id);
           }
 
+          if (createdNPC?.id && campaignId && suggestedSecret?.content?.trim()) {
+            try {
+              await createSecret(
+                campaignId,
+                createdNPC.id,
+                "npc",
+                suggestedSecret.content.trim(),
+                suggestedSecret.title?.trim() || undefined
+              );
+            } catch (secretErr: any) {
+              console.warn("Optionales Geheimnis konnte nicht angelegt werden:", secretErr?.message);
+            }
+          }
+
           if (onSuccess) {
             onSuccess();
-          } else {
+          } else if (worldId) {
+            router.push(`/dashboard/worlds/${worldId}/npcs`);
+            router.refresh();
+          } else if (campaignId) {
             router.push(`/dashboard/campaigns/${campaignId}?tab=npcs`);
             router.refresh();
           }
@@ -370,8 +449,8 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
             {isEditMode ? "NPC bearbeiten" : "Neuen NPC erstellen"}
           </h1>
           
-          {/* Prominenter KI-Button (nur im Create-Modus ohne Hook) */}
-          {!isEditMode && !hookContext && (
+          {/* Prominenter KI-Button (nur im Kampagnen-Kontext, Create-Modus ohne Hook) */}
+          {!isEditMode && !hookContext && campaignId && (
             <div className="mb-6">
               <button
                 type="button"
@@ -591,7 +670,7 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
               </div>
             ) : contextNPCs && (
               <ContextNPCsWidget
-                campaignId={campaignId}
+                campaignId={campaignId ?? ""}
                 contextNPCs={contextNPCs}
                 selectedContextNPCs={selectedContextNPCs}
                 onSelectNPC={(npcId, relationType) => {
@@ -619,8 +698,8 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
           </div>
         )}
 
-        {/* Erweiterte Felder (nur im Edit-Modus sichtbar) */}
-        {isEditMode && (
+        {/* Erweiterte Felder (Edit- & KI-Modus) */}
+        {showAdvancedSections && (
           <>
             {/* Alignment & Image URL */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -656,6 +735,31 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
               </div>
             </div>
 
+                {worldId && !isEditMode && (
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="font-barlow font-bold text-xs uppercase text-gray-500 flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-accent-gold" />
+                  Sektion neu generieren:
+                </span>
+                {(["appearance", "personality_traits", "description"] as const).map((section) => (
+                  <button
+                    key={section}
+                    type="button"
+                    onClick={() => handleRerollSection(section)}
+                    disabled={!!rerollSection}
+                    className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow font-bold text-xs uppercase text-gray-400 hover:text-accent-gold hover:border-accent-gold/50 disabled:opacity-50"
+                  >
+                    {rerollSection === section ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    {section === "appearance" ? "Aussehen" : section === "personality_traits" ? "Persönlichkeit" : "Beschreibung"}
+                  </button>
+                ))}
+              </div>
+            )}
+
                 <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
@@ -689,12 +793,11 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
               <label className="mb-2 block font-barlow font-bold text-sm uppercase text-accent-blue">
                 Beschreibung (Spieler-sichtbar)
               </label>
-              <textarea
+              <MarkdownEditor
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={4}
-                className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-blue resize-none"
-                placeholder="Eine kurze Beschreibung, die Spieler sehen können..."
+                onChange={(v) => setFormData({ ...formData, description: v })}
+                minHeight="min-h-[400px]"
+                placeholder="Eine kurze Beschreibung, die Spieler sehen können. Markdown: **fett**, *kursiv*, Listen, Überschriften, Zitate."
               />
             </div>
 
@@ -712,33 +815,7 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
               />
             </div>
 
-            {/* Player Notes */}
-            <div>
-              <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                Spieler-Notizen
-              </label>
-              <textarea
-                value={formData.player_notes}
-                onChange={(e) => setFormData({ ...formData, player_notes: e.target.value })}
-                rows={3}
-                className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-hero-vibrant resize-none"
-                placeholder="Notizen, die alle Spieler sehen können..."
-              />
-            </div>
-
-            {/* Reveal Checkbox */}
-            <div className="flex items-center gap-3 rounded border border-hero-border/30 bg-slate-900/50 p-4">
-              <input
-                type="checkbox"
-                id="is_revealed"
-                checked={formData.is_revealed}
-                onChange={(e) => setFormData({ ...formData, is_revealed: e.target.checked })}
-                className="h-5 w-5 rounded border-hero-dark bg-slate-800 text-hero-vibrant focus:ring-2 focus:ring-hero-vibrant cursor-pointer"
-              />
-              <label htmlFor="is_revealed" className="font-libre text-sm text-gray-300 cursor-pointer select-none">
-                Für Spieler sichtbar
-              </label>
-            </div>
+            {/* Spieler-Notizen: pro Kampagne auf der NPC-Detailseite (campaign_notes) */}
 
             {/* Spielleiter-Geheimnisse Sektion */}
             <div className="rounded-lg border-2 border-accent-blood/50 bg-slate-900/80 p-6 space-y-4">
@@ -795,7 +872,7 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
               </div>
             </div>
 
-            {/* Proben & Informationen */}
+            {/* Ergebnisse für Spielerproben – was Spieler bei Würfen über den NPC entdecken */}
             <CheckResultsEditor
               checkResults={formData.check_results}
               onChange={(results) => setFormData({ ...formData, check_results: results })}
@@ -824,8 +901,8 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
         </div>
       </form>
 
-      {/* AI Generation Wizard */}
-      {showWizard && (
+      {/* AI Generation Wizard (nur mit campaignId) */}
+      {showWizard && campaignId && (
         <AIGenerationWizard
           campaignId={campaignId}
           factions={factions}
@@ -835,6 +912,9 @@ export function NPCForm({ campaignId, initialData, hookContext, factions, locati
             setShowWizard(false);
             if (onSuccess) {
               onSuccess();
+            } else if (worldId) {
+              router.push(`/dashboard/worlds/${worldId}/npcs`);
+              router.refresh();
             } else {
               router.push(`/dashboard/campaigns/${campaignId}?tab=npcs`);
               router.refresh();
@@ -1095,7 +1175,7 @@ export function ContextNPCsWidget({
           {/* Header: Avatar + Name + Badge */}
           <div className="flex items-start gap-4">
             {npc.image_url ? (
-              <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden border-2 border-[#704214]">
+              <div className="relative h-20 w-20 shrink-0 rounded-lg overflow-hidden border-2 border-[#704214]">
                 <Image
                   src={npc.image_url}
                   alt={npc.name}
@@ -1104,14 +1184,14 @@ export function ContextNPCsWidget({
                 />
               </div>
             ) : (
-              <div className="h-20 w-20 flex-shrink-0 rounded-lg bg-[#e8d5b7] flex items-center justify-center border-2 border-[#704214]">
+              <div className="h-20 w-20 shrink-0 rounded-lg bg-[#e8d5b7] flex items-center justify-center border-2 border-[#704214]">
                 <Users className="h-10 w-10 text-[#704214]" />
               </div>
             )}
             <div className="flex-1 min-w-0 pt-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1">
-                  <h4 className="font-cinzel font-semibold text-lg text-black mb-1 break-words">
+                  <h4 className="font-cinzel font-semibold text-lg text-black mb-1 wrap-break-word">
                     {npc.name}
                     {(npc as any).location_name && (group as string) === "all" && (
                       <span className="ml-2 font-libre text-sm font-normal text-gray-600">
@@ -1120,7 +1200,7 @@ export function ContextNPCsWidget({
                     )}
                   </h4>
                   {npc.role && (
-                    <p className="font-libre text-sm text-gray-700 mb-2 break-words">
+                    <p className="font-libre text-sm text-gray-700 mb-2 wrap-break-word">
                       {npc.role}
                     </p>
                   )}
@@ -1134,7 +1214,7 @@ export function ContextNPCsWidget({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-shrink-0 p-2 rounded hover:bg-gray-100 transition-colors"
+                  className="shrink-0 p-2 rounded hover:bg-gray-100 transition-colors"
                   title="NPC-Profil in neuem Tab öffnen"
                 >
                   <Search className="h-4 w-4 text-gray-600" />

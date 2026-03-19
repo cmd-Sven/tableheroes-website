@@ -80,7 +80,6 @@ export async function applyWorldSkeleton(
           current_status: faction.current_status || "Neutral",
           description: faction.description,
           gm_notes: faction.gm_notes,
-          is_revealed: false,
         });
         factionMap.set(faction.name, result.id);
         created.factions++;
@@ -101,7 +100,6 @@ export async function applyWorldSkeleton(
           type: location.type || "Location",
           description: location.description,
           gm_notes: location.gm_notes,
-          is_revealed: false,
         });
         created.locations++;
       } catch (error) {
@@ -128,7 +126,6 @@ export async function applyWorldSkeleton(
           description: npc.description,
           gm_notes: npc.gm_notes,
           faction_id: factionId,
-          is_revealed: false,
         });
         created.npcs++;
       } catch (error) {

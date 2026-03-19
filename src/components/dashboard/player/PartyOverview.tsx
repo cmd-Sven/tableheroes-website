@@ -43,6 +43,7 @@ export function PartyOverview({ party }: Props) {
                 <p className="font-barlow font-bold text-white truncate">{member.name}</p>
                 <p className="font-libre text-sm text-gray-400">
                   {member.class} · {member.race}
+                  {member.culture && ` · ${member.culture}`}
                   {member.level != null && member.level > 0 && ` · Stufe ${member.level}`}
                 </p>
               </div>

@@ -1,55 +1,81 @@
 "use client";
 
+import { useState, useEffect } from "react";
+
+type Particle = { animationDelay: number; leftPercent: number };
+type Ember = { animationDelay: number; leftPercent: number; drift: number };
+
+function deterministicParticles(): Particle[] {
+  return Array.from({ length: 50 }, (_, i) => ({
+    animationDelay: i / 50,
+    leftPercent: (i / 50) * 100,
+  }));
+}
+
+function deterministicEmbers(): Ember[] {
+  return Array.from({ length: 25 }, (_, i) => ({
+    animationDelay: (i / 25) * 2,
+    leftPercent: 30 + (i / 25) * 40,
+    drift: ((i % 5) / 5 - 0.5) * 3,
+  }));
+}
+
+function randomParticles(): Particle[] {
+  return Array.from({ length: 50 }, () => ({
+    animationDelay: Math.random() * 1,
+    leftPercent: Math.random() * 100,
+  }));
+}
+
+function randomEmbers(): Ember[] {
+  return Array.from({ length: 25 }, () => ({
+    animationDelay: Math.random() * 2,
+    leftPercent: 30 + Math.random() * 40,
+    drift: (Math.random() - 0.5) * 3,
+  }));
+}
+
 export function FireEffect() {
-  const particles = Array.from({ length: 50 }, (_, i) => i);
-  const emberParticles = Array.from({ length: 25 }, (_, i) => i);
+  const [particles, setParticles] = useState<Particle[]>(deterministicParticles);
+  const [embers, setEmbers] = useState<Ember[]>(deterministicEmbers);
+
+  useEffect(() => {
+    setParticles(randomParticles());
+    setEmbers(randomEmbers());
+  }, []);
 
   return (
     <div
       className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none scale-50 origin-bottom"
       style={{
-        fontSize: "clamp(12px, 1.5vw, 24px)", // Responsive scaling
+        fontSize: "clamp(12px, 1.5vw, 24px)",
         filter: "blur(0.03em)",
-        width: "clamp(100px, 8vw, 200px)", // Scales with viewport
+        width: "clamp(100px, 8vw, 200px)",
         height: "12em",
         mixBlendMode: "screen",
       }}
     >
-      {/* Hauptfeuer-Partikel */}
-      {particles.map((_, index) => {
-        const animationDelay = Math.random() * 1; // 0 to 1s
-        const leftPercent = (index / 50) * 100; // Distribute across width
-
-        return (
-          <div
-            key={index}
-            className="particle"
-            style={{
-              animationDelay: `${animationDelay}s`,
-              left: `calc(${leftPercent}% - 2.5em)`,
-            }}
-          />
-        );
-      })}
-      
-      {/* Glut-Partikel (aufsteigend) */}
-      {emberParticles.map((_, index) => {
-        const animationDelay = Math.random() * 2; // 0 to 2s
-        const leftPercent = 30 + (Math.random() * 40); // Zwischen 30% und 70% der Breite
-        const horizontalDrift = (Math.random() - 0.5) * 3; // Leichte horizontale Drift
-
-        return (
-          <div
-            key={`ember-${index}`}
-            className="ember-particle"
-            style={{
-              animationDelay: `${animationDelay}s`,
-              left: `calc(${leftPercent}% - 0.5em)`,
-              "--drift": `${horizontalDrift}em`,
-            } as React.CSSProperties}
-          />
-        );
-      })}
+      {particles.map((p, index) => (
+        <div
+          key={index}
+          className="particle"
+          style={{
+            animationDelay: `${p.animationDelay}s`,
+            left: `calc(${p.leftPercent}% - 2.5em)`,
+          }}
+        />
+      ))}
+      {embers.map((e, index) => (
+        <div
+          key={`ember-${index}`}
+          className="ember-particle"
+          style={{
+            animationDelay: `${e.animationDelay}s`,
+            left: `calc(${e.leftPercent}% - 0.5em)`,
+            "--drift": `${e.drift}em`,
+          } as React.CSSProperties}
+        />
+      ))}
       
       <style jsx>{`
         .particle {

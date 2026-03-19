@@ -4,6 +4,157 @@ import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 /**
+ * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
+ * Falls character_id in campaign_members fehlt, wird der Charakter trotzdem gefunden.
+ */
+export async function getCharacterForMemberByUserId(
+  campaignId: string,
+  userId: string
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+    throw new Error("Nur der GM kann Charaktere laden.");
+  }
+
+  let { data: char } = await (supabase.from("characters") as any)
+    .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId)
+    .in("status", ["Active", "Alive", "Approved", "In_Review"])
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!char) {
+    const res = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
+      .eq("user_id", userId)
+      .in("status", ["Active", "Alive", "Approved", "In_Review"])
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    char = res.data;
+  }
+
+  return char as { id: string; name: string; class: string; race: string; level: number; status?: string } | null;
+}
+
+/**
+ * GM: Charakter per ID laden (inkl. character_relationships für Edit-Seite).
+ */
+export async function getCharacterByIdForGM(campaignId: string, characterId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .single();
+  if (!campaign) return null;
+  const gmId = (campaign as { gm_id: string; owner_id?: string }).gm_id;
+  const ownerId = (campaign as { gm_id: string; owner_id?: string }).owner_id;
+  if (gmId !== user.id && ownerId !== user.id) return null;
+
+  const { data: char } = await (supabase.from("characters") as any)
+    .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
+    .eq("id", characterId)
+    .eq("campaign_id", campaignId)
+    .single();
+  if (!char) return null;
+
+  const { data: relRows } = await (supabase.from("character_relationships") as any)
+    .select("id, relationship_type, description, npc_id")
+    .eq("character_id", characterId);
+  const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
+  let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
+  if (npcIds.length > 0) {
+    const { data: npcRows } = await (supabase.from("npcs") as any)
+      .select("id, name, role, title")
+      .in("id", npcIds);
+    npcMap = new Map(((npcRows as any[]) ?? []).map((n: any) => [n.id, { id: n.id, name: n.name, role: n.role, title: n.title }]));
+  }
+  (char as any).character_relationships = ((relRows as any[]) ?? []).map((r: any) => ({
+    id: r.id,
+    relationship_type: r.relationship_type,
+    description: r.description,
+    npcs: r.npc_id ? npcMap.get(r.npc_id) ?? null : null,
+  }));
+
+  return char;
+}
+
+/**
+ * Rassen, Kulturen und Sprachen für den Character-Wizard laden.
+ * Nur freigegebene (revealed) Lore-Einträge werden berücksichtigt.
+ */
+export async function getCharacterWizardLoreData(campaignId: string) {
+  const supabase = await createClient();
+
+  // Kampagne → world_id
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  if (!campaign?.world_id) return { races: [], cultures: [], languages: [] };
+
+  const worldId = campaign.world_id as string;
+
+  // Freigegebene Lore-IDs für diese Kampagne
+  const { data: visRows } = await (supabase.from("campaign_visibility") as any)
+    .select("entity_id")
+    .eq("campaign_id", campaignId)
+    .eq("entity_type", "lore")
+    .eq("is_revealed", true);
+
+  const revealedIds = new Set(((visRows as any[]) ?? []).map((v: any) => v.entity_id as string));
+
+  // Alle Rassen, Kulturen, Sprachen der Welt laden
+  const { data: loreRows } = await (supabase.from("world_lore") as any)
+    .select("id, name, type, culture_id, race_ids, language_ids")
+    .eq("world_id", worldId)
+    .in("type", ["Rasse", "Kultur", "Sprache"]);
+
+  const all = (loreRows as any[]) ?? [];
+
+  const races = all
+    .filter((l: any) => l.type === "Rasse" && revealedIds.has(l.id))
+    .map((l: any) => ({
+      id: l.id as string,
+      name: (l.name as string).trim(),
+      culture_id: l.culture_id as string | null,
+    }));
+
+  const cultures = all
+    .filter((l: any) => l.type === "Kultur" && revealedIds.has(l.id))
+    .map((l: any) => ({
+      id: l.id as string,
+      name: (l.name as string).trim(),
+      race_ids: (l.race_ids as string[]) ?? [],
+      language_ids: (l.language_ids as string[]) ?? [],
+    }));
+
+  const languages = all
+    .filter((l: any) => l.type === "Sprache" && revealedIds.has(l.id))
+    .map((l: any) => ({
+      id: l.id as string,
+      name: (l.name as string).trim(),
+    }));
+
+  return { races, cultures, languages };
+}
+
+/**
  * Server Actions für Charakter-Erstellung mit Beziehungen
  */
 
@@ -21,8 +172,11 @@ export async function createCharacterWithRelations(data: {
   race: string;
   level: number;
   biography?: string | null;
+  avatar_url?: string | null;
   faction_id?: string | null;
   location_id?: string | null;
+  culture_lore_id?: string | null;
+  languages?: string[];
   existing_contacts: Array<{ npc_id: string; relationship_type: string }>;
   new_contacts: Array<{
     name: string;
@@ -40,34 +194,43 @@ export async function createCharacterWithRelations(data: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Check if user is Accepted member
-  const { data: membershipRaw } = await (
+  // 2. Check if user is Accepted member (ohne characters-Join – FK kann fehlen)
+  const { data: membershipRaw, error: membershipError } = await (
     supabase.from("campaign_members") as any
   )
-    .select("id, status, character_id, characters(status)")
+    .select("id, status, character_id")
     .eq("campaign_id", data.campaign_id)
     .eq("user_id", user.id)
     .single();
 
-  // Hier den Typ knallhart erzwingen
-  const membership = membershipRaw as MembershipResult | null;
+  if (membershipError) {
+    console.error("[createCharacterWithRelations] membership error:", membershipError);
+  }
+
+  const membership = membershipRaw as { id: string; status: string; character_id: string | null } | null;
 
   if (!membership) {
     throw new Error("Du bist kein Mitglied dieser Kampagne.");
   }
 
-  // Jetzt ist .status garantiert vorhanden
-  const validStatuses = ["Accepted", "Drafting"];
+  const validStatuses = ["Accepted", "Drafting", "In_Review"];
   if (!validStatuses.includes(membership.status)) {
     throw new Error(
       "Nur akzeptierte Mitglieder (oder im Entwurf-Status) können Charaktere erstellen.",
     );
   }
 
-  // For Drafting status, allow updating even if character_id exists
-  // For Accepted status, allow if no character OR character is Dead/Archived
+  // For Drafting/In_Review: allow creating. For Accepted: allow if no character OR character is Dead/Archived
+  let characterStatus: string | null = null;
+  if (membership.character_id) {
+    const { data: charRow } = await (supabase.from("characters") as any)
+      .select("status")
+      .eq("id", membership.character_id)
+      .single();
+    characterStatus = (charRow as { status: string } | null)?.status ?? null;
+  }
+
   if (membership.status === "Accepted" && membership.character_id) {
-    const characterStatus = (membership.characters as any)?.status;
     const isDeadOrArchived =
       characterStatus === "Dead" || characterStatus === "Archived";
 
@@ -81,7 +244,7 @@ export async function createCharacterWithRelations(data: {
 
   // 3. Start transaction-like operations
   try {
-    // 3a. Create Character (Status: Pending_Approval bis GM freischaltet)
+    // 3a. Create Character (Status: Active – sofort spielbar, kein GM-Freischaltungs-Workflow)
     // current_location_id = world_lore.id (Heimatort aus Wizard)
     const { data: character, error: charError } = await (
       supabase.from("characters") as any
@@ -94,9 +257,12 @@ export async function createCharacterWithRelations(data: {
         race: data.race,
         level: data.level || 1,
         biography: data.biography || null,
+        avatar_url: data.avatar_url || null,
         faction_membership: data.faction_id || null,
         current_location_id: data.location_id || null,
-        status: "Pending_Approval",
+        culture_lore_id: data.culture_lore_id || null,
+        languages: data.languages && data.languages.length > 0 ? data.languages : [],
+        status: "Active",
       })
       .select()
       .single();
@@ -201,6 +367,61 @@ export async function createCharacterWithRelations(data: {
     console.error("Create Character With Relations Error:", error);
     throw error;
   }
+}
+
+/**
+ * Server Action für Spieler: Eigenen Charakter bearbeiten
+ */
+export async function updateCharacterPlayer(data: {
+  character_id: string;
+  campaign_id: string;
+  name?: string;
+  class?: string;
+  race?: string;
+  level?: number;
+  biography?: string | null;
+  culture_lore_id?: string | null;
+  languages?: string[];
+  faction_membership?: string | null;
+  current_location_id?: string | null;
+}) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: charRow } = await (supabase.from("characters") as any)
+    .select("id, user_id, campaign_id")
+    .eq("id", data.character_id)
+    .single();
+
+  if (!charRow || (charRow as any).user_id !== user.id) {
+    throw new Error("Du kannst nur deinen eigenen Charakter bearbeiten.");
+  }
+  if ((charRow as any).campaign_id !== data.campaign_id) {
+    throw new Error("Charakter gehört nicht zu dieser Kampagne.");
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.class !== undefined) updates.class = data.class;
+  if (data.race !== undefined) updates.race = data.race;
+  if (data.level !== undefined) updates.level = data.level;
+  if (data.biography !== undefined) updates.biography = data.biography;
+  if (data.culture_lore_id !== undefined) updates.culture_lore_id = data.culture_lore_id;
+  if (data.languages !== undefined) updates.languages = data.languages;
+  if (data.faction_membership !== undefined) updates.faction_membership = data.faction_membership;
+  if (data.current_location_id !== undefined) updates.current_location_id = data.current_location_id;
+
+  const { error } = await (supabase.from("characters") as any)
+    .update(updates)
+    .eq("id", data.character_id);
+
+  if (error) throw new Error(error.message || "Fehler beim Speichern.");
+  revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+  return { success: true };
 }
 
 /**
@@ -350,6 +571,7 @@ export async function updateCharacterByGM(data: {
     }
 
     revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+    revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
     return { success: true };
   } catch (error: any) {
     console.error("Update Character By GM Error:", error);

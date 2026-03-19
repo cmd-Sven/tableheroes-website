@@ -84,6 +84,11 @@ body {
   animation: buttonGlint 0.5s ease-out;
 }
 
+/* Erzwingt Schrumpfen in Flex/Grid (z. B. Lagerfeuer-Container im Footer) */
+.min-w-0-force {
+  min-width: 0 !important;
+}
+
 .flip-card-container {
   transform-style: preserve-3d;
   transition: transform 0.7s;

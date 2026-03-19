@@ -26,9 +26,11 @@ type Props = {
   isGM?: boolean;
   onDelete?: (lore: LoreEntry) => void;
   onToggleVisibility?: (lore: LoreEntry) => void;
+  /** Wenn gesetzt, wird dieser Link statt Kampagnen-Lore-Detail verwendet (z.B. Welt-Bearbeitung). */
+  detailHref?: string;
 };
 
-export function LoreGridCard({ lore, campaignId, isGM = false, onDelete, onToggleVisibility }: Props) {
+export function LoreGridCard({ lore, campaignId, isGM = false, onDelete, onToggleVisibility, detailHref }: Props) {
   const [isPending, startTransition] = useTransition();
   const [isFavorite, setIsFavorite] = useState(lore.is_favorite || false);
 
@@ -109,7 +111,7 @@ export function LoreGridCard({ lore, campaignId, isGM = false, onDelete, onToggl
     >
       {/* Clickable Link Wrapper */}
       <Link
-        href={`/dashboard/campaigns/${campaignId}/lore/${lore.id}`}
+        href={detailHref ?? `/dashboard/campaigns/${campaignId}/lore/${lore.id}`}
         className="absolute inset-0 z-10"
         aria-label={`${lore.name} Details öffnen`}
       />

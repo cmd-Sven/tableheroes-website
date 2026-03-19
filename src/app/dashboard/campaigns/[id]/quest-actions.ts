@@ -285,37 +285,15 @@ export async function completeQuest(questId: string) {
 export async function getQuests(campaignId: string) {
   const supabase = await createClient();
 
-  // Fetch quests with NPC, Location, and assigned Character data joined
-  // RLS will filter based on user role (GM sees all, Player sees only revealed)
+  // Fetch quests für die Kampagne (ohne abhängige Joins, um Schema-Cache-Fehler zu vermeiden)
   const { data: quests, error } = await (supabase.from("quests") as any)
-    .select(
-      `
-      *,
-      quest_giver:npcs (
-        id,
-        name,
-        title
-      ),
-      location:world_lore (
-        id,
-        name,
-        type
-      ),
-      assigned_character:characters (
-        id,
-        name,
-        class,
-        race,
-        level,
-        avatar_url
-      )
-    `,
-    )
+    .select("*")
     .eq("campaign_id", campaignId)
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Fetch Quests Error:", error);
+    console.error("Fehlerinhalt:", JSON.stringify(error, null, 2));
     return [];
   }
 
@@ -436,30 +414,7 @@ export async function getQuestById(questId: string) {
 
   // 2. Fetch Quest with all related data
   const { data: quest, error } = await (supabase.from("quests") as any)
-    .select(
-      `
-      *,
-      quest_giver:npcs (
-        id,
-        name,
-        title,
-        role
-      ),
-      location:world_lore (
-        id,
-        name,
-        type
-      ),
-      assigned_character:characters (
-        id,
-        name,
-        class,
-        race,
-        level,
-        avatar_url
-      )
-    `,
-    )
+    .select("*")
     .eq("id", questId)
     .single();
 

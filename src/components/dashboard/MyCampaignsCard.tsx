@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sword } from "lucide-react";
+import { Sword, ChevronRight } from "lucide-react";
 
 export type MembershipWithGm = {
   campaign: { id: string; name: string; system: string | null; gm_id: string | null };
@@ -13,7 +13,11 @@ type Props = {
   membershipsWithGm: MembershipWithGm[];
 };
 
+const MAX_CAMPAIGNS = 3;
+
 export function MyCampaignsCard({ membershipsWithGm }: Props) {
+  const displayList = membershipsWithGm.slice(0, MAX_CAMPAIGNS);
+
   if (membershipsWithGm.length === 0) {
     return (
       <div className="w-full p-4">
@@ -32,51 +36,26 @@ export function MyCampaignsCard({ membershipsWithGm }: Props) {
 
   return (
     <div className="w-full p-4">
-      <div className="grid w-full gap-4 sm:grid-cols-2">
-        {membershipsWithGm.map((m) => (
-          <Link
-            key={m.campaign.id}
-            href={`/dashboard/campaigns/${m.campaign.id}`}
-            className="block w-full rounded-md border border-hero-border bg-background-card p-4 shadow-lg hover:border-hero-vibrant transition-colors group"
-          >
-            <div className="mb-3">
-              <h3 className="font-cinzel font-bold text-lg text-white mb-1 group-hover:text-accent-gold transition-colors truncate">
-                {m.campaign.name || "Unbenannt"}
-              </h3>
-              <p className="font-barlow font-bold text-gray-500 uppercase text-xs mb-0.5">
-                {m.campaign.system || "System offen"}
-              </p>
-              <p className="font-libre text-xs text-gray-500">GM: {m.gmName}</p>
-            </div>
-            <div className="pt-3 border-t border-hero-border/30">
-              {m.character?.name ? (
-                <div className="flex items-center gap-3">
-                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                    {m.character.avatar_url ? (
-                      <img src={m.character.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center text-white font-bold text-sm">
-                        {m.character.name[0]?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-cinzel font-bold text-sm text-accent-gold truncate">{m.character.name}</p>
-                    <p className="font-libre text-xs text-gray-400">
-                      Lvl {m.character.level || 1} · {m.character.race} · {m.character.class}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="font-libre text-sm text-gray-500 italic">Charakter noch nicht erstellt</p>
-              )}
-            </div>
-            <p className="mt-3 pt-3 border-t border-hero-border/30 text-sm font-barlow font-bold uppercase text-hero-vibrant group-hover:text-white">
-              Zum Abenteuer →
-            </p>
-          </Link>
+      <ul className="space-y-0 divide-y divide-hero-border/30 rounded-md border border-hero-border/40 bg-hero-dark/20 overflow-hidden">
+        {displayList.map((m) => (
+          <li key={m.campaign.id}>
+            <Link
+              href={`/dashboard/campaigns/${m.campaign.id}`}
+              className="flex items-center justify-between gap-3 px-4 py-3 w-full hover:bg-hero-dark/40 transition-colors group"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-barlow font-bold text-white truncate group-hover:text-accent-gold transition-colors">
+                  {m.campaign.name || "Unbenannt"}
+                </p>
+                <p className="font-libre text-xs text-gray-500 truncate mt-0.5">
+                  {m.character?.name ?? "Kein Charakter"}
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-500 shrink-0 group-hover:text-accent-gold transition-colors" />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

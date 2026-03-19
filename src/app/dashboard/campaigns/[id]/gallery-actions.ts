@@ -1,16 +1,15 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { getVisibilityForCampaign } from "./campaign-visibility-actions";
 
 /**
  * Server Action: Get Campaign Gallery Images
  *
- * Sammelt alle öffentlichen Bilder (is_revealed === true) aus:
+ * Sammelt alle für diese Kampagne sichtbaren Bilder (campaign_visibility.is_revealed) aus:
  * - world_lore (image_url)
  * - npcs (image_url)
- * - factions (image_url)
- *
- * Nur für Spieler sichtbare Einträge werden zurückgegeben.
+ * - factions (image_url, falls campaign_visibility für faction genutzt wird)
  */
 
 type GalleryImage = {
@@ -25,88 +24,72 @@ export async function getCampaignGalleryImages(
 ): Promise<GalleryImage[]> {
   const supabase = await createClient();
 
-  // 1. Auth Check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("world_id")
+    .eq("id", campaignId)
+    .single();
+  if (!campaign?.world_id) return [];
+
+  const [loreVisibility, npcVisibility, factionVisibility] = await Promise.all([
+    getVisibilityForCampaign(campaignId, "lore"),
+    getVisibilityForCampaign(campaignId, "npc"),
+    getVisibilityForCampaign(campaignId, "faction"),
+  ]);
+
   const galleryImages: GalleryImage[] = [];
 
-  // 2. Fetch Lore Entries (is_revealed === true, has image_url)
   const { data: loreEntriesRaw } = await (supabase.from("world_lore") as any)
     .select("id, name, image_url")
-    .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
+    .eq("world_id", campaign.world_id)
     .not("image_url", "is", null);
+  const loreEntries = (loreEntriesRaw || []) as { id: string; name: string; image_url: string }[];
+  loreEntries.forEach((entry) => {
+    if (entry.image_url && loreVisibility[entry.id]) {
+      galleryImages.push({
+        id: entry.id,
+        url: entry.image_url,
+        altText: entry.name,
+        type: "lore",
+      });
+    }
+  });
 
-  // Expliziter Cast gegen 'never'
-  const loreEntries = loreEntriesRaw as
-    | { id: string; name: string; image_url: string }[]
-    | null;
-
-  if (loreEntries) {
-    loreEntries.forEach((entry) => {
-      if (entry.image_url) {
-        galleryImages.push({
-          id: entry.id,
-          url: entry.image_url,
-          altText: entry.name,
-          type: "lore",
-        });
-      }
-    });
-  }
-
-  // 3. Fetch NPCs (is_revealed === true, has image_url)
   const { data: npcsRaw } = await (supabase.from("npcs") as any)
     .select("id, name, image_url")
-    .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
+    .eq("world_id", campaign.world_id)
     .not("image_url", "is", null);
+  const npcs = (npcsRaw || []) as { id: string; name: string; image_url: string }[];
+  npcs.forEach((npc) => {
+    if (npc.image_url && npcVisibility[npc.id]) {
+      galleryImages.push({
+        id: npc.id,
+        url: npc.image_url,
+        altText: npc.name,
+        type: "npc",
+      });
+    }
+  });
 
-  // Expliziter Cast gegen 'never'
-  const npcs = npcsRaw as
-    | { id: string; name: string; image_url: string }[]
-    | null;
-
-  if (npcs) {
-    npcs.forEach((npc) => {
-      if (npc.image_url) {
-        galleryImages.push({
-          id: npc.id,
-          url: npc.image_url,
-          altText: npc.name,
-          type: "npc",
-        });
-      }
-    });
-  }
-
-  // 4. Fetch Factions (is_revealed === true, has image_url)
   const { data: factionsRaw } = await (supabase.from("factions") as any)
     .select("id, name, image_url")
     .eq("campaign_id", campaignId)
-    .eq("is_revealed", true)
     .not("image_url", "is", null);
-
-  // Expliziter Cast gegen 'never'
-  const factions = factionsRaw as
-    | { id: string; name: string; image_url: string }[]
-    | null;
-
-  if (factions) {
-    factions.forEach((faction) => {
-      if (faction.image_url) {
-        galleryImages.push({
-          id: faction.id,
-          url: faction.image_url,
-          altText: faction.name,
-          type: "faction",
-        });
-      }
-    });
-  }
+  const factions = (factionsRaw || []) as { id: string; name: string; image_url: string }[];
+  factions.forEach((faction) => {
+    if (faction.image_url && factionVisibility[faction.id]) {
+      galleryImages.push({
+        id: faction.id,
+        url: faction.image_url,
+        altText: faction.name,
+        type: "faction",
+      });
+    }
+  });
 
   return galleryImages;
 }

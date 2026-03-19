@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, User, Search, Filter, X, ScrollText } from "lucide-react";
+import { User, Search, X, ScrollText, Book } from "lucide-react";
 import Link from "next/link";
 import { NPCGridCard } from "@/src/components/dashboard/NPCGridCard";
 import { deleteNPC, toggleNPCReveal } from "./npc-actions";
@@ -33,12 +33,14 @@ type Faction = {
 
 type Props = {
   campaignId: string;
+  /** Welt-ID der Kampagne – für GM-Link „Zum Welt-Editor“. */
+  worldId?: string;
   npcs: NPC[];
   factions: Faction[];
   isGM: boolean;
 };
 
-export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
+export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [factionFilter, setFactionFilter] = useState<string>("Alle");
   const [statusFilter, setStatusFilter] = useState<string>("Alle");
@@ -55,7 +57,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
 
   const handleToggleVisibility = async (npc: NPC) => {
     try {
-      await toggleNPCReveal(npc.id, npc.is_revealed);
+      await toggleNPCReveal(campaignId, npc.id, npc.is_revealed);
     } catch (error: any) {
       alert(error.message || "Fehler beim Ändern der Sichtbarkeit.");
     }
@@ -141,16 +143,24 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
           <User className="h-5 w-5 text-accent-gold" />
           NPCs ({npcs.length})
         </h2>
-        {isGM && (
+        {isGM && worldId && (
           <Link
-            href={`/dashboard/campaigns/${campaignId}/npcs/new`}
+            href={`/dashboard/worlds/${worldId}/npcs`}
             className="flex items-center gap-2 rounded bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
           >
-            <Plus className="h-4 w-4" />
-            Neuer NPC
+            <Book className="h-4 w-4" />
+            Zum Welt-Editor
           </Link>
         )}
       </div>
+
+      {isGM && worldId && (
+        <div className="mb-6 rounded border border-blue-700/30 bg-blue-900/20 p-4">
+          <p className="font-libre text-sm text-blue-300 leading-relaxed">
+            NPCs gehören zur <strong>Welt</strong>, nicht zur Kampagne. Hier siehst du alle NPCs dieser Welt; mit dem Auge-Symbol machst du sie für Spieler <strong>in dieser Kampagne</strong> sichtbar. Neue NPCs legst du in der <strong>Welt-Verwaltung</strong> an („Zum Welt-Editor“).
+          </p>
+        </div>
+      )}
 
       {/* Search & Filter Bar */}
       <div className="mb-6 space-y-4">
@@ -291,20 +301,20 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
             <>
               <User className="h-12 w-12 text-gray-600 mx-auto mb-3" />
               <p className="font-cinzel text-lg text-accent-gold mb-2">
-                {isGM ? "Noch keine NPCs" : "Keine NPCs verfügbar"}
+                {isGM ? "Noch keine NPCs" : "Eure Helden wissen noch nichts über diese Welt..."}
               </p>
               <p className="font-libre text-sm text-gray-400 mb-4">
-                {isGM 
-                  ? "Erstelle deinen ersten NPC, um deine Welt zum Leben zu erwecken."
-                  : "Der Spielleiter hat noch keine NPCs für dich sichtbar gemacht."}
+                {isGM
+                  ? "NPCs legst du in der Welt-Verwaltung an („Zum Welt-Editor“). Danach kannst du sie hier mit dem Auge für Spieler sichtbar machen."
+                  : "Der Spielleiter hat noch keine NPCs für euch sichtbar gemacht."}
               </p>
-              {isGM && (
+              {isGM && worldId && (
                 <Link
-                  href={`/dashboard/campaigns/${campaignId}/npcs/new`}
+                  href={`/dashboard/worlds/${worldId}/npcs`}
                   className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-white hover:bg-hero-dark transition-colors"
                 >
-                  <Plus className="h-4 w-4" />
-                  Ersten NPC erstellen
+                  <Book className="h-4 w-4" />
+                  Zum Welt-Editor
                 </Link>
               )}
             </>
@@ -318,6 +328,7 @@ export function NPCsManagement({ campaignId, npcs, factions, isGM }: Props) {
               key={npc.id}
               npc={npc as any}
               campaignId={campaignId}
+              worldId={isGM && worldId ? worldId : undefined}
               isGM={isGM}
               onDelete={isGM ? (handleDelete as any) : undefined}
               onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}

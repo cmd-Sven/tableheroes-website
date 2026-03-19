@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Check, ChevronDown, Plus, X } from "lucide-react";
 import { createLocationQuick } from "@/src/app/dashboard/campaigns/[id]/location-actions";
-import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
+import { LOCATION_TYPES } from "@/src/lib/lore-types";
 
 type Location = { id: string; name: string; type: string };
 
@@ -16,8 +16,6 @@ type Props = {
   label?: string;
   onLocationCreated?: (location: Location) => void;
 };
-
-const GEOGRAPHICAL_TYPES = ["Stadt", "Region", "Ort", "Insel", "Gebäude", "Tempel", "Land", "Dungeon", "Akademie", "Markt", "Laden"];
 
 export function SmartLocationCombobox({
   campaignId,
@@ -245,7 +243,7 @@ export function SmartLocationCombobox({
               onChange={(e) => setQuickAddData((prev) => ({ ...prev, type: e.target.value }))}
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white outline-none focus:border-hero-vibrant text-sm"
             >
-              {GEOGRAPHICAL_TYPES.map((type) => (
+              {LOCATION_TYPES.map((type) => (
                 <option key={type} value={type}>
                   {type}
                 </option>

@@ -11,7 +11,9 @@ import {
   getGMNotifications,
   getGMRecipients,
   getPlayerMessages,
+  getUnreadInboxMessages,
 } from "@/src/lib/actions/message-actions";
+import { getPointsLog } from "@/src/lib/actions/point-actions";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
 import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
 import type { PendingApplication } from "@/src/components/dashboard/GMNotificationsWidget";
@@ -120,6 +122,8 @@ export default async function DashboardPage() {
           upcomingSessions={playerData.upcomingSessions}
           isBacker={!!profile?.is_backer}
           backerSince={profile?.backer_since ?? null}
+          pointsHistory={playerData.pointsHistory}
+          unreadInboxMessages={playerData.unreadInboxMessages}
         />
       </div>
     );
@@ -163,25 +167,68 @@ async function loadPlayerDashboardData(userId: string) {
     name: a.name,
     icon: a.image_url ?? null,
     image_url: a.image_url ?? null,
+    points_awarded: a.points_awarded ?? 0,
+    description: a.description ?? null,
   }));
   const hasNewAchievements = earnedAchievementsResult.hasNewContent;
+
+  console.log("[Dashboard] Achievements geladen für User:", userId, "Anzahl:", achievements.length);
 
   const { data: membershipsRaw } = await (
     supabase.from("campaign_members") as any
   )
-    .select(
-      `
-      campaign_id,
-      status,
-      character_id,
-      campaigns ( id, name, system, banner_url, gm_id ),
-      characters ( id, name, class, race, level, avatar_url, status )
-    `
-    )
+    .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
     .eq("user_id", userId)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved"]);
 
   const memberships = (membershipsRaw as any[]) || [];
+  let characterIds = [...new Set(memberships.map((m: any) => m.character_id).filter(Boolean))];
+
+  // Fallback: Wenn character_id fehlt, Charakter aus characters (user_id + campaign_id) laden
+  const membershipsWithoutChar = memberships.filter((m: any) => !m.character_id && (m.campaign_id ?? m.campaigns?.id));
+  if (membershipsWithoutChar.length > 0) {
+    const campaignIds = [...new Set(membershipsWithoutChar.map((m: any) => m.campaign_id ?? m.campaigns?.id))];
+    const { data: fallbackChars } = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, avatar_url, status, campaign_id")
+      .eq("user_id", userId)
+      .in("campaign_id", campaignIds)
+      .in("status", ["Active", "Alive"]);
+    for (const m of membershipsWithoutChar) {
+      const campId = m.campaign_id ?? m.campaigns?.id;
+      const char = (fallbackChars as any[])?.find((c: any) => c.campaign_id === campId);
+      if (char) {
+        (m as any).character_id = char.id;
+        characterIds.push(char.id);
+      }
+    }
+    characterIds = [...new Set(characterIds)];
+  }
+
+  let characterMap = new Map<string, { id: string; name: string; class: string; race: string; level: number; avatar_url: string | null; status: string }>();
+  if (characterIds.length > 0) {
+    const { data: charRows } = await (supabase.from("characters") as any)
+      .select("id, name, class, race, level, avatar_url, status")
+      .in("id", characterIds);
+    characterMap = new Map(
+      ((charRows as any[]) || []).map((c: any) => [
+        c.id,
+        {
+          id: c.id,
+          name: c.name ?? "",
+          class: c.class ?? "",
+          race: c.race ?? "",
+          level: c.level ?? 1,
+          avatar_url: c.avatar_url ?? null,
+          status: c.status ?? "Active",
+        },
+      ])
+    );
+  }
+  const membershipsWithChars = memberships.map((m: any) => ({
+    ...m,
+    characters: m.character_id ? characterMap.get(m.character_id) ?? null : null,
+  }));
+
   const gmIds = [
     ...new Set(memberships.map((m: any) => m.campaigns?.gm_id).filter(Boolean)),
   ];
@@ -198,7 +245,7 @@ async function loadPlayerDashboardData(userId: string) {
     );
   }
 
-  const membershipsWithGm = memberships.map((m: any) => ({
+  const membershipsWithGm = membershipsWithChars.map((m: any) => ({
     campaign: m.campaigns,
     character: m.characters
       ? {
@@ -215,7 +262,7 @@ async function loadPlayerDashboardData(userId: string) {
       : "Spielleiter",
   }));
 
-  const heroCharacters: HeroSliderCharacter[] = memberships
+  const heroCharacters: HeroSliderCharacter[] = membershipsWithChars
     .filter((m: any) => m.characters?.name)
     .map((m: any) => ({
       id: m.characters.id,
@@ -226,7 +273,7 @@ async function loadPlayerDashboardData(userId: string) {
       avatar_url: m.characters.avatar_url ?? null,
       campaignId: m.campaigns.id,
       campaignName: m.campaigns.name ?? "Kampagne",
-      status: (m.characters.status as string) ?? undefined,
+      status: m.characters.status ?? undefined,
     }));
 
   const { data: newAcceptancesRaw } = await (
@@ -243,14 +290,18 @@ async function loadPlayerDashboardData(userId: string) {
   }));
 
   const discoverableCampaigns = await getDiscoverableCampaigns();
-  const [loreResult, dailyComic, newsResult, upcomingSessions, playerMessages] =
+  const [loreResult, dailyComic, newsResult, upcomingSessions, playerMessages, pointsHistory, unreadInboxMessages] =
     await Promise.all([
       getRandomLoreSnippet(userId),
       getDailyComic(),
       getNewsForDashboard(userId),
       getUpcomingSessionsForUser(userId),
       getPlayerMessages(userId),
+      getPointsLog(userId, 5),
+      getUnreadInboxMessages(userId),
     ]);
+
+  console.log("[Dashboard] Points History geladen für User:", userId, "Anzahl:", pointsHistory.length);
 
   return {
     totalPoints,
@@ -267,6 +318,8 @@ async function loadPlayerDashboardData(userId: string) {
     hasNewAchievements,
     hasNewLore: loreResult.hasNewContent,
     upcomingSessions,
+    pointsHistory,
+    unreadInboxMessages,
   };
 }
 
@@ -361,8 +414,8 @@ async function loadGMDashboardData(userId: string) {
 async function getDiscoverableCampaigns() {
   const supabase = await createClient();
   const { data: campaignsRaw } = await (supabase.from("campaigns") as any)
-    .select("id, name, system, banner_url, description, mode, frequency")
-    .eq("status", "Active")
+    .select("id, name, system, banner_url, description, mode, frequency, schedule_day, schedule_time, schedule_interval")
+    // Nur veröffentlichte Kampagnen anzeigen; Detail-Status (active/planned/etc.) wird auf UI-Ebene interpretiert
     .eq("is_published", true)
     .order("created_at", { ascending: false })
     .limit(3);

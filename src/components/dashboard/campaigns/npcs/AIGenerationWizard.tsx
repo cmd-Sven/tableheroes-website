@@ -66,8 +66,6 @@ type WizardData = {
     gm_notes: string;
     title: string;
     image_url: string;
-    player_notes: string;
-    is_revealed: boolean;
     check_results?: Array<{
       type: "Wahrnehmung" | "Motiv erkennen" | "Wissen";
       dc: number;
@@ -82,7 +80,8 @@ type Props = {
   factions: Array<{ id: string; name: string; appearance?: string | null; structure?: string | null; philosophy?: string | null }>;
   locations: Array<{ id: string; name: string; type: string }>;
   onClose: () => void;
-  onSuccess?: () => void;
+  /** Nach erfolgreicher Erstellung: optional mit neuer NPC-ID (z.B. zum Verknüpfen mit Fraktions-TODO) */
+  onSuccess?: (npcId?: string) => void;
   hookContext?: {
     sourceNPCId?: string;
     sourceNPCName?: string;
@@ -158,6 +157,17 @@ export function AIGenerationWizard({
   useEffect(() => {
     setFactionsList(factions);
   }, [factions]);
+
+  // Kampagnen-NPCs beim Start laden (für Step 1: „Existierende NPC verbinden“)
+  useEffect(() => {
+    let cancelled = false;
+    getNPCsForAnalysis(campaignId).then((list) => {
+      if (!cancelled && Array.isArray(list)) {
+        setCampaignNPCs(list.map((n: any) => ({ id: n.id, name: n.name || "Unbenannt" })));
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [campaignId]);
 
   // Initialize wizard data with hook context or GM-Inbox-Prefill if provided
   const getInitialWizardData = (): WizardData => {
@@ -555,6 +565,15 @@ export function AIGenerationWizard({
   };
 
   const handleStep4Generate = async () => {
+    // Pflicht: Heimatort und Aufenthaltsort müssen gesetzt sein, damit die KI keine erfundenen Orte nutzt
+    if (!wizardData.current_location_id?.trim() || !wizardData.home_location_id?.trim()) {
+      alert(
+        "Bitte lege zuerst Aufenthaltsort und Heimatort in Schritt 3 (Soziales Umfeld) fest. " +
+        "Sonst erfindet die KI Orte, die in deiner Welt nicht existieren."
+      );
+      return;
+    }
+
     setIsGenerating(true);
     try {
       // Lade Location- und Faction-Details mit GM-Notizen für die KI-Generierung
@@ -597,6 +616,8 @@ export function AIGenerationWizard({
       
       const homeLocation = locationsList.find((l: any) => l.id === wizardData.home_location_id);
       if (homeLocation) prompt += `, Heimatort: ${homeLocation.name} (${homeLocation.type})`;
+
+      prompt += ". WICHTIG: Verwende NUR die angegebenen Orte (Aktueller Ort und Heimatort). Erfinde KEINE weiteren Ortsnamen oder Orte.";
 
       if (hookContext?.hook) {
         prompt += `. WICHTIGER KONTEXT AUS STORY-HOOK: ${hookContext.hook.description}. Die Rolle "${hookContext.hook.role}" ist ein unveränderlicher Fakt.`;
@@ -649,8 +670,6 @@ export function AIGenerationWizard({
           gm_notes: result.gm_notes || "",
           title: result.title || "",
           image_url: "",
-          player_notes: "",
-          is_revealed: false,
           is_secret_antagonist: result.is_secret_antagonist || false,
           hidden_agenda: result.hidden_agenda || "",
           true_nature: result.true_nature || "",
@@ -702,12 +721,10 @@ export function AIGenerationWizard({
           appearance: finalFields?.appearance || undefined,
           personality_traits: finalFields?.personality_traits || undefined,
           gm_notes: finalFields?.gm_notes || undefined,
-          player_notes: finalFields?.player_notes || undefined,
           image_url: finalFields?.image_url || undefined,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId || undefined,
-          is_revealed: finalFields?.is_revealed,
           narrative_hooks: wizardData.aiGenerated?.narrative_hooks || undefined,
           is_secret_antagonist: finalFields?.is_secret_antagonist || false,
           hidden_agenda: finalFields?.hidden_agenda || undefined,
@@ -829,9 +846,8 @@ export function AIGenerationWizard({
           }
         }
 
-        // Redirect zur Detailseite des neuen NPCs
         if (onSuccess) {
-          onSuccess();
+          onSuccess(createdNPC.id);
         } else {
           router.push(`/dashboard/campaigns/${campaignId}/npcs/${createdNPC.id}`);
           router.refresh();
@@ -914,7 +930,7 @@ export function AIGenerationWizard({
     setSelectedInferenceSuggestions,
   };
 
-  const content = <WizardContent {...wizardContentProps} />;
+  const content = <WizardContent {...(wizardContentProps as any)} />;
 
   if (!embedded) {
     return (

@@ -44,8 +44,12 @@ export async function getSecrets(entityId: string, entityType: string) {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("❌ [getSecrets] Error:", error);
-    console.error("❌ [getSecrets] Query params:", { entityId, entityType: normalizedEntityType });
+    // RLS oder andere Fehler (z. B. Aufruf ohne Kampagnenkontext auf Welt-NPC-Seite) → leere Liste, kein lauter Error
+    const msg = (error as { message?: string }).message;
+    const code = (error as { code?: string }).code;
+    if (process.env.NODE_ENV === "development" && (msg || code)) {
+      console.warn("[getSecrets] Keine Secrets geladen:", code ?? msg, { entityId, entityType: normalizedEntityType });
+    }
     return [];
   }
 

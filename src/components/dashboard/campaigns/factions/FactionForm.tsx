@@ -4,10 +4,11 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Sparkles, Loader2, ArrowLeft, Plus, X, Users } from "lucide-react";
 import Link from "next/link";
-import { createFaction, updateFaction, getFactions, getFactionRelations } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
+import { createFaction, updateFaction, getFactions, getFactionRelations, generateFactionForWorld } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { generateFaction } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
-import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS } from "@/src/lib/faction-types";
+import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS, FACTION_MEMBER_ROLES } from "@/src/lib/faction-types";
 import { SmartLocationCombobox } from "@/src/components/dashboard/campaigns/npcs/SmartLocationCombobox";
+import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { getAllLocations } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 
 type Location = {
@@ -32,6 +33,8 @@ type FactionData = {
   important_npcs_info?: string | null;
 };
 
+type PlannedMember = { name: string; role: string; npc_id?: string | null };
+
 type FactionRelation = {
   target_faction_id: string;
   relation_type: string;
@@ -39,31 +42,37 @@ type FactionRelation = {
 };
 
 type Props = {
-  campaignId: string;
+  campaignId?: string;
+  worldId?: string;
   initialData?: FactionData | null;
+  /** Vorbefüllung Name (z. B. aus World Task Board). Nur bei Erstellen. */
+  defaultName?: string;
+  /** Vorbefüllung Hauptsitz-Ort (z. B. von Orts-Detailseite). */
+  defaultHqLocationId?: string;
   locations?: Location[];
-  factions?: Array<{ id: string; name: string }>; // Für Diplomatie-Sektion
+  factions?: Array<{ id: string; name: string }>;
   onSuccess?: () => void;
 };
 
-export function FactionForm({ campaignId, initialData, locations = [], factions = [], onSuccess }: Props) {
+export function FactionForm({ campaignId, worldId, initialData, defaultName, defaultHqLocationId, locations = [], factions = [], onSuccess }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
   const [allLocations, setAllLocations] = useState<Location[]>(locations);
   const [allFactions, setAllFactions] = useState<Array<{ id: string; name: string }>>(factions);
   const [factionRelations, setFactionRelations] = useState<FactionRelation[]>([]);
+  const [plannedMembers, setPlannedMembers] = useState<PlannedMember[]>([]);
 
-  const isEditMode = !!initialData;
+  const isEditMode = !!(initialData?.id);
 
-  // Initialer State
+  // Initialer State (defaultName z. B. von World Task Board; bei Edit initialData.name)
   const [formData, setFormData] = useState<FactionData>({
-    name: "",
+    name: (initialData?.id ? initialData.name : (defaultName ?? "")) || "",
     type: "Gilde",
     current_status: null,
     description: null,
     image_url: null,
-    location_id: null,
+    location_id: defaultHqLocationId ?? null,
     gm_notes: null,
     is_revealed: false,
     appearance: null,
@@ -72,8 +81,14 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
     important_npcs_info: null,
   });
 
-  // Lade Locations und Factions beim Mount
+  // Lade Locations und Factions beim Mount (nur im Kampagnen-Kontext; bei worldId kommen sie von Server)
   useEffect(() => {
+    if (worldId) {
+      setAllLocations(locations);
+      setAllFactions(factions);
+      return;
+    }
+    if (!campaignId) return;
     const loadData = async () => {
       try {
         const [locationsData, factionsData] = await Promise.all([
@@ -87,30 +102,45 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
       }
     };
     loadData();
-  }, [campaignId]);
+  }, [campaignId, worldId, locations, factions]);
 
-  // Lade bestehende Relations im Edit-Mode
+  // Lade bestehende Relations im Edit-Mode (nur mit campaignId; Relations sind kampagnen-spezifisch)
   useEffect(() => {
+    const factionId = initialData?.id;
+    if (!campaignId || !isEditMode || !factionId) return;
     const loadRelations = async () => {
-      if (isEditMode && initialData?.id) {
-        try {
-          const relations = await getFactionRelations(campaignId, initialData.id);
-          setFactionRelations(
-            relations.map((rel: any) => ({
-              target_faction_id: rel.partnerFactionId,
-              relation_type: rel.relationType,
-              description: rel.description || null,
-            }))
-          );
-        } catch (error) {
-          console.error("Fehler beim Laden der Beziehungen:", error);
-        }
+      try {
+        const relations = await getFactionRelations(campaignId, factionId);
+        setFactionRelations(
+          relations.map((rel: any) => ({
+            target_faction_id: rel.partnerFactionId,
+            relation_type: rel.relationType,
+            description: rel.description || null,
+          }))
+        );
+      } catch (error) {
+        console.error("Fehler beim Laden der Beziehungen:", error);
       }
     };
     loadRelations();
   }, [isEditMode, initialData?.id, campaignId]);
 
-  // Daten laden, wenn initialData vorhanden ist
+  // Parst "Name - Rolle" Text (wie auf Detailseite) für Abwärtskompatibilität
+  const parseMembersFromText = (text: string | null | undefined): PlannedMember[] => {
+    if (!text || !text.trim()) return [];
+    const members: PlannedMember[] = [];
+    const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    for (const line of lines) {
+      const m = line.match(/^([^–—\-:]+)[:\-–—]\s*(.+)$/);
+      const name = m ? m[1].trim() : line;
+      const role = m ? m[2].trim() : "Mitglied";
+      if (name.length > 0) members.push({ name, role, npc_id: null });
+    }
+    if (members.length === 0 && text.trim()) members.push({ name: text.trim(), role: "Mitglied", npc_id: null });
+    return members;
+  };
+
+  // Daten laden, wenn initialData vorhanden ist. Mitglieder = planned_members ODER aus important_npcs_info parsen (eine Quelle)
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -127,19 +157,27 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
         philosophy: initialData.philosophy || null,
         important_npcs_info: initialData.important_npcs_info || null,
       });
+      const pm = (initialData as { planned_members?: Array<{ name: string; role: string; npc_id?: string | null }> }).planned_members;
+      if (Array.isArray(pm) && pm.length > 0) {
+        setPlannedMembers(pm.map((m) => ({ name: m.name || "", role: m.role || "Mitglied", npc_id: m.npc_id ?? null })));
+      } else if (initialData.important_npcs_info && initialData.important_npcs_info.trim() !== "") {
+        setPlannedMembers(parseMembersFromText(initialData.important_npcs_info));
+      }
     }
   }, [initialData]);
 
   const handleAIGenerate = async () => {
-    // Nur im Create Mode verfügbar
     if (isEditMode) return;
+    if (!campaignId && !worldId) return;
 
     const prompt = window.prompt("Beschreibe kurz deine Idee für die Fraktion:");
     if (!prompt || !prompt.trim()) return;
 
     setIsGenerating(true);
     try {
-      const result = await generateFaction(campaignId, prompt);
+      const result = campaignId
+        ? await generateFaction(campaignId, prompt)
+        : await generateFactionForWorld(worldId!, prompt);
 
       // Type & Status Matching
       let matchedType = result.type || "Gilde";
@@ -152,6 +190,8 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
         matchedStatus = null;
       }
 
+      const locationId = (result as any).headquarters_location_id ?? (result as any).location_id ?? null;
+
       setFormData((prev) => ({
         ...prev,
         name: result.name || prev.name,
@@ -163,7 +203,12 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
         structure: result.structure || prev.structure || null,
         philosophy: result.philosophy || prev.philosophy || null,
         important_npcs_info: result.important_npcs_info || prev.important_npcs_info || null,
+        location_id: locationId || prev.location_id,
       }));
+      const aiPlanned = (result as { planned_members?: Array<{ name: string; role: string }> }).planned_members;
+      if (Array.isArray(aiPlanned) && aiPlanned.length > 0) {
+        setPlannedMembers(aiPlanned.slice(0, 3).map((m) => ({ name: m.name || "", role: m.role || "Mitglied" })));
+      }
     } catch (error: any) {
       console.error(error);
       alert(error.message || "Fehler bei der KI-Generierung.");
@@ -197,6 +242,11 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
     e.preventDefault();
     startTransition(async () => {
       try {
+        const filteredPlanned = plannedMembers.filter((m) => m.name.trim() !== "");
+        const plannedPayload = filteredPlanned.map((m) => ({ name: m.name.trim(), role: m.role || "Mitglied", npc_id: m.npc_id ?? undefined }));
+        // „Mitglieder“ und „Wichtige Persönlichkeiten“ sind dasselbe: eine Quelle (planned_members), important_npcs_info wird daraus abgeleitet
+        const importantNpcsText = filteredPlanned.map((m) => `${m.name.trim()} - ${m.role || "Mitglied"}`).join("\n") || undefined;
+
         const payload = {
           name: formData.name.trim(),
           type: formData.type,
@@ -209,39 +259,41 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
           appearance: formData.appearance || undefined,
           structure: formData.structure || undefined,
           philosophy: formData.philosophy || undefined,
-          important_npcs_info: formData.important_npcs_info || undefined,
+          important_npcs_info: importantNpcsText,
+          planned_members: plannedPayload,
           faction_relations: factionRelations.filter((rel) => rel.target_faction_id && rel.target_faction_id !== initialData?.id),
         };
 
         let result;
         if (isEditMode && initialData?.id) {
-          // Edit Mode
           await updateFaction(initialData.id, payload);
           result = { id: initialData.id };
         } else {
-          // Create Mode
-          result = await createFaction({
-            campaign_id: campaignId,
-            ...payload,
-          });
+          result = await createFaction(
+            worldId
+              ? { world_id: worldId, ...payload }
+              : { campaign_id: campaignId!, ...payload }
+          );
         }
 
-        // Success handling
         if (onSuccess) {
           onSuccess();
         } else {
-          // Cache invalidieren
           router.refresh();
-          
-          if (isEditMode && initialData?.id) {
-            // Edit Mode -> Zurück zur Detailseite
-            router.push(`/dashboard/campaigns/${campaignId}/factions/${initialData.id}`);
-          } else if (result?.id) {
-            // Create Mode -> Zur neuen Detailseite (wenn ID vorhanden)
-            router.push(`/dashboard/campaigns/${campaignId}/factions/${result.id}`);
-          } else {
-            // Fallback: Zur Liste
-            router.push(`/dashboard/campaigns/${campaignId}?tab=factions`);
+          if (worldId) {
+            if (isEditMode && initialData?.id) {
+              router.push(`/dashboard/worlds/${worldId}/factions/${initialData.id}/edit`);
+            } else {
+              router.push(`/dashboard/worlds/${worldId}/factions`);
+            }
+          } else if (campaignId) {
+            if (isEditMode && initialData?.id) {
+              router.push(`/dashboard/campaigns/${campaignId}/factions/${initialData.id}`);
+            } else if (result?.id) {
+              router.push(`/dashboard/campaigns/${campaignId}/factions/${result.id}`);
+            } else {
+              router.push(`/dashboard/campaigns/${campaignId}?tab=factions`);
+            }
           }
         }
       } catch (error: any) {
@@ -268,7 +320,7 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 text-sm text-gray-300">
           <Link
-            href={`/dashboard/campaigns/${campaignId}?tab=factions`}
+            href={worldId ? `/dashboard/worlds/${worldId}/factions` : `/dashboard/campaigns/${campaignId!}?tab=factions`}
             className="hover:text-hero-vibrant transition-colors font-barlow font-bold uppercase"
           >
             Fraktionen
@@ -277,7 +329,7 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
           {isEditMode && initialData && (
             <>
               <Link
-                href={`/dashboard/campaigns/${campaignId}/factions/${initialData.id}`}
+                href={worldId ? `/dashboard/worlds/${worldId}/factions/${initialData.id}/edit` : `/dashboard/campaigns/${campaignId!}/factions/${initialData.id}`}
                 className="hover:text-hero-vibrant transition-colors font-barlow font-bold uppercase"
               >
                 {initialData.name}
@@ -302,8 +354,8 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-        {/* AI Generation Button (nur im Create Mode) */}
-        {!isEditMode && (
+        {/* AI Generation Button (nur im Create Mode, Kampagnen-Kontext) */}
+        {!isEditMode && (campaignId || worldId) && (
           <div className="flex justify-end">
             <button
               type="button"
@@ -381,66 +433,11 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
           </div>
         </div>
 
-        {/* Identität Sektion */}
+        {/* Identität Sektion (Erscheinungsbild) */}
         <div className="gothic-dashboard-card p-6 space-y-4">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
             Identität
           </h2>
-
-          {/* Name */}
-          <div>
-            <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-              Name der Fraktion *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold focus:ring-1 focus:ring-accent-gold"
-              placeholder="z.B. Die Schattengilde"
-            />
-          </div>
-
-          {/* Type & Status */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                Typ *
-              </label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-              >
-                {[...VALID_FACTION_TYPES].sort().map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                Aktueller Status
-              </label>
-              <select
-                value={formData.current_status || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, current_status: e.target.value || null })
-                }
-                className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-              >
-                <option value="">-- Kein Status --</option>
-                {[...VALID_RELATIONSHIPS].sort().map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
           {/* Erscheinungsbild */}
           <div>
@@ -504,7 +501,7 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
               Stützpunkt
             </label>
             <SmartLocationCombobox
-              campaignId={campaignId}
+              campaignId={campaignId ?? ""}
               locations={allLocations}
               value={formData.location_id || ""}
               onChange={(locationId) => setFormData({ ...formData, location_id: locationId || null })}
@@ -517,25 +514,73 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
           </div>
         </div>
 
-        {/* Mitglieder Sektion */}
+        {/* Mitglieder Sektion – geplante NPCs (Name + Rolle), später auf der Detailseite als TODO erstellbar */}
         <div className="gothic-dashboard-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
-            Mitglieder
-          </h2>
-
-          {/* Weitere wichtige NPCs */}
-          <div>
-            <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-              Weitere wichtige NPCs
-            </label>
-            <textarea
-              value={formData.important_npcs_info || ""}
-              onChange={(e) => setFormData({ ...formData, important_npcs_info: e.target.value || null })}
-              rows={4}
-              className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold resize-none"
-              placeholder="Namen und Rollen wichtiger Mitglieder, die noch nicht als NPCs angelegt wurden..."
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2">
+              Mitglieder
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPlannedMembers([...plannedMembers, { name: "", role: "Mitglied", npc_id: null }])}
+              className="flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/20 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-accent-gold transition-colors hover:bg-accent-gold/40"
+            >
+              <Plus className="h-4 w-4" />
+              Mitglied hinzufügen
+            </button>
           </div>
+          <p className="font-libre text-sm text-gray-400 mb-4">
+            Diese Mitglieder erscheinen auf der Fraktions-Detailseite als Liste. Du kannst sie dort per „NPC generieren“ anlegen und mit der Fraktion verknüpfen.
+          </p>
+          {plannedMembers.length > 0 ? (
+            <div className="space-y-3">
+              {plannedMembers.map((member, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 rounded-lg border border-hero-border bg-hero-dark/30 p-3"
+                >
+                  <input
+                    type="text"
+                    value={member.name}
+                    onChange={(e) =>
+                      setPlannedMembers(
+                        plannedMembers.map((m, i) => (i === index ? { ...m, name: e.target.value } : m))
+                      )
+                    }
+                    placeholder="Name des Mitglieds"
+                    className="flex-1 min-w-0 rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-white outline-none focus:border-accent-gold"
+                  />
+                  <select
+                    value={member.role}
+                    onChange={(e) =>
+                      setPlannedMembers(
+                        plannedMembers.map((m, i) => (i === index ? { ...m, role: e.target.value } : m))
+                      )
+                    }
+                    className="rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-sm text-white outline-none focus:border-accent-gold min-w-[180px]"
+                  >
+                    {FACTION_MEMBER_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setPlannedMembers(plannedMembers.filter((_, i) => i !== index))}
+                    className="p-1.5 rounded text-red-400 hover:bg-red-900/30 transition-colors"
+                    title="Entfernen"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="font-libre text-sm text-gray-400 italic">
+              Noch keine geplanten Mitglieder. Mit „Mitglied hinzufügen“ Namen und Rolle eintragen – auf der Detailseite kannst du daraus NPCs erstellen.
+            </p>
+          )}
         </div>
 
         {/* Diplomatie Sektion */}
@@ -659,12 +704,11 @@ export function FactionForm({ campaignId, initialData, locations = [], factions 
             <label className="mb-2 block font-barlow font-bold text-sm uppercase text-accent-blue">
               Beschreibung (Spieler-sichtbar)
             </label>
-            <textarea
+            <MarkdownEditor
               value={formData.description || ""}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-              rows={4}
-              className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-blue resize-none"
-              placeholder="Eine kurze Beschreibung, die Spieler sehen können..."
+              onChange={(v) => setFormData({ ...formData, description: v || null })}
+              minHeight="min-h-[400px]"
+              placeholder="Eine kurze Beschreibung, die Spieler sehen können. Markdown: **fett**, *kursiv*, Listen, Überschriften, Zitate."
             />
           </div>
 

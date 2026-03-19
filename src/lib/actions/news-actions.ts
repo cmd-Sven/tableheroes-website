@@ -140,10 +140,13 @@ export async function createNewsPost(
   if (!user) return { success: false, error: "Nicht angemeldet." };
 
   const { data: profile } = await (supabase.from("users") as any)
-    .select("primary_role")
+    .select("primary_role, is_super_admin")
     .eq("id", user.id)
     .single();
-  if ((profile as any)?.primary_role !== "Admin") {
+  if (
+    (profile as any)?.primary_role !== "Admin" &&
+    !(profile as any)?.is_super_admin
+  ) {
     return { success: false, error: "Nur Admins können News erstellen." };
   }
 
@@ -162,6 +165,7 @@ export async function createNewsPost(
 
   if (error) return { success: false, error: error.message };
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/news");
   revalidatePath("/dashboard/admin/news");
   return { success: true, id: (data as any)?.id };
 }
@@ -177,10 +181,13 @@ export async function updateNewsPost(
   if (!user) return { success: false, error: "Nicht angemeldet." };
 
   const { data: profile } = await (supabase.from("users") as any)
-    .select("primary_role")
+    .select("primary_role, is_super_admin")
     .eq("id", user.id)
     .single();
-  if ((profile as any)?.primary_role !== "Admin") {
+  if (
+    (profile as any)?.primary_role !== "Admin" &&
+    !(profile as any)?.is_super_admin
+  ) {
     return { success: false, error: "Nur Admins können News bearbeiten." };
   }
 
@@ -206,6 +213,7 @@ export async function updateNewsPost(
 
   if (error) return { success: false, error: error.message };
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/news");
   revalidatePath("/dashboard/admin/news");
   return { success: true };
 }
@@ -220,10 +228,13 @@ export async function deleteNewsPost(
   if (!user) return { success: false, error: "Nicht angemeldet." };
 
   const { data: profile } = await (supabase.from("users") as any)
-    .select("primary_role")
+    .select("primary_role, is_super_admin")
     .eq("id", user.id)
     .single();
-  if ((profile as any)?.primary_role !== "Admin") {
+  if (
+    (profile as any)?.primary_role !== "Admin" &&
+    !(profile as any)?.is_super_admin
+  ) {
     return { success: false, error: "Nur Admins können News löschen." };
   }
 
@@ -232,6 +243,7 @@ export async function deleteNewsPost(
     .eq("id", id);
   if (error) return { success: false, error: error.message };
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/news");
   revalidatePath("/dashboard/admin/news");
   return { success: true };
 }

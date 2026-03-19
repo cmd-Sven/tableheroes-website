@@ -7,31 +7,9 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Eye, EyeOff, Trash2, MapPin, Edit2, Save, X, Loader2, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { updateLoreEntry, toggleLoreReveal, deleteLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
-import { LoreImageSlider } from "./LoreImageSlider";
+import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
+import { LoreHeaderImageSlider } from "./LoreImageSlider";
 import { ImageBorderContainer } from "./ImageBorderContainer";
-
-const LORE_TYPES = [
-  "Stadt",
-  "Region",
-  "Ort",
-  "Insel",
-  "Gebäude",
-  "Tempel",
-  "Land",
-  "Dungeon",
-  "Akademie",
-  "Markt",
-  "Laden",
-  "Gottheit",
-  "Religion",
-  "Magie",
-  "Artefakt",
-  "Rasse",
-  "Kultur",
-  "Ereignis",
-  "Mythos",
-  "Geschichte",
-];
 
 // Inline Edit Field Component
 type InlineEditFieldProps = {
@@ -246,7 +224,7 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
   const handleToggleVisibility = () => {
     startTransition(async () => {
       try {
-        await toggleLoreReveal(lore.id, lore.is_revealed);
+        await toggleLoreReveal(campaignId, lore.id, lore.is_revealed);
         setLore((prev) => ({ ...prev, is_revealed: !prev.is_revealed }));
         router.refresh();
         onLoreUpdate?.();
@@ -313,23 +291,17 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
         )}
       </div>
 
-      {/* Cinematic Header - Main Image with Overlays */}
-      {lore.image_url ? (
-        <div className="relative w-full aspect-video lg:aspect-[21/9] rounded-lg bg-background-card overflow-hidden">
-          {/* Main Image with Ken Burns Effect - Behind everything */}
+      {/* Cinematic Header - Main Image with Overlays (min 400px height on desktop, centered top) */}
+      {(() => {
+        const allImages: Array<{ url: string; description: string }> = [
+          ...(lore.image_url ? [{ url: lore.image_url, description: lore.name }] : []),
+          ...(lore.additional_images || []),
+        ].filter((img) => img.url?.trim());
+        return allImages.length > 0 ? (
+        <div className="relative w-full min-h-[250px] lg:min-h-[400px] rounded-lg bg-background-card overflow-hidden">
+          {/* Main Image(s) - centered top */}
           <div className="absolute inset-0 overflow-hidden z-0">
-            <div className="absolute inset-0 animate-ken-burns">
-              <Image
-                src={lore.image_url}
-                alt={lore.name}
-                fill
-                className="object-cover"
-                priority
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            </div>
+            <LoreHeaderImageSlider images={allImages} />
           </div>
           
           {/* Gradient Overlay for Text Readability */}
@@ -404,7 +376,7 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
                   onChange={(e) => setEditValues({ ...editValues, type: e.target.value })}
                   className="rounded border border-hero-dark bg-slate-900/95 p-2 font-barlow font-bold text-sm uppercase text-white outline-none focus:border-hero-vibrant backdrop-blur-sm"
                 >
-                  {LORE_TYPES.map((type) => (
+                  {VALID_LORE_TYPES.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>
@@ -421,18 +393,6 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
               </span>
               </InlineEditField>
             </div>
-
-            {/* Image Slider - Bottom Right */}
-            {lore.additional_images && lore.additional_images.length > 0 && (
-              <motion.div 
-                className="absolute bottom-12 right-12 z-20"
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-                >
-                <LoreImageSlider images={lore.additional_images} />
-              </motion.div>
-            )}
 
             {/* Parent Selection - Bottom Left (GM only) - ALWAYS VISIBLE if isGM */}
             {isGM && (
@@ -558,7 +518,7 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
                     onChange={(e) => setEditValues({ ...editValues, type: e.target.value })}
                     className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-barlow font-bold text-sm uppercase text-white outline-none focus:border-hero-vibrant"
                   >
-                    {LORE_TYPES.map((type) => (
+                    {VALID_LORE_TYPES.map((type) => (
                       <option key={type} value={type}>
                         {type}
                       </option>
@@ -653,7 +613,8 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
             </div>
           </div>
         </ImageBorderContainer>
-      )}
+      );
+      })()}
     </>
   );
 }
