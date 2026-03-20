@@ -1,7 +1,8 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getGmCampaignMembersWithCharacters } from "./members-actions";
 
 /**
  * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
@@ -50,48 +51,54 @@ export async function getCharacterForMemberByUserId(
 }
 
 /**
- * GM: Charakter per ID laden (inkl. character_relationships für Edit-Seite).
+ * GM: Charakter über Members-Liste laden (nutzt getGmCampaignMembersWithCharacters).
+ * Diese Funktion funktioniert zuverlässig, da sie denselben Code-Pfad wie die Members-Anzeige nutzt.
  */
-export async function getCharacterByIdForGM(campaignId: string, characterId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getCharacterFromMembersForGM(
+  campaignId: string,
+  characterId: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { drafting, inReview, accepted } = await getGmCampaignMembersWithCharacters(campaignId);
+    const allMembers = [...drafting, ...inReview, ...accepted];
+    const member = allMembers.find(
+      (m) => m.character_id && String(m.character_id).toLowerCase() === String(characterId).toLowerCase()
+    );
+    if (!member?.character) return null;
 
-  const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id")
-    .eq("id", campaignId)
-    .single();
-  if (!campaign) return null;
-  const gmId = (campaign as { gm_id: string; owner_id?: string }).gm_id;
-  const ownerId = (campaign as { gm_id: string; owner_id?: string }).owner_id;
-  if (gmId !== user.id && ownerId !== user.id) return null;
+    const char = { ...member.character } as Record<string, unknown>;
+    const admin = createAdminClient();
 
-  const { data: char } = await (supabase.from("characters") as any)
-    .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
-    .eq("id", characterId)
-    .eq("campaign_id", campaignId)
-    .single();
-  if (!char) return null;
+    // modification_log und character_relationships nachladen
+    const { data: charFull } = await (admin.from("characters") as any)
+      .select("modification_log")
+      .eq("id", characterId)
+      .maybeSingle();
+    if (charFull?.modification_log != null) char.modification_log = charFull.modification_log;
 
-  const { data: relRows } = await (supabase.from("character_relationships") as any)
-    .select("id, relationship_type, description, npc_id")
-    .eq("character_id", characterId);
-  const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
-  let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
-  if (npcIds.length > 0) {
-    const { data: npcRows } = await (supabase.from("npcs") as any)
-      .select("id, name, role, title")
-      .in("id", npcIds);
-    npcMap = new Map(((npcRows as any[]) ?? []).map((n: any) => [n.id, { id: n.id, name: n.name, role: n.role, title: n.title }]));
+    const { data: relRows } = await (admin.from("character_relationships") as any)
+      .select("id, relationship_type, description, npc_id")
+      .eq("character_id", characterId);
+    const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
+    let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
+    if (npcIds.length > 0) {
+      const { data: npcRows } = await (admin.from("npcs") as any)
+        .select("id, name, role, title")
+        .in("id", npcIds);
+      npcMap = new Map(((npcRows as any[]) ?? []).map((n: any) => [n.id, { id: n.id, name: n.name, role: n.role, title: n.title }]));
+    }
+    char.character_relationships = ((relRows as any[]) ?? []).map((r: any) => ({
+      id: r.id,
+      relationship_type: r.relationship_type,
+      description: r.description,
+      npcs: r.npc_id ? npcMap.get(r.npc_id) ?? null : null,
+    }));
+
+    return char;
+  } catch (err) {
+    console.error("[getCharacterFromMembersForGM] error:", err);
+    return null;
   }
-  (char as any).character_relationships = ((relRows as any[]) ?? []).map((r: any) => ({
-    id: r.id,
-    relationship_type: r.relationship_type,
-    description: r.description,
-    npcs: r.npc_id ? npcMap.get(r.npc_id) ?? null : null,
-  }));
-
-  return char;
 }
 
 /**

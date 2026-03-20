@@ -12,7 +12,7 @@ import {
 const NEW_BADGE_STYLE =
   "absolute top-2 right-2 z-10 rounded-full bg-accent-gold/90 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-background-dark shadow-md";
 const NEW_GLOW_STYLE = "shadow-[0_0_15px_rgba(212,175,55,0.5)] animate-pulse";
-const ICON_SIZE = 56; // 56x56px (zwischen 48 und 64)
+const ICON_SIZE = 112; // 112x112px (doppelt so groß wie zuvor)
 const MAX_DISPLAY = 3;
 
 type Props = {
@@ -56,7 +56,7 @@ export function AchievementsCard({
         </p>
       </div>
     ) : (
-      <ul className="flex flex-wrap justify-center gap-3 w-full">
+      <ul className="flex flex-wrap justify-center gap-4 w-full">
         {displayList.map((a) => (
           <AchievementIconItem key={a.id} achievement={a} size={ICON_SIZE} />
         ))}
@@ -67,7 +67,7 @@ export function AchievementsCard({
     <div className="w-full p-4" ref={ref}>
       {hasNewContent ? (
         <div
-          className={`relative rounded-lg border border-hero-border/40 bg-hero-dark/20 min-h-[80px] ${NEW_GLOW_STYLE}`}
+          className={`relative rounded-lg border border-hero-border/40 bg-hero-dark/20 min-h-[140px] ${NEW_GLOW_STYLE}`}
         >
           <span className={NEW_BADGE_STYLE} aria-hidden>
             NEU
@@ -178,7 +178,7 @@ function AchievementIconItem({
             onError={handleError}
           />
         ) : (
-          <Award className="h-6 w-6 text-accent-gold/70" />
+          <Award className="h-12 w-12 text-accent-gold/70" />
         )}
       </div>
       {typeof document !== "undefined" &&

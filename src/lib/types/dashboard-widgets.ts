@@ -7,6 +7,16 @@ export type LoreSnippet = {
   campaignName: string;
 };
 
+/** Zufälliger Welt-Eintrag für "Wissen ist Macht" (Lore, NPC, Fraktion, Ort, Rasse, etc.). */
+export type DashboardLoreEntry = {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  type: "lore" | "npc" | "faction";
+  campaignId: string;
+  campaignName: string;
+};
+
 /** Teilnehmer einer Session (Charakter-Daten). */
 export type SessionParticipant = {
   userId: string;
@@ -16,6 +26,18 @@ export type SessionParticipant = {
   characterClass: string | null;
   characterLevel: number | null;
   characterAvatarUrl: string | null;
+};
+
+/** RSVP-Status eines Spielers für eine Session. */
+export type RsvpStatus = "Zusage" | "Absage" | "Via Online";
+
+/** RSVP eines Spielers (für GM-Ansicht). */
+export type SessionRsvp = {
+  userId: string;
+  username: string;
+  characterName: string | null;
+  rsvpStatus: RsvpStatus | null;
+  gmConfirmed: boolean;
 };
 
 /** Nächste Session für das Dashboard-Widget. */
@@ -28,4 +50,16 @@ export type UpcomingSession = {
   campaignName: string;
   campaignBannerUrl: string | null;
   participants: SessionParticipant[];
+  /** Anmeldefrist in Tagen (1, 2 oder 3). */
+  rsvpDeadlineDays: number | null;
+  /** true = Live vor Ort, nur 1 Via-Online-Platz. */
+  isLive: boolean;
+  /** Eigene RSVP des aktuellen Users (Spieler). */
+  userRsvp: RsvpStatus | null;
+  /** RSVPs aller Kampagnenmitglieder (für GM). */
+  rsvps: SessionRsvp[];
+  /** Deadline erreicht (heute oder in der Vergangenheit). */
+  deadlineReached: boolean;
+  /** Bei is_live: true wenn Via-Online-Platz bereits vergeben. */
+  viaOnlineTaken: boolean;
 };

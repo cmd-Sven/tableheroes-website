@@ -32,12 +32,22 @@ function getReputationColor(reputation: number): string {
   return "text-gray-400";
 }
 
+function getReputationBorderColor(reputation: number): string {
+  if (reputation >= 50) return "border-l-4 border-l-green-600";
+  if (reputation >= 20) return "border-l-4 border-l-green-500";
+  if (reputation < -50) return "border-l-4 border-l-red-600";
+  if (reputation < -20) return "border-l-4 border-l-red-500";
+  return "border-l-4 border-l-gray-500";
+}
+
 export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, onToggleVisibility, onInfoClick, playerReputation }: Props) {
   const detailHref = campaignId
     ? `/dashboard/campaigns/${campaignId}/factions/${faction.id}`
     : worldId
       ? `/dashboard/worlds/${worldId}/factions/${faction.id}`
       : "#";
+
+  const reputationBorderClass = playerReputation != null ? getReputationBorderColor(playerReputation) : "";
 
   const handleCardClick = () => {
     if (onInfoClick) {
@@ -60,7 +70,7 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       onClick={handleCardClick}
-      className="group relative h-full flex flex-col rounded-lg border-2 border-transparent overflow-hidden transition-all duration-300 ease-in-out hover:scale-[1.02] hover:border-[#C5A572] hover:shadow-xl cursor-pointer"
+      className={`group relative h-full flex flex-col rounded-lg border-2 border-transparent overflow-hidden transition-all duration-300 ease-in-out hover:scale-[1.02] hover:border-[#C5A572] hover:shadow-xl cursor-pointer ${reputationBorderClass}`}
       style={{
         backgroundImage: "url('/images/grunge-paper-background.jpg')",
         backgroundSize: "cover",

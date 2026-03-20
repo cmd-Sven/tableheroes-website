@@ -24,6 +24,11 @@ function getPointsForLevelInternal(level: number): number {
   return 50 * level * level + 450 * level;
 }
 
+/** Exportierte Version: Liefert die Punkteschwelle für Level n (für Level-Übersicht). */
+export function getPointsForLevel(level: number): number {
+  return getPointsForLevelInternal(level);
+}
+
 /**
  * Berechnet das Level eines Spielers basierend auf seinen Gesamtpunkten.
  * Es wird das höchste Level n gesucht, dessen Schwelle <= points ist.
@@ -36,7 +41,7 @@ export function calculateLevel(points: number): number {
 
   while (level < maxLevel) {
     const nextLevel = level + 1;
-    const required = getPointsForLevelInternal(nextLevel);
+    const required = getPointsForLevel(nextLevel);
     if (points < required) break;
     level = nextLevel;
   }
@@ -53,5 +58,5 @@ export function getPointsForNextLevel(currentLevel: number): number {
     ? Math.max(0, currentLevel)
     : 0;
   const nextLevel = safeLevel + 1;
-  return getPointsForLevelInternal(nextLevel);
+  return getPointsForLevel(nextLevel);
 }

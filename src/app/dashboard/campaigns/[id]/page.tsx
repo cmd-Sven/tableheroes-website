@@ -235,6 +235,53 @@ export default async function CampaignDetailPage({
     (s: any) => new Date(s.start_time) > new Date(),
   );
 
+  // RSVP-Status für geplante Sessions (GM: kann Session starten?)
+  let upcomingSessionsWithRsvp: Array<{
+    id: string;
+    title: string | null;
+    start_time: string;
+    type: string;
+    status: string;
+    canStart?: boolean;
+    pendingCount?: number;
+  }> = upcomingSessions as any[];
+  if (isGM && upcomingSessions.length > 0) {
+    const scheduledIds = upcomingSessions
+      .filter((s: any) => s.status === "Scheduled")
+      .map((s: any) => s.id);
+    if (scheduledIds.length > 0) {
+      const [membersRes, rsvpsRes] = await Promise.all([
+        (supabase.from("campaign_members") as any)
+          .select("user_id")
+          .eq("campaign_id", id)
+          .eq("status", "Accepted"),
+        (supabase.from("session_rsvps") as any)
+          .select("session_id, user_id")
+          .in("session_id", scheduledIds),
+      ]);
+      const memberIds = new Set(
+        ((membersRes.data as any[]) || []).map((m: any) => m.user_id)
+      );
+      const rsvpsBySession = new Map<string, Set<string>>();
+      for (const r of (rsvpsRes.data as any[]) || []) {
+        if (!rsvpsBySession.has(r.session_id))
+          rsvpsBySession.set(r.session_id, new Set());
+        rsvpsBySession.get(r.session_id)!.add(r.user_id);
+      }
+      upcomingSessionsWithRsvp = upcomingSessions.map((s: any) => {
+        if (s.status !== "Scheduled")
+          return { ...s, canStart: false, pendingCount: 0 };
+        const rsvpUserIds = rsvpsBySession.get(s.id) ?? new Set();
+        const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+        return {
+          ...s,
+          canStart: pendingCount === 0,
+          pendingCount,
+        };
+      });
+    }
+  }
+
   // Fetch NPCs, Factions, Lore, and Quests
   // Apply filters based on user role (GM sees all, Players see only revealed + own NPCs)
   let npcs: any[] = [];
@@ -646,7 +693,10 @@ export default async function CampaignDetailPage({
     const { data: allWorldLore, error: pcLErr } = await (supabase.from("world_lore") as any)
       .select("*")
       .eq("world_id", campaignWorldId);
-    if (pcLErr) console.error("❌ wizardLocations query error:", JSON.stringify(pcLErr));
+    if (pcLErr) {
+      const errMsg = (pcLErr as { message?: string })?.message ?? String(pcLErr);
+      console.error("❌ wizardLocations query error:", errMsg.length > 300 ? errMsg.slice(0, 300) + "…" : errMsg);
+    }
     wizardLocations = ((allWorldLore || []) as any[]).filter(
       (e: any) => typeMatchesGeographic(e.type) && e.allow_pc_origin === true
     );
@@ -1014,7 +1064,7 @@ export default async function CampaignDetailPage({
       campaignId={id}
       isGM={isGM}
       characterStatus={!isGM ? (myCharacter as any)?.status : undefined}
-      upcomingSessions={(upcomingSessions || []) as any}
+      upcomingSessions={(upcomingSessionsWithRsvp || []) as any}
       locations={loreEntries
         .filter((l: any) => isLocationType(l.type))
         .map((l: any) => ({ id: l.id, name: l.name, type: l.type }))
@@ -1304,15 +1354,20 @@ export default async function CampaignDetailPage({
         )}
       <DiscoverySlider items={allDiscoveries} />
       {myCharacter ? (
-        <MyCharacterSection
-          campaignId={id}
-          character={myCharacter}
-          cultures={wizardCultures}
-          languages={wizardLanguages}
-          factions={wizardFactions.map((f: any) => ({ id: f.id, name: f.name }))}
-          locations={wizardLocations.map((l: any) => ({ id: l.id, name: l.name, type: l.type ?? "" }))}
-          factionReputations={characterReputations}
-        />
+        <div className="space-y-4">
+          <CharacterSheet
+            character={myCharacter}
+            campaignId={id}
+            factionReputations={characterReputations}
+          />
+          <Link
+            href={`/dashboard/campaigns/${id}?tab=character`}
+            className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors"
+          >
+            <User className="h-4 w-4" />
+            Charakterblatt bearbeiten
+          </Link>
+        </div>
       ) : (
         <section className="rounded-lg border border-hero-dark bg-background-card p-6">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
@@ -1383,7 +1438,15 @@ export default async function CampaignDetailPage({
       {tab === "quests" && QuestTab}
       {tab === "members" && isGM && MembersTab}
       {tab === "character" && userHasCharacter && myCharacter && (
-        <CharacterSheet character={myCharacter} />
+        <MyCharacterSection
+          campaignId={id}
+          character={myCharacter}
+          cultures={wizardCultures}
+          languages={wizardLanguages}
+          factions={wizardFactions.map((f: any) => ({ id: f.id, name: f.name }))}
+          locations={wizardLocations.map((l: any) => ({ id: l.id, name: l.name, type: l.type ?? "" }))}
+          factionReputations={characterReputations}
+        />
       )}
       {tab === "settings" && isGM && SettingsTabContent}
       {tab === "settings" && !isGM && (

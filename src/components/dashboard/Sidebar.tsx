@@ -34,6 +34,7 @@ import {
   Megaphone,
   Newspaper,
   Hammer,
+  Coins,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -173,6 +174,7 @@ export function Sidebar({
   const generalNav = [
     { href: "/dashboard", label: "Mein Dashboard", icon: Home },
     { href: "/dashboard/my-campaigns", label: "Meine Kampagnen", icon: Map },
+    { href: "/dashboard/sessions", label: "Termine", icon: Calendar },
     ...(role === "GameMaster" || role === "Admin"
       ? [
           { href: "/dashboard/worlds", label: "Welten & Lore", icon: Book },
@@ -180,6 +182,7 @@ export function Sidebar({
       : []),
     { href: "/dashboard/characters", label: "Charaktere", icon: Users },
     { href: "/dashboard/achievements", label: "Achievements", icon: Award },
+    { href: "/dashboard/points", label: "Punkte", icon: Coins },
     { href: "/dashboard/news", label: "News-Archiv", icon: Newspaper },
     ...(role === "GameMaster"
       ? [
@@ -187,6 +190,11 @@ export function Sidebar({
             href: "/dashboard/gm/achievements",
             label: "Achievement anlegen (GM)",
             icon: Trophy,
+          },
+          {
+            href: "/dashboard/gm/points-catalog",
+            label: "Punktekatalog (GM)",
+            icon: Coins,
           },
         ]
       : []),
@@ -209,6 +217,11 @@ export function Sidebar({
           href: "/dashboard/gm/achievements",
           label: "Achievement-Studio",
           icon: Trophy,
+        },
+        {
+          href: "/dashboard/gm/points-catalog",
+          label: "Punktekatalog",
+          icon: Coins,
         },
       ]
     : [];
@@ -390,16 +403,27 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container – Marmor (Dashboard) vs Holz (Kampagne) für klare Ebenen-Trennung */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 transform gothic-sidebar border-r border-hero-border shadow-2xl shadow-black/70 transition-all duration-200 ease-in-out md:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        } ${isCollapsed ? "w-16" : "w-64"}`}
+        className={`fixed inset-y-0 left-0 z-40 transform border-r border-hero-border shadow-2xl shadow-black/70 transition-all duration-200 ease-in-out md:translate-x-0 ${
+          !isInCampaign ? "gothic-sidebar" : ""
+        } ${isOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "w-16" : "w-64"}`}
+        style={
+          isInCampaign
+            ? {
+                backgroundColor: "#0d1f0a",
+                backgroundImage: "url('/images/dark-wood.jpg')",
+                backgroundSize: "cover",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
       >
         <div className="flex h-full flex-col relative">
-          {/* Logo Header */}
+          {/* Logo Header – transparent damit Marmor/Holz sichtbar */}
           <div
-            className={`flex h-16 items-center gap-2 border-b border-hero-border/60 bg-black/70 backdrop-blur-sm px-6 ${
+            className={`flex h-16 items-center gap-2 border-b border-hero-border/60 bg-black/30 backdrop-blur-sm px-6 ${
               isCollapsed ? "justify-center px-2" : ""
             }`}
           >
@@ -416,8 +440,8 @@ export function Sidebar({
             />
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto bg-black/70">
+          {/* Navigation – transparent damit Marmor/Holz sichtbar */}
+          <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto bg-black/30">
             {/* Welt-Kontext: Zurück + Welt-Navigation */}
             {isInWorld && (
               <div className="mb-4 space-y-1">
@@ -603,7 +627,7 @@ export function Sidebar({
           </nav>
 
           {/* Toggle Collapse Button */}
-          <div className="border-t border-hero-border/60 bg-black/70 p-2">
+          <div className="border-t border-hero-border/60 bg-black/30 p-2">
             <button
               onClick={toggleCollapse}
               className="w-full flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant transition-colors"
@@ -618,7 +642,7 @@ export function Sidebar({
           </div>
 
           {/* User Footer */}
-          <div className="border-t border-hero-border/60 bg-black/80 p-4">
+          <div className="border-t border-hero-border/60 bg-black/40 p-4">
             <div
               className={`flex items-center gap-3 ${
                 isCollapsed ? "justify-center" : ""

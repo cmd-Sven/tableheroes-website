@@ -128,3 +128,23 @@ export const TYPE_MAPPING: Record<string, string[]> = {
   History: ["Ereignis", "Mythos", "Geschichten & Legenden"],
   Other: [],
 };
+
+/** Reihenfolge der Kategorien für die Spieler-Ansicht (Welt & Lore). */
+export const CATEGORY_ORDER = [
+  "Location",
+  "Religion",
+  "Culture",
+  "Organization",
+  "History",
+  "Magic",
+  "Other",
+] as const;
+
+/** Liefert die Kategorie für einen Lore-Typ (für Gruppierung). */
+export function getCategoryForType(type: string): string {
+  for (const [cat, types] of Object.entries(TYPE_MAPPING)) {
+    if (cat === "Other") continue;
+    if (types.includes(type)) return cat;
+  }
+  return "Other";
+}

@@ -179,6 +179,26 @@ export async function startSession(sessionId: string) {
     throw new Error("Nur der GM kann eine Session starten.");
   }
 
+  // 3b. Prüfen: Alle Spieler müssen sich bestätigt haben (RSVP abgegeben)
+  const { data: members } = await (supabase.from("campaign_members") as any)
+    .select("user_id")
+    .eq("campaign_id", session.campaign_id)
+    .eq("status", "Accepted");
+
+  const { data: rsvps } = await (supabase.from("session_rsvps") as any)
+    .select("user_id")
+    .eq("session_id", sessionId);
+
+  const memberIds = new Set(((members as any[]) || []).map((m: any) => m.user_id));
+  const rsvpUserIds = new Set(((rsvps as any[]) || []).map((r: any) => r.user_id));
+
+  const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+  if (pendingCount > 0) {
+    throw new Error(
+      `Die Session kann erst starten, wenn alle Spieler ihre Teilnahme bestätigt haben. Noch ${pendingCount} Spieler ohne Rückmeldung.`
+    );
+  }
+
   // 4. Update Session Status to Live
   const { error: updateError } = await (supabase.from("sessions") as any)
     .update({ status: "Live" })

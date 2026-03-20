@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { User, Loader2, Save, Info, Shield, Users } from "lucide-react";
+import { User, Loader2, Save, Info, Shield, Users, ExternalLink } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import Link from "next/link";
 
@@ -14,6 +14,14 @@ type Relationship = {
   description: string | null;
   npcs: { id: string; name: string; role: string | null; title: string | null } | null;
 };
+
+function getReputationColorClasses(reputation: number): string {
+  if (reputation >= 50) return "border-green-900/60 bg-green-900/20";
+  if (reputation >= 20) return "border-green-800/50 bg-green-900/10";
+  if (reputation < -50) return "border-red-900/60 bg-red-900/20";
+  if (reputation < -20) return "border-red-800/50 bg-red-900/10";
+  return "border-hero-border/40 bg-hero-dark/20";
+}
 
 type Props = {
   campaignId: string;
@@ -213,31 +221,57 @@ export function MyCharacterSection({
           {factions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Fraktion</label>
-              <select
-                value={form.faction_membership}
-                onChange={(e) => setForm((p) => ({ ...p, faction_membership: e.target.value }))}
-                className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
-              >
-                <option value="">-- Keine --</option>
-                {factions.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={form.faction_membership}
+                  onChange={(e) => setForm((p) => ({ ...p, faction_membership: e.target.value }))}
+                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+                >
+                  <option value="">-- Keine --</option>
+                  {factions.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                {form.faction_membership && (
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/factions/${form.faction_membership}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded border border-hero-dark bg-slate-900 p-2 text-gray-500 hover:text-accent-gold"
+                    title="Fraktion anzeigen"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
             </div>
           )}
           {locations.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Heimatort</label>
-              <select
-                value={form.current_location_id}
-                onChange={(e) => setForm((p) => ({ ...p, current_location_id: e.target.value }))}
-                className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
-              >
-                <option value="">-- Keiner --</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={form.current_location_id}
+                  onChange={(e) => setForm((p) => ({ ...p, current_location_id: e.target.value }))}
+                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+                >
+                  <option value="">-- Keiner --</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                  ))}
+                </select>
+                {form.current_location_id && (
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/lore/${form.current_location_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded border border-hero-dark bg-slate-900 p-2 text-gray-500 hover:text-accent-gold"
+                    title="Ort in der Lore anzeigen"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -254,9 +288,9 @@ export function MyCharacterSection({
           />
         </div>
 
-        {/* Beziehungen zu NPCs & Ruf bei Fraktionen */}
+        {/* Beziehungen zu NPCs & Ruf bei Fraktionen – Card Design */}
         {(relationships.length > 0 || factionReputations.length > 0) && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h3 className="font-barlow font-semibold text-lg text-accent-gold border-b border-hero-border pb-2 flex items-center gap-2">
               <Users className="h-5 w-5" />
               Beziehungen & Ruf
@@ -264,41 +298,60 @@ export function MyCharacterSection({
 
             {relationships.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-barlow font-bold uppercase text-gray-500 flex items-center gap-1">
+                <p className="mb-3 text-xs font-barlow font-bold uppercase text-gray-500 flex items-center gap-1">
                   <Users className="h-3.5 w-3.5" />
                   Beziehungen zu NPCs
                 </p>
-                <ul className="space-y-2">
-                  {relationships.map((rel: Relationship, idx: number) => (
-                    <li
-                      key={idx}
-                      className="flex items-center gap-2 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 font-libre text-sm text-gray-200"
-                    >
-                      <span className="font-semibold text-white">{rel.npcs?.name ?? "Unbekannt"}</span>
-                      <span className="text-gray-500">·</span>
-                      <span>{rel.relationship_type}</span>
-                      {rel.description && (
-                        <>
-                          <span className="text-gray-500">·</span>
-                          <span className="text-gray-400 italic">{rel.description}</span>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {relationships.map((rel: Relationship, idx: number) => {
+                    const npc = rel.npcs;
+                    const npcHref = npc?.id ? `/dashboard/campaigns/${campaignId}/npcs/${npc.id}` : null;
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-lg border border-hero-dark bg-background-card p-4 shadow-lg hover:border-hero-vibrant/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            {npcHref ? (
+                              <Link
+                                href={npcHref}
+                                className="font-cinzel font-bold text-accent-gold hover:text-hero-vibrant flex items-center gap-1.5 group"
+                              >
+                                {npc?.name ?? "Unbekannt"}
+                                <ExternalLink className="h-3.5 w-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
+                              </Link>
+                            ) : (
+                              <span className="font-cinzel font-bold text-white">{npc?.name ?? "Unbekannt"}</span>
+                            )}
+                            {(npc?.title || npc?.role) && (
+                              <p className="font-libre text-xs text-gray-500 mt-0.5">
+                                {npc.title ?? npc.role}
+                              </p>
+                            )}
+                            <p className="font-libre text-sm text-accent-gold mt-1">{rel.relationship_type}</p>
+                            {rel.description && (
+                              <p className="font-libre text-sm text-gray-400 mt-1 italic">{rel.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
             {factionReputations.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-barlow font-bold uppercase text-gray-500 flex items-center gap-1">
+                <p className="mb-3 text-xs font-barlow font-bold uppercase text-gray-500 flex items-center gap-1">
                   <Shield className="h-3.5 w-3.5" />
                   Fraktionen & Ruf
                 </p>
-                <p className="mb-2 font-libre text-xs text-gray-400 italic">
+                <p className="mb-3 font-libre text-xs text-gray-400 italic">
                   Der Spielleiter verwaltet deinen Ruf und Rang bei Fraktionen.
                 </p>
-                <div className="space-y-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {factionReputations.map((rep) => {
                     const statusLabel =
                       rep.reputation >= 80 ? "Vertrauensperson" :
@@ -309,22 +362,22 @@ export function MyCharacterSection({
                       rep.reputation >= -50 ? "Feindlich / Schulden" :
                       "Gehasster Feind";
                     const isPrimary = character.faction_membership === rep.faction_id;
+                    const colorClasses = getReputationColorClasses(rep.reputation);
                     return (
-                      <div
+                      <Link
                         key={rep.id}
-                        className={`flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 ${
-                          isPrimary ? "border-hero-vibrant/50 bg-hero-dark/30" : "border-hero-border/30 bg-hero-dark/20"
-                        }`}
+                        href={`/dashboard/campaigns/${campaignId}/factions/${rep.faction_id}`}
+                        className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 shadow-lg transition-all hover:scale-[1.02] hover:shadow-xl ${isPrimary ? "border-hero-vibrant/50 bg-hero-dark/30" : colorClasses}`}
                       >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-libre font-semibold text-white">{rep.faction_name}</span>
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <span className="font-cinzel font-bold text-white">{rep.faction_name}</span>
                           {isPrimary && (
-                            <span className="rounded bg-hero-vibrant/20 px-1.5 py-0.5 font-barlow text-xs font-bold uppercase text-hero-vibrant">
+                            <span className="rounded bg-hero-vibrant/20 px-1.5 py-0.5 font-barlow text-xs font-bold uppercase text-hero-vibrant shrink-0">
                               Deine Fraktion
                             </span>
                           )}
                           {rep.rank && (
-                            <span className="rounded bg-accent-gold/20 px-2 py-0.5 font-barlow text-xs font-bold uppercase text-accent-gold">
+                            <span className="rounded bg-accent-gold/20 px-2 py-0.5 font-barlow text-xs font-bold uppercase text-accent-gold shrink-0">
                               {rep.rank}
                             </span>
                           )}
@@ -341,7 +394,8 @@ export function MyCharacterSection({
                         >
                           {rep.reputation > 0 ? "+" : ""}{rep.reputation}
                         </span>
-                      </div>
+                        <ExternalLink className="h-4 w-4 text-gray-500 shrink-0" />
+                      </Link>
                     );
                   })}
                 </div>
@@ -355,11 +409,11 @@ export function MyCharacterSection({
         )}
 
         <Link
-          href={`/dashboard/campaigns/${campaignId}?tab=character`}
+          href={`/dashboard/campaigns/${campaignId}?tab=overview`}
           className="inline-flex items-center gap-2 rounded border border-hero-border px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-dark/50 transition-colors"
         >
           <User className="h-4 w-4" />
-          Vollständiges Charakterblatt anzeigen
+          Zurück zur Übersicht
         </Link>
       </div>
     </section>

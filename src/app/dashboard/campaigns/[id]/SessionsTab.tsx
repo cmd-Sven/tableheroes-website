@@ -17,6 +17,8 @@ type Props = {
     start_time: string;
     type: string;
     status: string;
+    canStart?: boolean;
+    pendingCount?: number;
   }>;
   locations: Array<{ id: string; name: string; type: string }>;
   npcs: Array<{ id: string; name: string; title: string | null }>;
@@ -139,14 +141,23 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
                     )}
 
                     {isScheduled && isGM && (
-                      <button
-                        type="button"
-                        onClick={() => handleStartSession(session.id)}
-                        disabled={isStarting}
-                        className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
-                      >
-                        🚀 Session starten
-                      </button>
+                      session.canStart ? (
+                        <button
+                          type="button"
+                          onClick={() => handleStartSession(session.id)}
+                          disabled={isStarting}
+                          className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
+                        >
+                          🚀 Session starten
+                        </button>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
+                          title="Alle Spieler müssen ihre Teilnahme bestätigen."
+                        >
+                          Warte auf {(session.pendingCount ?? 0)} Bestätigung(en)
+                        </span>
+                      )
                     )}
 
                     {isEnded && !isLive && (

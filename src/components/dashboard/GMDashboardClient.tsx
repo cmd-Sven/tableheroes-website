@@ -103,7 +103,7 @@ export function GMDashboardClient({
             title="Nächste Termine"
             icon={<Calendar className="h-5 w-5" />}
           >
-            <UpcomingSessionsCard sessions={upcomingSessions} />
+            <UpcomingSessionsCard sessions={upcomingSessions} isGM />
           </DashboardCard>
         </div>
 

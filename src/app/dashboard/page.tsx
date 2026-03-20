@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getRankFromPoints } from "@/src/lib/utils/rank-utils";
 import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
 import {
-  getRandomLoreSnippet,
+  getRandomLoreEntry,
   getDailyComic,
   getUpcomingSessionsForUser,
 } from "@/src/lib/actions/dashboard-widgets";
@@ -113,17 +113,19 @@ export default async function DashboardPage() {
           heroCharacters={playerData.heroCharacters}
           playerMessages={playerData.playerMessages}
           discoverableCampaigns={playerData.discoverableCampaigns}
-          randomLoreSnippet={playerData.randomLoreSnippet}
+          randomLoreEntry={playerData.randomLoreEntry}
           dailyComic={playerData.dailyComic}
           dashboardNews={playerData.dashboardNews}
           hasNewNews={playerData.hasNewNews}
           hasNewAchievements={playerData.hasNewAchievements}
+          newestAchievement={playerData.newestAchievement}
           hasNewLore={playerData.hasNewLore}
           upcomingSessions={playerData.upcomingSessions}
           isBacker={!!profile?.is_backer}
           backerSince={profile?.backer_since ?? null}
           pointsHistory={playerData.pointsHistory}
           unreadInboxMessages={playerData.unreadInboxMessages}
+          sessionConfirmationPending={playerData.sessionConfirmationPending}
         />
       </div>
     );
@@ -292,7 +294,7 @@ async function loadPlayerDashboardData(userId: string) {
   const discoverableCampaigns = await getDiscoverableCampaigns();
   const [loreResult, dailyComic, newsResult, upcomingSessions, playerMessages, pointsHistory, unreadInboxMessages] =
     await Promise.all([
-      getRandomLoreSnippet(userId),
+      getRandomLoreEntry(userId),
       getDailyComic(),
       getNewsForDashboard(userId),
       getUpcomingSessionsForUser(userId),
@@ -311,15 +313,19 @@ async function loadPlayerDashboardData(userId: string) {
     playerMessages,
     newAcceptances,
     discoverableCampaigns,
-    randomLoreSnippet: loreResult.snippet,
+    randomLoreEntry: loreResult.entry,
     dailyComic,
     dashboardNews: newsResult.posts,
     hasNewNews: newsResult.hasNewContent,
     hasNewAchievements,
+    newestAchievement: earnedAchievementsResult.newestAchievement,
     hasNewLore: loreResult.hasNewContent,
     upcomingSessions,
     pointsHistory,
     unreadInboxMessages,
+    sessionConfirmationPending: upcomingSessions.some(
+      (s) => s.deadlineReached && !s.userRsvp && s.status === "Scheduled"
+    ),
   };
 }
 

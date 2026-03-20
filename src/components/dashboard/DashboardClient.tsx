@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sword,
@@ -32,9 +33,10 @@ import { DailyComicCard } from "@/src/components/dashboard/DailyComicCard";
 import { NewsInfoCard } from "@/src/components/dashboard/NewsInfoCard";
 import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 import { SupportCard } from "@/src/components/dashboard/SupportCard";
+import { AchievementCongratulationsModal } from "@/src/components/dashboard/AchievementCongratulationsModal";
 import { AcceptanceNotification } from "@/src/app/dashboard/AcceptanceNotification";
 import type { PlayerMessage } from "@/src/lib/actions/message-actions";
-import type { LoreSnippet, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
+import type { DashboardLoreEntry, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
 import type { PointLogEntry } from "@/src/lib/actions/point-actions";
 
@@ -98,16 +100,24 @@ type Props = {
   playerMessages: PlayerMessage[];
   unreadInboxMessages: PlayerMessage[];
   discoverableCampaigns: DiscoverableCampaign[];
-  randomLoreSnippet: LoreSnippet | null;
+  randomLoreEntry: DashboardLoreEntry | null;
   dailyComic: { src: string | null };
   dashboardNews: NewsPost[];
   hasNewNews: boolean;
   hasNewAchievements: boolean;
+  newestAchievement: {
+    id: string;
+    name: string;
+    image_url?: string | null;
+    points_awarded: number;
+    description?: string | null;
+  } | null;
   hasNewLore: boolean;
   upcomingSessions: UpcomingSession[];
   isBacker?: boolean;
   backerSince?: string | null;
   pointsHistory: PointLogEntry[];
+  sessionConfirmationPending?: boolean;
 };
 
 export function DashboardClient({
@@ -121,18 +131,34 @@ export function DashboardClient({
   playerMessages,
   unreadInboxMessages = [],
   discoverableCampaigns,
-  randomLoreSnippet,
+  randomLoreEntry,
   dailyComic,
   dashboardNews,
   hasNewNews,
   hasNewAchievements,
+  newestAchievement = null,
   hasNewLore,
   upcomingSessions,
   isBacker,
   backerSince,
   pointsHistory,
+  sessionConfirmationPending = false,
 }: Props) {
   const router = useRouter();
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
+
+  useEffect(() => {
+    if (hasNewAchievements && newestAchievement) {
+      setShowAchievementModal(true);
+    }
+  }, [hasNewAchievements, newestAchievement]);
+
+  const handleAchievementModalClose = async () => {
+    setShowAchievementModal(false);
+    await markWidgetAsRead("achievement");
+    router.refresh();
+  };
+
   const handleMarkNewsRead = async () => {
     await markWidgetAsRead("news");
     router.refresh();
@@ -196,7 +222,12 @@ export function DashboardClient({
       id: "inbox",
       title: "Nachrichten",
       icon: <Inbox className="h-5 w-5" />,
-      content: <InboxCard messages={unreadInboxMessages} />,
+      content: (
+        <InboxCard
+          messages={unreadInboxMessages}
+          sessionConfirmationPending={sessionConfirmationPending}
+        />
+      ),
       colSpan: 1 as const,
     },
     {
@@ -218,7 +249,7 @@ export function DashboardClient({
       icon: <BookOpen className="h-5 w-5" />,
       content: (
         <LoreSnippetCard
-          snippet={randomLoreSnippet}
+          entry={randomLoreEntry}
           hasNewContent={hasNewLore}
           onMarkAsRead={handleMarkLoreRead}
         />
@@ -243,6 +274,12 @@ export function DashboardClient({
 
   return (
     <div className={`space-y-8 ${isBacker ? "backer-shimmer" : ""}`}>
+      {showAchievementModal && newestAchievement && (
+        <AchievementCongratulationsModal
+          achievement={newestAchievement}
+          onClose={handleAchievementModalClose}
+        />
+      )}
       <PlayerHeader {...profileHeader} />
 
       {newAcceptances.length > 0 && (

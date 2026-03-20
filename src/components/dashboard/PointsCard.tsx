@@ -152,8 +152,9 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
               amount: newEntry.amount,
               reason: newEntry.reason,
               createdAt: newEntry.created_at,
-              grantedBy: newEntry.granted_by,
+              grantedBy: newEntry.created_by ?? newEntry.granted_by,
               grantedByName: null,
+              catalogItemId: newEntry.catalog_item_id ?? null,
             };
 
             setPointsHistory((prev) => [formattedEntry, ...prev].slice(0, 5));

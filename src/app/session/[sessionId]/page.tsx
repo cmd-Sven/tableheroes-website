@@ -58,8 +58,7 @@ export default async function SessionPage({ params }: Props) {
   const { data: liveState } = await (supabase.from("session_live_states") as any)
     .select("*")
     .eq("session_id", sessionId)
-    .single()
-    .throwOnError(false);
+    .maybeSingle();
 
   // 4. Load Party Characters (accepted members with characters)
   const { data: partyRows } = await (supabase.from("campaign_members") as any)

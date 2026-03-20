@@ -144,10 +144,19 @@ body {
   background-position: center;
 }
 
-/* Gothic Sidebar: dunkler Marmor */
+/* Gothic Sidebar: dunkler Marmor (Spieler/GM Dashboard) */
 .gothic-sidebar {
   background-color: #051a02;
   background-image: url('/images/dark-marmor.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Gothic Sidebar Kampagne: dunkles Holz (Kampagnen-Dashboard) – optische Trennung der Ebenen */
+.gothic-sidebar-campaign {
+  background-color: #0d1f0a;
+  background-image: url('/images/dark-wood.jpg');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;

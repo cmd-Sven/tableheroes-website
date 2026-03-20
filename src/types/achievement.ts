@@ -44,11 +44,21 @@ function toFilenameOnly(value: string): string {
 /**
  * Liefert die URL zum Achievement-Bild. Alle Bilder unter /images/achievement/[dateiname].
  * Beim Auslesen wird nur der Dateiname verwendet; gespeicherte Pfade (z. B. images/achievements/…) werden bereinigt.
+ * Vollständige URLs (http/https) und absolute Pfade (/) werden unverändert zurückgegeben.
  */
 export function getAchievementImageSrc(
   imageUrl: string | null | undefined
 ): string | null {
   if (!imageUrl || !imageUrl.trim()) return null;
+  const trimmed = imageUrl.trim();
+  // Vollständige URLs (Supabase Storage etc.) direkt verwenden
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  // Bereits absoluter Pfad (z. B. /images/achievement/medal.png)
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
   const filename = toFilenameOnly(imageUrl);
   if (!filename) return null;
   const withExt = hasImageExtension(filename) ? filename : `${filename}.png`;
@@ -67,11 +77,14 @@ export function getAchievementImageSrcForCustom(
 /**
  * Fallback-URL mit anderer Extension (.webp ↔ .png).
  * Für onError: anderes Format versuchen.
+ * Bei externen URLs (http/https) oder absoluten Pfaden wird null zurückgegeben (kein Fallback).
  */
 export function getAchievementImageFallbackSrc(
   imageUrl: string | null | undefined
 ): string | null {
   if (!imageUrl || !imageUrl.trim()) return null;
+  const trimmed = imageUrl.trim();
+  if (trimmed.startsWith("http") || trimmed.startsWith("/")) return null;
   const filename = toFilenameOnly(imageUrl);
   if (!filename) return null;
   const lower = filename.toLowerCase();

@@ -2,13 +2,15 @@
 
 import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
-import { Inbox, Mail, X } from "lucide-react";
+import { Inbox, Mail, X, AlertTriangle } from "lucide-react";
 import { markMessageAsRead, type PlayerMessage } from "@/src/lib/actions/message-actions";
 
 const MAX_ITEMS = 3;
 
 type Props = {
   messages: PlayerMessage[];
+  /** Zeigt Banner "Warte auf Terminbestätigung" wenn Anmeldefrist erreicht und noch nicht zugesagt */
+  sessionConfirmationPending?: boolean;
 };
 
 function formatDate(iso: string): string {
@@ -20,7 +22,7 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function InboxCard({ messages: initialMessages }: Props) {
+export function InboxCard({ messages: initialMessages, sessionConfirmationPending = false }: Props) {
   const [messages, setMessages] = useState<PlayerMessage[]>(
     initialMessages.filter((m) => !m.readAt).slice(0, MAX_ITEMS)
   );
@@ -70,7 +72,25 @@ export function InboxCard({ messages: initialMessages }: Props) {
   }
 
   return (
-    <div className="w-full p-4">
+    <div className="w-full p-4 space-y-3">
+      {sessionConfirmationPending && (
+        <Link
+          href="/dashboard"
+          className="block rounded-lg border border-amber-500/50 bg-amber-900/20 px-4 py-3 hover:bg-amber-900/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-barlow font-bold text-sm text-amber-200">
+                Warte auf Terminbestätigung
+              </p>
+              <p className="font-libre text-xs text-gray-400 mt-0.5">
+                Bitte bestätige deine Teilnahme bei den nächsten Terminen.
+              </p>
+            </div>
+          </div>
+        </Link>
+      )}
       <ul className="space-y-2">
         {messages.map((msg) => (
           <li

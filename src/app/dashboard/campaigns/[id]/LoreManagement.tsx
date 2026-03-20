@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import { Book, Filter, Map as MapIcon, Search, X } from "lucide-react";
+import { Book, Filter, Map as MapIcon, Search, X, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { LoreGridCard } from "@/src/components/dashboard/LoreGridCard";
 import { deleteLoreEntry, toggleLoreReveal } from "./lore-actions";
-import { VALID_LORE_TYPES, TYPE_MAPPING } from "@/src/lib/lore-types";
+import { VALID_LORE_TYPES, TYPE_MAPPING, getCategoryForType, CATEGORY_ORDER } from "@/src/lib/lore-types";
 
 type LoreEntry = {
   id: string;
@@ -39,10 +39,23 @@ const FILTER_CATEGORIES = [
   "Other",
 ] as const;
 
+const CATEGORY_LABELS: Record<string, string> = {
+  Location: "Orte & Regionen",
+  Religion: "Religion & Glaube",
+  Culture: "Kultur & Völker",
+  Organization: "Organisationen",
+  History: "Geschichte & Mythos",
+  Magic: "Magie & Artefakte",
+  Other: "Sonstiges",
+};
+
 export function LoreManagement({ campaignId, worldId, loreEntries, isGM }: Props) {
   const [activeFilter, setActiveFilter] = useState<string>("Alle");
   const [searchQuery, setSearchQuery] = useState("");
   const [specificTypeFilter, setSpecificTypeFilter] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    () => new Set([...CATEGORY_ORDER])
+  );
 
   const handleDelete = async (lore: LoreEntry) => {
     try {
@@ -123,6 +136,22 @@ export function LoreManagement({ campaignId, worldId, loreEntries, isGM }: Props
       };
     });
   }, [flatEntries, activeFilter, searchQuery, specificTypeFilter, isGM]);
+
+  // Für Spieler: nach Kategorien gruppieren (für aufklappbare Sektionen)
+  const loreByCategory = useMemo(() => {
+    if (isGM) return null;
+    const groups: Record<string, typeof filteredLore> = {};
+    for (const entry of filteredLore) {
+      const cat = getCategoryForType(entry.type);
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(entry);
+    }
+    // Sortiere Einträge innerhalb jeder Kategorie nach Name
+    for (const cat of Object.keys(groups)) {
+      groups[cat].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return groups;
+  }, [filteredLore, isGM]);
 
 
   // Get parent options for dropdown (all lore entries, sorted alphabetically)
@@ -314,8 +343,63 @@ export function LoreManagement({ campaignId, worldId, loreEntries, isGM }: Props
             </>
           )}
         </div>
+      ) : !isGM && loreByCategory ? (
+        /* Spieler: Aufklappbare Kategorien */
+        <div className="space-y-2">
+          {CATEGORY_ORDER.filter((cat) => (loreByCategory[cat]?.length ?? 0) > 0).map((category) => {
+            const entries = loreByCategory[category] ?? [];
+            const isExpanded = expandedCategories.has(category);
+            const label = CATEGORY_LABELS[category] ?? category;
+            return (
+              <div
+                key={category}
+                className="rounded-lg border border-hero-dark bg-hero-dark/20 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedCategories((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(category)) next.delete(category);
+                      else next.add(category);
+                      return next;
+                    })
+                  }
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 font-barlow font-bold uppercase text-left text-hero-vibrant hover:bg-hero-dark/40 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0" />
+                    )}
+                    {label}
+                  </span>
+                  <span className="rounded-full bg-hero-dark px-2 py-0.5 font-barlow text-xs text-gray-400">
+                    {entries.length}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-hero-dark/50 p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {entries.map((lore) => (
+                        <LoreGridCard
+                          key={lore.id}
+                          lore={lore as any}
+                          campaignId={campaignId}
+                          isGM={false}
+                          detailHref={undefined}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        /* Grid View */
+        /* GM: Grid View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredLore.map((lore) => (
             <LoreGridCard

@@ -15,6 +15,7 @@ export type PointLogEntry = {
   createdAt: string;
   grantedBy: string | null;
   grantedByName: string | null;
+  catalogItemId: string | null;
 };
 
 export type MemberDetailData = {
@@ -65,6 +66,7 @@ export async function getPointsLog(
     createdAt: row.created_at,
     grantedBy: row.created_by ?? null,
     grantedByName: (row.users as any)?.username ?? null,
+    catalogItemId: row.catalog_item_id ?? null,
   }));
 
   console.log("[getPointsLog] Ergebnis für User:", userId, "Anzahl:", result.length, "Daten:", result);

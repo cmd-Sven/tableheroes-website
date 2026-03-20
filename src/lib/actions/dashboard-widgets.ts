@@ -5,8 +5,11 @@ import fs from "fs";
 import path from "path";
 import type {
   LoreSnippet,
+  DashboardLoreEntry,
   UpcomingSession,
   SessionParticipant,
+  SessionRsvp,
+  RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 
@@ -94,6 +97,141 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
   return { snippet, hasNewContent };
 }
 
+type RevealedEntry = {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  type: "lore" | "npc" | "faction";
+  campaignId: string;
+  campaignName: string;
+};
+
+/**
+ * Lädt einen zufälligen sichtbaren Eintrag (Lore, NPC, Fraktion, Ort, Rasse, etc.)
+ * aus Kampagnen, denen der Spieler beigetreten ist.
+ * Nur Einträge, die für Spieler freigegeben sind (campaign_visibility.is_revealed).
+ */
+export async function getRandomLoreEntry(userId: string): Promise<{
+  entry: DashboardLoreEntry | null;
+  hasNewContent: boolean;
+}> {
+  const supabase = await createClient();
+
+  const { data: userRow } = await (supabase.from("users") as any)
+    .select("last_lore_view")
+    .eq("id", userId)
+    .maybeSingle();
+  const lastView = (userRow as any)?.last_lore_view ?? null;
+
+  const { data: memberships } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id")
+    .eq("user_id", userId)
+    .in("status", ["Accepted", "Approved"]);
+
+  const campaignIds = [
+    ...new Set(
+      ((memberships as any[]) || [])
+        .map((m: any) => m.campaign_id)
+        .filter(Boolean)
+    ),
+  ];
+  if (campaignIds.length === 0) return { entry: null, hasNewContent: false };
+
+  const { data: campaigns } = await (supabase.from("campaigns") as any)
+    .select("id, name, world_id")
+    .in("id", campaignIds);
+
+  const allRevealed: RevealedEntry[] = [];
+
+  for (const camp of campaigns || []) {
+    const worldId = (camp as any).world_id;
+    const campaignId = (camp as any).id;
+    const campaignName = (camp as any).name ?? "Kampagne";
+
+    const [loreVisibility, npcVisibility, factionVisibility] = await Promise.all([
+      getVisibilityForCampaign(campaignId, "lore"),
+      worldId ? getVisibilityForCampaign(campaignId, "npc") : Promise.resolve({}),
+      getVisibilityForCampaign(campaignId, "faction"),
+    ]);
+
+    if (worldId) {
+      const loreRevealedIds = Object.entries(loreVisibility)
+        .filter(([, v]) => v)
+        .map(([entityId]) => entityId);
+      if (loreRevealedIds.length > 0) {
+        const { data: loreRows } = await (supabase.from("world_lore") as any)
+          .select("id, name, image_url")
+          .in("id", loreRevealedIds);
+        (loreRows || []).forEach((row: any) => {
+          allRevealed.push({
+            id: row.id,
+            name: row.name ?? "Lore",
+            imageUrl: row.image_url ?? null,
+            type: "lore",
+            campaignId,
+            campaignName,
+          });
+        });
+      }
+
+      const npcRevealedIds = Object.entries(npcVisibility)
+        .filter(([, v]) => v)
+        .map(([entityId]) => entityId);
+      if (npcRevealedIds.length > 0) {
+        const { data: npcRows } = await (supabase.from("npcs") as any)
+          .select("id, name, image_url")
+          .in("id", npcRevealedIds)
+          .eq("world_id", worldId);
+        (npcRows || []).forEach((row: any) => {
+          allRevealed.push({
+            id: row.id,
+            name: row.name ?? "NPC",
+            imageUrl: row.image_url ?? null,
+            type: "npc",
+            campaignId,
+            campaignName,
+          });
+        });
+      }
+    }
+
+    const factionRevealedIds = Object.entries(factionVisibility)
+      .filter(([, v]) => v)
+      .map(([entityId]) => entityId);
+    if (factionRevealedIds.length > 0) {
+      const { data: factionRows } = await (supabase.from("factions") as any)
+        .select("id, name, image_url")
+        .in("id", factionRevealedIds)
+        .eq("campaign_id", campaignId);
+      (factionRows || []).forEach((row: any) => {
+        allRevealed.push({
+          id: row.id,
+          name: row.name ?? "Fraktion",
+          imageUrl: row.image_url ?? null,
+          type: "faction",
+          campaignId,
+          campaignName,
+        });
+      });
+    }
+  }
+
+  if (allRevealed.length === 0) return { entry: null, hasNewContent: false };
+
+  const picked = allRevealed[Math.floor(Math.random() * allRevealed.length)];
+
+  const entry: DashboardLoreEntry = {
+    id: picked.id,
+    name: picked.name,
+    imageUrl: picked.imageUrl,
+    type: picked.type,
+    campaignId: picked.campaignId,
+    campaignName: picked.campaignName,
+  };
+
+  return { entry, hasNewContent: false };
+}
+
 /**
  * Scannt public/images/comic/ und gibt alle Bild-Dateinamen zurück (sortiert).
  */
@@ -145,19 +283,22 @@ export async function getDailyComic(): Promise<{
 /**
  * Lädt die nächsten geplanten & live Sessions über alle Kampagnen des Users.
  * Enthält Teilnehmer mit Charakter-Daten (Avatar, Klasse, Level).
+ * @param limit Maximale Anzahl Sessions (Standard: 6). Für Übersichtsseite z.B. 50.
  */
 export async function getUpcomingSessionsForUser(
-  userId: string
+  userId: string,
+  limit = 6
 ): Promise<UpcomingSession[]> {
   const supabase = await createClient();
 
   // 1. Alle Kampagnen des Users (als Spieler oder GM)
+  // Accepted, Drafting, In_Review, Approved = Spieler ist Teil der Kampagne und soll Termine sehen
   const { data: memberRows } = await (
     supabase.from("campaign_members") as any
   )
     .select("campaign_id")
     .eq("user_id", userId)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved", "Drafting", "In_Review"]);
 
   const memberCampaignIds = (
     (memberRows as any[]) || []
@@ -173,15 +314,38 @@ export async function getUpcomingSessionsForUser(
   ).map((c: any) => c.id as string);
 
   const allCampaignIds = [...new Set([...memberCampaignIds, ...gmCampaignIds])];
-  if (allCampaignIds.length === 0) return [];
+  if (allCampaignIds.length === 0) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[getUpcomingSessionsForUser] Keine Kampagnen-IDs:", {
+        userId,
+        memberCampaignIds,
+        gmCampaignIds,
+      });
+    }
+    return [];
+  }
 
-  // 2. Upcoming Sessions laden (Scheduled oder Live)
-  const { data: sessionsRaw } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, status, campaign_id")
+  // 2. Upcoming Sessions laden (nur zukünftige; wie Kampagnen-Seite: kein Status-Filter)
+  const nowIso = new Date().toISOString();
+  const { data: sessionsRaw, error: sessionsError } = await (
+    supabase.from("sessions") as any
+  )
+    .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
-    .in("status", ["Scheduled", "Live"])
+    .gte("start_time", nowIso)
     .order("start_time", { ascending: true })
-    .limit(6);
+    .limit(limit);
+
+  if (process.env.NODE_ENV === "development" && sessionsError) {
+    console.log("[getUpcomingSessionsForUser] Sessions-Fehler:", sessionsError);
+  }
+  if (process.env.NODE_ENV === "development" && (!sessionsRaw || (sessionsRaw as any[]).length === 0)) {
+    console.log("[getUpcomingSessionsForUser] Keine Sessions aus DB:", {
+      userId,
+      allCampaignIds,
+      sessionsCount: (sessionsRaw as any[])?.length ?? 0,
+    });
+  }
 
   const sessions = (sessionsRaw as any[]) || [];
   if (sessions.length === 0) return [];
@@ -238,9 +402,56 @@ export async function getUpcomingSessionsForUser(
     });
   }
 
-  // 5. Sessions zusammenbauen
+  // 5. Session-RSVPs laden (session_rsvps)
+  const sessionIds = sessions.map((s: any) => s.id);
+  const { data: rsvpsRaw } = await (supabase.from("session_rsvps") as any)
+    .select("session_id, user_id, rsvp_status, gm_confirmed")
+    .in("session_id", sessionIds);
+
+  const rsvpsBySession = new Map<string, Array<{ user_id: string; rsvp_status: string; gm_confirmed?: boolean }>>();
+  for (const r of (rsvpsRaw as any[]) || []) {
+    const sid = r.session_id as string;
+    if (!rsvpsBySession.has(sid)) rsvpsBySession.set(sid, []);
+    rsvpsBySession.get(sid)!.push({
+      user_id: r.user_id,
+      rsvp_status: r.rsvp_status,
+      gm_confirmed: r.gm_confirmed,
+    });
+  }
+
+  // 6. Sessions zusammenbauen
   const result: UpcomingSession[] = sessions.map((s: any) => {
     const campaign = campaignsById.get(s.campaign_id);
+    const participants = participantsByCampaign.get(s.campaign_id) ?? [];
+    const sessionRsvps = rsvpsBySession.get(s.id) ?? [];
+
+    const userRsvpRow = sessionRsvps.find((r) => r.user_id === userId);
+    const userRsvp = (userRsvpRow?.rsvp_status as RsvpStatus) ?? null;
+
+    const rsvps: SessionRsvp[] = participants.map((p) => {
+      const r = sessionRsvps.find((x) => x.user_id === p.userId);
+      return {
+        userId: p.userId,
+        username: p.username,
+        characterName: p.characterName,
+        rsvpStatus: (r?.rsvp_status as RsvpStatus) ?? null,
+        gmConfirmed: !!r?.gm_confirmed,
+      };
+    });
+
+    const deadlineDays = s.rsvp_deadline_days ?? null;
+    const startDate = new Date(s.start_time);
+    let deadline: Date | null = null;
+    if (deadlineDays) {
+      deadline = new Date(startDate);
+      deadline.setDate(deadline.getDate() - deadlineDays);
+      deadline.setHours(23, 59, 59, 999);
+    }
+    const now = new Date();
+    const deadlineReached = !!deadline && now >= deadline;
+    const viaOnlineCount = sessionRsvps.filter((r) => r.rsvp_status === "Via Online").length;
+    const viaOnlineTaken = s.is_live !== false && viaOnlineCount >= 1;
+
     return {
       id: s.id,
       title: s.title,
@@ -249,7 +460,13 @@ export async function getUpcomingSessionsForUser(
       campaignId: s.campaign_id,
       campaignName: campaign?.name ?? "Kampagne",
       campaignBannerUrl: campaign?.banner_url ?? null,
-      participants: participantsByCampaign.get(s.campaign_id) ?? [],
+      participants,
+      rsvpDeadlineDays: deadlineDays,
+      isLive: s.is_live !== false,
+      userRsvp,
+      rsvps,
+      deadlineReached,
+      viaOnlineTaken,
     };
   });
 

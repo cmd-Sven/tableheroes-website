@@ -251,37 +251,41 @@ export function DraggableCardGrid({
     }
   }, [layout, onSaveLayout]);
 
+  /** Layout-Reihenfolge für Masonry: nach y_pos, dann x_pos sortiert */
+  const layoutOrder = [...layout].sort(
+    (a, b) => a.y_pos - b.y_pos || a.x_pos - b.x_pos
+  );
+
+  /** Masonry-Rendering: Cards in Spalten, füllt Lücken durch unterschiedliche Höhen */
+  const renderMasonry = () => (
+    <div className="columns-1 md:columns-2 lg:columns-3 gap-6">
+      {layoutOrder.map((card) => {
+        const meta = cards.find((x) => x.id === card.id);
+        if (!meta) return null;
+        return (
+          <div
+            key={card.id}
+            className="break-inside-avoid mb-6"
+          >
+            <DashboardCard
+              title={meta.title}
+              icon={meta.icon}
+              colSpan={card.width}
+            >
+              {meta.content}
+            </DashboardCard>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   if (readOnly) {
-    const flat: React.ReactNode[] = [];
-    for (let r = 0; r < Math.max(rows, 1); r++) {
-      for (let c = 0; c < 3; c++) {
-        const card = getCardAt(layout, r, c);
-        if (card) {
-          const meta = cards.find((x) => x.id === card.id);
-          if (meta) {
-            flat.push(
-              <DashboardCard
-                key={card.id}
-                title={meta.title}
-                icon={meta.icon}
-                colSpan={card.width}
-              >
-                {meta.content}
-              </DashboardCard>
-            );
-          }
-          if (card.width === 2) {
-            flat.push(<div key={`pad-${r}-${c + 1}`} />);
-            c++;
-          }
-        } else if (getCardAtCell(layout, r, c)) {
-          flat.push(<div key={`pad-${r}-${c}`} />);
-        } else {
-          flat.push(<div key={`e-${r}-${c}`} />);
-        }
-      }
-    }
-    return <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{flat}</div>;
+    return (
+      <div className="space-y-6">
+        {renderMasonry()}
+      </div>
+    );
   }
 
   const slotPositions = getAllSlotPositions(layout);
@@ -325,6 +329,9 @@ export function DraggableCardGrid({
           {error}
         </p>
       )}
+      {!editMode ? (
+        renderMasonry()
+      ) : (
       <div
         className="grid grid-cols-3 gap-6 relative"
         style={{
@@ -394,6 +401,7 @@ export function DraggableCardGrid({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

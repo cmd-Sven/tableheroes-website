@@ -50,7 +50,9 @@ export async function getAchievementImageFilenames(): Promise<string[]> {
 export async function awardAchievement(
   userId: string,
   achievementName: string,
-  grantedBy?: string | null
+  grantedBy?: string | null,
+  /** Bei true: Nur Achievement vergeben, keine Punkte/Log (z.B. bei Punkte-Einlösung). */
+  skipPointsAndLog?: boolean
 ): Promise<{ awarded: boolean; error?: string }> {
   const supabase = await createClient();
 
@@ -93,7 +95,7 @@ export async function awardAchievement(
   console.log("[awardAchievement] ✓ Achievement vergeben:", achievementName, "an User:", userId);
 
   const points = Number(achievement.points_awarded) || 0;
-  if (points > 0) {
+  if (!skipPointsAndLog && points > 0) {
     // 2. total_points erhöhen
     const { data: userRow } = await (supabase.from("users") as any)
       .select("total_points")
@@ -265,7 +267,7 @@ export async function getAllAchievements(): Promise<
   }));
 }
 
-/** Lädt alle vom User errungenen Achievements (join user_achievements + achievements). hasNewContent: true, wenn das neueste Achievement jünger ist als last_achievement_view. */
+/** Lädt alle vom User errungenen Achievements (join user_achievements + achievements). hasNewContent: true, wenn das neueste Achievement jünger ist als last_achievement_view. newestAchievement: das zuletzt vergebene Achievement (für Gratulation-Modal). */
 export async function getUserAchievements(userId: string): Promise<{
   achievements: {
     id: string;
@@ -275,6 +277,13 @@ export async function getUserAchievements(userId: string): Promise<{
     description?: string | null;
   }[];
   hasNewContent: boolean;
+  newestAchievement: {
+    id: string;
+    name: string;
+    image_url?: string | null;
+    points_awarded: number;
+    description?: string | null;
+  } | null;
 }> {
   const supabase = await createClient();
   const [userRes, dataRes] = await Promise.all([
@@ -284,27 +293,31 @@ export async function getUserAchievements(userId: string): Promise<{
       .maybeSingle(),
     (supabase.from("user_achievements") as any)
       .select(
-        "achievement_id, awarded_at, achievements(id, name, image_url, icon, points_awarded, description)"
+        "achievement_id, awarded_at, achievements(id, name, icon, points_awarded, description)"
       )
       .eq("user_id", userId),
   ]);
-  
+
   if (dataRes.error) {
     console.error("[getUserAchievements] Fehler beim Laden:", dataRes.error);
-    return { achievements: [], hasNewContent: false };
+    return { achievements: [], hasNewContent: false, newestAchievement: null };
   }
-  
+
   const list = Array.isArray(dataRes.data) ? dataRes.data : [];
   console.log("[getUserAchievements] Raw data für User:", userId, "Anzahl Einträge:", list.length);
-  
+
   const lastView = (userRes.data as any)?.last_achievement_view ?? null;
   let newestAt: string | null = null;
+  let newestRow: any = null;
+
   const achievements = list
     .map((row: any) => {
       const a = row.achievements ?? row.achievement;
       if (row.awarded_at) {
-        if (!newestAt || new Date(row.awarded_at) > new Date(newestAt))
+        if (!newestAt || new Date(row.awarded_at) > new Date(newestAt)) {
           newestAt = row.awarded_at;
+          newestRow = row;
+        }
       }
       return a;
     })
@@ -320,16 +333,33 @@ export async function getUserAchievements(userId: string): Promise<{
       points_awarded: Number(a.points_awarded) || 0,
       description: a.description ?? null,
     }));
+
   const hasNewContent = newestAt
     ? !lastView || new Date(newestAt) > new Date(lastView)
     : achievements.length > 0 && !lastView;
-  
+
+  const a = newestRow?.achievements ?? newestRow?.achievement;
+  const newestAchievement =
+    hasNewContent && a
+      ? {
+          id: a.id,
+          name: a.name,
+          image_url:
+            a.image_url ??
+            a.icon ??
+            (a.name && ACHIEVEMENT_IMAGE_FILENAMES[a.name]) ??
+            null,
+          points_awarded: Number(a.points_awarded) || 0,
+          description: a.description ?? null,
+        }
+      : null;
+
   console.log("[getUserAchievements] Ergebnis für User:", userId, {
     achievementsCount: achievements.length,
     hasNewContent,
     newestAt,
     lastView,
   });
-  
-  return { achievements: achievements ?? [], hasNewContent };
+
+  return { achievements: achievements ?? [], hasNewContent, newestAchievement };
 }
