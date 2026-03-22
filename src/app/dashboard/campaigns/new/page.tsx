@@ -18,6 +18,13 @@ export default async function CreateCampaignPage() {
     redirect("/dashboard");
   }
 
+  const { count: campaignCount } = await (supabase.from("campaigns") as any)
+    .select("*", { count: "exact", head: true })
+    .eq("gm_id", user.id);
+  if ((campaignCount ?? 0) >= 3) {
+    redirect("/dashboard/my-campaigns?limit=3");
+  }
+
   const { data: worldsRaw } = await (supabase.from("worlds") as any)
     .select("id, name")
     .eq("gm_id", user.id)
@@ -28,11 +35,11 @@ export default async function CreateCampaignPage() {
     <div className="mx-auto max-w-3xl space-y-8">
       {/* Back Button */}
       <Link
-        href="/dashboard"
+        href="/dashboard/my-campaigns"
         className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-hero-vibrant hover:text-white transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Zurück
+        Zurück zu Meine Kampagnen
       </Link>
 
       {/* Page Header */}

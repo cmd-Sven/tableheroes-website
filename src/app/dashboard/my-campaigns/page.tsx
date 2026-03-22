@@ -1,8 +1,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Map as MapIcon, Sword } from "lucide-react";
+import { Map as MapIcon, Sword, Plus } from "lucide-react";
 import Image from "next/image";
+
+const GM_MAX_CAMPAIGNS = 3;
 
 type MembershipWithGm = {
   campaign: {
@@ -47,15 +49,32 @@ export default async function MyCampaignsPage() {
       .order("created_at", { ascending: false });
     const campaigns = (campaignsRaw as any[]) || [];
 
+    const canCreateMore = campaigns.length < GM_MAX_CAMPAIGNS;
+
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
-            Meine Kampagnen
-          </h1>
-          <p className="mt-2 font-libre text-gray-400">
-            Kampagnen, die du als Spielleiter leitest.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
+              Meine Kampagnen
+            </h1>
+            <p className="mt-2 font-libre text-gray-400">
+              Kampagnen, die du als Spielleiter leitest (max. {GM_MAX_CAMPAIGNS}).
+            </p>
+          </div>
+          {canCreateMore ? (
+            <Link
+              href="/dashboard/campaigns/new"
+              className="shrink-0 inline-flex items-center gap-2 rounded-md border border-hero-border bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-white text-sm shadow-lg hover:bg-hero-vibrant hover:border-hero-vibrant transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Kampagne erstellen
+            </Link>
+          ) : (
+            <span className="shrink-0 font-libre text-sm text-gray-500">
+              Limit erreicht ({campaigns.length}/{GM_MAX_CAMPAIGNS})
+            </span>
+          )}
         </div>
         {campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-16 text-center">

@@ -136,16 +136,18 @@ export function GMDashboardClient({
           <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2">
             <span className="inline-flex items-center gap-2">
               <MapPin className="h-5 w-5 text-accent-gold" />
-              Aktive Kampagnen
+              Aktive Kampagnen (max. 3)
             </span>
           </h2>
-          <Link
-            href="/dashboard/campaigns/new"
-            className="inline-flex items-center gap-2 rounded-md border border-hero-border bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-white text-sm shadow-lg transition-transform hover:scale-105 hover:bg-hero-vibrant"
-          >
-            <Plus className="h-4 w-4" />
-            Neue Kampagne
-          </Link>
+          {campaigns.length < 3 && (
+            <Link
+              href="/dashboard/campaigns/new"
+              className="inline-flex items-center gap-2 rounded-md border border-hero-border bg-hero-dark px-4 py-2 font-barlow font-bold uppercase text-white text-sm shadow-lg transition-transform hover:scale-105 hover:bg-hero-vibrant"
+            >
+              <Plus className="h-4 w-4" />
+              Neue Kampagne
+            </Link>
+          )}
         </div>
 
         {!hasCampaigns ? (

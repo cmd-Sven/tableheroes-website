@@ -25,6 +25,14 @@ export async function createCampaignAction(formData: FormData) {
     throw new Error("Unauthorized: Only Game Masters can create campaigns.");
   }
 
+  // Max 3 Kampagnen pro GM
+  const { count } = await (supabase.from("campaigns") as any)
+    .select("*", { count: "exact", head: true })
+    .eq("gm_id", user.id);
+  if ((count ?? 0) >= 3) {
+    throw new Error("Du hast das Maximum von 3 Kampagnen erreicht.");
+  }
+
   // Extract Form Data
   const world_id = formData.get("world_id") as string;
   const name = formData.get("name") as string;

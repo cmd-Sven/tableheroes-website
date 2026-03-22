@@ -292,13 +292,14 @@ export async function getUpcomingSessionsForUser(
   const supabase = await createClient();
 
   // 1. Alle Kampagnen des Users (als Spieler oder GM)
-  // Accepted, Drafting, In_Review, Approved = Spieler ist Teil der Kampagne und soll Termine sehen
+  // Session = Termin (Spielsitzung physisch oder online). sessions-Tabelle = Termine.
+  // Accepted, Approved, Active, Drafting, In_Review = Spieler ist Teil der Kampagne
   const { data: memberRows } = await (
     supabase.from("campaign_members") as any
   )
     .select("campaign_id")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved", "Drafting", "In_Review"]);
+    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
 
   const memberCampaignIds = (
     (memberRows as any[]) || []
@@ -325,29 +326,29 @@ export async function getUpcomingSessionsForUser(
     return [];
   }
 
-  // 2. Upcoming Sessions laden (nur zukünftige; wie Kampagnen-Seite: kein Status-Filter)
-  const nowIso = new Date().toISOString();
+  // 2. Sessions laden (wie Kampagnen-Seite: OHNE start_time-Filter in DB, danach client-seitig filtern)
   const { data: sessionsRaw, error: sessionsError } = await (
     supabase.from("sessions") as any
   )
     .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
-    .gte("start_time", nowIso)
     .order("start_time", { ascending: true })
-    .limit(limit);
+    .limit(limit * 3);
 
-  if (process.env.NODE_ENV === "development" && sessionsError) {
-    console.log("[getUpcomingSessionsForUser] Sessions-Fehler:", sessionsError);
-  }
-  if (process.env.NODE_ENV === "development" && (!sessionsRaw || (sessionsRaw as any[]).length === 0)) {
-    console.log("[getUpcomingSessionsForUser] Keine Sessions aus DB:", {
-      userId,
-      allCampaignIds,
-      sessionsCount: (sessionsRaw as any[])?.length ?? 0,
-    });
+  if (sessionsError) {
+    console.error("[getUpcomingSessionsForUser] Sessions-Fehler:", sessionsError);
+    return [];
   }
 
-  const sessions = (sessionsRaw as any[]) || [];
+  const allSessions = (sessionsRaw as any[]) || [];
+  const now = new Date();
+  const sessions = allSessions
+    .filter(
+      (s: any) =>
+        s.status === "Live" || (s.start_time && new Date(s.start_time) > now)
+    )
+    .slice(0, limit);
+
   if (sessions.length === 0) return [];
 
   // 3. Kampagnen-Details laden
@@ -366,7 +367,7 @@ export async function getUpcomingSessionsForUser(
     campaignsById.set(c.id, { name: c.name, banner_url: c.banner_url });
   }
 
-  // 4. Teilnehmer je Kampagne laden (Accepted Members + deren Charaktere)
+  // 4. Teilnehmer je Kampagne laden (Accepted/Approved Members + deren Charaktere)
   const { data: allMembersRaw } = await (
     supabase.from("campaign_members") as any
   )
@@ -379,7 +380,7 @@ export async function getUpcomingSessionsForUser(
     `
     )
     .in("campaign_id", sessionCampaignIds)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved", "Active"]);
 
   // Gruppiere Teilnehmer nach campaign_id
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
