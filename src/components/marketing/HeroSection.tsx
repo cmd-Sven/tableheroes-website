@@ -477,15 +477,15 @@ function HeroContentBox({ content }: HeroContentBoxProps) {
       case "membership":
         return {
           title: "Mitglied werden",
-          text: "Um Table-Heroes Mitglied zu werden musst Du dich vorab registrieren und erhälst Zugriff auf das Spieler-Dashboard. Dort hast Du die Möglichkeit aktuelle Kampagnen einzusehen, dich auf diese zu bewerben oder Dein Dashboard einzurichten. Aktuell ist noch keine Registrierung möglich bis zum Release.",
+          text: "Um Table-Heroes Mitglied zu werden musst Du dich vorab registrieren und erhälst Zugriff auf das Spieler-Dashboard. Dort hast Du die Möglichkeit aktuelle Kampagnen einzusehen, dich auf diese zu bewerben oder Dein Dashboard einzurichten. Behalte die News im Auge für die nächsten Updates und besuche unseren Discord!",
         };
       case "updates":
       default:
         return {
-          title: "Das Abenteuer beginnt bald",
-          text: "Registrierungen sind erst ab dem Launch-Tag möglich. Komm vorab auf unseren Discord!",
-          additionalText: "Du willst nicht warten? Komm auf unseren Discord und tausche dich jetzt schon mit der Community aus!",
-          membershipNote: "Exklusiv für registrierte Mitglieder",
+          title: "Das Abenteuer beginnt!",
+          text: "Die ersten mutigen Helden strömen herbei um sich den Abenteuern anzuschließen die auf sie warten.",
+          additionalText: "Registriert Euch und bleibt informiert. Die nächsten Termine folgen bald!",
+          membershipNote: undefined,
         };
     }
   };

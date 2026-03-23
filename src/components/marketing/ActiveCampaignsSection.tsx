@@ -221,7 +221,7 @@ export function ActiveCampaignsSection() {
         zIndex: 10,
       }}
     >
-      <div className="relative mx-auto max-w-6xl px-6 py-16">
+      <div className="relative z-30 mx-auto max-w-6xl px-6 py-16">
         <div className="flex flex-col items-center gap-6">
           <div className="text-center w-full">
             <motion.h2
