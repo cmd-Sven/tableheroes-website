@@ -81,14 +81,22 @@ export async function updateCampaignDetails(
   }
 
   // Extract form data
+  const nameRaw = formData.get("name") as string;
+  const name = nameRaw?.trim();
   const banner_url = formData.get("banner_url") as string;
   const frequency = formData.get("frequency") as string;
   const looking_for = formData.get("looking_for") as string;
   const house_rules = formData.get("house_rules") as string;
 
+  // Kampagnenname validieren (min. 2 Zeichen)
+  if (!name || name.length < 2) {
+    throw new Error("Kampagnenname muss mindestens 2 Zeichen lang sein.");
+  }
+
   // Update campaign
   const { error } = await (supabase.from("campaigns") as any)
     .update({
+      name,
       banner_url: banner_url || null,
       frequency: frequency || null,
       looking_for: looking_for || null,
@@ -101,9 +109,10 @@ export async function updateCampaignDetails(
     throw new Error(error.message);
   }
 
-  // Revalidate pages
+  // Revalidate pages (Name wird u.a. in Sidebar, Dashboard-Karten angezeigt)
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath(`/campaigns/${campaignId}`); // Public page
+  revalidatePath("/dashboard");
 }
 
 // ============================================================================

@@ -875,6 +875,26 @@ export default async function CampaignDetailPage({
               className="space-y-4"
               suppressHydrationWarning={true}
             >
+              {/* Kampagnenname */}
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block mb-2 font-barlow font-bold uppercase text-xs text-gray-300"
+                >
+                  Kampagnenname *
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  defaultValue={campaign.name || ""}
+                  placeholder="z.B. Zeitalter der Wiedergeburt"
+                  required
+                  minLength={2}
+                  className="w-full rounded bg-slate-900 border border-hero-dark p-2.5 text-sm text-white focus:border-hero-vibrant outline-none"
+                  suppressHydrationWarning={true}
+                />
+              </div>
               {/* Banner Image */}
               <div>
                 <label
@@ -1197,6 +1217,25 @@ export default async function CampaignDetailPage({
               className="space-y-4"
               suppressHydrationWarning={true}
             >
+              <div>
+                <label
+                  htmlFor="settings_name"
+                  className="block mb-2 font-barlow font-bold uppercase text-xs text-gray-300"
+                >
+                  Kampagnenname *
+                </label>
+                <input
+                  type="text"
+                  id="settings_name"
+                  name="name"
+                  defaultValue={campaign.name || ""}
+                  placeholder="z.B. Zeitalter der Wiedergeburt"
+                  required
+                  minLength={2}
+                  className="w-full rounded bg-slate-900 border border-hero-dark p-2.5 text-sm text-white focus:border-hero-vibrant outline-none"
+                  suppressHydrationWarning={true}
+                />
+              </div>
               <div>
                 <label
                   htmlFor="settings_banner_url"
