@@ -11,7 +11,10 @@ export type Achievement = {
   description?: string | null;
 };
 
-/** Einheitlicher Basispfad für alle Achievement-Bilder (public/images/achievement/). */
+/** API-Route für Achievement-Bilder (behebt Umlaute/Leerzeichen in Dateinamen) */
+const ACHIEVEMENT_IMAGE_API = "/api/achievement-image";
+
+/** Fallback: direkter Pfad für einfache Dateinamen */
 export const ACHIEVEMENT_IMAGE_BASE = "/images/achievement";
 
 const IMAGE_EXTENSIONS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -42,27 +45,44 @@ function toFilenameOnly(value: string): string {
 }
 
 /**
- * Liefert die URL zum Achievement-Bild. Alle Bilder unter /images/achievement/[dateiname].
- * Beim Auslesen wird nur der Dateiname verwendet; gespeicherte Pfade (z. B. images/achievements/…) werden bereinigt.
- * Vollständige URLs (http/https) und absolute Pfade (/) werden unverändert zurückgegeben.
+ * Liefert die URL zum Achievement-Bild.
+ * Nutzt API-Route (/api/achievement-image?file=...) für korrekte Handhabung von
+ * Umlauten (ä, ö, ü, ß) und Leerzeichen in Dateinamen.
  */
 export function getAchievementImageSrc(
   imageUrl: string | null | undefined
 ): string | null {
   if (!imageUrl || !imageUrl.trim()) return null;
   const trimmed = imageUrl.trim();
-  // Vollständige URLs (Supabase Storage etc.) direkt verwenden
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     return trimmed;
   }
-  // Bereits absoluter Pfad (z. B. /images/achievement/medal.png)
   if (trimmed.startsWith("/")) {
     return trimmed;
   }
   const filename = toFilenameOnly(imageUrl);
   if (!filename) return null;
   const withExt = hasImageExtension(filename) ? filename : `${filename}.png`;
-  return `${ACHIEVEMENT_IMAGE_BASE}/${encodeURIComponent(withExt)}`;
+  return `${ACHIEVEMENT_IMAGE_API}?file=${encodeURIComponent(withExt)}`;
+}
+
+/**
+ * Liefert alternative URLs zum Ausprobieren.
+ * Statischer Pfad zuerst (Next.js serviert Umlaute zuverlässig), dann API-Route.
+ */
+export function getAchievementImageSrcVariants(
+  imageUrl: string | null | undefined
+): string[] {
+  const filename = toFilenameOnly(imageUrl ?? "");
+  if (!filename) return [];
+  const withExt = hasImageExtension(filename) ? filename : `${filename}.png`;
+  const staticPath = `${ACHIEVEMENT_IMAGE_BASE}/${encodeURIComponent(withExt)}`;
+  const apiUrl = getAchievementImageSrc(imageUrl);
+  const fallbackExt = getAchievementImageFallbackSrc(imageUrl);
+  const variants = [staticPath];
+  if (apiUrl && !variants.includes(apiUrl)) variants.push(apiUrl);
+  if (fallbackExt && !variants.includes(fallbackExt)) variants.push(fallbackExt);
+  return variants;
 }
 
 /**
@@ -76,8 +96,7 @@ export function getAchievementImageSrcForCustom(
 
 /**
  * Fallback-URL mit anderer Extension (.webp ↔ .png).
- * Für onError: anderes Format versuchen.
- * Bei externen URLs (http/https) oder absoluten Pfaden wird null zurückgegeben (kein Fallback).
+ * Nutzt API-Route für Umlaute/Leerzeichen.
  */
 export function getAchievementImageFallbackSrc(
   imageUrl: string | null | undefined
@@ -93,5 +112,5 @@ export function getAchievementImageFallbackSrc(
     ? filename.replace(/\.[^.]+$/i, "").trim()
     : filename;
   const withOther = `${base}${otherExt}`;
-  return `${ACHIEVEMENT_IMAGE_BASE}/${encodeURIComponent(withOther)}`;
+  return `${ACHIEVEMENT_IMAGE_API}?file=${encodeURIComponent(withOther)}`;
 }

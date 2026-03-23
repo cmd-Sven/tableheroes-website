@@ -4,7 +4,7 @@ import {
   getAllAchievements,
   getUserAchievements,
 } from "@/src/lib/actions/achievement-actions";
-import { ACHIEVEMENT_IMAGE_FILENAMES } from "@/src/lib/constants/achievements";
+import { getAchievementImageForName } from "@/src/lib/constants/achievements";
 import {
   AchievementsList,
   type AchievementWithStatus,
@@ -31,7 +31,7 @@ export default async function AchievementsPage() {
     id: a.id,
     name: a.name,
     points_awarded: a.points_awarded ?? 0,
-    image_url: a.image_url ?? ACHIEVEMENT_IMAGE_FILENAMES[a.name] ?? null,
+    image_url: getAchievementImageForName(a.name) ?? a.image_url ?? null,
     description: a.description ?? null,
     unlocked: earnedIds.has(a.id),
   }));

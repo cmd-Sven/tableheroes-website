@@ -231,8 +231,12 @@ export default async function CampaignDetailPage({
     status: string;
   }> | null;
 
+  // Zukünftige Termine ODER laufende Live-Sessions (GM muss diese sehen/beenden können)
+  const now = new Date();
   const upcomingSessions = (sessions || []).filter(
-    (s: any) => new Date(s.start_time) > new Date(),
+    (s: any) =>
+      s.status !== "Cancelled" &&
+      (s.status === "Live" || (s.start_time && new Date(s.start_time) > now)),
   );
 
   // RSVP-Status für geplante Sessions (GM: kann Session starten?)
@@ -256,27 +260,32 @@ export default async function CampaignDetailPage({
           .eq("campaign_id", id)
           .eq("status", "Accepted"),
         (supabase.from("session_rsvps") as any)
-          .select("session_id, user_id")
+          .select("session_id, user_id, rsvp_status")
           .in("session_id", scheduledIds),
       ]);
       const memberIds = new Set(
         ((membersRes.data as any[]) || []).map((m: any) => m.user_id)
       );
       const rsvpsBySession = new Map<string, Set<string>>();
+      const acceptedRsvpsBySession = new Map<string, boolean>();
       for (const r of (rsvpsRes.data as any[]) || []) {
         if (!rsvpsBySession.has(r.session_id))
           rsvpsBySession.set(r.session_id, new Set());
         rsvpsBySession.get(r.session_id)!.add(r.user_id);
+        if (r.rsvp_status === "Zusage" || r.rsvp_status === "Via Online") {
+          acceptedRsvpsBySession.set(r.session_id, true);
+        }
       }
       upcomingSessionsWithRsvp = upcomingSessions.map((s: any) => {
         if (s.status !== "Scheduled")
-          return { ...s, canStart: false, pendingCount: 0 };
+          return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
         const rsvpUserIds = rsvpsBySession.get(s.id) ?? new Set();
         const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
         return {
           ...s,
           canStart: pendingCount === 0,
           pendingCount,
+          hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
         };
       });
     }

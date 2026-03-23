@@ -1,25 +1,143 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Calendar, Wand2 } from "lucide-react";
+import { useState, useTransition, useRef, useEffect } from "react";
+import { Calendar, Wand2, Pencil, Trash2, MoreVertical, Square } from "lucide-react";
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
+import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
-import { startSession } from "./session-actions";
+import { startSession, deleteSession, cancelSession, endSession } from "./session-actions";
+
+type SessionItem = {
+  id: string;
+  title: string | null;
+  start_time: string;
+  end_time?: string | null;
+  type: string;
+  status: string;
+  canStart?: boolean;
+  pendingCount?: number;
+  /** true wenn mindestens ein Spieler mit Zusage/Via Online */
+  hasAcceptedRsvps?: boolean;
+};
+
+/** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */
+function SessionActionsDropdown({
+  isStarting,
+  onEdit,
+  onDelete,
+  onCancel,
+  onEnd,
+  hasAcceptedRsvps,
+  isLive,
+}: {
+  isStarting: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCancel?: () => void;
+  onEnd?: () => void;
+  /** true = nur Absagen möglich, false = Löschen möglich */
+  hasAcceptedRsvps?: boolean;
+  /** true = Live-Session, nur „Session beenden“ anzeigen */
+  isLive?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="rounded p-2 text-gray-400 hover:text-white hover:bg-hero-dark transition-colors"
+        title="Aktionen"
+        aria-label="Session-Aktionen"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 min-w-[140px] rounded border border-hero-dark bg-background-card py-1 shadow-xl">
+          {isLive && onEnd ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onEnd();
+              }}
+              disabled={isStarting}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+            >
+              <Square className="h-4 w-4" />
+              Session beenden
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-gray-300 hover:bg-hero-dark hover:text-hero-vibrant transition-colors"
+              >
+                <Pencil className="h-4 w-4" />
+                Bearbeiten
+              </button>
+              {hasAcceptedRsvps && onCancel ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onCancel();
+                  }}
+                  disabled={isStarting}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Absagen
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onDelete();
+                  }}
+                  disabled={isStarting}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-red-400 hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Löschen
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   campaignId: string;
   isGM: boolean;
   /** Spieler: Nur bei Status 'Active' darf der Spieler Sessions betreten. */
   characterStatus?: string;
-  upcomingSessions: Array<{
-    id: string;
-    title: string | null;
-    start_time: string;
-    type: string;
-    status: string;
-    canStart?: boolean;
-    pendingCount?: number;
-  }>;
+  upcomingSessions: Array<SessionItem>;
   locations: Array<{ id: string; name: string; type: string }>;
   npcs: Array<{ id: string; name: string; title: string | null }>;
 };
@@ -27,11 +145,24 @@ type Props = {
 export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSessions, locations, npcs }: Props) {
   const canJoinSession = isGM || characterStatus === "Active";
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
   const [isStarting, startTransition] = useTransition();
   const router = useRouter();
 
   const handleSuccess = () => {
     router.refresh();
+  };
+
+  const handleDelete = (sessionId: string) => {
+    if (!confirm("Termin wirklich löschen? Dies kann nicht rückgängig gemacht werden.")) return;
+    startTransition(async () => {
+      try {
+        await deleteSession(sessionId);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Fehler beim Löschen.");
+      }
+    });
   };
 
   const handleStartSession = (sessionId: string) => {
@@ -48,6 +179,30 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
 
   const handleJoinLive = (sessionId: string) => {
     router.push(`/session/${sessionId}`);
+  };
+
+  const handleCancel = (sessionId: string) => {
+    if (!confirm("Termin absagen? Zugesagte Spieler erhalten eine Benachrichtigung in ihrer Nachrichten-Karte.")) return;
+    startTransition(async () => {
+      try {
+        await cancelSession(sessionId);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Fehler beim Absagen.");
+      }
+    });
+  };
+
+  const handleEndSession = (sessionId: string) => {
+    if (!confirm("Session beenden? Das Journal wird ins Logbuch übernommen.")) return;
+    startTransition(async () => {
+      try {
+        await endSession(sessionId);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Fehler beim Beenden der Session.");
+      }
+    });
   };
 
   return (
@@ -78,9 +233,8 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
             {upcomingSessions.map((session) => {
               const startDate = new Date(session.start_time);
               const formattedDate = new Intl.DateTimeFormat("de-DE", {
-                weekday: "short",
                 day: "2-digit",
-                month: "short",
+                month: "2-digit",
                 year: "numeric",
               }).format(startDate);
               const formattedTime = new Intl.DateTimeFormat("de-DE", {
@@ -104,14 +258,25 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
                 >
                   <div>
                     <p className="font-barlow font-bold text-white group-hover:text-hero-vibrant transition-colors">
-                      {session.title || formattedDate} • {formattedTime} Uhr
+                      {session.title || "Session"} • {formattedDate} • {formattedTime} Uhr
                     </p>
                     <p className="font-libre text-xs text-gray-500">
                       {session.type === "GameSession" ? "Spielabend" : session.type}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {isGM && (isScheduled || isEnded || isLive) && (
+                      <SessionActionsDropdown
+                        isStarting={isStarting}
+                        onEdit={() => setEditingSession(session)}
+                        onDelete={() => handleDelete(session.id)}
+                        onCancel={() => handleCancel(session.id)}
+                        onEnd={() => handleEndSession(session.id)}
+                        hasAcceptedRsvps={session.hasAcceptedRsvps}
+                        isLive={isLive}
+                      />
+                    )}
                     <span
                       className={`rounded px-2 py-1 font-barlow font-bold uppercase text-xs ${
                         isLive
@@ -174,14 +339,25 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
       </div>
 
       {isGM && (
-        <SessionWizardModal
-          campaignId={campaignId}
-          isOpen={isWizardOpen}
-          onClose={() => setIsWizardOpen(false)}
-          locations={locations}
-          npcs={npcs}
-          onSuccess={handleSuccess}
-        />
+        <>
+          <SessionWizardModal
+            campaignId={campaignId}
+            isOpen={isWizardOpen}
+            onClose={() => setIsWizardOpen(false)}
+            locations={locations}
+            npcs={npcs}
+            onSuccess={handleSuccess}
+          />
+          {editingSession && (
+            <SessionEditModal
+              session={editingSession}
+              campaignId={campaignId}
+              isOpen={!!editingSession}
+              onClose={() => setEditingSession(null)}
+              onSuccess={handleSuccess}
+            />
+          )}
+        </>
       )}
     </>
   );

@@ -8,10 +8,12 @@ export type RsvpStatus = "Zusage" | "Absage" | "Via Online";
 /**
  * Spieler setzt seine RSVP für eine Session.
  * Bei is_live Sessions: nur 1 "Via Online" Platz – prüfen ob bereits vergeben.
+ * @param context Optional: campaignId, isLive – aus dem Frontend, um Session-SELECT zu vermeiden (RLS kann Spieler blockieren).
  */
 export async function setSessionRsvp(
   sessionId: string,
-  rsvpStatus: RsvpStatus
+  rsvpStatus: RsvpStatus,
+  context?: { campaignId: string; isLive: boolean }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const {
@@ -19,14 +21,38 @@ export async function setSessionRsvp(
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Nicht authentifiziert." };
 
-  const { data: session } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, is_live")
-    .eq("id", sessionId)
-    .single();
+  let campaignId: string;
+  let isLive: boolean;
 
-  if (!session) return { success: false, error: "Session nicht gefunden." };
+  if (context) {
+    campaignId = context.campaignId;
+    isLive = context.isLive;
+    // Prüfen: User muss Kampagnenmitglied sein
+    const { data: member } = await (supabase.from("campaign_members") as any)
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", user.id)
+      .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"])
+      .maybeSingle();
+    if (!member) {
+      return { success: false, error: "Keine Berechtigung für diese Kampagne." };
+    }
+  } else {
+    const { data: session, error } = await (supabase.from("sessions") as any)
+      .select("id, campaign_id, is_live")
+      .eq("id", sessionId)
+      .single();
 
-  if (rsvpStatus === "Via Online" && session.is_live) {
+    if (error) {
+      console.error("[setSessionRsvp] Session-Load-Fehler:", error);
+      return { success: false, error: "Session nicht gefunden." };
+    }
+    if (!session) return { success: false, error: "Session nicht gefunden." };
+    campaignId = session.campaign_id as string;
+    isLive = session.is_live !== false;
+  }
+
+  if (rsvpStatus === "Via Online" && isLive) {
     const { data: existingViaOnline } = await (supabase.from("session_rsvps") as any)
       .select("id")
       .eq("session_id", sessionId)
@@ -52,7 +78,7 @@ export async function setSessionRsvp(
 
   if (error) return { success: false, error: error.message };
   revalidatePath("/dashboard");
-  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  if (campaignId) revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/dashboard/sessions");
   return { success: true };
 }

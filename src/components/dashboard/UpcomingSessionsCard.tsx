@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle } from "lucide-react";
+import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check } from "lucide-react";
 import type {
   UpcomingSession,
   SessionParticipant,
@@ -105,7 +105,10 @@ function SessionRowPlayer({ session }: { session: UpcomingSession }) {
     const value = e.target.value as RsvpStatus;
     if (!value) return;
     startTransition(async () => {
-      const res = await setSessionRsvp(session.id, value);
+      const res = await setSessionRsvp(session.id, value, {
+        campaignId: session.campaignId,
+        isLive: session.isLive,
+      });
       if (res.error) alert(res.error);
       else router.refresh();
     });
@@ -403,6 +406,73 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Vergangene Session (read-only, kein Betreten)                       */
+/* ------------------------------------------------------------------ */
+function PastSessionRow({ session }: { session: UpcomingSession }) {
+  const startDate = new Date(session.startTime);
+  const formattedDate = new Intl.DateTimeFormat("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(startDate);
+  const formattedTime = new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(startDate);
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-hero-dark/50 bg-background-card/70 opacity-90">
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/images/card-bg-greenWood.webp"
+          alt=""
+          fill
+          className="object-cover opacity-50"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background-dark/95 via-background-dark/85 to-background-dark/70" />
+      </div>
+      <div className="relative z-10 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-barlow font-bold text-[10px] uppercase tracking-wider text-hero-vibrant/60 mb-0.5">
+              {session.campaignName}
+            </p>
+            <h3 className="font-cinzel font-bold text-base text-gray-300 truncate">
+              {session.title || "Session"}
+            </h3>
+          </div>
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-gray-700/50 px-3 py-1 font-barlow font-bold uppercase text-[10px] text-gray-400 border border-gray-600/50">
+            <Check className="h-3 w-3" />
+            Beendet
+          </span>
+        </div>
+        <div className="flex items-center gap-4 text-gray-500">
+          <span className="font-barlow font-bold text-xs uppercase">{formattedDate}</span>
+          <span className="font-barlow text-xs">{formattedTime} Uhr</span>
+        </div>
+        <p className="mt-2 font-libre text-xs text-gray-500 italic">
+          Abgeschlossen vom Spielleiter · Kein erneuter Eintritt möglich
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Vergangene/beendete Termine – nur Anzeige, kein Betreten. */
+export function PastSessionsCard({ sessions }: { sessions: UpcomingSession[] }) {
+  if (sessions.length === 0) return null;
+
+  return (
+    <div className="w-full p-4 space-y-3">
+      {sessions.map((s) => (
+        <PastSessionRow key={s.id} session={s} />
+      ))}
     </div>
   );
 }

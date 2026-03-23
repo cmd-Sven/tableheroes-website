@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { sendMessage } from "@/src/lib/actions/message-actions";
 
 /**
  * Server Action: Create Session with Scenes
@@ -277,16 +278,15 @@ export async function endSession(sessionId: string) {
     throw new Error("Nur der GM kann eine Session beenden.");
   }
 
-  // 4. Fetch Live State (Journal)
-  const { data: liveState } = await (supabase.from("session_live_states") as any)
+  // 4. Fetch Live State (Journal) – maybeSingle: 0 oder 1 Zeile, kein Fehler
+  const { data: liveStateRow } = await (supabase.from("session_live_states") as any)
     .select("journal_text")
     .eq("session_id", sessionId)
-    .single()
-    .throwOnError(false);
+    .maybeSingle();
 
   const journalText =
-    (liveState && liveState.journal_text && liveState.journal_text.trim().length > 0)
-      ? liveState.journal_text
+    liveStateRow?.journal_text && String(liveStateRow.journal_text).trim().length > 0
+      ? String(liveStateRow.journal_text).trim()
       : "Keine Notizen gemacht.";
 
   // 5. Insert Journal Entry
@@ -335,3 +335,199 @@ export async function endSession(sessionId: string) {
   return { success: true, campaignId: (session as any).campaign_id };
 }
 
+// ============================================================================
+// Update Session (GM only)
+// ============================================================================
+export async function updateSession(
+  sessionId: string,
+  data: {
+    title?: string;
+    start_time?: string;
+    end_time?: string;
+    status?: string;
+    rsvp_deadline_days?: number | null;
+    is_live?: boolean;
+  }
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string } | null;
+  if (!session) throw new Error("Session nicht gefunden.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann Sessions bearbeiten.");
+  }
+
+  const payload: Record<string, unknown> = {};
+  if (data.title !== undefined) payload.title = data.title;
+  if (data.start_time !== undefined) payload.start_time = data.start_time;
+  if (data.end_time !== undefined) payload.end_time = data.end_time;
+  if (data.status !== undefined) payload.status = data.status;
+  if (data.rsvp_deadline_days !== undefined) payload.rsvp_deadline_days = data.rsvp_deadline_days;
+  if (data.is_live !== undefined) payload.is_live = data.is_live;
+
+  if (Object.keys(payload).length === 0) {
+    return { success: true };
+  }
+
+  const { error } = await (supabase.from("sessions") as any)
+    .update(payload)
+    .eq("id", sessionId);
+
+  if (error) {
+    console.error("Update Session Error:", error);
+    throw new Error(error.message || "Fehler beim Aktualisieren der Session.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/session/${sessionId}`);
+  return { success: true };
+}
+
+// ============================================================================
+// Delete Session (GM only) – nur wenn keine Zusage vorhanden
+// ============================================================================
+export async function deleteSession(sessionId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, title")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; title: string | null } | null;
+  if (!session) throw new Error("Session nicht gefunden.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann Sessions löschen.");
+  }
+
+  // Prüfen: Mindestens eine Zusage (Zusage oder Via Online) → nicht löschen
+  const { data: acceptedRsvps } = await (supabase.from("session_rsvps") as any)
+    .select("user_id")
+    .eq("session_id", sessionId)
+    .in("rsvp_status", ["Zusage", "Via Online"]);
+
+  if (acceptedRsvps && (acceptedRsvps as any[]).length > 0) {
+    throw new Error(
+      "Der Termin kann nicht gelöscht werden, da bereits Spieler zugesagt haben. Bitte nutze stattdessen „Absagen“, damit zugesagte Spieler benachrichtigt werden."
+    );
+  }
+
+  const { error } = await (supabase.from("sessions") as any).delete().eq("id", sessionId);
+
+  if (error) {
+    console.error("Delete Session Error:", error);
+    throw new Error(error.message || "Fehler beim Löschen der Session.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/session/${sessionId}`);
+  return { success: true };
+}
+
+// ============================================================================
+// Cancel Session (GM only) – Status auf Cancelled, Nachrichten an zugesagte Spieler
+// ============================================================================
+export async function cancelSession(sessionId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, title, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; title: string | null; status: string } | null;
+  if (!session) throw new Error("Session nicht gefunden.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, name")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string; name?: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann einen Termin absagen.");
+  }
+
+  if (session.status === "Live") {
+    throw new Error("Eine laufende Session kann nicht abgesagt werden. Beende sie zuerst.");
+  }
+
+  // Zugesagte Spieler laden (Zusage oder Via Online)
+  const { data: acceptedRsvps } = await (supabase.from("session_rsvps") as any)
+    .select("user_id")
+    .eq("session_id", sessionId)
+    .in("rsvp_status", ["Zusage", "Via Online"]);
+
+  const recipientIds = new Set<string>();
+  for (const r of (acceptedRsvps as any[]) || []) {
+    recipientIds.add(r.user_id);
+  }
+
+  // Session-Status auf Cancelled setzen
+  const { error: updateError } = await (supabase.from("sessions") as any)
+    .update({ status: "Cancelled" })
+    .eq("id", sessionId);
+
+  if (updateError) {
+    console.error("Cancel Session Error:", updateError);
+    throw new Error(updateError.message || "Fehler beim Absagen des Termins.");
+  }
+
+  // Direktnachrichten an zugesagte Spieler
+  const sessionTitle = session.title || "Termin";
+  const campaignName = campaign.name || "Kampagne";
+  const subject = `Termin abgesagt: ${sessionTitle}`;
+  const content = `Der Spielleiter hat den Termin „${sessionTitle}" in der Kampagne „${campaignName}" abgesagt.`;
+
+  for (const recipientId of recipientIds) {
+    const result = await sendMessage({
+      type: "direct",
+      recipientUserId: recipientId,
+      campaignId: session.campaign_id,
+      subject,
+      content,
+      priority: "high",
+    });
+    if (!result.success) {
+      console.error("[cancelSession] Nachricht an User", recipientId, "fehlgeschlagen:", result);
+    }
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/session/${sessionId}`);
+  return { success: true };
+}

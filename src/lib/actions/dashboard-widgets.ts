@@ -326,26 +326,64 @@ export async function getUpcomingSessionsForUser(
     return [];
   }
 
-  // 2. Sessions laden (wie Kampagnen-Seite: OHNE start_time-Filter in DB, danach client-seitig filtern)
-  const { data: sessionsRaw, error: sessionsError } = await (
-    supabase.from("sessions") as any
-  )
+  // 2. Sessions laden (ohne start_time-Filter in DB, danach client-seitig filtern)
+  // Erst mit allen Spalten versuchen; Fallback ohne rsvp_deadline_days/is_live falls Migration fehlt
+  let allSessions: any[] = [];
+  let sessionsError: unknown = null;
+
+  const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
     .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
     .order("start_time", { ascending: true })
     .limit(limit * 3);
 
-  if (sessionsError) {
-    console.error("[getUpcomingSessionsForUser] Sessions-Fehler:", sessionsError);
-    return [];
+  if (e1) {
+    const err = e1 as { message?: string; code?: string; details?: string };
+    const msg = String(err?.message ?? "").toLowerCase();
+    if (msg.includes("column") && (msg.includes("rsvp_deadline_days") || msg.includes("is_live"))) {
+      const { data: d2, error: e2 } = await (supabase.from("sessions") as any)
+        .select("id, title, start_time, status, campaign_id")
+        .in("campaign_id", allCampaignIds)
+        .order("start_time", { ascending: true })
+        .limit(limit * 3);
+      if (e2) {
+        sessionsError = e2;
+      } else {
+        allSessions = ((d2 as any[]) || []).map((s) => ({ ...s, rsvp_deadline_days: null, is_live: true }));
+      }
+    } else {
+      sessionsError = e1;
+    }
+  } else {
+    allSessions = (d1 as any[]) || [];
   }
 
-  const allSessions = (sessionsRaw as any[]) || [];
+  if (sessionsError) {
+    const err = sessionsError as { message?: string; code?: string; details?: string };
+    console.error("[getUpcomingSessionsForUser] Sessions-Fehler:", {
+      message: err?.message,
+      code: err?.code,
+      details: err?.details,
+    });
+    return [];
+  }
   const now = new Date();
+  const staleLiveThresholdMs = 48 * 60 * 60 * 1000; // 48 Stunden
+  // Nächste Termine: zukünftig geplant, oder Live (max. 48h alt – sonst verwaist). Beendete nie anzeigen.
   const sessions = allSessions
+    .filter((s: any) => !["Completed", "Ended", "Cancelled"].includes(s.status))
     .filter(
-      (s: any) =>
-        s.status === "Live" || (s.start_time && new Date(s.start_time) > now)
+      (s: any) => {
+        if (s.status === "Live") {
+          // Veraltete Live-Sessions ausblenden (GM beendet sie über Kampagnen-Seite)
+          if (s.start_time) {
+            const startMs = new Date(s.start_time).getTime();
+            if (now.getTime() - startMs > staleLiveThresholdMs) return false;
+          }
+          return true;
+        }
+        return s.start_time && new Date(s.start_time) > now;
+      }
     )
     .slice(0, limit);
 
@@ -472,4 +510,153 @@ export async function getUpcomingSessionsForUser(
   });
 
   return result;
+}
+
+/**
+ * Lädt vergangene/beendete Sessions (Termine) des Users.
+ * Beendet = GM hat als abgeschlossen gekennzeichnet (status Completed/Ended)
+ * oder start_time liegt in der Vergangenheit.
+ * Sortiert nach start_time absteigend (neueste zuerst).
+ */
+export async function getPastSessionsForUser(
+  userId: string,
+  limit = 20
+): Promise<UpcomingSession[]> {
+  const supabase = await createClient();
+
+  const { data: memberRows } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id")
+    .eq("user_id", userId)
+    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+
+  const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
+    .select("id")
+    .eq("gm_id", userId);
+
+  const memberCampaignIds = ((memberRows as any[]) || []).map((m: any) => m.campaign_id as string);
+  const gmCampaignIds = ((gmCampaignRows as any[]) || []).map((c: any) => c.id as string);
+  const allCampaignIds = [...new Set([...memberCampaignIds, ...gmCampaignIds])];
+
+  if (allCampaignIds.length === 0) return [];
+
+  let allSessions: any[] = [];
+  const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
+    .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
+    .in("campaign_id", allCampaignIds)
+    .order("start_time", { ascending: false })
+    .limit(limit * 3);
+
+  if (e1) {
+    const err = e1 as { message?: string };
+    const msg = String(err?.message ?? "").toLowerCase();
+    if (msg.includes("column") && (msg.includes("rsvp_deadline_days") || msg.includes("is_live"))) {
+      const { data: d2 } = await (supabase.from("sessions") as any)
+        .select("id, title, start_time, status, campaign_id")
+        .in("campaign_id", allCampaignIds)
+        .order("start_time", { ascending: false })
+        .limit(limit * 3);
+      allSessions = ((d2 as any[]) || []).map((s) => ({ ...s, rsvp_deadline_days: null, is_live: true }));
+    }
+  } else {
+    allSessions = (d1 as any[]) || [];
+  }
+
+  const now = new Date();
+  const sessions = allSessions
+    .filter(
+      (s: any) =>
+        ["Completed", "Ended"].includes(s.status) ||
+        (s.start_time && new Date(s.start_time) <= now)
+    )
+    .slice(0, limit);
+
+  if (sessions.length === 0) return [];
+
+  const sessionCampaignIds = [...new Set(sessions.map((s: any) => s.campaign_id))];
+  const { data: campaignsRaw } = await (supabase.from("campaigns") as any)
+    .select("id, name, banner_url")
+    .in("id", sessionCampaignIds);
+
+  const campaignsById = new Map<string, { name: string; banner_url: string | null }>();
+  for (const c of (campaignsRaw as any[]) || []) {
+    campaignsById.set(c.id, { name: c.name, banner_url: c.banner_url });
+  }
+
+  const { data: allMembersRaw } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id, user_id, users(id, username, avatar_url), characters(id, name, class, level, avatar_url)")
+    .in("campaign_id", sessionCampaignIds)
+    .in("status", ["Accepted", "Approved", "Active"]);
+
+  const participantsByCampaign = new Map<string, SessionParticipant[]>();
+  for (const row of (allMembersRaw as any[]) || []) {
+    const cId = row.campaign_id as string;
+    if (!participantsByCampaign.has(cId)) participantsByCampaign.set(cId, []);
+    const user = row.users as any;
+    const char = row.characters as any;
+    participantsByCampaign.get(cId)!.push({
+      userId: row.user_id,
+      username: user?.username ?? "Unbekannt",
+      avatarUrl: user?.avatar_url ?? null,
+      characterName: char?.name ?? null,
+      characterClass: char?.class ?? null,
+      characterLevel: char?.level ?? null,
+      characterAvatarUrl: char?.avatar_url ?? null,
+    });
+  }
+
+  const sessionIds = sessions.map((s: any) => s.id);
+  const { data: rsvpsRaw } = await (supabase.from("session_rsvps") as any)
+    .select("session_id, user_id, rsvp_status, gm_confirmed")
+    .in("session_id", sessionIds);
+
+  const rsvpsBySession = new Map<string, Array<{ user_id: string; rsvp_status: string; gm_confirmed?: boolean }>>();
+  for (const r of (rsvpsRaw as any[]) || []) {
+    const sid = r.session_id as string;
+    if (!rsvpsBySession.has(sid)) rsvpsBySession.set(sid, []);
+    rsvpsBySession.get(sid)!.push({ user_id: r.user_id, rsvp_status: r.rsvp_status, gm_confirmed: r.gm_confirmed });
+  }
+
+  return sessions.map((s: any) => {
+    const campaign = campaignsById.get(s.campaign_id);
+    const participants = participantsByCampaign.get(s.campaign_id) ?? [];
+    const sessionRsvps = rsvpsBySession.get(s.id) ?? [];
+    const userRsvpRow = sessionRsvps.find((r) => r.user_id === userId);
+    const rsvps: SessionRsvp[] = participants.map((p) => {
+      const r = sessionRsvps.find((x) => x.user_id === p.userId);
+      return {
+        userId: p.userId,
+        username: p.username,
+        characterName: p.characterName,
+        rsvpStatus: (r?.rsvp_status as RsvpStatus) ?? null,
+        gmConfirmed: !!r?.gm_confirmed,
+      };
+    });
+    const deadlineDays = s.rsvp_deadline_days ?? null;
+    const startDate = new Date(s.start_time);
+    let deadline: Date | null = null;
+    if (deadlineDays) {
+      deadline = new Date(startDate);
+      deadline.setDate(deadline.getDate() - deadlineDays);
+      deadline.setHours(23, 59, 59, 999);
+    }
+    const deadlineReached = !!deadline && now >= deadline;
+    const viaOnlineCount = sessionRsvps.filter((r) => r.rsvp_status === "Via Online").length;
+
+    return {
+      id: s.id,
+      title: s.title,
+      startTime: s.start_time,
+      status: s.status,
+      campaignId: s.campaign_id,
+      campaignName: campaign?.name ?? "Kampagne",
+      campaignBannerUrl: campaign?.banner_url ?? null,
+      participants,
+      rsvpDeadlineDays: deadlineDays,
+      isLive: false,
+      userRsvp: (userRsvpRow?.rsvp_status as RsvpStatus) ?? null,
+      rsvps,
+      deadlineReached,
+      viaOnlineTaken: s.is_live !== false && viaOnlineCount >= 1,
+    };
+  });
 }

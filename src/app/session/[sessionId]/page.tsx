@@ -1,5 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 
@@ -50,6 +50,11 @@ export default async function SessionPage({ params }: Props) {
 
   if (!campaign) {
     notFound();
+  }
+
+  // Beendete oder abgesagte Sessions können nicht mehr betreten werden
+  if (["Completed", "Ended", "Cancelled"].includes(session.status)) {
+    redirect(`/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&ended=1`);
   }
 
   const isGM = campaign.gm_id === user.id;

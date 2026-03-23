@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-// TODO: Admin-Mail hier anpassen (optional, falls Wartungsmodus aus DB nicht greift)
-const ADMIN_EMAIL = "DEINE_EMAIL@BEISPIEL.DE";
-
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -69,18 +66,22 @@ export async function middleware(request: NextRequest) {
   const isRoot = path === "/";
   const isLogin =
     path === "/login" || path === "/register" || path === "/signup";
-  const isMaintenance = path === "/maintenance";
   const isNextAsset = path.startsWith("/_next");
   const isImagesAsset = path.startsWith("/images");
   const isFavicon = path === "/favicon.ico";
   const isApi = path.startsWith("/api");
   const isOnboarding = path === "/onboarding";
   const isKodex = path === "/kodex";
+  const isMarketingPublic =
+    path === "/impressum" ||
+    path === "/datenschutz" ||
+    path.startsWith("/campaigns/") ||
+    path === "/support";
 
   if (
     isRoot ||
     isLogin ||
-    isMaintenance ||
+    isMarketingPublic ||
     isNextAsset ||
     isImagesAsset ||
     isFavicon ||
@@ -133,39 +134,6 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("redirect", path);
       return NextResponse.redirect(loginUrl);
-    }
-
-    // Optional: Admin-Hintertür per E-Mail (überschreibt DB-Wartung)
-    if (user.email === ADMIN_EMAIL) {
-      return response;
-    }
-
-    // Wartungsmodus aus site_settings: nur Admins dürfen ins Dashboard
-    try {
-      const { data: settingsRow } = await (supabase as any)
-        .from("site_settings")
-        .select("value")
-        .eq("key", "maintenance_mode")
-        .maybeSingle();
-      const maintenanceActive =
-        (settingsRow as any)?.value === "true" ||
-        (settingsRow as any)?.value === true;
-
-      if (maintenanceActive) {
-        const { data: profileRow } = await (supabase as any)
-          .from("users")
-          .select("primary_role")
-          .eq("id", user.id)
-          .maybeSingle();
-        const role = (profileRow as any)?.primary_role ?? "Player";
-        if (role !== "Admin") {
-          return NextResponse.redirect(
-            new URL("/?error=maintenance", request.url)
-          );
-        }
-      }
-    } catch {
-      // Tabelle site_settings fehlt oder RLS: Wartungsmodus ignoriert
     }
 
     return response;

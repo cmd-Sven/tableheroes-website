@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
 import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
@@ -275,9 +275,6 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
       className="relative min-h-[calc(100vh+200px)] md:min-h-0 md:h-[calc(80vh+100px)] flex items-center justify-center overflow-visible scroll-mt-20 isolate"
       style={{ contain: "strict" }}
     >
-      {/* Countdown oben mittig */}
-      <LaunchCountdown />
-
       {/* Parallax Background */}
       <ParallaxBackground />
 
@@ -300,7 +297,7 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
           className="flex flex-col md:grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-center"
           style={{ willChange: "transform, opacity" }}
         >
-          {/* Logo + Untertitel Block - Mobile: nach Countdown */}
+          {/* Logo + Untertitel Block */}
           <div className="flex flex-col items-center text-center order-2 md:order-1">
             <motion.div
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
@@ -467,203 +464,6 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
         </motion.div>
       </div>
     </section>
-  );
-}
-
-type Countdown = {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-};
-
-const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
-
-function useLaunchCountdown(): Countdown {
-  const [timeLeft, setTimeLeft] = useState<Countdown>({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  useEffect(() => {
-    const target = Date.now() + FOUR_DAYS_MS;
-
-    const update = () => {
-      const now = Date.now();
-      const diff = Math.max(0, target - now);
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-      const minutes = Math.floor((diff / (1000 * 60)) % 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-
-      setTimeLeft({ days, hours, minutes, seconds });
-    };
-
-    update();
-    const interval = setInterval(update, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  return timeLeft;
-}
-
-function LaunchCountdown() {
-  const { days, hours, minutes, seconds } = useLaunchCountdown();
-  const isExpired = days === 0 && hours === 0 && minutes === 0 && seconds === 0;
-
-  const format = (value: number) => value.toString().padStart(2, "0");
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.9 }}
-      animate={{ 
-        opacity: 1, 
-        y: 0, 
-        scale: [1, 1.02, 1],
-      }}
-      transition={{ 
-        duration: 0.6, 
-        ease: "easeOut",
-        scale: {
-          duration: 3,
-          repeat: Infinity,
-          ease: "easeInOut",
-        },
-      }}
-      className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 w-full max-w-xs px-3"
-    >
-      {isExpired ? (
-        <motion.div
-          className="relative w-full max-w-xs"
-          style={{
-            backgroundImage: "url('/images/countdown-bg.webP')",
-            backgroundSize: "100% 100%",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        >
-          <div className="px-4 py-3 text-center rounded-lg shadow-[0_0_20px_rgba(202,185,38,0.3)]">
-            <p className="font-cinzel font-bold text-sm text-white mb-1">
-              Das Portal ist offen!
-            </p>
-            <p className="font-barlow font-semibold uppercase text-xs text-white">
-              Jetzt beitreten
-            </p>
-          </div>
-        </motion.div>
-      ) : (
-        <motion.div
-          className="relative w-full"
-          animate={{
-            scale: [1, 1.02, 1],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          style={{
-            backgroundImage: "url('/images/countdown-bg.webP')",
-            backgroundSize: "100% 100%",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        >
-          {/* Goldener Rahmen mit Ornamenten - entfernt */}
-          
-          <div className="relative px-4 py-3 text-center">
-            {/* Haupttext */}
-            <p className="font-cinzel font-bold text-xs md:text-sm text-white mb-2 drop-shadow-sm">
-              Das Portal in Osnabrück öffnet sich in...
-            </p>
-            
-            {/* Countdown-Zahlen */}
-            <div className="flex items-center justify-center gap-1.5 md:gap-2 mb-2">
-              <div className="flex flex-col items-center">
-                <motion.span
-                  key={days}
-                  initial={{ scale: 1.2, opacity: 0.5 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="font-cinzel font-bold text-xl md:text-2xl text-white tabular-nums"
-                  style={{
-                    textShadow: "0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4)",
-                  }}
-                >
-                  {format(days)}
-                </motion.span>
-                <span className="font-barlow font-semibold text-[10px] text-white uppercase">Tage</span>
-              </div>
-              
-              <span className="font-cinzel font-bold text-lg text-white/60">:</span>
-              
-              <div className="flex flex-col items-center">
-                <motion.span
-                  key={hours}
-                  initial={{ scale: 1.2, opacity: 0.5 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="font-cinzel font-bold text-xl md:text-2xl text-white tabular-nums"
-                  style={{
-                    textShadow: "0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4)",
-                  }}
-                >
-                  {format(hours)}
-                </motion.span>
-                <span className="font-barlow font-semibold text-[10px] text-white uppercase">Std</span>
-              </div>
-              
-              <span className="font-cinzel font-bold text-lg text-white/60">:</span>
-              
-              <div className="flex flex-col items-center">
-                <motion.span
-                  key={minutes}
-                  initial={{ scale: 1.2, opacity: 0.5 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="font-cinzel font-bold text-xl md:text-2xl text-white tabular-nums"
-                  style={{
-                    textShadow: "0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4)",
-                  }}
-                >
-                  {format(minutes)}
-                </motion.span>
-                <span className="font-barlow font-semibold text-[10px] text-white uppercase">Min</span>
-              </div>
-              
-              <span className="font-cinzel font-bold text-lg text-white/60">:</span>
-              
-              <div className="flex flex-col items-center">
-                <motion.span
-                  key={seconds}
-                  initial={{ scale: 1.2, opacity: 0.5 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="font-cinzel font-bold text-xl md:text-2xl text-white tabular-nums"
-                  style={{
-                    textShadow: "0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4)",
-                  }}
-                >
-                  {format(seconds)}
-                </motion.span>
-                <span className="font-barlow font-semibold text-[10px] text-white uppercase">Sek</span>
-              </div>
-            </div>
-            
-            {/* Subtext */}
-            <p className="font-barlow font-semibold text-[10px] text-white uppercase tracking-wide">
-              Exklusiver Zugang zum Tool für Community-Mitglieder
-            </p>
-          </div>
-        </motion.div>
-      )}
-    </motion.div>
   );
 }
 

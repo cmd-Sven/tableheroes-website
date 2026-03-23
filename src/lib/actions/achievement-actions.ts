@@ -2,7 +2,10 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { ACHIEVEMENT_IMAGE_FILENAMES } from "@/src/lib/constants/achievements";
+import {
+  getAchievementImageForName,
+  ACHIEVEMENT_IMAGE_FILENAMES,
+} from "@/src/lib/constants/achievements";
 import fs from "fs";
 import path from "path";
 
@@ -244,7 +247,7 @@ export async function getAllAchievements(): Promise<
       id: r.id,
       name: r.name,
       points_awarded: Number(r.points_awarded) ?? 0,
-      image_url: r.icon ?? ACHIEVEMENT_IMAGE_FILENAMES[r.name] ?? null,
+      image_url: getAchievementImageForName(r.name) ?? r.icon ?? null,
       description: r.description ?? null,
       is_custom: Boolean(r.is_custom),
     }));
@@ -261,7 +264,7 @@ export async function getAllAchievements(): Promise<
     id: r.id,
     name: r.name,
     points_awarded: Number(r.points_awarded) ?? 0,
-    image_url: r.icon ?? ACHIEVEMENT_IMAGE_FILENAMES[r.name] ?? null,
+    image_url: getAchievementImageForName(r.name) ?? r.icon ?? null,
     description: null,
     is_custom: false,
   }));
@@ -328,7 +331,7 @@ export async function getUserAchievements(userId: string): Promise<{
       image_url:
         a.image_url ??
         a.icon ??
-        (a.name && ACHIEVEMENT_IMAGE_FILENAMES[a.name]) ??
+        (a.name && (getAchievementImageForName(a.name) ?? ACHIEVEMENT_IMAGE_FILENAMES[a.name] ?? null)) ??
         null,
       points_awarded: Number(a.points_awarded) || 0,
       description: a.description ?? null,
@@ -347,7 +350,7 @@ export async function getUserAchievements(userId: string): Promise<{
           image_url:
             a.image_url ??
             a.icon ??
-            (a.name && ACHIEVEMENT_IMAGE_FILENAMES[a.name]) ??
+            (a.name && (getAchievementImageForName(a.name) ?? ACHIEVEMENT_IMAGE_FILENAMES[a.name] ?? null)) ??
             null,
           points_awarded: Number(a.points_awarded) || 0,
           description: a.description ?? null,

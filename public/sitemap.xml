@@ -28,12 +28,4 @@
     <priority>0.3</priority>
   </url>
   
-  <!-- Maintenance Page -->
-  <url>
-    <loc>https://tableheroes.de/maintenance</loc>
-    <lastmod>2025-01-26</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  
 </urlset>
