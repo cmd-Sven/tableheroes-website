@@ -1,17 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Settings } from "lucide-react";
-import { updatePrivacyPublicProfile } from "@/src/app/dashboard/dashboard-actions";
+import {
+  updatePrivacyPublicProfile,
+  setPlayerDashboardTutorialDismissed,
+} from "@/src/app/dashboard/dashboard-actions";
 
 type Props = {
   privacyPublicProfile: boolean;
+  playerDashboardTutorialDismissed: boolean;
 };
 
-export function PlayerDashboardSettings({ privacyPublicProfile }: Props) {
+export function PlayerDashboardSettings({
+  privacyPublicProfile,
+  playerDashboardTutorialDismissed,
+}: Props) {
+  const router = useRouter();
   const [publicProfile, setPublicProfile] = useState(privacyPublicProfile);
+  const [tutorialDismissed, setTutorialDismissed] = useState(
+    playerDashboardTutorialDismissed
+  );
   const [saving, setSaving] = useState(false);
+  const [savingTutorial, setSavingTutorial] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTutorialDismissed(playerDashboardTutorialDismissed);
+  }, [playerDashboardTutorialDismissed]);
 
   const handleToggle = async () => {
     const next = !publicProfile;
@@ -24,6 +41,21 @@ export function PlayerDashboardSettings({ privacyPublicProfile }: Props) {
       setError(err instanceof Error ? err.message : "Einstellung konnte nicht gespeichert werden.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTutorialToggle = async () => {
+    const nextDismissed = !tutorialDismissed;
+    setError(null);
+    setSavingTutorial(true);
+    try {
+      await setPlayerDashboardTutorialDismissed(nextDismissed);
+      setTutorialDismissed(nextDismissed);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Einstellung konnte nicht gespeichert werden.");
+    } finally {
+      setSavingTutorial(false);
     }
   };
 
@@ -57,6 +89,33 @@ export function PlayerDashboardSettings({ privacyPublicProfile }: Props) {
           {publicProfile
             ? "Dein Profil ist unter /profile/[dein-username] für andere sichtbar."
             : "Nur du siehst dein Dashboard. Andere können dein Profil nicht aufrufen."}
+        </p>
+
+        <label className="flex items-center justify-between gap-4 cursor-pointer border-t border-hero-border pt-4">
+          <span className="font-libre text-gray-200">
+            Dashboard-Hilfe (Tutor) anzeigen
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!tutorialDismissed}
+            disabled={savingTutorial}
+            onClick={handleTutorialToggle}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-hero-vibrant focus:ring-offset-2 focus:ring-offset-background-dark disabled:opacity-50 ${
+              !tutorialDismissed ? "border-hero-vibrant bg-hero-vibrant" : "border-hero-border bg-hero-dark"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                !tutorialDismissed ? "translate-x-5" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </label>
+        <p className="font-libre text-sm text-gray-500">
+          {tutorialDismissed
+            ? "Die Einführungskarte oben auf dem Spieler-Dashboard ist ausgeblendet. Schalte ein, um sie wieder zu sehen."
+            : "Die Hilfe-Karte mit den Schritten wird oben auf dem Dashboard angezeigt."}
         </p>
         {error && (
           <p className="font-libre text-sm text-red-400 rounded border border-red-800 bg-red-950/30 px-3 py-2">

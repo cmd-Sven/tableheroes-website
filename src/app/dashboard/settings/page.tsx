@@ -7,6 +7,7 @@ import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
 type UserProfile = {
   username?: string | null;
   privacy_public_profile?: boolean | null;
+  player_dashboard_tutorial_dismissed?: boolean | null;
   avatar_url?: string | null;
   avatar_shape?: "circle" | "square" | null;
   profile_background_url?: string | null;
@@ -28,13 +29,15 @@ export default async function DashboardSettingsPage() {
 
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select(
-      "username, privacy_public_profile, avatar_url, avatar_shape, profile_background_url, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
+      "username, privacy_public_profile, player_dashboard_tutorial_dismissed, avatar_url, avatar_shape, profile_background_url, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
     )
     .eq("id", user.id)
     .single();
 
   const profile = profileRaw as unknown as UserProfile | null;
   const privacyPublicProfile = !!profile?.privacy_public_profile;
+  const playerDashboardTutorialDismissed =
+    !!profile?.player_dashboard_tutorial_dismissed;
 
   const profileDesign: ProfileDesignData = {
     avatarUrl: profile?.avatar_url ?? null,
@@ -75,6 +78,7 @@ export default async function DashboardSettingsPage() {
         userId={user.id}
         initialUsername={profile?.username ?? null}
         privacyPublicProfile={privacyPublicProfile}
+        playerDashboardTutorialDismissed={playerDashboardTutorialDismissed}
         profileDesign={profileDesign}
         achievements={achievements}
       />

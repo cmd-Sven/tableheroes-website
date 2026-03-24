@@ -38,3 +38,20 @@ export async function updatePrivacyPublicProfile(publicProfile: boolean) {
   revalidatePath("/dashboard/settings");
   revalidatePath("/profile/[username]", "page");
 }
+
+/** Spieler-Dashboard: Tutor-Karte ausblenden (true) oder wieder anzeigen (false). */
+export async function setPlayerDashboardTutorialDismissed(dismissed: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet");
+
+  const { error } = await (supabase.from("users") as any)
+    .update({ player_dashboard_tutorial_dismissed: dismissed })
+    .eq("id", user.id);
+
+  if (error) throw new Error(error.message || "Einstellung konnte nicht gespeichert werden.");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/settings");
+}

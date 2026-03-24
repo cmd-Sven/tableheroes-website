@@ -15,6 +15,7 @@ type Props = {
   userId: string;
   initialUsername: string | null;
   privacyPublicProfile: boolean;
+  playerDashboardTutorialDismissed: boolean;
   profileDesign: ProfileDesignData;
   achievements: AchievementOption[];
 };
@@ -23,6 +24,7 @@ export function SettingsClient({
   userId,
   initialUsername,
   privacyPublicProfile,
+  playerDashboardTutorialDismissed,
   profileDesign,
   achievements,
 }: Props) {
@@ -54,7 +56,10 @@ export function SettingsClient({
 
   return (
     <div className="space-y-8">
-      <PlayerDashboardSettings privacyPublicProfile={privacyPublicProfile} />
+      <PlayerDashboardSettings
+        privacyPublicProfile={privacyPublicProfile}
+        playerDashboardTutorialDismissed={playerDashboardTutorialDismissed}
+      />
       <ProfileSettings initial={profileDesign} achievements={achievements} />
       <section className="rounded-lg border border-hero-dark bg-background-card p-6">
         <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">

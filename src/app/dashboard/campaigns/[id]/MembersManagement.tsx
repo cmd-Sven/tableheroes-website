@@ -12,6 +12,7 @@ import {
   Settings,
   Award,
   Info,
+  Trash2,
 } from "lucide-react";
 import {
   acceptApplication,
@@ -23,6 +24,7 @@ import {
 import {
   approveCharacter,
   rejectCharacter,
+  deleteCharacterByGM,
 } from "./character-actions";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -553,13 +555,45 @@ export function MembersManagement({
                   )}
                   {isGM &&
                     (member.character?.id ? (
-                      <Link
-                        href={`/dashboard/campaigns/${campaignId}/characters/${member.character.id}`}
-                        className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors"
-                        title="Charakter verwalten"
-                      >
-                        <Settings className="h-5 w-5" />
-                      </Link>
+                      <>
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/characters/${member.character.id}`}
+                          className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors"
+                          title="Charakter verwalten"
+                        >
+                          <Settings className="h-5 w-5" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (isProcessing) return;
+                            const name = member.character?.name || "diesen Charakter";
+                            if (
+                              !confirm(
+                                `Charakter „${name}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
+                              )
+                            )
+                              return;
+                            setIsProcessing(true);
+                            try {
+                              await deleteCharacterByGM(member.character!.id, campaignId);
+                              toast.success("Charakter wurde entfernt.");
+                              window.location.reload();
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error ? err.message : "Charakter konnte nicht entfernt werden.",
+                              );
+                            } finally {
+                              setIsProcessing(false);
+                            }
+                          }}
+                          disabled={isProcessing}
+                          className="rounded-md p-2 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition-colors disabled:opacity-50"
+                          title="Charakter entfernen"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={async () => {

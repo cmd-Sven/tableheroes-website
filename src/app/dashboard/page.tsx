@@ -39,6 +39,7 @@ type UserProfile = {
   privacy_public_profile?: boolean | null;
   is_backer?: boolean | null;
   backer_since?: string | null;
+  player_dashboard_tutorial_dismissed?: boolean | null;
 };
 
 export default async function DashboardPage() {
@@ -126,6 +127,9 @@ export default async function DashboardPage() {
           pointsHistory={playerData.pointsHistory}
           unreadInboxMessages={playerData.unreadInboxMessages}
           sessionConfirmationPending={playerData.sessionConfirmationPending}
+          playerDashboardTutorialDismissed={
+            !!profile?.player_dashboard_tutorial_dismissed
+          }
         />
       </div>
     );

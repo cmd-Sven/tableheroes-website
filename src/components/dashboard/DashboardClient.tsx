@@ -35,6 +35,7 @@ import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSession
 import { SupportCard } from "@/src/components/dashboard/SupportCard";
 import { AchievementCongratulationsModal } from "@/src/components/dashboard/AchievementCongratulationsModal";
 import { AcceptanceNotification } from "@/src/app/dashboard/AcceptanceNotification";
+import { PlayerDashboardTutorial } from "@/src/components/dashboard/PlayerDashboardTutorial";
 import type { PlayerMessage } from "@/src/lib/actions/message-actions";
 import type { DashboardLoreEntry, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
@@ -118,6 +119,8 @@ type Props = {
   backerSince?: string | null;
   pointsHistory: PointLogEntry[];
   sessionConfirmationPending?: boolean;
+  /** true = Tutor-Hilfe ausgeblendet */
+  playerDashboardTutorialDismissed?: boolean;
 };
 
 export function DashboardClient({
@@ -143,6 +146,7 @@ export function DashboardClient({
   backerSince,
   pointsHistory,
   sessionConfirmationPending = false,
+  playerDashboardTutorialDismissed = false,
 }: Props) {
   const router = useRouter();
   const [showAchievementModal, setShowAchievementModal] = useState(false);
@@ -274,6 +278,9 @@ export function DashboardClient({
 
   return (
     <div className={`space-y-8 ${isBacker ? "backer-shimmer" : ""}`}>
+      <PlayerDashboardTutorial
+        initialDismissed={playerDashboardTutorialDismissed}
+      />
       {showAchievementModal && newestAchievement && (
         <AchievementCongratulationsModal
           achievement={newestAchievement}

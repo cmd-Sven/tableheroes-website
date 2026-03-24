@@ -4,7 +4,10 @@ import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Shield, Search } from "lucide-react";
-import { updateCharacterByGM } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import {
+  updateCharacterByGM,
+  deleteCharacterByGM,
+} from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import {
   getCharacterFactionReputations,
   upsertCharacterFactionReputation,
@@ -113,6 +116,25 @@ export function GMCharacterEditorPage({
     const updated = [...relationships];
     updated[index] = { ...updated[index], [field]: value };
     setRelationships(updated);
+  };
+
+  const handleDeleteCharacter = () => {
+    if (isPending) return;
+    if (
+      !confirm(
+        `Charakter „${character.name}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
+      )
+    )
+      return;
+    startTransition(async () => {
+      try {
+        await deleteCharacterByGM(character.id, campaignId);
+        router.push(`/dashboard/campaigns/${campaignId}?tab=members`);
+        router.refresh();
+      } catch (error) {
+        alert((error as Error).message || "Charakter konnte nicht entfernt werden.");
+      }
+    });
   };
 
   const handleSave = () => {
@@ -573,13 +595,24 @@ export function GMCharacterEditorPage({
 
       {/* Footer */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-hero-dark bg-background-card p-6">
-        <Link
-          href={`/dashboard/campaigns/${campaignId}?tab=members`}
-          className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-gray-300 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Abbrechen
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/dashboard/campaigns/${campaignId}?tab=members`}
+            className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-gray-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Abbrechen
+          </Link>
+          <button
+            type="button"
+            onClick={handleDeleteCharacter}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded border border-red-800/60 font-barlow font-bold uppercase text-sm text-red-400 hover:bg-red-950/40 transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Charakter entfernen
+          </button>
+        </div>
         <button
           type="button"
           onClick={handleSave}

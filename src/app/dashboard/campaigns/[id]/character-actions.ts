@@ -721,3 +721,72 @@ export async function rejectCharacter(characterId: string, campaignId: string) {
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath(`/dashboard/campaigns/${campaignId}/gm-inbox`);
 }
+
+/**
+ * GM: Spieler-Charakter aus der Kampagne entfernen (Datensatz löschen, Verknüpfung in campaign_members lösen).
+ */
+export async function deleteCharacterByGM(characterId: string, campaignId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", campaignId)
+    .single();
+  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+    throw new Error("Nur der GM kann Charaktere entfernen.");
+  }
+
+  const { data: char } = await (supabase.from("characters") as any)
+    .select("id, campaign_id")
+    .eq("id", characterId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  if (!char) {
+    throw new Error("Charakter nicht gefunden oder gehört nicht zu dieser Kampagne.");
+  }
+
+  const detachAndDelete = async (client: any) => {
+    const c = client;
+    const { error: cmErr } = await c
+      .from("campaign_members")
+      .update({ character_id: null })
+      .eq("campaign_id", campaignId)
+      .eq("character_id", characterId);
+    if (cmErr) {
+      console.error("[deleteCharacterByGM] campaign_members:", cmErr);
+    }
+    const { error: delErr } = await c.from("characters").delete().eq("id", characterId);
+    if (delErr) throw delErr;
+  };
+
+  try {
+    await detachAndDelete(supabase);
+  } catch (firstErr) {
+    console.warn("[deleteCharacterByGM] Anon-Delete fehlgeschlagen, versuche Service-Role:", firstErr);
+    try {
+      const admin = createAdminClient();
+      await detachAndDelete(admin);
+    } catch (secondErr) {
+      console.error("[deleteCharacterByGM]", secondErr);
+      const msg =
+        (secondErr as Error)?.message?.includes("SUPABASE_SERVICE_ROLE_KEY") ||
+        (secondErr as Error)?.message?.includes("createAdminClient")
+          ? (firstErr as Error)?.message
+          : (secondErr as Error)?.message;
+      throw new Error(
+        msg ||
+          "Charakter konnte nicht gelöscht werden (Berechtigung oder Datenbank).",
+      );
+    }
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/gm-inbox`);
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
