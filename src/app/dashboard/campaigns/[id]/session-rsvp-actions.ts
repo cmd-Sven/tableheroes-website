@@ -5,6 +5,32 @@ import { revalidatePath } from "next/cache";
 
 export type RsvpStatus = "Zusage" | "Absage" | "Via Online";
 
+/** Mindestens ein Charakter-Datensatz für die Kampagne (über Mitgliedschaft oder user_id+campaign_id). */
+async function playerHasCharacterForCampaign(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  campaignId: string
+): Promise<boolean> {
+  const { data: m } = await (supabase.from("campaign_members") as any)
+    .select("character_id")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if ((m as { character_id?: string | null } | null)?.character_id) {
+    const { data: ch } = await (supabase.from("characters") as any)
+      .select("id")
+      .eq("id", (m as { character_id: string }).character_id)
+      .maybeSingle();
+    return !!ch;
+  }
+  const { data: ch2 } = await (supabase.from("characters") as any)
+    .select("id")
+    .eq("user_id", userId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  return !!ch2;
+}
+
 /**
  * Spieler setzt seine RSVP für eine Session.
  * Bei is_live Sessions: nur 1 "Via Online" Platz – prüfen ob bereits vergeben.
@@ -50,6 +76,21 @@ export async function setSessionRsvp(
     if (!session) return { success: false, error: "Session nicht gefunden." };
     campaignId = session.campaign_id as string;
     isLive = session.is_live !== false;
+  }
+
+  const { data: campaignRow } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const isCampaignGm = (campaignRow as { gm_id?: string } | null)?.gm_id === user.id;
+
+  const hasChar = await playerHasCharacterForCampaign(supabase, user.id, campaignId);
+  if (!hasChar && !isCampaignGm) {
+    return {
+      success: false,
+      error:
+        "Rückmeldung zu Terminen ist erst möglich, wenn du einen Charakter für diese Kampagne erstellt hast.",
+    };
   }
 
   if (rsvpStatus === "Via Online" && isLive) {

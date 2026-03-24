@@ -187,7 +187,12 @@ export function DashboardClient({
       id: "upcoming-sessions",
       title: "Nächste Termine",
       icon: <Calendar className="h-5 w-5" />,
-      content: <UpcomingSessionsCard sessions={upcomingSessions} />,
+      content: (
+        <UpcomingSessionsCard
+          sessions={upcomingSessions}
+          rsvpBlockedCampaignIds={pendingCharacterCampaigns.map((c) => c.campaignId)}
+        />
+      ),
       colSpan: 1 as const,
     },
     {

@@ -2,7 +2,11 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Calendar, History } from "lucide-react";
-import { getUpcomingSessionsForUser, getPastSessionsForUser } from "@/src/lib/actions/dashboard-widgets";
+import {
+  getUpcomingSessionsForUser,
+  getPastSessionsForUser,
+  getPendingCharacterCampaignsForUser,
+} from "@/src/lib/actions/dashboard-widgets";
 import { UpcomingSessionsCard, PastSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 
 export default async function SessionsPage() {
@@ -13,10 +17,12 @@ export default async function SessionsPage() {
 
   if (!user) redirect("/");
 
-  const [upcomingSessions, pastSessions] = await Promise.all([
+  const [upcomingSessions, pastSessions, pendingCharacterCampaigns] = await Promise.all([
     getUpcomingSessionsForUser(user.id, 50),
     getPastSessionsForUser(user.id, 20),
+    getPendingCharacterCampaignsForUser(user.id),
   ]);
+  const rsvpBlockedCampaignIds = pendingCharacterCampaigns.map((c) => c.campaignId);
 
   return (
     <div className="space-y-8">
@@ -58,7 +64,11 @@ export default async function SessionsPage() {
               </p>
             </div>
           ) : (
-            <UpcomingSessionsCard sessions={upcomingSessions} showAll />
+            <UpcomingSessionsCard
+              sessions={upcomingSessions}
+              showAll
+              rsvpBlockedCampaignIds={rsvpBlockedCampaignIds}
+            />
           )}
         </section>
 

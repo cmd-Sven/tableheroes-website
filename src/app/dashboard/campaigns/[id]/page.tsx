@@ -187,8 +187,14 @@ export default async function CampaignDetailPage({
       isDeadOrArchived =
         characterStatus === "Dead" || characterStatus === "Archived";
 
-      // User has access if status is Accepted, Drafting, or In_Review
-      const validMemberStatuses = ["Accepted", "Drafting", "In_Review"];
+      // User has access if accepted / am Charakter arbeiten / Review
+      const validMemberStatuses = [
+        "Accepted",
+        "Approved",
+        "Drafting",
+        "In_Review",
+        "Changes_Proposed",
+      ];
       isAcceptedMember = validMemberStatuses.includes(membership.status);
 
       console.log(
@@ -594,12 +600,16 @@ export default async function CampaignDetailPage({
     }
   }
 
+  if (!isGM && membership) {
+    userHasCharacter = !!myCharacter;
+  }
+
   // ============================================================================
   // PLAYER: Load discoveries + party for direct player-dashboard view
   // ============================================================================
   let allDiscoveries: DiscoveryItem[] = [];
   let party: PartyMember[] = [];
-  const myCharacterId = membership?.character_id ?? null;
+  const myCharacterId = myCharacter?.id ?? membership?.character_id ?? null;
 
   if (!isGM && hasAccess) {
     const loreItems: DiscoveryItem[] = (loreEntries || []).slice(0, 8).map((e: any) => ({
@@ -1475,7 +1485,27 @@ export default async function CampaignDetailPage({
       {/* Tab Content (Conditional Rendering based on searchParams.tab) */}
       {tab === "overview" && !isGM && hasAccess && PlayerOverviewContent}
       {tab === "overview" && (isGM || !hasAccess) && OverviewTab}
-      {tab === "sessions" && SessionsTabContent}
+      {tab === "sessions" &&
+        !isGM &&
+        hasAccess &&
+        !myCharacter && (
+          <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 p-8 text-center space-y-4">
+            <p className="font-barlow font-bold text-lg text-amber-200 uppercase">
+              Termine & Rückmeldung
+            </p>
+            <p className="font-libre text-gray-300 max-w-lg mx-auto">
+              Eine Rückmeldung zu geplanten Terminen (Zusage/Absage) ist erst möglich,
+              wenn du einen Charakter für diese Kampagne erstellt hast.
+            </p>
+            <Link
+              href={`/dashboard/campaigns/${id}/character/new`}
+              className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors"
+            >
+              Charakter erstellen
+            </Link>
+          </div>
+        )}
+      {tab === "sessions" && (isGM || (hasAccess && myCharacter)) && SessionsTabContent}
       {tab === "lore" && LoreTab}
       {tab === "npcs" && (
         <div className="space-y-6">

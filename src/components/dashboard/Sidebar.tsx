@@ -71,6 +71,8 @@ export function Sidebar({
   const [maintenanceToggling, setMaintenanceToggling] = useState(false);
   const [campaignWorldId, setCampaignWorldId] = useState<string | null>(null);
   const [worldHasBlueprint, setWorldHasBlueprint] = useState<boolean | null>(null);
+  /** Spieler ohne Charakter: Sessions-Link nicht nutzbar (GM der Kampagne ausgenommen). */
+  const [sessionsNavLocked, setSessionsNavLocked] = useState<boolean | null>(null);
   const pathname = usePathname();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -100,6 +102,50 @@ export function Sidebar({
       setCampaignWorldId(null);
     }
   }, [campaignId, role]);
+
+  useEffect(() => {
+    const uid = user?.id;
+    if (!campaignId || !uid) {
+      setSessionsNavLocked(null);
+      return;
+    }
+    const supabase = createBrowserSupabaseClient();
+    let cancelled = false;
+    (async () => {
+      const { data: camp } = await supabase
+        .from("campaigns")
+        .select("gm_id")
+        .eq("id", campaignId)
+        .maybeSingle();
+      if (cancelled) return;
+      if ((camp as { gm_id?: string } | null)?.gm_id === uid) {
+        setSessionsNavLocked(false);
+        return;
+      }
+      const { data: m } = await supabase
+        .from("campaign_members")
+        .select("character_id")
+        .eq("campaign_id", campaignId)
+        .eq("user_id", uid)
+        .maybeSingle();
+      let hasChar = !!(m as { character_id?: string | null } | null)?.character_id;
+      if (!hasChar) {
+        const { data: ch } = await supabase
+          .from("characters")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("campaign_id", campaignId)
+          .maybeSingle();
+        hasChar = !!ch;
+      }
+      if (!cancelled) setSessionsNavLocked(!hasChar);
+    })().catch(() => {
+      if (!cancelled) setSessionsNavLocked(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, user?.id]);
 
   // Welt-Blueprint für Welt-Kontext laden (clientseitig, damit Sidebar weiß, ob NPCs/Lore/Fraktionen freigeschaltet werden sollen)
   useEffect(() => {
@@ -341,6 +387,8 @@ export function Sidebar({
     isActive,
     tab,
     badge,
+    disabled,
+    disabledTitle,
   }: {
     href: string;
     label: string;
@@ -348,9 +396,31 @@ export function Sidebar({
     isActive?: boolean;
     tab?: string;
     badge?: number;
+    disabled?: boolean;
+    disabledTitle?: string;
   }) {
     const active = isActive || (tab && currentTab === tab);
     const showBadge = typeof badge === "number" && badge > 0;
+    if (disabled) {
+      return (
+        <span
+          className="group relative flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase text-gray-500 opacity-60"
+          title={
+            disabledTitle ||
+            (isCollapsed ? label : undefined) ||
+            undefined
+          }
+        >
+          <Icon className="h-5 w-5 flex-shrink-0 text-gray-600" />
+          {!isCollapsed && <span className="flex-1">{label}</span>}
+          {isCollapsed && (
+            <span className="absolute left-full ml-2 z-50 hidden rounded bg-black border border-gray-700 px-2 py-1 text-xs font-barlow font-bold uppercase text-white shadow-lg group-hover:block whitespace-nowrap">
+              {disabledTitle || label}
+            </span>
+          )}
+        </span>
+      );
+    }
     return (
       <Link
         href={href}
@@ -600,6 +670,10 @@ export function Sidebar({
                       (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox"))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
+                    disabled={
+                      item.tab === "sessions" && sessionsNavLocked === true
+                    }
+                    disabledTitle="Rückmeldung nur mit Charakter möglich"
                   />
                 ))}
               </div>

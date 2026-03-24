@@ -5,6 +5,7 @@ import {
   getRandomLoreEntry,
   getDailyComic,
   getUpcomingSessionsForUser,
+  getPendingCharacterCampaignsForUser,
 } from "@/src/lib/actions/dashboard-widgets";
 import { getNewsForDashboard } from "@/src/lib/actions/news-actions";
 import {
@@ -187,7 +188,13 @@ async function loadPlayerDashboardData(userId: string) {
   )
     .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved"]);
+    .in("status", [
+      "Drafting",
+      "In_Review",
+      "Changes_Proposed",
+      "Accepted",
+      "Approved",
+    ]);
 
   const memberships = (membershipsRaw as any[]) || [];
   let characterIds = [...new Set(memberships.map((m: any) => m.character_id).filter(Boolean))];
@@ -298,62 +305,39 @@ async function loadPlayerDashboardData(userId: string) {
   }));
 
   const discoverableCampaigns = await getDiscoverableCampaigns();
-  const [loreResult, dailyComic, newsResult, upcomingSessions, playerMessages, pointsHistory, unreadInboxMessages] =
-    await Promise.all([
-      getRandomLoreEntry(userId),
-      getDailyComic(),
-      getNewsForDashboard(userId),
-      getUpcomingSessionsForUser(userId),
-      getPlayerMessages(userId),
-      getPointsLog(userId, 5),
-      getUnreadInboxMessages(userId),
-    ]);
+  const [
+    loreResult,
+    dailyComic,
+    newsResult,
+    upcomingSessions,
+    playerMessages,
+    pointsHistory,
+    unreadInboxMessages,
+    pendingCharacterCampaigns,
+  ] = await Promise.all([
+    getRandomLoreEntry(userId),
+    getDailyComic(),
+    getNewsForDashboard(userId),
+    getUpcomingSessionsForUser(userId),
+    getPlayerMessages(userId),
+    getPointsLog(userId, 5),
+    getUnreadInboxMessages(userId),
+    getPendingCharacterCampaignsForUser(userId),
+  ]);
 
+  const noRsvpCampaignIds = new Set(
+    pendingCharacterCampaigns.map((p) => p.campaignId)
+  );
   const firstPendingRsvpSession = upcomingSessions.find(
     (s) =>
       s.status === "Scheduled" &&
       !s.userRsvp &&
-      s.deadlineReached
+      s.deadlineReached &&
+      !noRsvpCampaignIds.has(s.campaignId)
   );
   const sessionRsvpHref = firstPendingRsvpSession
     ? `/dashboard/campaigns/${firstPendingRsvpSession.campaignId}?tab=sessions`
     : null;
-
-  let pendingCharacterCampaigns: { campaignId: string; campaignName: string }[] = [];
-  try {
-    const { data: cmNeedChar } = await (supabase.from("campaign_members") as any)
-      .select("id, status, character_id, campaign_id, campaigns!inner(id, name)")
-      .eq("user_id", userId)
-      .in("status", ["Drafting", "In_Review", "Changes_Proposed", "Accepted", "Approved"]);
-    const rows = (cmNeedChar as any[]) || [];
-    const campIds = [...new Set(rows.map((r: any) => r.campaign_id).filter(Boolean))];
-    const charByCampaign = new Map<string, string>();
-    if (campIds.length > 0) {
-      const { data: charRows } = await (supabase.from("characters") as any)
-        .select("id, campaign_id")
-        .eq("user_id", userId)
-        .in("campaign_id", campIds);
-      for (const c of (charRows as any[]) || []) {
-        if (c.campaign_id) charByCampaign.set(c.campaign_id, c.id);
-      }
-    }
-    const seen = new Set<string>();
-    for (const m of rows) {
-      const cid = m.campaign_id as string | undefined;
-      if (!cid || !m.campaigns?.id) continue;
-      const hasChar = !!(m.character_id || charByCampaign.has(cid));
-      if (hasChar) continue;
-      if (seen.has(m.campaigns.id)) continue;
-      seen.add(m.campaigns.id);
-      pendingCharacterCampaigns.push({
-        campaignId: m.campaigns.id,
-        campaignName: (m.campaigns.name as string) || "Kampagne",
-      });
-    }
-  } catch (e) {
-    console.warn("[Dashboard] pendingCharacterCampaigns:", e);
-    pendingCharacterCampaigns = [];
-  }
 
   console.log("[Dashboard] Points History geladen für User:", userId, "Anzahl:", pointsHistory.length);
 
@@ -379,7 +363,8 @@ async function loadPlayerDashboardData(userId: string) {
       (s) =>
         s.status === "Scheduled" &&
         !s.userRsvp &&
-        s.deadlineReached
+        s.deadlineReached &&
+        !noRsvpCampaignIds.has(s.campaignId)
     ),
     sessionRsvpHref,
     pendingCharacterCampaigns,

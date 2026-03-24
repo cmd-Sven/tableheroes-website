@@ -18,6 +18,8 @@ type Props = {
   showAll?: boolean;
   /** GM-Ansicht: RSVPs, Deadline, manuelle Bestätigung */
   isGM?: boolean;
+  /** Kampagnen-IDs ohne Charakter: RSVP ausgeblendet, Hinweis statt Dropdown */
+  rsvpBlockedCampaignIds?: string[];
 };
 
 /* ------------------------------------------------------------------ */
@@ -84,7 +86,13 @@ const RSVP_OPTIONS: { value: RsvpStatus; label: string }[] = [
 /* ------------------------------------------------------------------ */
 /* Session-Karte (Spieler: mit RSVP-Dropdown)                          */
 /* ------------------------------------------------------------------ */
-function SessionRowPlayer({ session }: { session: UpcomingSession }) {
+function SessionRowPlayer({
+  session,
+  rsvpBlocked,
+}: {
+  session: UpcomingSession;
+  rsvpBlocked?: boolean;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const startDate = new Date(session.startTime);
@@ -240,33 +248,46 @@ function SessionRowPlayer({ session }: { session: UpcomingSession }) {
         {/* RSVP Dropdown (nur bei geplanten Sessions) */}
         {isScheduled && (
           <div className="mt-3 pt-3 border-t border-hero-border/20" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              {deadlineHighlight && (
-                <span className="flex items-center gap-1.5 font-barlow font-bold text-amber-400 text-xs uppercase">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Anmeldefrist!
-                </span>
-              )}
-              <select
-                value={session.userRsvp ?? ""}
-                onChange={handleRsvpChange}
-                disabled={isPending}
-                className="flex-1 max-w-[180px] rounded border border-hero-border bg-slate-900/80 px-3 py-2 font-barlow font-bold text-xs text-white focus:border-hero-vibrant outline-none disabled:opacity-50"
-              >
-                <option value="">Deine Teilnahme…</option>
-                {RSVP_OPTIONS.map((opt) => (
-                  <option
-                    key={opt.value}
-                    value={opt.value}
-                    disabled={opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"}
-                  >
-                    {opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"
-                      ? "Via Online (ausgebucht)"
-                      : opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {rsvpBlocked ? (
+              <p className="font-libre text-xs text-gray-400 leading-relaxed">
+                Rückmeldung nur mit Charakter möglich.{" "}
+                <Link
+                  href={`/dashboard/campaigns/${session.campaignId}/character/new`}
+                  className="text-hero-vibrant underline hover:text-accent-gold"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Charakter anlegen
+                </Link>
+              </p>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                {deadlineHighlight && (
+                  <span className="flex items-center gap-1.5 font-barlow font-bold text-amber-400 text-xs uppercase">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Anmeldefrist!
+                  </span>
+                )}
+                <select
+                  value={session.userRsvp ?? ""}
+                  onChange={handleRsvpChange}
+                  disabled={isPending}
+                  className="flex-1 max-w-[180px] rounded border border-hero-border bg-slate-900/80 px-3 py-2 font-barlow font-bold text-xs text-white focus:border-hero-vibrant outline-none disabled:opacity-50"
+                >
+                  <option value="">Deine Teilnahme…</option>
+                  {RSVP_OPTIONS.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      disabled={opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"}
+                    >
+                      {opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"
+                        ? "Via Online (ausgebucht)"
+                        : opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -484,6 +505,7 @@ export function UpcomingSessionsCard({
   sessions,
   showAll = false,
   isGM = false,
+  rsvpBlockedCampaignIds = [],
 }: Props) {
   if (sessions.length === 0) {
     return (
@@ -508,13 +530,21 @@ export function UpcomingSessionsCard({
   const displaySessions = showAll ? sessions : sessions.slice(0, 2);
   const hasMore = !showAll && sessions.length > 2;
 
-  const SessionRowComponent = isGM ? SessionRowGM : SessionRowPlayer;
+  const blockedSet = new Set(rsvpBlockedCampaignIds);
 
   return (
     <div className="w-full p-4 space-y-3">
-      {displaySessions.map((s) => (
-        <SessionRowComponent key={s.id} session={s} />
-      ))}
+      {displaySessions.map((s) =>
+        isGM ? (
+          <SessionRowGM key={s.id} session={s} />
+        ) : (
+          <SessionRowPlayer
+            key={s.id}
+            session={s}
+            rsvpBlocked={blockedSet.has(s.campaignId)}
+          />
+        )
+      )}
       {hasMore && (
         <Link
           href="/dashboard/sessions"
