@@ -110,7 +110,7 @@ export function SecretDetailModal({
 
       {/* Modal */}
       <div
-        className="relative z-50 w-full max-w-4xl max-h-[90vh] rounded-xl border-2 border-accent-gold/50 bg-zinc-950 shadow-2xl overflow-hidden flex flex-col"
+        className="relative z-50 w-full max-w-4xl max-h-[90vh] rounded-xl border-2 border-accent-gold/50 bg-background-card shadow-2xl overflow-hidden flex flex-col"
         style={{
           backgroundImage: "url('/images/scroll-paper.png')",
           backgroundSize: "cover",
@@ -119,7 +119,7 @@ export function SecretDetailModal({
         }}
       >
         {/* Dark overlay for readability - KEINE Transparenz */}
-        <div className="absolute inset-0 bg-zinc-950/95 pointer-events-none" />
+        <div className="absolute inset-0 bg-background-dark pointer-events-none" />
 
         <div className="relative z-10 flex flex-col h-full">
           {/* Header */}
@@ -235,11 +235,11 @@ export function SecretDetailModal({
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     rows={8}
-                    className="w-full bg-background-card/50 border border-accent-gold/30 rounded p-4 font-libre text-gray-200 leading-relaxed outline-none focus:border-accent-gold resize-none"
+                    className="w-full bg-background-card border border-accent-gold/30 rounded p-4 font-libre text-gray-200 leading-relaxed outline-none focus:border-accent-gold resize-none"
                     placeholder="Beschreibe das Geheimnis..."
                   />
                 ) : (
-                  <div className="bg-background-card/30 border border-accent-gold/20 rounded p-4 font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
+                  <div className="bg-background-card border border-accent-gold/20 rounded p-4 font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
                     {secret.content}
                   </div>
                 )}
@@ -259,11 +259,11 @@ export function SecretDetailModal({
                       value={meaning}
                       onChange={(e) => setMeaning(e.target.value)}
                       rows={4}
-                      className="w-full bg-background-card/50 border border-accent-gold/30 rounded p-4 font-libre text-gray-200 leading-relaxed italic outline-none focus:border-accent-gold resize-none"
+                      className="w-full bg-background-card border border-accent-gold/30 rounded p-4 font-libre text-gray-200 leading-relaxed italic outline-none focus:border-accent-gold resize-none"
                       placeholder="Was bedeutet dieses Geheimnis für die Handlung?"
                     />
                   ) : (
-                    <div className="bg-background-card/30 border border-accent-gold/20 rounded p-4 font-libre text-gray-200 leading-relaxed italic">
+                    <div className="bg-background-card border border-accent-gold/20 rounded p-4 font-libre text-gray-200 leading-relaxed italic">
                       {secret.meaning || "Keine Notizen vorhanden."}
                     </div>
                   )}
@@ -289,12 +289,12 @@ export function SecretDetailModal({
                             setDiscoveryDc(Math.max(10, Math.min(25, val)));
                           }
                         }}
-                        className="w-20 bg-background-card/50 border border-accent-gold/30 rounded p-2 font-barlow font-bold text-accent-gold text-lg outline-none focus:border-accent-gold text-center"
+                        className="w-20 bg-background-card border border-accent-gold/30 rounded p-2 font-barlow font-bold text-accent-gold text-lg outline-none focus:border-accent-gold text-center"
                       />
                       <span className="font-libre text-gray-300">(10-25)</span>
                     </div>
                   ) : (
-                    <div className="bg-background-card/30 border border-accent-gold/20 rounded p-4">
+                    <div className="bg-background-card border border-accent-gold/20 rounded p-4">
                       <div className="font-cinzel font-bold text-2xl text-accent-gold">
                         DC {secret.discovery_dc || 15}
                       </div>
@@ -311,7 +311,7 @@ export function SecretDetailModal({
                   <label className="block font-barlow font-semibold text-sm uppercase text-gray-400 mb-2">
                     Status
                   </label>
-                  <div className="bg-background-card/30 border border-accent-gold/20 rounded p-4 flex items-center gap-2">
+                  <div className="bg-background-card border border-accent-gold/20 rounded p-4 flex items-center gap-2">
                     {secret.is_revealed ? (
                       <>
                         <Eye className="h-5 w-5 text-green-400" />

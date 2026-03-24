@@ -143,7 +143,7 @@ export function FactionDetailModal({ faction, members, isOpen, onClose, isGM = f
                 {members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 rounded border border-hero-dark bg-background-dark/50 p-3 hover:bg-background-dark transition-colors"
+                    className="flex items-center gap-3 rounded border border-hero-dark bg-background-dark p-3 hover:bg-background-dark transition-colors"
                   >
                     {member.avatar_url ? (
                       <img

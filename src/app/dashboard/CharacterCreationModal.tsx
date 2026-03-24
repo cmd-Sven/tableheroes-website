@@ -596,7 +596,7 @@ export function CharacterCreationModal({ onClose, campaignId }: CharacterCreatio
         </form>
 
         {/* Footer (Fixed) */}
-        <div className="flex-none p-6 border-t border-hero-dark bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-dark bg-background-dark">
           <div className="flex items-center justify-between gap-2">
             <div>
               {step > 1 && (

@@ -10,6 +10,9 @@ type Props = {
   leftRightBorderImage?: string;
 };
 
+/** Höhe der oberen/unteren Border-Streifen (muss zur Eckenbreite w-16 passen, nicht h-4 quetschen) */
+const TOP_BOTTOM_STRIP_H = "h-14"; /* 3.5rem ≈ 56px – genug für repeat-x ohne vertikales Zerquetschen */
+
 export function ImageBorderContainer({
   children,
   className = "",
@@ -18,32 +21,37 @@ export function ImageBorderContainer({
   leftRightBorderImage = "/images/border_left-right_gold.png",
 }: Props) {
   return (
-    <div className={`relative ${className}`}>
-      {/* Content */}
-      <div className="relative z-10 p-[25px]">{children}</div>
+    <div className={`relative min-h-0 ${className}`}>
+      {/* Content – min-h-full: Positionierungskontext hat volle Höhe (absolute Kinder im Lore-Header) */}
+      <div className="relative z-10 min-h-full w-full box-border p-[25px]">{children}</div>
 
-      {/* Top Border - positioned after corners to overlap */}
-      <div className="absolute top-0 left-8 right-8 h-4 z-20 pointer-events-none">
+      {/* Top Border: beginnt innerhalb der Ecken (w-16 = 4rem) */}
+      <div
+        className={`pointer-events-none absolute top-0 left-16 right-16 z-20 ${TOP_BOTTOM_STRIP_H}`}
+      >
         <div
-          className="w-full h-full"
+          className="h-full w-full"
           style={{
             backgroundImage: `url('${topBottomBorderImage}')`,
-            backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
-            backgroundPosition: "top center",
+            backgroundPosition: "center top",
+            /* Höhe des Streifens nutzen, Breite pro Kachel proportional */
+            backgroundSize: "auto 100%",
           }}
         />
       </div>
 
-      {/* Bottom Border - positioned after corners to overlap */}
-      <div className="absolute bottom-0 left-8 right-8 h-4 z-20 pointer-events-none">
+      {/* Bottom Border */}
+      <div
+        className={`pointer-events-none absolute bottom-0 left-16 right-16 z-20 ${TOP_BOTTOM_STRIP_H}`}
+      >
         <div
-          className="w-full h-full"
+          className="h-full w-full"
           style={{
             backgroundImage: `url('${topBottomBorderImage}')`,
-            backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
-            backgroundPosition: "bottom center",
+            backgroundPosition: "center bottom",
+            backgroundSize: "auto 100%",
           }}
         />
       </div>

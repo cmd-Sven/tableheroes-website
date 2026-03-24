@@ -264,7 +264,7 @@ function MessageDetailModal({
           </div>
 
           {/* Content */}
-          <div className="rounded-lg border border-hero-border/20 bg-background-dark/50 p-4">
+          <div className="rounded-lg border border-hero-border/20 bg-background-dark p-4">
             <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
               {msg.content}
             </p>

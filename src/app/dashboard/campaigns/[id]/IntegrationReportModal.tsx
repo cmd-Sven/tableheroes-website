@@ -132,7 +132,7 @@ export function IntegrationReportModal({
         </div>
 
         {/* Footer (Fixed) */}
-        <div className="flex-none p-6 border-t border-hero-dark bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-dark bg-background-dark">
           <div className="flex justify-end">
             <button
               onClick={onClose}

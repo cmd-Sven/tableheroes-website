@@ -144,7 +144,7 @@ export function FactionsManagement({ campaignId, worldId, factions, npcs = [], i
 
       {/* Spieler: Dein Ruf bei Fraktionen (nur lesbar) */}
       {!isGM && playerFactionReputations.length > 0 && (
-        <div className="mb-6 rounded border border-hero-border bg-background-dark/50 p-4">
+        <div className="mb-6 rounded border border-hero-border bg-background-dark p-4">
           <h3 className="font-barlow font-semibold text-accent-gold mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Dein Ruf bei Fraktionen

@@ -132,7 +132,7 @@ export function InboxCard({
       ))}
 
       {messages.length === 0 && !openMessage ? (
-        <div className="rounded-lg border border-hero-border/30 bg-background-dark/30 px-4 py-3">
+        <div className="rounded-lg border border-hero-border/30 bg-background-dark px-4 py-3">
           <p className="font-libre text-sm text-gray-500 text-center">
             Keine weiteren ungelesenen Nachrichten.
           </p>
@@ -171,7 +171,7 @@ export function InboxCard({
 
       <Link
         href="/dashboard/messages"
-        className="mt-3 flex items-center justify-center gap-2 rounded-md border border-hero-border/30 bg-background-dark/50 px-3 py-2 font-barlow font-bold text-xs uppercase text-gray-400 hover:bg-background-dark hover:text-hero-vibrant transition-colors"
+        className="mt-3 flex items-center justify-center gap-2 rounded-md border border-hero-border/30 bg-background-dark px-3 py-2 font-barlow font-bold text-xs uppercase text-gray-200 hover:bg-background-card hover:text-hero-vibrant transition-colors"
       >
         <Inbox className="h-4 w-4" />
         Alle Nachrichten
@@ -195,7 +195,7 @@ export function InboxCard({
             <button
               type="button"
               onClick={handleClose}
-              className="absolute top-3 right-3 z-10 rounded-full p-1.5 text-gray-400 hover:text-white hover:bg-white/10"
+              className="absolute top-3 right-3 z-10 rounded-full p-1.5 text-gray-300 hover:text-white hover:bg-hero-dark"
               aria-label="Schließen"
             >
               <X className="h-5 w-5" />
@@ -210,7 +210,7 @@ export function InboxCard({
                 {" · "}
                 {formatDate(openMessage.createdAt)}
               </p>
-              <div className="mt-4 rounded-lg border border-hero-border/20 bg-background-dark/50 p-4">
+              <div className="mt-4 rounded-lg border border-hero-border/20 bg-background-dark p-4">
                 <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
                   {openMessage.content}
                 </p>

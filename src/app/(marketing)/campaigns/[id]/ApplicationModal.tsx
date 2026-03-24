@@ -236,7 +236,7 @@ export function ApplicationModal({ campaignId, availableCharacters, onClose }: A
         </form>
 
         {/* Footer (Fixed) */}
-        <div className="flex-none p-6 border-t border-hero-border bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-border bg-background-dark">
           <button
             type="submit"
             form="application-form"

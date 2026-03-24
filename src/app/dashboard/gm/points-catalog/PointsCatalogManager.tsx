@@ -228,7 +228,7 @@ export function PointsCatalogManager({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded border border-hero-border bg-hero-dark px-6 py-2 font-barlow font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors disabled:opacity-50"
+              className="rounded border border-hero-border bg-hero-dark px-6 py-2 font-barlow font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors disabled:bg-zinc-800 disabled:text-gray-400 disabled:border-zinc-600"
             >
               {isSubmitting ? "Wird gespeichert…" : editingId ? "Aktualisieren" : "Erstellen"}
             </button>
@@ -236,7 +236,7 @@ export function PointsCatalogManager({
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded border border-hero-dark px-6 py-2 font-barlow font-bold uppercase text-gray-400 hover:text-white transition-colors"
+                className="rounded border border-hero-border bg-background-card px-6 py-2 font-barlow font-bold uppercase text-gray-200 hover:bg-hero-dark hover:text-white transition-colors"
               >
                 Abbrechen
               </button>

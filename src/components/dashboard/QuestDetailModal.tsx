@@ -350,7 +350,7 @@ export function QuestDetailModal({ quest, isOpen, onClose, npcs, isGM }: Props) 
         </div>
 
         {/* Footer */}
-        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark">
           <button
             onClick={onClose}
             className="w-full rounded border border-hero-border px-6 py-2 font-barlow font-bold uppercase text-gray-300 transition-colors hover:bg-hero-dark"

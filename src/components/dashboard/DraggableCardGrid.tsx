@@ -297,7 +297,7 @@ export function DraggableCardGrid({
           <button
             type="button"
             onClick={() => setEditMode(true)}
-            className="inline-flex items-center gap-2 rounded border border-hero-border bg-hero-dark/50 px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-300 hover:bg-hero-dark transition-colors"
+            className="inline-flex items-center gap-2 rounded border border-hero-border bg-background-card px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-200 hover:bg-hero-dark transition-colors"
           >
             <GripVertical className="h-4 w-4" />
             Layout bearbeiten
@@ -308,7 +308,7 @@ export function DraggableCardGrid({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-vibrant/30 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-vibrant/30 transition-colors"
             >
               <Save className="h-4 w-4" />
               {saving ? "Speichern…" : "Speichern"}
@@ -316,7 +316,7 @@ export function DraggableCardGrid({
             <button
               type="button"
               onClick={() => setEditMode(false)}
-              className="inline-flex items-center gap-2 rounded border border-hero-border bg-hero-dark/50 px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-400 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 rounded border border-hero-border bg-background-card px-4 py-2 font-barlow font-bold uppercase text-sm text-gray-200 hover:bg-hero-dark hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
               Abbrechen

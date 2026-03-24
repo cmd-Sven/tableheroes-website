@@ -185,7 +185,7 @@ export function AchievementCreatorClient({
             {existingAchievements.map((a) => (
               <li
                 key={a.id}
-                className="flex items-center gap-3 rounded border border-hero-border/50 bg-background-dark/50 p-3"
+                className="flex items-center gap-3 rounded border border-hero-border/50 bg-background-dark p-3"
               >
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-hero-border bg-hero-dark/40">
                   {(() => {

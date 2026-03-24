@@ -404,14 +404,14 @@ export function Sidebar({
     if (disabled) {
       return (
         <span
-          className="group relative flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase text-gray-500 opacity-60"
+          className="group relative flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase text-gray-400"
           title={
             disabledTitle ||
             (isCollapsed ? label : undefined) ||
             undefined
           }
         >
-          <Icon className="h-5 w-5 flex-shrink-0 text-gray-600" />
+          <Icon className="h-5 w-5 flex-shrink-0 text-gray-500" />
           {!isCollapsed && <span className="flex-1">{label}</span>}
           {isCollapsed && (
             <span className="absolute left-full ml-2 z-50 hidden rounded bg-black border border-gray-700 px-2 py-1 text-xs font-barlow font-bold uppercase text-white shadow-lg group-hover:block whitespace-nowrap">
@@ -428,7 +428,7 @@ export function Sidebar({
         className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors ${
           active
             ? "bg-hero-dark text-white shadow-md"
-            : "text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant"
+            : "text-gray-300 hover:bg-hero-dark/20 hover:text-hero-vibrant"
         }`}
         title={isCollapsed ? label : undefined}
       >
@@ -518,7 +518,7 @@ export function Sidebar({
                 <Link
                   href="/dashboard/worlds"
                   onClick={() => setIsOpen(false)}
-                  className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant ${
+                  className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors text-gray-300 hover:bg-hero-dark/20 hover:text-hero-vibrant ${
                     isCollapsed ? "justify-center" : ""
                   }`}
                   title={isCollapsed ? "Zurück zu Welten" : undefined}
@@ -564,12 +564,12 @@ export function Sidebar({
                 <Link
                   href="/dashboard"
                   onClick={() => setIsOpen(false)}
-                  className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors text-gray-400 hover:bg-hero-dark/20 hover:text-hero-vibrant ${
+                  className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-barlow font-bold uppercase transition-colors text-gray-300 hover:bg-hero-dark/20 hover:text-hero-vibrant ${
                     isCollapsed ? "justify-center" : ""
                   }`}
                   title={isCollapsed ? "Zurück zum Dashboard" : undefined}
                 >
-                  <ArrowLeft className="h-5 w-5 flex-shrink-0 text-gray-500" />
+                  <ArrowLeft className="h-5 w-5 flex-shrink-0 text-gray-400" />
                   {!isCollapsed && <span>Zurück zum Dashboard</span>}
                   {isCollapsed && (
                     <span className="absolute left-full ml-2 z-50 hidden rounded bg-background-card border border-hero-dark px-2 py-1 text-xs font-barlow font-bold uppercase text-white shadow-lg group-hover:block whitespace-nowrap">
@@ -753,7 +753,7 @@ export function Sidebar({
               )}
               <button
                 onClick={() => signOut()}
-                className="rounded p-1 text-gray-400 hover:bg-red-900/30 hover:text-accent-blood transition-colors flex-shrink-0"
+                className="rounded p-1 text-gray-300 hover:bg-red-900/40 hover:text-accent-blood transition-colors flex-shrink-0"
                 title="Abmelden"
               >
                 <LogOut className="h-5 w-5" />

@@ -127,7 +127,7 @@ export default async function GMInboxPage() {
             Kampagnen-Bewerbungen
           </h2>
           {!hasCampaignApplications ? (
-            <div className="rounded-lg border border-hero-dark/50 bg-background-card/50 p-6 text-center">
+            <div className="rounded-lg border border-hero-dark/50 bg-background-card p-6 text-center">
               <p className="font-libre text-gray-500">
                 Keine neuen Bewerbungen für deine Kampagnen.
               </p>
@@ -156,7 +156,7 @@ export default async function GMInboxPage() {
                     {group.items.map((item) => (
                       <li
                         key={item.id}
-                        className="flex items-start justify-between gap-4 rounded border border-hero-dark/50 bg-background-dark/50 p-4"
+                        className="flex items-start justify-between gap-4 rounded border border-hero-dark/50 bg-background-dark p-4"
                       >
                         <div>
                           <p className="font-barlow font-bold text-white uppercase">
@@ -184,7 +184,7 @@ export default async function GMInboxPage() {
             Charakter-Freigaben
           </h2>
           {!hasCharacterApprovals ? (
-            <div className="rounded-lg border border-hero-dark/50 bg-background-card/50 p-6 text-center">
+            <div className="rounded-lg border border-hero-dark/50 bg-background-card p-6 text-center">
               <p className="font-libre text-gray-500">
                 Keine Charaktere warten auf Freigabe.
               </p>
@@ -213,7 +213,7 @@ export default async function GMInboxPage() {
                     {group.characters.map((char: any) => (
                       <li
                         key={char.id}
-                        className="flex items-start justify-between gap-4 rounded border border-hero-dark/50 bg-background-dark/50 p-4"
+                        className="flex items-start justify-between gap-4 rounded border border-hero-dark/50 bg-background-dark p-4"
                       >
                         <div>
                           <p className="font-barlow font-bold text-white uppercase">

@@ -245,7 +245,7 @@ export function UniversalSecretModal({
 
       {/* Modal */}
       <div
-        className="relative z-50 w-full max-w-3xl rounded-xl border-2 border-accent-gold/50 bg-zinc-950 shadow-2xl overflow-hidden"
+        className="relative z-50 w-full max-w-3xl rounded-xl border-2 border-accent-gold/50 bg-background-card shadow-2xl overflow-hidden"
         style={{
           backgroundImage: "url('/images/scroll-paper.png')",
           backgroundSize: "cover",
@@ -381,7 +381,7 @@ export function UniversalSecretModal({
                     {selectedConspiracySecrets.map((secret, idx) => (
                       <div
                         key={idx}
-                        className="rounded border border-accent-gold/30 bg-background-card/50 p-3"
+                        className="rounded border border-accent-gold/30 bg-background-card p-3"
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-barlow font-bold text-xs uppercase text-accent-gold">
@@ -456,7 +456,7 @@ export function UniversalSecretModal({
               </div>
 
               {relatedSecrets.length === 0 ? (
-                <div className="text-center py-8 rounded border border-hero-border/20 bg-background-dark/50">
+                <div className="text-center py-8 rounded border border-hero-border/20 bg-background-dark">
                   <p className="font-libre text-sm text-gray-400">
                     Keine verwandten Geheimnisse gefunden.
                   </p>
@@ -477,7 +477,7 @@ export function UniversalSecretModal({
                           backgroundPosition: "center",
                         }}
                       >
-                        <div className="absolute inset-0 bg-zinc-950/90 rounded-lg pointer-events-none" />
+                        <div className="absolute inset-0 bg-background-dark rounded-lg pointer-events-none" />
                         <div className="relative z-10 flex items-start gap-3">
                           {/* Checkbox */}
                           <input

@@ -359,7 +359,7 @@ export function WizardContent({
             </div>
 
             {/* Wichtigste Fakten: Wohnort, Aufenthaltsort, Fraktion */}
-            <div className="rounded-lg border border-hero-border bg-background-card/50 p-4 space-y-4">
+            <div className="rounded-lg border border-hero-border bg-background-card p-4 space-y-4">
               <h4 className="font-cinzel font-bold text-accent-gold">Wichtigste Fakten</h4>
               <p className="text-xs text-gray-400 font-libre">
                 Wohnort und Aufenthaltsort festlegen, damit die KI keine erfundenen Orte nutzt.
@@ -400,7 +400,7 @@ export function WizardContent({
             </div>
 
             {/* Bereits existierende NPC verbinden */}
-            <div className="rounded-lg border border-hero-border bg-background-card/50 p-4 space-y-3">
+            <div className="rounded-lg border border-hero-border bg-background-card p-4 space-y-3">
               <h4 className="font-cinzel font-bold text-accent-gold">Bereits existierenden NPC verbinden</h4>
               <p className="text-xs text-gray-400 font-libre">
                 Optional: Verknüpfe diesen NPC mit einem bereits angelegten Charakter und gib die Beziehungsart an.

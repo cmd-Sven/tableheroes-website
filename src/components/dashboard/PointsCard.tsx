@@ -226,7 +226,7 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
       <div className="mt-4">
         <button
           onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-          className="w-full flex items-center justify-between rounded-md border border-hero-border/30 bg-background-dark/50 px-3 py-2 font-barlow font-bold text-xs uppercase text-gray-400 hover:bg-background-dark hover:border-hero-border transition-colors"
+          className="w-full flex items-center justify-between rounded-md border border-hero-border/30 bg-background-dark px-3 py-2 font-barlow font-bold text-xs uppercase text-gray-200 hover:bg-background-card hover:border-hero-border transition-colors"
         >
           <span>Letzte Belohnungen</span>
           {isHistoryOpen ? (
@@ -239,7 +239,7 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
         {isHistoryOpen && (
           <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto">
             {pointsHistory.length === 0 ? (
-              <div className="rounded border border-hero-border/20 bg-background-dark/50 p-4 text-center">
+              <div className="rounded border border-hero-border/20 bg-background-dark p-4 text-center">
                 <p className="font-libre text-xs text-gray-500 italic">
                   Noch keine Belohnungen erhalten.
                 </p>
@@ -248,7 +248,7 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
               pointsHistory.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-start gap-2 rounded border border-hero-border/20 bg-background-dark/70 p-2.5"
+                  className="flex items-start gap-2 rounded border border-hero-border/20 bg-background-dark p-2.5"
                   style={{
                     backgroundImage: "url('/images/pergament-subtle.jpg')",
                     backgroundSize: "cover",

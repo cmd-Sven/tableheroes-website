@@ -510,7 +510,7 @@ export function UpcomingSessionsCard({
   if (sessions.length === 0) {
     return (
       <div className="w-full p-4">
-        <div className="relative overflow-hidden rounded-lg border border-dashed border-hero-dark bg-background-card/50 py-12 text-center">
+        <div className="relative overflow-hidden rounded-lg border border-dashed border-hero-dark bg-background-card py-12 text-center">
           <div className="relative z-10">
             <div className="mb-4 mx-auto grid h-16 w-16 place-items-center rounded-full border border-hero-border bg-background-dark">
               <Swords className="h-8 w-8 text-accent-gold" />

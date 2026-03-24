@@ -123,6 +123,8 @@ type Props = {
   sessionRsvpHref?: string | null;
   /** Akzeptierte Bewerbung, noch kein Charakter – Links zum Charakterbogen */
   pendingCharacterCampaigns?: { campaignId: string; campaignName: string }[];
+  /** Kampagne-IDs mit bestätigter Mitgliedschaft – Badge in „Offene Kampagnen“ */
+  openCampaignsParticipantIds?: string[];
   /** true = Tutor-Hilfe ausgeblendet */
   playerDashboardTutorialDismissed?: boolean;
 };
@@ -152,6 +154,7 @@ export function DashboardClient({
   sessionConfirmationPending = false,
   sessionRsvpHref = null,
   pendingCharacterCampaigns = [],
+  openCampaignsParticipantIds = [],
   playerDashboardTutorialDismissed = false,
 }: Props) {
   const router = useRouter();
@@ -328,7 +331,10 @@ export function DashboardClient({
             title="Offene Kampagnen"
             icon={<Sword className="h-5 w-5" />}
           >
-            <OpenCampaignsCard discoverableCampaigns={discoverableCampaigns} />
+            <OpenCampaignsCard
+              discoverableCampaigns={discoverableCampaigns}
+              participantCampaignIds={openCampaignsParticipantIds}
+            />
           </DashboardCard>
         </div>
       </div>

@@ -223,7 +223,7 @@ export function MessagesList({
                 {" · "}
                 {formatDate(openMessage.createdAt)}
               </p>
-              <div className="mt-4 rounded-lg border border-hero-border/20 bg-background-dark/50 p-4">
+              <div className="mt-4 rounded-lg border border-hero-border/20 bg-background-dark p-4">
                 <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
                   {openMessage.content}
                 </p>

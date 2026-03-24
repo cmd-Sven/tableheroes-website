@@ -301,7 +301,7 @@ export function CreateLoreModal({ campaignId, isOpen, onClose, parentOptions, ex
         </form>
 
         {/* Footer (Fixed) */}
-        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark">
           <div className="flex justify-end gap-3">
             <button
               type="button"

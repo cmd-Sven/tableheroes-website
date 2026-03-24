@@ -174,7 +174,7 @@ export function ImageCarousel3D({
         <button
           type="button"
           onClick={prev}
-          className="group relative inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-hero-border/60 text-hero-border/60 hover:text-accent-gold hover:border-accent-gold transition-all duration-300 bg-background-card/50 hover:bg-background-card"
+          className="group relative inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-hero-border/60 text-hero-border/60 hover:text-accent-gold hover:border-accent-gold transition-all duration-300 bg-background-card hover:bg-background-card"
           aria-label="Vorheriges Bild"
         >
           <ChevronLeft className="h-5 w-5 ml-0.5" />
@@ -182,7 +182,7 @@ export function ImageCarousel3D({
         <button
           type="button"
           onClick={next}
-          className="group relative inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-hero-border/60 text-hero-border/60 hover:text-accent-gold hover:border-accent-gold transition-all duration-300 bg-background-card/50 hover:bg-background-card"
+          className="group relative inline-flex items-center justify-center w-11 h-11 rounded-full border-2 border-hero-border/60 text-hero-border/60 hover:text-accent-gold hover:border-accent-gold transition-all duration-300 bg-background-card hover:bg-background-card"
           aria-label="Nächstes Bild"
         >
           <ChevronRight className="h-5 w-5 mr-0.5" />

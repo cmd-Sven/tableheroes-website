@@ -151,7 +151,7 @@ export function GMDashboardClient({
         </div>
 
         {!hasCampaigns ? (
-          <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card py-16 text-center">
             <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-background-dark border border-hero-border">
               <Sword className="h-8 w-8 text-hero-vibrant" />
             </div>

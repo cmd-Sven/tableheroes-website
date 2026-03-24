@@ -52,7 +52,7 @@ export default async function SessionsPage() {
             Nächste Termine
           </h2>
           {upcomingSessions.length === 0 ? (
-            <div className="rounded-md border border-dashed border-hero-dark bg-background-card/50 py-12 text-center">
+            <div className="rounded-md border border-dashed border-hero-dark bg-background-card py-12 text-center">
               <div className="mb-4 mx-auto grid h-16 w-16 place-items-center rounded-full border border-hero-border bg-background-dark">
                 <Calendar className="h-8 w-8 text-accent-gold" />
               </div>

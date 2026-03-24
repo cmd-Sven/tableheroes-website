@@ -62,7 +62,7 @@ export function AchievementCongratulationsModal({ achievement, onClose }: Props)
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-full p-2 text-gray-400 hover:bg-hero-dark/50 hover:text-white transition-colors"
+          className="absolute top-4 right-4 rounded-full p-2 text-gray-300 hover:bg-hero-dark hover:text-white transition-colors"
           aria-label="Schließen"
         >
           <X className="h-5 w-5" />

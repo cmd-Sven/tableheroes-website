@@ -646,7 +646,7 @@ export function CreateQuestModal({
 
           {/* Erzählerische Anker (KI-Kontext) – unter Quest-Geber & Ort */}
           {(formData.quest_giver_id || formData.location_id) && (
-            <div className="rounded border border-hero-border/50 bg-background-dark/60 p-4">
+            <div className="rounded border border-hero-border/50 bg-background-dark p-4">
               <h4 className="font-barlow font-semibold text-sm uppercase text-accent-gold mb-2">
                 Erzählerische Anker (KI-Kontext)
               </h4>
@@ -980,7 +980,7 @@ export function CreateQuestModal({
         </form>
 
         {/* Footer (Fixed) */}
-        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark/50">
+        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark">
           <div className="flex justify-end gap-3">
             <button
               type="button"

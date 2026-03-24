@@ -510,7 +510,7 @@ export function GMCharacterEditor({
         </div>
 
         {/* Footer */}
-        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark/50 flex justify-end gap-3">
+        <div className="flex-none p-6 border-t border-hero-border/20 bg-background-dark flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}

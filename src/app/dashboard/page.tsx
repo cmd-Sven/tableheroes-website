@@ -130,6 +130,7 @@ export default async function DashboardPage() {
           sessionConfirmationPending={playerData.sessionConfirmationPending}
           sessionRsvpHref={playerData.sessionRsvpHref}
           pendingCharacterCampaigns={playerData.pendingCharacterCampaigns}
+          openCampaignsParticipantIds={playerData.openCampaignsParticipantIds}
           playerDashboardTutorialDismissed={
             !!profile?.player_dashboard_tutorial_dismissed
           }
@@ -194,6 +195,7 @@ async function loadPlayerDashboardData(userId: string) {
       "Changes_Proposed",
       "Accepted",
       "Approved",
+      "Active",
     ]);
 
   const memberships = (membershipsRaw as any[]) || [];
@@ -341,6 +343,15 @@ async function loadPlayerDashboardData(userId: string) {
 
   console.log("[Dashboard] Points History geladen für User:", userId, "Anzahl:", pointsHistory.length);
 
+  /** Kampagne-IDs, in denen der Spieler nach SL-Bestätigung Mitglied ist (wie „Meine Kampagnen“). */
+  const openCampaignsParticipantIds = [
+    ...new Set(
+      memberships
+        .map((m: any) => (m.campaign_id as string) ?? m.campaigns?.id)
+        .filter(Boolean),
+    ),
+  ];
+
   return {
     totalPoints,
     achievements,
@@ -349,6 +360,7 @@ async function loadPlayerDashboardData(userId: string) {
     playerMessages,
     newAcceptances,
     discoverableCampaigns,
+    openCampaignsParticipantIds,
     randomLoreEntry: loreResult.entry,
     dailyComic,
     dashboardNews: newsResult.posts,

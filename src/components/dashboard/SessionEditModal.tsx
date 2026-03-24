@@ -98,7 +98,7 @@ export function SessionEditModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:text-white transition-colors"
+            className="rounded p-1 text-gray-300 hover:bg-background-dark hover:text-white transition-colors"
             aria-label="Schließen"
           >
             <X className="h-5 w-5" />
@@ -152,14 +152,14 @@ export function SessionEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded border border-hero-dark px-4 py-2 font-barlow font-bold text-sm uppercase text-gray-400 hover:text-white transition-colors"
+              className="rounded border border-hero-border bg-background-card px-4 py-2 font-barlow font-bold text-sm uppercase text-gray-200 hover:bg-hero-dark hover:text-white transition-colors"
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold text-sm uppercase text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
+              className="rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold text-sm uppercase text-background-dark hover:bg-hero-dark transition-colors"
             >
               {isPending ? "Speichern…" : "Speichern"}
             </button>

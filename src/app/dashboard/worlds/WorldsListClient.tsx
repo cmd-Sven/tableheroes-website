@@ -78,7 +78,7 @@ export function WorldsListClient({ worlds }: Props) {
           Deine Welten
         </h2>
         {worlds.length === 0 ? (
-          <div className="rounded-md border border-dashed border-hero-dark bg-background-card/50 py-12 text-center">
+          <div className="rounded-md border border-dashed border-hero-dark bg-background-card py-12 text-center">
             <div className="mb-4 grid h-16 w-16 mx-auto place-items-center rounded-full bg-background-dark border border-hero-border">
               <Globe className="h-8 w-8 text-hero-vibrant" />
             </div>

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Sword } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sword, UserCheck } from "lucide-react";
 
 export type DiscoverableCampaign = {
   id: string;
@@ -37,6 +37,8 @@ function formatSchedule(c: DiscoverableCampaign): string | null {
 
 type Props = {
   discoverableCampaigns: DiscoverableCampaign[];
+  /** Nach Bestätigung durch den SL – Badge „Teilnehmer“ auf der Karte */
+  participantCampaignIds?: string[];
 };
 
 const CARD_WIDTH = 280;
@@ -46,9 +48,11 @@ const SLIDER_THRESHOLD = 2;
 function CampaignTicketCard({
   campaign,
   compact = false,
+  isParticipant,
 }: {
   campaign: DiscoverableCampaign;
   compact?: boolean;
+  isParticipant?: boolean;
 }) {
   return (
     <Link
@@ -72,6 +76,17 @@ function CampaignTicketCard({
             {campaign.system || "System"}
           </span>
         </div>
+        {isParticipant && (
+          <div className="absolute top-2 right-2 max-w-[calc(100%-5rem)]">
+            <span
+              className="inline-flex items-center gap-1 rounded border border-hero-vibrant/80 bg-background-dark/95 px-2 py-1 font-barlow font-bold uppercase text-[10px] leading-tight text-hero-vibrant shadow-lg"
+              title="Deine Bewerbung wurde vom Spielleiter bestätigt."
+            >
+              <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Teilnehmer
+            </span>
+          </div>
+        )}
       </div>
       <div className={compact ? "p-3" : "p-4"}>
         <h3
@@ -104,9 +119,13 @@ function CampaignTicketCard({
   );
 }
 
-export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
+export function OpenCampaignsCard({
+  discoverableCampaigns,
+  participantCampaignIds = [],
+}: Props) {
   const [index, setIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const participantSet = new Set(participantCampaignIds);
   const useSlider = discoverableCampaigns.length > SLIDER_THRESHOLD;
   const maxIndex = Math.max(0, Math.ceil(discoverableCampaigns.length / 2) - 1);
 
@@ -117,7 +136,7 @@ export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
   if (discoverableCampaigns.length === 0) {
     return (
       <div className="w-full p-4">
-        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card/50 py-12 text-center">
+        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-hero-dark bg-background-card py-12 text-center">
           <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-background-dark border border-hero-border">
             <Sword className="h-8 w-8 text-accent-gold" />
           </div>
@@ -135,7 +154,11 @@ export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
       <div className="w-full p-4">
         <div className="flex w-full gap-6 flex-wrap">
           {discoverableCampaigns.map((c) => (
-            <CampaignTicketCard key={c.id} campaign={c} />
+            <CampaignTicketCard
+              key={c.id}
+              campaign={c}
+              isParticipant={participantSet.has(c.id)}
+            />
           ))}
         </div>
       </div>
@@ -155,7 +178,11 @@ export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
             style={{ width: "max-content" }}
           >
             {discoverableCampaigns.map((c) => (
-              <CampaignTicketCard key={c.id} campaign={c} />
+              <CampaignTicketCard
+                key={c.id}
+                campaign={c}
+                isParticipant={participantSet.has(c.id)}
+              />
             ))}
           </motion.div>
         </div>
@@ -163,7 +190,7 @@ export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
           type="button"
           onClick={() => setIndex((i) => Math.max(0, i - 1))}
           disabled={index === 0}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-hero-border bg-background-card/95 text-accent-gold shadow-lg hover:bg-hero-dark hover:border-hero-vibrant disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-hero-border bg-background-card text-accent-gold shadow-lg hover:bg-hero-dark hover:border-hero-vibrant disabled:pointer-events-none disabled:bg-zinc-800 disabled:text-zinc-500 disabled:border-zinc-600 transition-colors"
           aria-label="Vorherige Kampagnen"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -172,7 +199,7 @@ export function OpenCampaignsCard({ discoverableCampaigns }: Props) {
           type="button"
           onClick={() => setIndex((i) => Math.min(maxIndex, i + 1))}
           disabled={index >= maxIndex}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-hero-border bg-background-card/95 text-accent-gold shadow-lg hover:bg-hero-dark hover:border-hero-vibrant disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-hero-border bg-background-card text-accent-gold shadow-lg hover:bg-hero-dark hover:border-hero-vibrant disabled:pointer-events-none disabled:bg-zinc-800 disabled:text-zinc-500 disabled:border-zinc-600 transition-colors"
           aria-label="Nächste Kampagnen"
         >
           <ChevronRight className="h-5 w-5" />

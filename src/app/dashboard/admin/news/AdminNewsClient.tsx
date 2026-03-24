@@ -378,7 +378,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
             {initialPosts.map((post) => (
               <li
                 key={post.id}
-                className="flex items-center justify-between gap-4 rounded border border-hero-border/50 bg-background-dark/50 p-4"
+                className="flex items-center justify-between gap-4 rounded border border-hero-border/50 bg-background-dark p-4"
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-cinzel font-bold text-hero-vibrant truncate">

@@ -99,7 +99,7 @@ export function GMInboxClient({
           Neue Beitritts-Anfragen
         </h2>
         {!hasApplications ? (
-          <div className="rounded-lg border border-hero-dark/50 bg-background-card/50 p-6 text-center">
+          <div className="rounded-lg border border-hero-dark/50 bg-background-card p-6 text-center">
             <p className="font-libre text-gray-500">
               Keine offenen Beitritts-Anfragen.
             </p>
@@ -163,7 +163,7 @@ export function GMInboxClient({
           Charakter-Entwürfe zur Prüfung
         </h2>
         {!hasCharacters ? (
-          <div className="rounded-lg border border-hero-dark/50 bg-background-card/50 p-6 text-center">
+          <div className="rounded-lg border border-hero-dark/50 bg-background-card p-6 text-center">
             <User className="h-12 w-12 text-gray-600 mx-auto mb-3" />
             <p className="font-libre text-gray-500">
               Keine Charaktere warten auf Freigabe (Status Pending_Approval).
@@ -228,7 +228,7 @@ export function GMInboxClient({
                         {char.player_npc_requests.map((req) => (
                           <li
                             key={req.id}
-                            className="flex items-center justify-between gap-4 rounded border border-hero-dark bg-background-dark/50 p-3"
+                            className="flex items-center justify-between gap-4 rounded border border-hero-dark bg-background-dark p-3"
                           >
                             <div>
                               <span className="font-libre font-semibold text-gray-200">

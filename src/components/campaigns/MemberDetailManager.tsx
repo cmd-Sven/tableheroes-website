@@ -197,7 +197,7 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
               Errungene Achievements
             </h3>
             {member.achievements.length === 0 ? (
-              <p className="font-libre text-sm text-gray-500 italic text-center py-4 border border-hero-border/30 rounded bg-background-dark/50">
+              <p className="font-libre text-sm text-gray-500 italic text-center py-4 border border-hero-border/30 rounded bg-background-dark">
                 Noch keine Achievements freigeschaltet.
               </p>
             ) : (
@@ -343,7 +343,7 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
                   {member.pointsLog.slice(0, 5).map((entry) => (
                     <div
                       key={entry.id}
-                      className="flex items-start gap-2 rounded border border-hero-border/20 bg-background-dark/50 p-2.5"
+                      className="flex items-start gap-2 rounded border border-hero-border/20 bg-background-dark p-2.5"
                     >
                       {entry.amount >= 0 ? (
                         <TrendingUp className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />
