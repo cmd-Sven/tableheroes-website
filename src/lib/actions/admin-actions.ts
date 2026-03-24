@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const SITE_SETTINGS_KEY_MAINTENANCE = "maintenance_mode";
@@ -206,7 +206,10 @@ export async function rejectUser(userId: string): Promise<{
   return { success: true };
 }
 
-/** Löscht einen User aus der users-Tabelle. Nur Admins. (Auth-User muss ggf. separat gelöscht werden.) */
+/**
+ * Löscht einen Nutzer inkl. Kampagnenmitgliedschaften, Charakteren, Nachrichten und Auth-Account.
+ * Erfordert SUPABASE_SERVICE_ROLE_KEY (Service-Role). Nur Admins.
+ */
 export async function deleteUser(userId: string): Promise<{
   success: boolean;
   error?: string;
@@ -217,6 +220,10 @@ export async function deleteUser(userId: string): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Nicht angemeldet." };
 
+  if (user.id === userId) {
+    return { success: false, error: "Du kannst deinen eigenen Account hier nicht löschen." };
+  }
+
   const { data: profile } = await (supabase.from("users") as any)
     .select("primary_role")
     .eq("id", user.id)
@@ -225,10 +232,121 @@ export async function deleteUser(userId: string): Promise<{
     return { success: false, error: "Nur Admins können Nutzer löschen." };
   }
 
-  const { error } = await (supabase.from("users") as any)
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      success: false,
+      error:
+        "Vollständiges Löschen ist nicht möglich: SUPABASE_SERVICE_ROLE_KEY fehlt in der Server-Umgebung.",
+    };
+  }
+
+  const { data: gmCampaigns } = await (admin.from("campaigns") as any)
+    .select("id")
+    .eq("gm_id", userId)
+    .limit(1);
+  if (gmCampaigns && (gmCampaigns as any[]).length > 0) {
+    return {
+      success: false,
+      error:
+        "Dieser Nutzer ist noch Spielleiter mindestens einer Kampagne. Bitte zuerst Kampagnen löschen oder einen anderen GM setzen.",
+    };
+  }
+
+  const { data: gmWorlds } = await (admin.from("worlds") as any)
+    .select("id")
+    .eq("gm_id", userId)
+    .limit(1);
+  if (gmWorlds && (gmWorlds as any[]).length > 0) {
+    return {
+      success: false,
+      error:
+        "Dieser Nutzer besitzt noch mindestens eine Welt. Bitte zuerst Welten löschen oder übertragen.",
+    };
+  }
+
+  const { data: charRows } = await (admin.from("characters") as any)
+    .select("id")
+    .eq("user_id", userId);
+  const charIds = ((charRows as any[]) || []).map((c: { id: string }) => c.id);
+
+  /** Optionale Tabellen – Fehler nur loggen (z. B. leere Ergebnisse oder fehlende Tabelle in älteren DBs). */
+  const tryDelete = async (label: string, fn: () => Promise<{ error: { message?: string } | null }>) => {
+    const { error } = await fn();
+    if (error?.message) {
+      console.warn(`[deleteUser] ${label}:`, error.message);
+    }
+  };
+
+  await tryDelete("session_rsvps", async () =>
+    (admin.from("session_rsvps") as any).delete().eq("user_id", userId)
+  );
+
+  await tryDelete("messages", async () =>
+    (admin.from("messages") as any)
+      .delete()
+      .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+  );
+
+  if (charIds.length > 0) {
+    await tryDelete("character_relationships", async () =>
+      (admin.from("character_relationships") as any)
+        .delete()
+        .in("character_id", charIds)
+    );
+  }
+
+  await tryDelete("user_achievements", async () =>
+    (admin.from("user_achievements") as any).delete().eq("user_id", userId)
+  );
+
+  await tryDelete("points_log", async () =>
+    (admin.from("points_log") as any).delete().eq("user_id", userId)
+  );
+
+  const { error: cmErr } = await (admin.from("campaign_members") as any)
     .delete()
-    .eq("id", userId);
-  if (error) return { success: false, error: error.message };
+    .eq("user_id", userId);
+  if (cmErr) {
+    console.error("[deleteUser] campaign_members", cmErr);
+    return {
+      success: false,
+      error: `Kampagnenmitgliedschaften konnten nicht entfernt werden: ${cmErr.message}`,
+    };
+  }
+
+  const { error: chErr } = await (admin.from("characters") as any)
+    .delete()
+    .eq("user_id", userId);
+  if (chErr) {
+    console.error("[deleteUser] characters", chErr);
+    return {
+      success: false,
+      error: `Charaktere konnten nicht gelöscht werden: ${chErr.message}`,
+    };
+  }
+
+  const { error: authErr } = await admin.auth.admin.deleteUser(userId);
+  if (authErr) {
+    console.error("[deleteUser] auth.admin.deleteUser", authErr);
+    const { error: usersErr } = await (admin.from("users") as any)
+      .delete()
+      .eq("id", userId);
+    if (usersErr) {
+      return {
+        success: false,
+        error: `Auth-Löschen fehlgeschlagen (${authErr.message}). Profil konnte nicht bereinigt werden: ${usersErr.message}`,
+      };
+    }
+    return {
+      success: false,
+      error: `Auth-Account konnte nicht gelöscht werden: ${authErr.message}. Profil-Datensatz wurde entfernt.`,
+    };
+  }
+
   revalidatePath("/dashboard/admin/users");
+  revalidatePath("/dashboard", "layout");
   return { success: true };
 }

@@ -119,6 +119,10 @@ type Props = {
   backerSince?: string | null;
   pointsHistory: PointLogEntry[];
   sessionConfirmationPending?: boolean;
+  /** Link zur Kampagnen-Seite Tab „Termine“ (RSVP) */
+  sessionRsvpHref?: string | null;
+  /** Akzeptierte Bewerbung, noch kein Charakter – Links zum Charakterbogen */
+  pendingCharacterCampaigns?: { campaignId: string; campaignName: string }[];
   /** true = Tutor-Hilfe ausgeblendet */
   playerDashboardTutorialDismissed?: boolean;
 };
@@ -146,6 +150,8 @@ export function DashboardClient({
   backerSince,
   pointsHistory,
   sessionConfirmationPending = false,
+  sessionRsvpHref = null,
+  pendingCharacterCampaigns = [],
   playerDashboardTutorialDismissed = false,
 }: Props) {
   const router = useRouter();
@@ -230,6 +236,8 @@ export function DashboardClient({
         <InboxCard
           messages={unreadInboxMessages}
           sessionConfirmationPending={sessionConfirmationPending}
+          sessionRsvpHref={sessionRsvpHref}
+          pendingCharacterCampaigns={pendingCharacterCampaigns}
         />
       ),
       colSpan: 1 as const,

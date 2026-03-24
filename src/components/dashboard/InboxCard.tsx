@@ -2,15 +2,19 @@
 
 import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
-import { Inbox, Mail, X, AlertTriangle } from "lucide-react";
+import { Inbox, Mail, X, AlertTriangle, Calendar, UserPlus } from "lucide-react";
 import { markMessageAsRead, type PlayerMessage } from "@/src/lib/actions/message-actions";
 
 const MAX_ITEMS = 3;
 
 type Props = {
   messages: PlayerMessage[];
-  /** Zeigt Banner "Warte auf Terminbestätigung" wenn Anmeldefrist erreicht und noch nicht zugesagt */
+  /** Es gibt geplante Termine ohne deine Zusage/Absage */
   sessionConfirmationPending?: boolean;
+  /** Direkt zur Kampagne Tab „Termine“ (RSVP); Fallback: /dashboard/sessions */
+  sessionRsvpHref?: string | null;
+  /** Bewerbung angenommen, noch kein Charakter */
+  pendingCharacterCampaigns?: { campaignId: string; campaignName: string }[];
 };
 
 function formatDate(iso: string): string {
@@ -22,7 +26,12 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function InboxCard({ messages: initialMessages, sessionConfirmationPending = false }: Props) {
+export function InboxCard({
+  messages: initialMessages,
+  sessionConfirmationPending = false,
+  sessionRsvpHref = null,
+  pendingCharacterCampaigns = [],
+}: Props) {
   const [messages, setMessages] = useState<PlayerMessage[]>(
     initialMessages.filter((m) => !m.readAt).slice(0, MAX_ITEMS)
   );
@@ -52,7 +61,14 @@ export function InboxCard({ messages: initialMessages, sessionConfirmationPendin
     }, 300);
   }, [openId]);
 
-  if (messages.length === 0 && !openMessage) {
+  const hasActionBanners =
+    sessionConfirmationPending || pendingCharacterCampaigns.length > 0;
+
+  const rsvpLink =
+    sessionRsvpHref ||
+    (sessionConfirmationPending ? "/dashboard/sessions" : null);
+
+  if (messages.length === 0 && !openMessage && !hasActionBanners) {
     return (
       <div className="w-full p-4">
         <div className="text-center py-6 rounded-lg border border-hero-border/40 bg-hero-dark/20">
@@ -73,53 +89,85 @@ export function InboxCard({ messages: initialMessages, sessionConfirmationPendin
 
   return (
     <div className="w-full p-4 space-y-3">
-      {sessionConfirmationPending && (
+      {sessionConfirmationPending && rsvpLink && (
         <Link
-          href="/dashboard"
+          href={rsvpLink}
           className="block rounded-lg border border-amber-500/50 bg-amber-900/20 px-4 py-3 hover:bg-amber-900/30 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <Calendar className="h-5 w-5 text-amber-400 shrink-0" />
             <div>
               <p className="font-barlow font-bold text-sm text-amber-200">
-                Warte auf Terminbestätigung
+                Termine warten auf deine Rückmeldung
               </p>
               <p className="font-libre text-xs text-gray-400 mt-0.5">
-                Bitte bestätige deine Teilnahme bei den nächsten Terminen.
+                Es gibt Termine, die noch auf deine Zusage oder Absage warten.
+                Tippe hier, um zu antworten.
               </p>
             </div>
           </div>
         </Link>
       )}
-      <ul className="space-y-2">
-        {messages.map((msg) => (
-          <li
-            key={msg.id}
-            className={`transition-all duration-300 ${
-              fadingId === msg.id ? "opacity-0 scale-95" : "opacity-100"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => handleOpen(msg)}
-              className="block w-full text-left rounded-lg border border-hero-border/40 bg-hero-dark/20 p-3 hover:border-hero-vibrant/50 hover:bg-hero-dark/30 transition-colors"
+
+      {pendingCharacterCampaigns.map((c) => (
+        <Link
+          key={c.campaignId}
+          href={`/dashboard/campaigns/${c.campaignId}/character/new`}
+          className="block rounded-lg border border-hero-vibrant/50 bg-hero-dark/40 px-4 py-3 hover:bg-hero-dark/60 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-hero-vibrant shrink-0" />
+            <div>
+              <p className="font-barlow font-bold text-sm text-hero-vibrant">
+                Bewerbung angenommen – Charakter erstellen
+              </p>
+              <p className="font-libre text-xs text-gray-300 mt-0.5">
+                Deine Bewerbung für{" "}
+                <span className="text-accent-gold font-medium">{c.campaignName}</span>{" "}
+                wurde akzeptiert. Erstelle jetzt deinen Charakter für die Kampagne.
+              </p>
+            </div>
+          </div>
+        </Link>
+      ))}
+
+      {messages.length === 0 && !openMessage ? (
+        <div className="rounded-lg border border-hero-border/30 bg-background-dark/30 px-4 py-3">
+          <p className="font-libre text-sm text-gray-500 text-center">
+            Keine weiteren ungelesenen Nachrichten.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {messages.map((msg) => (
+            <li
+              key={msg.id}
+              className={`transition-all duration-300 ${
+                fadingId === msg.id ? "opacity-0 scale-95" : "opacity-100"
+              }`}
             >
-              <p className="font-barlow font-bold text-sm text-white truncate">
-                {msg.subject}
-              </p>
-              <p className="font-libre text-xs text-gray-500 line-clamp-1 mt-0.5">
-                {msg.content}
-              </p>
-              <p className="font-barlow text-[10px] text-gray-600 mt-1.5">
-                {msg.senderName}
-                {msg.campaignName && ` · ${msg.campaignName}`}
-                {" · "}
-                {formatDate(msg.createdAt)}
-              </p>
-            </button>
-          </li>
-        ))}
-      </ul>
+              <button
+                type="button"
+                onClick={() => handleOpen(msg)}
+                className="block w-full text-left rounded-lg border border-hero-border/40 bg-hero-dark/20 p-3 hover:border-hero-vibrant/50 hover:bg-hero-dark/30 transition-colors"
+              >
+                <p className="font-barlow font-bold text-sm text-white truncate">
+                  {msg.subject}
+                </p>
+                <p className="font-libre text-xs text-gray-500 line-clamp-1 mt-0.5">
+                  {msg.content}
+                </p>
+                <p className="font-barlow text-[10px] text-gray-600 mt-1.5">
+                  {msg.senderName}
+                  {msg.campaignName && ` · ${msg.campaignName}`}
+                  {" · "}
+                  {formatDate(msg.createdAt)}
+                </p>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Link
         href="/dashboard/messages"
@@ -129,7 +177,6 @@ export function InboxCard({ messages: initialMessages, sessionConfirmationPendin
         Alle Nachrichten
       </Link>
 
-      {/* Detail-Modal */}
       {openMessage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"

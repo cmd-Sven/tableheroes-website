@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 
 export type MemberWithCharacter = {
   id: string;
@@ -29,6 +29,7 @@ export type MemberWithCharacter = {
 
 /**
  * GM: Lädt alle Kampagnenmitglieder inkl. Charaktere (Service-Role, RLS-Bypass).
+ * Ohne SUPABASE_SERVICE_ROLE_KEY: Fallback auf Session-Client — GM darf per RLS dieselben Zeilen lesen.
  */
 export async function getGmCampaignMembersWithCharacters(
   campaignId: string
@@ -37,7 +38,18 @@ export async function getGmCampaignMembersWithCharacters(
   inReview: MemberWithCharacter[];
   accepted: MemberWithCharacter[];
 }> {
-  const supabase = createAdminClient();
+  let supabase: ReturnType<typeof createAdminClient>;
+  let allowRepairWrites = true;
+  try {
+    supabase = createAdminClient();
+  } catch (err) {
+    console.warn(
+      "[getGmCampaignMembersWithCharacters] Kein Admin-Client, nutze Session (RLS):",
+      err
+    );
+    supabase = (await createClient()) as unknown as ReturnType<typeof createAdminClient>;
+    allowRepairWrites = false;
+  }
 
   const { data: members, error: membersError } = await supabase
     .from("campaign_members")
@@ -73,9 +85,11 @@ export async function getGmCampaignMembersWithCharacters(
       if (c) {
         (m as any).character_id = c.id;
         charIds.push(c.id);
-        await (supabase.from("campaign_members") as any)
-          .update({ character_id: c.id })
-          .eq("id", m.id);
+        if (allowRepairWrites) {
+          await (supabase.from("campaign_members") as any)
+            .update({ character_id: c.id })
+            .eq("id", m.id);
+        }
       }
     }
     charIds = [...new Set(charIds)];

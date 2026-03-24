@@ -127,6 +127,8 @@ export default async function DashboardPage() {
           pointsHistory={playerData.pointsHistory}
           unreadInboxMessages={playerData.unreadInboxMessages}
           sessionConfirmationPending={playerData.sessionConfirmationPending}
+          sessionRsvpHref={playerData.sessionRsvpHref}
+          pendingCharacterCampaigns={playerData.pendingCharacterCampaigns}
           playerDashboardTutorialDismissed={
             !!profile?.player_dashboard_tutorial_dismissed
           }
@@ -307,6 +309,52 @@ async function loadPlayerDashboardData(userId: string) {
       getUnreadInboxMessages(userId),
     ]);
 
+  const firstPendingRsvpSession = upcomingSessions.find(
+    (s) =>
+      s.status === "Scheduled" &&
+      !s.userRsvp &&
+      s.deadlineReached
+  );
+  const sessionRsvpHref = firstPendingRsvpSession
+    ? `/dashboard/campaigns/${firstPendingRsvpSession.campaignId}?tab=sessions`
+    : null;
+
+  let pendingCharacterCampaigns: { campaignId: string; campaignName: string }[] = [];
+  try {
+    const { data: cmNeedChar } = await (supabase.from("campaign_members") as any)
+      .select("id, status, character_id, campaign_id, campaigns!inner(id, name)")
+      .eq("user_id", userId)
+      .in("status", ["Drafting", "In_Review", "Changes_Proposed", "Accepted", "Approved"]);
+    const rows = (cmNeedChar as any[]) || [];
+    const campIds = [...new Set(rows.map((r: any) => r.campaign_id).filter(Boolean))];
+    const charByCampaign = new Map<string, string>();
+    if (campIds.length > 0) {
+      const { data: charRows } = await (supabase.from("characters") as any)
+        .select("id, campaign_id")
+        .eq("user_id", userId)
+        .in("campaign_id", campIds);
+      for (const c of (charRows as any[]) || []) {
+        if (c.campaign_id) charByCampaign.set(c.campaign_id, c.id);
+      }
+    }
+    const seen = new Set<string>();
+    for (const m of rows) {
+      const cid = m.campaign_id as string | undefined;
+      if (!cid || !m.campaigns?.id) continue;
+      const hasChar = !!(m.character_id || charByCampaign.has(cid));
+      if (hasChar) continue;
+      if (seen.has(m.campaigns.id)) continue;
+      seen.add(m.campaigns.id);
+      pendingCharacterCampaigns.push({
+        campaignId: m.campaigns.id,
+        campaignName: (m.campaigns.name as string) || "Kampagne",
+      });
+    }
+  } catch (e) {
+    console.warn("[Dashboard] pendingCharacterCampaigns:", e);
+    pendingCharacterCampaigns = [];
+  }
+
   console.log("[Dashboard] Points History geladen für User:", userId, "Anzahl:", pointsHistory.length);
 
   return {
@@ -328,8 +376,13 @@ async function loadPlayerDashboardData(userId: string) {
     pointsHistory,
     unreadInboxMessages,
     sessionConfirmationPending: upcomingSessions.some(
-      (s) => s.deadlineReached && !s.userRsvp && s.status === "Scheduled"
+      (s) =>
+        s.status === "Scheduled" &&
+        !s.userRsvp &&
+        s.deadlineReached
     ),
+    sessionRsvpHref,
+    pendingCharacterCampaigns,
   };
 }
 

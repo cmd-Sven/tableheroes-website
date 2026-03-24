@@ -206,14 +206,20 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
 
   async function handleDelete(id: string) {
     if (
-      !confirm("Nutzer wirklich löschen? Dies entfernt nur den Profil-Eintrag.")
+      !confirm(
+        "Nutzer wirklich endgültig löschen? Profil, Kampagnenmitgliedschaften, Charaktere und der Login (Auth) werden entfernt. Spielleiter/Weltbesitzer können nicht gelöscht werden, solange sie noch Kampagnen/Welten besitzen."
+      )
     )
       return;
+    setLoadingId(id);
     const res = await deleteUser(id);
+    setLoadingId(null);
     if (res.success) {
-      toast.success("Nutzer gelöscht.");
+      toast.success("Nutzer wurde vollständig gelöscht.");
       router.refresh();
-    } else toast.error(res.error ?? "Fehler");
+    } else {
+      toast.error(res.error ?? "Löschen fehlgeschlagen.");
+    }
   }
 
   const totalUsers = pendingUsers.length + approvedUsers.length;
