@@ -298,17 +298,22 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
           ...(lore.additional_images || []),
         ].filter((img) => img.url?.trim());
         return allImages.length > 0 ? (
-        <div className="relative w-full min-h-[250px] lg:min-h-[400px] rounded-lg bg-background-card overflow-hidden">
+        <div className="relative isolate w-full overflow-hidden rounded-lg bg-background-card">
+          {/* Im Flow: reserviert Höhe (nur absolute Kinder würden sonst 0px Höhe ergeben → Rahmen oben+unten übereinander) */}
+          <div
+            className="w-full min-h-[clamp(17rem,42vw,28rem)]"
+            aria-hidden
+          />
           {/* Main Image(s) - centered top */}
-          <div className="absolute inset-0 overflow-hidden z-0">
+          <div className="absolute inset-0 z-0 overflow-hidden">
             <LoreHeaderImageSlider images={allImages} />
           </div>
           
           {/* Gradient Overlay for Text Readability */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/20 to-transparent pointer-events-none z-[5]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none z-[5]" />
+          <div className="pointer-events-none absolute inset-0 z-[5] bg-gradient-to-br from-black/50 via-black/20 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 z-[5] bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           
-          <ImageBorderContainer className="absolute inset-0 w-full h-full">
+          <ImageBorderContainer className="absolute inset-0 z-10 h-full min-h-full w-full">
             {/* Breadcrumb - Top Left (above title) */}
             {breadcrumb.length > 0 && (
               <motion.div 

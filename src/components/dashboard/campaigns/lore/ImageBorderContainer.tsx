@@ -21,13 +21,14 @@ export function ImageBorderContainer({
   leftRightBorderImage = "/images/border_left-right_gold.png",
 }: Props) {
   return (
-    <div className={`relative min-h-0 ${className}`}>
-      {/* Content – min-h-full: Positionierungskontext hat volle Höhe (absolute Kinder im Lore-Header) */}
-      <div className="relative z-10 min-h-full w-full box-border p-[25px]">{children}</div>
+    <div className={`relative ${className}`}>
+      {/* Rahmen-Deko unter dem Text (z), sonst überdecken volle Breite/Höhe-Layer die Schrift */}
+      {/* Content – volle Höhe für absolute Kinder (Titel, Breadcrumb) */}
+      <div className="relative z-[25] min-h-full w-full box-border p-[25px]">{children}</div>
 
       {/* Top Border: beginnt innerhalb der Ecken (w-16 = 4rem) */}
       <div
-        className={`pointer-events-none absolute top-0 left-16 right-16 z-20 ${TOP_BOTTOM_STRIP_H}`}
+        className={`pointer-events-none absolute top-0 left-16 right-16 z-[12] ${TOP_BOTTOM_STRIP_H}`}
       >
         <div
           className="h-full w-full"
@@ -43,7 +44,7 @@ export function ImageBorderContainer({
 
       {/* Bottom Border */}
       <div
-        className={`pointer-events-none absolute bottom-0 left-16 right-16 z-20 ${TOP_BOTTOM_STRIP_H}`}
+        className={`pointer-events-none absolute bottom-0 left-16 right-16 z-[12] ${TOP_BOTTOM_STRIP_H}`}
       >
         <div
           className="h-full w-full"
@@ -57,7 +58,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Left Border - positioned after corners to overlap */}
-      <div className="absolute top-16 bottom-16 left-0 w-8 z-20 pointer-events-none">
+      <div className="pointer-events-none absolute top-16 bottom-16 left-0 z-[12] w-8">
         <div
           className="w-full h-full"
           style={{
@@ -70,7 +71,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Right Border - positioned after corners to overlap */}
-      <div className="absolute top-16 bottom-16 right-0 w-8 z-20 pointer-events-none">
+      <div className="pointer-events-none absolute top-16 bottom-16 right-0 z-[12] w-8">
         <div
           className="w-full h-full"
           style={{
@@ -83,7 +84,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Top Left Corner */}
-      <div className="absolute top-0 left-0 w-16 h-16 z-30 pointer-events-none">
+      <div className="pointer-events-none absolute left-0 top-0 z-[18] h-16 w-16">
         <Image
           src={cornerImage}
           alt=""
@@ -93,7 +94,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Top Right Corner */}
-      <div className="absolute top-0 right-0 w-16 h-16 z-30 pointer-events-none">
+      <div className="pointer-events-none absolute right-0 top-0 z-[18] h-16 w-16">
         <Image
           src={cornerImage}
           alt=""
@@ -104,7 +105,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Bottom Left Corner */}
-      <div className="absolute bottom-0 left-0 w-16 h-16 z-30 pointer-events-none">
+      <div className="pointer-events-none absolute bottom-0 left-0 z-[18] h-16 w-16">
         <Image
           src={cornerImage}
           alt=""
@@ -115,7 +116,7 @@ export function ImageBorderContainer({
       </div>
 
       {/* Bottom Right Corner */}
-      <div className="absolute bottom-0 right-0 w-16 h-16 z-30 pointer-events-none">
+      <div className="pointer-events-none absolute bottom-0 right-0 z-[18] h-16 w-16">
         <Image
           src={cornerImage}
           alt=""
