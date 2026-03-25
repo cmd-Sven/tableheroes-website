@@ -297,7 +297,12 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
           ...(lore.additional_images || []),
         ].filter((img) => img.url?.trim());
         return allImages.length > 0 ? (
-        <div className="relative isolate w-full min-h-[clamp(17rem,42vw,28rem)] overflow-hidden rounded-lg bg-background-card">
+        <div className="relative isolate w-full overflow-hidden rounded-lg bg-background-card">
+          {/* Fixe Höhe im Flow: nur absolute Kinder → sonst 0px Höhe, keine vertikalen Borders / keine Ecken unten */}
+          <div
+            className="h-[clamp(17rem,42vw,28rem)] w-full shrink-0"
+            aria-hidden
+          />
           {/* Main Image(s) - centered top */}
           <div className="absolute inset-0 z-0 overflow-hidden">
             <LoreHeaderImageSlider images={allImages} />
