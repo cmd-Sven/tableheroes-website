@@ -8,12 +8,19 @@ import { generateLore } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
 import { LOCATION_TYPES, LORE_TYPES, isLocationType } from "@/src/lib/lore-types";
 import { StoriesAndLegendsEditor } from "./StoriesAndLegendsEditor";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import {
+  DEFAULT_IMAGE_DISPLAY,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
 import { getDeitiesByWorld, saveDeityFromLore, type DeityRelationshipInput } from "@/src/app/dashboard/worlds/deity-actions";
 import { saveReligionFromLore, type ReligionHolidayInput, type ReligionImportantFigureInput } from "@/src/app/dashboard/worlds/religion-actions";
 
 type AdditionalImage = {
   url: string;
   description: string;
+  display?: ImageDisplaySettings;
 };
 
 type StorySection = { dc: number; skill: string; content: string; is_revealed: boolean };
@@ -24,6 +31,7 @@ type LoreEntry = {
   type: string;
   parent_id: string | null;
   image_url: string | null;
+  image_display?: unknown;
   additional_images?: AdditionalImage[] | null;
   description: string | null;
   gm_notes: string | null;
@@ -126,6 +134,7 @@ export function LoreForm({
     type: resolvedType,
     parent_id: (initialParentId || WORLD_ROOT_VALUE) as string | null,
     image_url: "",
+    image_display: { ...DEFAULT_IMAGE_DISPLAY } as ImageDisplaySettings,
     additional_images: [] as AdditionalImage[],
     description: "",
     gm_notes: "",
@@ -142,7 +151,12 @@ export function LoreForm({
         type: initialData.type || defaultType,
         parent_id: parentId,
         image_url: initialData.image_url || "",
-        additional_images: initialData.additional_images || [],
+        additional_images: (initialData.additional_images || []).map((img) => ({
+          url: img.url,
+          description: img.description,
+          display: normalizeImageDisplay((img as AdditionalImage).display ?? null),
+        })),
+        image_display: normalizeImageDisplay(initialData.image_display ?? null),
         description: initialData.description || "",
         gm_notes: initialData.gm_notes || "",
         stories_and_legends: initialData.stories_and_legends || [],
@@ -179,6 +193,7 @@ export function LoreForm({
         stories_and_legends: [],
         race_subtypes: "",
         race_traits: "",
+        image_display: { ...DEFAULT_IMAGE_DISPLAY },
       });
       setSelectedReligionIds([]);
       setSelectedLanguageIds([]);
@@ -243,6 +258,15 @@ export function LoreForm({
     }));
   };
 
+  const updateAdditionalImageDisplay = (index: number, display: ImageDisplaySettings) => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_images: prev.additional_images.map((img, i) =>
+        i === index ? { ...img, display: normalizeImageDisplay(display) } : img
+      ),
+    }));
+  };
+
   const handleAIGenerate = async () => {
     if (isEditMode) return;
 
@@ -289,7 +313,17 @@ export function LoreForm({
           type: formData.type,
           parent_id: parentId,
           image_url: formData.image_url || undefined,
-          additional_images: formData.additional_images.filter((img) => img.url.trim() !== "") || null,
+          additional_images:
+            formData.additional_images
+              .filter((img) => img.url.trim() !== "")
+              .map((img) => ({
+                url: img.url.trim(),
+                description: (img.description || "").trim(),
+                display: normalizeImageDisplay(img.display ?? DEFAULT_IMAGE_DISPLAY),
+              })) || null,
+          image_display: formData.image_url.trim()
+            ? normalizeImageDisplay(formData.image_display)
+            : null,
           description: formData.description || undefined,
           gm_notes: formData.gm_notes || undefined,
           race_subtypes: formData.race_subtypes || undefined,
@@ -1427,8 +1461,18 @@ export function LoreForm({
             placeholder="https://example.com/image.jpg"
           />
           <p className="mt-1 text-xs text-gray-500 font-libre">
-            Das Hauptbild wird oben groß im Landscape-Format angezeigt.
+            Querformat im Header. Unten: Ausschnitt (Cover), ganzes Bild (Contain) und ggf. Hintergrundfarbe.
           </p>
+          {formData.image_url.trim() ? (
+            <div className="mt-4">
+              <ImageUrlDisplayEditor
+                value={formData.image_display}
+                onChange={(image_display) => setFormData((prev) => ({ ...prev, image_display }))}
+                previewUrl={formData.image_url}
+                previewAspectClassName="aspect-video"
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* Additional Images */}
@@ -1475,6 +1519,15 @@ export function LoreForm({
                     className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white text-sm outline-none transition-all focus:border-accent-gold"
                     placeholder="Kurze Beschreibung (optional)"
                   />
+                  {img.url.trim() ? (
+                    <ImageUrlDisplayEditor
+                      value={img.display ?? DEFAULT_IMAGE_DISPLAY}
+                      onChange={(d) => updateAdditionalImageDisplay(index, d)}
+                      previewUrl={img.url}
+                      previewAspectClassName="aspect-video"
+                      className="mt-2"
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>

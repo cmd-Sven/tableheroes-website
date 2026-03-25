@@ -19,6 +19,7 @@ import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visi
 // Create NPC
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
+import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 
 export async function createNPC(formData: {
   campaign_id?: string;
@@ -51,6 +52,7 @@ export async function createNPC(formData: {
   religions?: string[] | null;
   deities?: string[] | null;
   languages?: string[] | null;
+  image_display?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -220,6 +222,10 @@ export async function createNPC(formData: {
     personality_traits: formData.personality_traits || null,
     alignment: formData.alignment || null,
     image_url: formData.image_url || null,
+    image_display:
+      formData.image_display != null && (formData.image_url || "").trim() !== ""
+        ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
+        : null,
     narrative_hooks: formData.narrative_hooks && formData.narrative_hooks.length > 0 ? formData.narrative_hooks : null,
     is_secret_antagonist: formData.is_secret_antagonist ?? false,
     hidden_agenda: formData.hidden_agenda || null,
@@ -448,6 +454,7 @@ export async function updateNPC(
     }> | null;
     /** Weltweite Beziehungen zu anderen NPCs (weltbezogen, nicht kampagnenbezogen). Pro Ziel-NPC max. 2 Beziehungstypen. */
     world_relations?: Array<{ target_npc_id: string; relation_types: string[] }> | null;
+    image_display?: unknown | null;
   }
 ) {
   const supabase = await createClient();
@@ -501,6 +508,14 @@ export async function updateNPC(
     "Erzfeind", "Gegenspieler", "Liebschaft", "Geschäftspartner", "Kollege", "Kamerad", "Verräter",
     "Sklave", "Untertan", "Diener", "Leibeigener", "Angestellter",
   ]);
+  if (updates.image_display !== undefined) {
+    const raw = updates.image_display;
+    normalizedUpdates.image_display =
+      raw == null
+        ? null
+        : imageDisplayToJson(normalizeImageDisplay(raw));
+  }
+
   if (updates.world_relations !== undefined) {
     const raw = updates.world_relations;
     if (!Array.isArray(raw) || raw.length === 0) {

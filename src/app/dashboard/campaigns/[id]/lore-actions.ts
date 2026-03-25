@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { BUILDING_LOCATION_TYPES } from "@/src/lib/lore-types";
+import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { revalidatePath } from "next/cache";
 import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visibility-actions";
 
@@ -10,7 +11,11 @@ import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visi
  * world_id kommt immer aus der Kampagne (campaign.world_id).
  */
 
-type AdditionalImageItem = { url: string; description: string };
+type AdditionalImageItem = {
+  url: string;
+  description: string;
+  display?: ReturnType<typeof imageDisplayToJson> | null;
+};
 
 /** Normalisiert additional_images für JSONB: Array beibehalten, String parsen, sonst null. */
 function normalizeAdditionalImages(
@@ -19,10 +24,19 @@ function normalizeAdditionalImages(
   if (value == null) return null;
   if (Array.isArray(value)) {
     const arr = value
-      .map((item) => ({
-        url: typeof (item as any)?.url === "string" ? (item as any).url : "",
-        description: typeof (item as any)?.description === "string" ? (item as any).description : "",
-      }))
+      .map((item) => {
+        const raw = item as Record<string, unknown>;
+        const url = typeof raw?.url === "string" ? raw.url : "";
+        const description = typeof raw?.description === "string" ? raw.description : "";
+        const displayRaw = raw?.display;
+        const display =
+          displayRaw != null && typeof displayRaw === "object"
+            ? imageDisplayToJson(normalizeImageDisplay(displayRaw))
+            : undefined;
+        const base: AdditionalImageItem = { url, description };
+        if (display) base.display = display;
+        return base;
+      })
       .filter((item) => item.url.trim() !== "");
     return arr.length > 0 ? arr : null;
   }
@@ -66,6 +80,8 @@ export async function createLoreEntry(formData: {
   race_subtypes?: string | null;
   /** Besondere Merkmale (world_lore.race_traits) */
   race_traits?: string | null;
+  /** URL-Bild: Cover/Contain, Fokus, Letterbox-Farbe */
+  image_display?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -112,6 +128,10 @@ export async function createLoreEntry(formData: {
     parent_id: formData.parent_id || null,
     image_url: formData.image_url || null,
     additional_images: additionalImages,
+    image_display:
+      formData.image_display != null
+        ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
+        : null,
     description: formData.description || null,
     gm_notes: formData.gm_notes || null,
     allow_pc_origin: formData.allow_pc_origin ?? false,
@@ -211,6 +231,7 @@ export async function updateLoreEntry(
     culture_id?: string | null;
     race_subtypes?: string | null;
     race_traits?: string | null;
+    image_display?: unknown | null;
   }
 ) {
   const supabase = await createClient();
@@ -242,6 +263,11 @@ export async function updateLoreEntry(
   const updatePayload: Record<string, unknown> = { ...updates };
   if ("additional_images" in updates) {
     updatePayload.additional_images = normalizeAdditionalImages(updates.additional_images);
+  }
+  if ("image_display" in updates) {
+    const raw = updates.image_display;
+    updatePayload.image_display =
+      raw == null ? null : imageDisplayToJson(normalizeImageDisplay(raw));
   }
 
   const { error } = await (supabase.from("world_lore") as any)

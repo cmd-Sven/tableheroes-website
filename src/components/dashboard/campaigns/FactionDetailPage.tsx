@@ -23,6 +23,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import {
+  imageDisplayBackdropStyle,
+  imageDisplayObjectStyle,
+  normalizeImageDisplay,
+} from "@/src/lib/image-display";
 import { useRouter } from "next/navigation";
 
 import {
@@ -76,6 +81,7 @@ type Faction = {
   current_status: string | null;
   description: string | null;
   image_url: string | null;
+  image_display?: unknown;
   location_id: string | null;
   lore_id: string | null;
   gm_notes: string | null;
@@ -578,12 +584,16 @@ export function FactionDetailPage({
           {/* Image - Portrait Format */}
           <div className="shrink-0">
             {faction.image_url ? (
-              <div className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg">
+              <div
+                className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg"
+                style={imageDisplayBackdropStyle(normalizeImageDisplay(faction.image_display))}
+              >
                 <Image
                   src={faction.image_url}
                   alt={faction.name}
                   fill
-                  className="object-cover"
+                  className="select-none"
+                  style={imageDisplayObjectStyle(normalizeImageDisplay(faction.image_display))}
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                   }}

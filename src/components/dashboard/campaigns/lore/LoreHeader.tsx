@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, EyeOff, Trash2, MapPin, Edit2, Save, X, Loader2, Chevro
 import { updateLoreEntry, toggleLoreReveal, deleteLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
 import { LoreHeaderImageSlider } from "./LoreImageSlider";
+import { normalizeImageDisplay } from "@/src/lib/image-display";
 import { ImageBorderContainer } from "./ImageBorderContainer";
 
 // Inline Edit Field Component
@@ -109,8 +110,9 @@ type LoreEntry = {
   name: string;
   type: string;
   image_url: string | null;
+  image_display?: unknown;
   is_revealed: boolean;
-  additional_images?: Array<{ url: string; description: string }> | null;
+  additional_images?: Array<{ url: string; description: string; display?: unknown }> | null;
   parent?: {
     id: string;
     name: string;
@@ -292,9 +294,16 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
 
       {/* Cinematic Header - Main Image with Overlays (min 400px height on desktop, centered top) */}
       {(() => {
-        const allImages: Array<{ url: string; description: string }> = [
-          ...(lore.image_url ? [{ url: lore.image_url, description: lore.name }] : []),
-          ...(lore.additional_images || []),
+        const baseDisplay = normalizeImageDisplay(lore.image_display);
+        const allImages = [
+          ...(lore.image_url
+            ? [{ url: lore.image_url, description: lore.name, display: baseDisplay }]
+            : []),
+          ...(lore.additional_images || []).map((img) => ({
+            url: img.url,
+            description: img.description,
+            display: normalizeImageDisplay(img.display ?? baseDisplay),
+          })),
         ].filter((img) => img.url?.trim());
         return allImages.length > 0 ? (
         <div className="relative isolate w-full overflow-hidden rounded-lg bg-background-card">

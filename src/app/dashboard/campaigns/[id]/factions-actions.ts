@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { revalidatePath } from "next/cache";
 import { setCampaignVisibility } from "./campaign-visibility-actions";
 
@@ -33,6 +34,7 @@ export async function createFaction(formData: {
     relation_type: string;
     description?: string | null;
   }>;
+  image_display?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -77,6 +79,10 @@ export async function createFaction(formData: {
       current_status: formData.current_status || null,
       description: formData.description || null,
       image_url: formData.image_url || null,
+      image_display:
+        formData.image_display != null && (formData.image_url || "").trim() !== ""
+          ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
+          : null,
       location_id: formData.location_id || null,
       gm_notes: formData.gm_notes || null,
       is_revealed: formData.is_revealed ?? false,
@@ -318,6 +324,7 @@ export async function updateFaction(
       relation_type: string;
       description?: string | null;
     }>;
+    image_display?: unknown | null;
   }
 ) {
   const supabase = await createClient();
@@ -340,8 +347,14 @@ export async function updateFaction(
     throw new Error("Nur der GM dieser Welt kann Fraktionen bearbeiten.");
   }
 
-  const { planned_members: pm, faction_relations: _fr, ...restUpdates } = updates;
+  const { planned_members: pm, faction_relations: _fr, image_display: imageDisplayRaw, ...restUpdates } = updates;
   const updatePayload: Record<string, unknown> = { ...restUpdates };
+  if (imageDisplayRaw !== undefined) {
+    updatePayload.image_display =
+      imageDisplayRaw == null
+        ? null
+        : imageDisplayToJson(normalizeImageDisplay(imageDisplayRaw));
+  }
   if (pm !== undefined) {
     updatePayload.planned_members = Array.isArray(pm)
       ? pm.map((m) => ({ name: m.name || "", role: m.role || "Mitglied", npc_id: m.npc_id ?? null }))

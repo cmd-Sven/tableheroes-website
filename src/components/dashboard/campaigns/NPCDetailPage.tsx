@@ -23,6 +23,13 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import {
+  imageDisplayBackdropStyle,
+  imageDisplayObjectStyle,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
 import {
   updateNPC,
   updateNPCNotes,
@@ -71,6 +78,7 @@ type NPC = {
   personality_traits: string | null;
   gm_notes: string | null;
   image_url: string | null;
+  image_display?: unknown;
   is_revealed: boolean;
   is_favorite?: boolean;
   all_quests?: Quest[];
@@ -245,6 +253,7 @@ export function NPCDetailPage({
   // Editing states
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [imageDisplayEdit, setImageDisplayEdit] = useState<ImageDisplaySettings | null>(null);
 
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
   const [isEditingPlayerNotes, setIsEditingPlayerNotes] = useState(false);
@@ -430,17 +439,22 @@ export function NPCDetailPage({
   const handleSaveField = (field: string) => {
     startTransition(async () => {
       try {
-        const updates: Record<string, string | null> = {};
+        const updates: Record<string, string | null | ImageDisplaySettings | unknown> = {};
         const value = editValues[field];
 
-        // Handle special fields
-        if (field === "faction_id" || field === "current_location_id") {
+        if (field === "image_url") {
+          updates.image_url = value || null;
+          updates.image_display =
+            value && value.trim() !== ""
+              ? normalizeImageDisplay(imageDisplayEdit ?? npc.image_display)
+              : null;
+        } else if (field === "faction_id" || field === "current_location_id") {
           updates[field] = value && value.trim() !== "" ? value : null;
         } else {
           updates[field] = value || null;
         }
 
-        await updateNPC(npc.id, updates);
+        await updateNPC(npc.id, updates as Parameters<typeof updateNPC>[1]);
 
         // Update local state
         if (field === "faction_id") {
@@ -465,12 +479,22 @@ export function NPCDetailPage({
                 }
               : null,
           }));
+        } else if (field === "image_url") {
+          setNpc((prev) => ({
+            ...prev,
+            image_url: value || null,
+            image_display:
+              value && value.trim() !== ""
+                ? normalizeImageDisplay(imageDisplayEdit ?? prev.image_display)
+                : null,
+          }));
         } else {
           setNpc((prev) => ({ ...prev, [field]: value || null }));
         }
 
         setEditingField(null);
         setEditValues({});
+        setImageDisplayEdit(null);
         router.refresh();
       } catch (error) {
         const errorMessage =
@@ -483,11 +507,17 @@ export function NPCDetailPage({
   const handleCancelEdit = () => {
     setEditingField(null);
     setEditValues({});
+    setImageDisplayEdit(null);
   };
 
   const handleStartEdit = (field: string, currentValue: string | null) => {
     setEditingField(field);
     setEditValues({ [field]: currentValue || "" });
+    if (field === "image_url") {
+      setImageDisplayEdit(normalizeImageDisplay(npc.image_display));
+    } else {
+      setImageDisplayEdit(null);
+    }
   };
 
   const handleSaveGMNotes = () => {
@@ -665,31 +695,31 @@ export function NPCDetailPage({
                     placeholder="Bild-URL eingeben..."
                     autoFocus
                   />
-                  {editValues.image_url && (
-                    <div className="mt-3 relative w-full h-40 rounded overflow-hidden border border-hero-border">
-                      <Image
-                        src={editValues.image_url}
-                        alt="Vorschau"
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
+                  {editValues.image_url && imageDisplayEdit ? (
+                    <div className="mt-3">
+                      <ImageUrlDisplayEditor
+                        value={imageDisplayEdit}
+                        onChange={setImageDisplayEdit}
+                        previewUrl={editValues.image_url}
+                        previewAspectClassName="aspect-[3/4] max-w-[220px]"
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               }
             >
               {npc.image_url ? (
-                <div className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg">
+                <div
+                  className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg"
+                  style={imageDisplayBackdropStyle(normalizeImageDisplay(npc.image_display))}
+                >
                   <Image
                     src={npc.image_url}
                     alt={npc.name}
                     fill
-                    className="object-cover"
+                    className="select-none"
+                    style={imageDisplayObjectStyle(normalizeImageDisplay(npc.image_display))}
                     onError={(e) => {
-                      // Fallback to icon if image fails to load
                       e.currentTarget.style.display = "none";
                     }}
                   />

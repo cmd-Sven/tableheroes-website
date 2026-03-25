@@ -19,7 +19,8 @@ type LoreEntry = {
   type: string;
   description: string | null;
   image_url: string | null;
-  additional_images?: Array<{ url: string; description: string }> | null;
+  image_display?: unknown;
+  additional_images?: Array<{ url: string; description: string; display?: unknown }> | null;
   gm_notes: string | null;
   is_revealed: boolean;
   parent_id: string | null;

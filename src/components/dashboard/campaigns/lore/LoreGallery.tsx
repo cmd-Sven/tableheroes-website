@@ -5,10 +5,12 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Edit2, Save, X, Loader2, Plus, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { DEFAULT_IMAGE_DISPLAY, normalizeImageDisplay, type ImageDisplaySettings } from "@/src/lib/image-display";
 
 type AdditionalImage = {
   url: string;
   description: string;
+  display?: ImageDisplaySettings;
 };
 
 type Props = {
@@ -21,15 +23,25 @@ export function LoreGallery({ lore: initialLore, isGM, onUpdate }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isEditingGallery, setIsEditingGallery] = useState(false);
-  const [galleryImages, setGalleryImages] = useState<AdditionalImage[]>(
-    initialLore.additional_images || []
+  const [galleryImages, setGalleryImages] = useState<AdditionalImage[]>(() =>
+    (initialLore.additional_images || []).map((img) => ({
+      url: img.url,
+      description: img.description,
+      display: normalizeImageDisplay((img as AdditionalImage).display ?? DEFAULT_IMAGE_DISPLAY),
+    }))
   );
   const [lightboxImage, setLightboxImage] = useState<{ url: string; description: string; index: number } | null>(null);
 
   // Sync gallery images when lore changes
   useEffect(() => {
     if (!isEditingGallery) {
-      setGalleryImages(initialLore.additional_images || []);
+      setGalleryImages(
+        (initialLore.additional_images || []).map((img) => ({
+          url: img.url,
+          description: img.description,
+          display: normalizeImageDisplay((img as AdditionalImage).display ?? DEFAULT_IMAGE_DISPLAY),
+        }))
+      );
     }
   }, [initialLore.additional_images, isEditingGallery]);
 
@@ -51,7 +63,14 @@ export function LoreGallery({ lore: initialLore, isGM, onUpdate }: Props) {
         const validImages = galleryImages.filter((img) => img.url.trim() !== "");
         
         await updateLoreEntry(initialLore.id, {
-          additional_images: validImages.length > 0 ? validImages : null,
+          additional_images:
+            validImages.length > 0
+              ? validImages.map((img) => ({
+                  url: img.url.trim(),
+                  description: (img.description || "").trim(),
+                  display: normalizeImageDisplay(img.display ?? DEFAULT_IMAGE_DISPLAY),
+                }))
+              : null,
         });
         
         setGalleryImages(validImages);
@@ -71,7 +90,10 @@ export function LoreGallery({ lore: initialLore, isGM, onUpdate }: Props) {
   };
 
   const addGalleryImage = () => {
-    setGalleryImages([...galleryImages, { url: "", description: "" }]);
+    setGalleryImages([
+      ...galleryImages,
+      { url: "", description: "", display: { ...DEFAULT_IMAGE_DISPLAY } },
+    ]);
   };
 
   const removeGalleryImage = (index: number) => {
@@ -104,7 +126,15 @@ export function LoreGallery({ lore: initialLore, isGM, onUpdate }: Props) {
             {isGM && !isEditingGallery && (
               <button
                 onClick={() => {
-                  setGalleryImages(initialLore.additional_images || []);
+                  setGalleryImages(
+                    (initialLore.additional_images || []).map((img) => ({
+                      url: img.url,
+                      description: img.description,
+                      display: normalizeImageDisplay(
+                        (img as AdditionalImage).display ?? DEFAULT_IMAGE_DISPLAY
+                      ),
+                    }))
+                  );
                   setIsEditingGallery(true);
                 }}
                 className="p-1.5 rounded text-slate-500 hover:text-accent-gold hover:bg-hero-dark transition-colors"

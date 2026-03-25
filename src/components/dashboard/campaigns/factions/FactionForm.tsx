@@ -10,6 +10,12 @@ import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS, FACTION_MEMBER_ROLES } from "
 import { SmartLocationCombobox } from "@/src/components/dashboard/campaigns/npcs/SmartLocationCombobox";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { getAllLocations } from "@/src/app/dashboard/campaigns/[id]/location-actions";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import {
+  DEFAULT_IMAGE_DISPLAY,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
 
 type Location = {
   id: string;
@@ -24,6 +30,7 @@ type FactionData = {
   current_status: string | null;
   description: string | null;
   image_url: string | null;
+  image_display?: ImageDisplaySettings | null;
   location_id: string | null;
   gm_notes: string | null;
   is_revealed: boolean;
@@ -72,6 +79,7 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
     current_status: null,
     description: null,
     image_url: null,
+    image_display: { ...DEFAULT_IMAGE_DISPLAY },
     location_id: defaultHqLocationId ?? null,
     gm_notes: null,
     is_revealed: false,
@@ -149,6 +157,7 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
         current_status: initialData.current_status || null,
         description: initialData.description || null,
         image_url: initialData.image_url || null,
+        image_display: normalizeImageDisplay(initialData.image_display ?? null),
         location_id: initialData.location_id || null,
         gm_notes: initialData.gm_notes || null,
         is_revealed: initialData.is_revealed || false,
@@ -697,6 +706,16 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold focus:ring-1 focus:ring-accent-gold"
               placeholder="https://..."
             />
+            {formData.image_url?.trim() ? (
+              <div className="mt-4">
+                <ImageUrlDisplayEditor
+                  value={formData.image_display ?? DEFAULT_IMAGE_DISPLAY}
+                  onChange={(image_display) => setFormData((prev) => ({ ...prev, image_display }))}
+                  previewUrl={formData.image_url}
+                  previewAspectClassName="aspect-video max-w-md"
+                />
+              </div>
+            ) : null}
           </div>
 
           {/* Description */}

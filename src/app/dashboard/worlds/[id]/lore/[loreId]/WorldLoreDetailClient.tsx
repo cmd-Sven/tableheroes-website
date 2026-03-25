@@ -9,6 +9,7 @@ import { LoreHeaderImageSlider } from "@/src/components/dashboard/campaigns/lore
 import { SmartText } from "@/src/components/ui/SmartText";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { normalizeImageDisplay } from "@/src/lib/image-display";
 import { SUGGESTED_PARENT_TYPES, SUGGESTED_CHILD_TYPES, isLocationType } from "@/src/lib/lore-types";
 
 type LoreData = {
@@ -16,8 +17,9 @@ type LoreData = {
   type: string;
   description: string | null;
   image_url: string | null;
+  image_display?: unknown;
   gm_notes?: string | null;
-  additional_images: Array<{ url: string; description: string }>;
+  additional_images?: Array<{ url: string; description: string; display?: unknown }>;
   parent_id?: string | null;
 };
 
@@ -168,9 +170,14 @@ export function WorldLoreDetailClient({
     });
   };
 
-  const allImages: Array<{ url: string; description: string }> = [
-    ...(lore.image_url ? [{ url: lore.image_url, description: lore.name }] : []),
-    ...lore.additional_images,
+  const baseDisplay = normalizeImageDisplay(lore.image_display);
+  const allImages = [
+    ...(lore.image_url ? [{ url: lore.image_url, description: lore.name, display: baseDisplay }] : []),
+    ...(lore.additional_images || []).map((img) => ({
+      url: img.url,
+      description: img.description,
+      display: normalizeImageDisplay(img.display ?? baseDisplay),
+    })),
   ].filter((img) => img.url?.trim());
 
   return (
@@ -976,13 +983,13 @@ export function WorldLoreDetailClient({
       )}
 
       {/* Bildergalerie (alle zusätzlichen Bilder) */}
-      {lore.additional_images.length > 0 && (
+      {(lore.additional_images || []).length > 0 && (
         <div className="mt-6 rounded-lg border border-hero-dark bg-background-card p-6">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
             Bildergalerie
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {lore.additional_images.map((img, index) => (
+            {(lore.additional_images || []).map((img, index) => (
               <button
                 key={index}
                 type="button"
@@ -1013,7 +1020,7 @@ export function WorldLoreDetailClient({
       )}
 
       {/* Lightbox */}
-      {lightboxImage && lore.additional_images.length > 0 && (
+      {lightboxImage && (lore.additional_images || []).length > 0 && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
           onClick={() => setLightboxImage(null)}
@@ -1036,9 +1043,9 @@ export function WorldLoreDetailClient({
             {lightboxImage.description && (
               <p className="font-libre text-lg text-white text-center mt-4">{lightboxImage.description}</p>
             )}
-            {lore.additional_images.length > 1 && (
+            {(lore.additional_images || []).length > 1 && (
               <p className="font-barlow text-sm text-gray-400 text-center mt-2">
-                Bild {lightboxImage.index + 1} von {lore.additional_images.length}
+                Bild {lightboxImage.index + 1} von {(lore.additional_images || []).length}
               </p>
             )}
           </div>

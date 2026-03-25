@@ -14,6 +14,12 @@ import { AIGenerationWizard } from "./AIGenerationWizard";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { CheckResultsEditor } from "./CheckResultsEditor";
 import { suggestInferenceRelationsForTarget } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import {
+  DEFAULT_IMAGE_DISPLAY,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
 
 type NPC = {
   id?: string;
@@ -89,6 +95,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
   const showAdvancedSections = isEditMode || !!hookContext || !!initialData;
 
   // Context NPCs State
+  const [imageDisplay, setImageDisplay] = useState<ImageDisplaySettings>({ ...DEFAULT_IMAGE_DISPLAY });
+
   const [contextNPCs, setContextNPCs] = useState<{
     sameLocation: Array<{ id: string; name: string; image_url: string | null; role: string | null }>;
     nearbyLocations: Array<{ id: string; name: string; image_url: string | null; role: string | null }>;
@@ -211,6 +219,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         true_nature: (initialData as any).true_nature || "",
         check_results: (initialData as any).check_results || [],
       });
+      setImageDisplay(normalizeImageDisplay((initialData as { image_display?: unknown }).image_display));
     } else {
       setFormData({
         name: "",
@@ -236,6 +245,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         true_nature: "",
         check_results: [],
       });
+      setImageDisplay({ ...DEFAULT_IMAGE_DISPLAY });
     }
   }, [initialData]);
 
@@ -371,6 +381,9 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           personality_traits: formData.personality_traits || undefined,
           gm_notes: formData.gm_notes || undefined,
           image_url: formData.image_url || undefined,
+          image_display: formData.image_url.trim()
+            ? normalizeImageDisplay(imageDisplay)
+            : null,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId,
@@ -732,6 +745,16 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
                   placeholder="https://example.com/image.jpg"
                 />
+                {formData.image_url.trim() ? (
+                  <div className="mt-3">
+                    <ImageUrlDisplayEditor
+                      value={imageDisplay}
+                      onChange={setImageDisplay}
+                      previewUrl={formData.image_url}
+                      previewAspectClassName="aspect-[3/4] max-w-[220px]"
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
 

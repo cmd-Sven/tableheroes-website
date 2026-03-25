@@ -147,17 +147,26 @@ export default async function WorldLoreDetailPage({ params }: Props) {
   const backLabel = isLocation ? "Zurück zu Orte" : "Zurück zu Lore";
 
   // Parse additional_images (can be JSON string from DB)
-  const parseAdditionalImages = (val: unknown): Array<{ url: string; description: string }> => {
+  const parseAdditionalImages = (
+    val: unknown
+  ): Array<{ url: string; description: string; display?: unknown }> => {
     if (!val) return [];
+    const mapItem = (i: any) => ({
+      url: String(i?.url ?? ""),
+      description: String(i?.description ?? ""),
+      ...(i?.display != null ? { display: i.display } : {}),
+    });
     if (typeof val === "string") {
       try {
         const parsed = JSON.parse(val);
-        return Array.isArray(parsed) ? parsed.filter((i: any) => i?.url?.trim()) : [];
+        return Array.isArray(parsed)
+          ? parsed.filter((i: any) => i?.url?.trim()).map(mapItem)
+          : [];
       } catch {
         return [];
       }
     }
-    return Array.isArray(val) ? val.filter((i: any) => i?.url?.trim()) : [];
+    return Array.isArray(val) ? val.filter((i: any) => i?.url?.trim()).map(mapItem) : [];
   };
 
   const additionalImages = parseAdditionalImages(lore.additional_images);
@@ -203,6 +212,7 @@ export default async function WorldLoreDetailPage({ params }: Props) {
           type: lore.type,
           description: lore.description,
           image_url: lore.image_url,
+          image_display: lore.image_display,
           gm_notes: lore.gm_notes,
           additional_images: additionalImages,
           parent_id: lore.parent_id,
