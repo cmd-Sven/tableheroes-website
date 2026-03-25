@@ -161,6 +161,86 @@ export async function getCharacterWizardLoreData(campaignId: string) {
   return { races, cultures, languages };
 }
 
+/** Spieler: Auswahl nur gültig, wenn campaign_visibility für genau diese campaignId is_revealed ist (GM überspringt). */
+async function validatePlayerSelectionsAgainstCampaignVisibility(
+  supabase: any,
+  params: {
+    campaignId: string;
+    worldId: string;
+    actorUserId: string;
+    campaignGmId: string;
+    faction_id?: string | null;
+    location_id?: string | null;
+    culture_lore_id?: string | null;
+    languages?: string[];
+    existing_contacts?: Array<{ npc_id: string; relationship_type?: string }>;
+  },
+) {
+  if (params.actorUserId === params.campaignGmId) return;
+
+  const { getVisibilityForCampaign } = await import("./campaign-visibility-actions");
+  const [loreVis, facVis, npcVis] = await Promise.all([
+    getVisibilityForCampaign(params.campaignId, "lore"),
+    getVisibilityForCampaign(params.campaignId, "faction"),
+    getVisibilityForCampaign(params.campaignId, "npc"),
+  ]);
+
+  if (params.faction_id) {
+    if (facVis[params.faction_id] !== true) {
+      throw new Error("Diese Fraktion ist in dieser Kampagne nicht freigegeben.");
+    }
+    const { data: fRow } = await (supabase.from("factions") as any)
+      .select("world_id, allow_pc_join_on_creation")
+      .eq("id", params.faction_id)
+      .single();
+    if (!fRow || fRow.world_id !== params.worldId || fRow.allow_pc_join_on_creation !== true) {
+      throw new Error("Ungültige Fraktionswahl.");
+    }
+  }
+
+  if (params.location_id) {
+    if (loreVis[params.location_id] !== true) {
+      throw new Error("Dieser Ort ist in dieser Kampagne nicht freigegeben.");
+    }
+    const { data: lRow } = await (supabase.from("world_lore") as any)
+      .select("world_id, allow_pc_origin")
+      .eq("id", params.location_id)
+      .single();
+    if (!lRow || lRow.world_id !== params.worldId || lRow.allow_pc_origin !== true) {
+      throw new Error("Ungültige Ortswahl.");
+    }
+  }
+
+  if (params.culture_lore_id) {
+    if (loreVis[params.culture_lore_id] !== true) {
+      throw new Error("Diese Kultur ist in dieser Kampagne nicht freigegeben.");
+    }
+    const { data: cRow } = await (supabase.from("world_lore") as any)
+      .select("world_id, type")
+      .eq("id", params.culture_lore_id)
+      .single();
+    if (!cRow || cRow.world_id !== params.worldId || cRow.type !== "Kultur") {
+      throw new Error("Ungültige Kulturwahl.");
+    }
+  }
+
+  if (params.languages?.length) {
+    for (const langId of params.languages) {
+      if (loreVis[langId] !== true) {
+        throw new Error("Eine gewählte Sprache ist in dieser Kampagne nicht freigegeben.");
+      }
+    }
+  }
+
+  if (params.existing_contacts?.length) {
+    for (const c of params.existing_contacts) {
+      if (c.npc_id && npcVis[c.npc_id] !== true) {
+        throw new Error("Ein gewählter NPC ist in dieser Kampagne nicht freigegeben.");
+      }
+    }
+  }
+}
+
 /**
  * Server Actions für Charakter-Erstellung mit Beziehungen
  */
@@ -248,6 +328,27 @@ export async function createCharacterWithRelations(data: {
     }
     // If character is Dead or Archived, allow creating a new one
   }
+
+  const { data: campaignCtxRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, world_id")
+    .eq("id", data.campaign_id)
+    .single();
+  const campaignCtx = campaignCtxRaw as { gm_id: string; world_id: string | null } | null;
+  if (!campaignCtx?.world_id) {
+    throw new Error("Kampagne hat keine Welt.");
+  }
+
+  await validatePlayerSelectionsAgainstCampaignVisibility(supabase, {
+    campaignId: data.campaign_id,
+    worldId: campaignCtx.world_id,
+    actorUserId: user.id,
+    campaignGmId: campaignCtx.gm_id,
+    faction_id: data.faction_id,
+    location_id: data.location_id,
+    culture_lore_id: data.culture_lore_id,
+    languages: data.languages,
+    existing_contacts: data.existing_contacts,
+  });
 
   // 3. Start transaction-like operations
   try {
@@ -410,6 +511,24 @@ export async function updateCharacterPlayer(data: {
   if ((charRow as any).campaign_id !== data.campaign_id) {
     throw new Error("Charakter gehört nicht zu dieser Kampagne.");
   }
+
+  const { data: campaignMeta } = await (supabase.from("campaigns") as any)
+    .select("gm_id, world_id")
+    .eq("id", data.campaign_id)
+    .single();
+  const cmeta = campaignMeta as { gm_id: string; world_id: string | null } | null;
+  if (!cmeta?.world_id) throw new Error("Kampagne hat keine Welt.");
+
+  await validatePlayerSelectionsAgainstCampaignVisibility(supabase, {
+    campaignId: data.campaign_id,
+    worldId: cmeta.world_id,
+    actorUserId: user.id,
+    campaignGmId: cmeta.gm_id,
+    faction_id: data.faction_membership !== undefined ? data.faction_membership : undefined,
+    location_id: data.current_location_id !== undefined ? data.current_location_id : undefined,
+    culture_lore_id: data.culture_lore_id !== undefined ? data.culture_lore_id : undefined,
+    languages: data.languages !== undefined ? data.languages : undefined,
+  });
 
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;

@@ -38,6 +38,7 @@ import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlid
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-actions";
+import { getVisibilityForCampaign } from "./campaign-visibility-actions";
 import { getCharacterFactionReputations } from "./reputation-actions";
 import type {
   DiscoveryItem,
@@ -675,7 +676,7 @@ export default async function CampaignDetailPage({
   // ============================================================================
   const galleryImages = await getCampaignGalleryImages(id);
 
-  // Charakter-Wizard: Orte aus world_lore (allow_pc_origin ODER is_revealed), Fraktionen aus factions (allow_pc_join_on_creation)
+  // Charakter-Wizard (Spieler): world_lore + allow_pc_origin + campaign_visibility dieser Kampagne; Fraktionen analog
   // Typen wie in DB: Stadt, Region, Ort, Akademie (case-insensitive)
   const GEOGRAPHIC_TYPES = [
     "Stadt",
@@ -719,6 +720,12 @@ export default async function CampaignDetailPage({
     wizardLocations = ((allWorldLore || []) as any[]).filter(
       (e: any) => typeMatchesGeographic(e.type) && e.allow_pc_origin === true
     );
+    const [loreVisWizard, facVisWizard] = await Promise.all([
+      getVisibilityForCampaign(id, "lore"),
+      getVisibilityForCampaign(id, "faction"),
+    ]);
+    wizardLocations = wizardLocations.filter((e: any) => loreVisWizard[e.id] === true);
+    wizardFactions = wizardFactions.filter((f: any) => facVisWizard[f.id] === true);
     console.log("✅ wizardLocations:", wizardLocations.length, wizardLocations.map((l: any) => l.name));
   } else {
     console.log("⚠️ wizardFactions/wizardLocations: kein campaignWorldId, isGM=", isGM);

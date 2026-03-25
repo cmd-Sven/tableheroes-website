@@ -659,7 +659,7 @@ export async function updateNPCAllowPcOnboarding(npcId: string, allow: boolean) 
 }
 
 // ============================================================================
-// Get NPCs by Faction for Onboarding (campaign_visibility.is_revealed OR allow_pc_onboarding)
+// Nur NPCs, die in dieser Kampagne für Spieler freigegeben sind UND für Onboarding markiert sind
 // ============================================================================
 export async function getNPCsByFactionForOnboarding(campaignId: string, factionId: string) {
   const supabase = await createClient();
@@ -689,7 +689,7 @@ export async function getNPCsByFactionForOnboarding(campaignId: string, factionI
 
   const visibility = await getVisibilityForCampaign(campaignId, "npc");
   const npcs = (npcsRaw || []).filter(
-    (npc: any) => visibility[npc.id] === true || npc.allow_pc_onboarding === true
+    (npc: any) => visibility[npc.id] === true && npc.allow_pc_onboarding === true,
   );
   return npcs.map((n: any) => ({ id: n.id, name: n.name, title: n.title, role: n.role })) as { id: string; name: string; title: string | null; role: string | null }[];
 }

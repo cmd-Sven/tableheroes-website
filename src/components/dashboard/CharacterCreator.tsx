@@ -103,7 +103,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     status: "Alive",
   });
 
-  // Filter revealed items (already filtered in parent: wizardFactions / wizardLocations aus world_lore)
+  // Spieler: Fraktionen/Orte/NPCs kommen serverseitig nur mit Freigaben der jeweiligen Kampagne (campaign_visibility)
   const revealedFactions = factions;
   const revealedLocations = locations;
   const revealedNPCs = npcs;

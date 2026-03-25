@@ -618,7 +618,10 @@ export async function getChildLocationsForOnboarding(campaignId: string, parentI
     console.error("getChildLocationsForOnboarding Error:", error);
     return [];
   }
-  return (children || []) as { id: string; name: string; type: string }[];
+  const visibility = await getVisibilityForCampaign(campaignId, "lore");
+  return ((children || []) as { id: string; name: string; type: string }[]).filter(
+    (c) => visibility[c.id] === true,
+  );
 }
 
 // ============================================================================

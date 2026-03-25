@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CharacterCreatorPageClient } from "./CharacterCreatorPageClient";
 import { getNPCs } from "../../npc-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
 
 const GEOGRAPHIC_TYPES = ["Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde"];
 const typeMatchesGeographic = (type: string | null | undefined) =>
@@ -73,6 +74,12 @@ export default async function CharacterNewPage({ params }: Props) {
       wizardLocations = ((allLore || []) as any[]).filter(
         (e: any) => typeMatchesGeographic(e.type) && e.allow_pc_origin === true
       );
+      const [loreVis, facVis] = await Promise.all([
+        getVisibilityForCampaign(campaignId, "lore"),
+        getVisibilityForCampaign(campaignId, "faction"),
+      ]);
+      wizardLocations = wizardLocations.filter((e: any) => loreVis[e.id] === true);
+      wizardFactions = wizardFactions.filter((f: any) => facVis[f.id] === true);
     }
     npcs = await getNPCs(campaignId, user.id, isGM);
   }
