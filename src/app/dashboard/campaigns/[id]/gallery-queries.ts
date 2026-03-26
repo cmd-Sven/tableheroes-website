@@ -1,16 +1,5 @@
-"use server";
-
 import { createClient } from "@/src/lib/supabase/server";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
-
-/**
- * Server Action: Get Campaign Gallery Images
- *
- * Sammelt alle für diese Kampagne sichtbaren Bilder (campaign_visibility.is_revealed) aus:
- * - world_lore (image_url)
- * - npcs (image_url)
- * - factions (image_url, falls campaign_visibility für faction genutzt wird)
- */
 
 type GalleryImage = {
   id: string;
@@ -19,15 +8,13 @@ type GalleryImage = {
   type: "lore" | "npc" | "faction";
 };
 
-export async function getCampaignGalleryImages(
-  campaignId: string,
-): Promise<GalleryImage[]> {
+export async function getCampaignGalleryImages(campaignId: string): Promise<GalleryImage[]> {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht authentifiziert.");
+  if (!user) return [];
 
   const { data: campaign } = await (supabase.from("campaigns") as any)
     .select("world_id")

@@ -279,26 +279,7 @@ export async function completeQuest(questId: string) {
   revalidatePath(`/dashboard/campaigns/${quest.campaign_id}`);
 }
 
-// ============================================================================
-// Get Quests (with NPC & Location Joins)
-// ============================================================================
-export async function getQuests(campaignId: string) {
-  const supabase = await createClient();
-
-  // Fetch quests für die Kampagne (ohne abhängige Joins, um Schema-Cache-Fehler zu vermeiden)
-  const { data: quests, error } = await (supabase.from("quests") as any)
-    .select("*")
-    .eq("campaign_id", campaignId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Fetch Quests Error:", error);
-    console.error("Fehlerinhalt:", JSON.stringify(error, null, 2));
-    return [];
-  }
-
-  return quests || [];
-}
+// getQuests: quest-queries.ts
 
 // ============================================================================
 // Quest Participants Management

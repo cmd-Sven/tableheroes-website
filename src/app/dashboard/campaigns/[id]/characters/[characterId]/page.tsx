@@ -3,8 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCampaignAccess } from "../../campaign-access";
 import { getCharacterFromMembersForGM } from "../../character-actions";
-import { getFactionsWithMembers } from "../../factions-actions";
-import { getNPCs } from "../../npc-actions";
+import { getFactionsWithMembers } from "../../factions-queries";
+import { getNPCs } from "../../npc-queries";
 import { GMCharacterEditorPage } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
 
 type Props = {

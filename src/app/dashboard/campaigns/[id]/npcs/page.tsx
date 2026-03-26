@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCampaignAccess } from "../campaign-access";
-import { getNPCs } from "../npc-actions";
-import { getFactionsWithMembers } from "../factions-actions";
+import { getNPCs } from "../npc-queries";
+import { getFactionsWithMembers } from "../factions-queries";
 import { NPCsManagement } from "../NPCsManagement";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 

@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getGmCampaignMembersWithCharacters } from "./members-actions";
+import { getCharacterWizardLoreData as loadCharacterWizardLoreData } from "./character-queries";
 
 /**
  * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
@@ -102,63 +103,11 @@ export async function getCharacterFromMembersForGM(
 }
 
 /**
- * Rassen, Kulturen und Sprachen für den Character-Wizard laden.
- * Nur freigegebene (revealed) Lore-Einträge werden berücksichtigt.
+ * Rassen, Kulturen und Sprachen für den Character-Wizard (Server Action für Client).
+ * Implementierung: character-queries.ts
  */
 export async function getCharacterWizardLoreData(campaignId: string) {
-  const supabase = await createClient();
-
-  // Kampagne → world_id
-  const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("world_id")
-    .eq("id", campaignId)
-    .single();
-  if (!campaign?.world_id) return { races: [], cultures: [], languages: [] };
-
-  const worldId = campaign.world_id as string;
-
-  // Freigegebene Lore-IDs für diese Kampagne
-  const { data: visRows } = await (supabase.from("campaign_visibility") as any)
-    .select("entity_id")
-    .eq("campaign_id", campaignId)
-    .eq("entity_type", "lore")
-    .eq("is_revealed", true);
-
-  const revealedIds = new Set(((visRows as any[]) ?? []).map((v: any) => v.entity_id as string));
-
-  // Alle Rassen, Kulturen, Sprachen der Welt laden
-  const { data: loreRows } = await (supabase.from("world_lore") as any)
-    .select("id, name, type, culture_id, race_ids, language_ids")
-    .eq("world_id", worldId)
-    .in("type", ["Rasse", "Kultur", "Sprache"]);
-
-  const all = (loreRows as any[]) ?? [];
-
-  const races = all
-    .filter((l: any) => l.type === "Rasse" && revealedIds.has(l.id))
-    .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
-      culture_id: l.culture_id as string | null,
-    }));
-
-  const cultures = all
-    .filter((l: any) => l.type === "Kultur" && revealedIds.has(l.id))
-    .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
-      race_ids: (l.race_ids as string[]) ?? [],
-      language_ids: (l.language_ids as string[]) ?? [],
-    }));
-
-  const languages = all
-    .filter((l: any) => l.type === "Sprache" && revealedIds.has(l.id))
-    .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
-    }));
-
-  return { races, cultures, languages };
+  return loadCharacterWizardLoreData(campaignId);
 }
 
 /** Spieler: Auswahl nur gültig, wenn campaign_visibility für genau diese campaignId is_revealed ist (GM überspringt). */

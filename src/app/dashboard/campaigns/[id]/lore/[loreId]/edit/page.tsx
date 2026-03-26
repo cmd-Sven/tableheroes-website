@@ -2,8 +2,9 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { LoreForm } from "@/src/components/dashboard/campaigns/lore/LoreForm";
-import { getLoreById, getLoreEntries } from "../../../lore-actions";
-import { getWorldByCampaign } from "../../../world-actions";
+import { getLoreById } from "../../../lore-actions";
+import { getLoreEntries } from "../../../lore-queries";
+import { getWorldByCampaign } from "../../../world-queries";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;

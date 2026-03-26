@@ -13,11 +13,11 @@ import {
 import { togglePublishStatus, updateCampaignDetails } from "./actions";
 import { MembersManagement } from "./MembersManagement";
 import { GroupRewardForm } from "@/src/components/campaigns/GroupRewardForm";
-import { getNPCs } from "./npc-actions";
-import { getFactionsWithMembers } from "./factions-actions";
-import { getLoreEntries } from "./lore-actions";
+import { getNPCs } from "./npc-queries";
+import { getFactionsWithMembers } from "./factions-queries";
+import { getLoreEntries } from "./lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
-import { getQuests } from "./quest-actions";
+import { getQuests } from "./quest-queries";
 import { NPCsManagement } from "./NPCsManagement";
 import { FactionsManagement } from "./FactionsManagement";
 import { LoreManagement } from "./LoreManagement";
@@ -29,17 +29,17 @@ import { CharacterSheet } from "@/src/components/dashboard/campaigns/CharacterSh
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
 import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
 import { CampaignScheduleForm } from "@/src/components/dashboard/campaigns/CampaignScheduleForm";
-import { getCampaignGalleryImages } from "./gallery-actions";
-import { getWorldByCampaign, getWorldsByGm } from "./world-actions";
+import { getCampaignGalleryImages } from "./gallery-queries";
+import { getWorldByCampaign, getWorldsByGm } from "./world-queries";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 import { OnboardingSettings } from "@/src/components/dashboard/campaigns/OnboardingSettings";
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
 import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlider";
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
-import { getCharacterWizardLoreData } from "./character-actions";
+import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
-import { getCharacterFactionReputations } from "./reputation-actions";
+import { getCharacterFactionReputations } from "./reputation-queries";
 import type {
   DiscoveryItem,
   PartyMember,

@@ -1,9 +1,10 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { getNPCById, getNPCs } from "../../npc-actions";
+import { getNPCById } from "../../npc-actions";
+import { getNPCs } from "../../npc-queries";
 import { redirect, notFound } from "next/navigation";
 import { NPCDetailPage } from "@/src/components/dashboard/campaigns/NPCDetailPage";
 import { getFactions } from "../../factions-actions";
-import { getLoreEntries } from "../../lore-actions";
+import { getLoreEntries } from "../../lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { getCampaignNote } from "../../campaign-notes-actions";

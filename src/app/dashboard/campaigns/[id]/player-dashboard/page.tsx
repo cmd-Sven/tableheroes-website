@@ -4,10 +4,10 @@ import Link from "next/link";
 import { ArrowLeft, User, Shield, Users, ExternalLink } from "lucide-react";
 import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlider";
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
-import { getLoreEntries } from "../lore-actions";
-import { getNPCs } from "../npc-actions";
-import { getFactionsWithMembers } from "../factions-actions";
-import { getCharacterFactionReputations } from "../reputation-actions";
+import { getLoreEntries } from "../lore-queries";
+import { getNPCs } from "../npc-queries";
+import { getFactionsWithMembers } from "../factions-queries";
+import { getCharacterFactionReputations } from "../reputation-queries";
 
 type Props = {
   params: Promise<{ id: string }>;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { NPCForm } from "@/src/components/dashboard/campaigns/npcs/NPCForm";
 import { getNPCById } from "../../../npc-actions";
 import { getFactions } from "../../../factions-actions";
-import { getLoreEntries } from "../../../lore-actions";
+import { getLoreEntries } from "../../../lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {

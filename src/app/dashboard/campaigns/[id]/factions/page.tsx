@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { getCampaignAccess } from "../campaign-access";
-import { getFactionsWithMembers } from "../factions-actions";
-import { getNPCs } from "../npc-actions";
-import { getCharacterFactionReputations } from "../reputation-actions";
+import { getFactionsWithMembers } from "../factions-queries";
+import { getNPCs } from "../npc-queries";
+import { getCharacterFactionReputations } from "../reputation-queries";
 import { FactionsManagement } from "../FactionsManagement";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 

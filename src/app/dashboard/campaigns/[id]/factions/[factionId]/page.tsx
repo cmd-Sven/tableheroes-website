@@ -4,8 +4,8 @@ import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FactionDetailPage } from "@/src/components/dashboard/campaigns/FactionDetailPage";
-import { getNPCs } from "../../npc-actions";
-import { getLoreEntries } from "../../lore-actions";
+import { getNPCs } from "../../npc-queries";
+import { getLoreEntries } from "../../lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 import { getCampaignNote } from "../../campaign-notes-actions";
 

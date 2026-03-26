@@ -1,7 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
-import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 
 type Props = {
   params: Promise<{ sessionId: string }>;

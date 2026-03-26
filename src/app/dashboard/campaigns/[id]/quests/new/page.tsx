@@ -1,8 +1,8 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { QuestForm } from "@/src/components/dashboard/campaigns/quests/QuestForm";
-import { getNPCs } from "../../npc-actions";
-import { getLoreEntries } from "../../lore-actions";
+import { getNPCs } from "../../npc-queries";
+import { getLoreEntries } from "../../lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {

@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { QuestDetailPage } from "@/src/components/dashboard/campaigns/quests/QuestDetailPage";
 import { getQuestById } from "@/src/app/dashboard/campaigns/[id]/quest-actions";
-import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
-import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
+import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {

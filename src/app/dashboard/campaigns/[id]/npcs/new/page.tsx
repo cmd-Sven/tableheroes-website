@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AIGenerationWizardEmbedded } from "@/src/components/dashboard/campaigns/npcs/AIGenerationWizardEmbedded";
 import { getFactions } from "../../factions-actions";
 import { getAllLocations } from "../../location-actions";
-import { getWorldByCampaign } from "../../world-actions";
+import { getWorldByCampaign } from "../../world-queries";
 
 type Props = {
   params: Promise<{ id: string }>;

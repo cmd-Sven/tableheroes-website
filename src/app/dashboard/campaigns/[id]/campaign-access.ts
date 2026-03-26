@@ -55,7 +55,7 @@ export async function getCampaignAccess(campaignId: string): Promise<CampaignAcc
 
   let gmWorlds: { id: string; name: string; description: string | null }[] = [];
   if (isGM && !world) {
-    const { getWorldsByGm } = await import("./world-actions");
+    const { getWorldsByGm } = await import("./world-queries");
     gmWorlds = await getWorldsByGm(user.id);
   }
 

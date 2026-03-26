@@ -2,53 +2,19 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import {
+  getCharacterFactionReputations as loadCharacterFactionReputations,
+  type FactionReputation,
+} from "./reputation-queries";
 
-export type FactionReputation = {
-  id: string;
-  faction_id: string;
-  faction_name: string;
-  reputation: number;
-  rank: string | null;
-  gm_notes: string | null;
-};
+export type { FactionReputation };
 
-/**
- * Ruf eines Charakters bei Fraktionen laden (für Spieler: eigener Charakter)
- */
+/** Server Action für Client; Server Components: reputation-queries importieren. */
 export async function getCharacterFactionReputations(
   characterId: string,
-  campaignId: string
+  campaignId: string,
 ): Promise<FactionReputation[]> {
-  const supabase = await createClient();
-
-  const { data: rows, error } = await (supabase.from("character_faction_reputation") as any)
-    .select("id, faction_id, reputation, rank, gm_notes")
-    .eq("character_id", characterId);
-
-  if (error) {
-    console.warn("[getCharacterFactionReputations] error:", error);
-    return [];
-  }
-
-  const items = (rows as any[]) ?? [];
-  if (items.length === 0) return [];
-
-  const factionIds = [...new Set(items.map((r: any) => r.faction_id))];
-  const { data: factionRows } = await (supabase.from("factions") as any)
-    .select("id, name")
-    .in("id", factionIds);
-  const factionMap = new Map(
-    ((factionRows as { id: string; name: string }[]) ?? []).map((f) => [f.id, f.name])
-  );
-
-  return items.map((r: any) => ({
-    id: r.id,
-    faction_id: r.faction_id,
-    faction_name: factionMap.get(r.faction_id) ?? "Unbekannt",
-    reputation: r.reputation ?? 0,
-    rank: r.rank ?? null,
-    gm_notes: r.gm_notes,
-  }));
+  return loadCharacterFactionReputations(characterId, campaignId);
 }
 
 /**

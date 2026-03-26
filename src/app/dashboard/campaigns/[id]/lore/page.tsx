@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCampaignAccess } from "../campaign-access";
-import { getLoreEntries } from "../lore-actions";
+import { getLoreEntries } from "../lore-queries";
 import { LoreManagement } from "../LoreManagement";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 

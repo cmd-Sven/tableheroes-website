@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CharacterCreatorPageClient } from "./CharacterCreatorPageClient";
-import { getNPCs } from "../../npc-actions";
+import { getNPCs } from "../../npc-queries";
 import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 
 const GEOGRAPHIC_TYPES = ["Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde"];
