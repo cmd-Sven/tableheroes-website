@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CharacterCreatorPageClient } from "./CharacterCreatorPageClient";
 import { getNPCs } from "../../npc-actions";
-import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 
 const GEOGRAPHIC_TYPES = ["Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde"];
 const typeMatchesGeographic = (type: string | null | undefined) =>

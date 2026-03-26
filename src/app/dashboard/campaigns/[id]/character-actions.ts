@@ -178,7 +178,7 @@ async function validatePlayerSelectionsAgainstCampaignVisibility(
 ) {
   if (params.actorUserId === params.campaignGmId) return;
 
-  const { getVisibilityForCampaign } = await import("./campaign-visibility-actions");
+  const { getVisibilityForCampaign } = await import("./campaign-visibility-queries");
   const [loreVis, facVis, npcVis] = await Promise.all([
     getVisibilityForCampaign(params.campaignId, "lore"),
     getVisibilityForCampaign(params.campaignId, "faction"),

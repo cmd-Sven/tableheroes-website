@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
-import { getVisibilityForCampaign } from "./campaign-visibility-actions";
+import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 
 /**
  * Server Action: Get Campaign Gallery Images

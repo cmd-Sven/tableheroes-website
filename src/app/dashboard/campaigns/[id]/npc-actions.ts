@@ -2,7 +2,8 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visibility-actions";
+import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { setCampaignVisibility } from "./campaign-visibility-actions";
 
 /**
  * Server Actions für NPCs
@@ -733,7 +734,7 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht authentifiziert.");
+  if (!user) return [];
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
     .select("id, world_id")

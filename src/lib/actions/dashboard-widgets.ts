@@ -11,7 +11,7 @@ import type {
   SessionRsvp,
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
-import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
+import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");

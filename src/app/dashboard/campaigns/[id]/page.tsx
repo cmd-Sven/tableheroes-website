@@ -38,7 +38,7 @@ import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlid
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-actions";
-import { getVisibilityForCampaign } from "./campaign-visibility-actions";
+import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { getCharacterFactionReputations } from "./reputation-actions";
 import type {
   DiscoveryItem,

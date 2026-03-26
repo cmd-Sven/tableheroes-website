@@ -622,7 +622,7 @@ export async function generateFactionForWorld(worldId: string, userPrompt: strin
 // ============================================================================
 export async function getFactionsWithMembers(campaignId: string) {
   const supabase = await createClient();
-  const { getVisibilityForCampaign } = await import("./campaign-visibility-actions");
+  const { getVisibilityForCampaign } = await import("./campaign-visibility-queries");
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
     .select("id, world_id")

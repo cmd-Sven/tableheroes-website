@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { LoreDetailPage } from "@/src/components/dashboard/campaigns/lore/LoreDetailPage";
 import { getLoreById, getChildLoreEntries, getLoreEntriesForParent, getLoreBreadcrumb, getOrphanedLoreEntries } from "../../lore-actions";
-import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { getNPCsByLocation } from "../../location-actions";
 import { isLocationType } from "@/src/lib/lore-types";
 

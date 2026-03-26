@@ -1,6 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { getFactionById, getFactionRelations } from "../../factions-actions";
-import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FactionDetailPage } from "@/src/components/dashboard/campaigns/FactionDetailPage";

@@ -4,7 +4,8 @@ import { createClient } from "@/src/lib/supabase/server";
 import { BUILDING_LOCATION_TYPES } from "@/src/lib/lore-types";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { revalidatePath } from "next/cache";
-import { getVisibilityForCampaign, setCampaignVisibility } from "./campaign-visibility-actions";
+import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { setCampaignVisibility } from "./campaign-visibility-actions";
 
 /**
  * Server Actions für World Lore (Hierarchical)

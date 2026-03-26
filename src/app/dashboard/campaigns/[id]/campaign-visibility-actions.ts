@@ -2,46 +2,17 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { VisibilityEntityType } from "./campaign-visibility-queries";
+
+export type { VisibilityEntityType } from "./campaign-visibility-queries";
 
 /**
  * Erwartete Tabelle campaign_visibility:
  * - campaign_id (uuid), entity_type (text), entity_id (uuid), is_revealed (boolean)
  * - UNIQUE(campaign_id, entity_type, entity_id) oder PK(campaign_id, entity_type, entity_id)
+ *
+ * Sichtbarkeits-Queries: getVisibilityForCampaign in campaign-visibility-queries.ts (kein "use server").
  */
-
-export type VisibilityEntityType = "lore" | "npc" | "faction";
-
-/**
- * Lädt die Sichtbarkeits-Map für eine Kampagne und einen Entity-Typ.
- * Rückgabe: Record<entity_id, is_revealed>.
- */
-export async function getVisibilityForCampaign(
-  campaignId: string,
-  entityType: VisibilityEntityType
-): Promise<Record<string, boolean>> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return {};
-
-  const { data: rows, error } = await (supabase.from("campaign_visibility") as any)
-    .select("entity_id, is_revealed")
-    .eq("campaign_id", campaignId)
-    .eq("entity_type", entityType);
-
-  if (error) {
-    console.error("[campaign_visibility] getVisibilityForCampaign:", error);
-    return {};
-  }
-
-  const map: Record<string, boolean> = {};
-  (rows || []).forEach((r: { entity_id: string; is_revealed: boolean }) => {
-    map[r.entity_id] = !!r.is_revealed;
-  });
-  return map;
-}
 
 /**
  * Setzt oder toggelt die Sichtbarkeit eines Elements für eine Kampagne.

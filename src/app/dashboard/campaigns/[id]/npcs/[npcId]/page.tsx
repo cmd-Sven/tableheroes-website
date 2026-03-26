@@ -5,7 +5,7 @@ import { NPCDetailPage } from "@/src/components/dashboard/campaigns/NPCDetailPag
 import { getFactions } from "../../factions-actions";
 import { getLoreEntries } from "../../lore-actions";
 import { isLocationType } from "@/src/lib/lore-types";
-import { getVisibilityForCampaign } from "../../campaign-visibility-actions";
+import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { getCampaignNote } from "../../campaign-notes-actions";
 
 type Props = {

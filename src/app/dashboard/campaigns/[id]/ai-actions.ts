@@ -2205,7 +2205,7 @@ export async function generateBackstorySuggestions(
   }
 
   // 3. Fetch REVEALED entities only (Sichtbarkeit aus campaign_visibility)
-  const { getVisibilityForCampaign } = await import("./campaign-visibility-actions");
+  const { getVisibilityForCampaign } = await import("./campaign-visibility-queries");
   const { data: campaignRow } = await supabase.from("campaigns").select("world_id").eq("id", campaignId).single();
   const worldId = (campaignRow as any)?.world_id ?? null;
 
