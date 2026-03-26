@@ -10,6 +10,34 @@ const GEOGRAPHIC_TYPES = ["Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde
 const typeMatchesGeographic = (type: string | null | undefined) =>
   GEOGRAPHIC_TYPES.some((t) => String(t).toLowerCase() === String(type ?? "").toLowerCase());
 
+/** Nur primitive Felder – vermeidet RSC/Flight-Serialisierungsfehler durch DB-Typen. */
+function wizardFactionsForClient(rows: any[]) {
+  return rows.map((f: any) => ({
+    id: String(f.id),
+    name: f.name != null ? String(f.name) : "",
+    type: f.type != null ? String(f.type) : "",
+    allow_pc_join_on_creation: !!f.allow_pc_join_on_creation,
+  }));
+}
+
+function wizardLocationsForClient(rows: any[]) {
+  return rows.map((e: any) => ({
+    id: String(e.id),
+    name: e.name != null ? String(e.name) : "",
+    type: e.type != null ? String(e.type) : "",
+    allow_pc_origin: !!e.allow_pc_origin,
+  }));
+}
+
+function wizardNpcsForClient(rows: any[]) {
+  return rows.map((n: any) => ({
+    id: String(n.id),
+    name: n.name != null ? String(n.name) : "",
+    title: n.title != null ? String(n.title) : null,
+    role: n.role != null ? String(n.role) : null,
+  }));
+}
+
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -96,9 +124,9 @@ export default async function CharacterNewPage({ params }: Props) {
         </Link>
         <CharacterCreatorPageClient
           campaignId={campaignId}
-          factions={wizardFactions}
-          locations={wizardLocations}
-          npcs={npcs}
+          factions={wizardFactionsForClient(wizardFactions)}
+          locations={wizardLocationsForClient(wizardLocations)}
+          npcs={wizardNpcsForClient(npcs)}
         />
       </div>
     </div>

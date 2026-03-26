@@ -2,19 +2,9 @@
 
 import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
 
 const SITE_SETTINGS_KEY_MAINTENANCE = "maintenance_mode";
-
-/** Liest den Wartungsmodus aus site_settings (Key: maintenance_mode). */
-export async function getMaintenanceStatus(): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await (supabase.from("site_settings") as any)
-    .select("value")
-    .eq("key", SITE_SETTINGS_KEY_MAINTENANCE)
-    .maybeSingle();
-  const value = (data as any)?.value;
-  return value === "true" || value === true;
-}
 
 /** Schaltet den Wartungsmodus um. Nur Admins. */
 export async function toggleMaintenanceMode(): Promise<{

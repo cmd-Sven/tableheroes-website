@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Inbox, Users, UserPlus, ShieldCheck, ArrowRight } from "lucide-react";
-import { getPendingApplications } from "@/src/lib/actions/application-actions";
+import { getPendingApplications } from "@/src/lib/queries/application-queries";
 import { getPendingApprovalCharactersWithRequests } from "@/src/app/dashboard/campaigns/[id]/player-npc-requests-actions";
 
 export const revalidate = 0;

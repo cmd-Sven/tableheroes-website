@@ -5,8 +5,8 @@ import { Footer } from "@/src/components/layout/Footer";
 import { signOut } from "@/src/app/(auth)/signout-action";
 import { cookies } from "next/headers";
 import { SidebarWidthProvider } from "@/src/components/dashboard/SidebarWidthProvider";
-import { getPendingApplicationsCount } from "@/src/lib/actions/application-actions";
-import { getMaintenanceStatus } from "@/src/lib/actions/admin-actions";
+import { getPendingApplicationsCount } from "@/src/lib/queries/application-queries";
+import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
 
 export const dynamic = "force-dynamic";
 
