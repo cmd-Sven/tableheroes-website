@@ -496,6 +496,10 @@ export function MembersManagement({
                           </span>
                         </div>
                       </div>
+                    ) : member.character_id ? (
+                      <p className="font-libre text-xs text-gray-400">
+                        Charakter verknüpft — über „Verwalten“ öffnen, falls der Name hier nicht erscheint.
+                      </p>
                     ) : (
                       <p className="font-libre text-xs text-gray-500">
                         Noch kein Charakter
@@ -554,10 +558,10 @@ export function MembersManagement({
                     </>
                   )}
                   {isGM &&
-                    (member.character?.id ? (
+                    (member.character?.id || member.character_id ? (
                       <>
                         <Link
-                          href={`/dashboard/campaigns/${campaignId}/characters/${member.character.id}`}
+                          href={`/dashboard/campaigns/${campaignId}/characters/${member.character?.id ?? member.character_id}`}
                           className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-accent-gold transition-colors"
                           title="Charakter verwalten"
                         >
@@ -567,6 +571,8 @@ export function MembersManagement({
                           type="button"
                           onClick={async () => {
                             if (isProcessing) return;
+                            const charId = member.character?.id ?? member.character_id;
+                            if (!charId) return;
                             const name = member.character?.name || "diesen Charakter";
                             if (
                               !confirm(
@@ -576,7 +582,7 @@ export function MembersManagement({
                               return;
                             setIsProcessing(true);
                             try {
-                              await deleteCharacterByGM(member.character!.id, campaignId);
+                              await deleteCharacterByGM(charId, campaignId);
                               toast.success("Charakter wurde entfernt.");
                               window.location.reload();
                             } catch (err) {

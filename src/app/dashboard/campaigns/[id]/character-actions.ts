@@ -51,9 +51,44 @@ export async function getCharacterForMemberByUserId(
   return char as { id: string; name: string; class: string; race: string; level: number; status?: string } | null;
 }
 
+const GM_CHARACTER_BASE_SELECT =
+  "id, name, class, race, level, status, biography, avatar_url, modification_log";
+
 /**
- * GM: Charakter über Members-Liste laden (nutzt getGmCampaignMembersWithCharacters).
- * Diese Funktion funktioniert zuverlässig, da sie denselben Code-Pfad wie die Members-Anzeige nutzt.
+ * Lädt eine Charakterzeile für die GM-Ansicht.
+ * Ohne Service Role blockiert RLS oft die Batch-Abfrage in getGmCampaignMembersWithCharacters —
+ * dann ist character_id gesetzt, aber member.character fehlt. Direkter Select umgeht das
+ * zuverlässig mit Admin-Client; sonst Session (falls RLS GM-Lesen erlaubt).
+ */
+async function fetchCharacterRowForGm(
+  campaignId: string,
+  characterId: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const admin = createAdminClient();
+    const { data } = await (admin.from("characters") as any)
+      .select(GM_CHARACTER_BASE_SELECT)
+      .eq("id", characterId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (data) return data as Record<string, unknown>;
+  } catch {
+    /* kein SUPABASE_SERVICE_ROLE_KEY */
+  }
+  const supabase = await createClient();
+  const { data, error } = await (supabase.from("characters") as any)
+    .select(GM_CHARACTER_BASE_SELECT)
+    .eq("id", characterId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as Record<string, unknown>;
+}
+
+/**
+ * GM: Charakter für die Bearbeitungsseite laden.
+ * Nutzt die Members-Liste, falls der Charakter dort mit Daten ankommt; sonst direkter Fetch
+ * (wichtig, wenn RLS die Batch-Charaktere aus campaign_members ausblendet).
  */
 export async function getCharacterFromMembersForGM(
   campaignId: string,
@@ -62,28 +97,45 @@ export async function getCharacterFromMembersForGM(
   try {
     const { drafting, inReview, accepted } = await getGmCampaignMembersWithCharacters(campaignId);
     const allMembers = [...drafting, ...inReview, ...accepted];
+    const idNorm = String(characterId).toLowerCase();
     const member = allMembers.find(
-      (m) => m.character_id && String(m.character_id).toLowerCase() === String(characterId).toLowerCase()
+      (m) => m.character_id && String(m.character_id).toLowerCase() === idNorm
     );
-    if (!member?.character) return null;
 
-    const char = { ...member.character } as Record<string, unknown>;
-    const admin = createAdminClient();
+    let char: Record<string, unknown> | null = null;
+    if (member?.character) {
+      char = { ...(member.character as Record<string, unknown>) };
+    } else if (member?.character_id) {
+      char = await fetchCharacterRowForGm(campaignId, characterId);
+    } else {
+      char = await fetchCharacterRowForGm(campaignId, characterId);
+    }
 
-    // modification_log und character_relationships nachladen
-    const { data: charFull } = await (admin.from("characters") as any)
-      .select("modification_log")
-      .eq("id", characterId)
-      .maybeSingle();
-    if (charFull?.modification_log != null) char.modification_log = charFull.modification_log;
+    if (!char) return null;
 
-    const { data: relRows } = await (admin.from("character_relationships") as any)
+    let admin: ReturnType<typeof createAdminClient> | null = null;
+    try {
+      admin = createAdminClient();
+    } catch {
+      admin = null;
+    }
+
+    if (char.modification_log == null && admin) {
+      const { data: charFull } = await (admin.from("characters") as any)
+        .select("modification_log")
+        .eq("id", characterId)
+        .maybeSingle();
+      if (charFull?.modification_log != null) char.modification_log = charFull.modification_log;
+    }
+
+    const relClient = admin ?? (await createClient());
+    const { data: relRows } = await (relClient.from("character_relationships") as any)
       .select("id, relationship_type, description, npc_id")
       .eq("character_id", characterId);
     const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
     let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
     if (npcIds.length > 0) {
-      const { data: npcRows } = await (admin.from("npcs") as any)
+      const { data: npcRows } = await (relClient.from("npcs") as any)
         .select("id, name, role, title")
         .in("id", npcIds);
       npcMap = new Map(((npcRows as any[]) ?? []).map((n: any) => [n.id, { id: n.id, name: n.name, role: n.role, title: n.title }]));
