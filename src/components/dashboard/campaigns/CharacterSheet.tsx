@@ -9,6 +9,8 @@ import {
   Skull,
   Heart,
   ExternalLink,
+  Globe,
+  MapPin,
 } from "lucide-react";
 
 type CharacterRelationship = {
@@ -39,6 +41,11 @@ type Character = {
   status?: string | null;
   biography: string | null;
   faction_membership: string | null;
+  avatar_url?: string | null;
+  culture_name?: string | null;
+  language_names?: string[];
+  faction_name?: string | null;
+  location_name?: string | null;
   character_relationships?: CharacterRelationship[];
 };
 
@@ -56,26 +63,50 @@ function getReputationColorClasses(reputation: number): string {
   return "border-hero-border/40 bg-hero-dark/20";
 }
 
+function statusLabelDe(s: string): string {
+  switch (s) {
+    case "Alive":
+    case "Active":
+      return "Aktiv / Lebend";
+    case "Dead":
+      return "Tot";
+    case "Archived":
+      return "Archiviert";
+    case "Paused":
+      return "Pausiert";
+    case "Pending_Approval":
+      return "Wartet auf Freigabe";
+    case "In_Review":
+      return "In Prüfung";
+    default:
+      return s;
+  }
+}
+
 export function CharacterSheet({ character, campaignId, factionReputations = [] }: Props) {
   const relationships = character.character_relationships || [];
   const status = character.status || "Alive";
-  const isAlive = status === "Alive";
+  const isHealthy = status === "Alive" || status === "Active";
   const isDead = status === "Dead";
+  const langs =
+    character.language_names?.filter(Boolean).length ?? 0 > 0
+      ? (character.language_names ?? []).filter(Boolean)
+      : [];
 
   return (
     <div className="space-y-6">
       {/* Header Card */}
       <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
               <h2 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant">
                 {character.name}
               </h2>
               {/* Status Badge */}
               <span
                 className={`inline-flex items-center gap-1.5 rounded px-3 py-1 font-barlow font-bold uppercase text-xs ${
-                  isAlive
+                  isHealthy
                     ? "bg-green-900/30 text-green-400 border border-green-700"
                     : isDead
                     ? "bg-red-900/30 text-red-400 border border-red-700"
@@ -87,15 +118,7 @@ export function CharacterSheet({ character, campaignId, factionReputations = [] 
                 ) : (
                   <Heart className="h-3.5 w-3.5" />
                 )}
-                {status === "Alive"
-                  ? "Lebend"
-                  : status === "Dead"
-                  ? "Tot"
-                  : status === "Archived"
-                  ? "Archiviert"
-                  : status === "Paused"
-                  ? "Pausiert"
-                  : status}
+                {statusLabelDe(status)}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-4">
@@ -120,7 +143,50 @@ export function CharacterSheet({ character, campaignId, factionReputations = [] 
                 </span>
               </div>
             </div>
+            {(character.culture_name ||
+              langs.length > 0 ||
+              character.faction_name ||
+              character.location_name) && (
+              <div className="mt-4 space-y-2 rounded border border-hero-border/40 bg-hero-dark/20 p-4">
+                <p className="font-barlow font-bold text-xs uppercase text-gray-500">Herkunft & Zugehörigkeit</p>
+                {character.culture_name ? (
+                  <p className="font-libre text-sm text-gray-200">
+                    <span className="text-gray-500">Kultur:</span> {character.culture_name}
+                  </p>
+                ) : null}
+                {langs.length > 0 ? (
+                  <p className="font-libre text-sm text-gray-200 flex flex-wrap items-start gap-2">
+                    <Globe className="h-4 w-4 text-accent-gold shrink-0 mt-0.5" />
+                    <span>
+                      <span className="text-gray-500">Sprachen:</span> {langs.join(", ")}
+                    </span>
+                  </p>
+                ) : null}
+                {character.faction_name ? (
+                  <p className="font-libre text-sm text-gray-200">
+                    <span className="text-gray-500">Fraktion:</span> {character.faction_name}
+                  </p>
+                ) : null}
+                {character.location_name ? (
+                  <p className="font-libre text-sm text-gray-200 flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-accent-gold shrink-0 mt-0.5" />
+                    <span>
+                      <span className="text-gray-500">Heimatort:</span> {character.location_name}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
+          {character.avatar_url ? (
+            <div className="h-36 w-36 shrink-0 overflow-hidden rounded-lg border border-hero-border bg-hero-dark">
+              <img
+                src={character.avatar_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

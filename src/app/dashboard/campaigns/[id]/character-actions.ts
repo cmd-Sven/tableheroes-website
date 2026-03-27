@@ -52,7 +52,7 @@ export async function getCharacterForMemberByUserId(
 }
 
 const GM_CHARACTER_BASE_SELECT =
-  "id, name, class, race, level, status, biography, avatar_url, modification_log";
+  "id, name, class, race, level, status, biography, avatar_url, modification_log, culture_lore_id, languages, faction_membership, current_location_id";
 
 /**
  * Lädt eine Charakterzeile für die GM-Ansicht.
@@ -102,13 +102,13 @@ export async function getCharacterFromMembersForGM(
       (m) => m.character_id && String(m.character_id).toLowerCase() === idNorm
     );
 
-    let char: Record<string, unknown> | null = null;
-    if (member?.character) {
+    /** Vollständige Zeile (Kultur, Sprachen, Fraktion, Ort) — Batch aus members liefert oft nur Teilmenge. */
+    let char: Record<string, unknown> | null = await fetchCharacterRowForGm(
+      campaignId,
+      characterId,
+    );
+    if (!char && member?.character) {
       char = { ...(member.character as Record<string, unknown>) };
-    } else if (member?.character_id) {
-      char = await fetchCharacterRowForGm(campaignId, characterId);
-    } else {
-      char = await fetchCharacterRowForGm(campaignId, characterId);
     }
 
     if (!char) return null;
@@ -493,6 +493,7 @@ export async function updateCharacterPlayer(data: {
   languages?: string[];
   faction_membership?: string | null;
   current_location_id?: string | null;
+  avatar_url?: string | null;
 }) {
   const supabase = await createClient();
 
@@ -541,6 +542,9 @@ export async function updateCharacterPlayer(data: {
   if (data.languages !== undefined) updates.languages = data.languages;
   if (data.faction_membership !== undefined) updates.faction_membership = data.faction_membership;
   if (data.current_location_id !== undefined) updates.current_location_id = data.current_location_id;
+  if (data.avatar_url !== undefined) {
+    updates.avatar_url = data.avatar_url?.trim() ? data.avatar_url.trim() : null;
+  }
 
   const { error } = await (supabase.from("characters") as any)
     .update(updates)
@@ -558,9 +562,18 @@ export async function updateCharacterPlayer(data: {
 export async function updateCharacterByGM(data: {
   character_id: string;
   campaign_id: string;
-  status: "Alive" | "Dead" | "Archived" | "Paused";
+  /** DB kann Active, Pending_Approval, Alive, … nutzen */
+  status: string;
   level: number;
+  name: string;
+  class: string;
+  race: string;
   biography?: string | null;
+  culture_lore_id?: string | null;
+  languages?: string[];
+  faction_membership?: string | null;
+  current_location_id?: string | null;
+  avatar_url?: string | null;
   relationships: Array<{
     id?: string;
     npc_id: string;
@@ -578,12 +591,11 @@ export async function updateCharacterByGM(data: {
 
   // 2. Check if user is GM of this campaign
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, world_id")
     .eq("id", data.campaign_id)
     .single();
 
-  // Expliziter Cast, um 'never' zu verhindern
-  const campaign = campaignRaw as { gm_id: string } | null;
+  const campaign = campaignRaw as { gm_id: string; world_id: string | null } | null;
 
   if (!campaign) {
     throw new Error("Kampagne nicht gefunden.");
@@ -591,6 +603,19 @@ export async function updateCharacterByGM(data: {
 
   if (campaign.gm_id !== user.id) {
     throw new Error("Nur der Spielleiter kann Charaktere verwalten.");
+  }
+
+  if (campaign.world_id) {
+    await validatePlayerSelectionsAgainstCampaignVisibility(supabase, {
+      campaignId: data.campaign_id,
+      worldId: campaign.world_id,
+      actorUserId: user.id,
+      campaignGmId: campaign.gm_id,
+      faction_id: data.faction_membership ?? null,
+      location_id: data.current_location_id ?? null,
+      culture_lore_id: data.culture_lore_id ?? null,
+      languages: data.languages ?? [],
+    });
   }
 
   // 3. Verify character belongs to this campaign
@@ -611,12 +636,21 @@ export async function updateCharacterByGM(data: {
   }
 
   try {
-    // 4. Update character status, level, and biography
+    const langArr = Array.isArray(data.languages) ? data.languages.map(String) : [];
+
     const { error: updateError } = await (supabase.from("characters") as any)
       .update({
         status: data.status,
         level: data.level,
-        biography: data.biography || null,
+        name: (data.name ?? "").trim() || "Unbenannt",
+        class: data.class,
+        race: data.race,
+        biography: data.biography ?? null,
+        culture_lore_id: data.culture_lore_id ?? null,
+        languages: langArr,
+        faction_membership: data.faction_membership ?? null,
+        current_location_id: data.current_location_id ?? null,
+        avatar_url: data.avatar_url?.trim() ? data.avatar_url.trim() : null,
       })
       .eq("id", data.character_id);
 

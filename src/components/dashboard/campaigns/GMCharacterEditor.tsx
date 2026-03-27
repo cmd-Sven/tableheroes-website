@@ -10,6 +10,11 @@ import {
   type FactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
 
+function normalizeLangIds(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x));
+}
+
 type Character = {
   id: string;
   name: string;
@@ -18,6 +23,11 @@ type Character = {
   level: number;
   status?: string;
   biography?: string | null;
+  culture_lore_id?: string | null;
+  languages?: unknown;
+  faction_membership?: string | null;
+  current_location_id?: string | null;
+  avatar_url?: string | null;
   character_relationships?: Array<{
     id: string;
     relationship_type: string;
@@ -123,9 +133,17 @@ export function GMCharacterEditor({
         await updateCharacterByGM({
           character_id: character.id,
           campaign_id: campaignId,
-          status: status as "Alive" | "Dead" | "Archived" | "Paused",
+          status,
           level,
+          name: character.name,
+          class: character.class,
+          race: character.race,
           biography: biography || null,
+          culture_lore_id: character.culture_lore_id ?? null,
+          languages: normalizeLangIds(character.languages),
+          faction_membership: character.faction_membership ?? null,
+          current_location_id: character.current_location_id ?? null,
+          avatar_url: character.avatar_url ?? null,
           relationships: relationships.filter(
             (r) => r.npc_id && r.relationship_type
           ),
@@ -243,7 +261,10 @@ export function GMCharacterEditor({
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
               disabled={isPending}
             >
-              <option value="Alive">Lebend</option>
+              <option value="Active">Aktiv (spielbar)</option>
+              <option value="Pending_Approval">Wartet auf Freigabe</option>
+              <option value="In_Review">In Prüfung</option>
+              <option value="Alive">Lebend (Legacy)</option>
               <option value="Dead">Tot</option>
               <option value="Archived">Archiviert</option>
               <option value="Paused">Pausiert</option>

@@ -24,6 +24,10 @@ export type MemberWithCharacter = {
     status?: string;
     biography?: string | null;
     avatar_url?: string | null;
+    culture_lore_id?: string | null;
+    languages?: unknown;
+    faction_membership?: string | null;
+    current_location_id?: string | null;
   } | null;
 };
 
@@ -75,7 +79,7 @@ export async function getGmCampaignMembersWithCharacters(
     const fallbackUserIds = membersWithoutChar.map((m) => m.user_id);
     let { data: fallbackChars } = await supabase
       .from("characters")
-      .select("id, name, class, race, level, status, biography, avatar_url, user_id, campaign_id")
+      .select("id, name, class, race, level, status, biography, avatar_url, user_id, campaign_id, culture_lore_id, languages, faction_membership, current_location_id")
       .in("user_id", fallbackUserIds)
       .in("status", ["Active", "Alive", "Approved", "In_Review"])
       .or(`campaign_id.eq.${campaignId},campaign_id.is.null`);
@@ -98,7 +102,12 @@ export async function getGmCampaignMembersWithCharacters(
   const [usersRes, charsRes] = await Promise.all([
     supabase.from("users").select("id, username, avatar_url, email, current_rank").in("id", userIds),
     charIds.length > 0
-      ? supabase.from("characters").select("id, name, class, race, level, status, biography, avatar_url").in("id", charIds)
+      ? supabase
+          .from("characters")
+          .select(
+            "id, name, class, race, level, status, biography, avatar_url, culture_lore_id, languages, faction_membership, current_location_id",
+          )
+          .in("id", charIds)
       : { data: [] as any[], error: null },
   ]);
 
@@ -116,7 +125,20 @@ export async function getGmCampaignMembersWithCharacters(
       current_rank: null,
     }));
   }
-  const charRows = (charsRes.data || []) as { id: string; name: string; class: string; race: string; level: number; status?: string; biography?: string | null; avatar_url?: string | null }[];
+  const charRows = (charsRes.data || []) as {
+    id: string;
+    name: string;
+    class: string;
+    race: string;
+    level: number;
+    status?: string;
+    biography?: string | null;
+    avatar_url?: string | null;
+    culture_lore_id?: string | null;
+    languages?: unknown;
+    faction_membership?: string | null;
+    current_location_id?: string | null;
+  }[];
 
   const userMap = new Map(userRows.map((u) => [u.id, u]));
   const charMap = new Map(charRows.map((c) => [c.id.toLowerCase(), c]));

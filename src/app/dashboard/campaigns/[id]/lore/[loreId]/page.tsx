@@ -45,7 +45,10 @@ export default async function LoreDetailPageRoute({ params }: Props) {
     // Expliziter Cast gegen 'never'
     const membership = membershipRaw as { status: string } | null;
 
-    if (!membership || !["Accepted", "Drafting", "In_Review"].includes(membership.status)) {
+    if (
+      !membership ||
+      !["Accepted", "Approved", "Drafting", "In_Review"].includes(membership.status)
+    ) {
       redirect("/dashboard");
     }
   }
@@ -53,7 +56,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   // 4. Fetch Lore Entry
   let lore;
   try {
-    lore = await getLoreById(loreId);
+    lore = await getLoreById(loreId, { campaignId });
   } catch (error: any) {
     console.error("Error loading lore entry:", error);
     notFound();
@@ -265,7 +268,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   let parent = null;
   if ((lore as any).parent_id) {
     try {
-      const parentData = await getLoreById((lore as any).parent_id);
+      const parentData = await getLoreById((lore as any).parent_id, { campaignId });
       parent = {
         id: parentData.id,
         name: parentData.name,

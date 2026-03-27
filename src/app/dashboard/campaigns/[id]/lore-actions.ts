@@ -460,8 +460,20 @@ export async function getLoreEntriesByWorld(worldId: string) {
 
 // Get All Lore Entries: lore-queries.ts (RSC) – hier keine Duplikation.
 
+/** Status, in denen Spieler Kampagnen-Inhalte sehen dürfen (kein „Active“ — das ist kein campaign_members-Status). */
+const PLAYER_LORE_MEMBER_STATUSES = ["Accepted", "Approved", "Drafting", "In_Review"] as const;
+
+export type GetLoreByIdOptions = {
+  /**
+   * Aus dem Kampagnen-Kontext übergeben: prüft Mitgliedschaft nur für diese Kampagne.
+   * Ohne diese Option: alle Kampagnen mit derselben world_id — bei mehreren Treffern
+   * lieferte `.maybeSingle()` einen Fehler → fälschlich 404 auf der Lore-Detailseite.
+   */
+  campaignId?: string;
+};
+
 // Get Single Lore Entry by ID (Zugriff: GM der Welt oder Spieler in Kampagne mit dieser Welt)
-export async function getLoreById(loreId: string) {
+export async function getLoreById(loreId: string, options?: GetLoreByIdOptions) {
   const supabase = await createClient();
 
   const {
@@ -489,19 +501,52 @@ export async function getLoreById(loreId: string) {
     return lore;
   }
 
-  // Spieler: Mitgliedschaft prüfen
+  // Spieler aus Kampagnen-URL: nur diese eine Kampagne prüfen (robust bei mehreren Welten-Kampagnen)
+  if (options?.campaignId) {
+    const { data: campaignRow } = await (supabase.from("campaigns") as any)
+      .select("id, world_id, gm_id")
+      .eq("id", options.campaignId)
+      .maybeSingle();
+    const camp = campaignRow as { id: string; world_id: string | null; gm_id: string } | null;
+    if (!camp?.world_id || camp.world_id !== lore.world_id) {
+      throw new Error("Lore-Eintrag gehört nicht zu dieser Kampagne.");
+    }
+    if (camp.gm_id === user.id) {
+      return lore;
+    }
+    const { data: membership, error: memErr } = await (supabase.from("campaign_members") as any)
+      .select("id")
+      .eq("campaign_id", options.campaignId)
+      .eq("user_id", user.id)
+      .in("status", [...PLAYER_LORE_MEMBER_STATUSES])
+      .maybeSingle();
+    if (memErr) {
+      console.error("[getLoreById] membership:", memErr);
+    }
+    if (!membership) {
+      throw new Error("Kein Zugriff auf diesen Lore-Eintrag.");
+    }
+    return lore;
+  }
+
+  // Fallback (z. B. Welt-Dashboard): irgendeine Kampagne mit dieser Welt — höchstens eine Zeile
   const { data: campaignsWithWorld } = await (supabase.from("campaigns") as any)
     .select("id")
     .eq("world_id", lore.world_id);
   const campaignIds = (campaignsWithWorld || []).map((c: { id: string }) => c.id);
   if (campaignIds.length === 0) throw new Error("Lore-Eintrag nicht gefunden.");
-  const { data: membership } = await (supabase.from("campaign_members") as any)
+  const { data: memberRows, error: multiErr } = await (supabase.from("campaign_members") as any)
     .select("id")
     .eq("user_id", user.id)
     .in("campaign_id", campaignIds)
-    .in("status", ["Accepted", "Active", "Drafting", "In_Review"])
-    .maybeSingle();
-  if (!membership) throw new Error("Kein Zugriff auf diesen Lore-Eintrag.");
+    .in("status", [...PLAYER_LORE_MEMBER_STATUSES])
+    .limit(1);
+  if (multiErr) {
+    console.error("[getLoreById] campaign_members:", multiErr);
+  }
+  if (!memberRows?.length) {
+    throw new Error("Kein Zugriff auf diesen Lore-Eintrag.");
+  }
 
   return lore;
 }

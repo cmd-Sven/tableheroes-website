@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { User, Loader2, Save, Info, Shield, Users, ExternalLink } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import Link from "next/link";
@@ -23,6 +23,11 @@ function getReputationColorClasses(reputation: number): string {
   return "border-hero-border/40 bg-hero-dark/20";
 }
 
+function normalizeLangIds(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x));
+}
+
 type Props = {
   campaignId: string;
   character: {
@@ -34,12 +39,13 @@ type Props = {
     biography: string | null;
     culture_lore_id: string | null;
     culture_name?: string | null;
-    languages: string[];
+    languages?: unknown;
     language_names?: string[];
     faction_membership: string | null;
     faction_name?: string | null;
     current_location_id: string | null;
     location_name?: string | null;
+    avatar_url?: string | null;
     status?: string;
     character_relationships?: Relationship[];
   };
@@ -59,6 +65,8 @@ export function MyCharacterSection({
   locations,
   factionReputations = [],
 }: Props) {
+  const savedLangIds = normalizeLangIds(character.languages);
+
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
     name: character.name,
@@ -67,10 +75,66 @@ export function MyCharacterSection({
     level: character.level,
     biography: character.biography ?? "",
     culture_lore_id: character.culture_lore_id ?? "",
-    languages: character.languages ?? [],
+    languages: savedLangIds,
     faction_membership: character.faction_membership ?? "",
     current_location_id: character.current_location_id ?? "",
+    avatar_url: character.avatar_url ?? "",
   });
+
+  const cultureOptions = useMemo(() => {
+    const cid = form.culture_lore_id || character.culture_lore_id || "";
+    const list = cultures.map((c) => ({ ...c }));
+    if (cid && !list.some((x) => x.id === cid)) {
+      list.push({
+        id: cid,
+        name: character.culture_name?.trim() || "Gespeicherte Kultur",
+      });
+    }
+    return list;
+  }, [cultures, form.culture_lore_id, character.culture_lore_id, character.culture_name]);
+
+  const factionOptions = useMemo(() => {
+    const fid = form.faction_membership || character.faction_membership || "";
+    const list = factions.map((f) => ({ ...f }));
+    if (fid && !list.some((x) => x.id === fid)) {
+      list.push({
+        id: fid,
+        name: character.faction_name?.trim() || "Gespeicherte Fraktion",
+      });
+    }
+    return list;
+  }, [factions, form.faction_membership, character.faction_membership, character.faction_name]);
+
+  const locationOptions = useMemo(() => {
+    const lid = form.current_location_id || character.current_location_id || "";
+    const list = locations.map((l) => ({ ...l }));
+    if (lid && !list.some((x) => x.id === lid)) {
+      list.push({
+        id: lid,
+        name: character.location_name?.trim() || "Gespeicherter Ort",
+        type: "",
+      });
+    }
+    return list;
+  }, [locations, form.current_location_id, character.current_location_id, character.location_name]);
+
+  /** Freigegebene Sprachen + alle aktuell gewählten IDs (auch wenn Visibility später ändert) */
+  const languageOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const l of languages) map.set(l.id, l);
+    const names = character.language_names ?? [];
+    for (const id of form.languages) {
+      if (!map.has(id)) {
+        const idx = savedLangIds.indexOf(id);
+        const label =
+          idx >= 0 && names[idx] && names[idx] !== id
+            ? names[idx]
+            : `Gespeichert (${id.slice(0, 8)}…)`;
+        map.set(id, { id, name: label });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [languages, form.languages, character.language_names, savedLangIds]);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -87,6 +151,7 @@ export function MyCharacterSection({
           languages: form.languages,
           faction_membership: form.faction_membership || null,
           current_location_id: form.current_location_id || null,
+          avatar_url: form.avatar_url.trim() || null,
         });
         window.location.reload();
       } catch (e: unknown) {
@@ -172,7 +237,19 @@ export function MyCharacterSection({
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />
           </div>
-          {cultures.length > 0 && (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
+              Avatar-URL (Bild-Link)
+            </label>
+            <input
+              type="url"
+              value={form.avatar_url}
+              onChange={(e) => setForm((p) => ({ ...p, avatar_url: e.target.value }))}
+              placeholder="https://…"
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+            />
+          </div>
+          {cultureOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Kultur</label>
               <div className="flex items-center gap-2">
@@ -182,7 +259,7 @@ export function MyCharacterSection({
                   className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
                 >
                   <option value="">-- Keine --</option>
-                  {cultures.map((c) => (
+                  {cultureOptions.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -200,12 +277,19 @@ export function MyCharacterSection({
               </div>
             </div>
           )}
-          {languages.length > 0 && (
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Sprachen</label>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Sprachen</label>
+            {languageOptions.length === 0 ? (
+              <p className="font-libre text-sm text-gray-500 italic">
+                Für diese Kampagne sind keine freigegebenen Sprachen hinterlegt. Kontaktiere deinen Spielleiter, falls du Sprachen wählen sollst.
+              </p>
+            ) : (
               <div className="flex flex-wrap gap-2">
-                {languages.map((lang) => (
-                  <label key={lang.id} className="flex cursor-pointer items-center gap-2 rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-sm text-gray-200 hover:border-hero-border">
+                {languageOptions.map((lang) => (
+                  <label
+                    key={lang.id}
+                    className="flex cursor-pointer items-center gap-2 rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-sm text-gray-200 hover:border-hero-border"
+                  >
                     <input
                       type="checkbox"
                       checked={form.languages.includes(lang.id)}
@@ -216,9 +300,9 @@ export function MyCharacterSection({
                   </label>
                 ))}
               </div>
-            </div>
-          )}
-          {factions.length > 0 && (
+            )}
+          </div>
+          {factionOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Fraktion</label>
               <div className="flex items-center gap-2">
@@ -228,7 +312,7 @@ export function MyCharacterSection({
                   className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
                 >
                   <option value="">-- Keine --</option>
-                  {factions.map((f) => (
+                  {factionOptions.map((f) => (
                     <option key={f.id} value={f.id}>{f.name}</option>
                   ))}
                 </select>
@@ -246,7 +330,7 @@ export function MyCharacterSection({
               </div>
             </div>
           )}
-          {locations.length > 0 && (
+          {locationOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Heimatort</label>
               <div className="flex items-center gap-2">
@@ -256,8 +340,11 @@ export function MyCharacterSection({
                   className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
                 >
                   <option value="">-- Keiner --</option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                  {locationOptions.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                      {loc.type ? ` (${loc.type})` : ""}
+                    </option>
                   ))}
                 </select>
                 {form.current_location_id && (

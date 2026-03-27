@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Shield, Search } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Shield, Search, Info } from "lucide-react";
 import {
   updateCharacterByGM,
   deleteCharacterByGM,
@@ -15,6 +15,11 @@ import {
   type FactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
 
+function normalizeLanguageIds(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x));
+}
+
 type Character = {
   id: string;
   name: string;
@@ -23,6 +28,11 @@ type Character = {
   level: number;
   status?: string;
   biography?: string | null;
+  culture_lore_id?: string | null;
+  languages?: unknown;
+  faction_membership?: string | null;
+  current_location_id?: string | null;
+  avatar_url?: string | null;
   character_relationships?: Array<{
     id: string;
     relationship_type: string;
@@ -45,11 +55,20 @@ type NPC = {
 
 type Faction = { id: string; name: string };
 
+type LoreOpt = { id: string; name: string };
+type LocOpt = { id: string; name: string; type: string };
+
 type Props = {
   character: Character;
   campaignId: string;
   npcs: NPC[];
+  /** Fraktionen für Ruf-UI */
   factions?: Faction[];
+  cultures?: LoreOpt[];
+  languages?: LoreOpt[];
+  locations?: LocOpt[];
+  /** Dropdown „Fraktion“ (Charakter) */
+  factionChoices?: Faction[];
 };
 
 export function GMCharacterEditorPage({
@@ -57,6 +76,10 @@ export function GMCharacterEditorPage({
   campaignId,
   npcs,
   factions = [],
+  cultures = [],
+  languages = [],
+  locations = [],
+  factionChoices = [],
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -66,9 +89,19 @@ export function GMCharacterEditorPage({
   const [newRepFactionId, setNewRepFactionId] = useState("");
   const [newRepValue, setNewRepValue] = useState(0);
   const [newRepRank, setNewRepRank] = useState("");
-  const [status, setStatus] = useState(character.status || "Alive");
+  const [status, setStatus] = useState(character.status || "Active");
   const [level, setLevel] = useState(character.level || 1);
   const [biography, setBiography] = useState(character.biography || "");
+  const [charName, setCharName] = useState(character.name);
+  const [characterClass, setCharacterClass] = useState(character.class);
+  const [charRace, setCharRace] = useState(character.race);
+  const [cultureLoreId, setCultureLoreId] = useState(character.culture_lore_id ?? "");
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() =>
+    normalizeLanguageIds(character.languages),
+  );
+  const [factionMembership, setFactionMembership] = useState(character.faction_membership ?? "");
+  const [currentLocationId, setCurrentLocationId] = useState(character.current_location_id ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(character.avatar_url ?? "");
   const [relationships, setRelationships] = useState<
     Array<{
       id?: string;
@@ -87,6 +120,48 @@ export function GMCharacterEditorPage({
 
   const [npcSearch, setNpcSearch] = useState<Record<number, string>>({});
   const [factionSearch, setFactionSearch] = useState("");
+
+  const languageOptions = useMemo(() => {
+    const map = new Map<string, LoreOpt>();
+    for (const l of languages) map.set(l.id, l);
+    for (const id of selectedLanguages) {
+      if (!map.has(id)) map.set(id, { id, name: `Gespeichert (${id.slice(0, 8)}…)` });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [languages, selectedLanguages]);
+
+  const cultureOptions = useMemo(() => {
+    const cid = character.culture_lore_id ?? "";
+    const list = [...cultures];
+    if (cid && !list.some((x) => x.id === cid)) {
+      list.push({ id: cid, name: "Gespeicherter Eintrag" });
+    }
+    return list;
+  }, [cultures, character.culture_lore_id]);
+
+  const factionOptionsForChar = useMemo(() => {
+    const fid = character.faction_membership ?? "";
+    const list = [...factionChoices];
+    if (fid && !list.some((x) => x.id === fid)) {
+      list.push({ id: fid, name: "Gespeicherter Eintrag" });
+    }
+    return list;
+  }, [factionChoices, character.faction_membership]);
+
+  const locationOptions = useMemo(() => {
+    const lid = character.current_location_id ?? "";
+    const list = [...locations];
+    if (lid && !list.some((x) => x.id === lid)) {
+      list.push({ id: lid, name: "Gespeicherter Eintrag", type: "" });
+    }
+    return list;
+  }, [locations, character.current_location_id]);
+
+  const toggleLanguage = (id: string) => {
+    setSelectedLanguages((prev) =>
+      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id],
+    );
+  };
 
   useEffect(() => {
     if (character.id) {
@@ -145,9 +220,17 @@ export function GMCharacterEditorPage({
         await updateCharacterByGM({
           character_id: character.id,
           campaign_id: campaignId,
-          status: status as "Alive" | "Dead" | "Archived" | "Paused",
+          status,
           level,
+          name: charName.trim() || character.name,
+          class: characterClass,
+          race: charRace,
           biography: biography || null,
+          culture_lore_id: cultureLoreId || null,
+          languages: selectedLanguages,
+          faction_membership: factionMembership || null,
+          current_location_id: currentLocationId || null,
+          avatar_url: avatarUrl.trim() || null,
           relationships: relationships.filter(
             (r) => r.npc_id && r.relationship_type
           ),
@@ -241,6 +324,174 @@ export function GMCharacterEditorPage({
         </p>
       </div>
 
+      {/* Stammdaten: alle Felder wie im Wizard / Spieler-Editor */}
+      <div className="rounded-lg border border-hero-dark bg-background-card p-6">
+        <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+          Stammdaten & Herkunft
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Name</label>
+            <input
+              type="text"
+              value={charName}
+              onChange={(e) => setCharName(e.target.value)}
+              className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+              disabled={isPending}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Klasse</label>
+            <input
+              type="text"
+              value={characterClass}
+              onChange={(e) => setCharacterClass(e.target.value)}
+              className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+              disabled={isPending}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Rasse</label>
+            <input
+              type="text"
+              value={charRace}
+              onChange={(e) => setCharRace(e.target.value)}
+              className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+              disabled={isPending}
+            />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">
+              Avatar-URL (Bild-Link)
+            </label>
+            <input
+              type="url"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://…"
+              className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+              disabled={isPending}
+            />
+          </div>
+          {cultureOptions.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Kultur</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={cultureLoreId}
+                  onChange={(e) => setCultureLoreId(e.target.value)}
+                  className="min-w-0 flex-1 rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+                  disabled={isPending}
+                >
+                  <option value="">— Keine —</option>
+                  {cultureOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {cultureLoreId ? (
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/lore/${cultureLoreId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded border border-hero-dark p-2 text-gray-400 hover:text-accent-gold"
+                    title="Lore öffnen"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {factionOptionsForChar.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Fraktion</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={factionMembership}
+                  onChange={(e) => setFactionMembership(e.target.value)}
+                  className="min-w-0 flex-1 rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+                  disabled={isPending}
+                >
+                  <option value="">— Keine —</option>
+                  {factionOptionsForChar.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+                {factionMembership ? (
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/factions/${factionMembership}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded border border-hero-dark p-2 text-gray-400 hover:text-accent-gold"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {locationOptions.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">Heimatort</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={currentLocationId}
+                  onChange={(e) => setCurrentLocationId(e.target.value)}
+                  className="min-w-0 flex-1 rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
+                  disabled={isPending}
+                >
+                  <option value="">— Keiner —</option>
+                  {locationOptions.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                      {loc.type ? ` (${loc.type})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {currentLocationId ? (
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/lore/${currentLocationId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded border border-hero-dark p-2 text-gray-400 hover:text-accent-gold"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-4">
+          <label className="mb-2 block text-xs font-barlow font-bold uppercase text-gray-400">Sprachen</label>
+          {languageOptions.length === 0 ? (
+            <p className="font-libre text-sm text-gray-500 italic">Keine Sprachen in der Welt definiert.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {languageOptions.map((lang) => (
+                <label
+                  key={lang.id}
+                  className="flex cursor-pointer items-center gap-2 rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-sm text-gray-200 hover:border-hero-border"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedLanguages.includes(lang.id)}
+                    onChange={() => toggleLanguage(lang.id)}
+                    className="rounded border-hero-dark"
+                    disabled={isPending}
+                  />
+                  {lang.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Linke Spalte: Status, Level, Biografie */}
         <div className="space-y-6">
@@ -259,7 +510,10 @@ export function GMCharacterEditorPage({
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
                   disabled={isPending}
                 >
-                  <option value="Alive">Lebend</option>
+                  <option value="Active">Aktiv (spielbar)</option>
+                  <option value="Pending_Approval">Wartet auf Freigabe</option>
+                  <option value="In_Review">In Prüfung</option>
+                  <option value="Alive">Lebend (Legacy)</option>
                   <option value="Dead">Tot</option>
                   <option value="Archived">Archiviert</option>
                   <option value="Paused">Pausiert</option>

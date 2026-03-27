@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCampaignAccess } from "../../campaign-access";
 import { getCharacterFromMembersForGM } from "../../character-actions";
+import { getCharacterEditorLoreOptionsForGm } from "../../character-queries";
 import { getFactionsWithMembers } from "../../factions-queries";
 import { getNPCs } from "../../npc-queries";
 import { GMCharacterEditorPage } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
@@ -17,11 +18,20 @@ export default async function GMCharacterEditPage({ params }: Props) {
 
   if (!isGM) notFound();
 
-  const [character, factions, npcs] = await Promise.all([
+  const [character, editorOpts, factions, npcs] = await Promise.all([
     getCharacterFromMembersForGM(campaignId, characterId),
+    getCharacterEditorLoreOptionsForGm(campaignId),
     getFactionsWithMembers(campaignId),
     getNPCs(campaignId, userId, true),
   ]);
+
+  const factionChoices =
+    editorOpts.factions.length > 0
+      ? editorOpts.factions
+      : (factions as { id: string; name: string }[]).map((f) => ({
+          id: f.id,
+          name: f.name,
+        }));
 
   if (!character) {
     return (
@@ -59,7 +69,11 @@ export default async function GMCharacterEditPage({ params }: Props) {
         character={character as any}
         campaignId={campaignId}
         npcs={npcs}
-        factions={factions}
+        factions={(factions as any[]).map((f: any) => ({ id: f.id, name: f.name }))}
+        cultures={editorOpts.cultures}
+        languages={editorOpts.languages}
+        locations={editorOpts.locations}
+        factionChoices={factionChoices}
       />
     </div>
   );
