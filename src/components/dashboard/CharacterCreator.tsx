@@ -75,6 +75,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [race, setRace] = useState("");
   const [raceCustom, setRaceCustom] = useState("");
   const [selectedCultureId, setSelectedCultureId] = useState("");
+  /** Lore-IDs (`world_lore.id`) – muss mit Server-Validierung (campaign_visibility) übereinstimmen, nicht Anzeigenamen. */
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [level, setLevel] = useState(1);
   const [biography, setBiography] = useState("");
@@ -493,7 +494,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                     {availableLanguages
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((lang) => {
-                        const isSelected = selectedLanguages.includes(lang.name);
+                        const isSelected = selectedLanguages.includes(lang.id);
                         const isDisabled = !isSelected && selectedLanguages.length >= 2;
                         return (
                           <div
@@ -513,9 +514,9 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                                 disabled={isDisabled}
                                 onChange={() => {
                                   if (isSelected) {
-                                    setSelectedLanguages(selectedLanguages.filter((l) => l !== lang.name));
+                                    setSelectedLanguages(selectedLanguages.filter((l) => l !== lang.id));
                                   } else if (selectedLanguages.length < 2) {
-                                    setSelectedLanguages([...selectedLanguages, lang.name]);
+                                    setSelectedLanguages([...selectedLanguages, lang.id]);
                                   }
                                 }}
                                 className="accent-accent-gold"

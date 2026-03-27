@@ -1,20 +1,20 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { getRankFromPoints } from "@/src/lib/utils/rank-utils";
-import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
+import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
 import {
   getRandomLoreEntry,
   getDailyComic,
   getUpcomingSessionsForUser,
   getPendingCharacterCampaignsForUser,
-} from "@/src/lib/actions/dashboard-widgets";
-import { getNewsForDashboard } from "@/src/lib/actions/news-actions";
+} from "@/src/lib/queries/dashboard-widgets-queries";
+import { getNewsForDashboard } from "@/src/lib/queries/news-queries";
 import {
   getGMNotifications,
   getGMRecipients,
   getPlayerMessages,
   getUnreadInboxMessages,
-} from "@/src/lib/actions/message-actions";
-import { getPointsLog } from "@/src/lib/actions/point-actions";
+} from "@/src/lib/queries/message-queries";
+import { getPointsLog } from "@/src/lib/queries/point-queries";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
 import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
 import type { PendingApplication } from "@/src/components/dashboard/GMNotificationsWidget";

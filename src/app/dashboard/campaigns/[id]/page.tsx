@@ -10,13 +10,16 @@ import {
   Settings,
   User,
 } from "lucide-react";
-import { togglePublishStatus, updateCampaignDetails } from "./actions";
+import {
+  togglePublishStatus,
+  updateCampaignDetails,
+} from "./campaign-settings-actions";
 import { MembersManagement } from "./MembersManagement";
 import { GroupRewardForm } from "@/src/components/campaigns/GroupRewardForm";
 import { getNPCs } from "./npc-queries";
 import { getFactionsWithMembers } from "./factions-queries";
 import { getLoreEntries } from "./lore-queries";
-import { isLocationType } from "@/src/lib/lore-types";
+import { isLocationType, TYPE_MAPPING } from "@/src/lib/lore-types";
 import { getQuests } from "./quest-queries";
 import { NPCsManagement } from "./NPCsManagement";
 import { FactionsManagement } from "./FactionsManagement";
@@ -39,6 +42,7 @@ import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { getCharacterFactionReputations } from "./reputation-queries";
 import type {
   DiscoveryItem,
@@ -605,6 +609,10 @@ export default async function CampaignDetailPage({
     userHasCharacter = !!myCharacter;
   }
 
+  /** Flight/RSC: volle characters-Zeile enthält JSONB/Felder, die Client-Grenzen sprengen können */
+  const myCharacterForClient =
+    !isGM && myCharacter ? serializeForClient(myCharacter) : null;
+
   // ============================================================================
   // PLAYER: Load discoveries + party for direct player-dashboard view
   // ============================================================================
@@ -614,31 +622,31 @@ export default async function CampaignDetailPage({
 
   if (!isGM && hasAccess) {
     const loreItems: DiscoveryItem[] = (loreEntries || []).slice(0, 8).map((e: any) => ({
-      id: e.id,
-      name: e.name,
+      id: String(e.id),
+      name: String(e.name ?? ""),
       kind: "lore" as const,
-      description: e.description ?? null,
-      image_url: e.image_url ?? null,
-      type: e.type,
-      created_at: e.created_at,
+      description: e.description != null ? String(e.description) : null,
+      image_url: e.image_url != null ? String(e.image_url) : null,
+      type: String(e.type ?? ""),
+      created_at: e.created_at != null ? String(e.created_at) : "",
     }));
     const factionItems: DiscoveryItem[] = (factions || []).slice(0, 8).map((e: any) => ({
-      id: e.id,
-      name: e.name,
+      id: String(e.id),
+      name: String(e.name ?? ""),
       kind: "faction" as const,
-      description: e.description ?? null,
+      description: e.description != null ? String(e.description) : null,
       image_url: null,
-      type: e.type,
-      created_at: e.created_at,
+      type: String(e.type ?? ""),
+      created_at: e.created_at != null ? String(e.created_at) : "",
     }));
     const npcItems: DiscoveryItem[] = (npcs || []).slice(0, 8).map((e: any) => ({
-      id: e.id,
-      name: e.name,
+      id: String(e.id),
+      name: String(e.name ?? ""),
       kind: "npc" as const,
-      description: e.description ?? null,
+      description: e.description != null ? String(e.description) : null,
       image_url: null,
-      type: e.title ?? undefined,
-      created_at: e.created_at,
+      type: e.title != null ? String(e.title) : undefined,
+      created_at: e.created_at != null ? String(e.created_at) : "",
     }));
     allDiscoveries = [...loreItems, ...factionItems, ...npcItems]
       .sort(
@@ -1105,6 +1113,12 @@ export default async function CampaignDetailPage({
     </div>
   );
 
+  const sessionsTabNpcs = (npcs || []).map((n: any) => ({
+    id: String(n.id),
+    name: String(n.name ?? ""),
+    title: n.title != null ? String(n.title) : null,
+  }));
+
   const SessionsTabContent = (
     <SessionsTab
       campaignId={id}
@@ -1113,9 +1127,9 @@ export default async function CampaignDetailPage({
       upcomingSessions={(upcomingSessionsWithRsvp || []) as any}
       locations={loreEntries
         .filter((l: any) => isLocationType(l.type))
-        .map((l: any) => ({ id: l.id, name: l.name, type: l.type }))
+        .map((l: any) => ({ id: String(l.id), name: String(l.name ?? ""), type: String(l.type ?? "") }))
         .sort((a: any, b: any) => a.name.localeCompare(b.name))}
-      npcs={npcs}
+      npcs={sessionsTabNpcs}
     />
   );
 
@@ -1215,6 +1229,17 @@ export default async function CampaignDetailPage({
   const onboardingLocations = safeLoreEntries.filter((e: any) =>
     typeMatchesGeographic(e.type),
   );
+
+  /** Wie Charakter-Wizard / getCharacterWizardLoreData: Rasse, Kultur, Sprache (siehe TYPE_MAPPING.Culture). */
+  const wizardLoreTypes = new Set(TYPE_MAPPING.Culture);
+  const cultureLanguageLoreForSettings = safeLoreEntries
+    .filter((e: any) => wizardLoreTypes.has(String(e.type ?? "")))
+    .map((e: any) => ({
+      id: e.id as string,
+      name: String(e.name ?? ""),
+      type: String(e.type ?? ""),
+      is_revealed: !!e.is_revealed,
+    }));
 
   const SettingsTabContent = (
     <div className="space-y-8">
@@ -1375,14 +1400,11 @@ export default async function CampaignDetailPage({
         <h3 className="font-barlow font-bold text-lg text-accent-gold uppercase mb-4 border-b border-hero-border pb-2">
           Onboarding
         </h3>
-        <p className="font-libre text-sm text-gray-400 mb-4">
-          Bestimme, welche Fraktionen, Orte und NPCs Spieler im Charakter-Wizard
-          wählen können.
-        </p>
         <OnboardingSettings
           campaignId={id}
           factions={safeFactions}
           locations={onboardingLocations}
+          cultureLanguageLore={cultureLanguageLoreForSettings}
           npcs={safeNpcs.map((n: any) => ({
             id: n.id,
             name: n.name ?? "",
@@ -1418,10 +1440,10 @@ export default async function CampaignDetailPage({
           </div>
         )}
       <DiscoverySlider items={allDiscoveries} />
-      {myCharacter ? (
+      {myCharacterForClient ? (
         <div className="space-y-4">
           <CharacterSheet
-            character={myCharacter}
+            character={myCharacterForClient as any}
             campaignId={id}
             factionReputations={characterReputations}
           />
@@ -1522,14 +1544,18 @@ export default async function CampaignDetailPage({
       )}
       {tab === "quests" && QuestTab}
       {tab === "members" && isGM && MembersTab}
-      {tab === "character" && userHasCharacter && myCharacter && (
+      {tab === "character" && userHasCharacter && myCharacterForClient && (
         <MyCharacterSection
           campaignId={id}
-          character={myCharacter}
+          character={myCharacterForClient as any}
           cultures={wizardCultures}
           languages={wizardLanguages}
-          factions={wizardFactions.map((f: any) => ({ id: f.id, name: f.name }))}
-          locations={wizardLocations.map((l: any) => ({ id: l.id, name: l.name, type: l.type ?? "" }))}
+          factions={wizardFactions.map((f: any) => ({ id: String(f.id), name: String(f.name ?? "") }))}
+          locations={wizardLocations.map((l: any) => ({
+            id: String(l.id),
+            name: String(l.name ?? ""),
+            type: String(l.type ?? ""),
+          }))}
           factionReputations={characterReputations}
         />
       )}

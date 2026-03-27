@@ -56,6 +56,12 @@ type DeityDetails = {
   relationships?: DeityRelationshipView[];
 } | null;
 
+type ReligionDeityLoreLink = {
+  loreId: string | null;
+  name: string;
+  epithet: string | null;
+} | null;
+
 type Props = {
   lore: LoreData;
   worldId: string;
@@ -71,6 +77,7 @@ type Props = {
   parentOptions?: ParentOption[];
   orphanedEntries?: ChildEntry[];
   religionDetails?: ReligionDetails;
+  religionDeityLore?: ReligionDeityLoreLink;
   deityDetails?: DeityDetails;
   loreMetadata?: {
     cultureName?: string; cultureId?: string;
@@ -99,6 +106,7 @@ export function WorldLoreDetailClient({
   parentOptions = [],
   orphanedEntries = [],
   religionDetails = null,
+  religionDeityLore = null,
   deityDetails = null,
   loreMetadata = {},
 }: Props) {
@@ -325,9 +333,29 @@ export function WorldLoreDetailClient({
             </div>
           )}
           {/* Religion-Details (World View) */}
-          {lore.type === "Religion" && religionDetails && (
+          {lore.type === "Religion" && (religionDetails || religionDeityLore) && (
             <div className="mb-4 space-y-3">
-              {religionDetails.interpretation && (
+              {religionDeityLore && (
+                <div>
+                  <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">Gottheit</h3>
+                  <p className="font-libre text-sm text-gray-200 leading-relaxed">
+                    {religionDeityLore.loreId ? (
+                      <Link
+                        href={`/dashboard/worlds/${worldId}/lore/${religionDeityLore.loreId}`}
+                        className="text-hero-vibrant hover:underline"
+                      >
+                        {religionDeityLore.name}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-200">{religionDeityLore.name}</span>
+                    )}
+                    {religionDeityLore.epithet ? (
+                      <span className="text-gray-300"> – {religionDeityLore.epithet}</span>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+              {religionDetails?.interpretation && (
                 <div>
                   <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">
                     Interpretation der Gottheit
@@ -337,11 +365,11 @@ export function WorldLoreDetailClient({
                   </p>
                 </div>
               )}
-              {(religionDetails.priest_title ||
-                religionDetails.cleric_title ||
-                religionDetails.paladin_title) && (
+              {(religionDetails?.priest_title ||
+                religionDetails?.cleric_title ||
+                religionDetails?.paladin_title) && (
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {religionDetails.priest_title && (
+                  {religionDetails?.priest_title && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Priesterbezeichnung
@@ -351,7 +379,7 @@ export function WorldLoreDetailClient({
                       </p>
                     </div>
                   )}
-                  {religionDetails.cleric_title && (
+                  {religionDetails?.cleric_title && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Klerikerbezeichnung
@@ -361,7 +389,7 @@ export function WorldLoreDetailClient({
                       </p>
                     </div>
                   )}
-                  {religionDetails.paladin_title && (
+                  {religionDetails?.paladin_title && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Paladinbezeichnung
@@ -373,11 +401,11 @@ export function WorldLoreDetailClient({
                   )}
                 </div>
               )}
-              {(religionDetails.order_notes ||
-                religionDetails.magic_relation ||
-                religionDetails.relics) && (
+              {(religionDetails?.order_notes ||
+                religionDetails?.magic_relation ||
+                religionDetails?.relics) && (
                 <div className="grid gap-4 sm:grid-cols-3">
-                  {religionDetails.order_notes && (
+                  {religionDetails?.order_notes && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Ordnung der Religion
@@ -387,7 +415,7 @@ export function WorldLoreDetailClient({
                       </p>
                     </div>
                   )}
-                  {religionDetails.magic_relation && (
+                  {religionDetails?.magic_relation && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Bezug zur Magie
@@ -397,7 +425,7 @@ export function WorldLoreDetailClient({
                       </p>
                     </div>
                   )}
-                  {religionDetails.relics && (
+                  {religionDetails?.relics && (
                     <div>
                       <h4 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Wichtige Reliquien
@@ -409,8 +437,7 @@ export function WorldLoreDetailClient({
                   )}
                 </div>
               )}
-              {Array.isArray(religionDetails.holidays) &&
-                religionDetails.holidays.length > 0 && (
+              {religionDetails?.holidays && religionDetails.holidays.length > 0 && (
                   <div>
                     <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">
                       Besondere Feiertage
@@ -439,7 +466,7 @@ export function WorldLoreDetailClient({
                     </ul>
                   </div>
                 )}
-              {Array.isArray(religionDetails.important_figures) &&
+              {religionDetails?.important_figures &&
                 religionDetails.important_figures.length > 0 && (
                   <div>
                     <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">

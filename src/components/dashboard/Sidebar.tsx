@@ -11,6 +11,7 @@ import {
 import {
   Home,
   Map,
+  MapPin,
   Users,
   Settings,
   LogOut,
@@ -73,6 +74,8 @@ export function Sidebar({
   const [worldHasBlueprint, setWorldHasBlueprint] = useState<boolean | null>(null);
   /** Spieler ohne Charakter: Sessions-Link nicht nutzbar (GM der Kampagne ausgenommen). */
   const [sessionsNavLocked, setSessionsNavLocked] = useState<boolean | null>(null);
+  /** Anzeigename der aktuellen Kampagne (Pfad /dashboard/campaigns/[id]/…) */
+  const [campaignScopeName, setCampaignScopeName] = useState<string | null>(null);
   const pathname = usePathname();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -146,6 +149,35 @@ export function Sidebar({
       cancelled = true;
     };
   }, [campaignId, user?.id]);
+
+  useEffect(() => {
+    if (!campaignId) {
+      setCampaignScopeName(null);
+      return;
+    }
+    const supabase = createBrowserSupabaseClient();
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("name")
+        .eq("id", campaignId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        setCampaignScopeName(null);
+        return;
+      }
+      setCampaignScopeName(
+        (data as { name?: string | null }).name?.trim() || null,
+      );
+    })().catch(() => {
+      if (!cancelled) setCampaignScopeName(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
 
   // Welt-Blueprint für Welt-Kontext laden (clientseitig, damit Sidebar weiß, ob NPCs/Lore/Fraktionen freigeschaltet werden sollen)
   useEffect(() => {
@@ -654,10 +686,29 @@ export function Sidebar({
             {isInCampaign && !isInWorld && campaignNav.length > 0 && (
               <div className="space-y-1">
                 {!isCollapsed && (
-                  <p className="px-3 py-2 text-xs font-barlow font-bold uppercase text-gray-500">
-                    Aktuelle Kampagne
-                  </p>
+                  <div className="px-3 py-2">
+                    <p className="text-[10px] font-barlow font-bold uppercase tracking-wider text-gray-500">
+                      Aktuelle Kampagne
+                    </p>
+                    <p
+                      className="mt-1 line-clamp-2 break-words font-barlow text-sm font-extrabold uppercase leading-tight tracking-wide text-hero-vibrant"
+                      title={campaignScopeName ?? undefined}
+                    >
+                      {campaignScopeName ?? "Kampagne wird geladen …"}
+                    </p>
+                  </div>
                 )}
+                {isCollapsed && campaignScopeName ? (
+                  <div
+                    className="flex justify-center pb-1"
+                    title={campaignScopeName}
+                  >
+                    <MapPin
+                      className="h-4 w-4 shrink-0 text-hero-vibrant"
+                      aria-label={`Kampagne: ${campaignScopeName}`}
+                    />
+                  </div>
+                ) : null}
                 {campaignNav.map((item) => (
                   <NavItem
                     key={item.href}

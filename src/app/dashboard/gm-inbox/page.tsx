@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Inbox, Users, UserPlus, ShieldCheck, ArrowRight } from "lucide-react";
 import { getPendingApplications } from "@/src/lib/queries/application-queries";
-import { getPendingApprovalCharactersWithRequests } from "@/src/app/dashboard/campaigns/[id]/player-npc-requests-actions";
+import { getPendingApprovalCharactersWithRequests } from "@/src/app/dashboard/campaigns/[id]/player-npc-requests-queries";
 
 export const revalidate = 0;
 

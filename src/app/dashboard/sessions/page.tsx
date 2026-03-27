@@ -6,7 +6,7 @@ import {
   getUpcomingSessionsForUser,
   getPastSessionsForUser,
   getPendingCharacterCampaignsForUser,
-} from "@/src/lib/actions/dashboard-widgets";
+} from "@/src/lib/queries/dashboard-widgets-queries";
 import { UpcomingSessionsCard, PastSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 
 export default async function SessionsPage() {

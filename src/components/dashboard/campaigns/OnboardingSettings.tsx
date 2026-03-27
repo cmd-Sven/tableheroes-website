@@ -1,16 +1,37 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, MapPin, Loader2, Check, User, AlertCircle, Search, Save } from "lucide-react";
+import {
+  Users,
+  MapPin,
+  Loader2,
+  Check,
+  User,
+  AlertCircle,
+  Search,
+  Save,
+  Eye,
+  EyeOff,
+  Languages,
+} from "lucide-react";
 import { updateFactionAllowPcJoin } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
-import { updateLoreAllowPcOrigin } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { updateLoreAllowPcOrigin, toggleLoreReveal } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { updateNPCAllowPcOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { BUILDING_LOCATION_TYPES, LARGE_LOCATION_TYPES } from "@/src/lib/lore-types";
 
 type Faction = { id: string; name: string; type?: string; allow_pc_join_on_creation?: boolean };
 type Location = { id: string; name: string; type: string; parent_id?: string | null; allow_pc_origin?: boolean };
 type NPC = { id: string; name: string; title?: string | null; role?: string | null; allow_pc_onboarding?: boolean };
+
+/** Kultur- und Spracheinträge (`world_lore`): Sichtbarkeit = campaign_visibility (wie Augensymbol in der Lore-Ansicht). */
+export type LoreCultureVisibilityRow = {
+  id: string;
+  name: string;
+  type: string;
+  is_revealed: boolean;
+};
 
 type PendingChanges = {
   factions: Record<string, boolean>;
@@ -23,9 +44,11 @@ type Props = {
   factions: Faction[];
   locations: Location[];
   npcs?: NPC[];
+  /** Optional: Kultur- & Sprach-Lore mit Freigabe für Spieler (Karte / Wizard). */
+  cultureLanguageLore?: LoreCultureVisibilityRow[];
 };
 
-type CategoryFilter = "all" | "factions" | "locations" | "npcs";
+type CategoryFilter = "all" | "factions" | "locations" | "npcs" | "lore_culture";
 
 function matchesSearch(name: string, searchQuery: string, subtitle?: string | null): boolean {
   if (!searchQuery.trim()) return true;
@@ -76,8 +99,46 @@ function OnboardingToggle({
   );
 }
 
-export function OnboardingSettings({ campaignId, factions, locations, npcs = [] }: Props) {
+export function OnboardingSettings({
+  campaignId,
+  factions,
+  locations,
+  npcs = [],
+  cultureLanguageLore = [],
+}: Props) {
   const router = useRouter();
+  const [loreCultureRows, setLoreCultureRows] = useState<LoreCultureVisibilityRow[]>(
+    cultureLanguageLore,
+  );
+  const [loreRevealTogglingId, setLoreRevealTogglingId] = useState<string | null>(null);
+  const loreRevealMutexRef = useRef(false);
+  const prevLoreIdsKeyRef = useRef<string | null>(null);
+
+  /** Nur neu mergen, wenn sich die Menge der Lore-IDs ändert – nicht bei jedem RSC-Refresh (neue Array-Referenz). */
+  const loreIdsKey = useMemo(
+    () =>
+      `${campaignId}:` +
+      cultureLanguageLore
+        .map((r) => String(r.id))
+        .sort()
+        .join("|"),
+    [campaignId, cultureLanguageLore],
+  );
+
+  useEffect(() => {
+    if (prevLoreIdsKeyRef.current === loreIdsKey) return;
+    prevLoreIdsKeyRef.current = loreIdsKey;
+    setLoreCultureRows((prev) => {
+      const prevById = new Map(prev.map((r) => [String(r.id), r]));
+      return cultureLanguageLore.map((incoming) => {
+        const id = String(incoming.id);
+        const old = prevById.get(id);
+        if (old) return { ...incoming, id, is_revealed: old.is_revealed };
+        return { ...incoming, id };
+      });
+    });
+  }, [loreIdsKey, cultureLanguageLore]);
+
   const [pendingChanges, setPendingChanges] = useState<PendingChanges>({
     factions: {},
     locations: {},
@@ -130,6 +191,48 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
         matchesSearch(n.name, searchQuery, n.title ?? n.role ?? "")
       ),
     [sortedNpcs, searchQuery]
+  );
+
+  const filteredLoreCulture = useMemo(
+    () =>
+      loreCultureRows.filter((row) => matchesSearch(row.name, searchQuery, row.type)),
+    [loreCultureRows, searchQuery],
+  );
+
+  const handleLoreRevealToggle = useCallback(
+    async (row: LoreCultureVisibilityRow) => {
+      if (loreRevealMutexRef.current) return;
+      const rowId = String(row.id);
+      const previousRevealed = !!row.is_revealed;
+      const nextRevealed = !previousRevealed;
+
+      setErrorMessage(null);
+      loreRevealMutexRef.current = true;
+      setLoreRevealTogglingId(rowId);
+
+      setLoreCultureRows((prev) =>
+        prev.map((r) =>
+          String(r.id) === rowId ? { ...r, is_revealed: nextRevealed } : r,
+        ),
+      );
+
+      try {
+        await toggleLoreReveal(campaignId, rowId, previousRevealed);
+      } catch (e: unknown) {
+        setLoreCultureRows((prev) =>
+          prev.map((r) =>
+            String(r.id) === rowId ? { ...r, is_revealed: previousRevealed } : r,
+          ),
+        );
+        setErrorMessage(
+          (e as Error)?.message ?? "Sichtbarkeit konnte nicht geändert werden.",
+        );
+      } finally {
+        loreRevealMutexRef.current = false;
+        setLoreRevealTogglingId(null);
+      }
+    },
+    [campaignId],
   );
 
   const pendingCount =
@@ -246,6 +349,8 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
     }
   }, [pendingCount, pendingChanges, router]);
 
+  const showLoreCulture =
+    categoryFilter === "all" || categoryFilter === "lore_culture";
   const showFactions = categoryFilter === "all" || categoryFilter === "factions";
   const showLocations = categoryFilter === "all" || categoryFilter === "locations";
   const showNpcs = categoryFilter === "all" || categoryFilter === "npcs";
@@ -280,7 +385,18 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
       )}
 
       <p className="font-libre text-gray-400">
-        Bestimme, welche Fraktionen, Orte und NPCs Spieler im Charakter-Wizard wählen können. Änderungen werden erst nach Klick auf „Änderungen übernehmen“ gespeichert.
+        <span className="block">
+          <span className="font-semibold text-gray-300">Rasse, Kultur &amp; Sprache:</span>{" "}
+          Sichtbarkeit für Spieler (wie das Augensymbol in der Lore) – Klick auf den Schalter
+          wirkt sofort.{" "}
+          <span className="text-green-400/90">Grün</span> = Spieler können den Eintrag sehen,{" "}
+          <span className="text-red-400/90">Rot</span> = verborgen.
+        </span>
+        <span className="mt-2 block">
+          <span className="font-semibold text-gray-300">Fraktionen, Orte, NPCs:</span>{" "}
+          ob sie im Wizard überhaupt wählbar sind – wird erst nach „Änderungen übernehmen“
+          gespeichert.
+        </span>
       </p>
 
       {/* Suchleiste */}
@@ -300,6 +416,10 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
           {(
             [
               { key: "all" as CategoryFilter, label: "Alle" },
+              {
+                key: "lore_culture" as CategoryFilter,
+                label: "Rasse, Kultur & Sprache",
+              },
               { key: "factions" as CategoryFilter, label: "Fraktionen" },
               { key: "locations" as CategoryFilter, label: "Orte" },
               { key: "npcs" as CategoryFilter, label: "NPCs" },
@@ -320,6 +440,93 @@ export function OnboardingSettings({ campaignId, factions, locations, npcs = [] 
           ))}
         </div>
       </div>
+
+      {/* ─── Kultur & Sprache: Sichtbarkeit (campaign_visibility) ─── */}
+      {showLoreCulture && (
+        <section>
+          <h3 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-2 flex items-center gap-2">
+            <Languages className="h-5 w-5 text-accent-gold" />
+            Rassen, Kulturen &amp; Sprachen – für Spieler sichtbar
+          </h3>
+          <p className="font-libre text-gray-500 text-sm mb-4">
+            Nur freigegebene Einträge erscheinen im Charakter-Wizard und in der Spieler-Lore.
+            Entspricht dem Augensymbol auf dem jeweiligen Lore-Eintrag. Schalter{" "}
+            <span className="text-green-400/90">grün</span> = sichtbar,{" "}
+            <span className="text-red-400/90">rot</span> = nicht sichtbar.
+          </p>
+          {filteredLoreCulture.length === 0 ? (
+            <div className="rounded-lg border border-hero-border/30 bg-zinc-900/40 p-4 font-libre text-sm text-gray-400">
+              {searchQuery ? (
+                <p>Keine Einträge passen zur Suche.</p>
+              ) : (
+                <>
+                  <p className="mb-3">
+                    Es sind noch keine Rassen-, Kultur- oder Sprach-Einträge in der Welt dieser
+                    Kampagne vorhanden (oder sie sind anderen Lore-Typen zugeordnet).
+                  </p>
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}?tab=lore`}
+                    className="inline-flex font-barlow text-xs font-bold uppercase text-hero-vibrant hover:underline"
+                  >
+                    Zur Kampagne → Tab „Welt & Lore“
+                  </Link>
+                </>
+              )}
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {filteredLoreCulture.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-hero-border/20 bg-zinc-900/40 p-4 transition-colors hover:border-hero-border/40"
+                >
+                  <span className="font-libre text-gray-200 min-w-0">
+                    <span className="font-semibold text-white">{row.name}</span>
+                    <span className="text-zinc-500 ml-2">({row.type})</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!!loreRevealTogglingId}
+                    onClick={() => handleLoreRevealToggle(row)}
+                    aria-pressed={row.is_revealed}
+                    className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 font-barlow text-xs font-bold uppercase transition-colors disabled:opacity-50 ${
+                      row.is_revealed
+                        ? "border-green-500/70 bg-green-950/35 text-green-300 shadow-[0_0_0_1px_rgba(34,197,94,0.2)]"
+                        : "border-red-500/60 bg-red-950/30 text-red-200 shadow-[0_0_0_1px_rgba(239,68,68,0.15)]"
+                    }`}
+                    title={
+                      row.is_revealed
+                        ? "Für Spieler ausblenden (aktuell: sichtbar)"
+                        : "Für Spieler sichtbar schalten (aktuell: nicht sichtbar)"
+                    }
+                  >
+                    {loreRevealTogglingId === String(row.id) ? (
+                      <Loader2
+                        className={`h-4 w-4 animate-spin ${
+                          row.is_revealed ? "text-green-400" : "text-red-400"
+                        }`}
+                      />
+                    ) : row.is_revealed ? (
+                      <Eye className="h-4 w-4 shrink-0 text-green-400" aria-hidden />
+                    ) : (
+                      <EyeOff className="h-4 w-4 shrink-0 text-red-400" aria-hidden />
+                    )}
+                    {row.is_revealed ? (
+                      <span>Sichtbar</span>
+                    ) : (
+                      <span>Verborgen</span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {showLoreCulture && (showFactions || showLocations || showNpcs) && (
+        <hr className="border-hero-border/40" />
+      )}
 
       {/* ─── Fraktionen ─── */}
       {showFactions && (

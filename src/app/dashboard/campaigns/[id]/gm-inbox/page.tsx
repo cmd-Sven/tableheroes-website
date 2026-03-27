@@ -1,7 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getPendingApprovalCharactersWithRequests } from "../player-npc-requests-actions";
+import { getPendingApprovalCharactersWithRequests } from "../player-npc-requests-queries";
 import { GMInboxClient } from "@/src/components/dashboard/campaigns/GMInboxClient";
 
 type Props = {

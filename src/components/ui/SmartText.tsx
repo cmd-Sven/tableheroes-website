@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 
 export type EntityForSmartText = {
   id: string;
@@ -195,9 +196,12 @@ export function SmartText({
         prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-6 prose-ol:space-y-1
         prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
         prose-a:text-hero-vibrant prose-a:hover:underline
+        prose-img:rounded-md prose-img:max-w-full prose-img:my-2
         ${className}`}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{trimmed}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+        {trimmed}
+      </ReactMarkdown>
     </div>
   );
 }

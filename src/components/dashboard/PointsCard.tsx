@@ -8,7 +8,7 @@ import {
 } from "@/src/lib/utils/rank-utils";
 import confetti from "canvas-confetti";
 import { createClient } from "@/src/lib/supabase/client";
-import type { PointLogEntry } from "@/src/lib/actions/point-actions";
+import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 type Props = {
   totalPoints: number;

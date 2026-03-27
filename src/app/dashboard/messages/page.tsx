@@ -1,5 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
-import { getPlayerMessages } from "@/src/lib/actions/message-actions";
+import { getPlayerMessages } from "@/src/lib/queries/message-queries";
 import { MessagesList } from "@/src/components/dashboard/MessagesList";
 import { redirect } from "next/navigation";
 

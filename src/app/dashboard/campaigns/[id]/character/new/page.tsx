@@ -66,7 +66,7 @@ export default async function CharacterNewPage({ params }: Props) {
       .select("status")
       .eq("campaign_id", campaignId)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!member || !["Accepted", "Drafting", "In_Review"].includes(member.status)) {
       redirect(`/dashboard/campaigns/${campaignId}`);

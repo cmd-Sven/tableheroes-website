@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
@@ -77,6 +78,12 @@ type LoreMetadata = {
   spokenByRaces?: LoreLink[];
 };
 
+type ReligionDeityLoreLink = {
+  loreId: string | null;
+  name: string;
+  epithet: string | null;
+} | null;
+
 type Props = {
   lore: LoreEntry;
   campaignId: string;
@@ -87,6 +94,7 @@ type Props = {
   parentOptions?: Array<{ id: string; name: string; type: string }>;
   orphanedEntries?: Array<{ id: string; name: string; type: string; image_url: string | null }>;
   religionDetails?: ReligionDetails;
+  religionDeityLore?: ReligionDeityLoreLink;
   deityDetails?: DeityDetails;
   loreMetadata?: LoreMetadata;
 };
@@ -101,6 +109,7 @@ export function LoreDetailPage({
   parentOptions = [],
   orphanedEntries = [],
   religionDetails = null,
+  religionDeityLore = null,
   deityDetails = null,
   loreMetadata = {},
 }: Props) {
@@ -280,14 +289,35 @@ export function LoreDetailPage({
           )}
 
           {/* Religion-Details */}
-          {lore.type === "Religion" && religionDetails && (
+          {lore.type === "Religion" && (religionDetails || religionDeityLore) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
               <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
                 Glaubensprofil
               </h2>
 
+              {religionDeityLore && (
+                <div>
+                  <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">Gottheit</h3>
+                  <p className="font-libre text-sm text-gray-200 leading-relaxed">
+                    {religionDeityLore.loreId ? (
+                      <Link
+                        href={`/dashboard/campaigns/${campaignId}/lore/${religionDeityLore.loreId}`}
+                        className="text-hero-vibrant hover:underline"
+                      >
+                        {religionDeityLore.name}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-200">{religionDeityLore.name}</span>
+                    )}
+                    {religionDeityLore.epithet ? (
+                      <span className="text-gray-300"> – {religionDeityLore.epithet}</span>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+
               {/* Interpretation */}
-              {religionDetails.interpretation && (
+              {religionDetails?.interpretation && (
                 <div>
                   <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-1">
                     Interpretation der Gottheit
@@ -299,11 +329,11 @@ export function LoreDetailPage({
               )}
 
               {/* Rollen / Titel */}
-              {(religionDetails.priest_title ||
-                religionDetails.cleric_title ||
-                religionDetails.paladin_title) && (
+              {(religionDetails?.priest_title ||
+                religionDetails?.cleric_title ||
+                religionDetails?.paladin_title) && (
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {religionDetails.priest_title && (
+                  {religionDetails?.priest_title && (
                     <div>
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Priesterbezeichnung
@@ -313,7 +343,7 @@ export function LoreDetailPage({
                       </p>
                     </div>
                   )}
-                  {religionDetails.cleric_title && (
+                  {religionDetails?.cleric_title && (
                     <div>
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Klerikerbezeichnung
@@ -323,7 +353,7 @@ export function LoreDetailPage({
                       </p>
                     </div>
                   )}
-                  {religionDetails.paladin_title && (
+                  {religionDetails?.paladin_title && (
                     <div>
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Paladinbezeichnung
@@ -337,11 +367,11 @@ export function LoreDetailPage({
               )}
 
               {/* Ordnung / Magie / Reliquien */}
-              {(religionDetails.order_notes ||
-                religionDetails.magic_relation ||
-                religionDetails.relics) && (
+              {(religionDetails?.order_notes ||
+                religionDetails?.magic_relation ||
+                religionDetails?.relics) && (
                 <div className="grid gap-4 sm:grid-cols-3">
-                  {religionDetails.order_notes && (
+                  {religionDetails?.order_notes && (
                     <div className="sm:col-span-1">
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Ordnung der Religion
@@ -351,7 +381,7 @@ export function LoreDetailPage({
                       </p>
                     </div>
                   )}
-                  {religionDetails.magic_relation && (
+                  {religionDetails?.magic_relation && (
                     <div className="sm:col-span-1">
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Bezug zur Magie
@@ -361,7 +391,7 @@ export function LoreDetailPage({
                       </p>
                     </div>
                   )}
-                  {religionDetails.relics && (
+                  {religionDetails?.relics && (
                     <div className="sm:col-span-1">
                       <h3 className="font-barlow font-bold text-[11px] uppercase text-gray-400 mb-1">
                         Wichtige Reliquien
@@ -375,7 +405,7 @@ export function LoreDetailPage({
               )}
 
               {/* Feiertage */}
-              {Array.isArray(religionDetails.holidays) &&
+              {religionDetails?.holidays &&
                 religionDetails.holidays.length > 0 && (
                   <div>
                     <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-2">
@@ -407,7 +437,7 @@ export function LoreDetailPage({
                 )}
 
               {/* Wichtige Persönlichkeiten */}
-              {Array.isArray(religionDetails.important_figures) &&
+              {religionDetails?.important_figures &&
                 religionDetails.important_figures.length > 0 && (
                   <div>
                     <h3 className="font-cinzel font-bold text-accent-gold text-sm mb-2">

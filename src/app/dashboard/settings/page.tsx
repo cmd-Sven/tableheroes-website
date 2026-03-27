@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { SettingsClient } from "./SettingsClient";
 import type { ProfileDesignData } from "@/src/components/dashboard/settings/ProfileSettings";
-import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
+import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
 
 type UserProfile = {
   username?: string | null;

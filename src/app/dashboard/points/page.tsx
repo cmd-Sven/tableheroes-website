@@ -1,6 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getPointsLog } from "@/src/lib/actions/point-actions";
+import { getPointsLog } from "@/src/lib/queries/point-queries";
 import {
   calculateLevel,
   getPointsForLevel,

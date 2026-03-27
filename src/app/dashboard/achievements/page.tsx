@@ -1,9 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import {
-  getAllAchievements,
-  getUserAchievements,
-} from "@/src/lib/actions/achievement-actions";
+import { getAllAchievements } from "@/src/lib/actions/achievement-actions";
+import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
 import { getAchievementImageForName } from "@/src/lib/constants/achievements";
 import {
   AchievementsList,

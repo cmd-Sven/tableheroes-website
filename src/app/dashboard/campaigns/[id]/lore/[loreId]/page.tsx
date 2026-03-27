@@ -61,17 +61,46 @@ export default async function LoreDetailPageRoute({ params }: Props) {
 
   if (!lore) notFound();
 
-  // 5.1 Religion-Details für Religions-Einträge laden
+  // 5.1 Religion-Details für Religions-Einträge laden (+ verknüpfte Gottheit für Lore-Link)
   let religionDetails: any = null;
+  let religionDeityLore: {
+    loreId: string | null;
+    name: string;
+    epithet: string | null;
+  } | null = null;
   if ((lore as any).type === "Religion") {
     try {
+      const worldId = (lore as any).world_id;
       const { data: religion } = await (supabase.from("religions") as any)
-        .select("interpretation, priest_title, cleric_title, paladin_title, order_notes, magic_relation, relics, holidays, important_figures")
-        .eq("world_id", (lore as any).world_id)
+        .select(
+          "interpretation, priest_title, cleric_title, paladin_title, order_notes, magic_relation, relics, holidays, important_figures, deity_id"
+        )
+        .eq("world_id", worldId)
         .eq("name", (lore as any).name)
         .maybeSingle();
       if (religion) {
         religionDetails = religion;
+      }
+      const deityId = (religion as { deity_id?: string | null } | null)?.deity_id;
+      if (deityId) {
+        const { data: deity } = await (supabase.from("deities") as any)
+          .select("name, epithet")
+          .eq("id", deityId)
+          .maybeSingle();
+        if (deity) {
+          const deityName = String((deity as any).name ?? "Unbenannt");
+          const { data: deityLoreRow } = await (supabase.from("world_lore") as any)
+            .select("id")
+            .eq("world_id", worldId)
+            .eq("type", "Gottheit")
+            .eq("name", deityName)
+            .maybeSingle();
+          religionDeityLore = {
+            loreId: deityLoreRow ? String((deityLoreRow as any).id) : null,
+            name: deityName,
+            epithet: (deity as any).epithet ?? null,
+          };
+        }
       }
     } catch (error) {
       console.error("Error loading religion details:", error);
@@ -378,6 +407,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
       parentOptions={parentOptions}
       orphanedEntries={orphanedEntries}
       religionDetails={religionDetails}
+      religionDeityLore={religionDeityLore}
       deityDetails={deityDetails}
       loreMetadata={loreMetadata}
     />

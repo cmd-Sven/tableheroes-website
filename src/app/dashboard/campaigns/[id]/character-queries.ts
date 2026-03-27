@@ -31,28 +31,31 @@ export async function getCharacterWizardLoreData(campaignId: string) {
 
   const all = (loreRows as any[]) ?? [];
 
+  const asStringArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((x) => String(x)) : [];
+
   const races = all
     .filter((l: any) => l.type === "Rasse" && revealedIds.has(l.id))
     .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
-      culture_id: l.culture_id as string | null,
+      id: String(l.id),
+      name: String(l.name ?? "").trim(),
+      culture_id: l.culture_id != null ? String(l.culture_id) : null,
     }));
 
   const cultures = all
     .filter((l: any) => l.type === "Kultur" && revealedIds.has(l.id))
     .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
-      race_ids: (l.race_ids as string[]) ?? [],
-      language_ids: (l.language_ids as string[]) ?? [],
+      id: String(l.id),
+      name: String(l.name ?? "").trim(),
+      race_ids: asStringArray(l.race_ids),
+      language_ids: asStringArray(l.language_ids),
     }));
 
   const languages = all
     .filter((l: any) => l.type === "Sprache" && revealedIds.has(l.id))
     .map((l: any) => ({
-      id: l.id as string,
-      name: (l.name as string).trim(),
+      id: String(l.id),
+      name: String(l.name ?? "").trim(),
     }));
 
   return { races, cultures, languages };

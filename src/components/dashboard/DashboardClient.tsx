@@ -39,7 +39,7 @@ import { PlayerDashboardTutorial } from "@/src/components/dashboard/PlayerDashbo
 import type { PlayerMessage } from "@/src/lib/actions/message-actions";
 import type { DashboardLoreEntry, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
-import type { PointLogEntry } from "@/src/lib/actions/point-actions";
+import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 export type ProfileHeaderData = {
   username: string | null;

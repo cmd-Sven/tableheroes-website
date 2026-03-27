@@ -17,7 +17,8 @@ import {
   HelpCircle,
   Loader2,
 } from "lucide-react";
-import { adjustMemberPoints, type PointLogEntry } from "@/src/lib/actions/point-actions";
+import { adjustMemberPoints } from "@/src/lib/actions/point-actions";
+import type { PointLogEntry } from "@/src/lib/types/point-log";
 import { getAchievementImageSrc } from "@/src/types/achievement";
 import { toast } from "sonner";
 

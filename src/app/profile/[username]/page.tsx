@@ -11,7 +11,7 @@ import {
   Star,
 } from "lucide-react";
 import { getRankFromPoints } from "@/src/lib/utils/rank-utils";
-import { getUserAchievements } from "@/src/lib/actions/achievement-actions";
+import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
 import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import { PointsCard } from "@/src/components/dashboard/PointsCard";

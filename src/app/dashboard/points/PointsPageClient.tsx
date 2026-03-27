@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Star, TrendingUp, TrendingDown, ShoppingCart } from "lucide-react";
 import { getPointsForLevel } from "@/src/lib/utils/rank-utils";
-import type { PointLogEntry } from "@/src/lib/actions/point-actions";
+import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 type Props = {
   totalPoints: number;

@@ -1,7 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link2, ChevronDown } from "lucide-react";
+import {
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+  Heading3,
+  Quote,
+  Link2,
+  ChevronDown,
+  Strikethrough,
+  Image as ImageIcon,
+  Minus,
+} from "lucide-react";
 
 export type EntityForMarkdownEditor = {
   id: string;
@@ -101,7 +115,8 @@ function insertAtLineStart(textarea: HTMLTextAreaElement, prefix: string): strin
 export function MarkdownEditor({
   value,
   onChange,
-  placeholder = "Beschreibung… (Markdown: **fett**, *kursiv*, # Überschrift, - Liste, > Zitat)",
+  placeholder =
+    "Beschreibung… Leerzeile = neuer Absatz. Einmal Enter = Zeilenumbruch. Markdown: **fett**, *kursiv*, ~~durchgestrichen~~, # Überschrift, > Zitat, ![Alt](https://…), --- für Linie.",
   minHeight = "min-h-[400px]",
   className = "",
   entities = [],
@@ -131,15 +146,33 @@ export function MarkdownEditor({
     setShowEntityPicker(false);
   };
 
+  const insertImageMarkdown = (ta: HTMLTextAreaElement): string => {
+    const url = window.prompt("Bild-URL (https://…)", "https://");
+    if (!url?.trim()) return ta.value;
+    const alt = window.prompt("Bildbeschreibung (Alt-Text)", "Bild") || "Bild";
+    return insertAtCursor(ta, `![${alt}](${url.trim()})`);
+  };
+
   const buttons: { icon: typeof Bold; title: string; action: (ta: HTMLTextAreaElement) => string }[] = [
     { icon: Bold, title: "Fett", action: (ta) => wrapSelection(ta, "**", "**", "fett") },
     { icon: Italic, title: "Kursiv", action: (ta) => wrapSelection(ta, "*", "*", "kursiv") },
+    {
+      icon: Strikethrough,
+      title: "Durchgestrichen",
+      action: (ta) => wrapSelection(ta, "~~", "~~", "text"),
+    },
     { icon: List, title: "Aufzählung", action: (ta) => insertAtLineStart(ta, "- ") },
     { icon: ListOrdered, title: "Nummerierte Liste", action: (ta) => insertAtLineStart(ta, "1. ") },
     { icon: Heading1, title: "Überschrift 1", action: (ta) => insertAtLineStart(ta, "# ") },
     { icon: Heading2, title: "Überschrift 2", action: (ta) => insertAtLineStart(ta, "## ") },
     { icon: Heading3, title: "Überschrift 3", action: (ta) => insertAtLineStart(ta, "### ") },
     { icon: Quote, title: "Zitat", action: (ta) => insertAtLineStart(ta, "> ") },
+    {
+      icon: Minus,
+      title: "Horizontale Linie",
+      action: (ta) => insertAtCursor(ta, "\n\n---\n\n"),
+    },
+    { icon: ImageIcon, title: "Bild einfügen (Markdown)", action: insertImageMarkdown },
   ];
 
   return (

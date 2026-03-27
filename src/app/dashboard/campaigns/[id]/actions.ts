@@ -12,109 +12,6 @@ import {
   CampaignSchema,
 } from "@/src/lib/validations/schemas";
 
-export async function togglePublishStatus(
-  campaignId: string,
-  currentState: boolean,
-) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error("Not authenticated");
-
-  // Verify ownership
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
-    .eq("id", campaignId)
-    .single();
-
-  // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
-    campaignRaw,
-  );
-
-  if (!parsed.success || parsed.data.gm_id !== user.id) {
-    throw new Error("Unauthorized: You are not the GM of this campaign.");
-  }
-
-  // Toggle is_published
-  const { error } = await (supabase.from("campaigns") as any)
-    .update({ is_published: !currentState })
-    .eq("id", campaignId);
-
-  if (error) {
-    console.error("Toggle Publish Error:", error);
-    throw new Error(error.message);
-  }
-
-  // Revalidate pages
-  revalidatePath("/dashboard");
-  revalidatePath(`/dashboard/campaigns/${campaignId}`);
-  revalidatePath("/"); // Landing page
-}
-
-export async function updateCampaignDetails(
-  campaignId: string,
-  formData: FormData,
-) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error("Not authenticated");
-
-  // Verify ownership
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
-    .eq("id", campaignId)
-    .single();
-
-  // Validierung mit Zod
-  const parsed = CampaignSchema.pick({ id: true, gm_id: true }).safeParse(
-    campaignRaw,
-  );
-
-  if (!parsed.success || parsed.data.gm_id !== user.id) {
-    throw new Error("Unauthorized: You are not the GM of this campaign.");
-  }
-
-  // Extract form data
-  const nameRaw = formData.get("name") as string;
-  const name = nameRaw?.trim();
-  const banner_url = formData.get("banner_url") as string;
-  const frequency = formData.get("frequency") as string;
-  const looking_for = formData.get("looking_for") as string;
-  const house_rules = formData.get("house_rules") as string;
-
-  // Kampagnenname validieren (min. 2 Zeichen)
-  if (!name || name.length < 2) {
-    throw new Error("Kampagnenname muss mindestens 2 Zeichen lang sein.");
-  }
-
-  // Update campaign
-  const { error } = await (supabase.from("campaigns") as any)
-    .update({
-      name,
-      banner_url: banner_url || null,
-      frequency: frequency || null,
-      looking_for: looking_for || null,
-      house_rules: house_rules || null,
-    })
-    .eq("id", campaignId);
-
-  if (error) {
-    console.error("Update Campaign Details Error:", error);
-    throw new Error(error.message);
-  }
-
-  // Revalidate pages (Name wird u.a. in Sidebar, Dashboard-Karten angezeigt)
-  revalidatePath(`/dashboard/campaigns/${campaignId}`);
-  revalidatePath(`/campaigns/${campaignId}`); // Public page
-  revalidatePath("/dashboard");
-}
-
 // ============================================================================
 // RECURRING SESSION SCHEDULE
 // ============================================================================
@@ -966,18 +863,8 @@ export async function updateCampaignDescription(
     return { success: false, error: "Nur der Spielleiter kann die Beschreibung bearbeiten." };
   }
 
-  // Serverseitige Sanitization (XSS-Schutz)
-  const sanitizeHtml = (await import("sanitize-html")).default;
-  const clean = sanitizeHtml(htmlContent, {
-    allowedTags: [
-      "h1", "h2", "h3", "p", "br",
-      "strong", "b", "em", "i",
-      "ul", "ol", "li",
-      "blockquote",
-    ],
-    allowedAttributes: {},
-    allowedClasses: {},
-  });
+  const { sanitizeDescriptionHtml } = await import("@/src/lib/sanitize-description-html");
+  const clean = sanitizeDescriptionHtml(htmlContent);
 
   const { error } = await (supabase.from("campaigns") as any)
     .update({ description: clean })
