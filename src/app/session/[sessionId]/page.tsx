@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
+import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type Props = {
@@ -29,12 +30,17 @@ export default async function SessionPage({ params }: Props) {
 
   // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status")
+    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids")
     .eq("id", sessionId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    status: string;
+    stage_deck_npc_ids?: string[] | null;
+    stage_deck_faction_ids?: string[] | null;
+  } | null;
 
   if (sessionError || !session) {
     notFound();
@@ -121,6 +127,28 @@ export default async function SessionPage({ params }: Props) {
     is_revealed: npc.is_revealed ?? false,
   }));
 
+  const factionsRaw = await getFactionsWithMembers((session as any).campaign_id);
+  let allCampaignFactions = (factionsRaw || []).map((f: any) => ({
+    id: String(f.id),
+    name: String(f.name ?? "Fraktion"),
+    image_url: f.image_url ?? null,
+    type: f.type != null ? String(f.type) : null,
+    description: f.description != null ? String(f.description) : null,
+    is_revealed: f.is_revealed ?? false,
+  }));
+  if (!isGM) {
+    allCampaignFactions = allCampaignFactions.filter((f) => f.is_revealed);
+  }
+
+  const stageDeckNpcIds =
+    session?.stage_deck_npc_ids != null && Array.isArray(session.stage_deck_npc_ids)
+      ? session.stage_deck_npc_ids.map(String)
+      : null;
+  const stageDeckFactionIds =
+    session?.stage_deck_faction_ids != null && Array.isArray(session.stage_deck_faction_ids)
+      ? session.stage_deck_faction_ids.map(String)
+      : null;
+
   // 6. Load Active, Revealed Quests for this campaign
   const { data: activeQuests } = await (supabase.from("quests") as any)
     .select(
@@ -154,6 +182,9 @@ export default async function SessionPage({ params }: Props) {
       initialLiveState={liveState || null}
       partyCharacters={partyCharacters}
       allCampaignNpcs={allCampaignNpcs || []}
+      allCampaignFactions={allCampaignFactions}
+      stageDeckNpcIds={stageDeckNpcIds}
+      stageDeckFactionIds={stageDeckFactionIds}
       activeQuests={activeQuests || []}
     />
   );

@@ -237,6 +237,7 @@ export async function startSession(sessionId: string) {
       current_location: null,
       journal_text: null,
       visible_npc_ids: [],
+      visible_faction_ids: [],
       scribe_id: user.id,
     });
     if (liveError) {
@@ -318,6 +319,67 @@ export async function markSessionPlanningComplete(sessionId: string) {
 }
 
 // ============================================================================
+// GM: Bühnendeck (welche NPCs/Fraktionen im Stage Manager erscheinen)
+// ============================================================================
+export async function updateSessionStageDeck(
+  sessionId: string,
+  deck: {
+    stage_deck_npc_ids: string[] | null;
+    stage_deck_faction_ids: string[] | null;
+  },
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string } | null;
+  if (sessionError || !session) {
+    throw new Error("Session nicht gefunden.");
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann das Bühnendeck ändern.");
+  }
+
+  const { error: updateError } = await (supabase.from("sessions") as any)
+    .update({
+      stage_deck_npc_ids: deck.stage_deck_npc_ids,
+      stage_deck_faction_ids: deck.stage_deck_faction_ids,
+    })
+    .eq("id", sessionId);
+
+  if (updateError) {
+    if (
+      updateError.message?.includes("stage_deck") ||
+      updateError.message?.includes("column")
+    ) {
+      throw new Error(
+        "Spalten stage_deck_* fehlen. Bitte Migration 20260329100000_session_stage_deck_and_visible_factions.sql ausführen.",
+      );
+    }
+    throw new Error(updateError.message || "Deck konnte nicht gespeichert werden.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/session/${sessionId}`);
+  return { success: true };
+}
+
+// ============================================================================
 // GM: Live-State-Zeile für Vorbereitung (Scheduled) — unabhängig von RSVP / Live-Start
 // ============================================================================
 export async function ensureSessionPrepLiveState(sessionId: string) {
@@ -363,6 +425,7 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
       current_location: null,
       journal_text: null,
       visible_npc_ids: [],
+      visible_faction_ids: [],
       scribe_id: user.id,
     })
     .select()
@@ -459,7 +522,7 @@ export async function endSession(sessionId: string) {
 
   // 7. Cleanup Live State (optional: nur sichtbare NPCs leeren)
   const { error: liveCleanupError } = await (supabase.from("session_live_states") as any)
-    .update({ visible_npc_ids: [] })
+    .update({ visible_npc_ids: [], visible_faction_ids: [] })
     .eq("session_id", sessionId);
 
   if (liveCleanupError) {

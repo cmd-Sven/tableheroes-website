@@ -14,10 +14,15 @@ import {
   Search,
   X,
   Power,
+  Flag,
+  ScrollText,
+  ExternalLink,
+  PlusCircle,
 } from "lucide-react";
 import {
   endSession,
   ensureSessionPrepLiveState,
+  updateSessionStageDeck,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type LiveState = {
@@ -29,6 +34,7 @@ type LiveState = {
   journal_text: string | null;
   scribe_id: string | null;
   visible_npc_ids: string[] | null;
+  visible_faction_ids?: string[] | null;
   background_url?: string | null;
 };
 
@@ -50,6 +56,15 @@ type CampaignNpc = {
   is_revealed?: boolean | null;
 };
 
+type CampaignFaction = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  type: string | null;
+  description: string | null;
+  is_revealed?: boolean;
+};
+
 type ActiveQuest = {
   id: string;
   title: string;
@@ -69,6 +84,11 @@ type Props = {
   initialLiveState: LiveState | null;
   partyCharacters: PartyCharacter[];
   allCampaignNpcs: CampaignNpc[];
+  allCampaignFactions: CampaignFaction[];
+  /** null = alle NPCs im Stage Manager */
+  stageDeckNpcIds: string[] | null;
+  /** null = alle Fraktionen im Stage Manager */
+  stageDeckFactionIds: string[] | null;
   activeQuests: ActiveQuest[];
 };
 
@@ -81,6 +101,9 @@ export function LiveSessionBoard({
   initialLiveState,
   partyCharacters,
   allCampaignNpcs,
+  allCampaignFactions,
+  stageDeckNpcIds,
+  stageDeckFactionIds,
   activeQuests,
 }: Props) {
   const router = useRouter();
@@ -93,6 +116,36 @@ export function LiveSessionBoard({
   );
   const [showQuests, setShowQuests] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
+  const [stageFactionSearch, setStageFactionSearch] = useState("");
+  const [npcDeckAll, setNpcDeckAll] = useState(stageDeckNpcIds == null);
+  const [factionDeckAll, setFactionDeckAll] = useState(stageDeckFactionIds == null);
+  const [npcDeckPick, setNpcDeckPick] = useState<Set<string>>(() => {
+    if (stageDeckNpcIds?.length) return new Set(stageDeckNpcIds);
+    return new Set();
+  });
+  const [factionDeckPick, setFactionDeckPick] = useState<Set<string>>(() => {
+    if (stageDeckFactionIds?.length) return new Set(stageDeckFactionIds);
+    return new Set();
+  });
+
+  useEffect(() => {
+    setNpcDeckAll(stageDeckNpcIds == null);
+    setFactionDeckAll(stageDeckFactionIds == null);
+    setNpcDeckPick(
+      new Set(
+        stageDeckNpcIds?.length
+          ? stageDeckNpcIds
+          : allCampaignNpcs.map((n) => n.id),
+      ),
+    );
+    setFactionDeckPick(
+      new Set(
+        stageDeckFactionIds?.length
+          ? stageDeckFactionIds
+          : allCampaignFactions.map((f) => f.id),
+      ),
+    );
+  }, [stageDeckNpcIds, stageDeckFactionIds, allCampaignNpcs, allCampaignFactions]);
 
   const isPrepMode = sessionStatus === "Scheduled";
 
@@ -191,13 +244,57 @@ export function LiveSessionBoard({
     [allCampaignNpcs, activeNpcIds],
   );
 
+  const npcStagePool = useMemo(() => {
+    if (stageDeckNpcIds == null) return allCampaignNpcs;
+    const allowed = new Set(stageDeckNpcIds);
+    return allCampaignNpcs.filter((n) => allowed.has(n.id));
+  }, [allCampaignNpcs, stageDeckNpcIds]);
+
+  const factionStagePool = useMemo(() => {
+    if (stageDeckFactionIds == null) return allCampaignFactions;
+    const allowed = new Set(stageDeckFactionIds);
+    return allCampaignFactions.filter((f) => allowed.has(f.id));
+  }, [allCampaignFactions, stageDeckFactionIds]);
+
+  const activeFactionIds = useMemo(() => {
+    return new Set(liveState?.visible_faction_ids || []);
+  }, [liveState?.visible_faction_ids]);
+
+  const activeFactions = useMemo(
+    () => allCampaignFactions.filter((f) => activeFactionIds.has(f.id)),
+    [allCampaignFactions, activeFactionIds],
+  );
+
   const filteredNpcsForStageManager = useMemo(() => {
     const term = stageSearch.trim().toLowerCase();
-    if (!term) return allCampaignNpcs;
-    return allCampaignNpcs.filter((npc) =>
+    if (!term) return npcStagePool;
+    return npcStagePool.filter((npc) =>
       `${npc.name} ${npc.title || ""}`.toLowerCase().includes(term),
     );
-  }, [allCampaignNpcs, stageSearch]);
+  }, [npcStagePool, stageSearch]);
+
+  const filteredFactionsForStageManager = useMemo(() => {
+    const term = stageFactionSearch.trim().toLowerCase();
+    if (!term) return factionStagePool;
+    return factionStagePool.filter((f) =>
+      `${f.name} ${f.type || ""}`.toLowerCase().includes(term),
+    );
+  }, [factionStagePool, stageFactionSearch]);
+
+  function saveStageDeck() {
+    if (!isGM) return;
+    startTransition(async () => {
+      try {
+        await updateSessionStageDeck(sessionId, {
+          stage_deck_npc_ids: npcDeckAll ? null : Array.from(npcDeckPick),
+          stage_deck_faction_ids: factionDeckAll ? null : Array.from(factionDeckPick),
+        });
+        router.refresh();
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : "Deck konnte nicht gespeichert werden.");
+      }
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // UI
@@ -226,7 +323,17 @@ export function LiveSessionBoard({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <a
+            href={`/dashboard/campaigns/${campaignId}?tab=lore`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded border border-hero-border bg-background-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-accent-gold hover:text-accent-gold transition-colors"
+          >
+            <ScrollText className="h-4 w-4" />
+            Lore
+            <ExternalLink className="h-3 w-3 opacity-60" />
+          </a>
           {/* Quest Journal Toggle */}
           {activeQuests.length > 0 && (
             <button
@@ -375,7 +482,7 @@ export function LiveSessionBoard({
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-accent-gold" />
                 <h2 className="font-barlow font-bold text-sm uppercase text-gray-200">
-                  Bühne / Aktive NPCs
+                  Bühne / Aktive Karten
                 </h2>
               </div>
               {isGM && (
@@ -389,61 +496,119 @@ export function LiveSessionBoard({
               )}
             </div>
 
-            {activeNpcs.length === 0 ? (
+            {activeNpcs.length === 0 && activeFactions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-center">
                 <p className="max-w-md font-libre text-sm text-gray-400">
-                  Aktuell steht niemand auf der Bühne. Der Spielleiter kann im
-                  Stage Manager NPCs hinzufügen.
+                  Noch nichts auf der Bühne. Der Spielleiter kann im Stage Manager
+                  NPCs und Fraktionen aktivieren.
                 </p>
               </div>
             ) : (
-              <div
-                className={`flex-1 ${
-                  activeNpcs.length === 1
-                    ? "flex items-center justify-center"
-                    : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-                }`}
-              >
-                {activeNpcs.map((npc) => (
+              <div className="flex-1 flex flex-col gap-8">
+                {activeNpcs.length > 0 && (
                   <div
-                    key={npc.id}
-                    className={`rounded-lg border border-hero-border/40 bg-background-dark/80 p-4 shadow-lg flex flex-col ${
-                      activeNpcs.length === 1 ? "max-w-lg w-full" : ""
-                    }`}
+                    className={
+                      activeNpcs.length === 1
+                        ? "flex flex-1 items-center justify-center"
+                        : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                    }
                   >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-14 w-14 rounded-full bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center">
-                        {npc.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={npc.image_url}
-                            alt={npc.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="font-cinzel text-lg text-accent-gold">
-                            {npc.name[0]?.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-cinzel font-bold text-lg text-white">
-                          {npc.name}
-                        </p>
-                        {npc.title && (
-                          <p className="font-libre text-xs text-accent-gold">
-                            {npc.title}
+                    {activeNpcs.map((npc) => (
+                      <div
+                        key={npc.id}
+                        className={`rounded-lg border border-hero-border/40 bg-background-dark/80 p-4 shadow-lg flex flex-col ${
+                          activeNpcs.length === 1 ? "max-w-lg w-full" : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="h-14 w-14 rounded-full bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center">
+                            {npc.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={npc.image_url}
+                                alt={npc.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="font-cinzel text-lg text-accent-gold">
+                                {npc.name[0]?.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-cinzel font-bold text-lg text-white">
+                              {npc.name}
+                            </p>
+                            {npc.title && (
+                              <p className="font-libre text-xs text-accent-gold">
+                                {npc.title}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {npc.description && (
+                          <p className="font-libre text-sm text-gray-300 leading-relaxed">
+                            {npc.description}
                           </p>
                         )}
                       </div>
-                    </div>
-                    {npc.description && (
-                      <p className="font-libre text-sm text-gray-300 leading-relaxed">
-                        {npc.description}
-                      </p>
-                    )}
+                    ))}
                   </div>
-                ))}
+                )}
+                {activeFactions.length > 0 && (
+                  <div>
+                    <h3 className="font-barlow font-bold text-xs uppercase text-gray-500 mb-3 flex items-center gap-2">
+                      <Flag className="h-3.5 w-3.5 text-accent-gold" />
+                      Aktive Fraktionen
+                    </h3>
+                    <div
+                      className={
+                        activeFactions.length === 1
+                          ? "flex justify-center"
+                          : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                      }
+                    >
+                      {activeFactions.map((fac) => (
+                        <div
+                          key={fac.id}
+                          className={`rounded-lg border border-amber-900/40 bg-amber-950/20 p-4 shadow-lg ${
+                            activeFactions.length === 1 ? "max-w-lg w-full" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="h-12 w-12 rounded-md bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center shrink-0">
+                              {fac.image_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={fac.image_url}
+                                  alt={fac.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <Flag className="h-6 w-6 text-accent-gold" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-cinzel font-bold text-base text-white truncate">
+                                {fac.name}
+                              </p>
+                              {fac.type && (
+                                <p className="font-libre text-[10px] text-gray-400 truncate">
+                                  {fac.type}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {fac.description && (
+                            <p className="font-libre text-xs text-gray-300 leading-relaxed line-clamp-4">
+                              {fac.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -566,7 +731,141 @@ export function LiveSessionBoard({
             </button>
           </div>
 
-          {/* Search */}
+          {/* Bühnendeck: welche Karten im Manager erscheinen */}
+          <details
+            className="border-b border-hero-dark px-4 py-2 group/deck"
+            open={isPrepMode}
+          >
+            <summary className="font-barlow font-bold text-xs uppercase cursor-pointer text-accent-gold list-none flex items-center justify-between">
+              <span>Bühnendeck planen</span>
+              <span className="text-gray-500 group-open/deck:rotate-180 transition-transform text-[10px]">
+                ▼
+              </span>
+            </summary>
+            <div className="mt-3 space-y-4 pb-3 font-libre text-xs text-gray-300">
+              <p className="text-[11px] text-gray-500">
+                Lege fest, welche NPCs und Fraktionen du im Manager siehst. Standard ist
+                „alle“ der Kampagne (sichtbar für dich). Eingeschränktes Deck hilft am
+                Abend den Überblick zu behalten.
+              </p>
+              <div className="space-y-2">
+                <p className="font-barlow font-bold uppercase text-[10px] text-gray-400">
+                  NPCs im Manager
+                </p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="npc-deck"
+                    checked={npcDeckAll}
+                    onChange={() => setNpcDeckAll(true)}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  Alle Kampagnen-NPCs
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="npc-deck"
+                    checked={!npcDeckAll}
+                    onChange={() => {
+                      setNpcDeckAll(false);
+                      setNpcDeckPick(new Set(allCampaignNpcs.map((n) => n.id)));
+                    }}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  Nur ausgewählte
+                </label>
+                {!npcDeckAll && (
+                  <div className="max-h-32 overflow-y-auto rounded border border-hero-border/40 bg-background-dark p-2 space-y-1">
+                    {allCampaignNpcs.map((npc) => (
+                      <label
+                        key={npc.id}
+                        className="flex items-center gap-2 cursor-pointer text-[11px]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={npcDeckPick.has(npc.id)}
+                          onChange={(e) => {
+                            setNpcDeckPick((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(npc.id);
+                              else next.delete(npc.id);
+                              return next;
+                            });
+                          }}
+                          className="rounded border-hero-border"
+                        />
+                        <span className="truncate">{npc.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="font-barlow font-bold uppercase text-[10px] text-gray-400">
+                  Fraktionen im Manager
+                </p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="fac-deck"
+                    checked={factionDeckAll}
+                    onChange={() => setFactionDeckAll(true)}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  Alle Fraktionen
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="fac-deck"
+                    checked={!factionDeckAll}
+                    onChange={() => {
+                      setFactionDeckAll(false);
+                      setFactionDeckPick(new Set(allCampaignFactions.map((f) => f.id)));
+                    }}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  Nur ausgewählte
+                </label>
+                {!factionDeckAll && (
+                  <div className="max-h-32 overflow-y-auto rounded border border-hero-border/40 bg-background-dark p-2 space-y-1">
+                    {allCampaignFactions.map((fac) => (
+                      <label
+                        key={fac.id}
+                        className="flex items-center gap-2 cursor-pointer text-[11px]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={factionDeckPick.has(fac.id)}
+                          onChange={(e) => {
+                            setFactionDeckPick((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(fac.id);
+                              else next.delete(fac.id);
+                              return next;
+                            });
+                          }}
+                          className="rounded border-hero-border"
+                        />
+                        <span className="truncate">{fac.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={saveStageDeck}
+                disabled={isUpdating}
+                className="w-full rounded border border-hero-vibrant bg-hero-vibrant/20 py-2 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-50"
+              >
+                Deck speichern
+              </button>
+            </div>
+          </details>
+
+          {/* Search NPCs */}
           <div className="px-4 py-3 border-b border-hero-dark flex items-center gap-2">
             <Search className="h-4 w-4 text-gray-500" />
             <input
@@ -579,7 +878,7 @@ export function LiveSessionBoard({
           </div>
 
           {/* NPC List with Toggles */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <div className="overflow-y-auto px-4 py-3 space-y-2 max-h-[28vh]">
             {filteredNpcsForStageManager.length === 0 ? (
               <p className="font-libre text-xs text-gray-500">
                 Keine NPCs gefunden.
@@ -626,8 +925,83 @@ export function LiveSessionBoard({
             )}
           </div>
 
+          {/* Fraktionen auf die Bühne */}
+          <div className="px-4 py-2 border-b border-hero-dark flex items-center gap-2">
+            <Flag className="h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              value={stageFactionSearch}
+              onChange={(e) => setStageFactionSearch(e.target.value)}
+              placeholder="Fraktionen suchen..."
+              className="flex-1 rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+            />
+          </div>
+          <div className="overflow-y-auto px-4 py-3 space-y-2 max-h-[22vh] border-b border-hero-dark">
+            {filteredFactionsForStageManager.length === 0 ? (
+              <p className="font-libre text-xs text-gray-500">
+                Keine Fraktionen im Deck oder keine Treffer.
+              </p>
+            ) : (
+              filteredFactionsForStageManager.map((fac) => {
+                const isOnStage = activeFactionIds.has(fac.id);
+                return (
+                  <label
+                    key={fac.id}
+                    className="flex items-center gap-3 rounded border border-amber-900/30 bg-background-dark px-3 py-2 cursor-pointer hover:border-amber-700/50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isOnStage}
+                      onChange={(e) => {
+                        const currentIds = new Set(
+                          liveState?.visible_faction_ids || [],
+                        );
+                        if (e.target.checked) {
+                          currentIds.add(fac.id);
+                        } else {
+                          currentIds.delete(fac.id);
+                        }
+                        updateLiveState({
+                          visible_faction_ids: Array.from(currentIds),
+                        });
+                      }}
+                      className="h-4 w-4 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-barlow font-bold text-xs text-white truncate">
+                        {fac.name}
+                      </p>
+                      {fac.type && (
+                        <p className="font-libre text-[10px] text-gray-400 truncate">
+                          {fac.type}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          <div className="border-b border-hero-dark px-4 py-3 space-y-2">
+            <a
+              href={`/dashboard/campaigns/${campaignId}/npcs/new`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex w-full items-center justify-center gap-2 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant transition-colors"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Neuen NPC anlegen
+              <ExternalLink className="h-3 w-3 opacity-70" />
+            </a>
+            <p className="font-libre text-[10px] text-gray-500 text-center">
+              Öffnet in einem neuen Tab. Danach diese Seite aktualisieren oder Deck auf
+              „alle NPCs“ stellen, bis der neue Eintrag im Deck ist.
+            </p>
+          </div>
+
           {/* Background Image Settings */}
-          <div className="border-t border-hero-dark px-4 py-3 space-y-2">
+          <div className="border-t border-hero-dark px-4 py-3 space-y-2 mt-auto">
             <div className="flex items-center gap-2 mb-1">
               <BookOpen className="h-4 w-4 text-accent-gold" />
               <p className="font-barlow font-bold text-xs uppercase text-gray-300">
