@@ -551,7 +551,7 @@ export function MembersManagement({
                         onClick={() => handleOpenMemberDetails(member.user_id)}
                         disabled={isProcessing || loadingMemberDetails}
                         className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-hero-vibrant transition-colors disabled:opacity-50"
-                        title="Spieler-Details"
+                        title="Spieler & Charakter: Punkte, Achievements, RSVP"
                       >
                         <Info className="h-5 w-5" />
                       </button>

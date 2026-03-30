@@ -117,8 +117,11 @@ function SessionRowPlayer({
         campaignId: session.campaignId,
         isLive: session.isLive,
       });
-      if (res.error) alert(res.error);
-      else router.refresh();
+      if (!res.success || res.error) {
+        alert(res.error || "Rückmeldung konnte nicht gespeichert werden.");
+        return;
+      }
+      router.refresh();
     });
   };
 
@@ -325,7 +328,11 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
 
   const handleGmConfirm = (userId: string, confirmed: boolean) => {
     startTransition(async () => {
-      await setGmConfirmed(session.id, userId, confirmed);
+      const res = await setGmConfirmed(session.id, userId, confirmed);
+      if (!res.success) {
+        alert(res.error || "Speichern fehlgeschlagen.");
+        return;
+      }
       router.refresh();
     });
   };
@@ -334,7 +341,11 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
     const val = e.target.value;
     const days = val === "" ? null : (Number(val) as 1 | 2 | 3);
     startTransition(async () => {
-      await updateSessionRsvpSettings(session.id, days, session.isLive);
+      const res = await updateSessionRsvpSettings(session.id, days, session.isLive);
+      if (!res.success || res.error) {
+        alert(res.error || "Anmeldefrist konnte nicht gespeichert werden.");
+        return;
+      }
       router.refresh();
     });
   };

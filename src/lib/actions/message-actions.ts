@@ -83,7 +83,7 @@ export async function sendMessage(
     )
       .select("user_id")
       .eq("campaign_id", input.campaignId)
-      .eq("status", "Accepted")
+      .in("status", ["Accepted", "Approved"])
       .neq("user_id", user.id);
 
     const memberCount = ((members as any[]) || []).length;

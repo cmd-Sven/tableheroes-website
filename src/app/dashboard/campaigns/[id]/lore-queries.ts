@@ -85,3 +85,47 @@ export async function getLoreEntries(campaignId: string) {
 
   return enrichedLore;
 }
+
+export type RecentLoreSnippet = {
+  id: string;
+  name: string;
+  type: string | null;
+  created_at: string | null;
+};
+
+/** Die zuletzt angelegten Lore-Einträge der Welt der Kampagne (nur GM). */
+export async function getRecentLoreForGmDashboard(
+  campaignId: string,
+  limit = 3,
+): Promise<RecentLoreSnippet[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, world_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const campaign = campaignRaw as { gm_id: string; world_id: string | null } | null;
+  if (!campaign || campaign.gm_id !== user.id || !campaign.world_id) return [];
+
+  const { data: rows, error } = await (supabase.from("world_lore") as any)
+    .select("id, name, type, created_at")
+    .eq("world_id", campaign.world_id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[getRecentLoreForGmDashboard]", error);
+    return [];
+  }
+
+  return ((rows as any[]) || []).map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? "Ohne Titel"),
+    type: r.type != null ? String(r.type) : null,
+    created_at: r.created_at != null ? String(r.created_at) : null,
+  }));
+}

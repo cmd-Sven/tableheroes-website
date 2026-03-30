@@ -562,7 +562,10 @@ export function GMCharacterEditorPage({
         {/* Rechte Spalte: Beziehungen & Ruf */}
         <div className="space-y-6">
           {/* Beziehungen */}
-          <div className="rounded-lg border border-hero-dark bg-background-card p-6">
+          <div
+            id="gm-character-npc-relations"
+            className="rounded-lg border border-hero-dark bg-background-card p-6 scroll-mt-24"
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2">
                 Beziehungen & Kontakte
@@ -705,7 +708,8 @@ export function GMCharacterEditorPage({
           </div>
 
           {/* Ruf bei Fraktionen */}
-          {factions.length > 0 && (
+          <div id="gm-character-faction-reputation" className="scroll-mt-24">
+          {factions.length > 0 ? (
             <div className="rounded-lg border border-hero-dark bg-background-card p-6">
               <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-accent-gold" />
@@ -843,7 +847,19 @@ export function GMCharacterEditorPage({
                 </div>
               )}
             </div>
+          ) : (
+            <div className="rounded-lg border border-hero-dark bg-background-card p-6">
+              <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-accent-gold" />
+                Ruf bei Fraktionen
+              </h2>
+              <p className="font-libre text-sm text-gray-500">
+                Noch keine Fraktionen in dieser Kampagne. Lege welche an, um Ruf und
+                Ränge zu verwalten.
+              </p>
+            </div>
           )}
+          </div>
         </div>
       </div>
 

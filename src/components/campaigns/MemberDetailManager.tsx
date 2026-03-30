@@ -2,9 +2,9 @@
 
 import { useState, useTransition, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   X,
-  Star,
   Award,
   TrendingUp,
   TrendingDown,
@@ -16,9 +16,13 @@ import {
   XCircle,
   HelpCircle,
   Loader2,
+  Shield,
+  Sparkles,
+  ScrollText,
+  ExternalLink,
 } from "lucide-react";
 import { adjustMemberPoints } from "@/src/lib/actions/point-actions";
-import type { PointLogEntry } from "@/src/lib/types/point-log";
+import type { MemberDetailData } from "@/src/lib/actions/point-actions";
 import { getAchievementImageSrc } from "@/src/types/achievement";
 import { toast } from "sonner";
 
@@ -26,23 +30,8 @@ import { toast } from "sonner";
 // Types
 // ============================================================================
 
-type MemberDetails = {
-  userId: string;
-  username: string;
-  avatarUrl: string | null;
-  totalPoints: number;
-  achievements: Array<{
-    id: string;
-    name: string;
-    imageUrl: string | null;
-    pointsAwarded: number;
-  }>;
-  pointsLog: PointLogEntry[];
-  nextSessionStatus: "accepted" | "declined" | "pending" | null;
-};
-
 type Props = {
-  member: MemberDetails;
+  member: MemberDetailData;
   campaignId: string;
   onClose: () => void;
 };
@@ -159,7 +148,7 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="font-barlow text-xs uppercase text-gray-500">
-                  Spieler-Details
+                  Spieler & Charakter
                 </span>
                 {sessionStatus && SessionIcon && (
                   <div
@@ -191,6 +180,81 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-black/20">
+          {/* Charakter in dieser Kampagne */}
+          <section>
+            <h3 className="font-cinzel font-bold text-lg text-accent-gold mb-3 flex items-center gap-2">
+              <ScrollText className="h-5 w-5" />
+              Charakter
+            </h3>
+            {member.character ? (
+              <div className="rounded-lg border border-hero-border/40 bg-hero-dark/30 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-accent-gold/30 bg-black/50">
+                      {member.character.avatarUrl ? (
+                        <Image
+                          src={member.character.avatarUrl}
+                          alt=""
+                          width={56}
+                          height={56}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center font-barlow font-bold text-accent-gold">
+                          {member.character.name[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-cinzel font-bold text-lg text-white truncate">
+                        {member.character.name}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 font-libre text-sm text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <Shield className="h-3.5 w-3.5 text-accent-gold shrink-0" />
+                          {member.character.class || "—"}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5 text-accent-gold shrink-0" />
+                          {member.character.race || "—"}
+                        </span>
+                        <span className="font-barlow text-xs uppercase text-gray-500">
+                          Stufe {member.character.level}
+                        </span>
+                        {member.character.status && (
+                          <span className="font-barlow text-xs uppercase text-gray-500">
+                            · {member.character.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/dashboard/campaigns/${campaignId}/characters/${member.character.id}`}
+                    className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors shrink-0"
+                  >
+                    Vollständiges Blatt
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+                {(member.character.biography ?? "").trim() ? (
+                  <div>
+                    <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">
+                      Hintergrund
+                    </p>
+                    <p className="font-libre text-sm text-gray-300 leading-relaxed line-clamp-6 whitespace-pre-wrap">
+                      {member.character.biography}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="font-libre text-sm text-gray-500 italic text-center py-4 border border-hero-border/30 rounded bg-background-dark">
+                Noch kein Charakter für diese Kampagne verknüpft.
+              </p>
+            )}
+          </section>
+
           {/* Achievements Gallery */}
           <section>
             <h3 className="font-cinzel font-bold text-lg text-accent-gold mb-3 flex items-center gap-2">
@@ -378,13 +442,4 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
       </div>
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
 }

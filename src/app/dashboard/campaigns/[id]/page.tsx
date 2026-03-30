@@ -10,6 +10,7 @@ import {
   Settings,
   User,
 } from "lucide-react";
+import { GmCampaignDashboard } from "@/src/components/campaigns/GmCampaignDashboard";
 import {
   togglePublishStatus,
   updateCampaignDetails,
@@ -26,7 +27,6 @@ import { FactionsManagement } from "./FactionsManagement";
 import { LoreManagement } from "./LoreManagement";
 import { QuestLogManagement } from "./QuestLogManagement";
 import { SessionsTab } from "./SessionsTab";
-import { Plus } from "lucide-react";
 import { CharacterCreatorButton } from "./CharacterCreatorButton";
 import { CharacterSheet } from "@/src/components/dashboard/campaigns/CharacterSheet";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
@@ -269,7 +269,7 @@ export default async function CampaignDetailPage({
         (supabase.from("campaign_members") as any)
           .select("user_id")
           .eq("campaign_id", id)
-          .eq("status", "Accepted"),
+          .in("status", ["Accepted", "Approved"]),
         (supabase.from("session_rsvps") as any)
           .select("session_id, user_id, rsvp_status")
           .in("session_id", scheduledIds),
@@ -516,6 +516,33 @@ export default async function CampaignDetailPage({
       .eq("campaign_id", id)
       .eq("status", "Accepted");
     acceptedMembersCount = count || 0;
+  }
+
+  let gmDashboardCharacters: import("@/src/components/campaigns/GmCampaignDashboard").GmDashboardCharacterCard[] =
+    [];
+  let gmRecentLore: import("./lore-queries").RecentLoreSnippet[] = [];
+  let gmBroadcastRecipientCount = 0;
+  if (isGM) {
+    const { getRecentLoreForGmDashboard } = await import("./lore-queries");
+    gmRecentLore = await getRecentLoreForGmDashboard(id, 3);
+    gmDashboardCharacters = acceptedMembers
+      .filter((m: any) => m.character?.id || m.character_id)
+      .map((m: any) => ({
+        characterId: String(m.character?.id ?? m.character_id),
+        name: String(m.character?.name ?? "Charakter"),
+        classLabel: String(m.character?.class ?? "—"),
+        race: String(m.character?.race ?? "—"),
+        level: Number(m.character?.level) || 1,
+        username: String(m.user?.username ?? "Spieler"),
+        playerAvatarUrl: m.user?.avatar_url ?? null,
+      }));
+    const { data: bcm } = await (supabase.from("campaign_members") as any)
+      .select("user_id")
+      .eq("campaign_id", id)
+      .in("status", ["Accepted", "Approved"]);
+    gmBroadcastRecipientCount = ((bcm as { user_id: string }[]) || []).filter(
+      (row) => row.user_id !== user.id,
+    ).length;
   }
 
   // ============================================================================
@@ -771,7 +798,19 @@ export default async function CampaignDetailPage({
   // ============================================================================
 
   const OverviewTab = (
-    <div className="grid gap-8 lg:grid-cols-3">
+    <div className="space-y-8">
+      {isGM && (
+        <GmCampaignDashboard
+          campaignId={id}
+          campaignName={campaign.name ?? "Kampagne"}
+          isPublished={!!campaign.is_published}
+          hasWorld={!!campaignWorldId}
+          characters={gmDashboardCharacters}
+          recentLore={gmRecentLore}
+          broadcastRecipientCount={gmBroadcastRecipientCount}
+        />
+      )}
+      <div className="grid gap-8 lg:grid-cols-3">
       {/* Left Column (Main Content) */}
       <div className="lg:col-span-2 space-y-6">
         {/* Apply to Campaign (when not yet a member) */}
@@ -992,101 +1031,34 @@ export default async function CampaignDetailPage({
             </form>
           </div>
         )}
-
-        {/* Spielplan & Termine (GM Only) */}
-        {isGM && (
-          <CampaignScheduleForm
-            campaignId={id}
-            initialInterval={campaign.schedule_interval ?? null}
-            initialDay={campaign.schedule_day ?? null}
-            initialTime={campaign.schedule_time ?? null}
-            initialDuration={campaign.schedule_duration_hours ?? null}
-            initialFrequencyNote={campaign.frequency ?? null}
-          />
-        )}
       </div>
 
       {/* Right Column (Sidebar/Tools) */}
       <div className="space-y-6">
-        {/* Visibility Toggle (CRITICAL) */}
         {isGM && (
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4 flex items-center gap-2">
-              {campaign.is_published ? (
-                <Eye className="h-5 w-5 text-green-400" />
-              ) : (
-                <EyeOff className="h-5 w-5 text-gray-500" />
-              )}
-              Sichtbarkeit
-            </h3>
-
-            <div className="mb-4">
-              <div
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 font-barlow font-bold uppercase text-sm ${
-                  campaign.is_published
-                    ? "bg-green-900/30 text-green-400 border border-green-700"
-                    : "bg-gray-700/30 text-gray-400 border border-gray-600"
-                }`}
-              >
-                {campaign.is_published ? "🌍 Öffentlich" : "🔒 Privat"}
-              </div>
-            </div>
-
-            <p className="font-libre text-xs text-gray-400 mb-4">
-              {campaign.is_published
-                ? "Diese Kampagne ist auf der Landing Page sichtbar und Spieler können beitreten."
-                : "Diese Kampagne ist privat. Nur du kannst sie sehen."}
-            </p>
-
-            <form
-              action={togglePublishStatus.bind(null, id, campaign.is_published)}
-              suppressHydrationWarning={true}
-            >
-              <button
-                type="submit"
-                className={`w-full rounded-md border px-4 py-2.5 font-barlow font-bold uppercase text-sm transition-colors ${
-                  campaign.is_published
-                    ? "border-gray-600 bg-gray-700 text-white hover:bg-gray-600"
-                    : "border-hero-border bg-hero-dark text-white hover:bg-hero-vibrant"
-                }`}
-                suppressHydrationWarning={true}
-              >
-                {campaign.is_published ? "Privat schalten" : "Veröffentlichen"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        {isGM && (
-          <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4 flex items-center gap-2">
+            <h3 className="font-barlow font-bold text-lg text-white uppercase mb-3 flex items-center gap-2">
               <Settings className="h-5 w-5 text-accent-gold" />
-              Quick Actions
+              Mehr
             </h3>
-            <div className="space-y-2">
-              <button
-                className="w-full text-left rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
-                suppressHydrationWarning={true}
-              >
-                <Plus className="inline h-4 w-4 mr-2" />
-                Neue Session planen
-              </button>
-              <button
-                className="w-full text-left rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
-                suppressHydrationWarning={true}
-              >
-                <Users className="inline h-4 w-4 mr-2" />
-                Spieler einladen
-              </button>
+            <Link
+              href={`/dashboard/campaigns/${id}?tab=settings`}
+              className="flex w-full items-center rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
+            >
+              <Settings className="inline h-4 w-4 mr-2" />
+              Einstellungen
+            </Link>
+            <p className="mt-3 font-libre text-xs text-gray-500">
+              Spielplan, Onboarding und Sichtbarkeit findest du auch unter
+              Einstellungen sowie unter{" "}
               <Link
-                href={`/dashboard/campaigns/${id}?tab=settings`}
-                className="flex w-full items-center rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
+                href={`/dashboard/campaigns/${id}/schedule`}
+                className="text-hero-vibrant hover:underline"
               >
-                <Settings className="inline h-4 w-4 mr-2" />
-                Einstellungen
+                Termine &amp; Spielplan
               </Link>
-            </div>
+              .
+            </p>
           </div>
         )}
 
@@ -1109,6 +1081,7 @@ export default async function CampaignDetailPage({
             </Link>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

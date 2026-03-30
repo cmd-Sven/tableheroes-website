@@ -12,6 +12,17 @@ import type { PointLogEntry } from "@/src/lib/types/point-log";
 // Types
 // ============================================================================
 
+export type MemberDetailCharacter = {
+  id: string;
+  name: string;
+  class: string;
+  race: string;
+  level: number;
+  status?: string | null;
+  biography?: string | null;
+  avatarUrl?: string | null;
+};
+
 export type MemberDetailData = {
   userId: string;
   username: string;
@@ -25,6 +36,8 @@ export type MemberDetailData = {
   }>;
   pointsLog: PointLogEntry[];
   nextSessionStatus: "accepted" | "declined" | "pending" | null;
+  /** Charakter dieser Kampagne (falls vorhanden) */
+  character: MemberDetailCharacter | null;
 };
 
 // ============================================================================
@@ -52,6 +65,26 @@ export async function getMemberDetails(
     return {
       success: false,
       error: "Nur der Spielleiter kann Mitglieder-Details einsehen.",
+    };
+  }
+
+  const { data: membership } = await (supabase.from("campaign_members") as any)
+    .select("id, character_id")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId)
+    .in("status", [
+      "Accepted",
+      "Approved",
+      "Drafting",
+      "In_Review",
+      "Changes_Proposed",
+    ])
+    .maybeSingle();
+
+  if (!membership) {
+    return {
+      success: false,
+      error: "Dieser Nutzer ist kein Mitglied dieser Kampagne.",
     };
   }
 
@@ -94,35 +127,82 @@ export async function getMemberDetails(
   const pointsLog = await getPointsLog(userId, 5);
   console.log("[getMemberDetails] Points Log geladen für User:", userId, "Anzahl:", pointsLog.length);
 
-  // Fetch next session status
-  const { data: nextSessionData } = await (
-    supabase.from("campaign_sessions") as any
-  )
-    .select(
-      "id, scheduled_for, session_participants!inner ( id, user_id, status )"
-    )
-    .eq("campaign_id", campaignId)
-    .gte("scheduled_for", new Date().toISOString())
-    .order("scheduled_for", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // Kampagnen-Charakter (Mitgliedschaft oder Fallback user_id + campaign_id)
+  let character: MemberDetailCharacter | null = null;
+  const charId = (membership as { character_id?: string | null }).character_id;
+  if (charId) {
+    const { data: ch } = await (supabase.from("characters") as any)
+      .select(
+        "id, name, class, race, level, status, biography, avatar_url",
+      )
+      .eq("id", charId)
+      .maybeSingle();
+    if (ch) {
+      character = {
+        id: ch.id,
+        name: ch.name ?? "Unbenannt",
+        class: ch.class ?? "",
+        race: ch.race ?? "",
+        level: Number(ch.level) || 1,
+        status: ch.status ?? null,
+        biography: ch.biography ?? null,
+        avatarUrl: ch.avatar_url ?? null,
+      };
+    }
+  }
+  if (!character) {
+    const { data: chRows } = await (supabase.from("characters") as any)
+      .select(
+        "id, name, class, race, level, status, biography, avatar_url",
+      )
+      .eq("user_id", userId)
+      .eq("campaign_id", campaignId)
+      .limit(1);
+    const ch = Array.isArray(chRows) ? chRows[0] : null;
+    if (ch) {
+      character = {
+        id: ch.id,
+        name: ch.name ?? "Unbenannt",
+        class: ch.class ?? "",
+        race: ch.race ?? "",
+        level: Number(ch.level) || 1,
+        status: ch.status ?? null,
+        biography: ch.biography ?? null,
+        avatarUrl: ch.avatar_url ?? null,
+      };
+    }
+  }
 
+  // Nächster Termin + RSVP (Tabelle sessions / session_rsvps)
   let nextSessionStatus: "accepted" | "declined" | "pending" | null = null;
-  if (nextSessionData && (nextSessionData as any).session_participants) {
-    const participants = Array.isArray((nextSessionData as any).session_participants)
-      ? (nextSessionData as any).session_participants
-      : [(nextSessionData as any).session_participants];
+  const { data: sessionRows } = await (supabase.from("sessions") as any)
+    .select("id, start_time, status")
+    .eq("campaign_id", campaignId)
+    .order("start_time", { ascending: true })
+    .limit(25);
 
-    const userParticipation = participants.find(
-      (p: any) => p.user_id === userId
-    );
-    if (userParticipation) {
-      const status = userParticipation.status?.toLowerCase();
-      if (status === "accepted") nextSessionStatus = "accepted";
-      else if (status === "declined") nextSessionStatus = "declined";
-      else nextSessionStatus = "pending";
-    } else {
+  const nowMs = Date.now();
+  const upcoming = ((sessionRows as any[]) || []).find((s) => {
+    if (["Completed", "Ended", "Cancelled"].includes(s.status)) return false;
+    if (s.status === "Live") return true;
+    return s.start_time && new Date(s.start_time).getTime() > nowMs;
+  });
+
+  if (upcoming?.id) {
+    const { data: rsvpRow } = await (supabase.from("session_rsvps") as any)
+      .select("rsvp_status")
+      .eq("session_id", upcoming.id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!rsvpRow) {
       nextSessionStatus = "pending";
+    } else {
+      const st = String((rsvpRow as any).rsvp_status ?? "");
+      if (st === "Absage") nextSessionStatus = "declined";
+      else if (st === "Zusage" || st === "Via Online")
+        nextSessionStatus = "accepted";
+      else nextSessionStatus = "pending";
     }
   }
 
@@ -136,6 +216,7 @@ export async function getMemberDetails(
       achievements,
       pointsLog,
       nextSessionStatus,
+      character,
     },
   };
 }
@@ -186,7 +267,7 @@ export async function adjustMemberPoints(
     .select("id")
     .eq("campaign_id", campaignId)
     .eq("user_id", targetUserId)
-    .eq("status", "Accepted")
+    .in("status", ["Accepted", "Approved"])
     .maybeSingle();
 
   if (!memberData) {
@@ -293,7 +374,7 @@ export async function distributeGroupPoints(
   )
     .select("user_id")
     .eq("campaign_id", campaignId)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved"]);
 
   if (membersError) {
     console.error("[distributeGroupPoints:members]", membersError);

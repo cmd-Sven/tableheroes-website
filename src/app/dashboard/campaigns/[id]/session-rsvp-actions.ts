@@ -23,12 +23,12 @@ async function playerHasCharacterForCampaign(
       .maybeSingle();
     return !!ch;
   }
-  const { data: ch2 } = await (supabase.from("characters") as any)
+  const { data: chRows } = await (supabase.from("characters") as any)
     .select("id")
     .eq("user_id", userId)
     .eq("campaign_id", campaignId)
-    .maybeSingle();
-  return !!ch2;
+    .limit(1);
+  return Array.isArray(chRows) && chRows.length > 0;
 }
 
 /**
@@ -58,7 +58,7 @@ export async function setSessionRsvp(
       .select("id")
       .eq("campaign_id", campaignId)
       .eq("user_id", user.id)
-      .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"])
+      .in("status", ["Accepted", "Approved", "Drafting", "In_Review"])
       .maybeSingle();
     if (!member) {
       return { success: false, error: "Keine Berechtigung für diese Kampagne." };
@@ -106,18 +106,44 @@ export async function setSessionRsvp(
     }
   }
 
-  const { error } = await (supabase.from("session_rsvps") as any)
-    .upsert(
-      {
-        session_id: sessionId,
-        user_id: user.id,
-        rsvp_status: rsvpStatus,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "session_id,user_id" }
-    );
+  const nowIso = new Date().toISOString();
 
-  if (error) return { success: false, error: error.message };
+  const { data: existingRsvp } = await (supabase.from("session_rsvps") as any)
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  let writeError: { message: string; code?: string } | null = null;
+
+  if (existingRsvp?.id) {
+    const { error } = await (supabase.from("session_rsvps") as any)
+      .update({ rsvp_status: rsvpStatus, updated_at: nowIso })
+      .eq("id", existingRsvp.id)
+      .eq("user_id", user.id);
+    writeError = error ?? null;
+  } else {
+    const { error } = await (supabase.from("session_rsvps") as any).insert({
+      session_id: sessionId,
+      user_id: user.id,
+      rsvp_status: rsvpStatus,
+      updated_at: nowIso,
+    });
+    writeError = error ?? null;
+    if (writeError?.message?.includes("duplicate") || writeError?.code === "23505") {
+      const { error: retryErr } = await (supabase.from("session_rsvps") as any)
+        .update({ rsvp_status: rsvpStatus, updated_at: nowIso })
+        .eq("session_id", sessionId)
+        .eq("user_id", user.id);
+      writeError = retryErr ?? null;
+    }
+  }
+
+  if (writeError) {
+    console.error("[setSessionRsvp] DB:", writeError);
+    return { success: false, error: writeError.message || "Rückmeldung konnte nicht gespeichert werden." };
+  }
+
   revalidatePath("/dashboard");
   if (campaignId) revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/dashboard/sessions");
@@ -194,30 +220,48 @@ export async function updateSessionRsvpSettings(
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Nicht authentifiziert." };
 
-  const { data: session } = await (supabase.from("sessions") as any)
+  const { data: session, error: sessionErr } = await (supabase.from("sessions") as any)
     .select("id, campaign_id")
     .eq("id", sessionId)
-    .single();
+    .maybeSingle();
 
-  if (!session) return { success: false, error: "Session nicht gefunden." };
+  if (sessionErr || !session) {
+    console.error("[updateSessionRsvpSettings] Session:", sessionErr);
+    return { success: false, error: sessionErr?.message || "Session nicht gefunden." };
+  }
 
-  const { data: campaign } = await (supabase.from("campaigns") as any)
+  const { data: campaign, error: campErr } = await (supabase.from("campaigns") as any)
     .select("gm_id")
     .eq("id", session.campaign_id)
-    .single();
+    .maybeSingle();
 
-  if (!campaign || (campaign as any).gm_id !== user.id) {
+  if (campErr || !campaign || (campaign as any).gm_id !== user.id) {
     return { success: false, error: "Nur der GM kann Einstellungen ändern." };
   }
 
+  const patch: Record<string, unknown> = { is_live: isLive };
+  if (rsvpDeadlineDays === null) {
+    patch.rsvp_deadline_days = null;
+  } else {
+    patch.rsvp_deadline_days = rsvpDeadlineDays;
+  }
+
   const { error } = await (supabase.from("sessions") as any)
-    .update({
-      rsvp_deadline_days: rsvpDeadlineDays,
-      is_live: isLive,
-    })
+    .update(patch)
     .eq("id", sessionId);
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    console.error("[updateSessionRsvpSettings] Update:", error);
+    const msg = error.message || "";
+    if (msg.includes("rsvp_deadline_days") || msg.includes("is_live") || msg.includes("column")) {
+      return {
+        success: false,
+        error:
+          "Datenbank-Spalten fehlen (rsvp_deadline_days / is_live). Bitte Migration 20260226100000_session_rsvps_and_settings.sql in Supabase ausführen.",
+      };
+    }
+    return { success: false, error: msg || "Einstellungen konnten nicht gespeichert werden." };
+  }
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
   return { success: true };
