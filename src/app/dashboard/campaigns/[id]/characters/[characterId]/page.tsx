@@ -7,6 +7,7 @@ import { getCharacterEditorLoreOptionsForGm } from "../../character-queries";
 import { getFactionsWithMembers } from "../../factions-queries";
 import { getNPCs } from "../../npc-queries";
 import { GMCharacterEditorPage } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
+import { serializeForClient } from "@/src/lib/serialize-for-flight";
 
 type Props = {
   params: Promise<{ id: string; characterId: string }>;
@@ -55,6 +56,22 @@ export default async function GMCharacterEditPage({ params }: Props) {
     );
   }
 
+  /** RSC/Flight: JSONB (modification_log), volle NPC-Zeilen u. ä. nicht roh an Client geben. */
+  const charRecord = character as Record<string, unknown>;
+  const { modification_log: _unusedModLog, ...characterForClient } = charRecord;
+
+  const npcsForEditor = (npcs as any[]).map((n) => ({
+    id: String(n.id),
+    name: String(n.name ?? ""),
+    role: n.role != null ? String(n.role) : null,
+    title: n.title != null ? String(n.title) : null,
+  }));
+
+  const factionsSlim = (factions as any[]).map((f: any) => ({
+    id: String(f.id),
+    name: String(f.name ?? ""),
+  }));
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <Link
@@ -66,14 +83,14 @@ export default async function GMCharacterEditPage({ params }: Props) {
       </Link>
 
       <GMCharacterEditorPage
-        character={character as any}
+        character={serializeForClient(characterForClient) as any}
         campaignId={campaignId}
-        npcs={npcs}
-        factions={(factions as any[]).map((f: any) => ({ id: f.id, name: f.name }))}
-        cultures={editorOpts.cultures}
-        languages={editorOpts.languages}
-        locations={editorOpts.locations}
-        factionChoices={factionChoices}
+        npcs={serializeForClient(npcsForEditor)}
+        factions={serializeForClient(factionsSlim)}
+        cultures={serializeForClient(editorOpts.cultures)}
+        languages={serializeForClient(editorOpts.languages)}
+        locations={serializeForClient(editorOpts.locations)}
+        factionChoices={serializeForClient(factionChoices)}
       />
     </div>
   );

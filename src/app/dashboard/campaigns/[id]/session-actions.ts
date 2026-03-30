@@ -50,6 +50,7 @@ export async function createSessionWithScenes(formData: {
       start_time: formData.start_time,
       end_time: formData.end_time,
       status: "Scheduled",
+      gm_prep_complete: false,
     })
     .select()
     .single();
@@ -155,12 +156,17 @@ export async function startSession(sessionId: string) {
 
   // 2. Load Session with Campaign
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status")
+    .select("id, campaign_id, status, gm_prep_complete")
     .eq("id", sessionId)
     .single();
 
   // Expliziter Cast gegen 'never'
-  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    status: string;
+    gm_prep_complete?: boolean | null;
+  } | null;
 
   if (sessionError || !session) {
     console.error("Start Session Error (Session Load):", sessionError);
@@ -200,6 +206,13 @@ export async function startSession(sessionId: string) {
     );
   }
 
+  const prepOk = session.gm_prep_complete !== false;
+  if (!prepOk) {
+    throw new Error(
+      "Die Session kann erst starten, wenn du die Planung abgeschlossen hast (Button „Planung abschließen“ auf der Kampagne oder bei den Terminen).",
+    );
+  }
+
   // 4. Update Session Status to Live
   const { error: updateError } = await (supabase.from("sessions") as any)
     .update({ status: "Live" })
@@ -236,6 +249,62 @@ export async function startSession(sessionId: string) {
   }
   revalidatePath(`/session/${sessionId}`);
 
+  return { success: true };
+}
+
+// ============================================================================
+// GM: Session-Planung abschließen (Voraussetzung für Live-Start)
+// ============================================================================
+export async function markSessionPlanningComplete(sessionId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  if (sessionError || !session) {
+    throw new Error("Session nicht gefunden.");
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann die Planung abschließen.");
+  }
+
+  if (session.status !== "Scheduled") {
+    throw new Error("Planung kann nur für geplante Termine abgeschlossen werden.");
+  }
+
+  const { error: updateError } = await (supabase.from("sessions") as any)
+    .update({ gm_prep_complete: true })
+    .eq("id", sessionId);
+
+  if (updateError) {
+    if (
+      updateError.message?.includes("gm_prep_complete") ||
+      updateError.message?.includes("column")
+    ) {
+      throw new Error(
+        "Spalte gm_prep_complete fehlt. Bitte Migration 20260327160000_sessions_gm_prep_complete.sql in Supabase ausführen.",
+      );
+    }
+    throw new Error(updateError.message || "Speichern fehlgeschlagen.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/session/${sessionId}`);
   return { success: true };
 }
 

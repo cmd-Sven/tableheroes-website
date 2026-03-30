@@ -5,7 +5,13 @@ import { Calendar, Wand2, Pencil, Trash2, MoreVertical, Square } from "lucide-re
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
-import { startSession, deleteSession, cancelSession, endSession } from "./session-actions";
+import {
+  startSession,
+  deleteSession,
+  cancelSession,
+  endSession,
+  markSessionPlanningComplete,
+} from "./session-actions";
 
 type SessionItem = {
   id: string;
@@ -18,6 +24,8 @@ type SessionItem = {
   pendingCount?: number;
   /** true wenn mindestens ein Spieler mit Zusage/Via Online */
   hasAcceptedRsvps?: boolean;
+  /** false = GM muss Planung abschließen (neue Termine); undefined = ältere Daten ohne Spalte */
+  gm_prep_complete?: boolean;
 };
 
 /** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */
@@ -177,6 +185,18 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
     });
   };
 
+  const handleMarkPrepComplete = (sessionId: string) => {
+    if (isStarting) return;
+    startTransition(async () => {
+      try {
+        await markSessionPlanningComplete(sessionId);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Planung konnte nicht gespeichert werden.");
+      }
+    });
+  };
+
   const handleJoinLive = (sessionId: string) => {
     router.push(`/session/${sessionId}`);
   };
@@ -315,6 +335,24 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
                         >
                           🚀 Session starten
                         </button>
+                      ) : (session.pendingCount ?? 0) === 0 &&
+                        session.gm_prep_complete === false ? (
+                        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
+                          <span
+                            className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
+                            title="Vorbereitung abschließen, dann starten."
+                          >
+                            Planung offen
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleMarkPrepComplete(session.id)}
+                            disabled={isStarting}
+                            className="inline-flex items-center gap-1 rounded border border-hero-border bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant disabled:opacity-50"
+                          >
+                            Planung abschließen
+                          </button>
+                        </div>
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"

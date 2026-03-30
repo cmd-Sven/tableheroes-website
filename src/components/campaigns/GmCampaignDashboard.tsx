@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Eye,
   EyeOff,
-  CalendarClock,
   Shield,
   UserPlus,
   Swords,
@@ -17,6 +16,11 @@ import {
 } from "lucide-react";
 import { togglePublishStatus } from "@/src/app/dashboard/campaigns/[id]/campaign-settings-actions";
 import { CampaignBroadcastQuickForm } from "./CampaignBroadcastQuickForm";
+import { GmTermineSpielplanCard } from "./GmTermineSpielplanCard";
+import type {
+  GmTermineNextSession,
+  GmTerminePlayerRsvp,
+} from "./GmTermineSpielplanCard";
 import type { RecentLoreSnippet } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
 
 export type GmDashboardCharacterCard = {
@@ -26,6 +30,8 @@ export type GmDashboardCharacterCard = {
   race: string;
   level: number;
   username: string;
+  /** Gesamtpunkte des Spielers (users.total_points) */
+  playerTotalPoints: number;
   playerAvatarUrl: string | null;
 };
 
@@ -37,6 +43,11 @@ type Props = {
   characters: GmDashboardCharacterCard[];
   recentLore: RecentLoreSnippet[];
   broadcastRecipientCount: number;
+  termineSpielplan: {
+    campaignId: string;
+    nextSession: GmTermineNextSession | null;
+    players: GmTerminePlayerRsvp[];
+  };
 };
 
 const cardClass =
@@ -50,6 +61,7 @@ export function GmCampaignDashboard({
   characters,
   recentLore,
   broadcastRecipientCount,
+  termineSpielplan,
 }: Props) {
   const base = `/dashboard/campaigns/${campaignId}`;
   const marketingCampaignUrl = `/campaigns/${campaignId}`;
@@ -152,27 +164,11 @@ export function GmCampaignDashboard({
           </form>
         </div>
 
-        {/* Termine & Spielplan */}
-        <div className={`${cardClass} lg:col-span-2 xl:col-span-3`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-hero-border pb-4 mb-2">
-            <div>
-              <h2 className="font-cinzel font-bold text-xl text-accent-gold mb-1 flex items-center gap-2">
-                <CalendarClock className="h-5 w-5" />
-                Termine &amp; Spielplan
-              </h2>
-              <p className="font-libre text-sm text-gray-400">
-                Sitzungen planen, Spielrhythmus und Abstimmungen verwalten.
-              </p>
-            </div>
-            <Link
-              href={`${base}/schedule`}
-              className="inline-flex items-center justify-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/15 px-5 py-2.5 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors shrink-0"
-            >
-              <CalendarClock className="h-4 w-4" />
-              Verwalten
-            </Link>
-          </div>
-        </div>
+        <GmTermineSpielplanCard
+          campaignId={termineSpielplan.campaignId}
+          nextSession={termineSpielplan.nextSession}
+          players={termineSpielplan.players}
+        />
       </div>
 
       {/* Spielcharaktere */}
@@ -203,7 +199,11 @@ export function GmCampaignDashboard({
                       {c.name}
                     </p>
                     <p className="font-libre text-xs text-gray-500">
-                      {c.username}
+                      <span className="text-gray-400">{c.username}</span>
+                      <span className="text-accent-gold font-barlow font-semibold">
+                        {" "}
+                        · {c.playerTotalPoints.toLocaleString("de-DE")} Pkt
+                      </span>
                     </p>
                     <p className="font-libre text-sm text-gray-400 mt-1">
                       {c.classLabel} · {c.race} · Stufe {c.level}

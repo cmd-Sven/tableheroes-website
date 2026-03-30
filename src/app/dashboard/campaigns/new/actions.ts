@@ -97,6 +97,7 @@ export async function createCampaignAction(formData: FormData) {
       start_time: sessionStart.toISOString(),
       end_time: sessionEnd.toISOString(),
       status: "Scheduled",
+      gm_prep_complete: false,
     };
 
     const { error: sessionError } = await (supabase.from("sessions") as any).insert(sessionPayload);

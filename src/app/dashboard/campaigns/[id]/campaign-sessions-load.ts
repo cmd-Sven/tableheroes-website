@@ -65,9 +65,10 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       }
       const rsvpUserIds = rsvpsBySession.get(s.id) ?? new Set();
       const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+      const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,
-        canStart: pendingCount === 0,
+        canStart: pendingCount === 0 && prepOk,
         pendingCount,
         hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
       };

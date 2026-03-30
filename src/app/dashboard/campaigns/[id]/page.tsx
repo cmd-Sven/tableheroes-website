@@ -11,6 +11,10 @@ import {
   User,
 } from "lucide-react";
 import { GmCampaignDashboard } from "@/src/components/campaigns/GmCampaignDashboard";
+import type {
+  GmTermineNextSession,
+  GmTerminePlayerRsvp,
+} from "@/src/components/campaigns/GmTermineSpielplanCard";
 import {
   togglePublishStatus,
   updateCampaignDetails,
@@ -227,6 +231,13 @@ export default async function CampaignDetailPage({
     { isGM, isAcceptedMember },
   );
 
+  /** RSVP-Zeilen für GM-Termin-Card (nur geplante Sessions mit IDs) */
+  let gmSessionRsvpRows: {
+    session_id: string;
+    user_id: string;
+    rsvp_status: string;
+  }[] = [];
+
   // Fetch Sessions
   const { data: sessionsRaw } = await (supabase.from("sessions") as any)
     .select("*")
@@ -279,7 +290,12 @@ export default async function CampaignDetailPage({
       );
       const rsvpsBySession = new Map<string, Set<string>>();
       const acceptedRsvpsBySession = new Map<string, boolean>();
-      for (const r of (rsvpsRes.data as any[]) || []) {
+      gmSessionRsvpRows = ((rsvpsRes.data as any[]) || []).map((r: any) => ({
+        session_id: String(r.session_id),
+        user_id: String(r.user_id),
+        rsvp_status: String(r.rsvp_status ?? ""),
+      }));
+      for (const r of gmSessionRsvpRows) {
         if (!rsvpsBySession.has(r.session_id))
           rsvpsBySession.set(r.session_id, new Set());
         rsvpsBySession.get(r.session_id)!.add(r.user_id);
@@ -294,7 +310,7 @@ export default async function CampaignDetailPage({
         const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
         return {
           ...s,
-          canStart: pendingCount === 0,
+          canStart: pendingCount === 0 && (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
           pendingCount,
           hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
         };
@@ -525,17 +541,34 @@ export default async function CampaignDetailPage({
   if (isGM) {
     const { getRecentLoreForGmDashboard } = await import("./lore-queries");
     gmRecentLore = await getRecentLoreForGmDashboard(id, 3);
-    gmDashboardCharacters = acceptedMembers
-      .filter((m: any) => m.character?.id || m.character_id)
-      .map((m: any) => ({
-        characterId: String(m.character?.id ?? m.character_id),
-        name: String(m.character?.name ?? "Charakter"),
-        classLabel: String(m.character?.class ?? "—"),
-        race: String(m.character?.race ?? "—"),
-        level: Number(m.character?.level) || 1,
-        username: String(m.user?.username ?? "Spieler"),
-        playerAvatarUrl: m.user?.avatar_url ?? null,
-      }));
+    const cardMembers = acceptedMembers.filter(
+      (m: any) => m.character?.id || m.character_id,
+    );
+    const cardUserIds = [
+      ...new Set(
+        cardMembers.map((m: any) => m.user_id).filter(Boolean) as string[],
+      ),
+    ];
+    const pointsByUserId = new Map<string, number>();
+    if (cardUserIds.length > 0) {
+      const { data: pointsRows } = await (supabase.from("users") as any)
+        .select("id, total_points")
+        .in("id", cardUserIds);
+      for (const row of (pointsRows as { id: string; total_points?: number | null }[]) ||
+        []) {
+        pointsByUserId.set(row.id, Number(row.total_points) || 0);
+      }
+    }
+    gmDashboardCharacters = cardMembers.map((m: any) => ({
+      characterId: String(m.character?.id ?? m.character_id),
+      name: String(m.character?.name ?? "Charakter"),
+      classLabel: String(m.character?.class ?? "—"),
+      race: String(m.character?.race ?? "—"),
+      level: Number(m.character?.level) || 1,
+      username: String(m.user?.username ?? "Spieler"),
+      playerTotalPoints: pointsByUserId.get(m.user_id) ?? 0,
+      playerAvatarUrl: m.user?.avatar_url ?? null,
+    }));
     const { data: bcm } = await (supabase.from("campaign_members") as any)
       .select("user_id")
       .eq("campaign_id", id)
@@ -543,6 +576,90 @@ export default async function CampaignDetailPage({
     gmBroadcastRecipientCount = ((bcm as { user_id: string }[]) || []).filter(
       (row) => row.user_id !== user.id,
     ).length;
+  }
+
+  type GmTerminePayload = {
+    campaignId: string;
+    nextSession: GmTermineNextSession | null;
+    players: GmTerminePlayerRsvp[];
+  };
+  let gmTermineSpielplan: GmTerminePayload = {
+    campaignId: id,
+    nextSession: null,
+    players: [],
+  };
+  if (isGM) {
+    const list = (upcomingSessionsWithRsvp as any[]) || [];
+    const live = list.find((s: any) => s.status === "Live");
+    const scheduled = list.find((s: any) => s.status === "Scheduled");
+    const featured = live ?? scheduled ?? list[0] ?? null;
+
+    if (featured) {
+      const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
+      const byUser = new Map(rows.map((r) => [r.user_id, r.rsvp_status]));
+
+      const players: GmTerminePayload["players"] = acceptedMembers
+        .filter((m: any) => m.user_id && m.user_id !== user.id)
+        .map((m: any) => {
+          const st = byUser.get(m.user_id);
+          if (st === "Zusage") {
+            return {
+              userId: m.user_id,
+              username: String(m.user?.username ?? "Spieler"),
+              status: "zusage" as const,
+              label: "Termin angenommen",
+            };
+          }
+          if (st === "Via Online") {
+            return {
+              userId: m.user_id,
+              username: String(m.user?.username ?? "Spieler"),
+              status: "via_online" as const,
+              label: "Online dabei",
+            };
+          }
+          if (st === "Absage") {
+            return {
+              userId: m.user_id,
+              username: String(m.user?.username ?? "Spieler"),
+              status: "absage" as const,
+              label: "Abgesagt",
+            };
+          }
+          return {
+            userId: m.user_id,
+            username: String(m.user?.username ?? "Spieler"),
+            status: "offen" as const,
+            label: "Noch keine Rückmeldung",
+          };
+        });
+
+      const rawDays = featured.rsvp_deadline_days;
+      const parsedDays =
+        rawDays != null && rawDays !== ""
+          ? Number(rawDays)
+          : null;
+      const rsvpDeadlineDays =
+        parsedDays != null && !Number.isNaN(parsedDays) ? parsedDays : null;
+
+      gmTermineSpielplan = {
+        campaignId: id,
+        nextSession: {
+          id: String(featured.id),
+          title: featured.title != null ? String(featured.title) : null,
+          startTime: String(featured.start_time),
+          status: String(featured.status),
+          rsvpDeadlineDays,
+          isLive: featured.is_live !== false,
+          canStart:
+            featured.status === "Scheduled" ? Boolean(featured.canStart) : false,
+          pendingCount: Number(featured.pendingCount ?? 0),
+          gmPrepComplete:
+            (featured as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
+        },
+        players,
+      };
+    }
   }
 
   // ============================================================================
@@ -808,6 +925,7 @@ export default async function CampaignDetailPage({
           characters={gmDashboardCharacters}
           recentLore={gmRecentLore}
           broadcastRecipientCount={gmBroadcastRecipientCount}
+          termineSpielplan={gmTermineSpielplan}
         />
       )}
       <div className="grid gap-8 lg:grid-cols-3">
