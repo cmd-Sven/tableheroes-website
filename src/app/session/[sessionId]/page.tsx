@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
+import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type Props = {
   params: Promise<{ sessionId: string }>;
@@ -59,11 +60,25 @@ export default async function SessionPage({ params }: Props) {
 
   const isGM = campaign.gm_id === user.id;
 
-  // 3. Load live state (if exists)
-  const { data: liveState } = await (supabase.from("session_live_states") as any)
+  /** Geplant: nur GM darf die Session-Oberfläche öffnen (Vorbereitung ohne Spieler). */
+  if (session.status === "Scheduled" && !isGM) {
+    redirect(
+      `/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&scheduled=1`,
+    );
+  }
+
+  // 3. Live state; für GM bei Scheduled ggf. Entwurfszeile anlegen
+  let { data: liveState } = await (supabase.from("session_live_states") as any)
     .select("*")
     .eq("session_id", sessionId)
     .maybeSingle();
+
+  if (isGM && session.status === "Scheduled" && !liveState) {
+    const ensured = await ensureSessionPrepLiveState(sessionId);
+    if (ensured) {
+      liveState = ensured as typeof liveState;
+    }
+  }
 
   // 4. Load Party Characters (accepted members with characters)
   const { data: partyRows } = await (supabase.from("campaign_members") as any)
@@ -133,6 +148,7 @@ export default async function SessionPage({ params }: Props) {
     <LiveSessionBoard
       sessionId={sessionId}
       campaignId={(session as any).campaign_id as string}
+      sessionStatus={session.status}
       isGM={isGM}
       userId={user.id}
       initialLiveState={liveState || null}

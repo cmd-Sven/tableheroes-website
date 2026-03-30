@@ -12,6 +12,7 @@ import {
   Loader2,
   Rocket,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 import {
   startSession,
@@ -138,6 +139,15 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
           </div>
         </div>
         <div className="flex flex-col sm:items-end gap-2 shrink-0">
+          {nextSession?.status === "Scheduled" && (
+            <Link
+              href={`/session/${nextSession.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold uppercase text-xs text-accent-gold hover:bg-accent-gold/20 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              Tisch vorbereiten &amp; testen
+            </Link>
+          )}
           {!nextSession ? (
             <Link
               href={scheduleUrl}

@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { Calendar, Wand2, Pencil, Trash2, MoreVertical, Square } from "lucide-react";
+import Link from "next/link";
+import {
+  Calendar,
+  Wand2,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  Square,
+  Sparkles,
+} from "lucide-react";
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
@@ -323,6 +332,16 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
                           Freischaltung ausstehend
                         </span>
                       )
+                    )}
+
+                    {isScheduled && isGM && (
+                      <Link
+                        href={`/session/${session.id}`}
+                        className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Vorbereiten
+                      </Link>
                     )}
 
                     {isScheduled && isGM && (

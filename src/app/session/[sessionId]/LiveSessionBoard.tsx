@@ -15,7 +15,10 @@ import {
   X,
   Power,
 } from "lucide-react";
-import { endSession } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import {
+  endSession,
+  ensureSessionPrepLiveState,
+} from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type LiveState = {
   id: string;
@@ -60,6 +63,7 @@ type ActiveQuest = {
 type Props = {
   sessionId: string;
   campaignId: string;
+  sessionStatus: string;
   isGM: boolean;
   userId: string;
   initialLiveState: LiveState | null;
@@ -71,6 +75,7 @@ type Props = {
 export function LiveSessionBoard({
   sessionId,
   campaignId,
+  sessionStatus,
   isGM,
   userId,
   initialLiveState,
@@ -89,8 +94,26 @@ export function LiveSessionBoard({
   const [showQuests, setShowQuests] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
 
+  const isPrepMode = sessionStatus === "Scheduled";
+
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
+
+  // Fallback: Entwurfszeile nachziehen (z. B. RLS/Netz beim ersten Load)
+  useEffect(() => {
+    if (!isGM || !isPrepMode || liveState) return;
+    let cancelled = false;
+    (async () => {
+      const row = await ensureSessionPrepLiveState(sessionId);
+      if (!cancelled && row) {
+        setLiveState(row as LiveState);
+        setBackgroundUrl((row as LiveState).background_url || null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGM, isPrepMode, sessionId, liveState]);
 
   // ---------------------------------------------------------------------------
   // Realtime Subscription
@@ -192,8 +215,16 @@ export function LiveSessionBoard({
       <div className="pointer-events-none absolute inset-0 -z-10 bg-black/60" />
       {/* Top Bar: Exit Button */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-hero-dark bg-background-card/80">
-        <div className="font-barlow text-sm uppercase text-gray-400">
-          Live Session Dashboard
+        <div className="flex flex-col gap-1">
+          <div className="font-barlow text-sm uppercase text-gray-400">
+            {isPrepMode ? "Session – Vorbereitung" : "Live Session Dashboard"}
+          </div>
+          {isPrepMode && (
+            <p className="font-libre text-xs text-accent-gold/90 max-w-xl">
+              Du gestaltest und testest den Tisch vor dem Start. Spieler sehen diese Ansicht erst,
+              wenn die Session live geht – unabhängig von Zu- oder Absagen.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Quest Journal Toggle */}
@@ -212,8 +243,8 @@ export function LiveSessionBoard({
             </button>
           )}
 
-          {/* Session beenden (GM Only) */}
-          {isGM && (
+          {/* Session beenden (GM Only, nicht in Vorbereitung) */}
+          {isGM && !isPrepMode && (
             <button
               type="button"
               onClick={() => {
@@ -249,11 +280,18 @@ export function LiveSessionBoard({
 
           {/* Exit Button */}
           <button
-            onClick={() => router.push("/dashboard")}
+            type="button"
+            onClick={() =>
+              router.push(
+                isPrepMode
+                  ? `/dashboard/campaigns/${campaignId}?tab=sessions`
+                  : "/dashboard",
+              )
+            }
             className="inline-flex items-center gap-2 rounded border border-red-700 bg-red-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-xs text-red-200 hover:bg-red-800/70 transition-colors"
           >
             <LogOut className="h-4 w-4" />
-            Session verlassen
+            {isPrepMode ? "Zur Kampagne" : "Session verlassen"}
           </button>
         </div>
       </div>

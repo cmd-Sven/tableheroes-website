@@ -223,24 +223,33 @@ export async function startSession(sessionId: string) {
     throw new Error(updateError.message);
   }
 
-  // 5. Initialize / Upsert Live State
-  const { error: liveError } = await (supabase.from("session_live_states") as any)
-    .upsert(
-      {
-        session_id: sessionId,
-        weather: "Klar",
-        current_time: "Tagsüber",
-        current_location: null,
-        journal_text: null,
-        visible_npc_ids: [],
-        scribe_id: user.id,
-      },
-      { onConflict: "session_id" },
-    );
+  // 5. Live State: nur anlegen wenn noch keine Zeile (Vorbereitung am Tisch bleibt erhalten)
+  const { data: existingLive } = await (supabase.from("session_live_states") as any)
+    .select("session_id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
 
-  if (liveError) {
-    console.error("Start Session Error (Init Live State):", liveError);
-    throw new Error(liveError.message);
+  if (!existingLive) {
+    const { error: liveError } = await (supabase.from("session_live_states") as any).insert({
+      session_id: sessionId,
+      weather: "Klar",
+      current_time: "Tagsüber",
+      current_location: null,
+      journal_text: null,
+      visible_npc_ids: [],
+      scribe_id: user.id,
+    });
+    if (liveError) {
+      console.error("Start Session Error (Init Live State):", liveError);
+      throw new Error(liveError.message);
+    }
+  } else {
+    const { error: scribeErr } = await (supabase.from("session_live_states") as any)
+      .update({ scribe_id: user.id })
+      .eq("session_id", sessionId);
+    if (scribeErr) {
+      console.error("Start Session Error (scribe_id):", scribeErr);
+    }
   }
 
   // 6. Revalidate
@@ -306,6 +315,69 @@ export async function markSessionPlanningComplete(sessionId: string) {
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
   revalidatePath(`/session/${sessionId}`);
   return { success: true };
+}
+
+// ============================================================================
+// GM: Live-State-Zeile für Vorbereitung (Scheduled) — unabhängig von RSVP / Live-Start
+// ============================================================================
+export async function ensureSessionPrepLiveState(sessionId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  if (sessionError || !session || session.status !== "Scheduled") {
+    return null;
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    return null;
+  }
+
+  const { data: existing } = await (supabase.from("session_live_states") as any)
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (existing) return existing as Record<string, unknown>;
+
+  const { data: inserted, error: insertError } = await (supabase.from("session_live_states") as any)
+    .insert({
+      session_id: sessionId,
+      weather: null,
+      current_time: null,
+      current_location: null,
+      journal_text: null,
+      visible_npc_ids: [],
+      scribe_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error("[ensureSessionPrepLiveState] insert:", insertError);
+    const { data: raceRow } = await (supabase.from("session_live_states") as any)
+      .select("*")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    return (raceRow as Record<string, unknown>) ?? null;
+  }
+
+  return (inserted as Record<string, unknown>) ?? null;
 }
 
 // ============================================================================
