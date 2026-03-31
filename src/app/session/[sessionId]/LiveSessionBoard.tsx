@@ -174,9 +174,9 @@ export function LiveSessionBoard({
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
 
-  // Fallback: Entwurfszeile nachziehen (z. B. RLS/Netz beim ersten Load)
+  // Fallback: Live-State-Zeile nachziehen (Scheduled + Live; z. B. RLS/SSR ohne Zeile)
   useEffect(() => {
-    if (!isGM || !isPrepMode || liveState) return;
+    if (!isGM || liveState) return;
     let cancelled = false;
     (async () => {
       const row = await ensureSessionPrepLiveState(sessionId);
@@ -188,7 +188,7 @@ export function LiveSessionBoard({
     return () => {
       cancelled = true;
     };
-  }, [isGM, isPrepMode, sessionId, liveState]);
+  }, [isGM, sessionId, liveState]);
 
   // ---------------------------------------------------------------------------
   // Realtime Subscription
@@ -223,8 +223,10 @@ export function LiveSessionBoard({
   // ---------------------------------------------------------------------------
   // Helper: Update Live State (environment / journal)
   // ---------------------------------------------------------------------------
-  function updateLiveState(patch: Partial<LiveState>) {
-    if (!liveState) return;
+  /** `baseOverride`: z. B. direkt nach ensureSessionPrepLiveState, wenn React liveState noch null hat */
+  function updateLiveState(patch: Partial<LiveState>, baseOverride?: LiveState) {
+    const base = baseOverride ?? liveState;
+    if (!base) return;
 
     startTransition(async () => {
       try {
@@ -238,10 +240,9 @@ export function LiveSessionBoard({
           return;
         }
 
-        // Optimistisches Update – Realtime wird das ohnehin bestätigen
         setLiveState((prev) => {
-          if (!prev) return prev;
-          const next = { ...prev, ...patch };
+          const mergeFrom = prev ?? base;
+          const next = { ...mergeFrom, ...patch };
           if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
             setBackgroundUrl(next.background_url || null);
           }
@@ -328,26 +329,39 @@ export function LiveSessionBoard({
   const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
 
   function placeOnStage(kind: "npc" | "faction", id: string) {
-    if (!liveState) {
-      alert("Session-Zustand wird noch geladen – bitte kurz warten.");
-      return;
-    }
-    const sid = String(id);
-    if (kind === "npc") {
-      const currentIds = new Set(
-        (liveState.visible_npc_ids || []).map(String),
-      );
-      if (currentIds.has(sid)) return;
-      currentIds.add(sid);
-      updateLiveState({ visible_npc_ids: Array.from(currentIds) });
-    } else {
-      const currentIds = new Set(
-        (liveState.visible_faction_ids || []).map(String),
-      );
-      if (currentIds.has(sid)) return;
-      currentIds.add(sid);
-      updateLiveState({ visible_faction_ids: Array.from(currentIds) });
-    }
+    void (async () => {
+      let base: LiveState | null = liveState;
+      if (!base && isGM) {
+        try {
+          const row = await ensureSessionPrepLiveState(sessionId);
+          if (row) {
+            base = row as LiveState;
+            setLiveState(base);
+            setBackgroundUrl(base.background_url || null);
+          }
+        } catch (e) {
+          console.error("[placeOnStage] ensureSessionPrepLiveState", e);
+        }
+      }
+      if (!base) {
+        alert("Session-Zustand wird noch geladen – bitte kurz warten.");
+        return;
+      }
+      const sid = String(id);
+      if (kind === "npc") {
+        const currentIds = new Set((base.visible_npc_ids || []).map(String));
+        if (currentIds.has(sid)) return;
+        currentIds.add(sid);
+        updateLiveState({ visible_npc_ids: Array.from(currentIds) }, base);
+      } else {
+        const currentIds = new Set(
+          (base.visible_faction_ids || []).map(String),
+        );
+        if (currentIds.has(sid)) return;
+        currentIds.add(sid);
+        updateLiveState({ visible_faction_ids: Array.from(currentIds) }, base);
+      }
+    })();
   }
 
   // ---------------------------------------------------------------------------
@@ -679,60 +693,46 @@ export function LiveSessionBoard({
                         : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
                     }
                   >
-                    {activeNpcs.map((npc) => (
-                      <div
-                        key={npc.id}
-                        className={`rounded-lg border border-hero-border/40 bg-background-dark/80 p-4 shadow-lg flex flex-col ${
-                          activeNpcs.length === 1 ? "max-w-lg w-full" : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 mb-3">
+                    {activeNpcs.map((npc) => {
+                      const cardTitle = [npc.name, npc.title]
+                        .filter(Boolean)
+                        .join(" — ");
+                      return (
+                        <button
+                          key={npc.id}
+                          type="button"
+                          title={cardTitle}
+                          aria-label={`Porträt: ${npc.name}`}
+                          onClick={() => {
+                            if (npc.image_url) {
+                              setStagePortrait({
+                                name: npc.name,
+                                subtitle: npc.title,
+                                imageUrl: npc.image_url,
+                              });
+                            }
+                          }}
+                          className={`group relative aspect-[3/4] w-full max-h-[min(52vh,420px)] overflow-hidden rounded-lg border-2 border-hero-border/50 bg-background-dark shadow-lg transition-transform duration-200 hover:z-10 hover:scale-[1.02] hover:border-hero-vibrant/90 focus:outline-none focus:ring-2 focus:ring-hero-vibrant ${
+                            activeNpcs.length === 1 ? "max-w-xs" : ""
+                          } ${npc.image_url ? "cursor-zoom-in" : "cursor-default"}`}
+                        >
                           {npc.image_url ? (
-                            <button
-                              type="button"
-                              title="Klicken für größeres Bild"
-                              aria-label={`Porträt von ${npc.name} vergrößern`}
-                              onClick={() =>
-                                setStagePortrait({
-                                  name: npc.name,
-                                  subtitle: npc.title,
-                                  imageUrl: npc.image_url!,
-                                })
-                              }
-                              className="h-14 w-14 shrink-0 cursor-zoom-in overflow-hidden rounded-full border border-hero-border bg-hero-dark transition-transform duration-200 hover:scale-105 hover:border-hero-vibrant focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={npc.image_url}
-                                alt=""
-                                className="h-full w-full object-cover pointer-events-none"
-                              />
-                            </button>
+                            // eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte
+                            <img
+                              src={npc.image_url}
+                              alt=""
+                              className="h-full w-full object-cover pointer-events-none"
+                            />
                           ) : (
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                              <span className="font-cinzel text-lg text-accent-gold">
+                            <div className="flex h-full w-full items-center justify-center bg-hero-dark/60">
+                              <span className="font-cinzel text-5xl text-accent-gold">
                                 {npc.name[0]?.toUpperCase()}
                               </span>
                             </div>
                           )}
-                          <div>
-                            <p className="font-cinzel font-bold text-lg text-white">
-                              {npc.name}
-                            </p>
-                            {npc.title && (
-                              <p className="font-libre text-xs text-accent-gold">
-                                {npc.title}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        {npc.description && (
-                          <p className="font-libre text-sm text-gray-300 leading-relaxed">
-                            {npc.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {activeFactions.length > 0 && (
@@ -748,58 +748,44 @@ export function LiveSessionBoard({
                           : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
                       }
                     >
-                      {activeFactions.map((fac) => (
-                        <div
-                          key={fac.id}
-                          className={`rounded-lg border border-amber-900/40 bg-amber-950/20 p-4 shadow-lg ${
-                            activeFactions.length === 1 ? "max-w-lg w-full" : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
+                      {activeFactions.map((fac) => {
+                        const cardTitle = [fac.name, fac.type]
+                          .filter(Boolean)
+                          .join(" — ");
+                        return (
+                          <button
+                            key={fac.id}
+                            type="button"
+                            title={cardTitle}
+                            aria-label={`Fraktion: ${fac.name}`}
+                            onClick={() => {
+                              if (fac.image_url) {
+                                setStagePortrait({
+                                  name: fac.name,
+                                  subtitle: fac.type,
+                                  imageUrl: fac.image_url,
+                                });
+                              }
+                            }}
+                            className={`group relative aspect-[3/4] w-full max-h-[min(52vh,420px)] overflow-hidden rounded-lg border-2 border-amber-800/60 bg-amber-950/30 shadow-lg transition-transform duration-200 hover:z-10 hover:scale-[1.02] hover:border-amber-500/80 focus:outline-none focus:ring-2 focus:ring-amber-500/80 ${
+                              activeFactions.length === 1 ? "max-w-xs" : ""
+                            } ${fac.image_url ? "cursor-zoom-in" : "cursor-default"}`}
+                          >
                             {fac.image_url ? (
-                              <button
-                                type="button"
-                                title="Klicken für größeres Bild"
-                                aria-label={`Bild der Fraktion ${fac.name} vergrößern`}
-                                onClick={() =>
-                                  setStagePortrait({
-                                    name: fac.name,
-                                    subtitle: fac.type,
-                                    imageUrl: fac.image_url!,
-                                  })
-                                }
-                                className="flex h-12 w-12 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-hero-border bg-hero-dark transition-transform duration-200 hover:scale-105 hover:border-amber-600/70 focus:outline-none focus:ring-2 focus:ring-amber-500/80"
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={fac.image_url}
-                                  alt=""
-                                  className="h-full w-full object-cover pointer-events-none"
-                                />
-                              </button>
+                              // eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte
+                              <img
+                                src={fac.image_url}
+                                alt=""
+                                className="h-full w-full object-cover pointer-events-none"
+                              />
                             ) : (
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-hero-border bg-hero-dark">
-                                <Flag className="h-6 w-6 text-accent-gold" />
+                              <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-amber-950/40">
+                                <Flag className="h-14 w-14 text-accent-gold/90" />
                               </div>
                             )}
-                            <div className="min-w-0">
-                              <p className="font-cinzel font-bold text-base text-white truncate">
-                                {fac.name}
-                              </p>
-                              {fac.type && (
-                                <p className="font-libre text-[10px] text-gray-400 truncate">
-                                  {fac.type}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {fac.description && (
-                            <p className="font-libre text-xs text-gray-300 leading-relaxed line-clamp-4">
-                              {fac.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

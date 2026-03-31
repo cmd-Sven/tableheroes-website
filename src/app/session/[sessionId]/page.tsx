@@ -4,6 +4,7 @@ import { LiveSessionBoard } from "./LiveSessionBoard";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
@@ -51,12 +52,14 @@ export default async function SessionPage({ params }: Props) {
 
   // 2. Load Campaign to determine GM
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", (session as any).campaign_id)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { gm_id: string } | null;
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
 
   if (!campaign) {
     notFound();
@@ -67,7 +70,7 @@ export default async function SessionPage({ params }: Props) {
     redirect(`/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&ended=1`);
   }
 
-  const isGM = campaign.gm_id === user.id;
+  const isGM = isCampaignGm(campaign, user.id);
 
   /** Geplant: nur GM darf die Session-Oberfläche öffnen (Vorbereitung ohne Spieler). */
   if (session.status === "Scheduled" && !isGM) {
@@ -82,7 +85,11 @@ export default async function SessionPage({ params }: Props) {
     .eq("session_id", sessionId)
     .maybeSingle();
 
-  if (isGM && session.status === "Scheduled" && !liveState) {
+  if (
+    isGM &&
+    !liveState &&
+    !["Completed", "Ended", "Cancelled"].includes(session.status)
+  ) {
     const ensured = await ensureSessionPrepLiveState(sessionId);
     if (ensured) {
       liveState = ensured as typeof liveState;
