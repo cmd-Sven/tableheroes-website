@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabaseClient";
 import {
@@ -18,11 +19,11 @@ import {
   ScrollText,
   ExternalLink,
   PlusCircle,
+  LayoutGrid,
 } from "lucide-react";
 import {
   endSession,
   ensureSessionPrepLiveState,
-  updateSessionStageDeck,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type LiveState = {
@@ -117,35 +118,6 @@ export function LiveSessionBoard({
   const [showQuests, setShowQuests] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
   const [stageFactionSearch, setStageFactionSearch] = useState("");
-  const [npcDeckAll, setNpcDeckAll] = useState(stageDeckNpcIds == null);
-  const [factionDeckAll, setFactionDeckAll] = useState(stageDeckFactionIds == null);
-  const [npcDeckPick, setNpcDeckPick] = useState<Set<string>>(() => {
-    if (stageDeckNpcIds?.length) return new Set(stageDeckNpcIds);
-    return new Set();
-  });
-  const [factionDeckPick, setFactionDeckPick] = useState<Set<string>>(() => {
-    if (stageDeckFactionIds?.length) return new Set(stageDeckFactionIds);
-    return new Set();
-  });
-
-  useEffect(() => {
-    setNpcDeckAll(stageDeckNpcIds == null);
-    setFactionDeckAll(stageDeckFactionIds == null);
-    setNpcDeckPick(
-      new Set(
-        stageDeckNpcIds?.length
-          ? stageDeckNpcIds
-          : allCampaignNpcs.map((n) => n.id),
-      ),
-    );
-    setFactionDeckPick(
-      new Set(
-        stageDeckFactionIds?.length
-          ? stageDeckFactionIds
-          : allCampaignFactions.map((f) => f.id),
-      ),
-    );
-  }, [stageDeckNpcIds, stageDeckFactionIds, allCampaignNpcs, allCampaignFactions]);
 
   const isPrepMode = sessionStatus === "Scheduled";
 
@@ -281,20 +253,7 @@ export function LiveSessionBoard({
     );
   }, [factionStagePool, stageFactionSearch]);
 
-  function saveStageDeck() {
-    if (!isGM) return;
-    startTransition(async () => {
-      try {
-        await updateSessionStageDeck(sessionId, {
-          stage_deck_npc_ids: npcDeckAll ? null : Array.from(npcDeckPick),
-          stage_deck_faction_ids: factionDeckAll ? null : Array.from(factionDeckPick),
-        });
-        router.refresh();
-      } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : "Deck konnte nicht gespeichert werden.");
-      }
-    });
-  }
+  const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
 
   // ---------------------------------------------------------------------------
   // UI
@@ -486,13 +445,22 @@ export function LiveSessionBoard({
                 </h2>
               </div>
               {isGM && (
-                <button
-                  type="button"
-                  onClick={() => setIsStageManagerOpen(true)}
-                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-3 py-1 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-hero-vibrant hover:text-white transition-colors"
-                >
-                  Stage verwalten
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={stagePrepHref}
+                    className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-1 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/20 transition-colors"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    Bühne vorbereiten
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setIsStageManagerOpen(true)}
+                    className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-3 py-1 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-hero-vibrant hover:text-white transition-colors"
+                  >
+                    Stage (live)
+                  </button>
+                </div>
               )}
             </div>
 
@@ -712,319 +680,220 @@ export function LiveSessionBoard({
         </div>
       </div>
 
-      {/* Stage Manager Drawer (GM Only) */}
+      {/* Stage Manager: Schnellzugriff (breit, ein Scrollbereich) */}
       {isGM && isStageManagerOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-background-card border-l border-hero-dark shadow-2xl flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-hero-dark">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-accent-gold" />
-              <h2 className="font-barlow font-bold text-sm uppercase text-gray-200">
-                Stage Manager
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsStageManagerOpen(false)}
-              className="rounded p-1 text-gray-400 hover:text-white hover:bg-background-dark transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Bühnendeck: welche Karten im Manager erscheinen */}
-          <details
-            className="border-b border-hero-dark px-4 py-2 group/deck"
-            open={isPrepMode}
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]"
+            aria-label="Stage Manager schließen"
+            onClick={() => setIsStageManagerOpen(false)}
+          />
+          <div
+            className="fixed inset-y-0 right-0 z-50 flex h-dvh w-full max-w-full flex-col border-l border-hero-border/40 min-h-0 sm:max-w-2xl lg:max-w-4xl"
+            style={{
+              background: `
+              radial-gradient(ellipse 110% 55% at -5% 5%, rgba(58, 66, 72, 0.55) 0%, transparent 58%),
+              radial-gradient(ellipse 90% 45% at 105% 25%, rgba(48, 56, 62, 0.5) 0%, transparent 52%),
+              radial-gradient(ellipse 70% 50% at 40% 100%, rgba(42, 50, 56, 0.45) 0%, transparent 48%),
+              radial-gradient(ellipse 50% 35% at 75% 60%, rgba(255, 255, 255, 0.06) 0%, transparent 45%),
+              linear-gradient(158deg, #151a1d 0%, #0b0e11 38%, #0f1316 72%, #12161a 100%),
+              repeating-linear-gradient(
+                -18deg,
+                transparent 0px,
+                transparent 4px,
+                rgba(255, 255, 255, 0.025) 4px,
+                rgba(255, 255, 255, 0.025) 5px
+              )
+            `,
+              boxShadow:
+                "inset 0 0 72px rgba(0,0,0,0.42), -12px 0 48px rgba(0,0,0,0.5)",
+            }}
           >
-            <summary className="font-barlow font-bold text-xs uppercase cursor-pointer text-accent-gold list-none flex items-center justify-between">
-              <span>Bühnendeck planen</span>
-              <span className="text-gray-500 group-open/deck:rotate-180 transition-transform text-[10px]">
-                ▼
-              </span>
-            </summary>
-            <div className="mt-3 space-y-4 pb-3 font-libre text-xs text-gray-300">
-              <p className="text-[11px] text-gray-500">
-                Lege fest, welche NPCs und Fraktionen du im Manager siehst. Standard ist
-                „alle“ der Kampagne (sichtbar für dich). Eingeschränktes Deck hilft am
-                Abend den Überblick zu behalten.
-              </p>
-              <div className="space-y-2">
-                <p className="font-barlow font-bold uppercase text-[10px] text-gray-400">
-                  NPCs im Manager
-                </p>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="npc-deck"
-                    checked={npcDeckAll}
-                    onChange={() => setNpcDeckAll(true)}
-                    className="border-hero-border text-hero-vibrant"
-                  />
-                  Alle Kampagnen-NPCs
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="npc-deck"
-                    checked={!npcDeckAll}
-                    onChange={() => {
-                      setNpcDeckAll(false);
-                      setNpcDeckPick(new Set(allCampaignNpcs.map((n) => n.id)));
-                    }}
-                    className="border-hero-border text-hero-vibrant"
-                  />
-                  Nur ausgewählte
-                </label>
-                {!npcDeckAll && (
-                  <div className="max-h-32 overflow-y-auto rounded border border-hero-border/40 bg-background-dark p-2 space-y-1">
-                    {allCampaignNpcs.map((npc) => (
-                      <label
-                        key={npc.id}
-                        className="flex items-center gap-2 cursor-pointer text-[11px]"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={npcDeckPick.has(npc.id)}
-                          onChange={(e) => {
-                            setNpcDeckPick((prev) => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(npc.id);
-                              else next.delete(npc.id);
-                              return next;
-                            });
-                          }}
-                          className="rounded border-hero-border"
-                        />
-                        <span className="truncate">{npc.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <p className="font-barlow font-bold uppercase text-[10px] text-gray-400">
-                  Fraktionen im Manager
-                </p>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="fac-deck"
-                    checked={factionDeckAll}
-                    onChange={() => setFactionDeckAll(true)}
-                    className="border-hero-border text-hero-vibrant"
-                  />
-                  Alle Fraktionen
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="fac-deck"
-                    checked={!factionDeckAll}
-                    onChange={() => {
-                      setFactionDeckAll(false);
-                      setFactionDeckPick(new Set(allCampaignFactions.map((f) => f.id)));
-                    }}
-                    className="border-hero-border text-hero-vibrant"
-                  />
-                  Nur ausgewählte
-                </label>
-                {!factionDeckAll && (
-                  <div className="max-h-32 overflow-y-auto rounded border border-hero-border/40 bg-background-dark p-2 space-y-1">
-                    {allCampaignFactions.map((fac) => (
-                      <label
-                        key={fac.id}
-                        className="flex items-center gap-2 cursor-pointer text-[11px]"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={factionDeckPick.has(fac.id)}
-                          onChange={(e) => {
-                            setFactionDeckPick((prev) => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(fac.id);
-                              else next.delete(fac.id);
-                              return next;
-                            });
-                          }}
-                          className="rounded border-hero-border"
-                        />
-                        <span className="truncate">{fac.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hero-dark px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Users className="h-4 w-4 shrink-0 text-accent-gold" />
+                <h2 className="font-barlow font-bold text-sm uppercase text-gray-200 truncate">
+                  Stage (live)
+                </h2>
               </div>
               <button
                 type="button"
-                onClick={saveStageDeck}
-                disabled={isUpdating}
-                className="w-full rounded border border-hero-vibrant bg-hero-vibrant/20 py-2 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-50"
+                onClick={() => setIsStageManagerOpen(false)}
+                className="shrink-0 rounded p-1 text-gray-400 hover:text-white hover:bg-background-dark transition-colors"
               >
-                Deck speichern
+                <X className="h-4 w-4" />
               </button>
             </div>
-          </details>
 
-          {/* Search NPCs */}
-          <div className="px-4 py-3 border-b border-hero-dark flex items-center gap-2">
-            <Search className="h-4 w-4 text-gray-500" />
-            <input
-              type="text"
-              value={stageSearch}
-              onChange={(e) => setStageSearch(e.target.value)}
-              placeholder="NPCs suchen..."
-              className="flex-1 rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
-            />
-          </div>
-
-          {/* NPC List with Toggles */}
-          <div className="overflow-y-auto px-4 py-3 space-y-2 max-h-[28vh]">
-            {filteredNpcsForStageManager.length === 0 ? (
-              <p className="font-libre text-xs text-gray-500">
-                Keine NPCs gefunden.
-              </p>
-            ) : (
-              filteredNpcsForStageManager.map((npc) => {
-                const isOnStage = activeNpcIds.has(npc.id);
-                return (
-                  <label
-                    key={npc.id}
-                    className="flex items-center gap-3 rounded border border-hero-border/30 bg-background-dark px-3 py-2 cursor-pointer hover:border-hero-vibrant transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isOnStage}
-                      onChange={(e) => {
-                        const currentIds = new Set(
-                          liveState?.visible_npc_ids || [],
-                        );
-                        if (e.target.checked) {
-                          currentIds.add(npc.id);
-                        } else {
-                          currentIds.delete(npc.id);
-                        }
-                        updateLiveState({
-                          visible_npc_ids: Array.from(currentIds),
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-barlow font-bold text-xs text-white truncate">
-                        {npc.name}
-                      </p>
-                      {npc.title && (
-                        <p className="font-libre text-[10px] text-gray-400 truncate">
-                          {npc.title}
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
-
-          {/* Fraktionen auf die Bühne */}
-          <div className="px-4 py-2 border-b border-hero-dark flex items-center gap-2">
-            <Flag className="h-4 w-4 text-gray-500" />
-            <input
-              type="text"
-              value={stageFactionSearch}
-              onChange={(e) => setStageFactionSearch(e.target.value)}
-              placeholder="Fraktionen suchen..."
-              className="flex-1 rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
-            />
-          </div>
-          <div className="overflow-y-auto px-4 py-3 space-y-2 max-h-[22vh] border-b border-hero-dark">
-            {filteredFactionsForStageManager.length === 0 ? (
-              <p className="font-libre text-xs text-gray-500">
-                Keine Fraktionen im Deck oder keine Treffer.
-              </p>
-            ) : (
-              filteredFactionsForStageManager.map((fac) => {
-                const isOnStage = activeFactionIds.has(fac.id);
-                return (
-                  <label
-                    key={fac.id}
-                    className="flex items-center gap-3 rounded border border-amber-900/30 bg-background-dark px-3 py-2 cursor-pointer hover:border-amber-700/50 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isOnStage}
-                      onChange={(e) => {
-                        const currentIds = new Set(
-                          liveState?.visible_faction_ids || [],
-                        );
-                        if (e.target.checked) {
-                          currentIds.add(fac.id);
-                        } else {
-                          currentIds.delete(fac.id);
-                        }
-                        updateLiveState({
-                          visible_faction_ids: Array.from(currentIds),
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-barlow font-bold text-xs text-white truncate">
-                        {fac.name}
-                      </p>
-                      {fac.type && (
-                        <p className="font-libre text-[10px] text-gray-400 truncate">
-                          {fac.type}
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
-
-          <div className="border-b border-hero-dark px-4 py-3 space-y-2">
-            <a
-              href={`/dashboard/campaigns/${campaignId}/npcs/new`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant transition-colors"
-            >
-              <PlusCircle className="h-4 w-4" />
-              Neuen NPC anlegen
-              <ExternalLink className="h-3 w-3 opacity-70" />
-            </a>
-            <p className="font-libre text-[10px] text-gray-500 text-center">
-              Öffnet in einem neuen Tab. Danach diese Seite aktualisieren oder Deck auf
-              „alle NPCs“ stellen, bis der neue Eintrag im Deck ist.
-            </p>
-          </div>
-
-          {/* Background Image Settings */}
-          <div className="border-t border-hero-dark px-4 py-3 space-y-2 mt-auto">
-            <div className="flex items-center gap-2 mb-1">
-              <BookOpen className="h-4 w-4 text-accent-gold" />
-              <p className="font-barlow font-bold text-xs uppercase text-gray-300">
-                Hintergrund Bild-URL
+            <div className="shrink-0 space-y-2 border-b border-hero-dark px-4 py-3">
+              <Link
+                href={stagePrepHref}
+                onClick={() => setIsStageManagerOpen(false)}
+                className="flex w-full items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-2.5 font-barlow font-bold uppercase text-xs text-accent-gold hover:bg-accent-gold/20 transition-colors"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Bühnendeck &amp; Vorbereitung (Vollansicht)
+              </Link>
+              <p className="font-libre text-[11px] text-gray-500">
+                Deck einschränken, Hintergrund und weitere Einstellungen erledigst du in der
+                Vollansicht. Hier nur schnell NPCs/Fraktionen auf die Bühne schalten.
               </p>
             </div>
-            <input
-              type="url"
-              defaultValue={liveState?.background_url || ""}
-              placeholder="https://... (Atmosphärisches Hintergrundbild)"
-              onBlur={(e) =>
-                updateLiveState({
-                  background_url: e.target.value.trim() || null,
-                })
-              }
-              className="w-full rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
-            />
-            <p className="font-libre text-[11px] text-gray-500">
-              Tipp: Nutze stimmungsvolle Bilder (z.B. Taverne, Wald, Dungeon). Das
-              Bild wird als atmosphärischer Hintergrund angezeigt.
-            </p>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="px-4 py-3 border-b border-hero-dark flex items-center gap-2 min-w-0">
+                <Search className="h-4 w-4 shrink-0 text-gray-500" />
+                <input
+                  type="search"
+                  value={stageSearch}
+                  onChange={(e) => setStageSearch(e.target.value)}
+                  placeholder="NPCs suchen…"
+                  className="min-w-0 flex-1 rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+                />
+              </div>
+              <div className="space-y-2 px-4 py-3">
+                {filteredNpcsForStageManager.length === 0 ? (
+                  <p className="font-libre text-xs text-gray-500">
+                    Keine NPCs gefunden.
+                  </p>
+                ) : (
+                  filteredNpcsForStageManager.map((npc) => {
+                    const isOnStage = activeNpcIds.has(npc.id);
+                    return (
+                      <label
+                        key={npc.id}
+                        className="flex items-center gap-3 rounded border border-hero-border/30 bg-background-dark px-3 py-2 cursor-pointer hover:border-hero-vibrant transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isOnStage}
+                          onChange={(e) => {
+                            const currentIds = new Set(
+                              liveState?.visible_npc_ids || [],
+                            );
+                            if (e.target.checked) {
+                              currentIds.add(npc.id);
+                            } else {
+                              currentIds.delete(npc.id);
+                            }
+                            updateLiveState({
+                              visible_npc_ids: Array.from(currentIds),
+                            });
+                          }}
+                          className="h-4 w-4 shrink-0 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-barlow font-bold text-xs text-white break-words">
+                            {npc.name}
+                          </p>
+                          {npc.title && (
+                            <p className="font-libre text-[10px] text-gray-400 break-words">
+                              {npc.title}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="px-4 py-2 border-y border-hero-dark flex items-center gap-2 min-w-0">
+                <Flag className="h-4 w-4 shrink-0 text-gray-500" />
+                <input
+                  type="search"
+                  value={stageFactionSearch}
+                  onChange={(e) => setStageFactionSearch(e.target.value)}
+                  placeholder="Fraktionen suchen…"
+                  className="min-w-0 flex-1 rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+                />
+              </div>
+              <div className="space-y-2 px-4 py-3 pb-6">
+                {filteredFactionsForStageManager.length === 0 ? (
+                  <p className="font-libre text-xs text-gray-500">
+                    Keine Fraktionen im Deck oder keine Treffer.
+                  </p>
+                ) : (
+                  filteredFactionsForStageManager.map((fac) => {
+                    const isOnStage = activeFactionIds.has(fac.id);
+                    return (
+                      <label
+                        key={fac.id}
+                        className="flex items-center gap-3 rounded border border-amber-900/30 bg-background-dark px-3 py-2 cursor-pointer hover:border-amber-700/50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isOnStage}
+                          onChange={(e) => {
+                            const currentIds = new Set(
+                              liveState?.visible_faction_ids || [],
+                            );
+                            if (e.target.checked) {
+                              currentIds.add(fac.id);
+                            } else {
+                              currentIds.delete(fac.id);
+                            }
+                            updateLiveState({
+                              visible_faction_ids: Array.from(currentIds),
+                            });
+                          }}
+                          className="h-4 w-4 shrink-0 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-barlow font-bold text-xs text-white break-words">
+                            {fac.name}
+                          </p>
+                          {fac.type && (
+                            <p className="font-libre text-[10px] text-gray-400 break-words">
+                              {fac.type}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="border-t border-hero-dark px-4 py-3 space-y-2">
+                <a
+                  href={`/dashboard/campaigns/${campaignId}/npcs/new`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant transition-colors"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Neuen NPC anlegen
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </a>
+              </div>
+
+              <div className="border-t border-hero-dark px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <BookOpen className="h-4 w-4 text-accent-gold" />
+                  <p className="font-barlow font-bold text-xs uppercase text-gray-300">
+                    Hintergrund (Kurz)
+                  </p>
+                </div>
+                <p className="font-libre text-[10px] text-gray-500">
+                  Ausführliche Vorschau und Pflege: Vollansicht „Bühne vorbereiten“.
+                </p>
+                <input
+                  type="url"
+                  defaultValue={liveState?.background_url || ""}
+                  placeholder="https://…"
+                  onBlur={(e) =>
+                    updateLiveState({
+                      background_url: e.target.value.trim() || null,
+                    })
+                  }
+                  className="w-full rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Quest Journal Overlay (Player-Toggleable) */}
