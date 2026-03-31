@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { notFound, redirect } from "next/navigation";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
@@ -9,7 +10,7 @@ type Props = {
   params: Promise<{ id: string; sessionId: string }>;
 };
 
-/** Kein gezieltes select("background_url"): fehlende Spalte bricht PostgREST sonst ab. */
+/** Liest background_url aus einer beliebigen Live-State-Zeile (select("*")). */
 function pickBackgroundUrl(row: unknown): string | null {
   if (!row || typeof row !== "object") return null;
   const v = (row as Record<string, unknown>).background_url;
@@ -50,11 +51,14 @@ export default async function SessionStagePrepPage({ params }: Props) {
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", campaignId)
     .single();
-  const campaign = campaignRaw as { gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
@@ -62,14 +66,20 @@ export default async function SessionStagePrepPage({ params }: Props) {
     redirect(`/dashboard/campaigns/${campaignId}?tab=sessions&ended=1`);
   }
 
-  if (session.status === "Scheduled") {
+  if (!["Completed", "Ended", "Cancelled"].includes(session.status)) {
     await ensureSessionPrepLiveState(sessionId);
   }
 
-  const { data: liveRow } = await (supabase.from("session_live_states") as any)
-    .select("background_url")
+  /** select("*"): vermeidet PostgREST-Fehler, falls Spalte background_url in der DB noch fehlt */
+  const { data: liveRow, error: liveRowError } = await (
+    supabase.from("session_live_states") as any
+  )
+    .select("*")
     .eq("session_id", sessionId)
     .maybeSingle();
+  if (liveRowError) {
+    console.error("[stage-prep] session_live_states:", liveRowError.message);
+  }
 
   const npcsFromCampaign = await getNPCs(campaignId, user.id, true);
   const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({

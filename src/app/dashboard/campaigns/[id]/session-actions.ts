@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 
@@ -346,12 +347,15 @@ export async function updateSessionStageDeck(
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann das Bühnendeck ändern.");
   }
 
@@ -404,12 +408,15 @@ export async function updateSessionBackgroundUrl(
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann den Hintergrund ändern.");
   }
 
@@ -465,7 +472,7 @@ export async function updateSessionBackgroundUrl(
 }
 
 // ============================================================================
-// GM: Live-State-Zeile für Vorbereitung (Scheduled) — unabhängig von RSVP / Live-Start
+// GM: Live-State-Zeile für Vorbereitung / Live — unabhängig von RSVP
 // ============================================================================
 export async function ensureSessionPrepLiveState(sessionId: string) {
   const supabase = await createClient();
@@ -481,17 +488,23 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     .single();
 
   const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
-  if (sessionError || !session || session.status !== "Scheduled") {
+  if (sessionError || !session) {
+    return null;
+  }
+  if (["Completed", "Ended", "Cancelled"].includes(session.status)) {
     return null;
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     return null;
   }
 
