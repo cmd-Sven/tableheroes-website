@@ -5,8 +5,10 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
-import { supabase } from "@/src/lib/supabaseClient";
-import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import {
+  updateSessionBackgroundUrl,
+  updateSessionStageDeck,
+} from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type CampaignNpc = {
   id: string;
@@ -94,6 +96,16 @@ export function StagePrepClient({
   }, [stageDeckNpcIds, stageDeckFactionIds, allCampaignNpcs, allCampaignFactions]);
 
   function saveDeck() {
+    if (!npcDeckAll && npcDeckPick.size === 0) {
+      alert(
+        'Bitte mindestens einen NPC auswählen oder „Alle Kampagnen-NPCs“ aktivieren.',
+      );
+      return;
+    }
+    if (!factionDeckAll && factionDeckPick.size === 0) {
+      alert('Bitte mindestens eine Fraktion auswählen oder „Alle Fraktionen“ aktivieren.');
+      return;
+    }
     startTransition(async () => {
       try {
         await updateSessionStageDeck(sessionId, {
@@ -110,13 +122,7 @@ export function StagePrepClient({
   function saveBackground() {
     startTransition(async () => {
       try {
-        const { error } = await (supabase.from("session_live_states") as any)
-          .update({ background_url: bgUrl.trim() || null })
-          .eq("session_id", sessionId);
-        if (error) {
-          alert(error.message);
-          return;
-        }
+        await updateSessionBackgroundUrl(sessionId, bgUrl.trim() || null);
         router.refresh();
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Speichern.");

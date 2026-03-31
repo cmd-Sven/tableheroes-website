@@ -25,6 +25,7 @@ import {
   endSession,
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { StageDeckHand } from "./StageDeckHand";
 
 type LiveState = {
   id: string;
@@ -118,8 +119,13 @@ export function LiveSessionBoard({
   const [showQuests, setShowQuests] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
   const [stageFactionSearch, setStageFactionSearch] = useState("");
+  const [stageDropHighlight, setStageDropHighlight] = useState(false);
 
   const isPrepMode = sessionStatus === "Scheduled";
+
+  useEffect(() => {
+    setBackgroundUrl(initialLiveState?.background_url || null);
+  }, [initialLiveState?.background_url]);
 
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
@@ -208,32 +214,44 @@ export function LiveSessionBoard({
   // Derived Data: Active NPCs & Party
   // ---------------------------------------------------------------------------
   const activeNpcIds = useMemo(() => {
-    return new Set(liveState?.visible_npc_ids || []);
+    return new Set((liveState?.visible_npc_ids || []).map(String));
   }, [liveState?.visible_npc_ids]);
 
   const activeNpcs = useMemo(
-    () => allCampaignNpcs.filter((npc) => activeNpcIds.has(npc.id)),
+    () => allCampaignNpcs.filter((npc) => activeNpcIds.has(String(npc.id))),
     [allCampaignNpcs, activeNpcIds],
   );
 
   const npcStagePool = useMemo(() => {
-    if (stageDeckNpcIds == null) return allCampaignNpcs;
-    const allowed = new Set(stageDeckNpcIds);
-    return allCampaignNpcs.filter((n) => allowed.has(n.id));
+    if (stageDeckNpcIds == null) {
+      return allCampaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
+    }
+    const deck = stageDeckNpcIds.map((id) => String(id)).filter(Boolean);
+    if (deck.length === 0) {
+      return allCampaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
+    }
+    const allowed = new Set(deck);
+    return allCampaignNpcs.filter((n) => allowed.has(String(n.id)));
   }, [allCampaignNpcs, stageDeckNpcIds]);
 
   const factionStagePool = useMemo(() => {
-    if (stageDeckFactionIds == null) return allCampaignFactions;
-    const allowed = new Set(stageDeckFactionIds);
-    return allCampaignFactions.filter((f) => allowed.has(f.id));
+    if (stageDeckFactionIds == null) {
+      return allCampaignFactions.map((f) => ({ ...f, id: String(f.id) }));
+    }
+    const deck = stageDeckFactionIds.map((id) => String(id)).filter(Boolean);
+    if (deck.length === 0) {
+      return allCampaignFactions.map((f) => ({ ...f, id: String(f.id) }));
+    }
+    const allowed = new Set(deck);
+    return allCampaignFactions.filter((f) => allowed.has(String(f.id)));
   }, [allCampaignFactions, stageDeckFactionIds]);
 
   const activeFactionIds = useMemo(() => {
-    return new Set(liveState?.visible_faction_ids || []);
+    return new Set((liveState?.visible_faction_ids || []).map(String));
   }, [liveState?.visible_faction_ids]);
 
   const activeFactions = useMemo(
-    () => allCampaignFactions.filter((f) => activeFactionIds.has(f.id)),
+    () => allCampaignFactions.filter((f) => activeFactionIds.has(String(f.id))),
     [allCampaignFactions, activeFactionIds],
   );
 
@@ -253,7 +271,40 @@ export function LiveSessionBoard({
     );
   }, [factionStagePool, stageFactionSearch]);
 
+  const inHandNpcs = useMemo(
+    () => npcStagePool.filter((n) => !activeNpcIds.has(String(n.id))),
+    [npcStagePool, activeNpcIds],
+  );
+
+  const inHandFactions = useMemo(
+    () => factionStagePool.filter((f) => !activeFactionIds.has(String(f.id))),
+    [factionStagePool, activeFactionIds],
+  );
+
   const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
+
+  function placeOnStage(kind: "npc" | "faction", id: string) {
+    if (!liveState) {
+      alert("Session-Zustand wird noch geladen – bitte kurz warten.");
+      return;
+    }
+    const sid = String(id);
+    if (kind === "npc") {
+      const currentIds = new Set(
+        (liveState.visible_npc_ids || []).map(String),
+      );
+      if (currentIds.has(sid)) return;
+      currentIds.add(sid);
+      updateLiveState({ visible_npc_ids: Array.from(currentIds) });
+    } else {
+      const currentIds = new Set(
+        (liveState.visible_faction_ids || []).map(String),
+      );
+      if (currentIds.has(sid)) return;
+      currentIds.add(sid);
+      updateLiveState({ visible_faction_ids: Array.from(currentIds) });
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // UI
@@ -263,7 +314,7 @@ export function LiveSessionBoard({
       {/* Atmospheric Background Layer */}
       {backgroundUrl && (
         <div
-          className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center opacity-0 animate-[fadeInBg_0.8s_ease-out_forwards]"
+          className="pointer-events-none absolute inset-0 -z-20 animate-fadeInBg bg-cover bg-center opacity-0"
           style={{ backgroundImage: `url(${backgroundUrl})` }}
         />
       )}
@@ -464,15 +515,58 @@ export function LiveSessionBoard({
               )}
             </div>
 
+            <div
+              className={`relative flex min-h-[min(40vh,280px)] flex-1 flex-col rounded-md transition-shadow duration-200 ${
+                stageDropHighlight
+                  ? "ring-2 ring-hero-vibrant ring-offset-2 ring-offset-background-card/90"
+                  : ""
+              }`}
+              onDragOver={(e) => {
+                if (!isGM) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+                setStageDropHighlight(true);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setStageDropHighlight(false);
+                }
+              }}
+              onDrop={(e) => {
+                if (!isGM) return;
+                e.preventDefault();
+                setStageDropHighlight(false);
+                try {
+                  const raw = e.dataTransfer.getData("application/json");
+                  if (!raw) return;
+                  const data = JSON.parse(raw) as { kind?: string; id?: string };
+                  if (data.kind === "npc" && data.id) placeOnStage("npc", data.id);
+                  if (data.kind === "faction" && data.id)
+                    placeOnStage("faction", data.id);
+                } catch {
+                  /* ignore invalid payload */
+                }
+              }}
+            >
             {activeNpcs.length === 0 && activeFactions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-center">
+              <div className="flex flex-1 items-center justify-center px-2 text-center">
                 <p className="max-w-md font-libre text-sm text-gray-400">
-                  Noch nichts auf der Bühne. Der Spielleiter kann im Stage Manager
-                  NPCs und Fraktionen aktivieren.
+                  {isGM ? (
+                    <>
+                      Noch nichts auf der Bühne. Ziehe Karten aus dem Deck unten
+                      hierher oder nutze{" "}
+                      <span className="text-gray-300">Stage (live)</span>.
+                    </>
+                  ) : (
+                    <>
+                      Noch nichts auf der Bühne. Der Spielleiter kann im Stage
+                      Manager NPCs und Fraktionen aktivieren.
+                    </>
+                  )}
                 </p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col gap-8">
+              <div className="flex flex-1 flex-col gap-8">
                 {activeNpcs.length > 0 && (
                   <div
                     className={
@@ -579,6 +673,7 @@ export function LiveSessionBoard({
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* Journal / Scribe */}
@@ -626,6 +721,14 @@ export function LiveSessionBoard({
             )}
           </div>
         </div>
+
+        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0) && (
+          <StageDeckHand
+            npcs={inHandNpcs}
+            factions={inHandFactions}
+            onPlace={placeOnStage}
+          />
+        )}
 
         {/* Bottom Party Tray */}
         <div className="rounded-lg border border-hero-dark bg-background-card/80 px-4 py-3 overflow-x-auto">
@@ -759,7 +862,7 @@ export function LiveSessionBoard({
                   </p>
                 ) : (
                   filteredNpcsForStageManager.map((npc) => {
-                    const isOnStage = activeNpcIds.has(npc.id);
+                    const isOnStage = activeNpcIds.has(String(npc.id));
                     return (
                       <label
                         key={npc.id}
@@ -816,7 +919,7 @@ export function LiveSessionBoard({
                   </p>
                 ) : (
                   filteredFactionsForStageManager.map((fac) => {
-                    const isOnStage = activeFactionIds.has(fac.id);
+                    const isOnStage = activeFactionIds.has(String(fac.id));
                     return (
                       <label
                         key={fac.id}

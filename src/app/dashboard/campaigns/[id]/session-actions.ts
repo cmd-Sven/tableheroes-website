@@ -380,6 +380,88 @@ export async function updateSessionStageDeck(
 }
 
 // ============================================================================
+// GM: Session-Hintergrundbild (session_live_states.background_url)
+// ============================================================================
+export async function updateSessionBackgroundUrl(
+  sessionId: string,
+  backgroundUrl: string | null,
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  if (sessionError || !session) {
+    throw new Error("Session nicht gefunden.");
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann den Hintergrund ändern.");
+  }
+
+  const trimmed =
+    backgroundUrl != null && String(backgroundUrl).trim() !== ""
+      ? String(backgroundUrl).trim()
+      : null;
+
+  const { data: existing } = await (supabase.from("session_live_states") as any)
+    .select("id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error: upErr } = await (supabase.from("session_live_states") as any)
+      .update({ background_url: trimmed })
+      .eq("session_id", sessionId);
+    if (upErr) {
+      if (
+        upErr.message?.includes("background_url") ||
+        upErr.message?.includes("column")
+      ) {
+        throw new Error(
+          "Spalte background_url fehlt. Bitte Migration session_live_states_background_url ausführen.",
+        );
+      }
+      throw new Error(upErr.message || "Speichern fehlgeschlagen.");
+    }
+  } else {
+    const { error: insErr } = await (supabase.from("session_live_states") as any).insert({
+      session_id: sessionId,
+      background_url: trimmed,
+      weather: null,
+      current_time: null,
+      current_location: null,
+      journal_text: null,
+      visible_npc_ids: [],
+      visible_faction_ids: [],
+      scribe_id: user.id,
+    });
+    if (insErr) {
+      throw new Error(insErr.message || "Live-Zustand konnte nicht angelegt werden.");
+    }
+  }
+
+  revalidatePath(`/session/${sessionId}`);
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}/sessions/${sessionId}/stage-prep`);
+  return { success: true };
+}
+
+// ============================================================================
 // GM: Live-State-Zeile für Vorbereitung (Scheduled) — unabhängig von RSVP / Live-Start
 // ============================================================================
 export async function ensureSessionPrepLiveState(sessionId: string) {

@@ -119,7 +119,7 @@ export default async function SessionPage({ params }: Props) {
     isGM
   );
   const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({
-    id: npc.id,
+    id: String(npc.id),
     name: npc.name,
     title: npc.title ?? null,
     description: npc.description ?? null,

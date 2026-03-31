@@ -45,9 +45,14 @@ const config: Config = {
             transform: "scale(1.15) translate(-2%, -2%)",
           },
         },
+        fadeInBg: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         kenBurns: "kenBurns 20s ease-in-out infinite",
+        fadeInBg: "fadeInBg 0.8s ease-out forwards",
       },
       scale: {
         '102': '1.02',
