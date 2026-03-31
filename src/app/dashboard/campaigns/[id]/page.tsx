@@ -8,6 +8,7 @@ import {
   Users,
   MapPin,
   Settings,
+  Store,
   User,
 } from "lucide-react";
 import { GmCampaignDashboard } from "@/src/components/campaigns/GmCampaignDashboard";
@@ -1165,6 +1166,13 @@ export default async function CampaignDetailPage({
             >
               <Settings className="inline h-4 w-4 mr-2" />
               Einstellungen
+            </Link>
+            <Link
+              href={`/dashboard/campaigns/${id}/shops`}
+              className="mt-2 flex w-full items-center rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
+            >
+              <Store className="inline h-4 w-4 mr-2" />
+              Shops und Handel
             </Link>
             <p className="mt-3 font-libre text-xs text-gray-500">
               Spielplan, Onboarding und Sichtbarkeit findest du auch unter

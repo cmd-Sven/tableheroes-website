@@ -122,8 +122,14 @@ export function StagePrepClient({
   function saveBackground() {
     startTransition(async () => {
       try {
-        await updateSessionBackgroundUrl(sessionId, bgUrl.trim() || null);
-        router.refresh();
+        const result = await updateSessionBackgroundUrl(
+          sessionId,
+          bgUrl.trim() || null,
+        );
+        if (result?.backgroundUrl != null) {
+          setBgUrl(result.backgroundUrl);
+        }
+        // Kein router.refresh(): vermeidet teures RSC-Reload; Revalidate läuft in der Action.
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Speichern.");
       }

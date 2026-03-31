@@ -457,8 +457,11 @@ export async function updateSessionBackgroundUrl(
 
   revalidatePath(`/session/${sessionId}`);
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/dashboard/campaigns/${session.campaign_id}/sessions/${sessionId}/stage-prep`);
-  return { success: true };
+  revalidatePath(
+    `/dashboard/campaigns/${session.campaign_id}/sessions/${sessionId}/stage-prep`,
+    "page",
+  );
+  return { success: true, backgroundUrl: trimmed };
 }
 
 // ============================================================================

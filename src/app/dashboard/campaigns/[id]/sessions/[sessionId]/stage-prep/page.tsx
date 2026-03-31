@@ -9,6 +9,17 @@ type Props = {
   params: Promise<{ id: string; sessionId: string }>;
 };
 
+/** Kein gezieltes select("background_url"): fehlende Spalte bricht PostgREST sonst ab. */
+function pickBackgroundUrl(row: unknown): string | null {
+  if (!row || typeof row !== "object") return null;
+  const v = (row as Record<string, unknown>).background_url;
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s || null;
+}
+
+export const dynamic = "force-dynamic";
+
 export default async function SessionStagePrepPage({ params }: Props) {
   const { id: campaignId, sessionId } = await params;
 
@@ -93,9 +104,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       allCampaignFactions={allCampaignFactions}
       stageDeckNpcIds={stageDeckNpcIds}
       stageDeckFactionIds={stageDeckFactionIds}
-      initialBackgroundUrl={
-        liveRow?.background_url != null ? String(liveRow.background_url) : null
-      }
+      initialBackgroundUrl={pickBackgroundUrl(liveRow)}
     />
   );
 }

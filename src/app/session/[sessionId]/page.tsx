@@ -4,6 +4,9 @@ import { LiveSessionBoard } from "./LiveSessionBoard";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
+import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
+import { isLocationType } from "@/src/lib/lore-types";
 
 type Props = {
   params: Promise<{ sessionId: string }>;
@@ -149,6 +152,37 @@ export default async function SessionPage({ params }: Props) {
       ? session.stage_deck_faction_ids.map(String)
       : null;
 
+  const loreLocationOptions = isGM
+    ? (await getLoreEntries((session as any).campaign_id))
+        .filter((e: { type?: string | null }) => isLocationType(String(e.type ?? "")))
+        .map((e: { id: string; name?: string | null; type?: string | null }) => ({
+          id: String(e.id),
+          name: String(e.name ?? "Ort"),
+          type: e.type != null ? String(e.type) : null,
+        }))
+        .sort((a: { name: string }, b: { name: string }) =>
+          a.name.localeCompare(b.name, "de"),
+        )
+    : [];
+
+  const locLoreRaw = (liveState as { current_location_lore_id?: string | null } | null)
+    ?.current_location_lore_id;
+  const locLoreId =
+    locLoreRaw != null && String(locLoreRaw).length > 0 ? String(locLoreRaw) : null;
+
+  let sessionLocationLoreReadable = false;
+  if (locLoreId) {
+    if (isGM) {
+      sessionLocationLoreReadable = true;
+    } else {
+      const loreVis = await getVisibilityForCampaign(
+        (session as any).campaign_id,
+        "lore",
+      );
+      sessionLocationLoreReadable = loreVis[locLoreId] === true;
+    }
+  }
+
   // 6. Load Active, Revealed Quests for this campaign
   const { data: activeQuests } = await (supabase.from("quests") as any)
     .select(
@@ -186,6 +220,8 @@ export default async function SessionPage({ params }: Props) {
       stageDeckNpcIds={stageDeckNpcIds}
       stageDeckFactionIds={stageDeckFactionIds}
       activeQuests={activeQuests || []}
+      loreLocationOptions={loreLocationOptions}
+      sessionLocationLoreReadable={sessionLocationLoreReadable}
     />
   );
 }

@@ -36,6 +36,7 @@ import {
   Newspaper,
   Hammer,
   Coins,
+  Store,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -370,6 +371,12 @@ export function Sidebar({
                 label: "Teilnehmer",
                 icon: Users,
                 tab: "members",
+              },
+              {
+                href: `/dashboard/campaigns/${campaignId}/shops`,
+                label: "Shops",
+                icon: Store,
+                tab: undefined,
               },
               {
                 href: `/dashboard/campaigns/${campaignId}/gm-inbox`,

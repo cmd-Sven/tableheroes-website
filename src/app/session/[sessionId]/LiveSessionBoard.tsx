@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabaseClient";
 import {
   LogOut,
-  Cloud,
   MapPin,
   Clock,
   Users,
@@ -26,12 +25,20 @@ import {
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { StageDeckHand } from "./StageDeckHand";
+import {
+  SessionWeatherControls,
+  SessionWeatherPlayerHint,
+} from "./SessionWeather";
 
 type LiveState = {
   id: string;
   session_id: string;
   weather: string | null;
+  weather_preset?: string | null;
+  weather_intensity?: number | null;
+  weather_temperature?: string | null;
   current_location: string | null;
+  current_location_lore_id?: string | null;
   current_time: string | null;
   journal_text: string | null;
   scribe_id: string | null;
@@ -67,6 +74,18 @@ type CampaignFaction = {
   is_revealed?: boolean;
 };
 
+type StagePortraitModal = {
+  name: string;
+  subtitle: string | null;
+  imageUrl: string;
+};
+
+type LoreLocationOption = {
+  id: string;
+  name: string;
+  type: string | null;
+};
+
 type ActiveQuest = {
   id: string;
   title: string;
@@ -92,6 +111,10 @@ type Props = {
   /** null = alle Fraktionen im Stage Manager */
   stageDeckFactionIds: string[] | null;
   activeQuests: ActiveQuest[];
+  /** Nur GM: Orte aus Lore (isLocationType) für Dropdown */
+  loreLocationOptions?: LoreLocationOption[];
+  /** Spieler dürfen Lore-Link nur sehen, wenn Eintrag für sie revealed ist */
+  sessionLocationLoreReadable?: boolean;
 };
 
 export function LiveSessionBoard({
@@ -107,6 +130,8 @@ export function LiveSessionBoard({
   stageDeckNpcIds,
   stageDeckFactionIds,
   activeQuests,
+  loreLocationOptions = [],
+  sessionLocationLoreReadable = false,
 }: Props) {
   const router = useRouter();
   const [liveState, setLiveState] = useState<LiveState | null>(initialLiveState);
@@ -120,12 +145,31 @@ export function LiveSessionBoard({
   const [isEnding, startEndTransition] = useTransition();
   const [stageFactionSearch, setStageFactionSearch] = useState("");
   const [stageDropHighlight, setStageDropHighlight] = useState(false);
+  const [stagePortrait, setStagePortrait] = useState<StagePortraitModal | null>(
+    null,
+  );
+  const [locationDraft, setLocationDraft] = useState(
+    () => initialLiveState?.current_location ?? "",
+  );
 
   const isPrepMode = sessionStatus === "Scheduled";
 
   useEffect(() => {
     setBackgroundUrl(initialLiveState?.background_url || null);
   }, [initialLiveState?.background_url]);
+
+  useEffect(() => {
+    setLocationDraft(liveState?.current_location ?? "");
+  }, [liveState?.current_location]);
+
+  useEffect(() => {
+    if (!stagePortrait) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setStagePortrait(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stagePortrait]);
 
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
@@ -417,23 +461,95 @@ export function LiveSessionBoard({
       <div className="flex-1 grid grid-rows-[auto_1fr_auto] gap-4 p-4 md:p-6">
         {/* Top HUD */}
         <div className="rounded-lg border border-hero-dark bg-background-card/80 px-4 py-3 flex flex-wrap items-center gap-4">
-          {/* Location */}
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-accent-gold" />
+          {/* Location + Lore-Verknüpfung */}
+          <div className="flex min-w-0 max-w-full flex-[1_1_260px] flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+            <MapPin className="mt-1 h-4 w-4 shrink-0 text-accent-gold" />
             {isGM ? (
-              <input
-                type="text"
-                defaultValue={liveState?.current_location || ""}
-                placeholder="Ort (z.B. Taverne zum Goldenen Griffon)"
-                onBlur={(e) =>
-                  updateLiveState({ current_location: e.target.value || null })
-                }
-                className="min-w-[200px] rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white focus:border-hero-vibrant outline-none"
-              />
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex min-w-[200px] flex-1 flex-col gap-1">
+                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                      Ort aus Lore
+                    </span>
+                    <select
+                      value={liveState?.current_location_lore_id || ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) {
+                          updateLiveState({
+                            current_location_lore_id: null,
+                          });
+                          return;
+                        }
+                        const opt = loreLocationOptions.find((o) => o.id === v);
+                        updateLiveState({
+                          current_location_lore_id: v,
+                          current_location: opt
+                            ? opt.name
+                            : liveState?.current_location ?? null,
+                        });
+                      }}
+                      className="w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 text-sm text-white focus:border-hero-vibrant outline-none"
+                    >
+                      <option value="">— Kein Lore-Ort —</option>
+                      {loreLocationOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                          {o.type ? ` (${o.type})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                      Anzeigename
+                    </span>
+                    <input
+                      type="text"
+                      value={locationDraft}
+                      onChange={(e) => setLocationDraft(e.target.value)}
+                      onBlur={() =>
+                        updateLiveState({
+                          current_location: locationDraft.trim() || null,
+                        })
+                      }
+                      placeholder="z. B. Hinterraum der Taverne"
+                      className="w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-hero-vibrant outline-none"
+                    />
+                  </label>
+                </div>
+                {liveState?.current_location_lore_id ? (
+                  <a
+                    href={`/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-accent-gold transition-colors"
+                  >
+                    <ScrollText className="h-3.5 w-3.5" />
+                    Lore-Eintrag öffnen
+                    <ExternalLink className="h-3 w-3 opacity-80" />
+                  </a>
+                ) : null}
+              </div>
             ) : (
-              <span className="font-libre text-sm text-gray-200">
-                {liveState?.current_location || "Unbekannter Ort"}
-              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="font-libre text-sm text-gray-200 break-words">
+                  {liveState?.current_location || "Unbekannter Ort"}
+                </span>
+                {sessionLocationLoreReadable &&
+                liveState?.current_location_lore_id ? (
+                  <a
+                    href={`/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 rounded border border-hero-border/50 bg-background-dark/80 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:border-accent-gold hover:text-accent-gold transition-colors"
+                  >
+                    <ScrollText className="h-3.5 w-3.5" />
+                    Ort in der Lore lesen
+                    <ExternalLink className="h-3 w-3 opacity-80" />
+                  </a>
+                ) : null}
+              </div>
             )}
           </div>
 
@@ -457,25 +573,11 @@ export function LiveSessionBoard({
             )}
           </div>
 
-          {/* Weather */}
-          <div className="flex items-center gap-2">
-            <Cloud className="h-4 w-4 text-accent-gold" />
-            {isGM ? (
-              <input
-                type="text"
-                defaultValue={liveState?.weather || ""}
-                placeholder="Wetter (z.B. Sturm, Nebel, Sonnig)"
-                onBlur={(e) =>
-                  updateLiveState({ weather: e.target.value || null })
-                }
-                className="min-w-[180px] rounded bg-slate-900 border border-hero-dark px-2 py-1 text-sm text-white focus:border-hero-vibrant outline-none"
-              />
-            ) : (
-              <span className="font-libre text-sm text-gray-200">
-                {liveState?.weather || "Wetter unbekannt"}
-              </span>
-            )}
-          </div>
+          <SessionWeatherControls
+            liveState={liveState}
+            updateLiveState={updateLiveState}
+            isGM={isGM}
+          />
 
           {isUpdating && (
             <span className="ml-auto font-libre text-xs text-gray-500">
@@ -483,6 +585,8 @@ export function LiveSessionBoard({
             </span>
           )}
         </div>
+
+        <SessionWeatherPlayerHint liveState={liveState} />
 
         {/* Center: Stage + Journal */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_minmax(280px,1fr)] gap-4">
@@ -583,20 +687,34 @@ export function LiveSessionBoard({
                         }`}
                       >
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="h-14 w-14 rounded-full bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center">
-                            {npc.image_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
+                          {npc.image_url ? (
+                            <button
+                              type="button"
+                              title="Klicken für größeres Bild"
+                              aria-label={`Porträt von ${npc.name} vergrößern`}
+                              onClick={() =>
+                                setStagePortrait({
+                                  name: npc.name,
+                                  subtitle: npc.title,
+                                  imageUrl: npc.image_url!,
+                                })
+                              }
+                              className="h-14 w-14 shrink-0 cursor-zoom-in overflow-hidden rounded-full border border-hero-border bg-hero-dark transition-transform duration-200 hover:scale-105 hover:border-hero-vibrant focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={npc.image_url}
-                                alt={npc.name}
-                                className="h-full w-full object-cover"
+                                alt=""
+                                className="h-full w-full object-cover pointer-events-none"
                               />
-                            ) : (
+                            </button>
+                          ) : (
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-hero-border bg-hero-dark">
                               <span className="font-cinzel text-lg text-accent-gold">
                                 {npc.name[0]?.toUpperCase()}
                               </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                           <div>
                             <p className="font-cinzel font-bold text-lg text-white">
                               {npc.name}
@@ -638,18 +756,32 @@ export function LiveSessionBoard({
                           }`}
                         >
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="h-12 w-12 rounded-md bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center shrink-0">
-                              {fac.image_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
+                            {fac.image_url ? (
+                              <button
+                                type="button"
+                                title="Klicken für größeres Bild"
+                                aria-label={`Bild der Fraktion ${fac.name} vergrößern`}
+                                onClick={() =>
+                                  setStagePortrait({
+                                    name: fac.name,
+                                    subtitle: fac.type,
+                                    imageUrl: fac.image_url!,
+                                  })
+                                }
+                                className="flex h-12 w-12 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-hero-border bg-hero-dark transition-transform duration-200 hover:scale-105 hover:border-amber-600/70 focus:outline-none focus:ring-2 focus:ring-amber-500/80"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={fac.image_url}
-                                  alt={fac.name}
-                                  className="h-full w-full object-cover"
+                                  alt=""
+                                  className="h-full w-full object-cover pointer-events-none"
                                 />
-                              ) : (
+                              </button>
+                            ) : (
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-hero-border bg-hero-dark">
                                 <Flag className="h-6 w-6 text-accent-gold" />
-                              )}
-                            </div>
+                              </div>
+                            )}
                             <div className="min-w-0">
                               <p className="font-cinzel font-bold text-base text-white truncate">
                                 {fac.name}
@@ -1075,6 +1207,54 @@ export function LiveSessionBoard({
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {stagePortrait && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stage-portrait-title"
+          onClick={() => setStagePortrait(null)}
+        >
+          <div
+            className="relative max-h-[92vh] w-full max-w-[min(96vw,52rem)] rounded-lg border border-hero-border bg-background-card shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setStagePortrait(null)}
+              className="absolute right-2 top-2 z-10 rounded-full border border-hero-border bg-background-dark/95 p-2 text-gray-300 hover:border-accent-gold hover:text-white transition-colors"
+              aria-label="Schließen"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center gap-3 p-4 pt-12 sm:p-6 sm:pt-14">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={stagePortrait.imageUrl}
+                alt={stagePortrait.name}
+                className="max-h-[min(78vh,720px)] w-auto max-w-full rounded-md object-contain shadow-lg"
+              />
+              <div className="max-w-full px-2 text-center">
+                <p
+                  id="stage-portrait-title"
+                  className="font-cinzel text-lg font-bold text-white"
+                >
+                  {stagePortrait.name}
+                </p>
+                {stagePortrait.subtitle ? (
+                  <p className="mt-1 font-libre text-sm text-accent-gold">
+                    {stagePortrait.subtitle}
+                  </p>
+                ) : null}
+                <p className="mt-2 font-libre text-xs text-gray-500">
+                  Klick außerhalb oder Esc zum Schließen
+                </p>
+              </div>
             </div>
           </div>
         </div>
