@@ -12,16 +12,26 @@ async function assertGmForCampaign(campaignId: string) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id")
+  const { data: campaignRaw, error: campErr } = await (
+    supabase.from("campaigns") as any
+  )
+    .select("*")
     .eq("id", campaignId)
     .single();
+  if (campErr || !campaignRaw) {
+    console.error("assertGmForCampaign campaigns", campErr);
+    throw new Error("Kampagne nicht gefunden.");
+  }
   const c = campaignRaw as {
-    gm_id: string;
+    gm_id?: string | null;
     owner_id?: string | null;
-  } | null;
-  if (!c) throw new Error("Kampagne nicht gefunden.");
-  const isGm = c.gm_id === user.id || c.owner_id === user.id;
+  };
+  const campaignGmId = c.gm_id != null ? String(c.gm_id) : null;
+  const campaignOwnerId = c.owner_id != null ? String(c.owner_id) : null;
+  const currentUserId = String(user.id);
+  const isGm =
+    (campaignGmId !== null && campaignGmId === currentUserId) ||
+    (campaignOwnerId !== null && campaignOwnerId === currentUserId);
   if (!isGm) throw new Error("Nur der Spielleiter kann Shops verwalten.");
   return { supabase, userId: user.id };
 }
@@ -60,17 +70,21 @@ export async function createCampaignShop(formData: FormData) {
   const notesRaw = String(formData.get("notes") ?? "").trim();
   const notes = notesRaw ? notesRaw : null;
 
+  const safePrice = Number.isFinite(price_modifier_percent)
+    ? price_modifier_percent
+    : 0;
+
   const { error } = await (supabase.from("campaign_shops") as any).insert({
     campaign_id: campaignId,
     name,
     shop_mode,
     archetype_key,
-    price_modifier_percent,
+    price_modifier_percent: safePrice,
     notes,
   });
 
   if (error) {
-    console.error("createCampaignShop", error);
+    console.error("createCampaignShop", error.code, error.message, error.details);
     throw new Error("Shop konnte nicht angelegt werden.");
   }
 

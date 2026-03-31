@@ -10,6 +10,7 @@ import {
   SHOP_ARCHETYPES,
   shopArchetypeLabel,
 } from "@/src/lib/shop-archetypes";
+import { getCatalogEntryCount } from "@/src/lib/shop-catalog";
 
 type Props = {
   campaignId: string;
@@ -87,11 +88,15 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                 required
                 className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white focus:border-hero-vibrant outline-none"
               >
-                {SHOP_ARCHETYPES.map((a) => (
-                  <option key={a.key} value={a.key}>
-                    {a.label}
-                  </option>
-                ))}
+                {SHOP_ARCHETYPES.map((a) => {
+                  const n = getCatalogEntryCount(a.key);
+                  return (
+                    <option key={a.key} value={a.key}>
+                      {a.label}
+                      {n > 0 ? ` (${n} im Katalog)` : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           ) : null}

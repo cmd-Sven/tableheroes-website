@@ -41,13 +41,15 @@ CREATE POLICY "campaign_shops_gm_all" ON public.campaign_shops
   USING (
     EXISTS (
       SELECT 1 FROM public.campaigns c
-      WHERE c.id = campaign_shops.campaign_id AND c.gm_id = auth.uid()
+      WHERE c.id = campaign_shops.campaign_id
+        AND (c.gm_id = auth.uid() OR c.owner_id = auth.uid())
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.campaigns c
-      WHERE c.id = campaign_shops.campaign_id AND c.gm_id = auth.uid()
+      WHERE c.id = campaign_shops.campaign_id
+        AND (c.gm_id = auth.uid() OR c.owner_id = auth.uid())
     )
   );
 
@@ -58,13 +60,15 @@ CREATE POLICY "campaign_shop_items_gm_all" ON public.campaign_shop_items
     EXISTS (
       SELECT 1 FROM public.campaign_shops s
       JOIN public.campaigns c ON c.id = s.campaign_id
-      WHERE s.id = campaign_shop_items.shop_id AND c.gm_id = auth.uid()
+      WHERE s.id = campaign_shop_items.shop_id
+        AND (c.gm_id = auth.uid() OR c.owner_id = auth.uid())
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.campaign_shops s
       JOIN public.campaigns c ON c.id = s.campaign_id
-      WHERE s.id = campaign_shop_items.shop_id AND c.gm_id = auth.uid()
+      WHERE s.id = campaign_shop_items.shop_id
+        AND (c.gm_id = auth.uid() OR c.owner_id = auth.uid())
     )
   );

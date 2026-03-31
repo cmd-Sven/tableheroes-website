@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCampaignAccess } from "../campaign-access";
 import { getCampaignShops } from "../shop-queries";
 import { CampaignShopsManager } from "@/src/components/dashboard/campaigns/CampaignShopsManager";
+import { ShopArchetypeCatalogBrowser } from "@/src/components/dashboard/campaigns/ShopArchetypeCatalogBrowser";
 import {
   KASSANDRA_COINS,
   SHOP_ARCHETYPES,
@@ -34,13 +35,17 @@ export default async function CampaignShopsPage({ params }: Props) {
         </h1>
         <p className="mt-3 max-w-3xl font-libre text-gray-200 leading-relaxed">
           Hier legst du Händler und Läden für diese Kampagne an.{" "}
-          <strong className="font-libre text-gray-100">Archetyp</strong> nutzt
-          später eine gemeinsame Warenliste pro Typ (z. B. Kräuterkundler) plus
-          Preismodifikator in Prozent.{" "}
+          <strong className="font-libre text-gray-100">Archetyp</strong> bezieht
+          die Waren aus dem{" "}
+          <strong className="font-libre text-gray-100">Standardkatalog</strong>{" "}
+          unten (z. B. Waffenmeister, Rüstungsschmied, Alchemist) plus
+          optionalem Preismodifikator in Prozent.{" "}
           <strong className="font-libre text-gray-100">Unique</strong> ist ein
-          eigener Katalog (Positionen folgen in einer späteren Phase).
+          eigener Katalog mit frei definierbaren Positionen (Erweiterung folgt).
         </p>
       </div>
+
+      <ShopArchetypeCatalogBrowser />
 
       <div className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg">
         <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
