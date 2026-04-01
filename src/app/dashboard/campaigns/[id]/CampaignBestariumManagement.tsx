@@ -2,10 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, PawPrint, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { PawPrint, Search, Filter } from "lucide-react";
 import { toggleBestariumReveal } from "./bestarium-actions";
 import type { CampaignBestariumCreature } from "./bestarium-queries";
 import type { BestariumPlayerListRow } from "./bestarium-queries";
+import {
+  BestariumGridCard,
+  type BestariumCardCreature,
+} from "@/src/components/dashboard/campaigns/BestariumGridCard";
+
+type UnifiedCard = BestariumCardCreature & { sort_order: number; is_revealed?: boolean };
 
 type Props = {
   campaignId: string;
@@ -22,30 +29,84 @@ export function CampaignBestariumManagement({
   gmCreatures,
   playerList,
 }: Props) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const [filterGattung, setFilterGattung] = useState<string>("all");
+  const [filterOrt, setFilterOrt] = useState<string>("all");
 
-  const displayList = isGM
-    ? gmCreatures.map((c) => ({
+  const unifiedList: UnifiedCard[] = useMemo(() => {
+    if (isGM) {
+      return gmCreatures.map((c) => ({
         id: c.id,
         name: c.name,
         sort_order: c.sort_order,
+        image_url: c.image_url,
+        creature_type: c.creature_type,
+        subtype: c.subtype,
+        location_name: c.location_name,
         is_revealed: c.is_revealed,
-      }))
-    : playerList.map((c) => ({ ...c, is_revealed: true }));
+      }));
+    }
+    return playerList.map((c) => ({
+      id: c.id,
+      name: c.name,
+      sort_order: c.sort_order,
+      image_url: c.image_url,
+      creature_type: c.creature_type,
+      subtype: null,
+      location_name: c.location_name,
+      is_revealed: true,
+    }));
+  }, [isGM, gmCreatures, playerList]);
+
+  const gattungOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of unifiedList) {
+      const t = c.creature_type?.trim();
+      if (t) set.add(t);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "de"));
+  }, [unifiedList]);
+
+  const ortOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of unifiedList) {
+      const n = c.location_name?.trim();
+      if (n) set.add(n);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "de"));
+  }, [unifiedList]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return displayList;
+    let list = unifiedList;
     const q = search.trim().toLowerCase();
-    return displayList.filter((c) => c.name.toLowerCase().includes(q));
-  }, [displayList, search]);
+    if (q) {
+      list = list.filter((c) => {
+        const hay =
+          `${c.name} ${c.creature_type ?? ""} ${c.subtype ?? ""} ${c.location_name ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (filterGattung !== "all") {
+      list = list.filter((c) => (c.creature_type ?? "").trim() === filterGattung);
+    }
+    if (filterOrt !== "all") {
+      list = list.filter((c) => (c.location_name ?? "").trim() === filterOrt);
+    }
+    return [...list].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "de"));
+  }, [unifiedList, search, filterGattung, filterOrt]);
 
   const handleToggle = async (creatureId: string, current: boolean) => {
     try {
       await toggleBestariumReveal(campaignId, creatureId, current);
+      router.refresh();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Sichtbarkeit konnte nicht geändert werden.");
     }
   };
+
+  const selectClass =
+    "rounded border border-hero-dark bg-slate-900/80 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none min-w-0 flex-1 sm:flex-none sm:min-w-[10rem]";
 
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card p-6 space-y-6">
@@ -70,66 +131,87 @@ export function CampaignBestariumManagement({
           : "Hier findest du Kreaturen, die eure Spielleitung für die Kampagne freigegeben hat."}
       </p>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Suchen…"
-          className="w-full pl-10 pr-4 py-2 rounded border border-hero-dark bg-slate-900/80 text-white font-libre placeholder-gray-500 focus:border-hero-vibrant outline-none"
-        />
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, Gattung oder Ort suchen…"
+            className="w-full pl-10 pr-4 py-2 rounded border border-hero-dark bg-slate-900/80 text-white font-libre placeholder-gray-500 focus:border-hero-vibrant outline-none"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2 text-gray-400 shrink-0">
+            <Filter className="h-4 w-4" aria-hidden />
+            <span className="font-barlow font-bold uppercase text-xs">Filter</span>
+          </div>
+          <select
+            value={filterGattung}
+            onChange={(e) => setFilterGattung(e.target.value)}
+            className={selectClass}
+            aria-label="Nach Gattung filtern"
+          >
+            <option value="all">Alle Gattungen</option>
+            {gattungOptions.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterOrt}
+            onChange={(e) => setFilterOrt(e.target.value)}
+            className={selectClass}
+            aria-label="Nach Region oder Ort filtern"
+          >
+            <option value="all">Alle Orte / Regionen</option>
+            {ortOptions.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <p className="font-libre text-center text-gray-500 py-10">
-          {isGM
-            ? "Noch keine Kreaturen in dieser Welt – lege sie im Welt-Editor unter Bestarium an."
-            : "Noch keine Kreaturen für dich freigegeben."}
+          {unifiedList.length === 0
+            ? isGM
+              ? "Noch keine Kreaturen in dieser Welt – lege sie im Welt-Editor unter Bestarium an."
+              : "Noch keine Kreaturen für dich freigegeben."
+            : "Keine Kreaturen mit diesen Filtern – Filter oder Suche anpassen."}
         </p>
       ) : (
-        <ul className="space-y-2">
-          {filtered.map((c) => (
-            <li
-              key={c.id}
-              className="flex flex-wrap items-center gap-3 rounded border border-hero-border/50 bg-background-dark/40 px-4 py-3"
-            >
-              <Link
-                href={
-                  isGM && worldId
-                    ? `/dashboard/worlds/${worldId}/bestarium/${c.id}`
-                    : `/dashboard/campaigns/${campaignId}/bestarium/${c.id}`
-                }
-                className="flex-1 min-w-0 font-cinzel font-bold text-accent-gold hover:text-hero-vibrant transition-colors truncate"
-              >
-                {c.name}
-              </Link>
-              {isGM && "is_revealed" in c && (
-                <button
-                  type="button"
-                  onClick={() => handleToggle(c.id, c.is_revealed)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 rounded px-3 py-1.5 font-barlow font-bold uppercase text-xs border transition-colors ${
-                    c.is_revealed
-                      ? "border-hero-vibrant bg-hero-vibrant/15 text-hero-vibrant"
-                      : "border-hero-dark text-gray-400 hover:border-gray-500"
-                  }`}
-                  title={c.is_revealed ? "Für Spieler ausblenden" : "Für Spieler freigeben"}
-                >
-                  {c.is_revealed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                  {c.is_revealed ? "Sichtbar" : "Verborgen"}
-                </button>
-              )}
-              {isGM && worldId && (
-                <Link
-                  href={`/dashboard/worlds/${worldId}/bestarium/${c.id}/edit`}
-                  className="shrink-0 font-barlow font-bold uppercase text-xs text-gray-500 hover:text-white"
-                >
-                  Statblock
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="font-barlow text-xs uppercase text-gray-500">
+            {filtered.length}{" "}
+            {filtered.length === 1 ? "Eintrag" : "Einträge"}
+          </p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 list-none p-0 m-0">
+            {filtered.map((c) => {
+              const detailHref =
+                isGM && worldId
+                  ? `/dashboard/worlds/${worldId}/bestarium/${c.id}`
+                  : `/dashboard/campaigns/${campaignId}/bestarium/${c.id}`;
+              return (
+                <li key={c.id} className="min-w-0">
+                  <BestariumGridCard
+                    creature={c}
+                    worldId={worldId}
+                    isGM={isGM}
+                    detailHref={detailHref}
+                    onToggleReveal={
+                      isGM ? (id, cur) => void handleToggle(id, cur) : undefined
+                    }
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   );

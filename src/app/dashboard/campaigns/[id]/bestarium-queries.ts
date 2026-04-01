@@ -2,9 +2,20 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import type { BestariumCreatureRow } from "@/src/app/dashboard/worlds/world-bestarium-actions";
 
-export type CampaignBestariumCreature = BestariumCreatureRow & { is_revealed: boolean };
+export type CampaignBestariumCreature = BestariumCreatureRow & {
+  is_revealed: boolean;
+  /** Anzeigename des verknüpften Ortes (nicht in DB-Zeile, aus locations geladen). */
+  location_name: string | null;
+};
 
-export type BestariumPlayerListRow = { id: string; name: string; sort_order: number };
+export type BestariumPlayerListRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+  image_url: string | null;
+  creature_type: string | null;
+  location_name: string | null;
+};
 
 export type BestariumPlayerDetail = {
   id: string;
@@ -39,7 +50,14 @@ export async function getBestariumCreaturesForCampaign(campaignId: string, isGM:
       console.error("[getBestariumCreaturesForCampaign] rpc list", error);
       return { gm: [], player: [] };
     }
-    const rows = (data || []) as BestariumPlayerListRow[];
+    const rows = ((data || []) as any[]).map((row) => ({
+      id: String(row.id),
+      name: String(row.name ?? ""),
+      sort_order: Number(row.sort_order) || 0,
+      image_url: row.image_url ?? null,
+      creature_type: row.creature_type ?? null,
+      location_name: row.location_name ?? null,
+    })) as BestariumPlayerListRow[];
     return { gm: [], player: rows };
   }
 
@@ -55,10 +73,26 @@ export async function getBestariumCreaturesForCampaign(campaignId: string, isGM:
   }
 
   const visibility = await getVisibilityForCampaign(campaignId, "bestarium");
-  const gm = ((creatures || []) as BestariumCreatureRow[]).map((c) => ({
+  const creatureRows = (creatures || []) as BestariumCreatureRow[];
+  const locIds = [
+    ...new Set(creatureRows.map((c) => c.location_id).filter(Boolean) as string[]),
+  ];
+  const locNames = new Map<string, string>();
+  if (locIds.length > 0) {
+    const { data: locRows } = await (supabase.from("locations") as any)
+      .select("id, name")
+      .in("id", locIds)
+      .eq("world_id", worldId);
+    for (const row of (locRows as any[]) || []) {
+      if (row?.id) locNames.set(String(row.id), String(row.name ?? "").trim() || "");
+    }
+  }
+
+  const gm = creatureRows.map((c) => ({
     ...c,
+    location_name: c.location_id ? locNames.get(c.location_id) ?? null : null,
     is_revealed: visibility[c.id] ?? false,
-  }));
+  })) as CampaignBestariumCreature[];
 
   return { gm, player: [] };
 }
