@@ -37,6 +37,7 @@ import {
   Hammer,
   Coins,
   Store,
+  PawPrint,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -408,6 +409,7 @@ export function Sidebar({
         { href: `/dashboard/worlds/${worldId}/locations`, label: "Orte", icon: Map },
         { href: `/dashboard/worlds/${worldId}/lore`, label: "Lore", icon: Book },
         { href: `/dashboard/worlds/${worldId}/factions`, label: "Fraktionen", icon: Shield },
+        { href: `/dashboard/worlds/${worldId}/bestarium`, label: "Bestarium", icon: PawPrint },
       ]
     : [];
 

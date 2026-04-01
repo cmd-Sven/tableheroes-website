@@ -50,7 +50,7 @@ export type GeneratedNPCResult = {
   suggested_secret?: { title: string; content: string } | null;
 };
 
-async function loadWorldAndAuth(worldId: string) {
+export async function loadWorldAndAuth(worldId: string) {
   const supabase = await createClient();
 
   // Deep Logging: empfangene worldId (UUID-ähnlich behandeln)

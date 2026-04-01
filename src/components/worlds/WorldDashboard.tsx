@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Book, Map, User, Users } from "lucide-react";
+import { Book, Map, PawPrint, User, Users } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { getWorldTasks } from "@/src/app/dashboard/worlds/world-tasks-actions";
 import { getWorldDashboardData } from "@/src/app/dashboard/worlds/world-dashboard-actions";
@@ -69,7 +69,7 @@ export async function WorldDashboard({
           <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mt-8 mb-4">
             Welt verwalten
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
             <WorldDashboardCard
               title="NPCs"
               icon={User}
@@ -114,6 +114,20 @@ export async function WorldDashboard({
               lastItem={
                 dashboardData?.lastFaction
                   ? { name: dashboardData.lastFaction.name, href: `/dashboard/worlds/${worldId}/factions/${dashboardData.lastFaction.id}` }
+                  : null
+              }
+            />
+            <WorldDashboardCard
+              title="Bestarium"
+              icon={PawPrint}
+              createHref={`/dashboard/worlds/${worldId}/bestarium`}
+              createLabel="Kreatur anlegen"
+              lastItem={
+                dashboardData?.lastBestarium
+                  ? {
+                      name: dashboardData.lastBestarium.name,
+                      href: `/dashboard/worlds/${worldId}/bestarium/${dashboardData.lastBestarium.id}`,
+                    }
                   : null
               }
             />
