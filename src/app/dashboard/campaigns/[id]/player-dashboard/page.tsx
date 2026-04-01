@@ -133,7 +133,14 @@ export default async function PlayerDashboardPage({ params }: Props) {
     name: e.name,
     kind: "faction" as const,
     description: e.description ?? null,
-    image_url: null,
+    image_url:
+      e.image_url != null
+        ? String(e.image_url)
+        : e.banner_url != null
+          ? String(e.banner_url)
+          : e.portrait_url != null
+            ? String(e.portrait_url)
+            : null,
     type: e.type,
     created_at: e.created_at,
   }));
@@ -142,7 +149,14 @@ export default async function PlayerDashboardPage({ params }: Props) {
     name: e.name,
     kind: "npc" as const,
     description: e.description ?? null,
-    image_url: null,
+    image_url:
+      e.image_url != null
+        ? String(e.image_url)
+        : e.portrait_url != null
+          ? String(e.portrait_url)
+          : e.avatar_url != null
+            ? String(e.avatar_url)
+            : null,
     type: e.title ?? undefined,
     created_at: e.created_at,
   }));
@@ -151,12 +165,14 @@ export default async function PlayerDashboardPage({ params }: Props) {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 8);
 
-  // Die Gruppe: andere Charaktere mit status = Active (users.avatar_url, culture_lore_id)
-  const { data: partyCharacters } = await (supabase.from("characters") as any)
-    .select("id, name, class, race, level, culture_lore_id, users(avatar_url)")
+  let partyQuery = (supabase.from("characters") as any)
+    .select("id, name, class, race, level, culture_lore_id, avatar_url, user_id")
     .eq("campaign_id", campaignId)
-    .eq("status", "Active")
-    .neq("id", myCharacterId || "");
+    .in("status", ["Active", "Alive", "Approved"]);
+  if (myCharacterId) {
+    partyQuery = partyQuery.neq("id", myCharacterId);
+  }
+  const { data: partyCharacters } = await partyQuery;
 
   const cultureIds = [...new Set((partyCharacters || []).map((c: any) => c.culture_lore_id).filter(Boolean))];
   let cultureMap = new Map<string, string>();
@@ -166,6 +182,19 @@ export default async function PlayerDashboardPage({ params }: Props) {
       .in("id", cultureIds);
     cultureMap = new Map(((cultureRows as { id: string; name: string }[]) ?? []).map((l) => [l.id, l.name]));
   }
+  const partyUserIds = [...new Set((partyCharacters || []).map((c: any) => c.user_id).filter(Boolean))];
+  let userAvatarMap = new Map<string, string | null>();
+  if (partyUserIds.length > 0) {
+    const { data: userRows } = await (supabase.from("users") as any)
+      .select("id, avatar_url")
+      .in("id", partyUserIds);
+    userAvatarMap = new Map(
+      ((userRows as { id: string; avatar_url: string | null }[]) ?? []).map((u) => [
+        u.id,
+        u.avatar_url ?? null,
+      ]),
+    );
+  }
 
   const party: PartyMember[] = (partyCharacters || []).map((c: any) => ({
     id: c.id,
@@ -174,7 +203,9 @@ export default async function PlayerDashboardPage({ params }: Props) {
     race: c.race ?? "",
     level: c.level ?? 1,
     culture: c.culture_lore_id ? (cultureMap.get(c.culture_lore_id) ?? "") : "",
-    avatar_url: c.users?.avatar_url ?? null,
+    avatar_url:
+      c.avatar_url?.trim?.() ||
+      (c.user_id ? userAvatarMap.get(c.user_id) ?? null : null),
   }));
 
   return (
@@ -195,7 +226,7 @@ export default async function PlayerDashboardPage({ params }: Props) {
         </Link>
       </div>
 
-      <DiscoverySlider items={allDiscoveries} />
+      <DiscoverySlider items={allDiscoveries} campaignId={campaignId} />
 
       {/* Fraktionen & Ruf – Card Design mit Links und Ruf-Farben */}
       {myCharacter && (myCharacter.faction_membership || factionReputations.length > 0) && (

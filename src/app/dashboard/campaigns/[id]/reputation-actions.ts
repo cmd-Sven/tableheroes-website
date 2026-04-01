@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import {
   getCharacterFactionReputations as loadCharacterFactionReputations,
   type FactionReputation,
@@ -36,11 +37,11 @@ export async function upsertCharacterFactionReputation(data: {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("gm_id, world_id")
+    .select("gm_id, owner_id")
     .eq("id", data.campaign_id)
     .single();
 
-  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+  if (!campaign || !isCampaignGm(campaign as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
     throw new Error("Nur der Spielleiter kann den Ruf verwalten.");
   }
 
@@ -63,6 +64,9 @@ export async function upsertCharacterFactionReputation(data: {
 
   if (error) throw new Error(error.message || "Fehler beim Speichern.");
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+  revalidatePath(
+    `/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`,
+  );
   return { success: true };
 }
 
@@ -81,13 +85,18 @@ export async function deleteCharacterFactionReputation(data: {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", data.campaign_id)
     .single();
 
-  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+  if (!campaign || !isCampaignGm(campaign as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
     throw new Error("Nur der Spielleiter kann den Ruf verwalten.");
   }
+
+  const { data: repRow } = await (supabase.from("character_faction_reputation") as any)
+    .select("character_id")
+    .eq("id", data.reputation_id)
+    .maybeSingle();
 
   const { error } = await (supabase.from("character_faction_reputation") as any)
     .delete()
@@ -95,5 +104,9 @@ export async function deleteCharacterFactionReputation(data: {
 
   if (error) throw new Error(error.message || "Fehler beim Löschen.");
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+  const charId = (repRow as { character_id?: string } | null)?.character_id;
+  if (charId) {
+    revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${charId}`);
+  }
   return { success: true };
 }

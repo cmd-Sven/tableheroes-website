@@ -8,11 +8,11 @@ import {
   updateCharacterByGM,
   deleteCharacterByGM,
 } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import type { FactionReputation } from "@/src/app/dashboard/campaigns/[id]/reputation-queries";
 import {
   getCharacterFactionReputations,
   upsertCharacterFactionReputation,
   deleteCharacterFactionReputation,
-  type FactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
 
 function normalizeLanguageIds(v: unknown): string[] {
@@ -69,6 +69,8 @@ type Props = {
   locations?: LocOpt[];
   /** Dropdown „Fraktion“ (Charakter) */
   factionChoices?: Faction[];
+  /** Vom Server geladen (RSC); nach router.refresh() aktualisiert */
+  initialFactionReputations: FactionReputation[];
 };
 
 export function GMCharacterEditorPage({
@@ -80,11 +82,14 @@ export function GMCharacterEditorPage({
   languages = [],
   locations = [],
   factionChoices = [],
+  initialFactionReputations,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [reputations, setReputations] = useState<FactionReputation[]>([]);
-  const [loadingReputations, setLoadingReputations] = useState(true);
+  const [reputations, setReputations] = useState<FactionReputation[]>(
+    initialFactionReputations,
+  );
+  const [loadingReputations, setLoadingReputations] = useState(false);
   const [repPending, setRepPending] = useState(false);
   const [newRepFactionId, setNewRepFactionId] = useState("");
   const [newRepValue, setNewRepValue] = useState(0);
@@ -164,13 +169,8 @@ export function GMCharacterEditorPage({
   };
 
   useEffect(() => {
-    if (character.id) {
-      setLoadingReputations(true);
-      getCharacterFactionReputations(character.id, campaignId)
-        .then(setReputations)
-        .finally(() => setLoadingReputations(false));
-    }
-  }, [character.id, campaignId]);
+    setReputations(initialFactionReputations);
+  }, [initialFactionReputations]);
 
   const handleAddRelationship = () => {
     setRelationships([

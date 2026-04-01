@@ -43,7 +43,7 @@ export function CinematicCampaignHeader({ name, system, status, imageUrl, campai
               src={imageUrl}
               alt={name}
               fill
-              className="object-cover"
+              className="object-cover object-top"
               priority
               onError={(e) => {
                 e.currentTarget.style.display = "none";

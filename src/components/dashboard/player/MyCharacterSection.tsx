@@ -47,6 +47,8 @@ type Props = {
     location_name?: string | null;
     avatar_url?: string | null;
     status?: string;
+    experience_points?: number;
+    pocket_gold?: number;
     character_relationships?: Relationship[];
   };
   cultures: Culture[];
@@ -73,6 +75,8 @@ export function MyCharacterSection({
     class: character.class,
     race: character.race,
     level: character.level,
+    experience_points: Number(character.experience_points ?? 0),
+    pocket_gold: Number(character.pocket_gold ?? 0),
     biography: character.biography ?? "",
     culture_lore_id: character.culture_lore_id ?? "",
     languages: savedLangIds,
@@ -152,6 +156,8 @@ export function MyCharacterSection({
           faction_membership: form.faction_membership || null,
           current_location_id: form.current_location_id || null,
           avatar_url: form.avatar_url.trim() || null,
+          experience_points: form.experience_points,
+          pocket_gold: form.pocket_gold,
         });
         window.location.reload();
       } catch (e: unknown) {
@@ -237,6 +243,40 @@ export function MyCharacterSection({
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />
           </div>
+          <div id="character-erfahrung" className="scroll-mt-24">
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
+              Erfahrungspunkte
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={form.experience_points}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  experience_points: Math.max(0, parseInt(e.target.value, 10) || 0),
+                }))
+              }
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+            />
+          </div>
+          <div id="character-gold" className="scroll-mt-24">
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
+              Goldbeutel (mitgeführt)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={form.pocket_gold}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  pocket_gold: Math.max(0, parseInt(e.target.value, 10) || 0),
+                }))
+              }
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+            />
+          </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
               Avatar-URL (Bild-Link)
@@ -277,7 +317,7 @@ export function MyCharacterSection({
               </div>
             </div>
           )}
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div id="character-sprachen" className="sm:col-span-2 lg:col-span-3 scroll-mt-24">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Sprachen</label>
             {languageOptions.length === 0 ? (
               <p className="font-libre text-sm text-gray-500 italic">
@@ -364,7 +404,7 @@ export function MyCharacterSection({
         </div>
 
         {/* Biografie */}
-        <div>
+        <div id="character-biografie" className="scroll-mt-24">
           <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Biografie</label>
           <textarea
             value={form.biography}
@@ -377,7 +417,7 @@ export function MyCharacterSection({
 
         {/* Beziehungen zu NPCs & Ruf bei Fraktionen – Card Design */}
         {(relationships.length > 0 || factionReputations.length > 0) && (
-          <div className="space-y-6">
+          <div id="character-beziehungen" className="space-y-6 scroll-mt-24">
             <h3 className="font-barlow font-semibold text-lg text-accent-gold border-b border-hero-border pb-2 flex items-center gap-2">
               <Users className="h-5 w-5" />
               Beziehungen & Ruf

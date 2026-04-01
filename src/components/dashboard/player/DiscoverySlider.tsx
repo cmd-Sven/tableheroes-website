@@ -6,6 +6,7 @@ import type { DiscoveryItem } from "@/src/app/dashboard/campaigns/[id]/player-da
 
 type Props = {
   items: DiscoveryItem[];
+  campaignId: string;
 };
 
 const kindIcon = {
@@ -14,13 +15,24 @@ const kindIcon = {
   npc: User,
 };
 
-const kindLabel = {
-  lore: "Ort / Lore",
+/** Kurz-Label für die Kategoriezeile */
+const kindCategoryLabel = {
+  lore: "Lore / Ort",
   faction: "Fraktion",
   npc: "NPC",
 };
 
-export function DiscoverySlider({ items }: Props) {
+function discoveryHref(campaignId: string, item: DiscoveryItem): string {
+  if (item.kind === "lore") {
+    return `/dashboard/campaigns/${campaignId}/lore/${item.id}`;
+  }
+  if (item.kind === "faction") {
+    return `/dashboard/campaigns/${campaignId}/factions/${item.id}`;
+  }
+  return `/dashboard/campaigns/${campaignId}/npcs/${item.id}`;
+}
+
+export function DiscoverySlider({ items, campaignId }: Props) {
   if (items.length === 0) {
     return (
       <section className="rounded-lg border border-hero-dark bg-background-card p-8 text-center">
@@ -35,58 +47,59 @@ export function DiscoverySlider({ items }: Props) {
     );
   }
 
+  const loop = [...items, ...items];
+
   return (
     <section>
       <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
         <ScrollText className="h-6 w-6 text-accent-gold" />
         Neuentdeckungen
       </h2>
-      <div className="overflow-x-auto pb-4 -mx-2 scrollbar-thin scrollbar-thumb-hero-border scrollbar-track-transparent">
-        <div className="flex gap-4 min-w-max px-2">
-          {items.map((item) => {
+      <div className="group/marquee relative overflow-hidden rounded-lg border border-hero-border/50 bg-background-card/80 py-4">
+        <div
+          className="flex gap-4 w-max pl-4 animate-discoveryMarquee motion-reduce:animate-none group-hover/marquee:[animation-play-state:paused]"
+          style={{
+            animationDuration: `${Math.max(28, items.length * 6)}s`,
+          }}
+        >
+          {loop.map((item, index) => {
             const Icon = kindIcon[item.kind];
-            const shortDesc = item.description
-              ? item.description.slice(0, 80).trim() + (item.description.length > 80 ? "…" : "")
-              : null;
+            const href = discoveryHref(campaignId, item);
             return (
-              <div
-                key={`${item.kind}-${item.id}`}
-                className="flex-shrink-0 w-[220px] rounded-lg border border-hero-border/40 bg-gradient-to-b from-amber-950/30 to-background-card overflow-hidden shadow-lg"
+              <a
+                key={`${item.kind}-${item.id}-${index}`}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex-shrink-0 w-[160px] rounded-lg border border-hero-border/40 bg-hero-dark/40 overflow-hidden shadow-md outline-none transition-transform duration-300 hover:scale-105 hover:border-accent-gold/60 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-hero-vibrant"
               >
-                <div className="relative h-28 bg-hero-dark/50">
+                <div className="relative h-[100px] bg-hero-dark/50">
                   {item.image_url ? (
                     <Image
                       src={item.image_url}
                       alt=""
                       fill
-                      className="object-cover"
-                      sizes="220px"
+                      className="object-cover object-top"
+                      sizes="160px"
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Icon className="h-10 w-10 text-accent-gold/40" />
+                      <Icon className="h-10 w-10 text-accent-gold/35" />
                     </div>
                   )}
-                  <div className="absolute bottom-1 left-2 right-2">
-                    <span className="inline-block rounded bg-black/60 px-2 py-0.5 text-xs font-barlow font-bold uppercase text-accent-gold">
-                      {kindLabel[item.kind]}
-                    </span>
-                  </div>
                 </div>
-                <div className="p-3">
-                  <p className="font-barlow font-bold text-sm uppercase text-white truncate" title={item.name}>
+                <div className="px-2.5 py-2 border-t border-hero-border/30">
+                  <p className="font-barlow font-bold text-[10px] uppercase tracking-wide text-accent-gold/90 mb-1">
+                    {kindCategoryLabel[item.kind]}
+                  </p>
+                  <p
+                    className="font-barlow font-bold text-xs uppercase text-white truncate leading-tight"
+                    title={item.name}
+                  >
                     {item.name}
                   </p>
-                  {item.type && (
-                    <p className="text-xs text-gray-500 font-libre mb-1">{item.type}</p>
-                  )}
-                  {shortDesc && (
-                    <p className="font-libre text-xs text-gray-400 line-clamp-2 leading-snug">
-                      {shortDesc}
-                    </p>
-                  )}
                 </div>
-              </div>
+              </a>
             );
           })}
         </div>

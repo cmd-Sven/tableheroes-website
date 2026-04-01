@@ -494,6 +494,8 @@ export async function updateCharacterPlayer(data: {
   faction_membership?: string | null;
   current_location_id?: string | null;
   avatar_url?: string | null;
+  experience_points?: number;
+  pocket_gold?: number;
 }) {
   const supabase = await createClient();
 
@@ -544,6 +546,14 @@ export async function updateCharacterPlayer(data: {
   if (data.current_location_id !== undefined) updates.current_location_id = data.current_location_id;
   if (data.avatar_url !== undefined) {
     updates.avatar_url = data.avatar_url?.trim() ? data.avatar_url.trim() : null;
+  }
+  if (data.experience_points !== undefined) {
+    const n = Math.max(0, Math.floor(Number(data.experience_points) || 0));
+    updates.experience_points = n;
+  }
+  if (data.pocket_gold !== undefined) {
+    const n = Math.max(0, Math.floor(Number(data.pocket_gold) || 0));
+    updates.pocket_gold = n;
   }
 
   const { error } = await (supabase.from("characters") as any)

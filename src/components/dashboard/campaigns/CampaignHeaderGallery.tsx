@@ -63,7 +63,7 @@ export function CampaignHeaderGallery({ images, campaignId }: Props) {
               src={image.url}
               alt={image.altText}
               fill
-              className="object-cover group-hover:scale-110 transition-transform duration-300"
+              className="object-cover object-top group-hover:scale-110 transition-transform duration-300"
               sizes="192px"
             />
             {/* Overlay with name */}

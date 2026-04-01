@@ -49,10 +49,15 @@ const config: Config = {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        discoveryMarquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         kenBurns: "kenBurns 20s ease-in-out infinite",
         fadeInBg: "fadeInBg 0.8s ease-out forwards",
+        discoveryMarquee: "discoveryMarquee 40s linear infinite",
       },
       scale: {
         '102': '1.02',

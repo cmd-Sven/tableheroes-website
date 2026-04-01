@@ -33,7 +33,6 @@ import { LoreManagement } from "./LoreManagement";
 import { QuestLogManagement } from "./QuestLogManagement";
 import { SessionsTab } from "./SessionsTab";
 import { CharacterCreatorButton } from "./CharacterCreatorButton";
-import { CharacterSheet } from "@/src/components/dashboard/campaigns/CharacterSheet";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
 import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
 import { CampaignScheduleForm } from "@/src/components/dashboard/campaigns/CampaignScheduleForm";
@@ -44,6 +43,9 @@ import { OnboardingSettings } from "@/src/components/dashboard/campaigns/Onboard
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
 import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlider";
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
+import { PlayerCampaignCharacterOverview } from "@/src/components/dashboard/player/PlayerCampaignCharacterOverview";
+import { PlayerCampaignNextSession } from "@/src/components/dashboard/player/PlayerCampaignNextSession";
+import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
@@ -692,7 +694,8 @@ export default async function CampaignDetailPage({
         const charId = characterData.id;
         const { data: relRows } = await (supabase.from("character_relationships") as any)
           .select("relationship_type, description, npc_id")
-          .eq("character_id", charId);
+          .eq("character_id", charId)
+          .order("id", { ascending: false });
         const npcIds = [...new Set(((relRows as any[]) ?? []).map((r: any) => r.npc_id).filter(Boolean))];
         let npcMap = new Map<string, { id: string; name: string; role: string | null; title: string | null }>();
         if (npcIds.length > 0) {
@@ -780,7 +783,14 @@ export default async function CampaignDetailPage({
       name: String(e.name ?? ""),
       kind: "faction" as const,
       description: e.description != null ? String(e.description) : null,
-      image_url: null,
+      image_url:
+        e.image_url != null
+          ? String(e.image_url)
+          : e.banner_url != null
+            ? String(e.banner_url)
+            : e.portrait_url != null
+              ? String(e.portrait_url)
+              : null,
       type: String(e.type ?? ""),
       created_at: e.created_at != null ? String(e.created_at) : "",
     }));
@@ -789,7 +799,14 @@ export default async function CampaignDetailPage({
       name: String(e.name ?? ""),
       kind: "npc" as const,
       description: e.description != null ? String(e.description) : null,
-      image_url: null,
+      image_url:
+        e.image_url != null
+          ? String(e.image_url)
+          : e.portrait_url != null
+            ? String(e.portrait_url)
+            : e.avatar_url != null
+              ? String(e.avatar_url)
+              : null,
       type: e.title != null ? String(e.title) : undefined,
       created_at: e.created_at != null ? String(e.created_at) : "",
     }));
@@ -800,11 +817,14 @@ export default async function CampaignDetailPage({
       )
       .slice(0, 8);
 
-    const { data: partyCharacters } = await (supabase.from("characters") as any)
-      .select("id, name, class, race, level, culture_lore_id, users(avatar_url)")
+    let partyQuery = (supabase.from("characters") as any)
+      .select("id, name, class, race, level, culture_lore_id, avatar_url, user_id")
       .eq("campaign_id", id)
-      .eq("status", "Active")
-      .neq("id", myCharacterId || "");
+      .in("status", ["Active", "Alive", "Approved"]);
+    if (myCharacterId) {
+      partyQuery = partyQuery.neq("id", myCharacterId);
+    }
+    const { data: partyCharacters } = await partyQuery;
     const cultureIds = [...new Set((partyCharacters || []).map((c: any) => c.culture_lore_id).filter(Boolean))];
     let cultureMap = new Map<string, string>();
     if (cultureIds.length > 0) {
@@ -813,6 +833,19 @@ export default async function CampaignDetailPage({
         .in("id", cultureIds);
       cultureMap = new Map(((cultureRows as { id: string; name: string }[]) ?? []).map((l) => [l.id, l.name]));
     }
+    const partyUserIds = [...new Set((partyCharacters || []).map((c: any) => c.user_id).filter(Boolean))];
+    let userAvatarMap = new Map<string, string | null>();
+    if (partyUserIds.length > 0) {
+      const { data: userRows } = await (supabase.from("users") as any)
+        .select("id, avatar_url")
+        .in("id", partyUserIds);
+      userAvatarMap = new Map(
+        ((userRows as { id: string; avatar_url: string | null }[]) ?? []).map((u) => [
+          u.id,
+          u.avatar_url ?? null,
+        ]),
+      );
+    }
     party = (partyCharacters || []).map((c: any) => ({
       id: c.id,
       name: c.name,
@@ -820,8 +853,62 @@ export default async function CampaignDetailPage({
       race: c.race ?? "",
       level: c.level ?? 1,
       culture: c.culture_lore_id ? (cultureMap.get(c.culture_lore_id) ?? "") : "",
-      avatar_url: c.users?.avatar_url ?? null,
+      avatar_url:
+        c.avatar_url?.trim?.() ||
+        (c.user_id ? userAvatarMap.get(c.user_id) ?? null : null),
     }));
+  }
+
+  let playerNextSessionData: {
+    session: {
+      id: string;
+      title: string | null;
+      start_time: string;
+      status: string;
+      rsvp_deadline_days?: number | null;
+      is_live?: boolean;
+    };
+    userRsvp: RsvpStatus | null;
+    deadlineReached: boolean;
+    viaOnlineTaken: boolean;
+  } | null = null;
+
+  if (!isGM && hasAccess && user && upcomingSessions.length > 0) {
+    const s = upcomingSessions[0] as any;
+    const { data: rsvpRowsRaw } = await (supabase.from("session_rsvps") as any)
+      .select("user_id, rsvp_status")
+      .eq("session_id", s.id);
+    const rsvpRows = (rsvpRowsRaw as { user_id: string; rsvp_status: string }[]) || [];
+    const mine = rsvpRows.find((r) => r.user_id === user.id);
+    const raw = mine?.rsvp_status;
+    let userRsvp: RsvpStatus | null = null;
+    if (raw === "Zusage" || raw === "Via Online" || raw === "Absage") {
+      userRsvp = raw;
+    }
+    const deadlineDays = s.rsvp_deadline_days ?? null;
+    const startDate = new Date(String(s.start_time));
+    let deadline: Date | null = null;
+    if (deadlineDays) {
+      deadline = new Date(startDate);
+      deadline.setDate(deadline.getDate() - Number(deadlineDays));
+      deadline.setHours(23, 59, 59, 999);
+    }
+    const deadlineReached = !!deadline && new Date() >= deadline;
+    const viaOnlineCount = rsvpRows.filter((r) => r.rsvp_status === "Via Online").length;
+    const viaOnlineTaken = s.is_live !== false && viaOnlineCount >= 1;
+    playerNextSessionData = {
+      session: {
+        id: String(s.id),
+        title: s.title != null ? String(s.title) : null,
+        start_time: String(s.start_time),
+        status: String(s.status),
+        rsvp_deadline_days: s.rsvp_deadline_days ?? null,
+        is_live: s.is_live,
+      },
+      userRsvp,
+      deadlineReached,
+      viaOnlineTaken,
+    };
   }
 
   // ============================================================================
@@ -894,7 +981,14 @@ export default async function CampaignDetailPage({
   // Kulturen, Sprachen & Ruf für Charakter-Bearbeitung (Spieler mit Charakter)
   let wizardCultures: { id: string; name: string }[] = [];
   let wizardLanguages: { id: string; name: string }[] = [];
-  let characterReputations: { id: string; faction_id: string; faction_name: string; reputation: number; rank: string | null }[] = [];
+  let characterReputations: {
+    id: string;
+    faction_id: string;
+    faction_name: string;
+    reputation: number;
+    rank: string | null;
+    updated_at: string;
+  }[] = [];
   if (!isGM && myCharacter) {
     const [loreData, repData] = await Promise.all([
       getCharacterWizardLoreData(id),
@@ -908,7 +1002,31 @@ export default async function CampaignDetailPage({
       faction_name: r.faction_name,
       reputation: r.reputation,
       rank: r.rank ?? null,
+      updated_at: r.updated_at,
     }));
+  }
+
+  let lastPlayerAchievement: {
+    name: string;
+    icon: string | null;
+    awarded_at: string;
+  } | null = null;
+  if (!isGM && user) {
+    const { data: uaRow } = await (supabase.from("user_achievements") as any)
+      .select("awarded_at, achievements(name, icon)")
+      .eq("user_id", user.id)
+      .order("awarded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ach = (uaRow as { achievements?: { name?: string; icon?: string | null } } | null)
+      ?.achievements;
+    if (ach && uaRow) {
+      lastPlayerAchievement = {
+        name: String(ach.name ?? ""),
+        icon: ach.icon != null ? String(ach.icon) : null,
+        awarded_at: String((uaRow as { awarded_at?: string }).awarded_at ?? ""),
+      };
+    }
   }
 
   // ============================================================================
@@ -1538,20 +1656,21 @@ export default async function CampaignDetailPage({
             <CharacterCreatorButton campaignId={id} />
           </div>
         )}
-      <DiscoverySlider items={allDiscoveries} />
+      <DiscoverySlider items={allDiscoveries} campaignId={id} />
       {myCharacterForClient ? (
         <div className="space-y-4">
-          <CharacterSheet
-            character={myCharacterForClient as any}
+          <PlayerCampaignCharacterOverview
             campaignId={id}
+            character={myCharacterForClient as any}
             factionReputations={characterReputations}
+            lastAchievement={lastPlayerAchievement}
           />
           <Link
             href={`/dashboard/campaigns/${id}?tab=character`}
-            className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors"
+            className="inline-flex items-center gap-2 rounded border border-hero-border bg-hero-dark/30 px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:border-accent-gold hover:text-accent-gold transition-colors"
           >
             <User className="h-4 w-4" />
-            Charakterblatt bearbeiten
+            Vollständiges Charakterblatt
           </Link>
         </div>
       ) : (
@@ -1565,7 +1684,23 @@ export default async function CampaignDetailPage({
           </p>
         </section>
       )}
-      <PartyOverview party={party} />
+      <section className="space-y-6">
+        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 flex items-center gap-2">
+          <Users className="h-6 w-6 text-accent-gold" />
+          Die Gruppe
+        </h2>
+        <PartyOverview party={party} hideTitle />
+        {playerNextSessionData && (
+          <PlayerCampaignNextSession
+            campaignId={id}
+            session={playerNextSessionData.session}
+            userRsvp={playerNextSessionData.userRsvp}
+            deadlineReached={playerNextSessionData.deadlineReached}
+            viaOnlineTaken={playerNextSessionData.viaOnlineTaken}
+            hasCharacter={!!myCharacterForClient}
+          />
+        )}
+      </section>
     </div>
   );
 

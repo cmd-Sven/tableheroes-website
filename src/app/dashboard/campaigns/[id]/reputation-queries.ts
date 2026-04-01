@@ -7,6 +7,7 @@ export type FactionReputation = {
   reputation: number;
   rank: string | null;
   gm_notes: string | null;
+  updated_at: string;
 };
 
 /**
@@ -20,7 +21,7 @@ export async function getCharacterFactionReputations(
   const supabase = await createClient();
 
   const { data: rows, error } = await (supabase.from("character_faction_reputation") as any)
-    .select("id, faction_id, reputation, rank, gm_notes")
+    .select("id, faction_id, reputation, rank, gm_notes, updated_at")
     .eq("character_id", characterId);
 
   if (error) {
@@ -46,5 +47,7 @@ export async function getCharacterFactionReputations(
     reputation: r.reputation ?? 0,
     rank: r.rank ?? null,
     gm_notes: r.gm_notes,
+    updated_at:
+      r.updated_at != null ? String(r.updated_at) : new Date(0).toISOString(),
   }));
 }
