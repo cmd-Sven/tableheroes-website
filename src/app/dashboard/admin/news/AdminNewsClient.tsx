@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -13,7 +13,19 @@ import {
   type NewsPost,
   type NewsPostInsert,
 } from "@/src/lib/constants/news";
-import { Trash2, Edit, X, Loader2, AlertTriangle } from "lucide-react";
+import {
+  Trash2,
+  Edit,
+  Loader2,
+  AlertTriangle,
+  Bold,
+  Italic,
+  Heading2,
+  Heading3,
+  Pilcrow,
+  List,
+} from "lucide-react";
+import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 
 const NEWS_IMAGE_BASE = "/images/news/";
 const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
@@ -26,6 +38,7 @@ type Props = {
 
 export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
   const router = useRouter();
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -104,6 +117,88 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function wrapSelection(open: string, close: string, placeholder: string) {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const v = form.content ?? "";
+    const hadSelection = start !== end;
+    const inner = hadSelection ? v.slice(start, end) : placeholder;
+    const next = v.slice(0, start) + open + inner + close + v.slice(end);
+    setForm((f) => ({ ...f, content: next }));
+    requestAnimationFrame(() => {
+      const t = contentRef.current;
+      if (!t) return;
+      t.focus();
+      if (hadSelection) {
+        const caret = start + open.length + inner.length + close.length;
+        t.setSelectionRange(caret, caret);
+      } else {
+        t.setSelectionRange(
+          start + open.length,
+          start + open.length + placeholder.length
+        );
+      }
+    });
+  }
+
+  function insertHeading(prefix: "## " | "### ") {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const v = form.content ?? "";
+    const placeholder =
+      prefix === "## " ? "Zwischenüberschrift" : "Kleiner Abschnitt";
+    const insertion = `${prefix}${placeholder}\n\n`;
+    const next = v.slice(0, start) + insertion + v.slice(end);
+    setForm((f) => ({ ...f, content: next }));
+    requestAnimationFrame(() => {
+      const t = contentRef.current;
+      if (!t) return;
+      t.focus();
+      const s = start + prefix.length;
+      t.setSelectionRange(s, s + placeholder.length);
+    });
+  }
+
+  function insertParagraphBreak() {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const v = form.content ?? "";
+    const next = v.slice(0, start) + "\n\n" + v.slice(end);
+    setForm((f) => ({ ...f, content: next }));
+    requestAnimationFrame(() => {
+      const t = contentRef.current;
+      if (!t) return;
+      t.focus();
+      const c = start + 2;
+      t.setSelectionRange(c, c);
+    });
+  }
+
+  function insertBulletLine() {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const v = form.content ?? "";
+    const placeholder = "Listenpunkt";
+    const insertion = `\n- ${placeholder}\n`;
+    const next = v.slice(0, start) + insertion + v.slice(end);
+    setForm((f) => ({ ...f, content: next }));
+    requestAnimationFrame(() => {
+      const t = contentRef.current;
+      if (!t) return;
+      t.focus();
+      const lineStart = start + "\n- ".length;
+      t.setSelectionRange(lineStart, lineStart + placeholder.length);
+    });
   }
 
   async function handleDelete(id: string) {
@@ -225,18 +320,106 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="space-y-2">
               <label className="block font-barlow font-bold uppercase text-sm text-gray-300 mb-1">
-                Inhalt (Markdown)
+                Inhalt
               </label>
-              <textarea
-                value={form.content ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, content: e.target.value }))
-                }
-                rows={6}
-                className="w-full rounded border border-hero-dark bg-slate-900 px-3 py-2 font-libre text-white focus:border-hero-vibrant outline-none resize-y"
-              />
+              <p className="font-libre text-xs text-gray-500 leading-relaxed mb-2">
+                Oben der <strong className="text-gray-400">Beitragstitel</strong> ist für Karten
+                und Listen. Im Textfeld nutzt du{" "}
+                <strong className="text-gray-400">Zwischenüberschriften</strong>,{" "}
+                <strong className="text-gray-400">Fett</strong>,{" "}
+                <strong className="text-gray-400">Kursiv</strong> und{" "}
+                <strong className="text-gray-400">Absätze</strong> (Leerzeile oder Button).
+                Einzelne Zeilenumbrüche werden als weicher Umbruch dargestellt.
+              </p>
+              <div className="flex flex-wrap gap-1.5 rounded border border-hero-border/60 bg-background-dark/80 p-2">
+                <button
+                  type="button"
+                  onClick={() => wrapSelection("**", "**", "fetter Text")}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Fett (** … **)"
+                >
+                  <Bold className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Fett
+                </button>
+                <button
+                  type="button"
+                  onClick={() => wrapSelection("*", "*", "kursiver Text")}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Kursiv (* … *)"
+                >
+                  <Italic className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Kursiv
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertHeading("## ")}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Zwischenüberschrift (##)"
+                >
+                  <Heading2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Überschrift
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertHeading("### ")}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Kleiner Titel (###)"
+                >
+                  <Heading3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Titel klein
+                </button>
+                <button
+                  type="button"
+                  onClick={insertParagraphBreak}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Neuer Absatz (doppelte Leerzeile)"
+                >
+                  <Pilcrow className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Absatz
+                </button>
+                <button
+                  type="button"
+                  onClick={insertBulletLine}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-slate-900 px-2 py-1.5 font-libre text-xs text-gray-200 hover:border-hero-vibrant/60 hover:text-white"
+                  title="Listenpunkt"
+                >
+                  <List className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Liste
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+                <div className="min-w-0">
+                  <span className="block font-barlow text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+                    Bearbeiten
+                  </span>
+                  <textarea
+                    ref={contentRef}
+                    value={form.content ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, content: e.target.value }))
+                    }
+                    rows={14}
+                    className="w-full min-h-[280px] rounded border border-hero-dark bg-slate-900 px-3 py-2 font-mono text-sm text-gray-100 focus:border-hero-vibrant outline-none resize-y"
+                    spellCheck
+                  />
+                </div>
+                <div className="min-w-0 flex flex-col">
+                  <span className="block font-barlow text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+                    Vorschau (wie auf der Seite)
+                  </span>
+                  <div className="flex-1 min-h-[200px] max-h-[min(70vh,26rem)] overflow-y-auto rounded border border-hero-border/50 bg-black/25 p-4">
+                    {form.content?.trim() ? (
+                      <NewsMarkdownBody markdown={form.content} />
+                    ) : (
+                      <p className="font-libre text-sm text-gray-500 italic leading-relaxed">
+                        Vorschau erscheint hier, sobald du Inhalt einfügst.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
             <div>
               <label className="block font-barlow font-bold uppercase text-sm text-gray-300 mb-1">
@@ -261,7 +444,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                 ))}
               </select>
               {/* Live-Vorschau */}
-              <div className="mt-2 rounded border border-hero-border/50 overflow-hidden bg-hero-dark/30 w-full max-w-xs aspect-video flex items-center justify-center relative">
+              <div className="mt-2 rounded border border-hero-border/50 overflow-hidden bg-hero-dark/30 w-full max-w-lg aspect-video flex items-center justify-center relative">
                 {form.image_url ? (
                   <img
                     src={form.image_url}

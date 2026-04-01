@@ -8,6 +8,7 @@ import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, Chec
 import type {
   UpcomingSession,
   SessionParticipant,
+  SessionRsvp,
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
 import { setSessionRsvp, setGmConfirmed, updateSessionRsvpSettings } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
@@ -83,6 +84,33 @@ const RSVP_OPTIONS: { value: RsvpStatus; label: string }[] = [
   { value: "Via Online", label: "Via Online" },
 ];
 
+function isPlayingRsvp(status: RsvpStatus | null | undefined): boolean {
+  return status === "Zusage" || status === "Via Online";
+}
+
+/** Teilnehmer mit Zusage / Via Online (Avatar-Daten aus Kampagnenliste, sonst RSVP-Stub). */
+function confirmedAttendees(session: UpcomingSession): SessionParticipant[] {
+  const playing = session.rsvps.filter((r) => isPlayingRsvp(r.rsvpStatus));
+  return playing.map((r) => participantFromRsvp(session, r));
+}
+
+function participantFromRsvp(
+  session: UpcomingSession,
+  r: SessionRsvp
+): SessionParticipant {
+  const p = session.participants.find((x) => x.userId === r.userId);
+  if (p) return p;
+  return {
+    userId: r.userId,
+    username: r.username,
+    avatarUrl: null,
+    characterName: r.characterName,
+    characterClass: null,
+    characterLevel: null,
+    characterAvatarUrl: null,
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Session-Karte (Spieler: mit RSVP-Dropdown)                          */
 /* ------------------------------------------------------------------ */
@@ -127,6 +155,9 @@ function SessionRowPlayer({
 
   const deadlineHighlight = session.deadlineReached && !session.userRsvp;
   const isScheduled = session.status === "Scheduled";
+  const confirmed = confirmedAttendees(session);
+  const userPlaying = isPlayingRsvp(session.userRsvp);
+  const userDeclined = session.userRsvp === "Absage";
 
   return (
     <div
@@ -200,31 +231,26 @@ function SessionRowPlayer({
 
           {/* Divider */}
           <div className="border-t border-hero-border/20 pt-3">
-            {/* Participants */}
-            {session.participants.length > 0 ? (
-              <div className="flex items-center gap-2">
+            {confirmed.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 mr-2">
                   <Shield className="h-3.5 w-3.5 text-accent-gold/60" />
                   <span className="font-barlow font-bold text-[10px] uppercase text-gray-500">
-                    Helden
+                    Zugesagt
                   </span>
                 </div>
-
-                {/* Avatar Stack */}
                 <div className="flex items-center -space-x-2">
-                  {session.participants.slice(0, 6).map((p) => (
+                  {confirmed.slice(0, 6).map((p) => (
                     <ParticipantAvatar key={p.userId} p={p} />
                   ))}
-                  {session.participants.length > 6 && (
+                  {confirmed.length > 6 && (
                     <div className="relative z-10 grid h-10 w-10 place-items-center rounded-full border-2 border-hero-border/60 bg-background-card font-barlow font-bold text-xs text-gray-400">
-                      +{session.participants.length - 6}
+                      +{confirmed.length - 6}
                     </div>
                   )}
                 </div>
-
-                {/* Compact Class/Level List (visible on larger screens) */}
                 <div className="hidden sm:flex flex-wrap gap-x-3 gap-y-1 ml-3">
-                  {session.participants
+                  {confirmed
                     .filter((p) => p.characterName)
                     .slice(0, 4)
                     .map((p) => (
@@ -235,14 +261,35 @@ function SessionRowPlayer({
                         <span className="text-accent-gold/80 font-bold">
                           {p.characterName}
                         </span>{" "}
-                        · {p.characterClass} Lvl {p.characterLevel}
+                        · {p.characterClass ?? "?"} Lvl{" "}
+                        {p.characterLevel ?? "?"}
                       </span>
                     ))}
                 </div>
               </div>
+            ) : userPlaying ? (
+              <div className="flex items-start gap-2 rounded-md border border-hero-vibrant/40 bg-hero-vibrant/10 px-3 py-2.5">
+                <CheckCircle
+                  className="h-5 w-5 shrink-0 text-hero-vibrant mt-0.5"
+                  aria-hidden
+                />
+                <div>
+                  <p className="font-barlow font-bold text-sm uppercase text-hero-vibrant">
+                    Du nimmst teil
+                  </p>
+                  <p className="font-libre text-xs text-gray-300 mt-0.5 leading-relaxed">
+                    Deine Zusage ist gespeichert. Weitere Spieler:innen erscheinen
+                    hier, sobald sie zugesagt haben.
+                  </p>
+                </div>
+              </div>
+            ) : userDeclined ? (
+              <p className="font-libre text-xs text-gray-500 italic">
+                Du hast für diese Session abgesagt.
+              </p>
             ) : (
               <p className="font-libre text-xs text-gray-500 italic">
-                Noch keine Teilnehmer bestätigt
+                Noch keine Zusage. Trage unten ein, ob du dabei bist.
               </p>
             )}
           </div>

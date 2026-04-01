@@ -80,6 +80,7 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
   const [languages, setLanguages] = useState(creature?.languages ?? "");
   const [passiveTraits, setPassiveTraits] = useState(creature?.passive_traits ?? "");
   const [physicalDesc, setPhysicalDesc] = useState(creature?.physical_description ?? "");
+  const [playerKnowledge, setPlayerKnowledge] = useState(creature?.player_knowledge ?? "");
   const [loreNotes, setLoreNotes] = useState(creature?.lore_notes ?? "");
 
   const [locationId, setLocationId] = useState(creature?.location_id ?? "");
@@ -149,6 +150,7 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
       languages: languages.trim() || null,
       passive_traits: passiveTraits.trim() || null,
       physical_description: physicalDesc.trim() || null,
+      player_knowledge: playerKnowledge.trim() || null,
       lore_notes: loreNotes.trim() || null,
       world_id: worldId,
       location_id: locationId || null,
@@ -486,6 +488,18 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
               rows={3}
               value={physicalDesc}
               onChange={(e) => setPhysicalDesc(e.target.value)}
+            />
+          </label>
+          <label>
+            <span className={labelClass}>Spielerwissen</span>
+            <p className="mt-1 font-libre text-xs text-gray-500 leading-relaxed">
+              Sichtbar für Spieler:innen, wenn die Kreatur in der Kampagne freigegeben ist (Gerüchte, Volksmund – ohne Statblock).
+            </p>
+            <textarea
+              className={`mt-1 ${inputClass}`}
+              rows={3}
+              value={playerKnowledge}
+              onChange={(e) => setPlayerKnowledge(e.target.value)}
             />
           </label>
           <label>

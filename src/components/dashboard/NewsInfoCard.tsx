@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 import type { NewsPost } from "@/src/lib/constants/news";
 
 const NEW_BADGE_STYLE =
@@ -71,7 +71,7 @@ export function NewsInfoCard({
               return (
                 <li key={post.id} className="p-4">
                   <div className="flex gap-3">
-                    <div className="shrink-0 w-16 h-16 rounded border border-hero-border/40 overflow-hidden bg-hero-dark/50">
+                    <div className="shrink-0 w-20 h-20 rounded border border-hero-border/40 overflow-hidden bg-hero-dark/50">
                       <img
                         src={thumbSrc}
                         alt=""
@@ -133,7 +133,7 @@ export function NewsInfoCard({
               const modalSrc = resolveNewsImageUrl(modalPost.image_url);
               if (!modalSrc) return null;
               return (
-                <div className="w-full h-48 shrink-0 overflow-hidden border-b border-hero-border/50">
+                <div className="w-full h-56 md:h-64 shrink-0 overflow-hidden border-b border-hero-border/50">
                   <img
                     src={modalSrc}
                     alt=""
@@ -152,11 +152,7 @@ export function NewsInfoCard({
               <h2 className="font-cinzel font-bold text-2xl text-hero-vibrant mb-4">
                 {modalPost.title}
               </h2>
-              <div className="font-libre text-gray-200 leading-relaxed prose prose-invert prose-p:my-2 prose-headings:font-cinzel prose-headings:text-accent-gold prose-a:text-hero-vibrant max-w-none">
-                <ReactMarkdown>
-                  {modalPost.content ?? "*Kein Inhalt.*"}
-                </ReactMarkdown>
-              </div>
+              <NewsMarkdownBody markdown={modalPost.content ?? ""} />
             </div>
           </div>
         </div>

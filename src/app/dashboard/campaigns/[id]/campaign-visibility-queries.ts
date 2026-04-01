@@ -5,7 +5,7 @@ import { createClient } from "@/src/lib/supabase/server";
  * und anderen Server-Modulen ohne Server-Action-Bundling-Probleme in Production.
  */
 
-export type VisibilityEntityType = "lore" | "npc" | "faction";
+export type VisibilityEntityType = "lore" | "npc" | "faction" | "bestarium";
 
 /**
  * Lädt die Sichtbarkeits-Map für eine Kampagne und einen Entity-Typ.

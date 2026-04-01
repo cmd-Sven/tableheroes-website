@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, MapPin } from "lucide-react";
+import { LayoutDashboard, MapPin, PawPrint } from "lucide-react";
 
 type Props = {
   campaignId: string;
@@ -20,6 +20,7 @@ export function CampaignScopeBanner({
   isGm,
 }: Props) {
   const hubHref = `/dashboard/campaigns/${campaignId}`;
+  const bestariumHref = `/dashboard/campaigns/${campaignId}/bestarium`;
 
   return (
     <header
@@ -74,6 +75,13 @@ export function CampaignScopeBanner({
           >
             <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
             Kampagnenzentrale
+          </Link>
+          <Link
+            href={bestariumHref}
+            className="inline-flex items-center gap-1.5 rounded border border-hero-border bg-hero-dark/50 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-hero-vibrant transition-colors hover:border-hero-vibrant hover:bg-hero-dark"
+          >
+            <PawPrint className="h-3.5 w-3.5" aria-hidden />
+            Bestarium
           </Link>
           <Link
             href="/dashboard/my-campaigns"

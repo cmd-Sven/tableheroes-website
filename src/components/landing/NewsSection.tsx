@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 import type { NewsPost } from "@/src/lib/constants/news";
 
 const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
@@ -174,7 +174,7 @@ export function NewsSection() {
                   backgroundSize: "cover",
                 }}
               >
-                <div className="w-full h-40 overflow-hidden border-b border-hero-border/60 bg-hero-dark/40">
+                <div className="w-full h-52 md:h-56 overflow-hidden border-b border-hero-border/60 bg-hero-dark/40">
                   <img
                     src={imgSrc}
                     alt=""
@@ -233,7 +233,7 @@ export function NewsSection() {
             >
               <X className="h-6 w-6" />
             </button>
-            <div className="w-full h-48 shrink-0 overflow-hidden border-b border-hero-border/50">
+            <div className="w-full h-56 md:h-64 shrink-0 overflow-hidden border-b border-hero-border/50">
               <img
                 src={resolveNewsImageUrl(selectedPost.image_url)}
                 alt=""
@@ -262,11 +262,7 @@ export function NewsSection() {
               <h2 className="font-cinzel font-bold text-2xl text-hero-vibrant mb-4">
                 {selectedPost.title}
               </h2>
-              <div className="font-libre text-gray-200 leading-relaxed prose prose-invert prose-p:my-2 prose-headings:font-cinzel prose-headings:text-accent-gold prose-a:text-hero-vibrant max-w-none">
-                <ReactMarkdown>
-                  {selectedPost.content ?? "*Kein Inhalt.*"}
-                </ReactMarkdown>
-              </div>
+              <NewsMarkdownBody markdown={selectedPost.content ?? ""} />
             </div>
           </div>
         </div>

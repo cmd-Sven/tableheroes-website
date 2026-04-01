@@ -83,15 +83,29 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const role = user.primary_role || user?.role || "Player";
 
-  // campaignId BEVOR jeder Logik extrahieren (verhindert ReferenceError)
-  // params.id kann in übergeordnetem Layout fehlen → Fallback: ID aus pathname
-  const pathSegments = pathname?.split("/") ?? [];
-  const isCampaignPath = pathname?.startsWith("/dashboard/campaigns/") && pathSegments[4];
-  const campaignId: string | undefined = (params?.id as string) ?? (isCampaignPath ? pathSegments[4] : undefined);
+  // Kampagnen-ID: useParams().id kommt aus dem dynamischen Segment [id]; im Dashboard-Root-Layout
+  // kann das in seltenen Fällen leer sein. Zuverlässiger Fallback: erstes Segment nach /dashboard/campaigns/
+  // (nicht pathSegments[4] – bei /campaigns/[uuid] ist die UUID Index 3, bei /campaigns/[uuid]/lore wäre [4] = "lore".)
+  function campaignIdFromPath(path: string | null | undefined): string | undefined {
+    if (!path?.startsWith("/dashboard/campaigns/")) return undefined;
+    const m = path.match(/^\/dashboard\/campaigns\/([^/]+)/);
+    const seg = m?.[1];
+    if (!seg || seg === "new") return undefined;
+    return seg;
+  }
+  const rawParamId = params?.id;
+  const paramCampaignId =
+    typeof rawParamId === "string"
+      ? rawParamId
+      : Array.isArray(rawParamId)
+        ? rawParamId[0]
+        : undefined;
+  const campaignId = paramCampaignId || campaignIdFromPath(pathname ?? null);
   const isInCampaign = !!campaignId;
 
   // Welt-Kontext: nur wenn wir unter /dashboard/worlds/[id]/ sind; "new" und leere Werte ausschließen
-  const rawWorldSegment = pathname?.startsWith("/dashboard/worlds/") ? pathSegments[3] : undefined;
+  const worldPathMatch = pathname?.match(/^\/dashboard\/worlds\/([^/]+)/);
+  const rawWorldSegment = worldPathMatch?.[1];
   const worldId: string | undefined =
     rawWorldSegment &&
     rawWorldSegment !== "new" &&
@@ -348,6 +362,12 @@ export function Sidebar({
           label: "Fraktionen",
           icon: Shield,
           tab: "factions",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}/bestarium`,
+          label: "Bestarium",
+          icon: PawPrint,
+          tab: undefined,
         },
         {
           href: `/dashboard/campaigns/${campaignId}?tab=quests`,
@@ -727,7 +747,8 @@ export function Sidebar({
                     tab={item.tab}
                     isActive={
                       pathname === item.href ||
-                      (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox"))
+                      (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox")) ||
+                      (!!pathname && item.href.endsWith("/bestarium") && pathname.startsWith(item.href))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
                     disabled={

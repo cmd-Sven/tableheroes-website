@@ -48,6 +48,8 @@ export type GeneratedBeastResult = {
   languages: string | null;
   passive_traits: string | null;
   physical_description: string | null;
+  /** Nur für Spieler:innen (bei Freigabe), ohne Statblock – Gerüchte, Volksmund, allgemeines Wissen. */
+  player_knowledge: string | null;
   lore_notes: string | null;
 };
 
@@ -179,6 +181,7 @@ function normalizeGeneratedBeast(raw: Record<string, unknown>): GeneratedBeastRe
     languages: strOrNull(raw.languages),
     passive_traits: strOrNull(raw.passive_traits),
     physical_description: strOrNull(raw.physical_description),
+    player_knowledge: strOrNull(raw.player_knowledge),
     lore_notes: strOrNull(raw.lore_notes),
   };
 }
@@ -250,6 +253,7 @@ function toRowPayload(input: SaveBestariumInput) {
     languages: input.languages,
     passive_traits: input.passive_traits,
     physical_description: input.physical_description,
+    player_knowledge: input.player_knowledge,
     lore_notes: input.lore_notes,
     location_id: input.location_id ?? null,
     lore_id: input.lore_id ?? null,
@@ -439,7 +443,8 @@ export async function generateBeastForWorld(worldId: string, options: GenerateBe
 - Nutze den Proficiency-Ansatz von Monstern in 5e: Angriffsbonus und Rettungswürfe sollen zum CR stimmig sein.`;
 
   const descriptionRules = `BESCHREIBUNG (Deutsch):
-- physical_description: Mindestens 4–6 Sätze flüssiges Deutsch für die Spielrunde – Aussehen, Bewegung, Licht, Geräusche, Geruch, wie sich die Kreatur im genannten VORKOMMEN ausnimmt (Bezug zum Ort).
+- physical_description: Mindestens 4–6 Sätze flüssiges Deutsch für die Spielrunde – Aussehen, Bewegung, Licht, Geräusche, Geruch, wie sich die Kreatur im genannten VORKOMMEN ausnimmt (Bezug zum Ort). Keine Spielwerte nennen.
+- player_knowledge: 2–5 Sätze Deutsch – was Charaktere in der Welt üblicherweise über diese Kreatur wissen oder erzählen (Gerüchte, Volksmund, Reisenden‑Weisheiten). Keine RK/TP/CR/Attribute; nichts, was nur der GM wissen soll.
 - lore_notes: 3–5 Sätze nur für den GM: Rolle am Ort, Verhalten, mögliche Hooks, wie sie zur Welt passt (Blueprint + Vorkommen).`;
 
   const systemPrompt = `Du bist ein erfahrener D&D 5e Game Designer. Erstelle eine MONSTER- oder BEAST-Statblock-Datenstruktur für die Fantasy-Welt "${world.name}".
@@ -475,7 +480,7 @@ attacks (Array),
 special_abilities, legendary_actions, lair_actions (String, leer wenn nicht zutreffend),
 challenge_rating, xp_awarded,
 senses, languages, passive_traits,
-physical_description, lore_notes`;
+physical_description, player_knowledge, lore_notes`;
 
   const userMessage =
     briefing.length > 0

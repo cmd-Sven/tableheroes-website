@@ -403,7 +403,7 @@ export async function getUpcomingSessionsForUser(
     campaignsById.set(c.id, { name: c.name, banner_url: c.banner_url });
   }
 
-  // 4. Teilnehmer je Kampagne laden (Accepted/Approved Members + deren Charaktere)
+  // 4. Teilnehmer je Kampagne laden (gleiche Member-Status wie Schritt 1, sonst leere Liste trotz sichtbarer Termine)
   const { data: allMembersRaw } = await (
     supabase.from("campaign_members") as any
   )
@@ -416,7 +416,7 @@ export async function getUpcomingSessionsForUser(
     `
     )
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Accepted", "Approved", "Active"]);
+    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
 
   // Gruppiere Teilnehmer nach campaign_id
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
@@ -583,7 +583,7 @@ export async function getPastSessionsForUser(
   const { data: allMembersRaw } = await (supabase.from("campaign_members") as any)
     .select("campaign_id, user_id, users(id, username, avatar_url), characters(id, name, class, level, avatar_url)")
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Accepted", "Approved", "Active"]);
+    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
 
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
   for (const row of (allMembersRaw as any[]) || []) {
