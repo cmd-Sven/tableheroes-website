@@ -8,19 +8,21 @@ type Props = {
   party: PartyMember[];
   /** Wenn true, kein eigener Abschnittstitel (z. B. gemeinsamer Block mit Session-Card). */
   hideTitle?: boolean;
+  /** Wenn true: kein eigener Marmor-Rahmen (Parent liefert Hintergrund). */
+  embedded?: boolean;
 };
 
-export function PartyOverview({ party, hideTitle = false }: Props) {
-  return (
-    <section className="rounded-lg border border-hero-dark bg-background-card p-6">
-      {!hideTitle && (
-        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+export function PartyOverview({ party, hideTitle = false, embedded = false }: Props) {
+  const body = (
+    <>
+      {!hideTitle && !embedded && (
+        <h2 className="font-barlow font-semibold text-2xl text-stone-100 border-b border-white/15 pb-2 mb-4 flex items-center gap-2">
           <Users className="h-6 w-6 text-accent-gold" />
           Die Gruppe
         </h2>
       )}
       {party.length === 0 ? (
-        <p className="font-libre text-gray-500 italic">
+        <p className="font-libre text-stone-400 italic">
           Noch keine weiteren aktiven Charaktere in dieser Kampagne.
         </p>
       ) : (
@@ -28,9 +30,9 @@ export function PartyOverview({ party, hideTitle = false }: Props) {
           {party.map((member) => (
             <div
               key={member.id}
-              className="overflow-hidden rounded-lg border border-hero-border/40 bg-gradient-to-b from-hero-dark/30 to-background-card shadow-md"
+              className="overflow-hidden rounded-lg border bg-party-card-dgreen shadow-md"
             >
-              <div className="relative aspect-[4/3] bg-hero-dark/50">
+              <div className="relative aspect-[4/3] bg-hero-dark/60">
                 {member.avatar_url ? (
                   <Image
                     src={member.avatar_url}
@@ -50,24 +52,34 @@ export function PartyOverview({ party, hideTitle = false }: Props) {
                   </p>
                 </div>
               </div>
-              <div className="p-3 space-y-1">
-                <p className="font-libre text-sm text-gray-300">
-                  <span className="text-gray-500">Rasse:</span> {member.race}
+              <div className="p-3 space-y-1 border-t border-hero-border/20">
+                <p className="font-libre text-sm text-gray-200">
+                  <span className="text-stone-400">Rasse:</span> {member.race}
                 </p>
-                <p className="font-libre text-sm text-gray-300">
-                  <span className="text-gray-500">Klasse:</span> {member.class}
+                <p className="font-libre text-sm text-gray-200">
+                  <span className="text-stone-400">Klasse:</span> {member.class}
                 </p>
                 <p className="font-barlow font-bold text-xs uppercase text-accent-gold">
                   Stufe {member.level != null && member.level > 0 ? member.level : 1}
                 </p>
                 {member.culture ? (
-                  <p className="font-libre text-xs text-gray-500 truncate">{member.culture}</p>
+                  <p className="font-libre text-xs text-stone-500 truncate">{member.culture}</p>
                 ) : null}
               </div>
             </div>
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{body}</div>;
+  }
+
+  return (
+    <section className="rounded-lg border border-white/10 bg-player-marble-section p-6 shadow-inner">
+      {body}
     </section>
   );
 }

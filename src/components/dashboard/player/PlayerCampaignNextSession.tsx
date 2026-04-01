@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { Calendar, Clock, Zap, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { Calendar, Clock, Zap, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { setSessionRsvp } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 
@@ -29,6 +29,19 @@ const RSVP_OPTIONS: { value: RsvpStatus; label: string }[] = [
   { value: "Via Online", label: "Via Online" },
 ];
 
+function feedbackMessage(status: RsvpStatus): string {
+  switch (status) {
+    case "Zusage":
+      return "Termin zugesagt";
+    case "Absage":
+      return "Termin abgesagt";
+    case "Via Online":
+      return "Via Online bestätigt";
+    default:
+      return "Rückmeldung gespeichert";
+  }
+}
+
 export function PlayerCampaignNextSession({
   campaignId,
   session,
@@ -39,6 +52,23 @@ export function PlayerCampaignNextSession({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [optimisticRsvp, setOptimisticRsvp] = useState<RsvpStatus | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const displayRsvp = optimisticRsvp ?? userRsvp;
+
+  useEffect(() => {
+    if (userRsvp && optimisticRsvp && userRsvp === optimisticRsvp) {
+      setOptimisticRsvp(null);
+    }
+  }, [userRsvp, optimisticRsvp]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const t = setTimeout(() => setFeedback(null), 6000);
+    return () => clearTimeout(t);
+  }, [feedback]);
+
   const isLive = session.status === "Live";
   const isScheduled = session.status === "Scheduled";
   const startDate = new Date(session.start_time);
@@ -57,21 +87,25 @@ export function PlayerCampaignNextSession({
   const handleRsvpChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as RsvpStatus;
     if (!value) return;
+    setFeedback(null);
+    setOptimisticRsvp(value);
     startTransition(async () => {
       const res = await setSessionRsvp(session.id, value, {
         campaignId,
         isLive: session.is_live !== false,
       });
       if (!res.success || res.error) {
+        setOptimisticRsvp(null);
         alert(res.error || "Rückmeldung konnte nicht gespeichert werden.");
         return;
       }
+      setFeedback(feedbackMessage(value));
       router.refresh();
     });
   };
 
   const joinHref = `/session/${session.id}`;
-  const deadlineHighlight = deadlineReached && !userRsvp && isScheduled;
+  const deadlineHighlight = deadlineReached && !displayRsvp && isScheduled;
 
   return (
     <section className="rounded-lg border border-hero-border/50 bg-gradient-to-br from-background-card to-hero-dark/30 p-5 shadow-lg">
@@ -143,11 +177,20 @@ export function PlayerCampaignNextSession({
                     Anmeldefrist – bitte zu- oder absagen
                   </p>
                 )}
+                {feedback && (
+                  <div
+                    className="flex items-center gap-2 rounded-md border border-green-600/60 bg-green-950/50 px-3 py-2.5 font-barlow font-bold text-sm text-green-200"
+                    role="status"
+                  >
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" aria-hidden />
+                    {feedback}
+                  </div>
+                )}
                 <label className="block font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
                   Deine Teilnahme
                 </label>
                 <select
-                  value={userRsvp ?? ""}
+                  value={displayRsvp ?? ""}
                   onChange={handleRsvpChange}
                   disabled={isPending}
                   className="w-full max-w-xs rounded border border-hero-dark bg-slate-900/90 px-3 py-2.5 font-barlow font-bold text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-50"
@@ -160,12 +203,12 @@ export function PlayerCampaignNextSession({
                       disabled={
                         opt.value === "Via Online" &&
                         viaOnlineTaken &&
-                        userRsvp !== "Via Online"
+                        displayRsvp !== "Via Online"
                       }
                     >
                       {opt.value === "Via Online" &&
                       viaOnlineTaken &&
-                      userRsvp !== "Via Online"
+                      displayRsvp !== "Via Online"
                         ? "Via Online (belegt)"
                         : opt.label}
                     </option>

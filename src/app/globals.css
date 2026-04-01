@@ -470,3 +470,75 @@ button.bg-hero-gold[disabled] {
   height: 0;
   font-style: italic;
 }
+
+/* Spieler-Kampagnenübersicht: Pergament + Marmor + Gruppenkarten */
+.bg-player-paper {
+  background-color: #e6dfd0;
+  background-image:
+    radial-gradient(ellipse 120% 80% at 20% 10%, rgba(255, 252, 245, 0.55), transparent 50%),
+    radial-gradient(ellipse 90% 60% at 85% 90%, rgba(120, 100, 80, 0.08), transparent 45%),
+    linear-gradient(165deg, rgba(90, 70, 50, 0.06) 0%, transparent 40%),
+    repeating-linear-gradient(
+      -8deg,
+      transparent,
+      transparent 3px,
+      rgba(60, 50, 40, 0.03) 3px,
+      rgba(60, 50, 40, 0.03) 4px
+    );
+  box-shadow:
+    inset 0 0 100px rgba(40, 30, 20, 0.07),
+    0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+.bg-player-marble {
+  background-color: #141c18;
+  background-image:
+    linear-gradient(145deg, rgba(42, 52, 46, 0.98) 0%, rgba(16, 24, 20, 0.99) 42%, rgba(28, 38, 32, 0.97) 100%),
+    radial-gradient(ellipse 70% 50% at 20% 30%, rgba(90, 130, 100, 0.14), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 75%, rgba(50, 70, 60, 0.2), transparent 50%),
+    linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.04) 48%, transparent 56%);
+}
+
+.bg-player-marble-section {
+  background-color: #121a16;
+  background-image:
+    linear-gradient(160deg, rgba(36, 48, 40, 0.95) 0%, rgba(14, 22, 18, 0.98) 50%, rgba(22, 32, 26, 0.96) 100%),
+    radial-gradient(ellipse 80% 60% at 15% 20%, rgba(80, 120, 90, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(40, 60, 50, 0.18), transparent 45%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bg-party-card-dgreen {
+  background: linear-gradient(180deg, #0f2818 0%, #0a1a12 55%, #07140e 100%);
+  border-color: rgba(35, 199, 99, 0.28);
+}
+
+.btn-player-edit-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  transition: all 0.2s ease;
+  background: linear-gradient(180deg, #d4c44a 0%, #cab926 45%, #a89d1e 100%);
+  color: #1a1408;
+  border: 1px solid rgba(90, 70, 20, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.btn-player-edit-gold:hover {
+  background: linear-gradient(180deg, #efe26a 0%, #e6d73a 40%, #cab926 100%);
+  box-shadow:
+    0 0 22px rgba(202, 185, 38, 0.55),
+    0 2px 12px rgba(0, 0, 0, 0.3);
+  transform: scale(1.02);
+}
+
+.btn-player-edit-gold:active {
+  transform: scale(0.98);
+}

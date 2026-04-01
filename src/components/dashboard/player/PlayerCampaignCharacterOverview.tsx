@@ -97,6 +97,9 @@ type Props = {
   lastAchievement: LastAchievement;
 };
 
+const marbleTile =
+  "rounded-md border border-white/10 bg-player-marble p-4 shadow-inner";
+
 export function PlayerCampaignCharacterOverview({
   campaignId,
   character,
@@ -112,115 +115,111 @@ export function PlayerCampaignCharacterOverview({
   const preview = buildContactPreview(campaignId, factionReputations, rels);
 
   return (
-    <section className="rounded-lg border border-hero-dark bg-background-card p-6 space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b border-hero-border pb-4">
+    <section className="rounded-xl border border-stone-700/40 bg-player-paper p-6 space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b border-stone-600/40 pb-4">
         <div>
-          <h2 className="font-barlow font-extrabold text-2xl uppercase tracking-wide text-hero-vibrant flex items-center gap-2">
-            <User className="h-7 w-7 text-accent-gold" />
+          <h2 className="font-barlow font-extrabold text-2xl uppercase tracking-wide text-stone-900 flex items-center gap-2">
+            <User className="h-7 w-7 text-amber-800" aria-hidden />
             {character.name}
           </h2>
-          <p className="font-libre text-sm text-gray-500 mt-1">
+          <p className="font-libre text-sm text-stone-700 mt-1">
             Stufe {character.level} · {character.class} · {character.race}
           </p>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
-          <p className="font-barlow font-bold text-xs uppercase text-gray-500">Klasse</p>
-          <p className="font-libre text-gray-200 mt-1">{character.class}</p>
+        <div className={marbleTile}>
+          <p className="font-barlow font-bold text-xs uppercase text-stone-400">Klasse</p>
+          <p className="font-libre text-gray-100 mt-1">{character.class}</p>
         </div>
-        <div className="rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
-          <p className="font-barlow font-bold text-xs uppercase text-gray-500">Rasse</p>
-          <p className="font-libre text-gray-200 mt-1">{character.race}</p>
+        <div className={marbleTile}>
+          <p className="font-barlow font-bold text-xs uppercase text-stone-400">Rasse</p>
+          <p className="font-libre text-gray-100 mt-1">{character.race}</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
+      <div
+        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${marbleTile}`}
+      >
         <div className="flex items-start gap-2 min-w-0">
           <Globe className="h-5 w-5 text-accent-gold shrink-0 mt-0.5" />
           <div>
-            <p className="font-barlow font-bold text-xs uppercase text-gray-500">Sprachen</p>
-            <p className="font-libre text-gray-200 mt-1">{langs}</p>
+            <p className="font-barlow font-bold text-xs uppercase text-stone-400">Sprachen</p>
+            <p className="font-libre text-gray-100 mt-1">{langs}</p>
           </div>
         </div>
-        <Link
-          href={editTabHref(campaignId, "character-sprachen")}
-          className="shrink-0 inline-flex items-center justify-center rounded border border-hero-vibrant bg-hero-vibrant/15 px-4 py-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors"
-        >
+        <Link href={editTabHref(campaignId, "character-sprachen")} className="btn-player-edit-gold shrink-0">
           Bearbeiten
         </Link>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
+      <div
+        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${marbleTile}`}
+      >
         <div className="flex items-start gap-2">
           <Sparkles className="h-5 w-5 text-accent-gold shrink-0 mt-0.5" />
           <div>
-            <p className="font-barlow font-bold text-xs uppercase text-gray-500">
+            <p className="font-barlow font-bold text-xs uppercase text-stone-400">
               Erfahrungspunkte (aktuell)
             </p>
-            <p className="font-libre text-gray-200 mt-1 tabular-nums">{xp.toLocaleString("de-DE")}</p>
+            <p className="font-libre text-gray-100 mt-1 tabular-nums">{xp.toLocaleString("de-DE")}</p>
           </div>
         </div>
-        <Link
-          href={editTabHref(campaignId, "character-erfahrung")}
-          className="shrink-0 inline-flex items-center justify-center rounded border border-hero-vibrant bg-hero-vibrant/15 px-4 py-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors"
-        >
+        <Link href={editTabHref(campaignId, "character-erfahrung")} className="btn-player-edit-gold shrink-0">
           Bearbeiten
         </Link>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
+      <div
+        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${marbleTile}`}
+      >
         <div className="flex items-start gap-2">
           <Coins className="h-5 w-5 text-accent-gold shrink-0 mt-0.5" />
           <div>
-            <p className="font-barlow font-bold text-xs uppercase text-gray-500">Goldbeutel</p>
-            <p className="font-libre text-gray-200 mt-1 tabular-nums">
+            <p className="font-barlow font-bold text-xs uppercase text-stone-400">Goldbeutel</p>
+            <p className="font-libre text-gray-100 mt-1 tabular-nums">
               {gold.toLocaleString("de-DE")} (mitgeführt)
             </p>
           </div>
         </div>
-        <Link
-          href={editTabHref(campaignId, "character-gold")}
-          className="shrink-0 inline-flex items-center justify-center rounded border border-hero-vibrant bg-hero-vibrant/15 px-4 py-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors"
-        >
+        <Link href={editTabHref(campaignId, "character-gold")} className="btn-player-edit-gold shrink-0">
           Bearbeiten
         </Link>
       </div>
 
-      <div className="rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
+      <div className={marbleTile}>
         <div className="flex items-center gap-2 mb-2">
           <Trophy className="h-5 w-5 text-accent-gold" />
-          <p className="font-barlow font-bold text-xs uppercase text-gray-500">Letztes Achievement</p>
+          <p className="font-barlow font-bold text-xs uppercase text-stone-400">Letztes Achievement</p>
         </div>
         {lastAchievement ? (
           <p className="font-cinzel font-bold text-accent-gold">{lastAchievement.name}</p>
         ) : (
-          <p className="font-libre text-sm text-gray-500 italic">Noch keins vergeben.</p>
+          <p className="font-libre text-sm text-stone-500 italic">Noch keins vergeben.</p>
         )}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between rounded-md border border-hero-border/40 bg-hero-dark/20 p-4">
+      <div
+        className={`flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between ${marbleTile}`}
+      >
         <div className="flex items-start gap-2 min-w-0 flex-1">
           <BookOpen className="h-5 w-5 text-accent-gold shrink-0 mt-0.5" />
           <div>
-            <p className="font-barlow font-bold text-xs uppercase text-gray-500">
+            <p className="font-barlow font-bold text-xs uppercase text-stone-400">
               Biografie &amp; Hintergrund
             </p>
-            <p className="font-libre text-sm text-gray-400 mt-1 line-clamp-3 whitespace-pre-wrap">
+            <p className="font-libre text-sm text-stone-300 mt-1 line-clamp-3 whitespace-pre-wrap">
               {character.biography?.trim() ? character.biography : "Noch keine Biografie."}
             </p>
           </div>
         </div>
-        <Link
-          href={editTabHref(campaignId, "biografie")}
-          className="shrink-0 inline-flex items-center justify-center rounded border border-hero-vibrant bg-hero-vibrant/15 px-4 py-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors"
-        >
+        <Link href={editTabHref(campaignId, "character-biografie")} className="btn-player-edit-gold shrink-0">
           Bearbeiten
         </Link>
       </div>
 
-      <div className="rounded-md border border-hero-border/40 bg-hero-dark/20 p-4 space-y-3">
+      <div className={`${marbleTile} space-y-3`}>
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-accent-gold" />
           <p className="font-barlow font-bold text-sm uppercase text-accent-gold">
@@ -228,7 +227,7 @@ export function PlayerCampaignCharacterOverview({
           </p>
         </div>
         {preview.length === 0 ? (
-          <p className="font-libre text-sm text-gray-500 italic">Noch keine Einträge.</p>
+          <p className="font-libre text-sm text-stone-500 italic">Noch keine Einträge.</p>
         ) : (
           <ul className="space-y-2">
             {preview.map((row) => (
@@ -237,15 +236,15 @@ export function PlayerCampaignCharacterOverview({
                   href={row.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-start justify-between gap-2 rounded border border-hero-border/30 bg-background-card/60 px-3 py-2 hover:border-accent-gold/50 transition-colors"
+                  className="group flex items-start justify-between gap-2 rounded border border-white/10 bg-black/25 px-3 py-2 hover:border-accent-gold/40 transition-colors"
                 >
                   <span>
                     <span className="font-cinzel font-bold text-white group-hover:text-accent-gold">
                       {row.title}
                     </span>
-                    <span className="font-libre text-sm text-gray-400 block">{row.detail}</span>
+                    <span className="font-libre text-sm text-stone-400 block">{row.detail}</span>
                   </span>
-                  <ExternalLink className="h-4 w-4 text-gray-600 group-hover:text-accent-gold shrink-0" />
+                  <ExternalLink className="h-4 w-4 text-stone-500 group-hover:text-accent-gold shrink-0" />
                 </Link>
               </li>
             ))}
@@ -253,7 +252,7 @@ export function PlayerCampaignCharacterOverview({
         )}
         <Link
           href={editTabHref(campaignId, "character-beziehungen")}
-          className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:text-accent-gold transition-colors"
+          className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-xs text-amber-950 underline decoration-amber-900/60 hover:text-amber-800 hover:decoration-amber-800 transition-colors"
         >
           Alle anzeigen
         </Link>

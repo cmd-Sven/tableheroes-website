@@ -45,6 +45,7 @@ import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlid
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { PlayerCampaignCharacterOverview } from "@/src/components/dashboard/player/PlayerCampaignCharacterOverview";
 import { PlayerCampaignNextSession } from "@/src/components/dashboard/player/PlayerCampaignNextSession";
+import { PlayerRsvpDeadlineBanner } from "@/src/components/dashboard/player/PlayerRsvpDeadlineBanner";
 import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-queries";
@@ -871,6 +872,8 @@ export default async function CampaignDetailPage({
     userRsvp: RsvpStatus | null;
     deadlineReached: boolean;
     viaOnlineTaken: boolean;
+    /** Ende des RSVP-Tages (23:59:59), ISO – für Countdown-Banner */
+    rsvpDeadlineEndIso: string | null;
   } | null = null;
 
   if (!isGM && hasAccess && user && upcomingSessions.length > 0) {
@@ -908,6 +911,7 @@ export default async function CampaignDetailPage({
       userRsvp,
       deadlineReached,
       viaOnlineTaken,
+      rsvpDeadlineEndIso: deadline ? deadline.toISOString() : null,
     };
   }
 
@@ -1684,12 +1688,12 @@ export default async function CampaignDetailPage({
           </p>
         </section>
       )}
-      <section className="space-y-6">
-        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 flex items-center gap-2">
+      <section className="rounded-xl border border-white/10 bg-player-marble-section p-6 shadow-xl space-y-6">
+        <h2 className="font-barlow font-semibold text-2xl text-stone-100 border-b border-white/15 pb-2 flex items-center gap-2">
           <Users className="h-6 w-6 text-accent-gold" />
           Die Gruppe
         </h2>
-        <PartyOverview party={party} hideTitle />
+        <PartyOverview party={party} hideTitle embedded />
         {playerNextSessionData && (
           <PlayerCampaignNextSession
             campaignId={id}
@@ -1703,6 +1707,15 @@ export default async function CampaignDetailPage({
       </section>
     </div>
   );
+
+  const showPlayerRsvpDeadlineBanner =
+    tab === "overview" &&
+    !isGM &&
+    hasAccess &&
+    !!myCharacterForClient &&
+    playerNextSessionData &&
+    playerNextSessionData.session.status === "Scheduled" &&
+    !playerNextSessionData.userRsvp;
 
   return (
     <div className="space-y-8">
@@ -1724,6 +1737,14 @@ export default async function CampaignDetailPage({
         campaignId={id}
         galleryImages={galleryImages}
       />
+
+      {showPlayerRsvpDeadlineBanner && playerNextSessionData && (
+        <PlayerRsvpDeadlineBanner
+          sessionTitle={playerNextSessionData.session.title}
+          rsvpDeadlineEndIso={playerNextSessionData.rsvpDeadlineEndIso}
+          sessionStartIso={playerNextSessionData.session.start_time}
+        />
+      )}
 
       {/* Campaign Stats (below header) */}
       <div className="flex items-center gap-4 text-sm font-libre text-gray-400">
