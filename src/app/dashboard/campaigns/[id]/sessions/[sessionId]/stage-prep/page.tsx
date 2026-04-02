@@ -70,15 +70,22 @@ export default async function SessionStagePrepPage({ params }: Props) {
     await ensureSessionPrepLiveState(sessionId);
   }
 
-  /** select("*"): vermeidet PostgREST-Fehler, falls Spalte background_url in der DB noch fehlt */
-  const { data: liveRow, error: liveRowError } = await (
-    supabase.from("session_live_states") as any
-  )
-    .select("*")
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  if (liveRowError) {
-    console.error("[stage-prep] session_live_states:", liveRowError.message);
+  /** Nur background_url: kleinste Payload, keine unbekannten Spalten-Typen für RSC/Flight. */
+  let initialBackgroundUrl: string | null = null;
+  try {
+    const { data: liveRow, error: liveRowError } = await (
+      supabase.from("session_live_states") as any
+    )
+      .select("background_url")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (liveRowError) {
+      console.error("[stage-prep] session_live_states:", liveRowError.message);
+    } else {
+      initialBackgroundUrl = pickBackgroundUrl(liveRow);
+    }
+  } catch (e) {
+    console.error("[stage-prep] session_live_states load exception:", e);
   }
 
   const npcsFromCampaign = await getNPCs(campaignId, user.id, true);
@@ -108,13 +115,13 @@ export default async function SessionStagePrepPage({ params }: Props) {
     <StagePrepClient
       sessionId={sessionId}
       campaignId={campaignId}
-      sessionTitle={session.title}
-      sessionStatus={session.status}
+      sessionTitle={session.title != null ? String(session.title) : null}
+      sessionStatus={String(session.status ?? "")}
       allCampaignNpcs={allCampaignNpcs}
       allCampaignFactions={allCampaignFactions}
       stageDeckNpcIds={stageDeckNpcIds}
       stageDeckFactionIds={stageDeckFactionIds}
-      initialBackgroundUrl={pickBackgroundUrl(liveRow)}
+      initialBackgroundUrl={initialBackgroundUrl}
     />
   );
 }

@@ -481,12 +481,10 @@ export async function updateSessionBackgroundUrl(
     }
   }
 
+  // Nur Live-Session invalidieren. Kein revalidatePath für diese Stage-Prep-URL oder die
+  // Kampagnen-Hub-Seite: In Production löste das einen RSC-Refresh der aktuellen Seite aus
+  // und führte zu „An error occurred in the Server Components render“ (Next 16).
   revalidatePath(`/session/${sessionId}`);
-  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  // Literaler Pfad (konkrete IDs): laut Next.js-Doku kein zweites Argument — "page" kann RSC-Refresh stören.
-  revalidatePath(
-    `/dashboard/campaigns/${session.campaign_id}/sessions/${sessionId}/stage-prep`,
-  );
   return { success: true, backgroundUrl: trimmed };
 }
 

@@ -131,7 +131,7 @@ export function StagePrepClient({
           bgUrl.trim() || null,
         );
         setBgUrl(result?.backgroundUrl ?? "");
-        router.refresh();
+        // Kein router.refresh(): vermeidet RSC-Neuaufbau dieser Route in Production (Digest-Fehler).
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Speichern.");
       }
