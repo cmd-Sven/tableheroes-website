@@ -3,6 +3,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
+import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
@@ -273,11 +274,8 @@ export async function startSession(sessionId: string) {
     }
   }
 
-  // 6. Revalidate
-  if ((session as any).campaign_id) {
-    revalidatePath(`/dashboard/campaigns/${(session as any).campaign_id}`);
-  }
-  revalidatePath(`/session/${sessionId}`);
+  // Kein revalidatePath hier: vermeidet RSC-/Digest-Fehler beim sofortigen
+  // router.push auf /session/...; die Zielseite lädt frisch, die Kampagne beim nächsten Besuch.
 
   return { success: true };
 }
@@ -334,7 +332,7 @@ export async function markSessionPlanningComplete(sessionId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/session/${sessionId}`);
+  // Kein revalidatePath(/session/…): vermeidet RSC-Digest, solange die Live-Oberfläche offen ist.
   return { success: true };
 }
 
@@ -398,7 +396,6 @@ export async function updateSessionStageDeck(
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/session/${sessionId}`);
   return { success: true };
 }
 
@@ -447,7 +444,7 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     .eq("session_id", sessionId)
     .maybeSingle();
 
-  if (existing) return existing as Record<string, unknown>;
+  if (existing) return serializeForClient(existing) as Record<string, unknown>;
 
   const { data: inserted, error: insertError } = await (supabase.from("session_live_states") as any)
     .insert({
@@ -469,10 +466,12 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
       .select("*")
       .eq("session_id", sessionId)
       .maybeSingle();
-    return (raceRow as Record<string, unknown>) ?? null;
+    const rr = raceRow as Record<string, unknown> | null;
+    return rr ? (serializeForClient(rr) as Record<string, unknown>) : null;
   }
 
-  return (inserted as Record<string, unknown>) ?? null;
+  const ins = inserted as Record<string, unknown> | null;
+  return ins ? (serializeForClient(ins) as Record<string, unknown>) : null;
 }
 
 // ============================================================================
@@ -562,11 +561,10 @@ export async function endSession(sessionId: string) {
     // Nicht kritisch für den Flow
   }
 
-  // 8. Revalidate
+  // Revalidate nur Kampagne; /session/ nicht invalidieren (Digest bei offener Oberfläche).
   if ((session as any).campaign_id) {
     revalidatePath(`/dashboard/campaigns/${(session as any).campaign_id}`);
   }
-  revalidatePath(`/session/${sessionId}`);
 
   return { success: true, campaignId: (session as any).campaign_id };
 }
@@ -632,7 +630,6 @@ export async function updateSession(
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/session/${sessionId}`);
   return { success: true };
 }
 
@@ -685,7 +682,6 @@ export async function deleteSession(sessionId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/session/${sessionId}`);
   return { success: true };
 }
 
@@ -764,6 +760,5 @@ export async function cancelSession(sessionId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
-  revalidatePath(`/session/${sessionId}`);
   return { success: true };
 }

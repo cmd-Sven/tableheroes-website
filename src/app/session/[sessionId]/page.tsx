@@ -8,6 +8,44 @@ import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
+import { serializeForClient } from "@/src/lib/serialize-for-flight";
+
+function normalizeQuestRelation(
+  v: unknown,
+): { id: string; name: string | null } | null {
+  if (v == null) return null;
+  if (Array.isArray(v)) {
+    return normalizeQuestRelation(v[0]);
+  }
+  if (typeof v === "object" && v !== null && "id" in v) {
+    const o = v as Record<string, unknown>;
+    return {
+      id: String(o.id),
+      name: o.name != null ? String(o.name) : null,
+    };
+  }
+  return null;
+}
+
+function normalizeActiveQuests(rows: unknown[]) {
+  return (rows || []).map((raw) => {
+    const q = raw as Record<string, unknown>;
+    return {
+      id: String(q.id),
+      title: String(q.title ?? ""),
+      description: q.description != null ? String(q.description) : null,
+      rewards:
+        typeof q.rewards === "string"
+          ? q.rewards
+          : q.rewards != null
+            ? JSON.stringify(q.rewards)
+            : null,
+      type: q.type != null ? String(q.type) : null,
+      quest_giver: normalizeQuestRelation(q.quest_giver),
+      location: normalizeQuestRelation(q.location),
+    };
+  });
+}
 
 type Props = {
   params: Promise<{ sessionId: string }>;
@@ -119,8 +157,24 @@ export default async function SessionPage({ params }: Props) {
 
   const partyCharacters =
     partyRows
-      ?.map((row: any) => row.characters)
-      .filter((c: any) => !!c) || [];
+      ?.map(
+        (row: { characters?: Record<string, unknown> | null }) => row.characters,
+      )
+      .filter(
+        (c: unknown): c is Record<string, unknown> =>
+          c != null && typeof c === "object",
+      )
+      .map((c: Record<string, unknown>) => ({
+        id: String(c.id),
+        name: String(c.name ?? ""),
+        class: c.class != null ? String(c.class) : null,
+        race: c.race != null ? String(c.race) : null,
+        level:
+          typeof c.level === "number" && Number.isFinite(c.level)
+            ? c.level
+            : null,
+        avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+      })) || [];
 
   // 5. Load campaign NPCs (Sichtbarkeit aus campaign_visibility)
   const npcsFromCampaign = await getNPCs(
@@ -130,11 +184,11 @@ export default async function SessionPage({ params }: Props) {
   );
   const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({
     id: String(npc.id),
-    name: npc.name,
-    title: npc.title ?? null,
-    description: npc.description ?? null,
-    image_url: npc.image_url ?? null,
-    is_revealed: npc.is_revealed ?? false,
+    name: String(npc.name ?? ""),
+    title: npc.title != null ? String(npc.title) : null,
+    description: npc.description != null ? String(npc.description) : null,
+    image_url: npc.image_url != null ? String(npc.image_url) : null,
+    is_revealed: !!npc.is_revealed,
   }));
 
   const factionsRaw = await getFactionsWithMembers((session as any).campaign_id);
@@ -213,6 +267,8 @@ export default async function SessionPage({ params }: Props) {
     .eq("status", "Active")
     .eq("is_revealed", true);
 
+  const normalizedQuests = normalizeActiveQuests(activeQuests ?? []);
+
   return (
     <LiveSessionBoard
       sessionId={sessionId}
@@ -220,14 +276,22 @@ export default async function SessionPage({ params }: Props) {
       sessionStatus={session.status}
       isGM={isGM}
       userId={user.id}
-      initialLiveState={liveState || null}
-      partyCharacters={partyCharacters}
-      allCampaignNpcs={allCampaignNpcs || []}
-      allCampaignFactions={allCampaignFactions}
-      stageDeckNpcIds={stageDeckNpcIds}
-      stageDeckFactionIds={stageDeckFactionIds}
-      activeQuests={activeQuests || []}
-      loreLocationOptions={loreLocationOptions}
+      initialLiveState={
+        liveState ? serializeForClient(liveState) : null
+      }
+      partyCharacters={serializeForClient(partyCharacters)}
+      allCampaignNpcs={serializeForClient(allCampaignNpcs || [])}
+      allCampaignFactions={serializeForClient(allCampaignFactions)}
+      stageDeckNpcIds={
+        stageDeckNpcIds != null ? serializeForClient(stageDeckNpcIds) : null
+      }
+      stageDeckFactionIds={
+        stageDeckFactionIds != null
+          ? serializeForClient(stageDeckFactionIds)
+          : null
+      }
+      activeQuests={serializeForClient(normalizedQuests)}
+      loreLocationOptions={serializeForClient(loreLocationOptions)}
       sessionLocationLoreReadable={sessionLocationLoreReadable}
     />
   );

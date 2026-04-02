@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { StagePrepClient } from "./StagePrepClient";
 
 type Props = {
@@ -117,10 +118,16 @@ export default async function SessionStagePrepPage({ params }: Props) {
       campaignId={campaignId}
       sessionTitle={session.title != null ? String(session.title) : null}
       sessionStatus={String(session.status ?? "")}
-      allCampaignNpcs={allCampaignNpcs}
-      allCampaignFactions={allCampaignFactions}
-      stageDeckNpcIds={stageDeckNpcIds}
-      stageDeckFactionIds={stageDeckFactionIds}
+      allCampaignNpcs={serializeForClient(allCampaignNpcs)}
+      allCampaignFactions={serializeForClient(allCampaignFactions)}
+      stageDeckNpcIds={
+        stageDeckNpcIds != null ? serializeForClient(stageDeckNpcIds) : null
+      }
+      stageDeckFactionIds={
+        stageDeckFactionIds != null
+          ? serializeForClient(stageDeckFactionIds)
+          : null
+      }
       initialBackgroundUrl={initialBackgroundUrl}
     />
   );
