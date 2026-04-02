@@ -483,9 +483,9 @@ export async function updateSessionBackgroundUrl(
 
   revalidatePath(`/session/${sessionId}`);
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  // Literaler Pfad (konkrete IDs): laut Next.js-Doku kein zweites Argument — "page" kann RSC-Refresh stören.
   revalidatePath(
     `/dashboard/campaigns/${session.campaign_id}/sessions/${sessionId}/stage-prep`,
-    "page",
   );
   return { success: true, backgroundUrl: trimmed };
 }

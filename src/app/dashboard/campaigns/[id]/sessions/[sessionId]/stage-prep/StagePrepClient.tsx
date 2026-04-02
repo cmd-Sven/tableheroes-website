@@ -79,6 +79,10 @@ export function StagePrepClient({
   const [facSearch, setFacSearch] = useState("");
 
   useEffect(() => {
+    setBgUrl(initialBackgroundUrl || "");
+  }, [initialBackgroundUrl]);
+
+  useEffect(() => {
     setNpcDeckAll(stageDeckNpcIds == null);
     setFactionDeckAll(stageDeckFactionIds == null);
     setNpcDeckPick(
@@ -126,10 +130,8 @@ export function StagePrepClient({
           sessionId,
           bgUrl.trim() || null,
         );
-        if (result?.backgroundUrl != null) {
-          setBgUrl(result.backgroundUrl);
-        }
-        // Kein router.refresh(): vermeidet teures RSC-Reload; Revalidate läuft in der Action.
+        setBgUrl(result?.backgroundUrl ?? "");
+        router.refresh();
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Speichern.");
       }
