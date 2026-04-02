@@ -9,7 +9,6 @@ import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries"
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
-import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -135,22 +134,9 @@ export default async function SessionPage({ params }: Props) {
     }
   }
 
-  // 4. Party: Mitglieder mit Charakter (Accepted/Approved/Active); Live = nur „dabei“ laut RSVP
-  const { data: rsvpRows } = await (supabase.from("session_rsvps") as any)
-    .select("user_id, rsvp_status, gm_confirmed")
-    .eq("session_id", sessionId);
-
-  const readyUserIds =
-    (rsvpRows as { user_id: string; rsvp_status?: string | null; gm_confirmed?: boolean }[] | null)
-      ?.filter((r) =>
-        isPlayerReadyForSessionStart({
-          rsvp_status: r.rsvp_status,
-          gm_confirmed: r.gm_confirmed,
-        }),
-      )
-      .map((r) => String(r.user_id)) ?? [];
-
-  let partyQuery = (supabase.from("campaign_members") as any)
+  // 4. Party: alle Kampagnenmitglieder mit Charakter (RSVP-Filter entfernt — sonst leerer Tray
+  // bei abweichenden user_id/RSVP-Daten; RSVP bleibt nur Start-Gate in session-actions).
+  const { data: partyRows } = await (supabase.from("campaign_members") as any)
     .select(
       `
         id,
@@ -170,12 +156,6 @@ export default async function SessionPage({ params }: Props) {
     .eq("campaign_id", (session as any).campaign_id)
     .in("status", ["Accepted", "Approved", "Active"])
     .not("character_id", "is", null);
-
-  if (session.status === "Live" && readyUserIds.length > 0) {
-    partyQuery = partyQuery.in("user_id", readyUserIds);
-  }
-
-  const { data: partyRows } = await partyQuery;
 
   const partyCharacters =
     partyRows

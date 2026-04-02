@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabaseClient";
@@ -146,6 +153,51 @@ export function LiveSessionBoard({
 }: Props) {
   const router = useRouter();
   const [liveState, setLiveState] = useState<LiveState | null>(initialLiveState);
+  const liveStateRef = useRef<LiveState | null>(initialLiveState);
+
+  useEffect(() => {
+    liveStateRef.current = liveState;
+  }, [liveState]);
+
+  const resolveLiveStateBase = useCallback(async (): Promise<LiveState | null> => {
+    if (liveStateRef.current) return liveStateRef.current;
+
+    const { data, error } = await supabase
+      .from("session_live_states")
+      .select("*")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[LiveSessionBoard] session_live_states:", error.message);
+    }
+
+    if (data) {
+      const next = normalizeLiveRow(data);
+      liveStateRef.current = next;
+      setLiveState(next);
+      setBackgroundUrl(next.background_url || null);
+      return next;
+    }
+
+    if (isGM) {
+      try {
+        const row = await ensureSessionPrepLiveState(sessionId);
+        if (row) {
+          const next = normalizeLiveRow(row);
+          liveStateRef.current = next;
+          setLiveState(next);
+          setBackgroundUrl(next.background_url || null);
+          return next;
+        }
+      } catch (e) {
+        console.error("[resolveLiveStateBase] ensureSessionPrepLiveState", e);
+      }
+    }
+
+    return null;
+  }, [sessionId, isGM]);
+
   const [isUpdating, startTransition] = useTransition();
   const [isStageManagerOpen, setIsStageManagerOpen] = useState(false);
   const [stageSearch, setStageSearch] = useState("");
@@ -185,45 +237,11 @@ export function LiveSessionBoard({
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
 
-  // Live-State nachladen: SSR kann Zeile fehlen (RLS); Spieler hatten keinen Client-Fetch.
+  // SSR ohne Zeile: sofort Client + ggf. GM-Anlage (ref-synchron für Klicks vor Re-Render)
   useEffect(() => {
-    if (liveState) return;
-
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from("session_live_states")
-        .select("*")
-        .eq("session_id", sessionId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (error) {
-        console.error("[LiveSessionBoard] session_live_states:", error.message);
-      }
-
-      if (data) {
-        const next = normalizeLiveRow(data);
-        setLiveState(next);
-        setBackgroundUrl(next.background_url || null);
-        return;
-      }
-
-      if (isGM) {
-        const row = await ensureSessionPrepLiveState(sessionId);
-        if (!cancelled && row) {
-          const next = normalizeLiveRow(row);
-          setLiveState(next);
-          setBackgroundUrl(next.background_url || null);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, isGM, liveState]);
+    if (initialLiveState != null) return;
+    void resolveLiveStateBase();
+  }, [sessionId, initialLiveState, resolveLiveStateBase]);
 
   // ---------------------------------------------------------------------------
   // Realtime Subscription
@@ -243,6 +261,7 @@ export function LiveSessionBoard({
           // We gehen davon aus, dass payload.new den aktuellen Zustand enthält
           if (payload.new) {
             const next = normalizeLiveRow(payload.new);
+            liveStateRef.current = next;
             setLiveState(next);
             setBackgroundUrl(next.background_url || null);
           }
@@ -258,13 +277,21 @@ export function LiveSessionBoard({
   // ---------------------------------------------------------------------------
   // Helper: Update Live State (environment / journal)
   // ---------------------------------------------------------------------------
-  /** `baseOverride`: z. B. direkt nach ensureSessionPrepLiveState, wenn React liveState noch null hat */
+  /** `baseOverride`: z. B. direkt nach resolveLiveStateBase, wenn React-State noch nachzieht */
   function updateLiveState(patch: Partial<LiveState>, baseOverride?: LiveState) {
-    const base = baseOverride ?? liveState;
-    if (!base) return;
-
     startTransition(async () => {
       try {
+        let base = baseOverride ?? liveStateRef.current;
+        if (!base) {
+          base = await resolveLiveStateBase();
+        }
+        if (!base) {
+          alert(
+            "Session-Zustand konnte nicht geladen werden. Bitte Seite neu laden. In Supabase: Migration session_live_states (Spalten + Realtime) ausführen.",
+          );
+          return;
+        }
+
         const { error } = await (supabase.from("session_live_states") as any)
           .update(patch)
           .eq("session_id", sessionId);
@@ -276,8 +303,9 @@ export function LiveSessionBoard({
         }
 
         setLiveState((prev) => {
-          const mergeFrom = prev ?? base;
+          const mergeFrom = prev ?? base!;
           const next = { ...mergeFrom, ...patch };
+          liveStateRef.current = next;
           if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
             setBackgroundUrl(next.background_url || null);
           }
@@ -365,21 +393,11 @@ export function LiveSessionBoard({
 
   function placeOnStage(kind: "npc" | "faction", id: string) {
     void (async () => {
-      let base: LiveState | null = liveState;
-      if (!base && isGM) {
-        try {
-          const row = await ensureSessionPrepLiveState(sessionId);
-          if (row) {
-            base = normalizeLiveRow(row);
-            setLiveState(base);
-            setBackgroundUrl(base.background_url || null);
-          }
-        } catch (e) {
-          console.error("[placeOnStage] ensureSessionPrepLiveState", e);
-        }
-      }
+      const base = await resolveLiveStateBase();
       if (!base) {
-        alert("Session-Zustand wird noch geladen – bitte kurz warten.");
+        alert(
+          "Session-Zustand wird noch geladen – bitte kurz warten oder Seite neu laden.",
+        );
         return;
       }
       const sid = String(id);

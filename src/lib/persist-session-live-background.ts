@@ -73,15 +73,11 @@ export async function persistSessionLiveBackground(
       return { ok: false, message: upErr.message || "Speichern fehlgeschlagen.", status: 500 };
     }
   } else {
+    // Minimaler Insert: vermeidet PostgREST-Fehler, wenn optionale Spalten in der DB fehlen
+    // (Schema-Cache). Weitere Spalten setzen Migration / ensureSessionPrepLiveState.
     const { error: insErr } = await supabase.from("session_live_states").insert({
       session_id: sessionId,
       background_url: trimmed,
-      weather: null,
-      current_time: null,
-      current_location: null,
-      journal_text: null,
-      visible_npc_ids: [],
-      visible_faction_ids: [],
       scribe_id: userId,
     });
     if (insErr) {
