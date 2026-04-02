@@ -47,6 +47,17 @@ type LiveState = {
   background_url?: string | null;
 };
 
+function normalizeLiveRow(row: unknown): LiveState {
+  const r = row as Record<string, unknown>;
+  const npcRaw = r.visible_npc_ids;
+  const facRaw = r.visible_faction_ids;
+  return {
+    ...(r as unknown as LiveState),
+    visible_npc_ids: Array.isArray(npcRaw) ? npcRaw.map(String) : [],
+    visible_faction_ids: Array.isArray(facRaw) ? facRaw.map(String) : [],
+  };
+}
+
 type PartyCharacter = {
   id: string;
   name: string;
@@ -174,21 +185,45 @@ export function LiveSessionBoard({
   const canEditJournal =
     isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId);
 
-  // Fallback: Live-State-Zeile nachziehen (Scheduled + Live; z. B. RLS/SSR ohne Zeile)
+  // Live-State nachladen: SSR kann Zeile fehlen (RLS); Spieler hatten keinen Client-Fetch.
   useEffect(() => {
-    if (!isGM || liveState) return;
+    if (liveState) return;
+
     let cancelled = false;
     (async () => {
-      const row = await ensureSessionPrepLiveState(sessionId);
-      if (!cancelled && row) {
-        setLiveState(row as LiveState);
-        setBackgroundUrl((row as LiveState).background_url || null);
+      const { data, error } = await supabase
+        .from("session_live_states")
+        .select("*")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("[LiveSessionBoard] session_live_states:", error.message);
+      }
+
+      if (data) {
+        const next = normalizeLiveRow(data);
+        setLiveState(next);
+        setBackgroundUrl(next.background_url || null);
+        return;
+      }
+
+      if (isGM) {
+        const row = await ensureSessionPrepLiveState(sessionId);
+        if (!cancelled && row) {
+          const next = normalizeLiveRow(row);
+          setLiveState(next);
+          setBackgroundUrl(next.background_url || null);
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isGM, sessionId, liveState]);
+  }, [sessionId, isGM, liveState]);
 
   // ---------------------------------------------------------------------------
   // Realtime Subscription
@@ -207,9 +242,9 @@ export function LiveSessionBoard({
         (payload) => {
           // We gehen davon aus, dass payload.new den aktuellen Zustand enthält
           if (payload.new) {
-          const next = payload.new as LiveState;
-          setLiveState(next);
-          setBackgroundUrl(next.background_url || null);
+            const next = normalizeLiveRow(payload.new);
+            setLiveState(next);
+            setBackgroundUrl(next.background_url || null);
           }
         },
       )
@@ -335,7 +370,7 @@ export function LiveSessionBoard({
         try {
           const row = await ensureSessionPrepLiveState(sessionId);
           if (row) {
-            base = row as LiveState;
+            base = normalizeLiveRow(row);
             setLiveState(base);
             setBackgroundUrl(base.background_url || null);
           }
