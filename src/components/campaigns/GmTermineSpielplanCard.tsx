@@ -13,17 +13,21 @@ import {
   Rocket,
   ClipboardList,
   Sparkles,
+  UserCheck,
 } from "lucide-react";
 import {
   startSession,
   markSessionPlanningComplete,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { setGmConfirmed } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 
 export type GmTerminePlayerRsvp = {
   userId: string;
   username: string;
-  status: "zusage" | "via_online" | "absage" | "offen";
+  status: "zusage" | "via_online" | "absage" | "offen" | "gm_override";
   label: string;
+  /** GM kann Spieler ohne Zusage (oder nach Absage) für den Start freigeben */
+  canGmManuallyConfirm?: boolean;
 };
 
 export type GmTermineNextSession = {
@@ -79,6 +83,8 @@ function RsvpIcon({ status }: { status: GmTerminePlayerRsvp["status"] }) {
     case "zusage":
     case "via_online":
       return <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />;
+    case "gm_override":
+      return <UserCheck className="h-4 w-4 shrink-0 text-accent-gold" />;
     case "absage":
       return <XCircle className="h-4 w-4 shrink-0 text-red-400" />;
     default:
@@ -118,6 +124,18 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
           err instanceof Error ? err.message : "Planung konnte nicht gespeichert werden.",
         );
       }
+    });
+  };
+
+  const handleGmConfirmPlayer = (sessionId: string, playerUserId: string) => {
+    if (isPending) return;
+    startTransition(async () => {
+      const res = await setGmConfirmed(sessionId, playerUserId, true);
+      if (!res.success) {
+        alert(res.error ?? "Bestätigung fehlgeschlagen.");
+        return;
+      }
+      router.refresh();
     });
   };
 
@@ -210,14 +228,16 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
           ) : nextSession.status === "Scheduled" ? (
             <div className="flex flex-col items-stretch sm:items-end gap-2">
               <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
-                Noch {nextSession.pendingCount}{" "}
-                {nextSession.pendingCount === 1 ? "Rückmeldung" : "Rückmeldungen"} offen
+                {nextSession.pendingCount === 1
+                  ? "Es fehlt noch 1 Spieler"
+                  : `Es fehlen noch ${nextSession.pendingCount} Spieler`}{" "}
+                (Zusage oder deine Freigabe unten)
               </span>
               <button
                 type="button"
                 disabled
                 className="inline-flex items-center justify-center gap-2 rounded border border-gray-600 bg-gray-800/50 px-5 py-2.5 font-barlow font-bold uppercase text-xs text-gray-500 cursor-not-allowed"
-                title="Alle Spieler müssen zuerst zu- oder absagen."
+                title="Alle Spieler müssen zugesagt haben oder du markierst sie in der Liste als dabei."
               >
                 Session starten
               </button>
@@ -291,10 +311,10 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                 {players.map((p) => (
                   <li
                     key={p.userId}
-                    className="flex items-center gap-2 rounded border border-hero-border/25 bg-hero-dark/20 px-3 py-2"
+                    className="flex flex-wrap items-center gap-2 rounded border border-hero-border/25 bg-hero-dark/20 px-3 py-2"
                   >
                     <RsvpIcon status={p.status} />
-                    <span className="font-barlow text-sm text-white truncate flex-1">
+                    <span className="font-barlow text-sm text-white truncate min-w-0 flex-1 basis-[40%]">
                       {p.username}
                     </span>
                     <span
@@ -304,6 +324,18 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                     >
                       {p.label}
                     </span>
+                    {p.canGmManuallyConfirm &&
+                    nextSession?.status === "Scheduled" &&
+                    nextSession?.id ? (
+                      <button
+                        type="button"
+                        onClick={() => handleGmConfirmPlayer(nextSession.id, p.userId)}
+                        disabled={isPending}
+                        className="ml-auto shrink-0 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+                      >
+                        Als dabei markieren
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>

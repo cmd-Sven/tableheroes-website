@@ -1,21 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, MapPin, PawPrint } from "lucide-react";
-
-const PLACEHOLDER = "/images/dark-marmor.jpg";
-
-export function resolveBestariumImageUrl(url: string | null | undefined): string {
-  if (!url?.trim()) return PLACEHOLDER;
-  const t = url.trim();
-  if (t.startsWith("http://") || t.startsWith("https://") || t.startsWith("/")) {
-    return t;
-  }
-  return `/images/news/${t}`;
-}
+import {
+  BESTARIUM_PLACEHOLDER_IMAGE,
+  resolveBestariumImageUrl,
+} from "@/src/lib/bestarium-image";
 
 export type BestariumCardCreature = {
   id: string;
@@ -49,7 +41,9 @@ export function BestariumGridCard({
   onToggleReveal,
 }: Props) {
   const [imgBroken, setImgBroken] = useState(false);
-  const imgSrc = imgBroken ? PLACEHOLDER : resolveBestariumImageUrl(creature.image_url);
+  const imgSrc = imgBroken
+    ? BESTARIUM_PLACEHOLDER_IMAGE
+    : resolveBestariumImageUrl(creature.image_url);
   const gattung = gattungLine(creature);
   const revealed = creature.is_revealed !== false;
 
@@ -92,12 +86,14 @@ export function BestariumGridCard({
 
       <Link href={detailHref} className="flex min-h-0 flex-1 flex-col text-left">
         <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden border-b border-gray-400/30 bg-hero-dark/40">
-          <Image
+          {/* natives img: zuverlässig für Supabase-URLs, /public und Next/Image-Optimizer-Umgehung */}
+          <img
             src={imgSrc}
             alt=""
-            fill
-            className="object-cover object-top"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="absolute inset-0 h-full w-full object-cover object-top"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
             onError={() => setImgBroken(true)}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/65 to-transparent" />

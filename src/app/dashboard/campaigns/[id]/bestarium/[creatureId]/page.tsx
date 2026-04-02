@@ -5,6 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { getBestariumPlayerDetail } from "../../bestarium-queries";
 import { getBestariumCreatureById } from "@/src/app/dashboard/worlds/world-bestarium-actions";
+import { resolveBestariumImageUrl } from "@/src/lib/bestarium-image";
 
 type Props = { params: Promise<{ id: string; creatureId: string }> };
 
@@ -61,20 +62,16 @@ export default async function CampaignBestariumCreaturePage({ params }: Props) {
 
       <article className="rounded-lg border border-hero-dark bg-background-card p-6 sm:p-8 shadow-lg space-y-6">
         <header className="border-b border-hero-border pb-4">
-          {safe.image_url && (
-            <div className="relative w-full max-h-64 aspect-video mb-4 rounded border border-hero-border overflow-hidden bg-hero-dark/40">
-              <Image
-                src={safe.image_url}
-                alt=""
-                fill
-                className="object-cover object-top"
-                sizes="(max-width: 768px) 100vw, 42rem"
-                unoptimized={
-                  safe.image_url.startsWith("http://") || safe.image_url.startsWith("https://")
-                }
-              />
-            </div>
-          )}
+          <div className="relative w-full max-h-64 aspect-video mb-4 rounded border border-hero-border overflow-hidden bg-hero-dark/40">
+            <Image
+              src={resolveBestariumImageUrl(safe.image_url)}
+              alt=""
+              fill
+              className="object-cover object-top"
+              sizes="(max-width: 768px) 100vw, 42rem"
+              unoptimized
+            />
+          </div>
           <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant">
             {safe.name}
           </h1>

@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { sendMessage } from "@/src/lib/actions/message-actions";
+import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
 /**
  * Server Action: Create Session with Scenes
@@ -187,23 +188,41 @@ export async function startSession(sessionId: string) {
     throw new Error("Nur der GM kann eine Session starten.");
   }
 
-  // 3b. Prüfen: Alle Spieler müssen sich bestätigt haben (RSVP abgegeben)
+  const gmId = campaign.gm_id;
+
+  // 3b. Jeder Spieler (ohne GM) muss „dabei“ sein: Zusage / Via Online ODER vom GM manuell bestätigt (gm_confirmed).
   const { data: members } = await (supabase.from("campaign_members") as any)
     .select("user_id")
     .eq("campaign_id", session.campaign_id)
-    .eq("status", "Accepted");
+    .in("status", ["Accepted", "Approved"]);
 
   const { data: rsvps } = await (supabase.from("session_rsvps") as any)
-    .select("user_id")
+    .select("user_id, rsvp_status, gm_confirmed")
     .eq("session_id", sessionId);
 
-  const memberIds = new Set(((members as any[]) || []).map((m: any) => m.user_id));
-  const rsvpUserIds = new Set(((rsvps as any[]) || []).map((r: any) => r.user_id));
+  const playerUserIds = ((members as any[]) || [])
+    .map((m: any) => m.user_id as string)
+    .filter((uid: string) => uid && uid !== gmId);
 
-  const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+  const rsvpByUser = new Map<
+    string,
+    { rsvp_status: string | null; gm_confirmed: boolean }
+  >();
+  for (const r of (rsvps as any[]) || []) {
+    rsvpByUser.set(String(r.user_id), {
+      rsvp_status: r.rsvp_status != null ? String(r.rsvp_status) : null,
+      gm_confirmed: !!r.gm_confirmed,
+    });
+  }
+
+  const notReady = playerUserIds.filter(
+    (uid) => !isPlayerReadyForSessionStart(rsvpByUser.get(uid)),
+  );
+
+  const pendingCount = notReady.length;
   if (pendingCount > 0) {
     throw new Error(
-      `Die Session kann erst starten, wenn alle Spieler ihre Teilnahme bestätigt haben. Noch ${pendingCount} Spieler ohne Rückmeldung.`
+      `Die Session kann erst starten, wenn alle Spieler zugesagt haben oder du sie manuell bestätigt hast. Noch ${pendingCount} Spieler nicht „dabei“.`
     );
   }
 

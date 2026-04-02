@@ -12,6 +12,7 @@ import type {
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
 import { setSessionRsvp, setGmConfirmed, updateSessionRsvpSettings } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
 
 type Props = {
   sessions: UpcomingSession[];
@@ -366,12 +367,14 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
     minute: "2-digit",
   }).format(startDate);
 
-  const playingRsvps = session.rsvps.filter(
-    (r) => r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online"
-  );
-  const allConfirmed =
-    playingRsvps.length > 0 &&
-    playingRsvps.every((r) => r.gmConfirmed);
+  const allReadyForSessionStart =
+    session.rsvps.length > 0 &&
+    session.rsvps.every((r) =>
+      isPlayerReadyForSessionStart({
+        rsvp_status: r.rsvpStatus,
+        gm_confirmed: r.gmConfirmed,
+      }),
+    );
 
   const handleGmConfirm = (userId: string, confirmed: boolean) => {
     startTransition(async () => {
@@ -454,19 +457,22 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
                     }`}>
                       {r.rsvpStatus ?? "—"}
                     </span>
-                    {(r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online") && (
+                    {!isPlayerReadyForSessionStart({
+                      rsvp_status: r.rsvpStatus,
+                      gm_confirmed: r.gmConfirmed,
+                    }) ? (
                       <button
                         type="button"
-                        onClick={() => handleGmConfirm(r.userId, !r.gmConfirmed)}
+                        onClick={() => handleGmConfirm(r.userId, true)}
                         disabled={isPending}
-                        className={`rounded px-2 py-0.5 font-barlow font-bold text-[10px] uppercase ${
-                          r.gmConfirmed
-                            ? "bg-hero-vibrant/30 text-hero-vibrant"
-                            : "bg-amber-900/40 text-amber-400 hover:bg-amber-800/50"
-                        }`}
+                        className="rounded bg-amber-900/40 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-amber-400 hover:bg-amber-800/50"
                       >
-                        {r.gmConfirmed ? "✓" : "Bestätigen"}
+                        Als dabei markieren
                       </button>
+                    ) : (
+                      <span className="rounded bg-hero-vibrant/20 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-hero-vibrant">
+                        ✓ Start OK
+                      </span>
                     )}
                   </div>
                 </div>
@@ -474,11 +480,11 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
             </div>
 
             {/* Alle bereit */}
-            {allConfirmed && session.rsvps.some((r) => r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online") && (
+            {allReadyForSessionStart && (
               <div className="mt-3 flex items-center gap-2 rounded bg-hero-vibrant/20 border border-hero-vibrant/50 px-3 py-2">
                 <CheckCircle className="h-5 w-5 text-hero-vibrant shrink-0" />
                 <span className="font-barlow font-bold text-sm text-hero-vibrant uppercase">
-                  Alle Spieler sind bereit, plane jetzt den Spielabend.
+                  Alle Spieler sind für den Start markiert (Zusage oder deine Freigabe).
                 </span>
               </div>
             )}

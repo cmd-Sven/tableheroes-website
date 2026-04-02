@@ -32,6 +32,7 @@ import { FactionsManagement } from "./FactionsManagement";
 import { LoreManagement } from "./LoreManagement";
 import { QuestLogManagement } from "./QuestLogManagement";
 import { SessionsTab } from "./SessionsTab";
+import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 import { CharacterCreatorButton } from "./CharacterCreatorButton";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
 import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
@@ -240,6 +241,7 @@ export default async function CampaignDetailPage({
     session_id: string;
     user_id: string;
     rsvp_status: string;
+    gm_confirmed: boolean;
   }[] = [];
 
   // Fetch Sessions
@@ -286,23 +288,23 @@ export default async function CampaignDetailPage({
           .eq("campaign_id", id)
           .in("status", ["Accepted", "Approved"]),
         (supabase.from("session_rsvps") as any)
-          .select("session_id, user_id, rsvp_status")
+          .select("session_id, user_id, rsvp_status, gm_confirmed")
           .in("session_id", scheduledIds),
       ]);
       const memberIds = new Set(
-        ((membersRes.data as any[]) || []).map((m: any) => m.user_id)
+        ((membersRes.data as any[]) || []).map((m: any) => m.user_id),
       );
-      const rsvpsBySession = new Map<string, Set<string>>();
       const acceptedRsvpsBySession = new Map<string, boolean>();
       gmSessionRsvpRows = ((rsvpsRes.data as any[]) || []).map((r: any) => ({
         session_id: String(r.session_id),
         user_id: String(r.user_id),
         rsvp_status: String(r.rsvp_status ?? ""),
+        gm_confirmed: !!r.gm_confirmed,
       }));
+      const rowsBySession = new Map<string, typeof gmSessionRsvpRows>();
       for (const r of gmSessionRsvpRows) {
-        if (!rsvpsBySession.has(r.session_id))
-          rsvpsBySession.set(r.session_id, new Set());
-        rsvpsBySession.get(r.session_id)!.add(r.user_id);
+        if (!rowsBySession.has(r.session_id)) rowsBySession.set(r.session_id, []);
+        rowsBySession.get(r.session_id)!.push(r);
         if (r.rsvp_status === "Zusage" || r.rsvp_status === "Via Online") {
           acceptedRsvpsBySession.set(r.session_id, true);
         }
@@ -310,11 +312,17 @@ export default async function CampaignDetailPage({
       upcomingSessionsWithRsvp = upcomingSessions.map((s: any) => {
         if (s.status !== "Scheduled")
           return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
-        const rsvpUserIds = rsvpsBySession.get(s.id) ?? new Set();
-        const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+        const sessionRows = rowsBySession.get(s.id) ?? [];
+        const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
+        const playerIds = [...memberIds].filter((uid) => uid !== user.id);
+        const pendingCount = playerIds.filter(
+          (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
+        ).length;
         return {
           ...s,
-          canStart: pendingCount === 0 && (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
+          canStart:
+            pendingCount === 0 &&
+            (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
           pendingCount,
           hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
         };
@@ -600,34 +608,60 @@ export default async function CampaignDetailPage({
 
     if (featured) {
       const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
-      const byUser = new Map(rows.map((r) => [r.user_id, r.rsvp_status]));
+      const byUser = new Map(rows.map((r) => [r.user_id, r]));
+      const allowGmConfirm = featured.status === "Scheduled";
 
       const players: GmTerminePayload["players"] = acceptedMembers
         .filter((m: any) => m.user_id && m.user_id !== user.id)
         .map((m: any) => {
-          const st = byUser.get(m.user_id);
-          if (st === "Zusage") {
+          const row = byUser.get(m.user_id);
+          const ready = isPlayerReadyForSessionStart(row);
+          const st = row?.rsvp_status;
+
+          if (ready) {
+            if (st === "Zusage") {
+              return {
+                userId: m.user_id,
+                username: String(m.user?.username ?? "Spieler"),
+                status: "zusage" as const,
+                label: "Termin angenommen",
+                canGmManuallyConfirm: false,
+              };
+            }
+            if (st === "Via Online") {
+              return {
+                userId: m.user_id,
+                username: String(m.user?.username ?? "Spieler"),
+                status: "via_online" as const,
+                label: "Online dabei",
+                canGmManuallyConfirm: false,
+              };
+            }
+            if (st === "Absage" && row?.gm_confirmed) {
+              return {
+                userId: m.user_id,
+                username: String(m.user?.username ?? "Spieler"),
+                status: "gm_override" as const,
+                label: "Abgesagt · vom GM für Start freigegeben",
+                canGmManuallyConfirm: false,
+              };
+            }
             return {
               userId: m.user_id,
               username: String(m.user?.username ?? "Spieler"),
               status: "zusage" as const,
-              label: "Termin angenommen",
+              label: "Vom GM als dabei markiert",
+              canGmManuallyConfirm: false,
             };
           }
-          if (st === "Via Online") {
-            return {
-              userId: m.user_id,
-              username: String(m.user?.username ?? "Spieler"),
-              status: "via_online" as const,
-              label: "Online dabei",
-            };
-          }
+
           if (st === "Absage") {
             return {
               userId: m.user_id,
               username: String(m.user?.username ?? "Spieler"),
               status: "absage" as const,
               label: "Abgesagt",
+              canGmManuallyConfirm: allowGmConfirm,
             };
           }
           return {
@@ -635,6 +669,7 @@ export default async function CampaignDetailPage({
             username: String(m.user?.username ?? "Spieler"),
             status: "offen" as const,
             label: "Noch keine Rückmeldung",
+            canGmManuallyConfirm: allowGmConfirm,
           };
         });
 
@@ -870,6 +905,8 @@ export default async function CampaignDetailPage({
       is_live?: boolean;
     };
     userRsvp: RsvpStatus | null;
+    /** Zusage / Via Online oder GM-Freigabe – für Badge „Next session: confirmed“ */
+    isAttendingNextSession: boolean;
     deadlineReached: boolean;
     viaOnlineTaken: boolean;
     /** Ende des RSVP-Tages (23:59:59), ISO – für Countdown-Banner */
@@ -879,15 +916,28 @@ export default async function CampaignDetailPage({
   if (!isGM && hasAccess && user && upcomingSessions.length > 0) {
     const s = upcomingSessions[0] as any;
     const { data: rsvpRowsRaw } = await (supabase.from("session_rsvps") as any)
-      .select("user_id, rsvp_status")
+      .select("user_id, rsvp_status, gm_confirmed")
       .eq("session_id", s.id);
-    const rsvpRows = (rsvpRowsRaw as { user_id: string; rsvp_status: string }[]) || [];
+    const rsvpRows =
+      (rsvpRowsRaw as {
+        user_id: string;
+        rsvp_status: string;
+        gm_confirmed?: boolean;
+      }[]) || [];
     const mine = rsvpRows.find((r) => r.user_id === user.id);
     const raw = mine?.rsvp_status;
     let userRsvp: RsvpStatus | null = null;
     if (raw === "Zusage" || raw === "Via Online" || raw === "Absage") {
       userRsvp = raw;
     }
+    const isAttendingNextSession = isPlayerReadyForSessionStart(
+      mine
+        ? {
+            rsvp_status: mine.rsvp_status,
+            gm_confirmed: !!mine.gm_confirmed,
+          }
+        : null,
+    );
     const deadlineDays = s.rsvp_deadline_days ?? null;
     const startDate = new Date(String(s.start_time));
     let deadline: Date | null = null;
@@ -909,6 +959,7 @@ export default async function CampaignDetailPage({
         is_live: s.is_live,
       },
       userRsvp,
+      isAttendingNextSession,
       deadlineReached,
       viaOnlineTaken,
       rsvpDeadlineEndIso: deadline ? deadline.toISOString() : null,
@@ -1668,6 +1719,8 @@ export default async function CampaignDetailPage({
             character={myCharacterForClient as any}
             factionReputations={characterReputations}
             lastAchievement={lastPlayerAchievement}
+            nextSessionConfirmed={playerNextSessionData?.isAttendingNextSession ?? false}
+            availableLanguages={wizardLanguages}
           />
           <Link
             href={`/dashboard/campaigns/${id}?tab=character`}

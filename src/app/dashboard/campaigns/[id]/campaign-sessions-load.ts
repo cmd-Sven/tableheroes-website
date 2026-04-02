@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
 export type SessionTabRow = Record<string, unknown> & {
   id: string;
@@ -37,24 +38,41 @@ export async function loadUpcomingSessionsWithRsvpForGm(
     .filter((s) => s.status === "Scheduled")
     .map((s) => s.id);
   if (scheduledIds.length > 0) {
+    const { data: campRow } = await (supabase.from("campaigns") as any)
+      .select("gm_id")
+      .eq("id", campaignId)
+      .maybeSingle();
+    const gmId = String((campRow as { gm_id?: string } | null)?.gm_id ?? "");
+
     const [membersRes, rsvpsRes] = await Promise.all([
       (supabase.from("campaign_members") as any)
         .select("user_id")
         .eq("campaign_id", campaignId)
         .in("status", ["Accepted", "Approved"]),
       (supabase.from("session_rsvps") as any)
-        .select("session_id, user_id, rsvp_status")
+        .select("session_id, user_id, rsvp_status, gm_confirmed")
         .in("session_id", scheduledIds),
     ]);
     const memberIds = new Set(
       ((membersRes.data as any[]) || []).map((m: any) => m.user_id),
     );
-    const rsvpsBySession = new Map<string, Set<string>>();
     const acceptedRsvpsBySession = new Map<string, boolean>();
-    for (const r of (rsvpsRes.data as any[]) || []) {
-      if (!rsvpsBySession.has(r.session_id))
-        rsvpsBySession.set(r.session_id, new Set());
-      rsvpsBySession.get(r.session_id)!.add(r.user_id);
+    type RsvpRow = {
+      session_id: string;
+      user_id: string;
+      rsvp_status: string;
+      gm_confirmed: boolean;
+    };
+    const normalized: RsvpRow[] = ((rsvpsRes.data as any[]) || []).map((r: any) => ({
+      session_id: String(r.session_id),
+      user_id: String(r.user_id),
+      rsvp_status: String(r.rsvp_status ?? ""),
+      gm_confirmed: !!r.gm_confirmed,
+    }));
+    const rowsBySession = new Map<string, RsvpRow[]>();
+    for (const r of normalized) {
+      if (!rowsBySession.has(r.session_id)) rowsBySession.set(r.session_id, []);
+      rowsBySession.get(r.session_id)!.push(r);
       if (r.rsvp_status === "Zusage" || r.rsvp_status === "Via Online") {
         acceptedRsvpsBySession.set(r.session_id, true);
       }
@@ -63,8 +81,12 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       if (s.status !== "Scheduled") {
         return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
       }
-      const rsvpUserIds = rsvpsBySession.get(s.id) ?? new Set();
-      const pendingCount = [...memberIds].filter((uid) => !rsvpUserIds.has(uid)).length;
+      const sessionRows = rowsBySession.get(s.id) ?? [];
+      const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
+      const playerIds = [...memberIds].filter((uid) => uid !== gmId);
+      const pendingCount = playerIds.filter(
+        (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
+      ).length;
       const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,

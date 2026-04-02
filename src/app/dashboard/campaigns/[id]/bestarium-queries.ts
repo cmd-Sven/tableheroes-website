@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import type { BestariumCreatureRow } from "@/src/app/dashboard/worlds/world-bestarium-actions";
+import { pickRpcString } from "@/src/lib/bestarium-image";
 
 export type CampaignBestariumCreature = BestariumCreatureRow & {
   is_revealed: boolean;
@@ -50,13 +51,13 @@ export async function getBestariumCreaturesForCampaign(campaignId: string, isGM:
       console.error("[getBestariumCreaturesForCampaign] rpc list", error);
       return { gm: [], player: [] };
     }
-    const rows = ((data || []) as any[]).map((row) => ({
-      id: String(row.id),
-      name: String(row.name ?? ""),
-      sort_order: Number(row.sort_order) || 0,
-      image_url: row.image_url ?? null,
-      creature_type: row.creature_type ?? null,
-      location_name: row.location_name ?? null,
+    const rows = ((data || []) as Record<string, unknown>[]).map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(pickRpcString(row, ["name", "Name"]) ?? ""),
+      sort_order: Number(row.sort_order ?? row.Sort_order ?? 0) || 0,
+      image_url: pickRpcString(row, ["image_url", "imageUrl", "IMAGE_URL"]),
+      creature_type: pickRpcString(row, ["creature_type", "creatureType", "CREATURE_TYPE"]),
+      location_name: pickRpcString(row, ["location_name", "locationName", "LOCATION_NAME"]),
     })) as BestariumPlayerListRow[];
     return { gm: [], player: rows };
   }
@@ -112,13 +113,14 @@ export async function getBestariumPlayerDetail(
     console.error("[getBestariumPlayerDetail]", error);
     return null;
   }
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return null;
+  const rowRaw = Array.isArray(data) ? data[0] : data;
+  if (!rowRaw || typeof rowRaw !== "object") return null;
+  const row = rowRaw as Record<string, unknown>;
   return {
-    id: String((row as any).id),
-    name: String((row as any).name ?? ""),
-    physical_description: (row as any).physical_description ?? null,
-    player_knowledge: (row as any).player_knowledge ?? null,
-    image_url: (row as any).image_url ?? null,
+    id: String(row.id ?? ""),
+    name: String(pickRpcString(row, ["name", "Name"]) ?? ""),
+    physical_description: pickRpcString(row, ["physical_description", "physicalDescription"]),
+    player_knowledge: pickRpcString(row, ["player_knowledge", "playerKnowledge"]),
+    image_url: pickRpcString(row, ["image_url", "imageUrl", "IMAGE_URL"]),
   };
 }

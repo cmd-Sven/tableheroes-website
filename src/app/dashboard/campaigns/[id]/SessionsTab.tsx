@@ -375,9 +375,9 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
-                          title="Alle Spieler müssen ihre Teilnahme bestätigen."
+                          title="Jeder Spieler braucht eine Zusage (oder Via Online) oder deine manuelle Freigabe in der Übersicht „Termine & Spielplan“."
                         >
-                          Warte auf {(session.pendingCount ?? 0)} Bestätigung(en)
+                          Noch {(session.pendingCount ?? 0)} Spieler ohne Zusage/Freigabe
                         </span>
                       )
                     )}
