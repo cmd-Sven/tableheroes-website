@@ -5,10 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
-import {
-  updateSessionBackgroundUrl,
-  updateSessionStageDeck,
-} from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 
 type CampaignNpc = {
   id: string;
@@ -126,12 +123,24 @@ export function StagePrepClient({
   function saveBackground() {
     startTransition(async () => {
       try {
-        const result = await updateSessionBackgroundUrl(
-          sessionId,
-          bgUrl.trim() || null,
+        const res = await fetch(
+          `/api/sessions/${encodeURIComponent(sessionId)}/live-background`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ backgroundUrl: bgUrl.trim() || null }),
+            credentials: "same-origin",
+          },
         );
-        setBgUrl(result?.backgroundUrl ?? "");
-        // Kein router.refresh(): vermeidet RSC-Neuaufbau dieser Route in Production (Digest-Fehler).
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          backgroundUrl?: string | null;
+        };
+        if (!res.ok) {
+          alert(typeof data.error === "string" ? data.error : "Fehler beim Speichern.");
+          return;
+        }
+        setBgUrl(data.backgroundUrl ?? "");
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Fehler beim Speichern.");
       }
