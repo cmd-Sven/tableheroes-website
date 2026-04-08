@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
@@ -15,10 +15,8 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
-import {
-  startSession,
-  markSessionPlanningComplete,
-} from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { markSessionPlanningComplete } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 import { setGmConfirmed } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 
 export type GmTerminePlayerRsvp = {
@@ -97,20 +95,14 @@ const cardClass =
 
 export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Props) {
   const router = useRouter();
+  const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const base = `/dashboard/campaigns/${campaignId}`;
   const scheduleUrl = `${base}/schedule`;
 
   const handleStart = (sessionId: string) => {
     if (isPending) return;
-    startTransition(async () => {
-      try {
-        await startSession(sessionId);
-        router.push(`/session/${sessionId}`);
-      } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : "Session konnte nicht gestartet werden.");
-      }
-    });
+    setStartBgSessionId(sessionId);
   };
 
   const handlePrepComplete = (sessionId: string) => {
@@ -144,6 +136,15 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
 
   return (
     <div className={`${cardClass} lg:col-span-2 xl:col-span-3`}>
+      <StartSessionBackgroundModal
+        open={startBgSessionId != null}
+        sessionId={startBgSessionId}
+        onOpenChange={(open) => !open && setStartBgSessionId(null)}
+        onStarted={(sid) => {
+          router.push(`/session/${sid}`);
+          setStartBgSessionId(null);
+        }}
+      />
       <div className="flex flex-col gap-4 border-b border-hero-border pb-4 mb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <CalendarClock className="h-6 w-6 shrink-0 text-accent-gold mt-0.5" />

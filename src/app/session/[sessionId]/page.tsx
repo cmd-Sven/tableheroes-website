@@ -134,49 +134,85 @@ export default async function SessionPage({ params }: Props) {
     }
   }
 
-  // 4. Party: alle Kampagnenmitglieder mit Charakter (RSVP-Filter entfernt — sonst leerer Tray
-  // bei abweichenden user_id/RSVP-Daten; RSVP bleibt nur Start-Gate in session-actions).
-  const { data: partyRows } = await (supabase.from("campaign_members") as any)
-    .select(
-      `
-        id,
-        status,
-        character_id,
-        user_id,
-        characters (
-          id,
-          name,
-          class,
-          race,
-          level,
-          avatar_url
-        )
-      `,
-    )
-    .eq("campaign_id", (session as any).campaign_id)
-    .in("status", ["Accepted", "Approved", "Active"])
-    .not("character_id", "is", null);
+  // 4. Party: RPC get_session_party_members (Supabase-Migration) — Spieler sehen Gruppe trotz characters-RLS.
+  const campaignId = (session as { campaign_id: string }).campaign_id;
 
-  const partyCharacters =
-    partyRows
-      ?.map(
-        (row: { characters?: Record<string, unknown> | null }) => row.characters,
-      )
-      .filter(
-        (c: unknown): c is Record<string, unknown> =>
-          c != null && typeof c === "object",
-      )
-      .map((c: Record<string, unknown>) => ({
-        id: String(c.id),
-        name: String(c.name ?? ""),
-        class: c.class != null ? String(c.class) : null,
-        race: c.race != null ? String(c.race) : null,
-        level:
-          typeof c.level === "number" && Number.isFinite(c.level)
-            ? c.level
-            : null,
-        avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
-      })) || [];
+  type PartyChar = {
+    id: string;
+    name: string;
+    class: string | null;
+    race: string | null;
+    level: number | null;
+    avatar_url: string | null;
+  };
+
+  let partyCharacters: PartyChar[] = [];
+
+  const rpcRes = await (supabase as any).rpc("get_session_party_members", {
+    p_session_id: sessionId,
+  });
+
+  if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+    partyCharacters = (rpcRes.data as Record<string, unknown>[]).map((c) => ({
+      id: String(c.id),
+      name: String(c.char_name ?? ""),
+      class: c.char_class != null ? String(c.char_class) : null,
+      race: c.race != null ? String(c.race) : null,
+      level:
+        typeof c.level === "number" && Number.isFinite(c.level)
+          ? c.level
+          : null,
+      avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+    }));
+  }
+
+  if (rpcRes.error || !Array.isArray(rpcRes.data)) {
+    const { data: memberPartyRows } = await (supabase.from("campaign_members") as any)
+      .select("character_id, user_id")
+      .eq("campaign_id", campaignId)
+      .in("status", ["Accepted", "Approved", "Active"])
+      .not("character_id", "is", null);
+
+    const characterIds = [
+      ...new Set(
+        ((memberPartyRows as { character_id?: string | null }[] | null) || [])
+          .map((r) => r.character_id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+
+    if (characterIds.length > 0) {
+      const { data: charRows } = await (supabase.from("characters") as any)
+        .select("id, name, class, race, level, avatar_url")
+        .in("id", characterIds)
+        .eq("campaign_id", campaignId);
+
+      const byId = new Map(
+        ((charRows as Record<string, unknown>[] | null) || []).map((c) => [
+          String(c.id),
+          c,
+        ]),
+      );
+
+      partyCharacters = characterIds
+        .map((cid) => byId.get(cid))
+        .filter(
+          (c): c is Record<string, unknown> =>
+            c != null && typeof c === "object",
+        )
+        .map((c) => ({
+          id: String(c.id),
+          name: String(c.name ?? ""),
+          class: c.class != null ? String(c.class) : null,
+          race: c.race != null ? String(c.race) : null,
+          level:
+            typeof c.level === "number" && Number.isFinite(c.level)
+              ? c.level
+              : null,
+          avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+        }));
+    }
+  }
 
   // 5. Load campaign NPCs (Sichtbarkeit aus campaign_visibility)
   const npcsFromCampaign = await getNPCs(

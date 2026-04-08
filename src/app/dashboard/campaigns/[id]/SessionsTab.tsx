@@ -15,12 +15,12 @@ import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModa
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
 import {
-  startSession,
   deleteSession,
   cancelSession,
   endSession,
   markSessionPlanningComplete,
 } from "./session-actions";
+import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 
 type SessionItem = {
   id: string;
@@ -163,6 +163,7 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
   const canJoinSession = isGM || characterStatus === "Active";
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
+  const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isStarting, startTransition] = useTransition();
   const router = useRouter();
 
@@ -184,14 +185,7 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
 
   const handleStartSession = (sessionId: string) => {
     if (isStarting) return;
-    startTransition(async () => {
-      try {
-        await startSession(sessionId);
-        router.push(`/session/${sessionId}`);
-      } catch (err: any) {
-        alert(err.message || "Fehler beim Starten der Session.");
-      }
-    });
+    setStartBgSessionId(sessionId);
   };
 
   const handleMarkPrepComplete = (sessionId: string) => {
@@ -236,6 +230,12 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
 
   return (
     <>
+      <StartSessionBackgroundModal
+        open={startBgSessionId != null}
+        sessionId={startBgSessionId}
+        onOpenChange={(open) => !open && setStartBgSessionId(null)}
+        onStarted={(sid) => router.push(`/session/${sid}`)}
+      />
       <div className="rounded-lg border border-hero-dark bg-background-card p-6">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-hero-dark">
           <h2 className="font-barlow font-bold text-xl text-white uppercase flex items-center gap-2">

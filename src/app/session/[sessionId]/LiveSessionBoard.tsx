@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/src/lib/supabaseClient";
+import { createClient as createBrowserSupabase } from "@/src/lib/supabase/client";
 import {
   LogOut,
   MapPin,
@@ -63,6 +63,13 @@ function normalizeLiveRow(row: unknown): LiveState {
     visible_npc_ids: Array.isArray(npcRaw) ? npcRaw.map(String) : [],
     visible_faction_ids: Array.isArray(facRaw) ? facRaw.map(String) : [],
   };
+}
+
+/** Ohne passende session_id ist React-State wirkungslos (Updates/Stage) — nicht als „geladen“ zählen. */
+function isViableLiveState(row: unknown, expectedSessionId: string): boolean {
+  if (row == null || typeof row !== "object") return false;
+  const sid = String((row as Record<string, unknown>).session_id ?? "");
+  return sid.length > 0 && sid === expectedSessionId;
 }
 
 type PartyCharacter = {
@@ -152,15 +159,31 @@ export function LiveSessionBoard({
   sessionLocationLoreReadable = false,
 }: Props) {
   const router = useRouter();
-  const [liveState, setLiveState] = useState<LiveState | null>(initialLiveState);
-  const liveStateRef = useRef<LiveState | null>(initialLiveState);
+  /** Cookie-Session (RLS): nicht supabaseClient.ts (nur Anon ohne Auth). */
+  const supabase = useMemo(() => createBrowserSupabase(), []);
+
+  const viableInitial =
+    initialLiveState != null &&
+    isViableLiveState(initialLiveState, sessionId);
+
+  const [liveState, setLiveState] = useState<LiveState | null>(
+    viableInitial ? initialLiveState : null,
+  );
+  const liveStateRef = useRef<LiveState | null>(
+    viableInitial ? initialLiveState : null,
+  );
 
   useEffect(() => {
     liveStateRef.current = liveState;
   }, [liveState]);
 
   const resolveLiveStateBase = useCallback(async (): Promise<LiveState | null> => {
-    if (liveStateRef.current) return liveStateRef.current;
+    if (
+      liveStateRef.current &&
+      isViableLiveState(liveStateRef.current, sessionId)
+    ) {
+      return normalizeLiveRow(liveStateRef.current);
+    }
 
     const { data, error } = await supabase
       .from("session_live_states")
@@ -196,13 +219,13 @@ export function LiveSessionBoard({
     }
 
     return null;
-  }, [sessionId, isGM]);
+  }, [sessionId, isGM, supabase]);
 
   const [isUpdating, startTransition] = useTransition();
   const [isStageManagerOpen, setIsStageManagerOpen] = useState(false);
   const [stageSearch, setStageSearch] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(
-    initialLiveState?.background_url || null,
+    viableInitial ? initialLiveState?.background_url || null : null,
   );
   const [showQuests, setShowQuests] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
@@ -212,7 +235,8 @@ export function LiveSessionBoard({
     null,
   );
   const [locationDraft, setLocationDraft] = useState(
-    () => initialLiveState?.current_location ?? "",
+    () =>
+      (viableInitial ? initialLiveState?.current_location : null) ?? "",
   );
 
   const isPrepMode = sessionStatus === "Scheduled";
@@ -239,9 +263,9 @@ export function LiveSessionBoard({
 
   // SSR ohne Zeile: sofort Client + ggf. GM-Anlage (ref-synchron für Klicks vor Re-Render)
   useEffect(() => {
-    if (initialLiveState != null) return;
+    if (viableInitial) return;
     void resolveLiveStateBase();
-  }, [sessionId, initialLiveState, resolveLiveStateBase]);
+  }, [sessionId, viableInitial, resolveLiveStateBase]);
 
   // ---------------------------------------------------------------------------
   // Realtime Subscription
@@ -272,7 +296,7 @@ export function LiveSessionBoard({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId]);
+  }, [sessionId, supabase]);
 
   // ---------------------------------------------------------------------------
   // Helper: Update Live State (environment / journal)
