@@ -29,6 +29,7 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
     date: "",
     time: "",
     duration: "4", // Default 4 hours
+    registrationClosedOnLanding: false,
   });
 
   // Step 2: Location
@@ -93,7 +94,13 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
   // Reset on close
   const handleClose = () => {
     setCurrentStep(1);
-    setLogistics({ title: "", date: "", time: "", duration: "4" });
+    setLogistics({
+      title: "",
+      date: "",
+      time: "",
+      duration: "4",
+      registrationClosedOnLanding: false,
+    });
     setSelectedLocationId("");
     setSelectedNPCIds([]);
     setUserPrompt("");
@@ -265,6 +272,7 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
           title: logistics.title,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
+          registration_closed_on_landing: logistics.registrationClosedOnLanding,
           location_id: selectedLocationId || null,
           scenes: [
             {
@@ -426,6 +434,28 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
                   />
                 </div>
               </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded border border-hero-border/50 bg-background-dark/80 p-3">
+                <input
+                  type="checkbox"
+                  checked={logistics.registrationClosedOnLanding}
+                  onChange={(e) =>
+                    setLogistics((prev) => ({
+                      ...prev,
+                      registrationClosedOnLanding: e.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-hero-dark text-hero-vibrant focus:ring-hero-vibrant"
+                />
+                <span>
+                  <span className="block font-barlow font-bold text-sm uppercase text-gray-200">
+                    Landingpage
+                  </span>
+                  <span className="mt-0.5 block font-libre text-xs text-gray-400 leading-relaxed">
+                    „Gruppe komplett - keine Anmeldung mehr möglich“ statt belegter Plätze anzeigen.
+                  </span>
+                </span>
+              </label>
 
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">

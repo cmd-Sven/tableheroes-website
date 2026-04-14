@@ -79,6 +79,8 @@ type PartyCharacter = {
   race: string | null;
   level: number | null;
   avatar_url: string | null;
+  /** Spieler-Account (für Presence: ausgegraut bis Tab offen) */
+  playerUserId?: string | null;
 };
 
 type CampaignNpc = {
@@ -239,6 +241,11 @@ export function LiveSessionBoard({
       (viableInitial ? initialLiveState?.current_location : null) ?? "",
   );
 
+  /** Wer die Session-Seite gerade offen hat (Realtime Presence) */
+  const [presentUserIds, setPresentUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
   const isPrepMode = sessionStatus === "Scheduled";
 
   useEffect(() => {
@@ -272,7 +279,9 @@ export function LiveSessionBoard({
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const channel = supabase
-      .channel(`session_live_${sessionId}`)
+      .channel(`session_live_${sessionId}`, {
+        config: { presence: { key: userId } },
+      })
       .on(
         "postgres_changes",
         {
@@ -282,7 +291,6 @@ export function LiveSessionBoard({
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          // We gehen davon aus, dass payload.new den aktuellen Zustand enthält
           if (payload.new) {
             const next = normalizeLiveRow(payload.new);
             liveStateRef.current = next;
@@ -291,12 +299,20 @@ export function LiveSessionBoard({
           }
         },
       )
-      .subscribe();
+      .on("presence", { event: "sync" }, () => {
+        const st = channel.presenceState();
+        setPresentUserIds(new Set(Object.keys(st)));
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ user_id: userId });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, supabase]);
+  }, [sessionId, supabase, userId]);
 
   // ---------------------------------------------------------------------------
   // Helper: Update Live State (environment / journal)
@@ -934,45 +950,69 @@ export function LiveSessionBoard({
             </h2>
           </div>
           {partyCharacters.length === 0 ? (
-            <p className="font-libre text-xs text-gray-400">
-              Noch keine aktiven Charaktere in dieser Session verknüpft.
-            </p>
+            <div className="space-y-1">
+              <p className="font-libre text-xs text-gray-400">
+                Hier erscheinen Charaktere von Spielern, die für diesen Termin
+                zugesagt haben (oder vom GM freigegeben wurden) und einen
+                Charakter in der Kampagne haben.
+              </p>
+              <p className="font-libre text-[10px] text-gray-500">
+                Wenn die Liste leer bleibt: In Supabase die Funktion{" "}
+                <code className="text-gray-400">get_session_party_tray</code>{" "}
+                aus der Migration ausführen.
+              </p>
+            </div>
           ) : (
             <div className="flex gap-3">
-              {partyCharacters.map((pc) => (
-                <div
-                  key={pc.id}
-                  className="min-w-[160px] rounded border border-hero-border/40 bg-background-dark/80 px-3 py-2 flex items-center gap-3 shadow-md"
-                >
-                  <div className="h-10 w-10 rounded-full bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center">
-                    {pc.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={pc.avatar_url}
-                        alt={pc.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="font-barlow text-sm text-accent-gold">
-                        {pc.name[0]?.toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-barlow font-bold text-xs text-white truncate">
-                      {pc.name}
-                    </p>
-                    <p className="font-libre text-[10px] text-gray-400 truncate">
-                      Lvl {pc.level || 1} · {pc.class || "Unbekannt"}
-                    </p>
-                    {pc.race && (
-                      <p className="font-libre text-[10px] text-gray-500 truncate">
-                        {pc.race}
+              {partyCharacters.map((pc) => {
+                const pid = pc.playerUserId ? String(pc.playerUserId) : "";
+                const self = pid === userId;
+                const onDeck =
+                  !pid || self || presentUserIds.has(pid);
+                return (
+                  <div
+                    key={pc.id}
+                    className="min-w-[160px] rounded border border-hero-border/40 bg-background-dark/80 px-3 py-2 flex items-center gap-3 shadow-md"
+                  >
+                    <div
+                      className={`relative h-10 w-10 shrink-0 rounded-full bg-hero-dark border border-hero-border overflow-hidden flex items-center justify-center transition-[opacity,filter] duration-200 ${
+                        onDeck ? "" : "opacity-45 grayscale"
+                      }`}
+                    >
+                      {pc.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={pc.avatar_url}
+                          alt={pc.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-barlow text-sm text-accent-gold">
+                          {pc.name[0]?.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-barlow font-bold text-xs text-white truncate">
+                        {pc.name}
                       </p>
-                    )}
+                      <p className="font-libre text-[10px] text-gray-400 truncate">
+                        Lvl {pc.level || 1} · {pc.class || "Unbekannt"}
+                      </p>
+                      {pc.race && (
+                        <p className="font-libre text-[10px] text-gray-500 truncate">
+                          {pc.race}
+                        </p>
+                      )}
+                      {pid && !self && !onDeck ? (
+                        <p className="font-libre text-[9px] text-amber-600/90 mt-0.5">
+                          Noch nicht in der Session
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

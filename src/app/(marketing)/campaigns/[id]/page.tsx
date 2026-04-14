@@ -24,6 +24,8 @@ interface GameSession {
   start_time: string;
   end_time?: string | null;
   type?: string | null;
+  title?: string | null;
+  registration_closed_on_landing?: boolean | null;
 }
 
 export default async function PublicCampaignPage({ params }: Props) {
@@ -132,7 +134,7 @@ export default async function PublicCampaignPage({ params }: Props) {
   // Fetch Next Session
   const { data: sessionsRaw } = await supabase
     .from("sessions")
-    .select("start_time, end_time, type")
+    .select("start_time, end_time, type, title, registration_closed_on_landing")
     .eq("campaign_id", id)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
@@ -435,6 +437,11 @@ export default async function PublicCampaignPage({ params }: Props) {
                   Nächste Session
                 </h3>
                 <div className="font-libre text-gray-200">
+                  {nextSession.title && String(nextSession.title).trim() ? (
+                    <p className="font-barlow font-bold text-sm uppercase tracking-wide text-accent-gold mb-2">
+                      {String(nextSession.title).trim()}
+                    </p>
+                  ) : null}
                   <p className="text-lg font-bold">
                     {new Intl.DateTimeFormat("de-DE", {
                       weekday: "long",
@@ -449,6 +456,11 @@ export default async function PublicCampaignPage({ params }: Props) {
                     }).format(new Date(nextSession.start_time))}{" "}
                     Uhr
                   </p>
+                  {nextSession.registration_closed_on_landing ? (
+                    <p className="mt-3 rounded border border-amber-700/50 bg-amber-950/30 px-2 py-2 font-barlow text-[11px] font-bold uppercase leading-snug tracking-wide text-amber-200/95">
+                      Gruppe komplett - keine Anmeldung mehr möglich
+                    </p>
+                  ) : null}
                 </div>
               </div>
             )}

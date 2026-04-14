@@ -35,6 +35,7 @@ type SessionItem = {
   hasAcceptedRsvps?: boolean;
   /** false = GM muss Planung abschließen (neue Termine); undefined = ältere Daten ohne Spalte */
   gm_prep_complete?: boolean;
+  registration_closed_on_landing?: boolean | null;
 };
 
 /** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */

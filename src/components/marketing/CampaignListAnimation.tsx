@@ -9,6 +9,8 @@ import Link from "next/link";
 export type SessionTicket = {
   campaignId: string;
   campaignName: string;
+  /** Anzeigename des nächsten Termins (optional) */
+  sessionTitle?: string | null;
   gameSystem: string;
   gmUsername: string;
   gmAvatarUrl: string | null;
@@ -19,6 +21,8 @@ export type SessionTicket = {
   slotsLabel: string; // "2/5 Plätze belegt"
   currentPlayers: number;
   maxPlayers: number;
+  /** GM: Landingpage zeigt „Gruppe komplett …“ statt Plätze */
+  registrationClosedOnLanding?: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -28,11 +32,23 @@ function SlotProgressBar({
   current,
   max,
   label,
+  registrationClosedOnLanding,
 }: {
   current: number;
   max: number;
   label: string;
+  registrationClosedOnLanding?: boolean;
 }) {
+  if (registrationClosedOnLanding) {
+    return (
+      <div className="rounded border border-amber-700/40 bg-amber-950/25 px-3 py-2">
+        <p className="font-barlow font-bold text-[11px] uppercase leading-snug tracking-wide text-amber-200/95">
+          {label}
+        </p>
+      </div>
+    );
+  }
+
   const isFull = max > 0 && current >= max;
   const isAlmostFull = max > 0 && current === max - 1;
   const percent = max > 0 ? Math.min((current / max) * 100, 100) : 0;
@@ -163,9 +179,14 @@ export function CampaignListAnimation({ tickets }: { tickets: SessionTicket[] })
             {/* ── 3. Body: Kampagne, System, GM ── */}
             <div className="flex flex-1 flex-col px-5 pb-5">
               {/* Kampagnen-Titel */}
-              <h3 className="line-clamp-2 font-cinzel font-bold text-xl text-white/90 mb-3 group-hover:text-accent-gold transition-colors duration-300">
+              <h3 className="line-clamp-2 font-cinzel font-bold text-xl text-white/90 mb-1 group-hover:text-accent-gold transition-colors duration-300">
                 {t.campaignName}
               </h3>
+              {t.sessionTitle ? (
+                <p className="line-clamp-2 font-barlow font-bold text-xs uppercase tracking-wide text-accent-gold/85 mb-3">
+                  Termin: {t.sessionTitle}
+                </p>
+              ) : null}
 
               {/* System Badge */}
               <div className="mb-5">
@@ -210,6 +231,7 @@ export function CampaignListAnimation({ tickets }: { tickets: SessionTicket[] })
                 current={t.currentPlayers}
                 max={t.maxPlayers}
                 label={t.slotsLabel}
+                registrationClosedOnLanding={t.registrationClosedOnLanding}
               />
 
               {/* CTA Button */}

@@ -134,7 +134,8 @@ export default async function SessionPage({ params }: Props) {
     }
   }
 
-  // 4. Party: RPC get_session_party_members (Supabase-Migration) — Spieler sehen Gruppe trotz characters-RLS.
+  // 4. Party-Tray: get_session_party_tray (Zusage/GM-Freigabe + user_id für Presence),
+  //    sonst get_session_party_members, sonst zweistufiger Fallback.
   const campaignId = (session as { campaign_id: string }).campaign_id;
 
   type PartyChar = {
@@ -144,16 +145,19 @@ export default async function SessionPage({ params }: Props) {
     race: string | null;
     level: number | null;
     avatar_url: string | null;
+    playerUserId?: string | null;
   };
 
   let partyCharacters: PartyChar[] = [];
 
-  const rpcRes = await (supabase as any).rpc("get_session_party_members", {
+  const trayRes = await (supabase as any).rpc("get_session_party_tray", {
     p_session_id: sessionId,
   });
 
-  if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-    partyCharacters = (rpcRes.data as Record<string, unknown>[]).map((c) => ({
+  const trayOk = !trayRes.error && Array.isArray(trayRes.data);
+
+  if (trayOk) {
+    partyCharacters = (trayRes.data as Record<string, unknown>[]).map((c) => ({
       id: String(c.id),
       name: String(c.char_name ?? ""),
       class: c.char_class != null ? String(c.char_class) : null,
@@ -163,10 +167,34 @@ export default async function SessionPage({ params }: Props) {
           ? c.level
           : null,
       avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+      playerUserId:
+        c.member_user_id != null ? String(c.member_user_id) : null,
     }));
   }
 
-  if (rpcRes.error || !Array.isArray(rpcRes.data)) {
+  const rpcRes = await (supabase as any).rpc("get_session_party_members", {
+    p_session_id: sessionId,
+  });
+
+  if (!trayOk) {
+    if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+      partyCharacters = (rpcRes.data as Record<string, unknown>[]).map(
+        (c) => ({
+          id: String(c.id),
+          name: String(c.char_name ?? ""),
+          class: c.char_class != null ? String(c.char_class) : null,
+          race: c.race != null ? String(c.race) : null,
+          level:
+            typeof c.level === "number" && Number.isFinite(c.level)
+              ? c.level
+              : null,
+          avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+        }),
+      );
+    }
+  }
+
+  if (!trayOk && partyCharacters.length === 0) {
     const { data: memberPartyRows } = await (supabase.from("campaign_members") as any)
       .select("character_id, user_id")
       .eq("campaign_id", campaignId)
@@ -194,6 +222,13 @@ export default async function SessionPage({ params }: Props) {
         ]),
       );
 
+      const charToPlayer = new Map<string, string>();
+      for (const r of (memberPartyRows as { character_id?: string | null; user_id?: string | null }[] | null) || []) {
+        if (r.character_id && r.user_id) {
+          charToPlayer.set(String(r.character_id), String(r.user_id));
+        }
+      }
+
       partyCharacters = characterIds
         .map((cid) => byId.get(cid))
         .filter(
@@ -210,6 +245,7 @@ export default async function SessionPage({ params }: Props) {
               ? c.level
               : null,
           avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+          playerUserId: charToPlayer.get(String(c.id)) ?? null,
         }));
     }
   }

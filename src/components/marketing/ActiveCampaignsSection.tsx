@@ -16,6 +16,8 @@ type SessionRow = {
   id: string;
   start_time: string | null;
   status: string | null;
+  title?: string | null;
+  registration_closed_on_landing?: boolean | null;
 };
 
 type CampaignRow = {
@@ -138,8 +140,12 @@ export function ActiveCampaignsSection() {
           timeZone: "Europe/Berlin",
         });
 
+        const groupFullLandingLabel =
+          "Gruppe komplett - keine Anmeldung mehr möglich";
+
         for (const item of top3) {
-          const { campaign: c, dateObj } = item;
+          const { campaign: c, dateObj, nextSession } = item;
+          const closedLanding = !!nextSession.registration_closed_on_landing;
 
           let currentPlayers = 0;
           const { data: memberRows, error: membersError } = await (supabase
@@ -160,7 +166,9 @@ export function ActiveCampaignsSection() {
           const max = c.max_players || 0;
 
           let slotsLabel = "";
-          if (max === 0) {
+          if (closedLanding) {
+            slotsLabel = groupFullLandingLabel;
+          } else if (max === 0) {
             slotsLabel = "Auf Anfrage";
           } else if (currentPlayers >= max) {
             slotsLabel = "Ausgebucht";
@@ -173,6 +181,10 @@ export function ActiveCampaignsSection() {
           finalTickets.push({
             campaignId: c.id,
             campaignName: c.name || "Unbenanntes Abenteuer",
+            sessionTitle:
+              nextSession.title && String(nextSession.title).trim()
+                ? String(nextSession.title).trim()
+                : null,
             gameSystem: c.system || "System offen",
             gmUsername: gm?.username || "Unbekannt",
             gmAvatarUrl: gm?.avatar_url || null,
@@ -183,6 +195,7 @@ export function ActiveCampaignsSection() {
             slotsLabel,
             currentPlayers,
             maxPlayers: max,
+            registrationClosedOnLanding: closedLanding,
           });
         }
 

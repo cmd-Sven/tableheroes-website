@@ -15,6 +15,8 @@ export async function createSessionWithScenes(formData: {
   title: string;
   start_time: string;
   end_time: string;
+  /** Öffentliche Landingpage: „Gruppe komplett“ statt Plätze-Anzeige */
+  registration_closed_on_landing?: boolean;
   location_id?: string | null;
   scenes: Array<{
     title: string;
@@ -54,6 +56,7 @@ export async function createSessionWithScenes(formData: {
       end_time: formData.end_time,
       status: "Scheduled",
       gm_prep_complete: false,
+      registration_closed_on_landing: !!formData.registration_closed_on_landing,
     })
     .select()
     .single();
@@ -581,6 +584,7 @@ export async function updateSession(
     status?: string;
     rsvp_deadline_days?: number | null;
     is_live?: boolean;
+    registration_closed_on_landing?: boolean;
   }
 ) {
   const supabase = await createClient();
@@ -615,6 +619,9 @@ export async function updateSession(
   if (data.status !== undefined) payload.status = data.status;
   if (data.rsvp_deadline_days !== undefined) payload.rsvp_deadline_days = data.rsvp_deadline_days;
   if (data.is_live !== undefined) payload.is_live = data.is_live;
+  if (data.registration_closed_on_landing !== undefined) {
+    payload.registration_closed_on_landing = data.registration_closed_on_landing;
+  }
 
   if (Object.keys(payload).length === 0) {
     return { success: true };
