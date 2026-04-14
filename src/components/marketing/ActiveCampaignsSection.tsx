@@ -18,6 +18,9 @@ type SessionRow = {
   status: string | null;
   title?: string | null;
   registration_closed_on_landing?: boolean | null;
+  visible_on_public_landing?: boolean | null;
+  show_open_slots_on_landing?: boolean | null;
+  show_session_title_on_landing?: boolean | null;
 };
 
 type CampaignRow = {
@@ -85,19 +88,28 @@ export function ActiveCampaignsSection() {
           .map((c) => {
             const sessions = sessionMap.get(c.id) ?? [];
             const futureSessions = sessions
-              .filter((s) => s.start_time && new Date(s.start_time) > now)
+              .filter((s) => {
+                if (!s.start_time || new Date(s.start_time) <= now) return false;
+                const st = String(s.status || "");
+                if (["Cancelled", "Completed", "Ended"].includes(st)) return false;
+                return true;
+              })
               .sort(
                 (a, b) =>
                   new Date(a.start_time!).getTime() -
                   new Date(b.start_time!).getTime()
               );
 
-            if (futureSessions.length === 0) return null;
+            const nextSession =
+              futureSessions.find(
+                (s) => (s as SessionRow).visible_on_public_landing !== false,
+              ) ?? null;
+            if (!nextSession || !nextSession.start_time) return null;
 
             return {
               campaign: c,
-              nextSession: futureSessions[0],
-              dateObj: new Date(futureSessions[0].start_time!),
+              nextSession,
+              dateObj: new Date(nextSession.start_time),
             };
           })
           .filter(Boolean) as {
@@ -140,12 +152,13 @@ export function ActiveCampaignsSection() {
           timeZone: "Europe/Berlin",
         });
 
-        const groupFullLandingLabel =
-          "Gruppe komplett - keine Anmeldung mehr möglich";
+        const groupFullLandingLabel = "Alle Gruppenplätze voll";
 
         for (const item of top3) {
           const { campaign: c, dateObj, nextSession } = item;
           const closedLanding = !!nextSession.registration_closed_on_landing;
+          const showSlots = nextSession.show_open_slots_on_landing !== false;
+          const showSessionTitle = nextSession.show_session_title_on_landing !== false;
 
           let currentPlayers = 0;
           const { data: memberRows, error: membersError } = await (supabase
@@ -168,6 +181,8 @@ export function ActiveCampaignsSection() {
           let slotsLabel = "";
           if (closedLanding) {
             slotsLabel = groupFullLandingLabel;
+          } else if (!showSlots) {
+            slotsLabel = "";
           } else if (max === 0) {
             slotsLabel = "Auf Anfrage";
           } else if (currentPlayers >= max) {
@@ -178,13 +193,15 @@ export function ActiveCampaignsSection() {
 
           const gm = gmMap.get(c.gm_id ?? "");
 
+          const rawTitle =
+            nextSession.title && String(nextSession.title).trim()
+              ? String(nextSession.title).trim()
+              : null;
+
           finalTickets.push({
             campaignId: c.id,
             campaignName: c.name || "Unbenanntes Abenteuer",
-            sessionTitle:
-              nextSession.title && String(nextSession.title).trim()
-                ? String(nextSession.title).trim()
-                : null,
+            sessionTitle: showSessionTitle ? rawTitle : null,
             gameSystem: c.system || "System offen",
             gmUsername: gm?.username || "Unbekannt",
             gmAvatarUrl: gm?.avatar_url || null,
@@ -196,6 +213,8 @@ export function ActiveCampaignsSection() {
             currentPlayers,
             maxPlayers: max,
             registrationClosedOnLanding: closedLanding,
+            showOpenSlotsOnLanding: showSlots,
+            showSessionTitleOnLanding: showSessionTitle,
           });
         }
 

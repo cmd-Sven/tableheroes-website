@@ -51,6 +51,7 @@ import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { CampaignSessionLandingVisibility } from "./CampaignSessionLandingVisibility";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { getCharacterFactionReputations } from "./reputation-queries";
 import type {
@@ -1513,6 +1514,31 @@ export default async function CampaignDetailPage({
       is_revealed: !!e.is_revealed,
     }));
 
+  const nextSessionLandingSettingsRow = (() => {
+    const list = (sessions || []).filter(
+      (s: any) =>
+        s.status === "Scheduled" &&
+        s.start_time &&
+        new Date(String(s.start_time)).getTime() > now.getTime(),
+    );
+    list.sort(
+      (a: any, b: any) =>
+        new Date(String(a.start_time)).getTime() -
+        new Date(String(b.start_time)).getTime(),
+    );
+    const s = list[0] as Record<string, unknown> | undefined;
+    if (!s) return null;
+    return {
+      id: String(s.id),
+      title: s.title != null ? String(s.title) : null,
+      start_time: String(s.start_time),
+      visible_on_public_landing: s.visible_on_public_landing !== false,
+      show_open_slots_on_landing: s.show_open_slots_on_landing !== false,
+      registration_closed_on_landing: !!s.registration_closed_on_landing,
+      show_session_title_on_landing: s.show_session_title_on_landing !== false,
+    };
+  })();
+
   const SettingsTabContent = (
     <div className="space-y-8">
       <h2 className="font-barlow font-bold text-xl text-white uppercase border-b border-hero-dark pb-2">
@@ -1663,6 +1689,11 @@ export default async function CampaignDetailPage({
                 {campaign.is_published ? "Privat schalten" : "Veröffentlichen"}
               </button>
             </form>
+
+            <CampaignSessionLandingVisibility
+              campaignId={id}
+              session={nextSessionLandingSettingsRow}
+            />
           </div>
         </div>
       </div>

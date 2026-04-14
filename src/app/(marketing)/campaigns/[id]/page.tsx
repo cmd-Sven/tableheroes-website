@@ -20,12 +20,15 @@ type Props = {
 };
 
 interface GameSession {
-  id?: string;
+  id: string;
   start_time: string;
   end_time?: string | null;
   type?: string | null;
+  status?: string | null;
   title?: string | null;
   registration_closed_on_landing?: boolean | null;
+  visible_on_public_landing?: boolean | null;
+  show_session_title_on_landing?: boolean | null;
 }
 
 export default async function PublicCampaignPage({ params }: Props) {
@@ -131,19 +134,24 @@ export default async function PublicCampaignPage({ params }: Props) {
     characters: m.character_id ? charMap.get(m.character_id) ?? null : null,
   }));
 
-  // Fetch Next Session
+  // Nächster Termin: erster zukünftiger, nicht beendeter Termin, der öffentlich sichtbar ist
   const { data: sessionsRaw } = await supabase
     .from("sessions")
-    .select("start_time, end_time, type, title, registration_closed_on_landing")
+    .select(
+      "id, start_time, end_time, type, status, title, registration_closed_on_landing, visible_on_public_landing, show_session_title_on_landing",
+    )
     .eq("campaign_id", id)
     .gte("start_time", new Date().toISOString())
     .order("start_time", { ascending: true })
-    .limit(1);
+    .limit(24);
 
-  // Type-Cast für Session-Objekt
-  const nextSession: GameSession | null = sessionsRaw && sessionsRaw.length > 0 
-    ? (sessionsRaw[0] as GameSession)
-    : null;
+  const sessionCandidates = (sessionsRaw || []) as GameSession[];
+  const nextSession: GameSession | null =
+    sessionCandidates.find((r) => {
+      const st = String(r.status || "");
+      if (["Cancelled", "Completed", "Ended"].includes(st)) return false;
+      return r.visible_on_public_landing !== false;
+    }) ?? null;
 
   // 1. Check if user is logged in
   const {
@@ -437,7 +445,9 @@ export default async function PublicCampaignPage({ params }: Props) {
                   Nächste Session
                 </h3>
                 <div className="font-libre text-gray-200">
-                  {nextSession.title && String(nextSession.title).trim() ? (
+                  {nextSession.show_session_title_on_landing !== false &&
+                  nextSession.title &&
+                  String(nextSession.title).trim() ? (
                     <p className="font-barlow font-bold text-sm uppercase tracking-wide text-accent-gold mb-2">
                       {String(nextSession.title).trim()}
                     </p>
@@ -458,7 +468,7 @@ export default async function PublicCampaignPage({ params }: Props) {
                   </p>
                   {nextSession.registration_closed_on_landing ? (
                     <p className="mt-3 rounded border border-amber-700/50 bg-amber-950/30 px-2 py-2 font-barlow text-[11px] font-bold uppercase leading-snug tracking-wide text-amber-200/95">
-                      Gruppe komplett - keine Anmeldung mehr möglich
+                      Alle Gruppenplätze voll
                     </p>
                   ) : null}
                 </div>

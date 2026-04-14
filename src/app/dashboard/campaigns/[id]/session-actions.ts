@@ -15,8 +15,6 @@ export async function createSessionWithScenes(formData: {
   title: string;
   start_time: string;
   end_time: string;
-  /** Öffentliche Landingpage: „Gruppe komplett“ statt Plätze-Anzeige */
-  registration_closed_on_landing?: boolean;
   location_id?: string | null;
   scenes: Array<{
     title: string;
@@ -56,7 +54,6 @@ export async function createSessionWithScenes(formData: {
       end_time: formData.end_time,
       status: "Scheduled",
       gm_prep_complete: false,
-      registration_closed_on_landing: !!formData.registration_closed_on_landing,
     })
     .select()
     .single();
@@ -585,6 +582,9 @@ export async function updateSession(
     rsvp_deadline_days?: number | null;
     is_live?: boolean;
     registration_closed_on_landing?: boolean;
+    visible_on_public_landing?: boolean;
+    show_open_slots_on_landing?: boolean;
+    show_session_title_on_landing?: boolean;
   }
 ) {
   const supabase = await createClient();
@@ -621,6 +621,15 @@ export async function updateSession(
   if (data.is_live !== undefined) payload.is_live = data.is_live;
   if (data.registration_closed_on_landing !== undefined) {
     payload.registration_closed_on_landing = data.registration_closed_on_landing;
+  }
+  if (data.visible_on_public_landing !== undefined) {
+    payload.visible_on_public_landing = data.visible_on_public_landing;
+  }
+  if (data.show_open_slots_on_landing !== undefined) {
+    payload.show_open_slots_on_landing = data.show_open_slots_on_landing;
+  }
+  if (data.show_session_title_on_landing !== undefined) {
+    payload.show_session_title_on_landing = data.show_session_title_on_landing;
   }
 
   if (Object.keys(payload).length === 0) {

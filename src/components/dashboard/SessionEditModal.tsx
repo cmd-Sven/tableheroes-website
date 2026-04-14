@@ -12,8 +12,6 @@ type SessionData = {
   status?: string;
   rsvp_deadline_days?: number | null;
   is_live?: boolean;
-  /** Landingpage: geschlossene Gruppe statt Plätze */
-  registration_closed_on_landing?: boolean | null;
 };
 
 type Props = {
@@ -40,15 +38,11 @@ export function SessionEditModal({
   const [title, setTitle] = useState(session.title ?? "");
   const [dateTime, setDateTime] = useState(toLocalDateTime(session.start_time));
   const [duration, setDuration] = useState(4);
-  const [registrationClosedOnLanding, setRegistrationClosedOnLanding] = useState(
-    !!session.registration_closed_on_landing,
-  );
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (isOpen && session) {
       setTitle(session.title ?? "");
-      setRegistrationClosedOnLanding(!!session.registration_closed_on_landing);
       setDateTime(toLocalDateTime(session.start_time));
       if (session.start_time && session.end_time) {
         const start = new Date(session.start_time).getTime();
@@ -153,24 +147,6 @@ export function SessionEditModal({
               ))}
             </select>
           </div>
-
-          <label className="flex cursor-pointer items-start gap-3 rounded border border-hero-border/50 bg-background-dark/80 p-3">
-            <input
-              type="checkbox"
-              checked={registrationClosedOnLanding}
-              onChange={(e) => setRegistrationClosedOnLanding(e.target.checked)}
-              className="mt-1 h-4 w-4 shrink-0 rounded border-hero-dark text-hero-vibrant focus:ring-hero-vibrant"
-            />
-            <span>
-              <span className="block font-barlow font-bold text-sm uppercase text-gray-200">
-                Öffentliche Landingpage
-              </span>
-              <span className="mt-0.5 block font-libre text-xs text-gray-400 leading-relaxed">
-                „Gruppe komplett - keine Anmeldung mehr möglich“ anzeigen (statt belegter Plätze).
-                Unabhängig von max. Spielern und aktiven Charakteren.
-              </span>
-            </span>
-          </label>
 
           <div className="flex justify-end gap-2 pt-4">
             <button

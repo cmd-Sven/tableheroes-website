@@ -21,8 +21,12 @@ export type SessionTicket = {
   slotsLabel: string; // "2/5 Plätze belegt"
   currentPlayers: number;
   maxPlayers: number;
-  /** GM: Landingpage zeigt „Gruppe komplett …“ statt Plätze */
+  /** GM: Text „Alle Gruppenplätze voll“ (unabhängig vom Ist-Stand) */
   registrationClosedOnLanding?: boolean;
+  /** false = keine Plätze-Anzeige auf der Karte */
+  showOpenSlotsOnLanding?: boolean;
+  /** false = kein Session-Titel trotz gesetztem Namen */
+  showSessionTitleOnLanding?: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -33,17 +37,29 @@ function SlotProgressBar({
   max,
   label,
   registrationClosedOnLanding,
+  showOpenSlotsOnLanding,
 }: {
   current: number;
   max: number;
   label: string;
   registrationClosedOnLanding?: boolean;
+  showOpenSlotsOnLanding?: boolean;
 }) {
   if (registrationClosedOnLanding) {
     return (
       <div className="rounded border border-amber-700/40 bg-amber-950/25 px-3 py-2">
         <p className="font-barlow font-bold text-[11px] uppercase leading-snug tracking-wide text-amber-200/95">
           {label}
+        </p>
+      </div>
+    );
+  }
+
+  if (showOpenSlotsOnLanding === false) {
+    return (
+      <div className="rounded border border-hero-border/30 bg-black/25 px-3 py-2">
+        <p className="font-barlow font-bold text-[10px] uppercase leading-snug tracking-wide text-gray-500">
+          Plätze werden nicht öffentlich angezeigt
         </p>
       </div>
     );
@@ -182,7 +198,7 @@ export function CampaignListAnimation({ tickets }: { tickets: SessionTicket[] })
               <h3 className="line-clamp-2 font-cinzel font-bold text-xl text-white/90 mb-1 group-hover:text-accent-gold transition-colors duration-300">
                 {t.campaignName}
               </h3>
-              {t.sessionTitle ? (
+              {t.sessionTitle && t.showSessionTitleOnLanding !== false ? (
                 <p className="line-clamp-2 font-barlow font-bold text-xs uppercase tracking-wide text-accent-gold/85 mb-3">
                   Termin: {t.sessionTitle}
                 </p>
@@ -232,6 +248,9 @@ export function CampaignListAnimation({ tickets }: { tickets: SessionTicket[] })
                 max={t.maxPlayers}
                 label={t.slotsLabel}
                 registrationClosedOnLanding={t.registrationClosedOnLanding}
+                showOpenSlotsOnLanding={
+                  t.showOpenSlotsOnLanding !== false
+                }
               />
 
               {/* CTA Button */}
