@@ -66,7 +66,9 @@ export function ActiveCampaignsSection() {
         // 2. Sessions separat laden
         const { data: sessData, error: sessError } = await supabase
           .from("sessions")
-          .select("id, campaign_id, start_time, status")
+          .select(
+            "id, campaign_id, start_time, status, title, registration_closed_on_landing, visible_on_public_landing, show_open_slots_on_landing, show_session_title_on_landing",
+          )
           .in("campaign_id", campaignIds);
 
         if (sessError) {
