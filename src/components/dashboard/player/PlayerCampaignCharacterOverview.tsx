@@ -418,7 +418,8 @@ export function PlayerCampaignCharacterOverview({
                 unoptimized={
                   avatarSrc.startsWith("http://") ||
                   avatarSrc.startsWith("data:") ||
-                  avatarSrc.includes("localhost")
+                  avatarSrc.includes("localhost") ||
+                  avatarSrc.includes("supabase.co")
                 }
               />
               {nextSessionConfirmed ? (

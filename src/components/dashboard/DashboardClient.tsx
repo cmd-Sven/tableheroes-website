@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { markWidgetAsRead } from "@/src/lib/actions/user-actions";
 import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
+import { PlayerCharacterQuickStrip } from "@/src/components/dashboard/PlayerCharacterQuickStrip";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import type { LayoutItem } from "@/src/lib/utils/layout-engine";
@@ -308,6 +309,8 @@ export function DashboardClient({
         />
       )}
       <PlayerHeader {...profileHeader} />
+
+      <PlayerCharacterQuickStrip characters={heroCharacters} />
 
       {newAcceptances.length > 0 && (
         <div className="space-y-4">

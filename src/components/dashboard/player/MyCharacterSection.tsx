@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { User, Loader2, Save, Info, Shield, Users, ExternalLink } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import {
@@ -75,6 +76,7 @@ export function MyCharacterSection({
   locations,
   factionReputations = [],
 }: Props) {
+  const router = useRouter();
   const savedLangIds = normalizeLangIds(character.languages);
 
   const [isPending, startTransition] = useTransition();
@@ -207,7 +209,7 @@ export function MyCharacterSection({
         }
 
         setAvatarFile(null);
-        window.location.reload();
+        router.refresh();
       } catch (e: unknown) {
         alert((e as Error).message || "Fehler beim Speichern.");
       }
@@ -226,6 +228,18 @@ export function MyCharacterSection({
   const relationships = character.character_relationships ?? [];
   const isPendingApproval = character.status === "Pending_Approval";
 
+  const saveButton = (
+    <button
+      type="button"
+      onClick={handleSave}
+      disabled={isPending}
+      className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors disabled:opacity-60 shadow-lg"
+    >
+      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+      Speichern
+    </button>
+  );
+
   return (
     <section className="rounded-lg border border-hero-dark bg-background-card p-6">
       <div className="mb-4 flex items-center justify-between border-b border-hero-border pb-2">
@@ -233,14 +247,7 @@ export function MyCharacterSection({
           <User className="h-6 w-6 text-accent-gold" />
           Mein Charakter
         </h2>
-        <button
-          onClick={handleSave}
-          disabled={isPending}
-          className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors disabled:opacity-60"
-        >
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Speichern
-        </button>
+        {saveButton}
       </div>
 
       {isPendingApproval && (
@@ -645,6 +652,13 @@ export function MyCharacterSection({
           <User className="h-4 w-4" />
           Zurück zur Übersicht
         </Link>
+
+        <div className="mt-10 flex flex-col gap-3 border-t border-hero-border pt-8 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-libre text-sm text-gray-400">
+            Alle Änderungen (Name, Punkte, Gold, Bild, …) werden mit „Speichern“ übernommen.
+          </p>
+          {saveButton}
+        </div>
       </div>
     </section>
   );
