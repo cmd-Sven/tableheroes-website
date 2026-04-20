@@ -736,9 +736,9 @@ export async function loadCampaignDetailPageData(
     userHasCharacter = !!myCharacter;
   }
 
-  /** Flight/RSC: volle characters-Zeile enthält JSONB/Felder, die Client-Grenzen sprengen können */
+  /** Klientenseitige Ansichten nutzen dieselbe Zeile wie myCharacter; Flight-Serialisierung erfolgt für die gesamte Payload unten. */
   const myCharacterForClient =
-    !isGM && myCharacter ? serializeForClient(myCharacter) : null;
+    !isGM && myCharacter ? myCharacter : null;
 
   // ============================================================================
   // PLAYER: Load discoveries + party for direct player-dashboard view
@@ -1027,7 +1027,7 @@ export async function loadCampaignDetailPageData(
     }
   }
 
-  return {
+  const pageData = {
     campaign,
     world,
     gmWorlds,
@@ -1072,4 +1072,7 @@ export async function loadCampaignDetailPageData(
     characterReputations,
     lastPlayerAchievement,
   };
+
+  /** Ein Durchlauf: alle Supabase-/DB-Typen (BigInt, …) für RSC → Client-Komponenten sicher */
+  return serializeForClient(pageData) as typeof pageData;
 }

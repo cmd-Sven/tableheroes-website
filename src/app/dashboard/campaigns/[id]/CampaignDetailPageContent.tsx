@@ -94,6 +94,13 @@ export function CampaignDetailPageContent({
     lastPlayerAchievement,
   } = data;
 
+  /** Nach serializeForClient kann `now` ISO-String statt Date sein */
+  const nowMs =
+    typeof now === "string"
+      ? new Date(now).getTime()
+      : now instanceof Date
+        ? now.getTime()
+        : Date.now();
 
   const OverviewTab = (
     <div className="space-y-8">
@@ -538,7 +545,7 @@ export function CampaignDetailPageContent({
       (s: any) =>
         s.status === "Scheduled" &&
         s.start_time &&
-        new Date(String(s.start_time)).getTime() > now.getTime(),
+        new Date(String(s.start_time)).getTime() > nowMs,
     );
     list.sort(
       (a: any, b: any) =>
