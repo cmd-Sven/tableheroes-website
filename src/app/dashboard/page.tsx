@@ -35,6 +35,10 @@ type UserProfile = {
   selected_achievement_id?: string | null;
   slogan?: string | null;
   show_slogan?: boolean | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  banner_position_x?: number | null;
+  banner_position_y?: number | null;
   /** Altes Format: string[] (Reihenfolge), neues Format: { id, x_pos, y_pos, width }[] */
   dashboard_layout?: unknown;
   privacy_public_profile?: boolean | null;
@@ -83,11 +87,15 @@ export default async function DashboardPage() {
         null,
       avatarUrl: profile?.avatar_url ?? null,
       avatarShape: (profile?.avatar_shape as "circle" | "square") ?? "circle",
+      avatarPositionX: profile?.avatar_position_x ?? 50,
+      avatarPositionY: profile?.avatar_position_y ?? 50,
       backgroundType: (profile?.profile_background_url ? "image" : "color") as
         | "color"
         | "image",
       backgroundColor: profile?.profile_background ?? null,
       backgroundImageUrl: profile?.profile_background_url ?? null,
+      bannerPositionX: profile?.banner_position_x ?? 50,
+      bannerPositionY: profile?.banner_position_y ?? 50,
       memberSince: profile?.created_at ?? null,
       rank,
       totalPoints,

@@ -11,6 +11,12 @@ type UserProfile = {
   avatar_url?: string | null;
   avatar_shape?: "circle" | "square" | null;
   profile_background_url?: string | null;
+  avatar_storage_path?: string | null;
+  profile_banner_storage_path?: string | null;
+  avatar_position_x?: number | null;
+  avatar_position_y?: number | null;
+  banner_position_x?: number | null;
+  banner_position_y?: number | null;
   show_rank?: boolean | null;
   show_points?: boolean | null;
   profile_achievement_mode?: "newest" | "specific" | null;
@@ -29,7 +35,7 @@ export default async function DashboardSettingsPage() {
 
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select(
-      "username, privacy_public_profile, player_dashboard_tutorial_dismissed, avatar_url, avatar_shape, profile_background_url, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
+      "username, privacy_public_profile, player_dashboard_tutorial_dismissed, avatar_url, avatar_shape, profile_background_url, avatar_storage_path, profile_banner_storage_path, avatar_position_x, avatar_position_y, banner_position_x, banner_position_y, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
     )
     .eq("id", user.id)
     .single();
@@ -41,6 +47,12 @@ export default async function DashboardSettingsPage() {
 
   const profileDesign: ProfileDesignData = {
     avatarUrl: profile?.avatar_url ?? null,
+    avatarStoragePath: profile?.avatar_storage_path ?? null,
+    profileBannerStoragePath: profile?.profile_banner_storage_path ?? null,
+    avatarPositionX: profile?.avatar_position_x ?? 50,
+    avatarPositionY: profile?.avatar_position_y ?? 50,
+    bannerPositionX: profile?.banner_position_x ?? 50,
+    bannerPositionY: profile?.banner_position_y ?? 50,
     avatarShape: (profile?.avatar_shape as "circle" | "square") ?? "circle",
     backgroundImageUrl: profile?.profile_background_url ?? null,
     showRank: profile?.show_rank ?? true,

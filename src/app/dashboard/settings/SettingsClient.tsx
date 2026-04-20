@@ -60,7 +60,11 @@ export function SettingsClient({
         privacyPublicProfile={privacyPublicProfile}
         playerDashboardTutorialDismissed={playerDashboardTutorialDismissed}
       />
-      <ProfileSettings initial={profileDesign} achievements={achievements} />
+      <ProfileSettings
+        userId={userId}
+        initial={profileDesign}
+        achievements={achievements}
+      />
       <section className="rounded-lg border border-hero-dark bg-background-card p-6">
         <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
           Account-Daten

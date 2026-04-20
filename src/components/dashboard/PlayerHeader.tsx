@@ -22,9 +22,14 @@ type Props = {
   avatarUrl?: string | null;
   /** Avatar-Form: 'circle' = rounded-full, 'square' = rounded-xl */
   avatarShape?: "circle" | "square";
+  /** Fokus für object-position (0–100), Standard 50 */
+  avatarPositionX?: number;
+  avatarPositionY?: number;
   backgroundType?: "color" | "image";
   backgroundColor?: string | null;
   backgroundImageUrl?: string | null;
+  bannerPositionX?: number;
+  bannerPositionY?: number;
   memberSince: string | null;
   rank: string;
   totalPoints: number;
@@ -44,9 +49,13 @@ export function PlayerHeader({
   username,
   avatarUrl,
   avatarShape = "circle",
+  avatarPositionX = 50,
+  avatarPositionY = 50,
   backgroundType = "color",
   backgroundColor,
   backgroundImageUrl,
+  bannerPositionX = 50,
+  bannerPositionY = 50,
   memberSince,
   rank,
   totalPoints,
@@ -67,7 +76,7 @@ export function PlayerHeader({
       ? {
           backgroundImage: `url(${backgroundImageUrl})`,
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: `${bannerPositionX}% ${bannerPositionY}%`,
         }
       : backgroundColor
       ? { backgroundColor: backgroundColor }
@@ -94,6 +103,9 @@ export function PlayerHeader({
                 fill
                 className="object-cover"
                 sizes="80px"
+                style={{
+                  objectPosition: `${avatarPositionX}% ${avatarPositionY}%`,
+                }}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center">

@@ -45,9 +45,13 @@ export type ProfileHeaderData = {
   username: string | null;
   avatarUrl: string | null;
   avatarShape?: "circle" | "square";
+  avatarPositionX?: number;
+  avatarPositionY?: number;
   backgroundType: "color" | "image";
   backgroundColor: string | null;
   backgroundImageUrl: string | null;
+  bannerPositionX?: number;
+  bannerPositionY?: number;
   memberSince: string | null;
   rank: string;
   totalPoints: number;

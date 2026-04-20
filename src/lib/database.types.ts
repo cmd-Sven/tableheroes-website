@@ -53,6 +53,15 @@ export type Database = {
           id: string;
           username: string | null;
           avatar_url: string | null;
+          /** Relativpfad im Storage-Bucket profile-media (Upload) */
+          avatar_storage_path: string | null;
+          /** Relativpfad Banner im Bucket profile-media */
+          profile_banner_storage_path: string | null;
+          /** 0–100 für object-position (Avatar, Live-Vorschau) */
+          avatar_position_x: number | null;
+          avatar_position_y: number | null;
+          banner_position_x: number | null;
+          banner_position_y: number | null;
           primary_role: string | null; // 'GameMaster' | 'Player' | 'Admin'
         };
         Insert: Record<string, unknown>;

@@ -261,6 +261,7 @@ export async function createCharacterWithRelations(data: {
   level: number;
   biography?: string | null;
   avatar_url?: string | null;
+  avatar_storage_path?: string | null;
   faction_id?: string | null;
   location_id?: string | null;
   culture_lore_id?: string | null;
@@ -367,6 +368,7 @@ export async function createCharacterWithRelations(data: {
         level: data.level || 1,
         biography: data.biography || null,
         avatar_url: data.avatar_url || null,
+        avatar_storage_path: data.avatar_storage_path || null,
         faction_membership: data.faction_id || null,
         current_location_id: data.location_id || null,
         culture_lore_id: data.culture_lore_id || null,
@@ -494,6 +496,7 @@ export async function updateCharacterPlayer(data: {
   faction_membership?: string | null;
   current_location_id?: string | null;
   avatar_url?: string | null;
+  avatar_storage_path?: string | null;
   experience_points?: number;
   pocket_gold?: number;
 }) {
@@ -546,6 +549,11 @@ export async function updateCharacterPlayer(data: {
   if (data.current_location_id !== undefined) updates.current_location_id = data.current_location_id;
   if (data.avatar_url !== undefined) {
     updates.avatar_url = data.avatar_url?.trim() ? data.avatar_url.trim() : null;
+  }
+  if (data.avatar_storage_path !== undefined) {
+    updates.avatar_storage_path = data.avatar_storage_path?.trim()
+      ? data.avatar_storage_path.trim()
+      : null;
   }
   if (data.experience_points !== undefined) {
     const n = Math.max(0, Math.floor(Number(data.experience_points) || 0));

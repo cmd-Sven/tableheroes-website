@@ -216,11 +216,15 @@ export default async function ProfilePage({ params }: Props) {
           avatarShape={
             (profileUser.avatar_shape as "circle" | "square") ?? "circle"
           }
+          avatarPositionX={(profileUser as any).avatar_position_x ?? 50}
+          avatarPositionY={(profileUser as any).avatar_position_y ?? 50}
           backgroundType={
             profileUser.profile_background_url ? "image" : "color"
           }
           backgroundColor={profileUser.profile_background ?? null}
           backgroundImageUrl={profileUser.profile_background_url ?? null}
+          bannerPositionX={(profileUser as any).banner_position_x ?? 50}
+          bannerPositionY={(profileUser as any).banner_position_y ?? 50}
           memberSince={profileUser.created_at ?? null}
           rank={rank}
           totalPoints={totalPoints}

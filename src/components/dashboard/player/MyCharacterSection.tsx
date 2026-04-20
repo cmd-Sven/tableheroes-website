@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { User, Loader2, Save, Info, Shield, Users, ExternalLink } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import {
+  PROFILE_MEDIA_ACCEPT_MIME,
+  PROFILE_MEDIA_MAX_BYTES,
+  removeProfileMediaAsset,
+  uploadCharacterPortrait,
+  validateProfileImageFile,
+} from "@/src/lib/profile-media";
 import Link from "next/link";
 
 type Culture = { id: string; name: string };
@@ -46,6 +53,7 @@ type Props = {
     current_location_id: string | null;
     location_name?: string | null;
     avatar_url?: string | null;
+    avatar_storage_path?: string | null;
     status?: string;
     experience_points?: number;
     pocket_gold?: number;
@@ -84,6 +92,21 @@ export function MyCharacterSection({
     current_location_id: character.current_location_id ?? "",
     avatar_url: character.avatar_url ?? "",
   });
+  const [avatarStoragePath, setAvatarStoragePath] = useState(
+    character.avatar_storage_path ?? null,
+  );
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarBlobUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(avatarFile);
+    setAvatarBlobUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [avatarFile]);
 
   const cultureOptions = useMemo(() => {
     const cid = form.culture_lore_id || character.culture_lore_id || "";
@@ -143,6 +166,23 @@ export function MyCharacterSection({
   const handleSave = () => {
     startTransition(async () => {
       try {
+        let nextAvatarUrl = form.avatar_url.trim() || null;
+        let nextAvatarPath = avatarStoragePath;
+
+        if (avatarFile) {
+          const r = await uploadCharacterPortrait(avatarFile, {
+            characterId: character.id,
+          });
+          if ("error" in r) {
+            alert(r.error);
+            return;
+          }
+          nextAvatarUrl = r.publicUrl;
+          nextAvatarPath = r.path;
+        }
+
+        if (!nextAvatarUrl) nextAvatarPath = null;
+
         await updateCharacterPlayer({
           character_id: character.id,
           campaign_id: campaignId,
@@ -155,10 +195,18 @@ export function MyCharacterSection({
           languages: form.languages,
           faction_membership: form.faction_membership || null,
           current_location_id: form.current_location_id || null,
-          avatar_url: form.avatar_url.trim() || null,
+          avatar_url: nextAvatarUrl,
+          avatar_storage_path: nextAvatarPath,
           experience_points: form.experience_points,
           pocket_gold: form.pocket_gold,
         });
+
+        const prevPath = character.avatar_storage_path ?? null;
+        if (prevPath && prevPath !== nextAvatarPath) {
+          await removeProfileMediaAsset(prevPath);
+        }
+
+        setAvatarFile(null);
         window.location.reload();
       } catch (e: unknown) {
         alert((e as Error).message || "Fehler beim Speichern.");
@@ -277,14 +325,69 @@ export function MyCharacterSection({
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />
           </div>
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div className="sm:col-span-2 lg:col-span-3 space-y-3">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Avatar-URL (Bild-Link)
+              Charakterbild
+            </label>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border-2 border-hero-border bg-hero-dark">
+                {(avatarBlobUrl || form.avatar_url.trim()) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- blob URLs
+                  <img
+                    src={avatarBlobUrl || form.avatar_url.trim()}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center font-libre text-[10px] text-gray-500 px-1 text-center">
+                    Kein Bild
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  type="file"
+                  accept={PROFILE_MEDIA_ACCEPT_MIME.join(",")}
+                  className="block w-full max-w-md text-sm text-gray-300 file:mr-2 file:rounded file:border file:border-hero-border file:bg-hero-dark file:px-2 file:py-1 file:font-barlow file:text-xs file:uppercase file:text-hero-vibrant"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f) return;
+                    const msg = validateProfileImageFile(f);
+                    if (msg) {
+                      alert(msg);
+                      return;
+                    }
+                    setAvatarFile(f);
+                  }}
+                />
+                <p className="font-libre text-xs text-gray-500">
+                  Bild hochladen (max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB, JPEG/PNG/WebP) oder URL nutzen.
+                </p>
+                {(form.avatar_url.trim() || avatarBlobUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarFile(null);
+                      setForm((p) => ({ ...p, avatar_url: "" }));
+                      setAvatarStoragePath(null);
+                    }}
+                    className="text-sm font-libre text-red-400 hover:underline"
+                  >
+                    Bild entfernen
+                  </button>
+                )}
+              </div>
+            </div>
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
+              Bild-URL (optional, statt Upload)
             </label>
             <input
               type="url"
               value={form.avatar_url}
-              onChange={(e) => setForm((p) => ({ ...p, avatar_url: e.target.value }))}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, avatar_url: e.target.value }));
+                setAvatarStoragePath(null);
+              }}
               placeholder="https://…"
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />

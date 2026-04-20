@@ -4,6 +4,11 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, User, ChevronRight, ChevronLeft, Plus, Trash2, Loader2, Info, Image } from "lucide-react";
 import { createCharacterWithRelations, getCharacterWizardLoreData } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import {
+  PROFILE_MEDIA_ACCEPT_MIME,
+  uploadCharacterPortrait,
+  validateProfileImageFile,
+} from "@/src/lib/profile-media";
 import { getNPCsByFactionForOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { getChildLocationsForOnboarding } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 
@@ -95,6 +100,18 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
 
   // Step D: Avatar
   const [avatar_url, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarBlobUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(avatarFile);
+    setAvatarBlobUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [avatarFile]);
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [newContactForm, setNewContactForm] = useState<NewContact>({
     name: "",
@@ -215,6 +232,19 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
 
     startTransition(async () => {
       try {
+        let finalAvatarUrl = avatar_url.trim() || null;
+        let finalAvatarPath: string | null = null;
+
+        if (avatarFile) {
+          const r = await uploadCharacterPortrait(avatarFile, {});
+          if ("error" in r) {
+            alert(r.error);
+            return;
+          }
+          finalAvatarUrl = r.publicUrl;
+          finalAvatarPath = r.path;
+        }
+
         await createCharacterWithRelations({
           campaign_id: campaignId,
           name,
@@ -222,7 +252,8 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           race: effectiveRace,
           level,
           biography: biography || null,
-          avatar_url: avatar_url.trim() || null,
+          avatar_url: finalAvatarUrl,
+          avatar_storage_path: finalAvatarPath,
           faction_id: faction_id || null,
           location_id: location_id || null,
           culture_lore_id: selectedCultureId || null,
@@ -972,24 +1003,46 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 Charakterbild (Optional)
               </h3>
               <p className="font-libre text-gray-300">
-                Füge optional ein Bild deines Charakters hinzu. Gib die vollständige URL zu einem Bild ein (z.B. von einem Bildhoster wie Imgur oder einer anderen Quelle).
+                Lade ein Portrait hoch (JPEG, PNG oder WebP) oder trage eine Bild-URL ein.
               </p>
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Bild-URL
+                  Datei hochladen
+                </label>
+                <input
+                  type="file"
+                  accept={PROFILE_MEDIA_ACCEPT_MIME.join(",")}
+                  className="w-full max-w-md text-sm text-gray-300 file:mr-2 file:rounded file:border file:border-hero-border file:bg-hero-dark file:px-2 file:py-1 file:font-barlow file:text-xs file:uppercase file:text-accent-gold"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f) return;
+                    const msg = validateProfileImageFile(f);
+                    if (msg) {
+                      alert(msg);
+                      return;
+                    }
+                    setAvatarFile(f);
+                    setAvatarUrl("");
+                  }}
+                />
+                <label className="mb-2 mt-5 block font-barlow font-bold text-sm uppercase text-gray-300">
+                  Bild-URL (falls kein Upload)
                 </label>
                 <input
                   type="url"
                   value={avatar_url}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  onChange={(e) => {
+                    setAvatarUrl(e.target.value);
+                    setAvatarFile(null);
+                  }}
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
                   placeholder="https://example.com/charakterbild.jpg"
                 />
-                {avatar_url.trim() && (
+                {(avatarBlobUrl || avatar_url.trim()) && (
                   <div className="mt-4 flex items-center gap-4">
                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border-2 border-hero-border bg-hero-dark">
                       <img
-                        src={avatar_url.trim()}
+                        src={(avatarBlobUrl || avatar_url.trim()) as string}
                         alt="Vorschau"
                         className="h-full w-full object-cover"
                         onError={(e) => {
