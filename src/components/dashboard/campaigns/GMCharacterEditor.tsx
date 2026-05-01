@@ -3,11 +3,11 @@
 import { useState, useTransition, useEffect } from "react";
 import { X, Save, Plus, Trash2, Loader2, Shield } from "lucide-react";
 import { updateCharacterByGM } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import type { FactionReputation } from "@/src/app/dashboard/campaigns/[id]/reputation-queries";
 import {
   getCharacterFactionReputations,
   upsertCharacterFactionReputation,
   deleteCharacterFactionReputation,
-  type FactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
 
 function normalizeLangIds(v: unknown): string[] {
@@ -74,7 +74,7 @@ export function GMCharacterEditor({
   const [newRepFactionId, setNewRepFactionId] = useState("");
   const [newRepValue, setNewRepValue] = useState(0);
   const [newRepRank, setNewRepRank] = useState("");
-  const [status, setStatus] = useState(character.status || "Alive");
+  const [status, setStatus] = useState(character.status || "Active");
   const [level, setLevel] = useState(character.level || 1);
   const [biography, setBiography] = useState(character.biography || "");
   const [relationships, setRelationships] = useState<
@@ -262,12 +262,12 @@ export function GMCharacterEditor({
               disabled={isPending}
             >
               <option value="Active">Aktiv (spielbar)</option>
+              <option value="Approved">Freigegeben</option>
               <option value="Pending_Approval">Wartet auf Freigabe</option>
-              <option value="In_Review">In Prüfung</option>
-              <option value="Alive">Lebend (Legacy)</option>
+              <option value="Draft">Entwurf</option>
               <option value="Dead">Tot</option>
               <option value="Archived">Archiviert</option>
-              <option value="Paused">Pausiert</option>
+              <option value="Rejected">Abgelehnt</option>
             </select>
             {status === "Dead" && (
               <p className="mt-2 font-libre text-xs text-yellow-400 italic">
