@@ -1,12 +1,36 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getPointsLog } from "@/src/lib/queries/point-queries";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 // PointLogEntry nicht re-exportieren: In "use server"-Modulen kann Turbopack
 // `export type { … }` fälschlich als Laufzeit-Export auswerten → ReferenceError.
+
+async function awardPointsSafe(
+  supabase: ReturnType<typeof createAdminClient>,
+  args: {
+    targetUserId: string;
+    amount: number;
+    reason: string;
+    awardedBy: string | null;
+    campaignId: string | null;
+    catalogId?: string | null;
+  },
+): Promise<{ newTotal: number | null; error?: string }> {
+  const { data, error } = await (supabase as any).rpc("award_points_safe", {
+    target_user_id: args.targetUserId,
+    points_amount: args.amount,
+    award_reason: args.reason,
+    awarded_by: args.awardedBy,
+    related_campaign_id: args.campaignId,
+    catalog_id: args.catalogId ?? null,
+  });
+
+  if (error) return { newTotal: null, error: error.message };
+  return { newTotal: typeof data === "number" ? data : Number(data) };
+}
 
 // ============================================================================
 // Types
@@ -27,6 +51,9 @@ export type MemberDetailData = {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  /** Lebenslang verdiente Punkte fuer Level/Rang-Fortschritt. */
+  lifetimePoints: number;
+  /** Aktuell ausgebbares Punkteguthaben. */
   totalPoints: number;
   achievements: Array<{
     id: string;
@@ -73,8 +100,8 @@ export async function getMemberDetails(
     .eq("campaign_id", campaignId)
     .eq("user_id", userId)
     .in("status", [
-      "Accepted",
       "Approved",
+      "Active",
       "Drafting",
       "In_Review",
       "Changes_Proposed",
@@ -92,7 +119,7 @@ export async function getMemberDetails(
   const { data: userData, error: userError } = await (
     supabase.from("users") as any
   )
-    .select("id, username, avatar_url, total_points")
+    .select("id, username, avatar_url, total_points, lifetime_points")
     .eq("id", userId)
     .maybeSingle();
 
@@ -181,11 +208,11 @@ export async function getMemberDetails(
     .order("start_time", { ascending: true })
     .limit(25);
 
-  const nowMs = Date.now();
   const upcoming = ((sessionRows as any[]) || []).find((s) => {
-    if (["Completed", "Ended", "Cancelled"].includes(s.status)) return false;
+    if (["Completed", "Cancelled"].includes(s.status)) return false;
     if (s.status === "Live") return true;
-    return s.start_time && new Date(s.start_time).getTime() > nowMs;
+    if (s.status === "Scheduled") return true;
+    return false;
   });
 
   if (upcoming?.id) {
@@ -212,6 +239,7 @@ export async function getMemberDetails(
       userId: (userData as any).id,
       username: (userData as any).username ?? "Unbekannt",
       avatarUrl: (userData as any).avatar_url ?? null,
+      lifetimePoints: Number((userData as any).lifetime_points) || 0,
       totalPoints: Number((userData as any).total_points) || 0,
       achievements,
       pointsLog,
@@ -267,7 +295,7 @@ export async function adjustMemberPoints(
     .select("id")
     .eq("campaign_id", campaignId)
     .eq("user_id", targetUserId)
-    .in("status", ["Accepted", "Approved"])
+    .in("status", ["Approved", "Active"])
     .maybeSingle();
 
   if (!memberData) {
@@ -277,50 +305,25 @@ export async function adjustMemberPoints(
     };
   }
 
-  // Hole aktuelle Punkte
-  const { data: userData } = await (supabase.from("users") as any)
-    .select("total_points")
-    .eq("id", targetUserId)
-    .single();
-
-  const currentPoints = Number((userData as any)?.total_points) || 0;
-  const newTotal = Math.max(0, currentPoints + amount);
-
-  // WICHTIG: Erst Log erstellen, dann Punkte updaten
-  // So können wir bei einem Log-Fehler abbrechen, bevor Punkte verteilt werden
-  const { error: logError } = await (supabase.from("points_log") as any).insert({
-    user_id: targetUserId,
+  const admin = createAdminClient();
+  const result = await awardPointsSafe(admin, {
+    targetUserId,
     amount,
     reason: reason.trim(),
-    created_by: user.id, // Spaltenname: created_by (nicht granted_by)
-    campaign_id: campaignId,
+    awardedBy: user.id,
+    campaignId,
   });
 
-  if (logError) {
-    console.error("[adjustMemberPoints:log] Fehler beim Erstellen des Log-Eintrags:", logError);
-    return { 
-      success: false, 
-      error: `Fehler beim Erstellen des Log-Eintrags: ${logError.message}` 
-    };
+  if (result.error) {
+    console.error("[adjustMemberPoints:rpc] Fehler beim atomaren Punkte-Update:", result.error);
+    return { success: false, error: result.error };
   }
 
-  console.log("[adjustMemberPoints] ✓ points_log Eintrag erstellt für User:", targetUserId, "Betrag:", amount, "Grund:", reason.trim());
-
-  // Update total_points (nur wenn Log erfolgreich war)
-  const { error: updateError } = await (supabase.from("users") as any)
-    .update({ total_points: newTotal })
-    .eq("id", targetUserId);
-
-  if (updateError) {
-    console.error("[adjustMemberPoints:update] Fehler beim Update:", updateError);
-    return { success: false, error: updateError.message };
-  }
-
-  console.log("[adjustMemberPoints] ✓ Punkte aktualisiert für User:", targetUserId, currentPoints, "→", newTotal);
+  console.log("[adjustMemberPoints] ✓ Punkte atomar aktualisiert für User:", targetUserId, "Betrag:", amount, "Neuer Stand:", result.newTotal);
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/dashboard");
-  return { success: true, newTotal };
+  return { success: true, newTotal: result.newTotal ?? undefined };
 }
 
 // ============================================================================
@@ -374,7 +377,7 @@ export async function distributeGroupPoints(
   )
     .select("user_id")
     .eq("campaign_id", campaignId)
-    .in("status", ["Accepted", "Approved"]);
+    .in("status", ["Approved", "Active"]);
 
   if (membersError) {
     console.error("[distributeGroupPoints:members]", membersError);
@@ -386,19 +389,14 @@ export async function distributeGroupPoints(
     return { success: false, error: "Keine akzeptierten Mitglieder in dieser Kampagne." };
   }
 
-  const userIds = members.map((m: any) => m.user_id);
-
-  // Bulk-Update: Erhöhe total_points für alle Mitglieder
-  // WICHTIG: Wir können nicht garantieren, dass alle Updates atomar sind,
-  // aber wir versuchen es so sicher wie möglich zu machen
   const failedUsers: string[] = [];
   let successCount = 0;
 
-  // Schritt 1: Hole aktuelle Punkte für alle User
+  const userIds = members.map((m: any) => m.user_id);
   const { data: usersData, error: usersError } = await (
     supabase.from("users") as any
   )
-    .select("id, total_points, username")
+    .select("id, username")
     .in("id", userIds);
 
   if (usersError) {
@@ -407,49 +405,25 @@ export async function distributeGroupPoints(
   }
 
   const users = (usersData as any[]) || [];
-
-  // Schritt 2: Update jeden User einzeln (für Fehlerbehandlung)
-  const logEntries: any[] = [];
+  const admin = createAdminClient();
 
   for (const userData of users) {
     const userId = userData.id;
-    const currentPoints = Number(userData.total_points) || 0;
-    const newTotal = Math.max(0, currentPoints + amount);
-
-    // Update total_points
-    const { error: updateError } = await (supabase.from("users") as any)
-      .update({ total_points: newTotal })
-      .eq("id", userId);
-
-    if (updateError) {
-      console.error(`[distributeGroupPoints:update:${userId}]`, updateError);
-      failedUsers.push(userData.username || userId);
-      continue; // Nächster User
-    }
-
-    // Erfolg: Bereite Log-Eintrag vor
-    logEntries.push({
-      user_id: userId,
+    const result = await awardPointsSafe(admin, {
+      targetUserId: userId,
       amount,
       reason: reason.trim(),
-      created_by: user.id,
-      campaign_id: campaignId,
+      awardedBy: user.id,
+      campaignId,
     });
 
-    successCount++;
-  }
-
-  // Schritt 3: Bulk-Insert für points_log (alle auf einmal)
-  if (logEntries.length > 0) {
-    const { error: logError } = await (supabase.from("points_log") as any)
-      .insert(logEntries);
-
-    if (logError) {
-      console.error("[distributeGroupPoints:log] Fehler beim Bulk-Insert:", logError);
-      // Punkte wurden bereits verteilt, nur Log-Fehler
-    } else {
-      console.log("[distributeGroupPoints] ✓", logEntries.length, "points_log Einträge erstellt");
+    if (result.error) {
+      console.error(`[distributeGroupPoints:rpc:${userId}]`, result.error);
+      failedUsers.push(userData.username || userId);
+      continue;
     }
+
+    successCount++;
   }
 
   console.log("[distributeGroupPoints] Abgeschlossen:", successCount, "erfolgreich,", failedUsers.length, "fehlgeschlagen");

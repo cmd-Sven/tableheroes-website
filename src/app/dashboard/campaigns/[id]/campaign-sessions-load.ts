@@ -13,7 +13,8 @@ export type SessionTabRow = Record<string, unknown> & {
 };
 
 /**
- * Lädt zukünftige/live Sessions inkl. RSVP-Zusammenfassung für den GM (SessionsTab).
+ * Lädt geplante (Scheduled) und laufende (Live) Sessions inkl. RSVP für den GM (SessionsTab).
+ * Scheduled bleibt sichtbar auch nach Startzeit — verspäteter Live-Start / Beitreten möglich.
  */
 export async function loadUpcomingSessionsWithRsvpForGm(
   campaignId: string,
@@ -25,12 +26,10 @@ export async function loadUpcomingSessionsWithRsvpForGm(
     .order("start_time", { ascending: true });
 
   const sessions = (sessionsRaw || []) as SessionTabRow[];
-  const now = new Date();
   const upcomingSessions = sessions.filter(
     (s) =>
-      s.status !== "Cancelled" &&
-      (s.status === "Live" ||
-        (s.start_time && new Date(String(s.start_time)).getTime() > now.getTime())),
+      !["Completed", "Cancelled"].includes(s.status) &&
+      (s.status === "Live" || s.status === "Scheduled"),
   );
 
   let upcomingSessionsWithRsvp: SessionTabRow[] = upcomingSessions;
@@ -48,7 +47,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       (supabase.from("campaign_members") as any)
         .select("user_id")
         .eq("campaign_id", campaignId)
-        .in("status", ["Accepted", "Approved"]),
+        .in("status", ["Approved", "Active"]),
       (supabase.from("session_rsvps") as any)
         .select("session_id, user_id, rsvp_status, gm_confirmed")
         .in("session_id", scheduledIds),
@@ -90,7 +89,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,
-        canStart: pendingCount === 0 && prepOk,
+        canStart: prepOk,
         pendingCount,
         hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
       };

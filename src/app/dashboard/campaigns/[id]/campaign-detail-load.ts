@@ -103,9 +103,11 @@ export async function loadCampaignDetailPageData(
     | "Applied"
     | "Drafting"
     | "In_Review"
-    | "Accepted"
+    | "Changes_Proposed"
+    | "Approved"
+    | "Active"
     | "Rejected"
-    | "Pending" = "none";
+    | "Removed" = "none";
   let userHasCharacter = false;
   let isAcceptedMember = false;
   let isDeadOrArchived = false;
@@ -146,8 +148,8 @@ export async function loadCampaignDetailPageData(
 
       // User has access if accepted / am Charakter arbeiten / Review
       const validMemberStatuses = [
-        "Accepted",
         "Approved",
+        "Active",
         "Drafting",
         "In_Review",
         "Changes_Proposed",
@@ -162,7 +164,7 @@ export async function loadCampaignDetailPageData(
       console.log(
         "🔍 [DashboardPage] Derived isAcceptedMember:",
         isAcceptedMember,
-        "(valid statuses: Accepted, Drafting, In_Review)",
+        "(valid statuses: Approved, Active, Drafting, In_Review, Changes_Proposed)",
       );
     } else {
       console.log("🔍 [DashboardPage] No membership found for user");
@@ -202,12 +204,12 @@ export async function loadCampaignDetailPageData(
     status: string;
   }> | null;
 
-  // Zukünftige Termine ODER laufende Live-Sessions (GM muss diese sehen/beenden können)
+  // Geplant (Scheduled) oder Live — auch nach Startzeit sichtbar (verspäteter Start / Beitreten)
   const now = new Date();
   const upcomingSessions = (sessions || []).filter(
     (s: any) =>
-      s.status !== "Cancelled" &&
-      (s.status === "Live" || (s.start_time && new Date(s.start_time) > now)),
+      !["Completed", "Cancelled"].includes(s.status) &&
+      (s.status === "Live" || s.status === "Scheduled"),
   );
 
   // RSVP-Status für geplante Sessions (GM: kann Session starten?)
@@ -229,7 +231,7 @@ export async function loadCampaignDetailPageData(
         (supabase.from("campaign_members") as any)
           .select("user_id")
           .eq("campaign_id", id)
-          .in("status", ["Accepted", "Approved"]),
+          .in("status", ["Approved", "Active"]),
         (supabase.from("session_rsvps") as any)
           .select("session_id, user_id, rsvp_status, gm_confirmed")
           .in("session_id", scheduledIds),
@@ -485,7 +487,7 @@ export async function loadCampaignDetailPageData(
     const { count } = await (supabase.from("campaign_members") as any)
       .select("id", { count: "exact", head: true })
       .eq("campaign_id", id)
-      .eq("status", "Accepted");
+      .eq("status", "Approved");
     acceptedMembersCount = count || 0;
   }
 
@@ -527,7 +529,7 @@ export async function loadCampaignDetailPageData(
     const { data: bcm } = await (supabase.from("campaign_members") as any)
       .select("user_id")
       .eq("campaign_id", id)
-      .in("status", ["Accepted", "Approved"]);
+      .in("status", ["Approved", "Active"]);
     gmBroadcastRecipientCount = ((bcm as { user_id: string }[]) || []).filter(
       (row) => row.user_id !== userId,
     ).length;
@@ -799,7 +801,7 @@ export async function loadCampaignDetailPageData(
     let partyQuery = (supabase.from("characters") as any)
       .select("id, name, class, race, level, culture_lore_id, avatar_url, user_id")
       .eq("campaign_id", id)
-      .in("status", ["Active", "Alive", "Approved"]);
+      .in("status", ["Active", "Approved"]);
     if (myCharacterId) {
       partyQuery = partyQuery.neq("id", myCharacterId);
     }
@@ -1027,6 +1029,14 @@ export async function loadCampaignDetailPageData(
     }
   }
 
+  const { data: sessionArchivesRaw } = await (supabase.from(
+    "session_archives",
+  ) as any)
+    .select("*")
+    .eq("campaign_id", id)
+    .order("archived_at", { ascending: false });
+  const sessionArchives = (sessionArchivesRaw as any[]) || [];
+
   const pageData = {
     campaign,
     world,
@@ -1044,6 +1054,7 @@ export async function loadCampaignDetailPageData(
     sessions,
     upcomingSessions,
     upcomingSessionsWithRsvp,
+    sessionArchives,
     now,
     npcs,
     factions,

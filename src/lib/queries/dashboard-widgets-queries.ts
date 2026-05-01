@@ -35,7 +35,7 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
   const { data: memberships } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved"]);
+    .in("status", ["Approved", "Active"]);
 
   const campaignIds = [
     ...new Set(
@@ -124,7 +124,7 @@ export async function getRandomLoreEntry(userId: string): Promise<{
   const { data: memberships } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved"]);
+    .in("status", ["Approved", "Active"]);
 
   const campaignIds = [
     ...new Set(
@@ -297,7 +297,7 @@ export async function getUpcomingSessionsForUser(
   )
     .select("campaign_id")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
 
   const memberCampaignIds = (
     (memberRows as any[]) || []
@@ -367,9 +367,9 @@ export async function getUpcomingSessionsForUser(
   }
   const now = new Date();
   const staleLiveThresholdMs = 48 * 60 * 60 * 1000; // 48 Stunden
-  // Nächste Termine: zukünftig geplant, oder Live (max. 48h alt – sonst verwaist). Beendete nie anzeigen.
+  // Nächste Termine: Scheduled (auch nach Startzeit) oder Live (max. 48h seit Start, sonst verwaist).
   const sessions = allSessions
-    .filter((s: any) => !["Completed", "Ended", "Cancelled"].includes(s.status))
+    .filter((s: any) => !["Completed", "Cancelled"].includes(s.status))
     .filter(
       (s: any) => {
         if (s.status === "Live") {
@@ -380,8 +380,11 @@ export async function getUpcomingSessionsForUser(
           }
           return true;
         }
-        return s.start_time && new Date(s.start_time) > now;
-      }
+        if (s.status === "Scheduled") {
+          return true;
+        }
+        return false;
+      },
     )
     .slice(0, limit);
 
@@ -416,7 +419,7 @@ export async function getUpcomingSessionsForUser(
     `
     )
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
 
   // Gruppiere Teilnehmer nach campaign_id
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
@@ -525,7 +528,7 @@ export async function getPastSessionsForUser(
   const { data: memberRows } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
-    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
 
   const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
     .select("id")
@@ -563,7 +566,7 @@ export async function getPastSessionsForUser(
   const sessions = allSessions
     .filter(
       (s: any) =>
-        ["Completed", "Ended"].includes(s.status) ||
+        ["Completed"].includes(s.status) ||
         (s.start_time && new Date(s.start_time) <= now)
     )
     .slice(0, limit);
@@ -583,7 +586,7 @@ export async function getPastSessionsForUser(
   const { data: allMembersRaw } = await (supabase.from("campaign_members") as any)
     .select("campaign_id, user_id, users(id, username, avatar_url), characters(id, name, class, level, avatar_url)")
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
 
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
   for (const row of (allMembersRaw as any[]) || []) {
@@ -671,7 +674,7 @@ export async function getPendingCharacterCampaignsForUser(
     const { data: cmNeedChar } = await (supabase.from("campaign_members") as any)
       .select("id, status, character_id, campaign_id, campaigns!inner(id, name)")
       .eq("user_id", userId)
-      .in("status", ["Drafting", "In_Review", "Changes_Proposed", "Accepted", "Approved"]);
+      .in("status", ["Drafting", "In_Review", "Changes_Proposed", "Approved", "Active"]);
     const rows = (cmNeedChar as any[]) || [];
     const campIds = [...new Set(rows.map((r: any) => r.campaign_id).filter(Boolean))];
     const charByCampaign = new Map<string, string>();
