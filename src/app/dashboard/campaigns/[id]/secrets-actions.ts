@@ -156,7 +156,7 @@ export async function saveSecret(
   }
 
   // 3. Validate entity exists and belongs to campaign
-  let entityTable: string;
+  let entityTable: "npcs" | "factions" | "world_lore";
   if (entityType === "npc") {
     entityTable = "npcs";
   } else if (entityType === "faction") {
@@ -165,7 +165,8 @@ export async function saveSecret(
     entityTable = "world_lore";
   }
 
-  const { data: entityRaw } = await (supabase.from(entityTable) as any)
+  const { data: entityRaw } = await (supabase as any)
+    .from(entityTable)
     .select("id, campaign_id")
     .eq("id", entityId)
     .maybeSingle();
