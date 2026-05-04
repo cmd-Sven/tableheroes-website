@@ -21,6 +21,10 @@ import {
   markSessionPlanningComplete,
 } from "./session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
+import {
+  PastSessionsGallery,
+  type SessionArchiveItem,
+} from "@/src/components/dashboard/campaigns/PastSessionsGallery";
 
 type SessionItem = {
   id: string;
@@ -156,11 +160,20 @@ type Props = {
   /** Spieler: Nur bei Status 'Active' darf der Spieler Sessions betreten. */
   characterStatus?: string;
   upcomingSessions: Array<SessionItem>;
+  archives?: SessionArchiveItem[];
   locations: Array<{ id: string; name: string; type: string }>;
   npcs: Array<{ id: string; name: string; title: string | null }>;
 };
 
-export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSessions, locations, npcs }: Props) {
+export function SessionsTab({
+  campaignId,
+  isGM,
+  characterStatus,
+  upcomingSessions,
+  archives = [],
+  locations,
+  npcs,
+}: Props) {
   const canJoinSession = isGM || characterStatus === "Active";
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
@@ -274,8 +287,7 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
 
               const isLive = session.status === "Live";
               const isScheduled = session.status === "Scheduled";
-              const isEnded =
-                session.status === "Completed" || session.status === "Ended";
+              const isEnded = session.status === "Completed";
 
               return (
                 <div
@@ -347,14 +359,21 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
 
                     {isScheduled && isGM && (
                       session.canStart ? (
-                        <button
-                          type="button"
-                          onClick={() => handleStartSession(session.id)}
-                          disabled={isStarting}
-                          className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
-                        >
-                          🚀 Session starten
-                        </button>
+                        <div className="flex flex-col items-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStartSession(session.id)}
+                            disabled={isStarting}
+                            className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
+                          >
+                            🚀 Session starten
+                          </button>
+                          {(session.pendingCount ?? 0) > 0 && (
+                            <span className="font-libre text-[10px] text-amber-400">
+                              Warnung: {session.pendingCount} ohne Zusage/Freigabe
+                            </span>
+                          )}
+                        </div>
                       ) : (session.pendingCount ?? 0) === 0 &&
                         session.gm_prep_complete === false ? (
                         <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
@@ -395,6 +414,8 @@ export function SessionsTab({ campaignId, isGM, characterStatus, upcomingSession
           </div>
         )}
       </div>
+
+      <PastSessionsGallery campaignId={campaignId} archives={archives} />
 
       {isGM && (
         <>
