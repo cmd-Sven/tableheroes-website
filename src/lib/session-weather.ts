@@ -1,8 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Cloud,
-  CloudFog,
-  CloudHail,
   CloudLightning,
   CloudRain,
   CloudSnow,
@@ -11,32 +9,31 @@ import {
 } from "lucide-react";
 
 export type WeatherPresetId =
-  | "clear"
-  | "sunny"
-  | "cloudy"
+  | "blizzard"
+  | "storm"
+  | "heavy_wind"
+  | "clouds"
   | "rain"
   | "snow"
-  | "fog"
-  | "storm"
-  | "wind"
-  | "hail";
+  | "sun"
+  | "sun_clouds";
 
 export type WeatherIntensity = 1 | 2 | 3;
 
 export const WEATHER_PRESET_ORDER: WeatherPresetId[] = [
-  "clear",
-  "sunny",
-  "cloudy",
+  "blizzard",
+  "storm",
+  "heavy_wind",
+  "clouds",
   "rain",
   "snow",
-  "fog",
-  "storm",
-  "wind",
-  "hail",
+  "sun",
+  "sun_clouds",
 ];
 
 type PresetMeta = {
   label: string;
+  iconFilename: string;
   levels: [string, string, string];
   /** Kurze mechanische / atmosphärische Hinweise für Spieler:innen */
   effects: [string[], string[], string[]];
@@ -44,32 +41,46 @@ type PresetMeta = {
 };
 
 export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
-  clear: {
-    label: "Klar / heiter",
+  blizzard: {
+    label: "Blizzard",
+    iconFilename: "Blizzard.png",
     levels: [
-      "Heiter, kaum Wind",
-      "Klarer Himmel",
-      "Strahlend klar (Blendung möglich)",
+      "Schneeböen",
+      "Blizzard",
+      "Whiteout",
     ],
     effects: [
-      ["Unauffällige Bedingungen", "Normale Sicht"],
-      ["Gute Sicht", "Ruhiges Wetter"],
-      ["Sehr gute Sicht", "Intensive Sonne kann blenden"],
+      ["Sicht deutlich reduziert", "Kälte spürbar"],
+      ["Schwieriges Gelände", "Orientierung erschwert"],
+      ["Kaum Sicht", "Fortbewegung und Orientierung extrem riskant"],
     ],
-    icon: Sun,
+    icon: CloudSnow,
   },
-  sunny: {
-    label: "Sonnig",
-    levels: ["Leicht sonnig", "Sonnig / warm", "Extreme Hitze / Glutsonne"],
+  storm: {
+    label: "Gewitter",
+    iconFilename: "Gewitter.png",
+    levels: ["Fernes Gewitter", "Unwetter zieht auf", "Schweres Gewitter"],
     effects: [
-      ["Angenehme Wärme"],
-      ["Hitzeeinfluss auf Marsch möglich", "Längere Rast empfohlen"],
-      ["Erschöpfung riskant", "Sonnenbrand / Hitzschlag möglich"],
+      ["Donner in der Ferne", "Leichte Unruhe bei Reittieren"],
+      ["Blitzegefahr", "Starker Wind", "Sicht schwankend"],
+      ["Extreme Gefahr im Freien", "Umsturz / Fallen riskant", "Sehr schlechte Sicht"],
     ],
-    icon: Sun,
+    icon: CloudLightning,
   },
-  cloudy: {
-    label: "Bewölkt",
+  heavy_wind: {
+    label: "Heftiger Wind",
+    iconFilename: "heftiger_wind.png",
+    levels: ["Starke Böen", "Sturmwind", "Orkanböen"],
+    effects: [
+      ["Geräusche werden verweht", "Lose Gegenstände bewegen sich"],
+      ["Schwieriger Fernkampf möglich", "Staub / Laub erschwert Sicht"],
+      ["Stehen / Balancieren schwer", "Flug / Klettern gefährlich"],
+    ],
+    icon: Wind,
+  },
+  clouds: {
+    label: "Nur Wolken",
+    iconFilename: "nur_wolken.png",
     levels: ["Leicht bewölkt", "Stark bewölkt", "Düstere Wolkendecke"],
     effects: [
       ["Weiche Beleuchtung", "Normale Sicht"],
@@ -80,6 +91,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   rain: {
     label: "Regen",
+    iconFilename: "Regen.png",
     levels: ["Leichter Regen", "Starker Regen", "Extremer Starkregen"],
     effects: [
       ["Leichte Sichtbeeinträchtigung", "Boden wird glatt"],
@@ -90,6 +102,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   snow: {
     label: "Schnee",
+    iconFilename: "Schnee.png",
     levels: ["Leichter Schneefall", "Starker Schneefall", "Blizzard / Schneesturm"],
     effects: [
       ["Leichte Sichtbeeinträchtigung", "Kälte spürbar"],
@@ -102,45 +115,27 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
     ],
     icon: CloudSnow,
   },
-  fog: {
-    label: "Nebel",
-    levels: ["Leichter Dunst", "Dichter Nebel", "Undurchdringlicher Nebel"],
+  sun: {
+    label: "Sonne",
+    iconFilename: "sonne.png",
+    levels: ["Leicht sonnig", "Sonnig / warm", "Extreme Hitze / Glutsonne"],
     effects: [
-      ["Leichte Sichtreduktion auf Distanz"],
-      ["Starke Sichtbehinderung", "Gruppe kann auseinandergeraten"],
-      ["Kaum Sicht über wenige Meter", "Navigation extrem schwierig"],
+      ["Angenehme Wärme"],
+      ["Hitzeeinfluss auf Marsch möglich", "Längere Rast empfohlen"],
+      ["Erschöpfung riskant", "Sonnenbrand / Hitzschlag möglich"],
     ],
-    icon: CloudFog,
+    icon: Sun,
   },
-  storm: {
-    label: "Gewitter / Sturm",
-    levels: ["Fernes Gewitter", "Unwetter zieht auf", "Schweres Unwetter"],
+  sun_clouds: {
+    label: "Sonne & Wolken",
+    iconFilename: "sonne_wolken.png",
+    levels: ["Aufgelockerte Wolken", "Wechselhaft", "Schnell ziehende Wolken"],
     effects: [
-      ["Donner in der Ferne", "Leichte Unruhe bei Reittieren"],
-      ["Blitzegefahr", "Starker Wind", "Sicht schwankend"],
-      ["Extreme Gefahr im Freien", "Umsturz / Fallen riskant", "Sehr schlechte Sicht"],
+      ["Freundliche Bedingungen", "Normale Sicht"],
+      ["Licht und Schatten wechseln", "Wetterumschwung möglich"],
+      ["Unruhige Atmosphäre", "Ferne Ziele schwerer einzuschätzen"],
     ],
-    icon: CloudLightning,
-  },
-  wind: {
-    label: "Wind",
-    levels: ["Leichte Brise", "Starker Wind", "Orkanböen"],
-    effects: [
-      ["Unauffällig", "Geräusche leicht verstärkt"],
-      ["Schwieriger Fernkampf möglich", "Staub / lose Gegenstände"],
-      ["Stehen / Balancieren schwer", "Flug / Klettern gefährlich"],
-    ],
-    icon: Wind,
-  },
-  hail: {
-    label: "Hagel",
-    levels: ["Graupel / leichter Hagel", "Hagel", "Schwerer Hagelschlag"],
-    effects: [
-      ["Unbequem", "leichte Deckung sinnvoll"],
-      ["Verletzungsgefahr ohne Deckung", "Tiere scheu"],
-      ["Hohe Verletzungsgefahr", "Schäden an Ausrüstung / Zelten möglich"],
-    ],
-    icon: CloudHail,
+    icon: Sun,
   },
 };
 
