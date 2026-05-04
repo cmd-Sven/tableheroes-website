@@ -50,6 +50,7 @@ import {
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
+import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
 import { StageDeckHand } from "./StageDeckHand";
 import {
@@ -63,14 +64,17 @@ import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInvento
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
-import { TravelDowntimeGmPanel } from "@/src/components/session/TravelDowntimeGmPanel";
+import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
 import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { LootChestOverlay } from "@/src/components/session/LootChestOverlay";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
+import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
 import {
   parseFapAllocations,
   type FapAllocationsMap,
 } from "@/src/lib/downtime-fap-types";
+import { npcReputationSmileyFromScore } from "@/src/lib/npc-reputation-smiley";
+import { sortNpcsByLocationPriority } from "@/src/lib/npc-stage-display";
 
 type LiveState = {
   id: string;
@@ -339,6 +343,9 @@ type CampaignNpc = {
   is_revealed?: boolean | null;
   is_merchant?: boolean | null;
   shop_id?: string | null;
+  /** world_lore.id – gleiche Semantik wie Session-Ort */
+  current_location_id?: string | null;
+  home_location_id?: string | null;
 };
 
 type CampaignFaction = {
@@ -356,12 +363,11 @@ type StagePortraitModal = {
   imageUrl: string;
 };
 
-type NpcReactionType = "positive" | "negative";
-
 type ActiveNpcReaction = {
   id: string;
   npcId: string;
-  type: NpcReactionType;
+  /** Anzuzeigendes Emoji (Ruf-Stand), Broadcast nutzt scoreAfter → Smiley */
+  emoji: string;
 };
 
 type TemperatureState = "cold" | "normal" | "hot";
@@ -514,7 +520,7 @@ function StageNpcCard({
             key={reaction.id}
             className="pointer-events-none absolute left-1/2 top-8 z-20 -translate-x-1/2 animate-[npc-reaction-float_3s_ease-out_forwards] text-6xl drop-shadow-[0_0_18px_rgba(0,0,0,0.85)]"
           >
-            {reaction.type === "positive" ? "😍" : "😡"}
+            {reaction.emoji}
           </div>
         ))}
 
@@ -544,8 +550,12 @@ function StageNpcCard({
             >
               -
             </button>
-              <span className="min-w-10 px-2 text-center font-barlow text-xs font-extrabold text-accent-gold">
-                {reputationScore > 0 ? `+${reputationScore}` : reputationScore}
+              <span
+                className="flex min-w-[2.5rem] items-center justify-center px-1 text-2xl leading-none"
+                title={isGM ? `Ruf ${reputationScore > 0 ? "+" : ""}${reputationScore} (nur SL)` : undefined}
+                aria-hidden={!isGM}
+              >
+                {npcReputationSmileyFromScore(reputationScore)}
               </span>
             <button
               type="button"
@@ -826,7 +836,7 @@ export function LiveSessionBoard({
   const [fateGmSettingsOpen, setFateGmSettingsOpen] = useState(false);
   const [weatherGmSettingsOpen, setWeatherGmSettingsOpen] = useState(false);
   const [tempGmSettingsOpen, setTempGmSettingsOpen] = useState(false);
-  const [travelGmSettingsOpen, setTravelGmSettingsOpen] = useState(false);
+  const [travelGmModalOpen, setTravelGmModalOpen] = useState(false);
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
   const [lootGmModalOpen, setLootGmModalOpen] = useState(false);
@@ -930,6 +940,7 @@ export function LiveSessionBoard({
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
   const [stageFactionSearch, setStageFactionSearch] = useState("");
+  const [npcSearchModalOpen, setNpcSearchModalOpen] = useState(false);
   const [stageDropHighlight, setStageDropHighlight] = useState(false);
   const [stagePortrait, setStagePortrait] = useState<StagePortraitModal | null>(
     null,
@@ -1025,10 +1036,9 @@ export function LiveSessionBoard({
     void resolveLiveStateBase();
   }, [sessionId, viableInitial, resolveLiveStateBase]);
 
-  const showNpcReaction = useCallback(
-    (npcId: string, type: NpcReactionType) => {
-      const id = `${npcId}-${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      setNpcReactions((prev) => [...prev, { id, npcId, type }]);
+  const showNpcReaction = useCallback((npcId: string, emoji: string) => {
+      const id = `${npcId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setNpcReactions((prev) => [...prev, { id, npcId, emoji }]);
       window.setTimeout(() => {
         setNpcReactions((prev) => prev.filter((item) => item.id !== id));
       }, 3000);
@@ -1087,13 +1097,23 @@ export function LiveSessionBoard({
       .on("broadcast", { event: "npc_reaction" }, (payload) => {
         const reaction = payload.payload as {
           npcId?: unknown;
+          scoreAfter?: unknown;
           type?: unknown;
         };
         const npcId =
           reaction.npcId != null ? String(reaction.npcId) : "";
-        const type = reaction.type === "positive" ? "positive" : "negative";
         if (!npcId) return;
-        showNpcReaction(npcId, type);
+        const scoreN =
+          reaction.scoreAfter != null ? Number(reaction.scoreAfter) : NaN;
+        if (Number.isFinite(scoreN)) {
+          showNpcReaction(npcId, npcReputationSmileyFromScore(scoreN));
+        } else {
+          const legacy = reaction.type === "positive" ? "positive" : "negative";
+          showNpcReaction(
+            npcId,
+            legacy === "positive" ? npcReputationSmileyFromScore(20) : npcReputationSmileyFromScore(-20),
+          );
+        }
       })
       .on("presence", { event: "sync" }, () => {
         const st = channel.presenceState();
@@ -1220,6 +1240,29 @@ export function LiveSessionBoard({
     [allCampaignNpcs, activeNpcIds],
   );
 
+  const sortedActiveNpcs = useMemo(
+    () =>
+      sortNpcsByLocationPriority(
+        activeNpcs,
+        liveState?.current_location_lore_id ?? null,
+      ),
+    [activeNpcs, liveState?.current_location_lore_id],
+  );
+
+  const gmNpcSearchRows = useMemo(
+    () =>
+      allCampaignNpcs.map((n) => ({
+        id: String(n.id),
+        name: n.name,
+        title: n.title ?? null,
+        image_url: n.image_url ?? null,
+        is_revealed: n.is_revealed,
+        current_location_id: n.current_location_id ?? null,
+        home_location_id: n.home_location_id ?? null,
+      })),
+    [allCampaignNpcs],
+  );
+
   useEffect(() => {
     if (activeNpcs.length === 0) {
       setNpcReputationScores({});
@@ -1282,7 +1325,7 @@ export function LiveSessionBoard({
   );
 
   const stageHasDeckContent =
-    activeNpcs.length > 0 ||
+    sortedActiveNpcs.length > 0 ||
     activeFactions.length > 0 ||
     Boolean(liveState?.current_loot_id);
 
@@ -1332,11 +1375,16 @@ export function LiveSessionBoard({
 
   const filteredNpcsForStageManager = useMemo(() => {
     const term = stageSearch.trim().toLowerCase();
-    if (!term) return npcStagePool;
-    return npcStagePool.filter((npc) =>
-      `${npc.name} ${npc.title || ""}`.toLowerCase().includes(term),
+    const base = !term
+      ? npcStagePool
+      : npcStagePool.filter((npc) =>
+          `${npc.name} ${npc.title || ""}`.toLowerCase().includes(term),
+        );
+    return sortNpcsByLocationPriority(
+      base,
+      liveState?.current_location_lore_id ?? null,
     );
-  }, [npcStagePool, stageSearch]);
+  }, [npcStagePool, stageSearch, liveState?.current_location_lore_id]);
 
   const filteredFactionsForStageManager = useMemo(() => {
     const term = stageFactionSearch.trim().toLowerCase();
@@ -1347,8 +1395,12 @@ export function LiveSessionBoard({
   }, [factionStagePool, stageFactionSearch]);
 
   const inHandNpcs = useMemo(
-    () => npcStagePool.filter((n) => !activeNpcIds.has(String(n.id))),
-    [npcStagePool, activeNpcIds],
+    () =>
+      sortNpcsByLocationPriority(
+        npcStagePool.filter((n) => !activeNpcIds.has(String(n.id))),
+        liveState?.current_location_lore_id ?? null,
+      ),
+    [npcStagePool, activeNpcIds, liveState?.current_location_lore_id],
   );
 
   const inHandFactions = useMemo(
@@ -1357,6 +1409,20 @@ export function LiveSessionBoard({
   );
 
   const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
+
+  const revealNpcOnCampaignIfNeeded = useCallback(
+    async (npcId: string) => {
+      const npc = allCampaignNpcs.find((entry) => String(entry.id) === npcId);
+      if (!npc || npc.is_revealed === true) return;
+      try {
+        await setCampaignVisibility(campaignId, "npc", npcId, true);
+        router.refresh();
+      } catch (err) {
+        console.error("[LiveSessionBoard] reveal NPC on stage:", err);
+      }
+    },
+    [allCampaignNpcs, campaignId, router],
+  );
 
   function placeOnStage(kind: "npc" | "faction", id: string) {
     void (async () => {
@@ -1380,6 +1446,7 @@ export function LiveSessionBoard({
           "stage_card",
           `Eine neue Präsenz betritt das Geschehen: ${npc?.name ?? "Unbekannt"}.`,
         );
+        await revealNpcOnCampaignIfNeeded(sid);
       } else {
         const currentIds = new Set(
           (base.visible_faction_ids || []).map(String),
@@ -1422,15 +1489,16 @@ export function LiveSessionBoard({
     startTransition(async () => {
       try {
         const row = await adjustNpcReputation(campaignId, npcId, amount);
+        const emoji = npcReputationSmileyFromScore(row.reputation_score);
         setNpcReputationScores((current) => ({
           ...current,
           [npcId]: row.reputation_score,
         }));
-        const type: NpcReactionType = amount > 0 ? "positive" : "negative";
+        showNpcReaction(npcId, emoji);
         await liveChannelRef.current?.send({
           type: "broadcast",
           event: "npc_reaction",
-          payload: { npcId, type },
+          payload: { npcId, scoreAfter: row.reputation_score },
         });
       } catch (err: any) {
         console.error("[LiveSessionBoard] adjustNpcReputation:", err);
@@ -1903,6 +1971,15 @@ export function LiveSessionBoard({
                     >
                       Stage live
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setNpcSearchModalOpen(true)}
+                      className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-3 py-2 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:border-accent-gold transition-colors"
+                      title="NPCs suchen und auf die Bühne legen"
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                      NPCs
+                    </button>
                   </>
                 )}
               </div>
@@ -2076,31 +2153,21 @@ export function LiveSessionBoard({
 
               {isGM && (
                 <div className="space-y-3">
-                  <GmSlideSettingsPanel
-                    isGM
-                    open={travelGmSettingsOpen}
-                    onToggle={() => setTravelGmSettingsOpen((v) => !v)}
-                    settingsLabel="Reise-Manager öffnen"
-                    preview={
-                      <div className="flex min-h-[4.5rem] items-center justify-center rounded-xl border border-white/20 bg-white/10 p-4 backdrop-blur-md">
-                        <Map className="h-12 w-12 text-accent-gold" aria-hidden />
-                      </div>
-                    }
-                    previewClassName="w-full"
+                  <button
+                    type="button"
+                    onClick={() => setTravelGmModalOpen(true)}
+                    className="flex w-full min-h-[4.5rem] items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-left backdrop-blur-md transition-colors hover:border-accent-gold/40 hover:bg-white/[0.12]"
                   >
-                    <TravelDowntimeGmPanel
-                      sessionId={sessionId}
-                      partyCharacters={partyCharacters}
-                      downtimeActive={!!liveState?.downtime_active}
-                      downtimeCurrentDay={liveState?.downtime_current_day ?? 1}
-                      downtimeTotalDays={liveState?.downtime_total_days ?? 1}
-                      fapAllocations={liveState?.fap_allocations ?? {}}
-                      onReload={async () => {
-                        await refreshLiveState();
-                        router.refresh();
-                      }}
-                    />
-                  </GmSlideSettingsPanel>
+                    <Map className="h-10 w-10 shrink-0 text-accent-gold" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold">
+                        Reise &amp; FAP
+                      </span>
+                      <span className="mt-0.5 block font-libre text-[11px] leading-snug text-gray-400">
+                        Großes Fenster: Reisetage, Gruppe, Rationen — nicht mehr in der schmalen Leiste.
+                      </span>
+                    </span>
+                  </button>
 
                   <GmSlideSettingsPanel
                     isGM
@@ -2214,7 +2281,23 @@ export function LiveSessionBoard({
               }}
             >
             {isGM ? (
-              <div className="pointer-events-none absolute bottom-0 right-0 z-[28] flex items-end justify-end p-3 md:p-5">
+              <div className="pointer-events-none absolute bottom-0 right-0 z-[28] flex flex-col items-end gap-2 p-3 md:p-5">
+                <button
+                  type="button"
+                  onClick={() => setTravelGmModalOpen(true)}
+                  className="pointer-events-auto flex items-center gap-2 rounded-xl border border-amber-700/60 bg-background-card/95 px-3 py-2 font-barlow text-[10px] font-extrabold uppercase tracking-wide text-amber-100 shadow-lg backdrop-blur-md transition-colors hover:bg-amber-950/50 sm:px-4 sm:py-2.5 sm:text-xs"
+                >
+                  <Map className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden />
+                  <span className="hidden min-[380px]:inline">{"Reise & FAP"}</span>
+                  <span className="min-[380px]:hidden">Reise</span>
+                  {liveState?.downtime_active ? (
+                    <span
+                      className="ml-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400 ring-2 ring-amber-400/40"
+                      title="Reise aktiv"
+                      aria-hidden
+                    />
+                  ) : null}
+                </button>
                 <button
                   type="button"
                   onClick={() => setLootGmModalOpen(true)}
@@ -2523,16 +2606,16 @@ export function LiveSessionBoard({
                     isGM={isGM}
                   />
                 ) : null}
-                {activeNpcs.length > 0 && (
+                {sortedActiveNpcs.length > 0 && (
                   <div
                     className={
-                      activeNpcs.length === 1
+                      sortedActiveNpcs.length === 1
                         ? "flex justify-center"
                         : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
                     }
                   >
                     <AnimatePresence mode="popLayout">
-                      {activeNpcs.map((npc) => {
+                      {sortedActiveNpcs.map((npc) => {
                         const reactionsForNpc = npcReactions.filter(
                           (reaction) => reaction.npcId === String(npc.id),
                         );
@@ -2540,7 +2623,7 @@ export function LiveSessionBoard({
                           <StageNpcCard
                             key={npc.id}
                             npc={npc}
-                            isSingle={activeNpcs.length === 1}
+                            isSingle={sortedActiveNpcs.length === 1}
                             isGM={isGM}
                             isCombatMode={!!liveState?.is_combat_mode}
                             isUpdating={isUpdating}
@@ -2607,7 +2690,9 @@ export function LiveSessionBoard({
                 </p>
               </div>
             ) : (
-              <div className="absolute inset-x-0 -top-[146px] z-[60] flex justify-center gap-5 overflow-x-auto overflow-y-visible px-1 pb-8">
+              <div className="absolute inset-x-0 -top-[146px] z-[60] flex justify-center px-1 pb-8 pointer-events-none">
+                <div className="pointer-events-auto w-fit max-w-full overflow-x-auto overflow-y-visible">
+                  <div className="flex justify-center gap-5">
                 {partyCharacters.map((pc) => {
                   const pid = pc.playerUserId ? String(pc.playerUserId) : "";
                   const self = pid === userId;
@@ -2728,6 +2813,8 @@ export function LiveSessionBoard({
                     </motion.div>
                   );
                 })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2754,6 +2841,37 @@ export function LiveSessionBoard({
             await refreshLiveState();
             router.refresh();
             setLootGmModalOpen(false);
+          }}
+        />
+      ) : null}
+
+      {isGM ? (
+        <TravelDowntimeGmModal
+          open={travelGmModalOpen}
+          onClose={() => setTravelGmModalOpen(false)}
+          sessionId={sessionId}
+          partyCharacters={partyCharacters}
+          downtimeActive={!!liveState?.downtime_active}
+          downtimeCurrentDay={liveState?.downtime_current_day ?? 1}
+          downtimeTotalDays={liveState?.downtime_total_days ?? 1}
+          fapAllocations={liveState?.fap_allocations ?? {}}
+          onReload={async () => {
+            await refreshLiveState();
+            router.refresh();
+          }}
+        />
+      ) : null}
+
+      {isGM ? (
+        <GmNpcSearchModal
+          open={npcSearchModalOpen}
+          onClose={() => setNpcSearchModalOpen(false)}
+          npcs={gmNpcSearchRows}
+          stageDeckNpcIds={stageDeckNpcIds}
+          currentLocationLoreId={liveState?.current_location_lore_id ?? null}
+          activeNpcIds={activeNpcIds}
+          onPlaceOnStage={(id) => {
+            placeOnStage("npc", id);
           }}
         />
       ) : null}
@@ -2937,13 +3055,25 @@ export function LiveSessionBoard({
                   Stage (live)
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsStageManagerOpen(false)}
-                className="shrink-0 rounded p-1 text-gray-400 hover:text-white hover:bg-background-dark transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setNpcSearchModalOpen(true)}
+                  className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:border-accent-gold transition-colors"
+                  title="NPCs suchen und auf die Bühne legen"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  NPCs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsStageManagerOpen(false)}
+                  className="rounded p-1 text-gray-400 hover:text-white hover:bg-background-dark transition-colors"
+                  aria-label="Schließen"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="shrink-0 space-y-2 border-b border-hero-dark px-4 py-3">
@@ -2994,12 +3124,16 @@ export function LiveSessionBoard({
                             );
                             if (e.target.checked) {
                               currentIds.add(npc.id);
+                              updateLiveState({
+                                visible_npc_ids: Array.from(currentIds),
+                              });
+                              void revealNpcOnCampaignIfNeeded(String(npc.id));
                             } else {
                               currentIds.delete(npc.id);
+                              updateLiveState({
+                                visible_npc_ids: Array.from(currentIds),
+                              });
                             }
-                            updateLiveState({
-                              visible_npc_ids: Array.from(currentIds),
-                            });
                           }}
                           className="h-4 w-4 shrink-0 rounded border-hero-border text-hero-vibrant focus:ring-hero-vibrant"
                         />

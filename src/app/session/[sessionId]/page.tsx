@@ -49,10 +49,15 @@ function normalizeActiveQuests(rows: unknown[]) {
 
 type Props = {
   params: Promise<{ sessionId: string }>;
+  searchParams?: Promise<{ mode?: string | string[] }>;
 };
 
-export default async function SessionPage({ params }: Props) {
+export default async function SessionPage({ params, searchParams }: Props) {
   const { sessionId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const modeParam = Array.isArray(resolvedSearchParams.mode)
+    ? resolvedSearchParams.mode[0]
+    : resolvedSearchParams.mode;
 
   // Basic UUID validation (if you use UUIDs for sessions)
   const uuidRegex =
@@ -104,11 +109,13 @@ export default async function SessionPage({ params }: Props) {
   }
 
   // Beendete oder abgesagte Sessions können nicht mehr betreten werden
-  if (["Completed", "Ended", "Cancelled"].includes(session.status)) {
+  if (["Completed", "Cancelled"].includes(session.status)) {
     redirect(`/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&ended=1`);
   }
 
   const isGM = isCampaignGm(campaign, user.id);
+  const forcePlayerView = modeParam === "player" && isGM;
+  const viewAsGM = isGM && !forcePlayerView;
 
   /** Geplant: nur GM darf die Session-Oberfläche öffnen (Vorbereitung ohne Spieler). */
   if (session.status === "Scheduled" && !isGM) {
@@ -126,7 +133,7 @@ export default async function SessionPage({ params }: Props) {
   if (
     isGM &&
     !liveState &&
-    !["Completed", "Ended", "Cancelled"].includes(session.status)
+    !["Completed", "Cancelled"].includes(session.status)
   ) {
     const ensured = await ensureSessionPrepLiveState(sessionId);
     if (ensured) {
@@ -134,9 +141,25 @@ export default async function SessionPage({ params }: Props) {
     }
   }
 
-  // 4. Party-Tray: get_session_party_tray (Zusage/GM-Freigabe + user_id für Presence),
-  //    sonst get_session_party_members, sonst zweistufiger Fallback.
+  // 4. Party: Tray-RPC → Members-RPC → Fallback (Survival-Felder in RPCs / einer Query)
   const campaignId = (session as { campaign_id: string }).campaign_id;
+
+  function survivalFromPartyRow(c: Record<string, unknown>): {
+    rations_count: number;
+    starvation_days: number;
+  } {
+    const rRaw = (c as { rations_count?: unknown }).rations_count;
+    const sRaw = (c as { starvation_days?: unknown }).starvation_days;
+    const rations_count =
+      rRaw === undefined || rRaw === null
+        ? 0
+        : Math.min(10, Math.max(0, Math.round(Number(rRaw))));
+    const starvation_days =
+      sRaw === undefined || sRaw === null
+        ? 0
+        : Math.max(0, Math.round(Number(sRaw)));
+    return { rations_count, starvation_days };
+  }
 
   type PartyChar = {
     id: string;
@@ -146,6 +169,8 @@ export default async function SessionPage({ params }: Props) {
     level: number | null;
     avatar_url: string | null;
     playerUserId?: string | null;
+    rations_count: number;
+    starvation_days: number;
   };
 
   let partyCharacters: PartyChar[] = [];
@@ -169,6 +194,7 @@ export default async function SessionPage({ params }: Props) {
       avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
       playerUserId:
         c.member_user_id != null ? String(c.member_user_id) : null,
+      ...survivalFromPartyRow(c as Record<string, unknown>),
     }));
   }
 
@@ -189,6 +215,7 @@ export default async function SessionPage({ params }: Props) {
               ? c.level
               : null,
           avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+          ...survivalFromPartyRow(c as Record<string, unknown>),
         }),
       );
     }
@@ -198,7 +225,7 @@ export default async function SessionPage({ params }: Props) {
     const { data: memberPartyRows } = await (supabase.from("campaign_members") as any)
       .select("character_id, user_id")
       .eq("campaign_id", campaignId)
-      .in("status", ["Accepted", "Approved", "Active"])
+      .in("status", ["Approved", "Active"])
       .not("character_id", "is", null);
 
     const characterIds = [
@@ -211,7 +238,7 @@ export default async function SessionPage({ params }: Props) {
 
     if (characterIds.length > 0) {
       const { data: charRows } = await (supabase.from("characters") as any)
-        .select("id, name, class, race, level, avatar_url")
+        .select("id, name, class, race, level, avatar_url, rations_count, starvation_days")
         .in("id", characterIds)
         .eq("campaign_id", campaignId);
 
@@ -246,6 +273,7 @@ export default async function SessionPage({ params }: Props) {
               : null,
           avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
           playerUserId: charToPlayer.get(String(c.id)) ?? null,
+          ...survivalFromPartyRow(c as Record<string, unknown>),
         }));
     }
   }
@@ -254,7 +282,7 @@ export default async function SessionPage({ params }: Props) {
   const npcsFromCampaign = await getNPCs(
     (session as any).campaign_id,
     user.id,
-    isGM
+    viewAsGM
   );
   const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({
     id: String(npc.id),
@@ -263,6 +291,12 @@ export default async function SessionPage({ params }: Props) {
     description: npc.description != null ? String(npc.description) : null,
     image_url: npc.image_url != null ? String(npc.image_url) : null,
     is_revealed: !!npc.is_revealed,
+    is_merchant: !!npc.is_merchant,
+    shop_id: npc.shop_id != null ? String(npc.shop_id) : null,
+    current_location_id:
+      npc.current_location_id != null ? String(npc.current_location_id) : null,
+    home_location_id:
+      npc.home_location_id != null ? String(npc.home_location_id) : null,
   }));
 
   const factionsRaw = await getFactionsWithMembers((session as any).campaign_id);
@@ -274,7 +308,7 @@ export default async function SessionPage({ params }: Props) {
     description: f.description != null ? String(f.description) : null,
     is_revealed: f.is_revealed ?? false,
   }));
-  if (!isGM) {
+  if (!viewAsGM) {
     allCampaignFactions = allCampaignFactions.filter((f) => f.is_revealed);
   }
 
@@ -287,13 +321,22 @@ export default async function SessionPage({ params }: Props) {
       ? session.stage_deck_faction_ids.map(String)
       : null;
 
-  const loreLocationOptions = isGM
+  const loreLocationOptions = viewAsGM
     ? (await getLoreEntries((session as any).campaign_id))
         .filter((e: { type?: string | null }) => isLocationType(String(e.type ?? "")))
-        .map((e: { id: string; name?: string | null; type?: string | null }) => ({
+        .map((e: {
+          id: string;
+          name?: string | null;
+          type?: string | null;
+          image_url?: string | null;
+          default_image_url?: string | null;
+        }) => ({
           id: String(e.id),
           name: String(e.name ?? "Ort"),
           type: e.type != null ? String(e.type) : null,
+          image_url: e.image_url != null ? String(e.image_url) : null,
+          default_image_url:
+            e.default_image_url != null ? String(e.default_image_url) : null,
         }))
         .sort((a: { name: string }, b: { name: string }) =>
           a.name.localeCompare(b.name, "de"),
@@ -307,7 +350,7 @@ export default async function SessionPage({ params }: Props) {
 
   let sessionLocationLoreReadable = false;
   if (locLoreId) {
-    if (isGM) {
+    if (viewAsGM) {
       sessionLocationLoreReadable = true;
     } else {
       const loreVis = await getVisibilityForCampaign(
@@ -349,6 +392,7 @@ export default async function SessionPage({ params }: Props) {
       campaignId={(session as any).campaign_id as string}
       sessionStatus={session.status}
       isGM={isGM}
+      forcePlayerView={forcePlayerView}
       userId={user.id}
       initialLiveState={
         liveState ? serializeForClient(liveState) : null
