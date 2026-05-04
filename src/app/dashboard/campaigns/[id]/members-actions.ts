@@ -7,13 +7,14 @@ export type MemberWithCharacter = {
   user_id: string;
   character_id: string | null;
   status: string;
+  campaign_rank: string | null;
   application_message: string | null;
   user: {
     id: string;
     username: string;
     avatar_url: string | null;
     email?: string;
-    current_rank?: string | null;
+    campaign_rank?: string | null;
   };
   character: {
     id: string;
@@ -57,7 +58,7 @@ export async function getGmCampaignMembersWithCharacters(
 
   const { data: members, error: membersError } = await supabase
     .from("campaign_members")
-    .select("id, user_id, character_id, status, application_message")
+    .select("id, user_id, character_id, status, application_message, campaign_rank")
     .eq("campaign_id", campaignId)
     .order("created_at", { ascending: true });
 
@@ -66,14 +67,27 @@ export async function getGmCampaignMembersWithCharacters(
     return { drafting: [], inReview: [], accepted: [] };
   }
 
-  const memberList = (members || []) as { id: string; user_id: string; character_id: string | null; status: string; application_message: string | null }[];
+  const memberList = (members || []) as {
+    id: string;
+    user_id: string;
+    character_id: string | null;
+    status: string;
+    campaign_rank: string | null;
+    application_message: string | null;
+  }[];
 
   const userIds = [...new Set(memberList.map((m) => m.user_id).filter(Boolean))];
-  let charIds = [...new Set(memberList.map((m) => m.character_id).filter(Boolean))];
+  let charIds: string[] = [
+    ...new Set(
+      memberList
+        .map((m) => m.character_id)
+        .filter((id): id is string => id != null && String(id).trim() !== ""),
+    ),
+  ];
 
   // Fallback: Accepted/Approved ohne character_id – Charakter per user_id + campaign_id laden
   const membersWithoutChar = memberList.filter(
-    (m) => !m.character_id && ["Accepted", "Approved"].includes(m.status)
+    (m) => !m.character_id && ["Approved", "Active"].includes(m.status)
   );
   if (membersWithoutChar.length > 0) {
     const fallbackUserIds = membersWithoutChar.map((m) => m.user_id);
@@ -81,7 +95,7 @@ export async function getGmCampaignMembersWithCharacters(
       .from("characters")
       .select("id, name, class, race, level, status, biography, avatar_url, user_id, campaign_id, culture_lore_id, languages, faction_membership, current_location_id")
       .in("user_id", fallbackUserIds)
-      .in("status", ["Active", "Alive", "Approved", "In_Review"])
+      .in("status", ["Active", "Approved", "Pending_Approval"])
       .or(`campaign_id.eq.${campaignId},campaign_id.is.null`);
     const fallbackList = (fallbackChars || []) as { id: string; user_id: string }[];
     for (const m of membersWithoutChar) {
@@ -100,7 +114,7 @@ export async function getGmCampaignMembersWithCharacters(
   }
 
   const [usersRes, charsRes] = await Promise.all([
-    supabase.from("users").select("id, username, avatar_url, email, current_rank").in("id", userIds),
+    supabase.from("users").select("id, username, avatar_url, email").in("id", userIds),
     charIds.length > 0
       ? supabase
           .from("characters")
@@ -111,7 +125,7 @@ export async function getGmCampaignMembersWithCharacters(
       : { data: [] as any[], error: null },
   ]);
 
-  let userRows = (usersRes.data || []) as { id: string; username: string; avatar_url: string | null; email?: string; current_rank?: string | null }[];
+  let userRows = (usersRes.data || []) as { id: string; username: string; avatar_url: string | null; email?: string }[];
   if (userRows.length === 0 && userIds.length > 0) {
     const { data: profileRows } = await supabase
       .from("profiles")
@@ -122,7 +136,6 @@ export async function getGmCampaignMembersWithCharacters(
       username: p.username ?? "Unbekannt",
       avatar_url: null,
       email: undefined,
-      current_rank: null,
     }));
   }
   const charRows = (charsRes.data || []) as {
@@ -149,12 +162,14 @@ export async function getGmCampaignMembersWithCharacters(
       username: "Unbekannt",
       avatar_url: null,
       email: undefined,
-      current_rank: null,
     };
     const char = m.character_id ? charMap.get(String(m.character_id).toLowerCase()) ?? null : null;
     return {
       ...m,
-      user: u,
+      user: {
+        ...u,
+        campaign_rank: (m as { campaign_rank?: string | null }).campaign_rank ?? null,
+      },
       character: char,
     };
   });
@@ -162,6 +177,6 @@ export async function getGmCampaignMembersWithCharacters(
   return {
     drafting: mapped.filter((m) => m.status === "Drafting"),
     inReview: mapped.filter((m) => m.status === "In_Review" || m.status === "Changes_Proposed"),
-    accepted: mapped.filter((m) => m.status === "Accepted" || m.status === "Approved"),
+    accepted: mapped.filter((m) => m.status === "Approved" || m.status === "Active"),
   };
 }
