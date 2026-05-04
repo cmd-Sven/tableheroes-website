@@ -57,7 +57,6 @@ export function CampaignDetailPageContent({
     currentUserId,
     userMembershipStatus,
     userHasCharacter,
-    isAcceptedMember,
     isDeadOrArchived,
     membership,
     hasAccess,
@@ -65,6 +64,7 @@ export function CampaignDetailPageContent({
     sessions,
     upcomingSessions,
     upcomingSessionsWithRsvp,
+    sessionArchives,
     now,
     npcs,
     factions,
@@ -102,6 +102,12 @@ export function CampaignDetailPageContent({
         ? now.getTime()
         : Date.now();
 
+  /** DB-Status: Approved / Active (nicht mehr „Accepted“). Drafting = Entwurf fortsetzen. */
+  const canShowPlayerCharacterCreator =
+    userMembershipStatus === "Drafting" ||
+    ((userMembershipStatus === "Approved" || userMembershipStatus === "Active") &&
+      (!userHasCharacter || isDeadOrArchived));
+
   const OverviewTab = (
     <div className="space-y-8">
       {isGM && (
@@ -124,12 +130,9 @@ export function CampaignDetailPageContent({
           <ApplyToCampaignBlock campaignId={id} />
         )}
 
-        {/* Character Creation Button (for Accepted Players or Drafting) */}
-        {!isGM &&
-          ((userMembershipStatus === "Accepted" &&
-            (!userHasCharacter || isDeadOrArchived)) ||
-            userMembershipStatus === "Drafting") && (
-            <div className="rounded-lg border border-hero-vibrant bg-gradient-to-br from-hero-dark/50 to-background-card p-6">
+        {/* Charakter erstellen / Entwurf (Approved, Active oder Drafting) */}
+        {!isGM && canShowPlayerCharacterCreator && (
+            <div className="rounded-lg border border-hero-vibrant bg-linear-to-br from-hero-dark/50 to-background-card p-6">
               <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-border pb-2 flex items-center gap-2">
                 <Users className="h-5 w-5 text-accent-gold" />
                 {userMembershipStatus === "Drafting"
@@ -147,7 +150,7 @@ export function CampaignDetailPageContent({
 
         {/* Character Sheet Link (if user has character) */}
         {!isGM && userHasCharacter && myCharacter && (
-          <div className="rounded-lg border border-hero-vibrant bg-gradient-to-br from-hero-dark/50 to-background-card p-6">
+          <div className="rounded-lg border border-hero-vibrant bg-linear-to-br from-hero-dark/50 to-background-card p-6">
             {(myCharacter as any).status === "Pending_Approval" && (
               <div className="mb-4 rounded border border-accent-gold/50 bg-accent-gold/10 p-3">
                 <p className="font-libre text-sm text-accent-gold">
@@ -180,13 +183,12 @@ export function CampaignDetailPageContent({
         {/* Membership Status Messages (for non-GM users) */}
         {!isGM &&
           userMembershipStatus !== "none" &&
-          userMembershipStatus !== "Accepted" && (
+          !["Approved", "Active"].includes(String(userMembershipStatus)) && (
             <div className="rounded-lg border border-hero-dark bg-background-card p-6">
               <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-dark pb-2">
                 Bewerbungsstatus
               </h2>
-              {userMembershipStatus === "Pending" ||
-              userMembershipStatus === "Applied" ? (
+              {userMembershipStatus === "Applied" ? (
                 <p className="font-libre text-gray-300">
                   <span className="text-accent-gold font-semibold">
                     Bewerbung läuft...
@@ -411,6 +413,7 @@ export function CampaignDetailPageContent({
       isGM={isGM}
       characterStatus={!isGM ? (myCharacter as any)?.status : undefined}
       upcomingSessions={(upcomingSessionsWithRsvp || []) as any}
+      archives={(sessionArchives || []) as any}
       locations={loreEntries
         .filter((l: any) => isLocationType(l.type))
         .map((l: any) => ({ id: String(l.id), name: String(l.name ?? ""), type: String(l.type ?? "") }))
@@ -451,7 +454,7 @@ export function CampaignDetailPageContent({
 
   // Extract characters from accepted members for personal quests
   const availableCharacters = acceptedMembers
-    .filter((m: any) => m.character_data && m.character_data.status === "Alive")
+    .filter((m: any) => m.character_data && m.character_data.status === "Active")
     .map((m: any) => ({
       id: m.character_data.id,
       name: m.character_data.name,
@@ -749,11 +752,8 @@ export function CampaignDetailPageContent({
   // Spieler-Übersicht (Home-Base): DiscoverySlider, Mein Charakter, PartyOverview
   const PlayerOverviewContent = (
     <div className="space-y-8">
-      {!isGM &&
-        ((userMembershipStatus === "Accepted" &&
-          (!userHasCharacter || isDeadOrArchived)) ||
-          userMembershipStatus === "Drafting") && (
-          <div className="rounded-lg border border-hero-vibrant bg-gradient-to-br from-hero-dark/50 to-background-card p-6">
+      {!isGM && canShowPlayerCharacterCreator && (
+          <div className="rounded-lg border border-hero-vibrant bg-linear-to-br from-hero-dark/50 to-background-card p-6">
             <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-border pb-2 flex items-center gap-2">
               <Users className="h-5 w-5 text-accent-gold" />
               {userMembershipStatus === "Drafting"
