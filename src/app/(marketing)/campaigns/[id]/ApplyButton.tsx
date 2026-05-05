@@ -7,7 +7,16 @@ import { Loader2 } from "lucide-react";
 
 type Props = {
   campaignId: string;
-  membershipStatus: "none" | "applied" | "accepted" | "pending" | "rejected" | "drafting" | "in_review";
+  membershipStatus:
+    | "none"
+    | "applied"
+    | "approved"
+    | "active"
+    | "rejected"
+    | "removed"
+    | "drafting"
+    | "in_review"
+    | "changes_proposed";
   userHasCharacter?: boolean;
   userCharacterName?: string | null;
   characterStatus?: string | null;
@@ -52,8 +61,8 @@ export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = f
     );
   }
 
-  // Status: Applied / Pending -> Zeige Hinweis
-  if (membershipStatus === "applied" || membershipStatus === "pending") {
+  // Status: Applied -> Zeige Hinweis
+  if (membershipStatus === "applied") {
     return (
       <div className="rounded-md border border-yellow-700/50 bg-yellow-900/20 px-4 py-3 text-center">
         <p className="font-barlow font-bold text-sm uppercase text-yellow-400 mb-1">
@@ -80,8 +89,21 @@ export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = f
     );
   }
 
+  if (membershipStatus === "removed") {
+    return (
+      <div className="rounded-md border border-red-700/50 bg-red-900/20 px-4 py-3 text-center">
+        <p className="font-barlow font-bold text-sm uppercase text-red-400 mb-1">
+          Teilnahme entfernt
+        </p>
+        <p className="font-libre text-xs text-gray-400">
+          Du bist aktuell nicht mehr Teil dieser Kampagne.
+        </p>
+      </div>
+    );
+  }
+
   // Status: In_Review -> Zeige Hinweis (keine Aktion möglich)
-  if (membershipStatus === "in_review") {
+  if (membershipStatus === "in_review" || membershipStatus === "changes_proposed") {
     return (
       <div className="rounded-md border border-blue-700/50 bg-blue-900/20 px-4 py-3 text-center">
         <p className="font-barlow font-bold text-sm uppercase text-blue-400 mb-1">
@@ -106,8 +128,8 @@ export function ApplyButton({ campaignId, membershipStatus, userHasCharacter = f
     );
   }
 
-  // Status: Accepted -> Zeige "Charakter erstellen" oder "Du nimmst teil als..."
-  if (membershipStatus === "accepted") {
+  // Status: Approved/Active -> Zeige "Charakter erstellen" oder "Du nimmst teil als..."
+  if (membershipStatus === "approved" || membershipStatus === "active") {
     // Allow character creation if:
     // 1. No character exists, OR
     // 2. Character exists but is Dead or Archived

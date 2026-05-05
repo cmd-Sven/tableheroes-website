@@ -1,7 +1,31 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+
+async function awardPointsSafe(
+  supabase: ReturnType<typeof createAdminClient>,
+  args: {
+    targetUserId: string;
+    amount: number;
+    reason: string;
+    awardedBy: string | null;
+    campaignId?: string | null;
+    catalogId?: string | null;
+  },
+): Promise<{ newTotal: number | null; error?: string }> {
+  const { data, error } = await (supabase as any).rpc("award_points_safe", {
+    target_user_id: args.targetUserId,
+    points_amount: args.amount,
+    award_reason: args.reason,
+    awarded_by: args.awardedBy,
+    related_campaign_id: args.campaignId ?? null,
+    catalog_id: args.catalogId ?? null,
+  });
+
+  if (error) return { newTotal: null, error: error.message };
+  return { newTotal: typeof data === "number" ? data : Number(data) };
+}
 
 export type CatalogItem = {
   id: string;
@@ -221,47 +245,29 @@ export async function redeemCatalogItem(
   const cost = Number(item.points_cost) || 0;
   if (cost <= 0) return { success: false, error: "Ungültige Belohnung." };
 
-  const { data: userData } = await (supabase.from("users") as any)
-    .select("total_points")
-    .eq("id", userId)
-    .single();
-
-  const currentPoints = Number((userData as any)?.total_points) || 0;
-  if (currentPoints < cost) {
-    return {
-      success: false,
-      error: `Du hast nur ${currentPoints} Punkte. Diese Belohnung kostet ${cost} Punkte.`,
-    };
-  }
-
-  const newTotal = Math.max(0, currentPoints - cost);
   const reason = `Belohnung eingelöst: ${item.name}`;
 
-  // 1. points_log Eintrag (negativer Betrag)
-  const { error: logErr } = await (supabase.from("points_log") as any).insert({
-    user_id: userId,
+  const admin = createAdminClient();
+  const result = await awardPointsSafe(admin, {
+    targetUserId: userId,
     amount: -cost,
     reason,
-    created_by: user.id,
-    catalog_item_id: catalogItemId,
+    awardedBy: user.id,
+    catalogId: catalogItemId,
   });
 
-  if (logErr) {
-    console.error("[redeemCatalogItem] points_log Fehler:", logErr);
-    return { success: false, error: logErr.message };
+  if (result.error) {
+    console.error("[redeemCatalogItem] Punkte-RPC Fehler:", result.error);
+    if (result.error.toLowerCase().includes("insufficient points")) {
+      return {
+        success: false,
+        error: `Du hast nicht genug Punkte. Diese Belohnung kostet ${cost} Punkte.`,
+      };
+    }
+    return { success: false, error: result.error };
   }
 
-  // 2. total_points reduzieren
-  const { error: updateErr } = await (supabase.from("users") as any)
-    .update({ total_points: newTotal })
-    .eq("id", userId);
-
-  if (updateErr) {
-    console.error("[redeemCatalogItem] Update Fehler:", updateErr);
-    return { success: false, error: updateErr.message };
-  }
-
-  // 3. Bei type=achievement: Achievement verleihen (über Namen)
+  // Bei type=achievement: Achievement verleihen (über Namen), ohne erneut Punkte/Log zu erzeugen.
   if (item.type === "achievement" && item.achievement_id) {
     const achName = (item.achievements as any)?.name;
     if (achName) {

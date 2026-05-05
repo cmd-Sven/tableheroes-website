@@ -27,6 +27,7 @@ type UserProfile = {
   avatar_shape?: "circle" | "square" | null;
   created_at?: string | null;
   total_points?: number | null;
+  lifetime_points?: number | null;
   profile_background?: string | null;
   profile_background_url?: string | null;
   show_rank?: boolean | null;
@@ -65,7 +66,8 @@ export default async function DashboardPage() {
     profile?.primary_role === "GameMaster" || profile?.primary_role === "Admin";
 
   const totalPoints = Number(profile?.total_points) || 0;
-  const rank = (profile as any)?.current_rank ?? getRankFromPoints(totalPoints);
+  const lifetimePoints = Number(profile?.lifetime_points) || 0;
+  const rank = getRankFromPoints(lifetimePoints);
   const favoriteAchievements: {
     id: string;
     name: string;
@@ -98,6 +100,7 @@ export default async function DashboardPage() {
       bannerPositionY: profile?.banner_position_y ?? 50,
       memberSince: profile?.created_at ?? null,
       rank,
+      lifetimePoints,
       totalPoints,
       favoriteAchievements: favoriteAchievementsResolved,
       showRank: profile?.show_rank ?? true,
@@ -118,6 +121,7 @@ export default async function DashboardPage() {
           }
           newAcceptances={playerData.newAcceptances}
           totalPoints={playerData.totalPoints}
+          lifetimePoints={playerData.lifetimePoints}
           achievements={playerData.achievements}
           membershipsWithGm={playerData.membershipsWithGm}
           heroCharacters={playerData.heroCharacters}
@@ -170,14 +174,17 @@ export default async function DashboardPage() {
 async function loadPlayerDashboardData(userId: string) {
   const supabase = await createClient();
   let totalPoints = 0;
+  let lifetimePoints = 0;
   try {
     const { data } = await (supabase.from("users") as any)
-      .select("total_points")
+      .select("total_points, lifetime_points")
       .eq("id", userId)
       .single();
     totalPoints = Number((data as any)?.total_points) || 0;
+    lifetimePoints = Number((data as any)?.lifetime_points) || 0;
   } catch {
     totalPoints = 0;
+    lifetimePoints = 0;
   }
   const earnedAchievementsResult = await getUserAchievements(userId);
   const achievements = earnedAchievementsResult.achievements.map((a) => ({
@@ -201,7 +208,6 @@ async function loadPlayerDashboardData(userId: string) {
       "Drafting",
       "In_Review",
       "Changes_Proposed",
-      "Accepted",
       "Approved",
       "Active",
     ]);
@@ -217,7 +223,7 @@ async function loadPlayerDashboardData(userId: string) {
       .select("id, name, class, race, level, avatar_url, status, campaign_id")
       .eq("user_id", userId)
       .in("campaign_id", campaignIds)
-      .in("status", ["Active", "Alive"]);
+      .in("status", ["Active"]);
     for (const m of membershipsWithoutChar) {
       const campId = m.campaign_id ?? m.campaigns?.id;
       const char = (fallbackChars as any[])?.find((c: any) => c.campaign_id === campId);
@@ -306,7 +312,7 @@ async function loadPlayerDashboardData(userId: string) {
   )
     .select("id, campaign_id, campaigns!inner(id, name)")
     .eq("user_id", userId)
-    .eq("status", "Accepted")
+    .eq("status", "Approved")
     .eq("has_seen_acceptance", false);
   const newAcceptances = ((newAcceptancesRaw as any[]) || []).map((a: any) => ({
     id: a.id,
@@ -362,6 +368,7 @@ async function loadPlayerDashboardData(userId: string) {
 
   return {
     totalPoints,
+    lifetimePoints,
     achievements,
     membershipsWithGm,
     heroCharacters,

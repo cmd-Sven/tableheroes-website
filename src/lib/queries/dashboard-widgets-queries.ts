@@ -10,6 +10,11 @@ import type {
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
+import {
+  isSessionStatusLive,
+  isSessionStatusScheduled,
+  isSessionStatusTerminal,
+} from "@/src/lib/session-status";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
@@ -369,23 +374,17 @@ export async function getUpcomingSessionsForUser(
   const staleLiveThresholdMs = 48 * 60 * 60 * 1000; // 48 Stunden
   // Nächste Termine: Scheduled (auch nach Startzeit) oder Live (max. 48h seit Start, sonst verwaist).
   const sessions = allSessions
-    .filter((s: any) => !["Completed", "Cancelled"].includes(s.status))
-    .filter(
-      (s: any) => {
-        if (s.status === "Live") {
-          // Veraltete Live-Sessions ausblenden (GM beendet sie über Kampagnen-Seite)
-          if (s.start_time) {
-            const startMs = new Date(s.start_time).getTime();
-            if (now.getTime() - startMs > staleLiveThresholdMs) return false;
-          }
-          return true;
+    .filter((s: any) => !isSessionStatusTerminal(s.status))
+    .filter((s: any) => {
+      if (isSessionStatusLive(s.status)) {
+        if (s.start_time) {
+          const startMs = new Date(s.start_time).getTime();
+          if (now.getTime() - startMs > staleLiveThresholdMs) return false;
         }
-        if (s.status === "Scheduled") {
-          return true;
-        }
-        return false;
-      },
-    )
+        return true;
+      }
+      return isSessionStatusScheduled(s.status);
+    })
     .slice(0, limit);
 
   if (sessions.length === 0) return [];

@@ -17,14 +17,15 @@ export default async function PointsPage() {
   if (!user) redirect("/");
 
   const { data: profile } = await (supabase.from("users") as any)
-    .select("total_points")
+    .select("total_points, lifetime_points")
     .eq("id", user.id)
     .single();
 
   const totalPoints = Number((profile as any)?.total_points) || 0;
+  const lifetimePoints = Number((profile as any)?.lifetime_points) || 0;
   const pointsLog = await getPointsLog(user.id, 50);
 
-  const level = calculateLevel(totalPoints);
+  const level = calculateLevel(lifetimePoints);
   const nextLevelPoints = getPointsForNextLevel(level);
   const currentLevelBase = level > 0 ? getPointsForLevel(level) : 0;
 
@@ -42,6 +43,7 @@ export default async function PointsPage() {
 
       <PointsPageClient
         totalPoints={totalPoints}
+        lifetimePoints={lifetimePoints}
         level={level}
         nextLevelPoints={nextLevelPoints}
         currentLevelBase={currentLevelBase}

@@ -32,6 +32,9 @@ type Props = {
   bannerPositionY?: number;
   memberSince: string | null;
   rank: string;
+  /** Lebenslang verdiente Punkte fuer Level/Rang-Fortschritt. */
+  lifetimePoints: number;
+  /** Aktuell ausgebbares Punkteguthaben. */
   totalPoints: number;
   favoriteAchievements: FavoriteAchievement[];
   isPublicView?: boolean;
@@ -58,6 +61,7 @@ export function PlayerHeader({
   bannerPositionY = 50,
   memberSince,
   rank,
+  lifetimePoints,
   totalPoints,
   favoriteAchievements,
   isPublicView = false,
@@ -66,7 +70,7 @@ export function PlayerHeader({
   slogan,
   showSlogan = false,
 }: Props) {
-  const level = calculateLevel(totalPoints);
+  const level = calculateLevel(lifetimePoints);
   const displayRank = rank;
   const favs = favoriteAchievements.slice(0, 3);
   const avatarRoundClass =

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import {
   getAchievementImageForName,
@@ -18,6 +18,30 @@ const ACHIEVEMENT_IMAGE_DIR = path.join(
 );
 
 const IMAGE_EXTENSIONS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
+
+async function awardPointsSafe(
+  supabase: ReturnType<typeof createAdminClient>,
+  args: {
+    targetUserId: string;
+    amount: number;
+    reason: string;
+    awardedBy: string | null;
+    campaignId?: string | null;
+    catalogId?: string | null;
+  },
+): Promise<{ newTotal: number | null; error?: string }> {
+  const { data, error } = await (supabase as any).rpc("award_points_safe", {
+    target_user_id: args.targetUserId,
+    points_amount: args.amount,
+    award_reason: args.reason,
+    awarded_by: args.awardedBy,
+    related_campaign_id: args.campaignId ?? null,
+    catalog_id: args.catalogId ?? null,
+  });
+
+  if (error) return { newTotal: null, error: error.message };
+  return { newTotal: typeof data === "number" ? data : Number(data) };
+}
 
 /** PostgREST meldet fehlende Spalten oft so (Schema-Cache), bevor RLS greift. */
 function isAchievementsColumnSchemaError(err: { message?: string } | null): boolean {
@@ -57,7 +81,7 @@ export async function getAchievementImageFilenames(): Promise<string[]> {
 
 /**
  * Verleiht ein Achievement an einen User (falls noch nicht vorhanden).
- * Trägt in user_achievements ein und addiert points_awarded zum total_points des Users.
+ * Trägt in user_achievements ein und addiert points_awarded zum Guthaben und zu lifetime_points.
  * Erstellt automatisch einen points_log Eintrag für die Historie.
  */
 export async function awardAchievement(
@@ -109,40 +133,21 @@ export async function awardAchievement(
 
   const points = Number(achievement.points_awarded) || 0;
   if (!skipPointsAndLog && points > 0) {
-    // 2. total_points erhöhen
-    const { data: userRow } = await (supabase.from("users") as any)
-      .select("total_points")
-      .eq("id", userId)
-      .single();
-    const current = Number((userRow as any)?.total_points) || 0;
-    const newTotal = current + points;
-
-    const { error: updateErr } = await (supabase.from("users") as any)
-      .update({ total_points: newTotal })
-      .eq("id", userId);
-
-    if (updateErr) {
-      console.error("[awardAchievement] Fehler beim Update total_points:", updateErr);
-      return { awarded: false, error: updateErr.message };
-    }
-
-    console.log("[awardAchievement] ✓ Punkte erhöht:", userId, current, "→", newTotal);
-
-    // 3. points_log Eintrag erstellen (für Historie & Goldregen)
     const reason = `Achievement "${achievement.name}" erhalten`;
-    const { error: logErr } = await (supabase.from("points_log") as any).insert({
-      user_id: userId,
+    const admin = createAdminClient();
+    const result = await awardPointsSafe(admin, {
+      targetUserId: userId,
       amount: points,
-      reason: reason,
-      created_by: grantedBy ?? null,
-      campaign_id: null,
+      reason,
+      awardedBy: grantedBy ?? null,
     });
 
-    if (logErr) {
-      console.error("[awardAchievement] Fehler beim points_log Insert:", logErr);
-    } else {
-      console.log("[awardAchievement] ✓ points_log Eintrag erstellt für User:", userId, "Betrag:", points, "Grund:", reason);
+    if (result.error) {
+      console.error("[awardAchievement] Fehler beim atomaren Punkte-RPC:", result.error);
+      return { awarded: false, error: result.error };
     }
+
+    console.log("[awardAchievement] ✓ Punkte atomar erhöht:", userId, "Betrag:", points, "Neuer Stand:", result.newTotal);
   }
 
   revalidatePath("/dashboard");

@@ -41,8 +41,8 @@ export default async function ProfilePage({ params }: Props) {
   if (!profileUser.privacy_public_profile) notFound();
 
   const totalPoints = Number(profileUser.total_points) || 0;
-  const rank =
-    (profileUser as any).current_rank ?? getRankFromPoints(totalPoints);
+  const lifetimePoints = Number(profileUser.lifetime_points) || 0;
+  const rank = getRankFromPoints(lifetimePoints);
   const earnedAchievementsResult = await getUserAchievements(profileUser.id);
   const achievements = (earnedAchievementsResult?.achievements ?? []).map(
     (a) => ({
@@ -75,7 +75,7 @@ export default async function ProfilePage({ params }: Props) {
     `,
     )
     .eq("user_id", profileUser.id)
-    .eq("status", "Accepted");
+    .eq("status", "Approved");
 
   const memberships = (membershipsRaw as any[]) || [];
 
@@ -138,7 +138,9 @@ export default async function ProfilePage({ params }: Props) {
       id: "points",
       title: "Punkte",
       icon: <Star className="h-5 w-5" />,
-      content: <PointsCard totalPoints={totalPoints} />,
+      content: (
+        <PointsCard totalPoints={totalPoints} lifetimePoints={lifetimePoints} />
+      ),
       colSpan: 1 as const,
     },
     {
@@ -227,6 +229,7 @@ export default async function ProfilePage({ params }: Props) {
           bannerPositionY={(profileUser as any).banner_position_y ?? 50}
           memberSince={profileUser.created_at ?? null}
           rank={rank}
+          lifetimePoints={lifetimePoints}
           totalPoints={totalPoints}
           favoriteAchievements={favoriteAchievements}
           isPublicView

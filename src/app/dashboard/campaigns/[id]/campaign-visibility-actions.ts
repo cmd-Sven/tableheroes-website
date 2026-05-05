@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { VisibilityEntityType } from "./campaign-visibility-queries";
 
@@ -32,15 +32,24 @@ export async function setCampaignVisibility(
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", campaignId)
     .single();
 
-  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
-    throw new Error("Nur der GM kann die Sichtbarkeit ändern.");
+  const campaignAccess = campaign as {
+    gm_id: string | null;
+    owner_id?: string | null;
+  } | null;
+  const canManageVisibility =
+    !!campaignAccess &&
+    (campaignAccess.gm_id === user.id || campaignAccess.owner_id === user.id);
+
+  if (!canManageVisibility) {
+    throw new Error("Nur der GM oder Owner kann die Sichtbarkeit ändern.");
   }
 
-  const { error } = await (supabase.from("campaign_visibility") as any)
+  const admin = createAdminClient();
+  const { error } = await (admin.from("campaign_visibility") as any)
     .upsert(
       {
         campaign_id: campaignId,
@@ -70,10 +79,17 @@ export async function getCampaignWorldId(campaignId: string): Promise<string | n
   if (!user) return null;
 
   const { data: row } = await (supabase.from("campaigns") as any)
-    .select("world_id, gm_id")
+    .select("world_id, gm_id, owner_id")
     .eq("id", campaignId)
     .single();
 
-  if (!row || (row as { gm_id: string }).gm_id !== user.id) return null;
+  const campaign = row as {
+    world_id: string | null;
+    gm_id: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!campaign || (campaign.gm_id !== user.id && campaign.owner_id !== user.id)) {
+    return null;
+  }
   return (row as { world_id: string | null }).world_id ?? null;
 }

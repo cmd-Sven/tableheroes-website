@@ -25,7 +25,7 @@ export async function getPendingApplications(
       "id, campaign_id, user_id, status, application_message, created_at, campaigns!inner(id, name, gm_id), users:user_id(username)",
     )
     .eq("campaigns.gm_id", userId)
-    .in("status", ["Applied", "Pending"])
+    .eq("status", "Applied")
     .order("created_at", { ascending: false });
 
   if (error) {

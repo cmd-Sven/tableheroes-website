@@ -62,7 +62,7 @@ export default async function CreateQuestPage({ params, searchParams }: Props) {
       )
     `)
     .eq("campaign_id", campaignId)
-    .eq("status", "Accepted");
+    .eq("status", "Approved");
 
   const members = membersRaw as any[] | null;
 

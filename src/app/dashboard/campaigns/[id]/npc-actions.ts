@@ -41,6 +41,8 @@ export async function createNPC(formData: {
   image_url?: string;
   narrative_hooks?: NarrativeHook[] | null;
   is_secret_antagonist?: boolean;
+  is_merchant?: boolean;
+  shop_id?: string | null;
   hidden_agenda?: string;
   true_nature?: string;
   secret_entry?: string;
@@ -229,6 +231,8 @@ export async function createNPC(formData: {
         : null,
     narrative_hooks: formData.narrative_hooks && formData.narrative_hooks.length > 0 ? formData.narrative_hooks : null,
     is_secret_antagonist: formData.is_secret_antagonist ?? false,
+    is_merchant: formData.is_merchant ?? false,
+    shop_id: formData.is_merchant && formData.shop_id ? formData.shop_id : null,
     hidden_agenda: formData.hidden_agenda || null,
     true_nature: formData.true_nature || null,
     check_results: formData.check_results && formData.check_results.length > 0 ? formData.check_results : null,
@@ -445,6 +449,8 @@ export async function updateNPC(
     image_url?: string;
     narrative_hooks?: NarrativeHook[] | null;
     is_secret_antagonist?: boolean;
+    is_merchant?: boolean;
+    shop_id?: string | null;
     hidden_agenda?: string | null;
     true_nature?: string | null;
     check_results?: Array<{
@@ -502,6 +508,14 @@ export async function updateNPC(
       original: originalLocationId,
       normalized: normalizedUpdates.current_location_id,
     });
+  }
+  if (updates.is_merchant !== undefined || updates.shop_id !== undefined) {
+    const isMerchant = updates.is_merchant ?? Boolean(normalizedUpdates.is_merchant);
+    normalizedUpdates.is_merchant = isMerchant;
+    normalizedUpdates.shop_id =
+      isMerchant && updates.shop_id && String(updates.shop_id).trim() !== ""
+        ? String(updates.shop_id).trim()
+        : null;
   }
 
   const ALLOWED_RELATION_TYPES = new Set([

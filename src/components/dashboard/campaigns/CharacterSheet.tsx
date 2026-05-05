@@ -65,19 +65,20 @@ function getReputationColorClasses(reputation: number): string {
 
 function statusLabelDe(s: string): string {
   switch (s) {
-    case "Alive":
     case "Active":
       return "Aktiv / Lebend";
+    case "Approved":
+      return "Freigegeben";
     case "Dead":
       return "Tot";
     case "Archived":
       return "Archiviert";
-    case "Paused":
-      return "Pausiert";
     case "Pending_Approval":
       return "Wartet auf Freigabe";
-    case "In_Review":
-      return "In Prüfung";
+    case "Draft":
+      return "Entwurf";
+    case "Rejected":
+      return "Abgelehnt";
     default:
       return s;
   }
@@ -85,8 +86,8 @@ function statusLabelDe(s: string): string {
 
 export function CharacterSheet({ character, campaignId, factionReputations = [] }: Props) {
   const relationships = character.character_relationships || [];
-  const status = character.status || "Alive";
-  const isHealthy = status === "Alive" || status === "Active";
+  const status = character.status || "Active";
+  const isHealthy = status === "Active" || status === "Approved";
   const isDead = status === "Dead";
   const langs =
     character.language_names?.filter(Boolean).length ?? 0 > 0

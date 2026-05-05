@@ -21,6 +21,8 @@ function suggestionToDraftItems(items: LootSuggestionItem[]): DraftItem[] {
     id: crypto.randomUUID(),
     name: it.name,
     desc: it.desc,
+    mundaneName: it.mundaneName,
+    mundaneDesc: it.mundaneDesc,
     rarity: it.rarity,
     price: it.price,
     isMagical: it.isMagical,
@@ -104,6 +106,8 @@ export function LootDraftPanel({
         ...it,
         name: it.name.trim() || "Gegenstand",
         desc: it.desc.trim(),
+        mundaneName: (it.mundaneName ?? "").trim() || undefined,
+        mundaneDesc: (it.mundaneDesc ?? "").trim() || undefined,
         rarity: it.rarity.trim().toLowerCase() || "common",
         price: Math.max(0, Math.round(it.price)),
         isMagical: Boolean(it.isMagical),
@@ -147,8 +151,8 @@ export function LootDraftPanel({
               isModal ? "text-sm" : "text-[10px]"
             }`}
           >
-            Eine Truhe ist mit der Session verknüpft. Spieler können sie öffnen, solange noch Inhalt
-            vorhanden ist.
+            Eine Truhe ist mit der Session verknüpft. Münzen nimmst du über die Truhe unten; Gegenstände
+            liegen als Karten auf der Bühne.
           </p>
           <button
             type="button"
@@ -337,6 +341,27 @@ export function LootDraftPanel({
                     Magisch
                   </label>
                 </div>
+                {it.isMagical ? (
+                  <div className="mt-2 space-y-1.5 rounded border border-accent-gold/25 bg-black/20 p-2">
+                    <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold/90">
+                      Vor Identifikation (Spieler und Bühne)
+                    </p>
+                    <input
+                      type="text"
+                      value={it.mundaneName ?? ""}
+                      onChange={(e) => updateItem(it.id, { mundaneName: e.target.value })}
+                      placeholder="Anzeigename z. B. Langschwert"
+                      className="w-full rounded border border-hero-dark/80 bg-slate-900 px-1.5 py-0.5 font-barlow text-[10px] text-white outline-none focus:border-accent-gold"
+                    />
+                    <textarea
+                      value={it.mundaneDesc ?? ""}
+                      onChange={(e) => updateItem(it.id, { mundaneDesc: e.target.value })}
+                      rows={2}
+                      placeholder="Beschreibung ohne magische Boni …"
+                      className="w-full resize-none rounded border border-hero-dark/80 bg-slate-900 px-1.5 py-0.5 font-libre text-[10px] text-gray-300 outline-none focus:border-accent-gold"
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

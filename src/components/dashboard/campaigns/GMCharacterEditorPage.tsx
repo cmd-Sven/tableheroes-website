@@ -511,12 +511,12 @@ export function GMCharacterEditorPage({
                   disabled={isPending}
                 >
                   <option value="Active">Aktiv (spielbar)</option>
+                  <option value="Approved">Freigegeben</option>
                   <option value="Pending_Approval">Wartet auf Freigabe</option>
-                  <option value="In_Review">In Prüfung</option>
-                  <option value="Alive">Lebend (Legacy)</option>
+                  <option value="Draft">Entwurf</option>
                   <option value="Dead">Tot</option>
                   <option value="Archived">Archiviert</option>
-                  <option value="Paused">Pausiert</option>
+                  <option value="Rejected">Abgelehnt</option>
                 </select>
                 {status === "Dead" && (
                   <p className="mt-2 font-libre text-sm text-yellow-400 italic">

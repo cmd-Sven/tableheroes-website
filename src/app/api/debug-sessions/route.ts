@@ -31,7 +31,7 @@ export async function GET() {
   )
     .select("campaign_id, status")
     .eq("user_id", user.id)
-    .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]);
+    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
 
   const memberCampaignIds = ((memberRows as any[]) || []).map(
     (m: any) => m.campaign_id as string

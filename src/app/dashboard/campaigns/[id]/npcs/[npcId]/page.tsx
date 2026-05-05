@@ -57,7 +57,7 @@ export default async function NPCDetailPageRoute({ params }: Props) {
     // Expliziter Cast gegen 'never'
     const membership = membershipRaw as { status: string } | null;
 
-    if (!membership || !["Accepted", "Drafting", "In_Review"].includes(membership.status)) {
+    if (!membership || !["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes(membership.status)) {
       redirect("/dashboard");
     }
   }
@@ -88,6 +88,53 @@ export default async function NPCDetailPageRoute({ params }: Props) {
   // 8. Spieler-Notiz für diese Kampagne laden (isolierte campaign_notes)
   const campaignNote = await getCampaignNote(campaignId, "npc", npcId);
   const initialCampaignPlayerNote = campaignNote?.content ?? "";
+
+  const { data: lastSeenRaw } = await (supabase.from(
+    "campaign_npc_reputation",
+  ) as any)
+    .select("last_seen_session_id, last_seen_location_id, last_seen_at")
+    .eq("campaign_id", campaignId)
+    .eq("npc_id", npcId)
+    .maybeSingle();
+
+  const lastSeenRow = lastSeenRaw as {
+    last_seen_session_id?: string | null;
+    last_seen_location_id?: string | null;
+    last_seen_at?: string | null;
+  } | null;
+
+  let lastSeen: {
+    archiveId: string | null;
+    sessionName: string | null;
+    locationId: string | null;
+    locationName: string | null;
+    seenAt: string | null;
+  } | null = null;
+
+  if (lastSeenRow?.last_seen_session_id || lastSeenRow?.last_seen_location_id) {
+    const [archiveResult, locationResult] = await Promise.all([
+      lastSeenRow.last_seen_session_id
+        ? (supabase.from("session_archives") as any)
+            .select("id, session_name")
+            .eq("id", lastSeenRow.last_seen_session_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      lastSeenRow.last_seen_location_id
+        ? (supabase.from("world_lore") as any)
+            .select("id, name")
+            .eq("id", lastSeenRow.last_seen_location_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    lastSeen = {
+      archiveId: lastSeenRow.last_seen_session_id ?? null,
+      sessionName: archiveResult.data?.session_name ?? null,
+      locationId: lastSeenRow.last_seen_location_id ?? null,
+      locationName: locationResult.data?.name ?? null,
+      seenAt: lastSeenRow.last_seen_at ?? null,
+    };
+  }
 
   // 9. Load factions and locations for dropdowns
   const factions = await getFactions(campaignId);
@@ -121,7 +168,7 @@ export default async function NPCDetailPageRoute({ params }: Props) {
         characters:character_id (id, name, class, race, level, status)
       `)
       .eq("campaign_id", campaignId)
-      .eq("status", "Accepted");
+      .eq("status", "Approved");
     membersForQuest = (membersRaw || []).map((m: any) => ({
       id: m.id,
       character_id: m.character_id,
@@ -141,6 +188,7 @@ export default async function NPCDetailPageRoute({ params }: Props) {
       initialCampaignPlayerNote={initialCampaignPlayerNote}
       factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
       locations={locations}
+      lastSeen={lastSeen}
       npcsForQuest={npcsForQuest}
       membersForQuest={membersForQuest}
     />

@@ -1,11 +1,11 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { isSessionStatusTerminal } from "@/src/lib/session-status";
 import { sendMessage } from "@/src/lib/actions/message-actions";
-import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
 /**
  * Server Action: Create Session with Scenes
@@ -178,54 +178,22 @@ export async function startSession(sessionId: string) {
 
   // 3. GM Check
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", (session as any).campaign_id)
     .single();
 
   // Typ-Sicherung gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
 
-  if (!campaign || campaign.gm_id !== user.id) {
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann eine Session starten.");
   }
 
-  const gmId = campaign.gm_id;
-
-  // 3b. Jeder Spieler (ohne GM) muss „dabei“ sein: Zusage / Via Online ODER vom GM manuell bestätigt (gm_confirmed).
-  const { data: members } = await (supabase.from("campaign_members") as any)
-    .select("user_id")
-    .eq("campaign_id", session.campaign_id)
-    .in("status", ["Accepted", "Approved"]);
-
-  const { data: rsvps } = await (supabase.from("session_rsvps") as any)
-    .select("user_id, rsvp_status, gm_confirmed")
-    .eq("session_id", sessionId);
-
-  const playerUserIds = ((members as any[]) || [])
-    .map((m: any) => m.user_id as string)
-    .filter((uid: string) => uid && uid !== gmId);
-
-  const rsvpByUser = new Map<
-    string,
-    { rsvp_status: string | null; gm_confirmed: boolean }
-  >();
-  for (const r of (rsvps as any[]) || []) {
-    rsvpByUser.set(String(r.user_id), {
-      rsvp_status: r.rsvp_status != null ? String(r.rsvp_status) : null,
-      gm_confirmed: !!r.gm_confirmed,
-    });
-  }
-
-  const notReady = playerUserIds.filter(
-    (uid) => !isPlayerReadyForSessionStart(rsvpByUser.get(uid)),
-  );
-
-  const pendingCount = notReady.length;
-  if (pendingCount > 0) {
-    throw new Error(
-      `Die Session kann erst starten, wenn alle Spieler zugesagt haben oder du sie manuell bestätigt hast. Noch ${pendingCount} Spieler nicht „dabei“.`
-    );
-  }
+  // Offene RSVPs sind nur noch eine UI-Warnung. Der GM/Owner darf die Session trotzdem starten.
 
   const prepOk = session.gm_prep_complete !== false;
   if (!prepOk) {
@@ -251,18 +219,31 @@ export async function startSession(sessionId: string) {
     .maybeSingle();
 
   if (!existingLive) {
-    const { error: liveError } = await (supabase.from("session_live_states") as any).insert({
+    const insertPayload = {
       session_id: sessionId,
       weather: "Klar",
+      temperature: "normal",
+      temperature_value: 15,
       current_time: "Tagsüber",
       current_location: null,
       journal_text: null,
+      system_logs: [],
       visible_npc_ids: [],
       visible_faction_ids: [],
+      is_background_manual_override: false,
+      is_combat_mode: false,
+      current_turn_index: 0,
       scribe_id: user.id,
-    });
+    };
+    const { error: liveError } = await (supabase.from("session_live_states") as any).insert(insertPayload);
     if (liveError) {
-      console.error("Start Session Error (Init Live State):", liveError);
+      console.error("Supabase Insert Error:", liveError);
+      console.error("Start Session Error (Init Live State):", {
+        payload: insertPayload,
+        session,
+        campaign,
+        userId: user.id,
+      });
       throw new Error(liveError.message);
     }
   } else {
@@ -302,12 +283,15 @@ export async function markSessionPlanningComplete(sessionId: string) {
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann die Planung abschließen.");
   }
 
@@ -420,9 +404,12 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
 
   const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
   if (sessionError || !session) {
+    if (sessionError) {
+      console.error("[ensureSessionPrepLiveState] Session Load Error:", sessionError);
+    }
     return null;
   }
-  if (["Completed", "Ended", "Cancelled"].includes(session.status)) {
+  if (isSessionStatusTerminal(session.status)) {
     return null;
   }
 
@@ -446,32 +433,311 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
 
   if (existing) return serializeForClient(existing) as Record<string, unknown>;
 
-  const { data: inserted, error: insertError } = await (supabase.from("session_live_states") as any)
-    .insert({
-      session_id: sessionId,
-      weather: null,
-      current_time: null,
-      current_location: null,
-      journal_text: null,
-      visible_npc_ids: [],
-      visible_faction_ids: [],
-      scribe_id: user.id,
-    })
+  const { data: rpcData, error: rpcError } = await (supabase as any).rpc(
+    "ensure_session_prep_live_state",
+    { p_session_id: sessionId },
+  );
+  if (rpcError) {
+    const msg = String(rpcError.message ?? "").toLowerCase();
+    const fnMissing =
+      rpcError.code === "PGRST202" ||
+      rpcError.code === "42883" ||
+      msg.includes("does not exist") ||
+      msg.includes("schema cache") ||
+      msg.includes("could not find the function");
+    if (!fnMissing) {
+      console.warn("[ensureSessionPrepLiveState] RPC:", rpcError);
+    }
+  } else if (rpcData != null) {
+    const rows = Array.isArray(rpcData) ? rpcData : [rpcData];
+    const first = rows.find(
+      (r) =>
+        r &&
+        typeof r === "object" &&
+        String((r as Record<string, unknown>).session_id ?? "") === sessionId,
+    );
+    if (first) {
+      return serializeForClient(first) as Record<string, unknown>;
+    }
+  }
+
+  let writeClient: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient> = supabase;
+  try {
+    writeClient = createAdminClient();
+  } catch (error) {
+    console.warn(
+      "[ensureSessionPrepLiveState] Admin-Client nicht verfügbar, verwende RLS-Client.",
+      error,
+    );
+  }
+
+  const insertPayload = {
+    session_id: sessionId,
+    weather: "Klar",
+    temperature: "normal",
+    temperature_value: 15,
+    current_time: "Tagsüber",
+    current_location: null,
+    journal_text: null,
+    system_logs: [],
+    visible_npc_ids: [],
+    visible_faction_ids: [],
+    is_background_manual_override: false,
+    is_combat_mode: false,
+    current_turn_index: 0,
+    scribe_id: user.id,
+  };
+
+  const { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
+    .insert(insertPayload)
     .select()
     .single();
 
   if (insertError) {
-    console.error("[ensureSessionPrepLiveState] insert:", insertError);
-    const { data: raceRow } = await (supabase.from("session_live_states") as any)
+    console.error("Supabase Insert Error:", insertError);
+    console.error("[ensureSessionPrepLiveState] Insert Context:", {
+      payload: insertPayload,
+      session,
+      campaign,
+      userId: user.id,
+    });
+    const { data: existingAfterFail } = await (supabase.from("session_live_states") as any)
       .select("*")
       .eq("session_id", sessionId)
       .maybeSingle();
-    const rr = raceRow as Record<string, unknown> | null;
+    const rr = existingAfterFail as Record<string, unknown> | null;
     return rr ? (serializeForClient(rr) as Record<string, unknown>) : null;
   }
 
   const ins = inserted as Record<string, unknown> | null;
   return ins ? (serializeForClient(ins) as Record<string, unknown>) : null;
+}
+
+type ChronicleEntry = {
+  id: string;
+  at: string;
+  text: string;
+  type: string;
+  author_name: string;
+};
+
+function normalizeStringIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item)).filter(Boolean)
+    : [];
+}
+
+function normalizeChronicleSnapshot(systemLogs: unknown, journalText: unknown): ChronicleEntry[] {
+  const entries: ChronicleEntry[] = [];
+
+  if (Array.isArray(systemLogs)) {
+    for (const item of systemLogs) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const text = String(row.text ?? "").trim();
+      if (!text) continue;
+      entries.push({
+        id: String(row.id ?? `system-${entries.length}`),
+        at: String(row.at ?? new Date().toISOString()),
+        text,
+        type: String(row.type ?? "system"),
+        author_name: String(row.author_name ?? "System"),
+      });
+    }
+  }
+
+  const manualText = String(journalText ?? "").trim();
+  if (manualText) {
+    entries.push({
+      id: `journal-${Date.now()}`,
+      at: new Date().toISOString(),
+      text: manualText,
+      type: "journal",
+      author_name: "Chronik",
+    });
+  }
+
+  return entries.sort(
+    (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+  );
+}
+
+export async function archiveSession(
+  sessionId: string,
+  campaignId: string,
+  sessionName?: string | null,
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw, error: sessionError } = await (supabase.from(
+    "sessions",
+  ) as any)
+    .select("id, campaign_id, title, start_time")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    title: string | null;
+    start_time: string | null;
+  } | null;
+
+  if (sessionError || !session) {
+    throw new Error("Session nicht gefunden.");
+  }
+
+  if (String(session.campaign_id) !== String(campaignId)) {
+    throw new Error("Session gehört nicht zu dieser Kampagne.");
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, owner_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+
+  if (!isCampaignGm(campaign, user.id)) {
+    throw new Error("Nur der GM kann eine Session archivieren.");
+  }
+
+  const { data: liveStateRaw } = await (supabase.from(
+    "session_live_states",
+  ) as any)
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const liveState = (liveStateRaw ?? {}) as Record<string, unknown>;
+  const npcIds = normalizeStringIds(liveState.visible_npc_ids);
+  const locationId =
+    liveState.current_location_lore_id != null
+      ? String(liveState.current_location_lore_id)
+      : null;
+
+  let encounteredNpcs: Array<{ id: string; name: string }> = [];
+  if (npcIds.length > 0) {
+    const { data: npcRows } = await (supabase.from("npcs") as any)
+      .select("id, name")
+      .in("id", npcIds);
+    encounteredNpcs = ((npcRows as Array<{ id: string; name: string }> | null) ?? [])
+      .map((npc) => ({ id: String(npc.id), name: String(npc.name ?? "Unbekannt") }));
+  }
+
+  let visitedLocations: Array<{ id: string | null; name: string }> = [];
+  if (locationId) {
+    const { data: locationRow } = await (supabase.from("world_lore") as any)
+      .select("id, name")
+      .eq("id", locationId)
+      .maybeSingle();
+    if (locationRow) {
+      visitedLocations = [{
+        id: String((locationRow as any).id),
+        name: String((locationRow as any).name ?? "Unbekannter Ort"),
+      }];
+    }
+  } else if (liveState.current_location) {
+    visitedLocations = [{
+      id: null,
+      name: String(liveState.current_location),
+    }];
+  }
+
+  const chronicleSnapshot = normalizeChronicleSnapshot(
+    liveState.system_logs,
+    liveState.journal_text,
+  );
+  const archivedAt = new Date().toISOString();
+  const fallbackSessionName =
+    session.title ||
+    sessionName ||
+    (session.start_time
+      ? `Session vom ${new Intl.DateTimeFormat("de-DE").format(new Date(session.start_time))}`
+      : "Unbenannte Session");
+
+  const { data: archiveRaw, error: archiveError } = await (supabase.from(
+    "session_archives",
+  ) as any)
+    .upsert(
+      {
+        campaign_id: campaignId,
+        session_id: sessionId,
+        session_name: sessionName?.trim() || fallbackSessionName,
+        archived_at: archivedAt,
+        chronicle_snapshot: chronicleSnapshot,
+        encountered_npcs: encounteredNpcs,
+        visited_locations: visitedLocations,
+      },
+      { onConflict: "session_id" },
+    )
+    .select("*")
+    .single();
+
+  if (archiveError || !archiveRaw) {
+    throw new Error(archiveError?.message || "Session konnte nicht archiviert werden.");
+  }
+
+  const archive = archiveRaw as { id: string };
+
+  if (npcIds.length > 0) {
+    const reputationRows = npcIds.map((npcId) => ({
+      campaign_id: campaignId,
+      npc_id: npcId,
+      last_seen_session_id: archive.id,
+      last_seen_location_id: locationId,
+      last_seen_at: archivedAt,
+    }));
+
+    const { error: reputationError } = await (supabase.from(
+      "campaign_npc_reputation",
+    ) as any).upsert(reputationRows, {
+      onConflict: "campaign_id,npc_id",
+    });
+
+    if (reputationError) {
+      throw new Error(reputationError.message);
+    }
+  }
+
+  const { error: liveResetError } = await (supabase.from(
+    "session_live_states",
+  ) as any)
+    .update({
+      visible_npc_ids: [],
+      visible_faction_ids: [],
+      is_combat_mode: false,
+      current_turn_index: 0,
+      system_logs: [],
+      journal_text: null,
+    })
+    .eq("session_id", sessionId);
+
+  if (liveResetError) {
+    throw new Error(liveResetError.message);
+  }
+
+  const { error: combatCleanupError } = await ((supabase as any).from(
+    "combat_participants",
+  ) as any)
+    .delete()
+    .eq("session_id", sessionId);
+
+  if (combatCleanupError) {
+    throw new Error(combatCleanupError.message);
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  return serializeForClient(archiveRaw) as any;
 }
 
 // ============================================================================
@@ -502,46 +768,29 @@ export async function endSession(sessionId: string) {
 
   // 3. GM Check
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", (session as any).campaign_id)
     .single();
 
   // Typ-Sicherung gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
 
-  if (!campaign || campaign.gm_id !== user.id) {
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann eine Session beenden.");
   }
 
-  // 4. Fetch Live State (Journal) – maybeSingle: 0 oder 1 Zeile, kein Fehler
-  const { data: liveStateRow } = await (supabase.from("session_live_states") as any)
-    .select("journal_text")
-    .eq("session_id", sessionId)
-    .maybeSingle();
+  // 4. Archive live state before cleanup/close.
+  await archiveSession(
+    sessionId,
+    (session as any).campaign_id,
+    (session as any).title || "Unbenannte Session",
+  );
 
-  const journalText =
-    liveStateRow?.journal_text && String(liveStateRow.journal_text).trim().length > 0
-      ? String(liveStateRow.journal_text).trim()
-      : "Keine Notizen gemacht.";
-
-  // 5. Insert Journal Entry
-  if ((session as any).campaign_id) {
-    const { error: journalError } = await (supabase.from("journals") as any).insert({
-      campaign_id: (session as any).campaign_id,
-      title: `Logbuch: ${(session as any).title || "Unbenannte Session"}`,
-      content: journalText,
-      type: "Session Log",
-      related_session_id: sessionId,
-      visibility: "Public",
-    });
-
-    if (journalError) {
-      console.error("End Session Error (Insert Journal):", journalError);
-      // Wir loggen nur – Session-Ende soll trotzdem weiterlaufen.
-    }
-  }
-
-  // 6. Close Session (status + end_time)
+  // 5. Close Session (status + end_time)
   const { error: closeError } = await (supabase.from("sessions") as any)
     .update({ status: "Completed", end_time: new Date().toISOString() })
     .eq("id", sessionId);
@@ -549,16 +798,6 @@ export async function endSession(sessionId: string) {
   if (closeError) {
     console.error("End Session Error (Close Session):", closeError);
     throw new Error(closeError.message);
-  }
-
-  // 7. Cleanup Live State (optional: nur sichtbare NPCs leeren)
-  const { error: liveCleanupError } = await (supabase.from("session_live_states") as any)
-    .update({ visible_npc_ids: [], visible_faction_ids: [] })
-    .eq("session_id", sessionId);
-
-  if (liveCleanupError) {
-    console.error("End Session Error (Cleanup Live State):", liveCleanupError);
-    // Nicht kritisch für den Flow
   }
 
   // Revalidate nur Kampagne; /session/ nicht invalidieren (Digest bei offener Oberfläche).
@@ -603,12 +842,16 @@ export async function updateSession(
   if (!session) throw new Error("Session nicht gefunden.");
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann Sessions bearbeiten.");
   }
 
@@ -669,12 +912,16 @@ export async function deleteSession(sessionId: string) {
   if (!session) throw new Error("Session nicht gefunden.");
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann Sessions löschen.");
   }
 
@@ -721,12 +968,17 @@ export async function cancelSession(sessionId: string) {
   if (!session) throw new Error("Session nicht gefunden.");
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id, name")
+    .select("id, gm_id, owner_id, name")
     .eq("id", session.campaign_id)
     .single();
 
-  const campaign = campaignRaw as { id: string; gm_id: string; name?: string } | null;
-  if (!campaign || campaign.gm_id !== user.id) {
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+    name?: string;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann einen Termin absagen.");
   }
 
@@ -757,7 +1009,7 @@ export async function cancelSession(sessionId: string) {
 
   // Direktnachrichten an zugesagte Spieler
   const sessionTitle = session.title || "Termin";
-  const campaignName = campaign.name || "Kampagne";
+  const campaignName = campaign?.name || "Kampagne";
   const subject = `Termin abgesagt: ${sessionTitle}`;
   const content = `Der Spielleiter hat den Termin „${sessionTitle}" in der Kampagne „${campaignName}" abgesagt.`;
 

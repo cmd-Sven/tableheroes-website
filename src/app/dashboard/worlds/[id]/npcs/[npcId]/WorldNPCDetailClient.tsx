@@ -24,6 +24,8 @@ import { toggleSecretGlobal } from "@/src/app/dashboard/campaigns/[id]/secrets-a
 import { CheckResultsEditor } from "@/src/components/dashboard/campaigns/npcs/CheckResultsEditor";
 import { RelationshipWizard } from "@/src/components/worlds/RelationshipWizard";
 import { RelationshipCard } from "@/src/components/worlds/RelationshipCard";
+import { SmartText } from "@/src/components/ui/SmartText";
+import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import type { RelationshipWithNames } from "@/src/app/dashboard/worlds/relationship-actions";
 import type { WorldBlueprint } from "@/src/types/world";
 
@@ -71,6 +73,7 @@ export function WorldNPCDetailClient({
   const [favPending, setFavPending] = useState(false);
   const [togglingSecretId, setTogglingSecretId] = useState<string | null>(null);
   const [playerView, setPlayerView] = useState(false);
+  const { entities } = useWorldEntities(worldId);
 
   // Relationship Wizard
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -236,9 +239,12 @@ export function WorldNPCDetailClient({
                 <BookOpen className="h-4 w-4" />
                 Beschreibung
               </h2>
-              <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {npc.description}
-              </p>
+              <SmartText
+                text={npc.description}
+                entities={entities}
+                worldId={worldId}
+                emptyMessage="Keine Beschreibung vorhanden."
+              />
             </section>
           )}
           {npc.appearance && (
@@ -247,9 +253,12 @@ export function WorldNPCDetailClient({
                 <Eye className="h-4 w-4" />
                 Aussehen
               </h2>
-              <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {npc.appearance}
-              </p>
+              <SmartText
+                text={npc.appearance}
+                entities={entities}
+                worldId={worldId}
+                emptyMessage="Kein Aussehen hinterlegt."
+              />
             </section>
           )}
           {npc.personality_traits && (
@@ -258,9 +267,12 @@ export function WorldNPCDetailClient({
                 <Heart className="h-4 w-4" />
                 Persönlichkeit
               </h2>
-              <p className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {npc.personality_traits}
-              </p>
+              <SmartText
+                text={npc.personality_traits}
+                entities={entities}
+                worldId={worldId}
+                emptyMessage="Keine Persönlichkeit hinterlegt."
+              />
             </section>
           )}
           {npc.current_location?.name && (

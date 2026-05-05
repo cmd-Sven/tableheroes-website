@@ -31,7 +31,7 @@ export default async function GMInboxPage() {
 
   // -------------------------------------------------------------------------
   // A. Kampagnen-Bewerbungen – zentrale Abfrage (dieselbe wie Badge)
-  // Status: "Applied" und "Pending" (exakt wie getPendingApplicationsCount)
+  // Status: "Applied" (exakt wie getPendingApplicationsCount)
   // -------------------------------------------------------------------------
   const applicationList = await getPendingApplications(userId);
 

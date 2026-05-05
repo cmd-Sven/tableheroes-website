@@ -44,6 +44,7 @@ import {
   Swords,
   Gift,
   Armchair,
+  UserRound,
 } from "lucide-react";
 import {
   endSession,
@@ -67,6 +68,7 @@ import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPa
 import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
 import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { LootChestOverlay } from "@/src/components/session/LootChestOverlay";
+import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
 import {
@@ -104,6 +106,8 @@ type LiveState = {
   current_loot_id?: string | null;
   fate_coins?: FateCoin[] | null;
   destroyed_fate_coins?: number | null;
+  /** GM: 0–3 reine UI-Platzhalter „Spieler 1–3“ (kein Account / kein Log). */
+  dummy_player_count?: number | null;
   downtime_active?: boolean | null;
   downtime_type?: string | null;
   downtime_current_day?: number | null;
@@ -170,6 +174,10 @@ function normalizeLiveRow(row: unknown): LiveState {
         : null,
     physically_present_user_ids: normalizePhysicallyPresentUserIds(
       r.physically_present_user_ids,
+    ),
+    dummy_player_count: Math.min(
+      3,
+      Math.max(0, Math.round(Number(r.dummy_player_count ?? 0)) || 0),
     ),
   };
 }
@@ -332,6 +340,8 @@ type PartyCharacter = {
   playerUserId?: string | null;
   rations_count: number;
   starvation_days: number;
+  /** Nur Client: GM-Platzhalter ohne echten Charakter */
+  isSessionDummy?: boolean;
 };
 
 type CampaignNpc = {
@@ -1018,6 +1028,28 @@ export function LiveSessionBoard({
   const physicallyPresentIdSet = new Set(
     normalizePhysicallyPresentUserIds(liveState?.physically_present_user_ids),
   );
+  const dummyPlayerCountLive = Math.min(
+    3,
+    Math.max(0, Math.round(Number(liveState?.dummy_player_count ?? 0)) || 0),
+  );
+  const displayPartyCharacters = useMemo((): PartyCharacter[] => {
+    const dummies: PartyCharacter[] = [];
+    for (let i = 1; i <= dummyPlayerCountLive; i += 1) {
+      dummies.push({
+        id: `session-dummy-${i}`,
+        name: `Spieler ${i}`,
+        class: "Platzhalter",
+        race: null,
+        level: null,
+        avatar_url: "/images/icon-empty.svg",
+        playerUserId: null,
+        rations_count: 0,
+        starvation_days: 0,
+        isSessionDummy: true,
+      });
+    }
+    return [...partyCharacters, ...dummies];
+  }, [partyCharacters, dummyPlayerCountLive]);
   const temperatureValue = isGM
     ? temperatureDraft
     : normalizeTemperatureValue(liveState?.temperature_value);
@@ -1356,11 +1388,13 @@ export function LiveSessionBoard({
   );
   const combatPlayerTokens = useMemo<CombatTokenPayload[]>(
     () =>
-      partyCharacters.map((pc) => ({
-        type: "player",
-        name: pc.name,
-        image_url: pc.avatar_url,
-      })),
+      partyCharacters
+        .filter((pc) => !pc.isSessionDummy)
+        .map((pc) => ({
+          type: "player",
+          name: pc.name,
+          image_url: pc.avatar_url,
+        })),
     [partyCharacters],
   );
   const combatMonsterTokens = useMemo<CombatTokenPayload[]>(
@@ -2243,6 +2277,52 @@ export function LiveSessionBoard({
                     ) : null}
                   </GmSlideSettingsPanel>
 
+                  <div className="rounded-xl border border-white/15 bg-white/5 p-3 backdrop-blur-md">
+                    <div className="mb-2 flex items-start gap-2">
+                      <UserRound className="h-8 w-8 shrink-0 text-accent-gold" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="font-barlow text-[10px] font-extrabold uppercase text-accent-gold">
+                          Platzhalter-Spieler
+                        </p>
+                        <p className="font-libre text-[10px] leading-snug text-gray-500">
+                          Bis zu drei zusätzliche Portraits (Spieler 1–3) ohne Registrierung — nur
+                          Anzeige, kein Rucksack, kein Chronik-Eintrag.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        type="button"
+                        disabled={dummyPlayerCountLive <= 0 || isUpdating}
+                        onClick={() =>
+                          updateLiveState({
+                            dummy_player_count: Math.max(0, dummyPlayerCountLive - 1),
+                          })
+                        }
+                        className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Platzhalter entfernen"
+                      >
+                        −
+                      </button>
+                      <span className="min-w-[3.5rem] text-center font-barlow text-sm font-extrabold text-accent-gold">
+                        {dummyPlayerCountLive} / 3
+                      </span>
+                      <button
+                        type="button"
+                        disabled={dummyPlayerCountLive >= 3 || isUpdating}
+                        onClick={() =>
+                          updateLiveState({
+                            dummy_player_count: Math.min(3, dummyPlayerCountLive + 1),
+                          })
+                        }
+                        className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Platzhalter hinzufügen"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               )}
             </aside>
@@ -2599,6 +2679,16 @@ export function LiveSessionBoard({
                   />
                 ) : null}
                 {liveState?.current_loot_id ? (
+                  <StageLootItemCards
+                    sessionId={sessionId}
+                    campaignId={campaignId}
+                    containerId={liveState.current_loot_id}
+                    characterId={currentPlayerCharacter?.id ?? null}
+                    isGM={isGM}
+                    isCombatMode={!!liveState?.is_combat_mode}
+                  />
+                ) : null}
+                {liveState?.current_loot_id ? (
                   <LootChestOverlay
                     sessionId={sessionId}
                     containerId={liveState.current_loot_id}
@@ -2677,7 +2767,7 @@ export function LiveSessionBoard({
           </div>
 
           <div className="relative z-50 h-40 shrink-0 overflow-visible border-t border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/90 to-background-dark/95 px-4">
-            {partyCharacters.length === 0 ? (
+            {displayPartyCharacters.length === 0 ? (
               <div className="space-y-1">
                 <p className="font-libre text-xs text-gray-400">
                   Hier erscheinen Charaktere von Spielern, die für diesen Termin zugesagt haben
@@ -2693,21 +2783,24 @@ export function LiveSessionBoard({
               <div className="absolute inset-x-0 -top-[146px] z-[60] flex justify-center px-1 pb-8 pointer-events-none">
                 <div className="pointer-events-auto w-fit max-w-full overflow-x-auto overflow-y-visible">
                   <div className="flex justify-center gap-5">
-                {partyCharacters.map((pc) => {
+                {displayPartyCharacters.map((pc) => {
                   const pid = pc.playerUserId ? String(pc.playerUserId) : "";
                   const self = pid === userId;
                   const onDeck =
+                    Boolean(pc.isSessionDummy) ||
                     !pid ||
                     self ||
                     presentUserIds.has(pid) ||
                     physicallyPresentIdSet.has(pid);
                   const isScribe = !!pid && liveState?.scribe_id === pid;
                   const canOpenInventory =
-                    (actualUserIsGM && !forcePlayerView) || pid === userId;
+                    ((actualUserIsGM && !forcePlayerView) || pid === userId) &&
+                    !pc.isSessionDummy;
                   const isActiveTurn =
                     liveState?.is_combat_mode &&
                     activeCombatParticipant?.type === "player" &&
-                    activeCombatParticipant.name === pc.name;
+                    activeCombatParticipant.name === pc.name &&
+                    !pc.isSessionDummy;
                   return (
                     <motion.div
                       key={pc.id}
@@ -2743,7 +2836,13 @@ export function LiveSessionBoard({
                           unoptimized
                         />
                         <div className="absolute inset-x-5 bottom-10 top-10 z-10 flex flex-col items-center px-5 pt-0 text-center">
-                          <div className="relative -mt-4 flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-amber-800/80 bg-hero-dark shadow-xl">
+                          <div
+                            className={`relative -mt-4 flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
+                              pc.isSessionDummy
+                                ? "border-dashed border-amber-600/90"
+                                : "border-amber-800/80"
+                            }`}
+                          >
                             {pc.avatar_url ? (
                               // eslint-disable-next-line @next/next/no-img-element -- Externe Charakter-Avatare aus Userdaten
                               <img
@@ -2761,7 +2860,9 @@ export function LiveSessionBoard({
                             {pc.name}
                           </p>
                           <p className="mt-0.5 max-w-36 truncate font-libre text-xs text-gray-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                            Lvl {pc.level || 1} · {pc.class || "Unbekannt"}
+                            {pc.isSessionDummy
+                              ? "Platzhalter · kein Account"
+                              : `Lvl ${pc.level || 1} · ${pc.class || "Unbekannt"}`}
                           </p>
                           {pid && !self && !onDeck ? (
                             <p className="mt-1 font-libre text-[9px] text-amber-300/90">

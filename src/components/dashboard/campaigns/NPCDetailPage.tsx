@@ -19,6 +19,7 @@ import {
   HeartPulse,
   Scroll,
   Plus,
+  SlidersHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -123,6 +124,13 @@ type Props = {
   initialCampaignPlayerNote?: string;
   factions?: Array<{ id: string; name: string }>;
   locations?: Array<{ id: string; name: string; type: string }>;
+  lastSeen?: {
+    archiveId: string | null;
+    sessionName: string | null;
+    locationId: string | null;
+    locationName: string | null;
+    seenAt: string | null;
+  } | null;
   /** Für Quest-Modal von NPC-Seite (nur GM) */
   npcsForQuest?: Array<{ id: string; name: string; title: string | null; role: string | null }>;
   membersForQuest?: Array<{ id: string; character_id: string | null; user?: { username: string } | null; character_data?: any; characters?: any }>;
@@ -236,6 +244,7 @@ export function NPCDetailPage({
   initialCampaignPlayerNote = "",
   factions = [],
   locations = [],
+  lastSeen = null,
   npcsForQuest = [],
   membersForQuest = [],
 }: Props) {
@@ -614,14 +623,26 @@ export function NPCDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Link
-          href={`/dashboard/campaigns/${campaignId}?tab=npcs`}
-          className="flex items-center gap-2 text-hero-vibrant hover:text-white transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span className="font-barlow font-bold uppercase">Zurück</span>
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/dashboard/campaigns/${campaignId}?tab=npcs`}
+            className="flex items-center gap-2 text-hero-vibrant hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-barlow font-bold uppercase">Zurück</span>
+          </Link>
+          {canEdit ? (
+            <Link
+              href={`/dashboard/campaigns/${campaignId}/npcs/${npc.id}/edit`}
+              className="inline-flex items-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 transition-colors"
+              title="Händler, Shop-Template, Hooks und weitere Felder (volles NPC-Formular)"
+            >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" />
+              Volles Formular
+            </Link>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleToggleFavorite}
@@ -1048,6 +1069,37 @@ export function NPCDetailPage({
                 </p>
               )}
             </InlineEditField>
+
+            {lastSeen && (lastSeen.archiveId || lastSeen.locationId || lastSeen.seenAt) && (
+              <div className="rounded border border-accent-gold/30 bg-accent-gold/10 p-3">
+                <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                  Zuletzt gesehen
+                </p>
+                <p className="font-libre text-sm text-gray-200">
+                  {lastSeen.archiveId ? (
+                    <Link
+                      href={`/dashboard/campaigns/${campaignId}?tab=sessions&archive=${lastSeen.archiveId}`}
+                      className="text-hero-vibrant hover:underline"
+                    >
+                      {lastSeen.sessionName || "Archivierte Session"}
+                    </Link>
+                  ) : (
+                    <span>{lastSeen.sessionName || "In einer vergangenen Session"}</span>
+                  )}
+                  {lastSeen.locationId || lastSeen.locationName ? " bei " : ""}
+                  {lastSeen.locationId ? (
+                    <Link
+                      href={`/dashboard/campaigns/${campaignId}/lore/${lastSeen.locationId}`}
+                      className="text-hero-vibrant hover:underline"
+                    >
+                      {lastSeen.locationName || "unbekannter Ort"}
+                    </Link>
+                  ) : lastSeen.locationName ? (
+                    <span>{lastSeen.locationName}</span>
+                  ) : null}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

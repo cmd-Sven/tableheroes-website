@@ -89,7 +89,7 @@ export async function getGMNotifications(
       "id, name, campaign_id, user_id, updated_at, users ( username, avatar_url )",
     )
     .in("campaign_id", campaignIds)
-    .eq("status", "Pending")
+    .eq("status", "Applied")
     .order("updated_at", { ascending: false })
     .limit(10);
 
@@ -169,7 +169,7 @@ export async function getGMRecipients(
     `,
     )
     .in("campaign_id", campaignIds)
-    .eq("status", "Accepted")
+    .eq("status", "Approved")
     .neq("user_id", userId);
 
   const membersMap = new Map<
@@ -208,7 +208,7 @@ export async function getPlayerMessages(
   const { data: memberRows } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
-    .eq("status", "Accepted");
+    .eq("status", "Approved");
 
   const campaignIds = ((memberRows as any[]) || []).map(
     (m: any) => m.campaign_id as string,

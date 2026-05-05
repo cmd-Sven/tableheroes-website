@@ -32,7 +32,7 @@ export async function getCharacterForMemberByUserId(
     .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
     .eq("campaign_id", campaignId)
     .eq("user_id", userId)
-    .in("status", ["Active", "Alive", "Approved", "In_Review"])
+    .in("status", ["Active", "Approved", "Pending_Approval"])
     .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -41,7 +41,7 @@ export async function getCharacterForMemberByUserId(
     const res = await (supabase.from("characters") as any)
       .select("id, name, class, race, level, status, biography, avatar_url, modification_log")
       .eq("user_id", userId)
-      .in("status", ["Active", "Alive", "Approved", "In_Review"])
+      .in("status", ["Active", "Approved", "Pending_Approval"])
       .order("id", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -283,7 +283,7 @@ export async function createCharacterWithRelations(data: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  // 2. Check if user is Accepted member (ohne characters-Join – FK kann fehlen)
+  // 2. Check if user is approved member (ohne characters-Join – FK kann fehlen)
   const { data: membershipRaw, error: membershipError } = await (
     supabase.from("campaign_members") as any
   )
@@ -302,14 +302,14 @@ export async function createCharacterWithRelations(data: {
     throw new Error("Du bist kein Mitglied dieser Kampagne.");
   }
 
-  const validStatuses = ["Accepted", "Drafting", "In_Review"];
+  const validStatuses = ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"];
   if (!validStatuses.includes(membership.status)) {
     throw new Error(
       "Nur akzeptierte Mitglieder (oder im Entwurf-Status) können Charaktere erstellen.",
     );
   }
 
-  // For Drafting/In_Review: allow creating. For Accepted: allow if no character OR character is Dead/Archived
+  // For Drafting/In_Review: allow creating. For Approved/Active: allow if no character OR character is Dead/Archived
   let characterStatus: string | null = null;
   if (membership.character_id) {
     const { data: charRow } = await (supabase.from("characters") as any)
@@ -319,7 +319,7 @@ export async function createCharacterWithRelations(data: {
     characterStatus = (charRow as { status: string } | null)?.status ?? null;
   }
 
-  if (membership.status === "Accepted" && membership.character_id) {
+  if (["Approved", "Active"].includes(membership.status) && membership.character_id) {
     const isDeadOrArchived =
       characterStatus === "Dead" || characterStatus === "Archived";
 
@@ -385,7 +385,7 @@ export async function createCharacterWithRelations(data: {
       );
     }
 
-    // 3b. Update campaign_members: Link character AND set status to Accepted
+    // 3b. Update campaign_members: Link character AND set status to Approved
     console.log("🔍 [ServerAction] Updating membership for user:", user.id);
     console.log("🔍 [ServerAction] Campaign ID:", data.campaign_id);
     console.log("🔍 [ServerAction] Character ID:", character.id);
@@ -395,7 +395,7 @@ export async function createCharacterWithRelations(data: {
     )
       .update({
         character_id: character.id,
-        status: "Accepted", // WICHTIG: Status muss auf Accepted wechseln!
+        status: "Approved", // WICHTIG: Status muss auf Approved wechseln!
       })
       .eq("campaign_id", data.campaign_id)
       .eq("user_id", user.id)
@@ -580,7 +580,7 @@ export async function updateCharacterPlayer(data: {
 export async function updateCharacterByGM(data: {
   character_id: string;
   campaign_id: string;
-  /** DB kann Active, Pending_Approval, Alive, … nutzen */
+  /** DB kann Active, Pending_Approval, Approved, … nutzen */
   status: string;
   level: number;
   name: string;
@@ -815,7 +815,7 @@ export async function approveCharacter(
     const { error: updateErr } = await (
       supabase.from("campaign_members") as any
     )
-      .update({ character_id: characterId, status: "Accepted" })
+      .update({ character_id: characterId, status: "Approved" })
       .eq("id", (existingMember as { id: string }).id);
     if (updateErr) throw new Error(updateErr.message);
   } else {
@@ -825,7 +825,7 @@ export async function approveCharacter(
       campaign_id: campaignId,
       user_id: userId,
       character_id: characterId,
-      status: "Accepted",
+      status: "Approved",
       role: "Player",
     });
     if (insertErr) throw new Error(insertErr.message);

@@ -37,7 +37,7 @@ export default async function CampaignBestariumCreaturePage({ params }: Props) {
 
     const ok =
       membership &&
-      ["Accepted", "Drafting", "In_Review"].includes((membership as { status: string }).status);
+      ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes((membership as { status: string }).status);
     if (!ok) redirect("/dashboard");
   }
 

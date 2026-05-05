@@ -267,10 +267,10 @@ export async function applyToCampaign(
   const existing = existingRaw as { id: string; status: string } | null;
 
   if (existing) {
-    if (existing.status === "Applied" || existing.status === "Pending") {
+    if (existing.status === "Applied") {
       throw new Error("Du hast dich bereits beworben.");
     }
-    if (existing.status === "Accepted") {
+    if (existing.status === "Approved" || existing.status === "Active") {
       throw new Error("Du bist bereits Mitglied dieser Kampagne.");
     }
   }
@@ -360,7 +360,7 @@ export async function applyToCampaignWithCharacter(
     if (existing.status === "Applied") {
       throw new Error("Du hast dich bereits beworben.");
     }
-    if (existing.status === "Accepted") {
+    if (existing.status === "Approved" || existing.status === "Active") {
       throw new Error("Du bist bereits Mitglied dieser Kampagne.");
     }
   }
@@ -655,22 +655,27 @@ export async function updateMemberRank(
 
   const { data: campaignRaw } = await supabase
     .from("campaigns")
-    .select("id, gm_id")
+    .select("id, gm_id, owner_id")
     .eq("id", campaignId)
     .single();
 
   const parsed = CampaignSchema.pick({
     id: true,
     gm_id: true,
+    owner_id: true,
   }).safeParse(campaignRaw);
 
-  if (!parsed.success || parsed.data.gm_id !== user.id) {
-    throw new Error("Unauthorized: You are not the GM.");
+  if (
+    !parsed.success ||
+    (parsed.data.gm_id !== user.id && parsed.data.owner_id !== user.id)
+  ) {
+    throw new Error("Unauthorized: You are not the GM or owner.");
   }
 
-  const { error } = await (supabase.from("users") as any)
-    .update({ current_rank: rank || null })
-    .eq("id", targetUserId);
+  const { error } = await (supabase.from("campaign_members") as any)
+    .update({ campaign_rank: rank || null })
+    .eq("campaign_id", campaignId)
+    .eq("user_id", targetUserId);
 
   if (error) {
     console.error("Update Member Rank Error:", error);
@@ -754,7 +759,7 @@ export async function repairMemberCharacterLink(
     .select("id, name")
     .eq("campaign_id", campaignId)
     .eq("user_id", userId)
-    .in("status", ["Active", "Alive", "Approved", "In_Review"])
+    .in("status", ["Active", "Approved", "Pending_Approval"])
     .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -763,7 +768,7 @@ export async function repairMemberCharacterLink(
     const res = await (supabase.from("characters") as any)
       .select("id, name")
       .eq("user_id", userId)
-      .in("status", ["Active", "Alive", "Approved", "In_Review"])
+      .in("status", ["Active", "Approved", "Pending_Approval"])
       .order("id", { ascending: false })
       .limit(1)
       .maybeSingle();

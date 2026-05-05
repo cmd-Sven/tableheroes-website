@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Edit2, Save, X, Loader2 } from "lucide-react";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { GothicSpotlightDescription } from "./GothicSpotlightDescription";
-import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
+import { WikiEditor, type WikiMentionEntity } from "@/src/components/ui/WikiEditor";
 import { SmartText } from "@/src/components/ui/SmartText";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 
@@ -97,6 +97,44 @@ export function LoreDescription({ lore, campaignId, isGM, onUpdate }: Props) {
   const router = useRouter();
   const worldId = lore.world_id ?? null;
   const { entities } = useWorldEntities(worldId);
+  const mentionEntities = useMemo<WikiMentionEntity[]>(
+    () =>
+      entities
+        .map((entity) => {
+          if (entity.type === "npc") {
+            const url = campaignId
+              ? `/dashboard/campaigns/${campaignId}/npcs/${entity.id}`
+              : worldId
+                ? `/dashboard/worlds/${worldId}/npcs/${entity.id}`
+                : null;
+            return url
+              ? { id: entity.id, name: entity.name, type: "npc" as const, url }
+              : null;
+          }
+
+          if (entity.type === "location") {
+            const url = campaignId
+              ? `/dashboard/campaigns/${campaignId}/lore/${entity.id}`
+              : worldId
+                ? `/dashboard/worlds/${worldId}/lore/${entity.id}`
+                : null;
+            return url
+              ? { id: entity.id, name: entity.name, type: "lore" as const, url }
+              : null;
+          }
+
+          const url = campaignId
+            ? `/dashboard/campaigns/${campaignId}/factions/${entity.id}`
+            : worldId
+              ? `/dashboard/worlds/${worldId}/factions/${entity.id}`
+              : null;
+          return url
+            ? { id: entity.id, name: entity.name, type: "faction" as const, url }
+            : null;
+        })
+        .filter((entity): entity is WikiMentionEntity => Boolean(entity)),
+    [campaignId, entities, worldId],
+  );
   const [isPending, startTransition] = useTransition();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
@@ -148,11 +186,12 @@ export function LoreDescription({ lore, campaignId, isGM, onUpdate }: Props) {
           canEdit={isGM}
           isPending={isPending}
           editComponent={
-            <MarkdownEditor
+            <WikiEditor
               value={editValues.description || ""}
               onChange={(v) => setEditValues({ ...editValues, description: v })}
               minHeight="min-h-[450px]"
               entities={entities}
+              mentionEntities={mentionEntities}
               campaignId={campaignId}
               worldId={worldId}
             />

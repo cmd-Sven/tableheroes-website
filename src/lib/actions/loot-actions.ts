@@ -3,22 +3,17 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import type { Json } from "@/src/lib/database.types";
+import {
+  fallbackMundaneName,
+  lootItemToJson,
+  parseIdentifyRequests,
+  parseLootItemRow,
+  type LootDraftPayload,
+  type LootIdentifyRequestRow,
+  type LootItemRow,
+} from "@/src/lib/loot/loot-item-model";
 
-export type LootItemRow = {
-  id: string;
-  name: string;
-  desc: string;
-  rarity: string;
-  price: number;
-  isMagical: boolean;
-};
-
-export type LootDraftPayload = {
-  name: string;
-  gp: number;
-  sp: number;
-  items: LootItemRow[];
-};
+export type { LootDraftPayload, LootIdentifyRequestRow, LootItemRow } from "@/src/lib/loot/loot-item-model";
 
 async function loadSessionCampaign(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -111,14 +106,26 @@ export async function publishLootToSession(
 
     const gp = Math.max(0, Math.round(draft.gp));
     const sp = Math.max(0, Math.round(draft.sp));
-    const itemsJson = draft.items.map((it) => ({
-      id: String(it.id).trim(),
-      name: it.name,
-      desc: it.desc,
-      rarity: it.rarity,
-      price: Math.max(0, Math.round(it.price)),
-      isMagical: Boolean(it.isMagical),
-    }));
+    const itemsJson = draft.items.map((it) => {
+      const isMagical = Boolean(it.isMagical);
+      const mundaneName = (it.mundaneName ?? "").trim() || (isMagical ? fallbackMundaneName(it.name) : it.name);
+      const mundaneDesc =
+        (it.mundaneDesc ?? "").trim() ||
+        (isMagical
+          ? "Magische Spuren, aber noch keine klare Identität — wirkt wie gewöhnliche Ausrüstung."
+          : it.desc);
+      return {
+        id: String(it.id).trim(),
+        name: it.name,
+        desc: it.desc,
+        mundaneName: mundaneName.slice(0, 160),
+        mundaneDesc: mundaneDesc.slice(0, 800),
+        rarity: it.rarity,
+        price: Math.max(0, Math.round(it.price)),
+        isMagical,
+        identified: !isMagical,
+      };
+    });
 
     const { data: ins, error: insErr } = await (supabase as any)
       .from("campaign_loot_containers")
@@ -258,34 +265,42 @@ export async function claimLootItemFromContainer(
 
     const { data: box, error: boxErr } = await (supabase as any)
       .from("campaign_loot_containers")
-      .select("id, campaign_id, items_json")
+      .select("id, campaign_id, items_json, identify_requests")
       .eq("id", containerId)
       .single();
 
     if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
-    const b = box as { campaign_id: string; items_json: unknown };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
     if (b.campaign_id !== chRow.campaign_id) {
       return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
     }
 
-    const arr = Array.isArray(b.items_json) ? [...(b.items_json as LootItemRow[])] : [];
-    const idx = arr.findIndex((it) => String((it as { id?: string }).id) === id);
+    const arr = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const idx = arr.findIndex((it) => String(it.id) === id);
     if (idx < 0) return { ok: false, error: "Item ist bereits weg." };
 
     const [picked] = arr.splice(idx, 1);
-    const p = picked as LootItemRow;
+    const p = picked;
 
-    const descParts = [p.desc, `Seltenheit: ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null].filter(
-      Boolean,
-    );
+    const knownMagical = Boolean(p.isMagical) && Boolean(p.identified);
+    const useMundane = Boolean(p.isMagical) && !p.identified;
+    const invName = (useMundane ? (p.mundaneName || fallbackMundaneName(p.name)) : p.name).slice(0, 160);
+    const mundaneBody =
+      (p.mundaneDesc && p.mundaneDesc.trim()) ||
+      "Magische Eigenschaften sind nicht identifiziert — du behandelst den Fund wie gewöhnliche Ausrüstung.";
+    const descParts = useMundane
+      ? [mundaneBody, `Seltenheit (geschätzt): ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null]
+      : [p.desc, `Seltenheit: ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null].filter(Boolean);
     const description = descParts.join("\n\n").slice(0, 1200) || null;
 
     const { error: insErr } = await (supabase as any).from("character_items").insert({
       character_id: characterId,
-      name: p.name.slice(0, 160),
+      name: invName,
       description,
-      category: p.isMagical ? "Consumable" : "Equipment",
-      icon_type: p.isMagical ? "potion" : "gear",
+      category: "Equipment",
+      icon_type: knownMagical ? "potion" : "gear",
       target_fap: 0,
       current_fap: 0,
       is_deleted: false,
@@ -293,13 +308,247 @@ export async function claimLootItemFromContainer(
 
     if (insErr) return { ok: false, error: insErr.message ?? "Item konnte nicht ins Inventar." };
 
+    const nextRequests = parseIdentifyRequests(b.identify_requests).filter((r) => r.item_id !== id);
+
     const { error: upErr } = await (supabase as any)
       .from("campaign_loot_containers")
-      .update({ items_json: arr as unknown as Json })
+      .update({
+        items_json: arr.map(lootItemToJson) as unknown as Json,
+        identify_requests: nextRequests as unknown as Json,
+      })
       .eq("id", containerId);
 
     if (upErr) return { ok: false, error: upErr.message ?? "Container konnte nicht aktualisiert werden." };
 
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function requestLootItemIdentify(
+  sessionId: string,
+  characterId: string,
+  containerId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const id = String(itemId).trim();
+    if (id.length < 8) return { ok: false, error: "Ungültiges Item." };
+
+    const { data: ch, error: chErr } = await supabase
+      .from("characters")
+      .select("id, user_id, campaign_id, name")
+      .eq("id", characterId)
+      .single();
+    if (chErr || !ch) return { ok: false, error: "Charakter nicht gefunden." };
+    const chRow = ch as { user_id: string | null; campaign_id: string; name: string | null };
+    if (chRow.user_id !== user.id) {
+      return { ok: false, error: "Nur mit dem eigenen Charakter anfragbar." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== chRow.campaign_id) {
+      return { ok: false, error: "Session/Kampagne ungültig." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, items_json, identify_requests")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
+    if (b.campaign_id !== chRow.campaign_id) {
+      return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+    }
+
+    const items = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const item = items.find((it) => it.id === id);
+    if (!item) return { ok: false, error: "Item nicht mehr auf der Bühne." };
+    if (!item.isMagical) return { ok: false, error: "Nur magische Gegenstände müssen identifiziert werden." };
+    if (item.identified) return { ok: false, error: "Bereits identifiziert." };
+
+    let pending = parseIdentifyRequests(b.identify_requests);
+    if (pending.some((r) => r.character_id === characterId && r.item_id === id)) {
+      return { ok: true };
+    }
+
+    const reqId = crypto.randomUUID();
+    const itemLabel = (item.mundaneName || fallbackMundaneName(item.name)).slice(0, 160);
+    pending = [
+      ...pending,
+      {
+        id: reqId,
+        character_id: characterId,
+        character_name: String(chRow.name ?? "Spieler").slice(0, 120),
+        item_id: id,
+        item_label: itemLabel,
+        created_at: new Date().toISOString(),
+      },
+    ].slice(-24);
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({ identify_requests: pending as unknown as Json })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Anfrage konnte nicht gesendet werden." };
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function resolveLootItemIdentify(
+  sessionId: string,
+  campaignId: string,
+  containerId: string,
+  requestId: string,
+  success: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann Identifikationen beantworten." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== campaignId) {
+      return { ok: false, error: "Session passt nicht zur Kampagne." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const rid = String(requestId).trim();
+    if (!rid) return { ok: false, error: "Ungültige Anfrage." };
+
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, items_json, identify_requests")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
+    if (b.campaign_id !== campaignId) return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+
+    const pending = parseIdentifyRequests(b.identify_requests);
+    const req = pending.find((r) => r.id === rid);
+    if (!req) return { ok: false, error: "Anfrage nicht mehr vorhanden." };
+
+    const nextPending = pending.filter((r) => r.id !== rid);
+
+    const items = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const idx = items.findIndex((it) => it.id === req.item_id);
+    if (idx < 0) {
+      const { error: upOnly } = await (supabase as any)
+        .from("campaign_loot_containers")
+        .update({ identify_requests: nextPending as unknown as Json })
+        .eq("id", containerId);
+      if (upOnly) return { ok: false, error: upOnly.message ?? "Update fehlgeschlagen." };
+      return { ok: true };
+    }
+
+    if (success) {
+      items[idx] = { ...items[idx], identified: true };
+    }
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({
+        items_json: items.map(lootItemToJson) as unknown as Json,
+        identify_requests: nextPending as unknown as Json,
+      })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Konnte nicht speichern." };
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function gmRemoveLootItemFromStage(
+  sessionId: string,
+  campaignId: string,
+  containerId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann Gegenstände von der Bühne nehmen." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== campaignId) {
+      return { ok: false, error: "Session passt nicht zur Kampagne." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const id = String(itemId).trim();
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, items_json, identify_requests")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
+    if (b.campaign_id !== campaignId) return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+
+    const items = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const nextItems = items.filter((it) => it.id !== id);
+    if (nextItems.length === items.length) {
+      return { ok: false, error: "Item nicht gefunden." };
+    }
+
+    const nextRequests = parseIdentifyRequests(b.identify_requests).filter((r) => r.item_id !== id);
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({
+        items_json: nextItems.map(lootItemToJson) as unknown as Json,
+        identify_requests: nextRequests as unknown as Json,
+      })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Konnte nicht entfernen." };
     return { ok: true };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";

@@ -37,6 +37,8 @@ type NPC = {
   faction_id: string | null;
   current_location_id: string | null;
   home_location_id: string | null;
+  is_merchant?: boolean | null;
+  shop_id?: string | null;
   narrative_hooks?: NarrativeHook[] | null;
 };
 
@@ -48,6 +50,7 @@ type Props = {
   initialData?: NPC | null;
   factions: Array<{ id: string; name: string }>;
   locations: Array<{ id: string; name: string; type: string }>;
+  shops?: Array<{ id: string; name: string; price_modifier_percent?: number | null }>;
   onSuccess?: () => void;
   onCreated?: (npcId: string) => void | Promise<void>;
   hookContext?: {
@@ -85,7 +88,7 @@ const ALIGNMENTS = [
   "Chaotic Evil",
 ];
 
-export function NPCForm({ campaignId, worldId, initialData, hookContext, factions, locations, onSuccess, onCreated, defaultRole, defaultLocationId, defaultName, defaultFactionId, defaultDescription, suggestedSecret }: Props) {
+export function NPCForm({ campaignId, worldId, initialData, hookContext, factions, locations, shops = [], onSuccess, onCreated, defaultRole, defaultLocationId, defaultName, defaultFactionId, defaultDescription, suggestedSecret }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -125,6 +128,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
     faction_id: string;
     current_location_id: string;
     home_location_id: string;
+    is_merchant: boolean;
+    shop_id: string;
     narrative_hooks: NarrativeHook[];
     is_secret_antagonist: boolean;
     hidden_agenda: string;
@@ -153,6 +158,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
     faction_id: defaultFactionId ?? "",
     current_location_id: defaultLocationId ?? "",
     home_location_id: defaultLocationId ?? "",
+    is_merchant: false,
+    shop_id: "",
     narrative_hooks: [],
     is_secret_antagonist: false,
     hidden_agenda: "",
@@ -213,6 +220,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         faction_id: initialData.faction_id || "",
         current_location_id: initialData.current_location_id || "",
         home_location_id: initialData.home_location_id || "",
+        is_merchant: Boolean(initialData.is_merchant),
+        shop_id: initialData.shop_id || "",
         narrative_hooks: initialData.narrative_hooks || [],
         is_secret_antagonist: (initialData as any).is_secret_antagonist || false,
         hidden_agenda: (initialData as any).hidden_agenda || "",
@@ -239,6 +248,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         faction_id: "",
         current_location_id: "",
         home_location_id: "",
+        is_merchant: false,
+        shop_id: "",
         narrative_hooks: [],
         is_secret_antagonist: false,
         hidden_agenda: "",
@@ -352,12 +363,22 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         const normalizedHomeLocationId = formData.home_location_id && String(formData.home_location_id).trim() !== "" 
           ? String(formData.home_location_id).trim() 
           : null;
+        const normalizedShopId =
+          formData.is_merchant && formData.shop_id && String(formData.shop_id).trim() !== ""
+            ? String(formData.shop_id).trim()
+            : null;
+
+        if (formData.is_merchant && shops.length > 0 && !normalizedShopId) {
+          throw new Error("Bitte wähle ein Shop-Template für diesen Händler aus.");
+        }
 
         console.log("🔍 [NPCForm] Form submission:", {
           original_current_location_id: formData.current_location_id,
           normalized_current_location_id: normalizedCurrentLocationId,
           original_home_location_id: formData.home_location_id,
           normalized_home_location_id: normalizedHomeLocationId,
+          is_merchant: formData.is_merchant,
+          shop_id: normalizedShopId,
         });
 
         const payload: any = {
@@ -387,6 +408,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId,
+          is_merchant: formData.is_merchant,
+          shop_id: normalizedShopId,
           narrative_hooks: formData.narrative_hooks && formData.narrative_hooks.length > 0 ? formData.narrative_hooks : undefined,
           is_secret_antagonist: formData.is_secret_antagonist,
           hidden_agenda: formData.hidden_agenda || undefined,
@@ -670,6 +693,69 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
                   </option>
                 ))}
             </select>
+          </div>
+        )}
+
+        {campaignId && (
+          <div className="rounded-lg border border-accent-gold/30 bg-slate-900/60 p-4">
+            <div className="flex items-start gap-3">
+              <input
+                id="is_merchant"
+                type="checkbox"
+                checked={formData.is_merchant}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    is_merchant: e.target.checked,
+                    shop_id: e.target.checked ? formData.shop_id : "",
+                  })
+                }
+                className="mt-1 h-5 w-5 cursor-pointer rounded border-hero-dark bg-slate-800 text-accent-gold focus:ring-2 focus:ring-accent-gold"
+              />
+              <div className="flex-1">
+                <label
+                  htmlFor="is_merchant"
+                  className="cursor-pointer select-none font-barlow text-sm font-bold uppercase text-accent-gold"
+                >
+                  Ist dieser NPC ein Händler?
+                </label>
+                <p className="mt-1 font-libre text-xs text-gray-400">
+                  Händler erhalten ein Shop-Template, das Waren und Preisaufschläge für den Verkauf steuert.
+                </p>
+              </div>
+            </div>
+
+            {formData.is_merchant && (
+              <div className="mt-4">
+                <label className="mb-2 block font-barlow text-sm font-bold uppercase text-gray-300">
+                  Shop-Template
+                </label>
+                <select
+                  value={formData.shop_id}
+                  onChange={(e) => setFormData({ ...formData, shop_id: e.target.value })}
+                  disabled={shops.length === 0}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">-- Shop auswählen --</option>
+                  {shops
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((shop) => (
+                      <option key={shop.id} value={shop.id}>
+                        {shop.name}
+                        {typeof shop.price_modifier_percent === "number"
+                          ? ` (${shop.price_modifier_percent >= 0 ? "+" : ""}${shop.price_modifier_percent}%)`
+                          : ""}
+                      </option>
+                    ))}
+                </select>
+                {shops.length === 0 && (
+                  <p className="mt-2 font-libre text-xs text-amber-300">
+                    Für diese Kampagne gibt es noch keine Shops. Lege zuerst einen Spielershop an.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

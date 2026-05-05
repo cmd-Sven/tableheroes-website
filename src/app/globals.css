@@ -89,6 +89,124 @@ body {
   min-width: 0 !important;
 }
 
+.animated-border-box {
+  position: absolute;
+  overflow: hidden;
+  border-radius: var(--glow-radius, 10px);
+  z-index: -1;
+  width: calc(100% + var(--glow-offset, 12px));
+  height: calc(100% + var(--glow-offset, 12px));
+  top: calc(var(--glow-offset, 12px) / -2);
+  left: calc(var(--glow-offset, 12px) / -2);
+  transition: opacity 2s ease-out;
+}
+
+.animated-border-box::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  background-image: conic-gradient(
+    rgba(0, 0, 0, 0),
+    var(--glow-color, #8b5cf6),
+    rgba(0, 0, 0, 0) 25%
+  );
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: th-stage-glow-rotate 4s linear infinite;
+}
+
+.animated-border-box::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 4px;
+  top: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  border-radius: var(--glow-inner-radius, 7px);
+  background: var(--glow-inner-background, #0a1f10);
+}
+
+@keyframes th-stage-glow-rotate {
+  100% {
+    transform: translate(-50%, -50%) rotate(1turn);
+  }
+}
+
+.th-weather-rain,
+.th-weather-rain-layer,
+.th-weather-snow {
+  position: absolute;
+  inset: -12%;
+  overflow: hidden;
+}
+
+.th-weather-rain-layer {
+  display: block;
+  opacity: 0.55;
+  background-image: radial-gradient(
+    ellipse 2px 7px at center,
+    rgba(220, 240, 255, 0.58) 0 55%,
+    transparent 60%
+  );
+  background-size: 46px 74px;
+  transform: translate3d(0, -28%, 0);
+  animation: th-weather-rain-fall 4.8s linear infinite;
+  will-change: transform;
+}
+
+.th-weather-rain-layer-2 {
+  opacity: 0.38;
+  filter: blur(0.4px);
+  background-size: 68px 96px;
+  background-position: 24px 12px;
+  animation-duration: 6.4s;
+}
+
+.th-weather-rain-layer-3 {
+  opacity: 0.24;
+  filter: blur(0.8px);
+  background-size: 92px 128px;
+  background-position: 46px 30px;
+  animation-duration: 8.2s;
+}
+
+@keyframes th-weather-rain-fall {
+  0% {
+    transform: translate3d(0, -28%, 0);
+  }
+  100% {
+    transform: translate3d(-8%, 82%, 0);
+  }
+}
+
+.th-weather-snow {
+  opacity: 0.65;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.75) 0 2px, transparent 3px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.45) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.6) 0 1.5px, transparent 2.5px);
+  background-size: 120px 140px, 180px 210px, 260px 280px;
+  animation: th-weather-snow-fall 14s linear infinite;
+}
+
+@keyframes th-weather-snow-fall {
+  0% {
+    transform: translate3d(0, -10%, 0);
+  }
+  50% {
+    transform: translate3d(4%, 45%, 0);
+  }
+  100% {
+    transform: translate3d(-3%, 100%, 0);
+  }
+}
+
 .flip-card-container {
   transform-style: preserve-3d;
   transition: transform 0.7s;

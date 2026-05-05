@@ -63,11 +63,11 @@ export default async function SessionStagePrepPage({ params }: Props) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
-  if (["Completed", "Ended", "Cancelled"].includes(session.status)) {
+  if (["Completed", "Cancelled"].includes(session.status)) {
     redirect(`/dashboard/campaigns/${campaignId}?tab=sessions&ended=1`);
   }
 
-  if (!["Completed", "Ended", "Cancelled"].includes(session.status)) {
+  if (!["Completed", "Cancelled"].includes(session.status)) {
     await ensureSessionPrepLiveState(sessionId);
   }
 

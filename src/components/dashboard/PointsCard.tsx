@@ -11,24 +11,32 @@ import { createClient } from "@/src/lib/supabase/client";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 type Props = {
+  /** Aktuell ausgebbares Guthaben. */
   totalPoints: number;
+  /** Lebenslang verdiente Punkte fuer Level-Fortschritt. */
+  lifetimePoints: number;
   pointsHistory?: PointLogEntry[];
 };
 
 const STORAGE_KEY = "last_seen_points_entry_id";
 
-export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialHistory = [] }: Props) {
+export function PointsCard({
+  totalPoints: initialPoints,
+  lifetimePoints: initialLifetimePoints,
+  pointsHistory: initialHistory = [],
+}: Props) {
   const [totalPoints, setTotalPoints] = useState(initialPoints);
+  const [lifetimePoints, setLifetimePoints] = useState(initialLifetimePoints);
   const [pointsHistory, setPointsHistory] = useState(initialHistory);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [progressAnimated, setProgressAnimated] = useState(0);
   const hasCheckedForNew = useRef(false);
 
   // Level Calculation
-  const level = calculateLevel(totalPoints);
+  const level = calculateLevel(lifetimePoints);
   const nextLevelPoints = getPointsForNextLevel(level);
   const currentLevelBase = level > 0 ? getPointsForNextLevel(level - 1) : 0;
-  const gainedInLevel = Math.max(0, totalPoints - currentLevelBase);
+  const gainedInLevel = Math.max(0, lifetimePoints - currentLevelBase);
   const requiredForLevel =
     nextLevelPoints - currentLevelBase > 0
       ? nextLevelPoints - currentLevelBase
@@ -137,12 +145,13 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
 
             supabase
               .from("users")
-              .select("total_points")
+              .select("total_points, lifetime_points")
               .eq("id", user.id)
               .single()
               .then(({ data }) => {
                 if (data) {
                   setTotalPoints(Number((data as any).total_points) || 0);
+                  setLifetimePoints(Number((data as any).lifetime_points) || 0);
                 }
               });
 
@@ -201,7 +210,7 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
             </div>
           </div>
           <p className="font-barlow text-xs text-gray-500 tabular-nums">
-            {totalPoints.toLocaleString("de-DE")} XP
+            {lifetimePoints.toLocaleString("de-DE")} Lifetime XP
           </p>
         </div>
 
@@ -209,7 +218,7 @@ export function PointsCard({ totalPoints: initialPoints, pointsHistory: initialH
         <div className="space-y-1">
           <div className="h-3 w-full overflow-hidden rounded-full border border-hero-border/40 bg-hero-dark/80">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-amber-700 transition-all duration-700 ease-out"
+              className="h-full rounded-full bg-linear-to-r from-yellow-500 to-amber-700 transition-all duration-700 ease-out"
               style={{
                 width: `${progressAnimated}%`,
                 boxShadow: "0 0 12px rgba(234, 179, 8, 0.4)",

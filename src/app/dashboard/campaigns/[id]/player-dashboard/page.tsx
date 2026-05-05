@@ -57,7 +57,7 @@ export default async function PlayerDashboardPage({ params }: Props) {
     .eq("user_id", user.id)
     .single();
 
-  if (!membership || !["Accepted", "Approved"].includes(membership.status)) {
+  if (!membership || !["Approved", "Active"].includes(membership.status)) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
@@ -168,7 +168,7 @@ export default async function PlayerDashboardPage({ params }: Props) {
   let partyQuery = (supabase.from("characters") as any)
     .select("id, name, class, race, level, culture_lore_id, avatar_url, user_id")
     .eq("campaign_id", campaignId)
-    .in("status", ["Active", "Alive", "Approved"]);
+    .in("status", ["Active", "Approved"]);
   if (myCharacterId) {
     partyQuery = partyQuery.neq("id", myCharacterId);
   }

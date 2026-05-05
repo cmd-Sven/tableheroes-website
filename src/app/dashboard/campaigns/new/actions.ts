@@ -69,7 +69,7 @@ export async function createCampaignAction(formData: FormData) {
       description: description || null,
       max_players,
       mode: mode || "Online",
-      status: "active",
+      status: "Active",
       is_published: false,
     })
     .select("id")

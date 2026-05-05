@@ -47,7 +47,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
 
     if (
       !membership ||
-      !["Accepted", "Approved", "Drafting", "In_Review"].includes(membership.status)
+      !["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes(membership.status)
     ) {
       redirect("/dashboard");
     }

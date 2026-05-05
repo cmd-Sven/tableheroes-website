@@ -3,12 +3,13 @@
  */
 
 /**
- * Legacy-Hilfsfunktion: einfachen Rang-Namen aus Punkten ableiten.
+ * Legacy-Hilfsfunktion: einfachen Rang-Namen aus lebenslang verdienten Punkten ableiten.
+ * Erwartet users.lifetime_points, nicht das ausgebbare users.total_points-Guthaben.
  * Kann weiterhin für Fallbacks genutzt werden.
  */
-export function getRankFromPoints(points: number): string {
-  if (points >= 500) return "Legende";
-  if (points >= 100) return "Abenteurer";
+export function getRankFromPoints(lifetimePoints: number): string {
+  if (lifetimePoints >= 500) return "Legende";
+  if (lifetimePoints >= 100) return "Abenteurer";
   return "Novize";
 }
 
@@ -30,11 +31,12 @@ export function getPointsForLevel(level: number): number {
 }
 
 /**
- * Berechnet das Level eines Spielers basierend auf seinen Gesamtpunkten.
+ * Berechnet das Level eines Spielers basierend auf lebenslang verdienten Punkten.
+ * Erwartet users.lifetime_points, damit Ausgaben im Punktekatalog das Level nicht senken.
  * Es wird das höchste Level n gesucht, dessen Schwelle <= points ist.
  */
-export function calculateLevel(points: number): number {
-  if (!Number.isFinite(points) || points <= 0) return 0;
+export function calculateLevel(lifetimePoints: number): number {
+  if (!Number.isFinite(lifetimePoints) || lifetimePoints <= 0) return 0;
 
   let level = 0;
   const maxLevel = 100; // Sicherheitskappe
@@ -42,7 +44,7 @@ export function calculateLevel(points: number): number {
   while (level < maxLevel) {
     const nextLevel = level + 1;
     const required = getPointsForLevel(nextLevel);
-    if (points < required) break;
+    if (lifetimePoints < required) break;
     level = nextLevel;
   }
 

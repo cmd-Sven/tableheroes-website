@@ -6,6 +6,7 @@ import {
   deleteCampaignShop,
 } from "@/src/app/dashboard/campaigns/[id]/shop-actions";
 import type { CampaignShopRow } from "@/src/app/dashboard/campaigns/[id]/shop-queries";
+import { AIShopGeneratorModal } from "@/src/components/dashboard/campaigns/shops/AIShopGeneratorModal";
 import {
   SHOP_ARCHETYPES,
   shopArchetypeLabel,
@@ -21,6 +22,25 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
   const [shopMode, setShopMode] = useState<"archetype" | "unique">(
     "archetype",
   );
+  const [aiShop, setAiShop] = useState<CampaignShopRow | null>(null);
+
+  const buildNpcContext = (shop: CampaignShopRow) => {
+    const merchantContext =
+      shop.merchant_npcs.length > 0
+        ? shop.merchant_npcs
+            .map((npc) => {
+              const parts = [
+                `Name: ${npc.name}`,
+                npc.role ? `Rolle: ${npc.role}` : null,
+                npc.description ? `Beschreibung: ${npc.description}` : null,
+              ].filter(Boolean);
+              return parts.join(". ");
+            })
+            .join("\n\n")
+        : "Kein NPC ist direkt mit diesem Shop verknuepft.";
+
+    return `Shop: ${shop.name}. Modus: ${shop.shop_mode}. Notizen: ${shop.notes || "Keine"}.\n\n${merchantContext}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -163,7 +183,8 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                   <th className="py-2 pr-4">Name</th>
                   <th className="py-2 pr-4">Modus</th>
                   <th className="py-2 pr-4">Typ / Preis %</th>
-                  <th className="py-2 w-28" />
+                  <th className="py-2 pr-4">Händler</th>
+                  <th className="py-2 w-40" />
                 </tr>
               </thead>
               <tbody>
@@ -192,7 +213,32 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                         "—"
                       )}
                     </td>
+                    <td className="py-3 pr-4">
+                      {s.merchant_npcs.length > 0 ? (
+                        <div className="space-y-1">
+                          {s.merchant_npcs.map((npc) => (
+                            <span
+                              key={npc.id}
+                              className="block rounded border border-accent-gold/30 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold"
+                            >
+                              {npc.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500">
+                          Kein Händler-NPC
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3">
+                      <button
+                        type="button"
+                        onClick={() => setAiShop(s)}
+                        className="mb-2 block rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-accent-gold transition-colors hover:bg-accent-gold hover:text-black"
+                      >
+                        KI-Inventar
+                      </button>
                       <form action={deleteCampaignShop}>
                         <input
                           type="hidden"
@@ -215,6 +261,16 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
           </div>
         )}
       </div>
+
+      {aiShop ? (
+        <AIShopGeneratorModal
+          campaignId={campaignId}
+          shopId={aiShop.id}
+          shopName={aiShop.name}
+          npcContext={buildNpcContext(aiShop)}
+          onClose={() => setAiShop(null)}
+        />
+      ) : null}
     </div>
   );
 }

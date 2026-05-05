@@ -1,4 +1,8 @@
 import { createClient } from "@/src/lib/supabase/server";
+import {
+  isSessionStatusScheduled,
+  isSessionStatusScheduledOrLive,
+} from "@/src/lib/session-status";
 import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
 export type SessionTabRow = Record<string, unknown> & {
@@ -26,15 +30,13 @@ export async function loadUpcomingSessionsWithRsvpForGm(
     .order("start_time", { ascending: true });
 
   const sessions = (sessionsRaw || []) as SessionTabRow[];
-  const upcomingSessions = sessions.filter(
-    (s) =>
-      !["Completed", "Cancelled"].includes(s.status) &&
-      (s.status === "Live" || s.status === "Scheduled"),
+  const upcomingSessions = sessions.filter((s) =>
+    isSessionStatusScheduledOrLive(s.status),
   );
 
   let upcomingSessionsWithRsvp: SessionTabRow[] = upcomingSessions;
   const scheduledIds = upcomingSessions
-    .filter((s) => s.status === "Scheduled")
+    .filter((s) => isSessionStatusScheduled(s.status))
     .map((s) => s.id);
   if (scheduledIds.length > 0) {
     const { data: campRow } = await (supabase.from("campaigns") as any)
@@ -77,7 +79,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       }
     }
     upcomingSessionsWithRsvp = upcomingSessions.map((s) => {
-      if (s.status !== "Scheduled") {
+      if (!isSessionStatusScheduled(s.status)) {
         return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
       }
       const sessionRows = rowsBySession.get(s.id) ?? [];

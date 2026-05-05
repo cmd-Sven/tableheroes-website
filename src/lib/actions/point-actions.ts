@@ -4,6 +4,11 @@ import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getPointsLog } from "@/src/lib/queries/point-queries";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
+import {
+  isSessionStatusLive,
+  isSessionStatusScheduled,
+  isSessionStatusTerminal,
+} from "@/src/lib/session-status";
 
 // PointLogEntry nicht re-exportieren: In "use server"-Modulen kann Turbopack
 // `export type { … }` fälschlich als Laufzeit-Export auswerten → ReferenceError.
@@ -209,9 +214,9 @@ export async function getMemberDetails(
     .limit(25);
 
   const upcoming = ((sessionRows as any[]) || []).find((s) => {
-    if (["Completed", "Cancelled"].includes(s.status)) return false;
-    if (s.status === "Live") return true;
-    if (s.status === "Scheduled") return true;
+    if (isSessionStatusTerminal(s.status)) return false;
+    if (isSessionStatusLive(s.status)) return true;
+    if (isSessionStatusScheduled(s.status)) return true;
     return false;
   });
 

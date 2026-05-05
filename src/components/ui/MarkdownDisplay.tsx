@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
 
 type MarkdownDisplayProps = {
   content: string;
@@ -14,7 +17,7 @@ export function MarkdownDisplay({
   emptyMessage = "Keine Beschreibung vorhanden.",
   className = "",
 }: MarkdownDisplayProps) {
-  const text = (content || "").trim();
+  const text = normalizeEscapedMarkdown(content || "").trim();
 
   if (!text) {
     return (
@@ -38,9 +41,41 @@ export function MarkdownDisplay({
         prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-6 prose-ol:space-y-1
         prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
         prose-a:text-hero-vibrant prose-a:hover:underline
+        prose-hr:border-hero-border/70 prose-hr:my-6
         ${className}`}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          a: ({ href, children }) => {
+            if (!href) return <>{children}</>;
+            if (href.startsWith("/")) {
+              return (
+                <Link href={href} className="text-hero-vibrant underline hover:text-hero-vibrant/90">
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-hero-vibrant underline hover:text-hero-vibrant/90"
+              >
+                {children}
+              </a>
+            );
+          },
+          hr: () => <hr className="my-6 border-hero-border/70" />,
+          strong: ({ children }) => (
+            <strong className="font-bold text-white">{children}</strong>
+          ),
+          em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     </div>
   );
 }

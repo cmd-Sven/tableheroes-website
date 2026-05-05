@@ -358,9 +358,9 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
                 </h3>
               </div>
 
-              {/* Last Session Alert (if Paused) */}
+              {/* Last Session Alert (if still live) */}
               {wizardContext?.lastSession && 
-               (wizardContext.lastSession.status === "Paused" || wizardContext.lastSession.status === "In Progress") && (
+               wizardContext.lastSession.status === "Live" && (
                 <div className="rounded border-2 border-yellow-600/50 bg-yellow-900/20 p-4 flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                   <div>

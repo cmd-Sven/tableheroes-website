@@ -5,6 +5,8 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
+import { slugifyHeading } from "./TableOfContents";
 
 export type EntityForSmartText = {
   id: string;
@@ -139,6 +141,46 @@ function processChildren(
   });
 }
 
+function childrenToText(children: React.ReactNode): string {
+  return React.Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") return String(child);
+      if (React.isValidElement(child)) {
+        const el = child as React.ReactElement<{ children?: React.ReactNode }>;
+        return childrenToText(el.props.children);
+      }
+      return "";
+    })
+    .join("");
+}
+
+function renderLink({
+  href,
+  children,
+}: {
+  href?: string;
+  children?: React.ReactNode;
+}) {
+  if (!href) return <>{children}</>;
+  if (href.startsWith("/")) {
+    return (
+      <Link href={href} className="text-hero-vibrant underline hover:text-hero-vibrant/90">
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-hero-vibrant underline hover:text-hero-vibrant/90"
+    >
+      {children}
+    </a>
+  );
+}
+
 export function SmartText({
   text,
   entities,
@@ -147,28 +189,47 @@ export function SmartText({
   emptyMessage = "Keine Beschreibung vorhanden.",
   className = "",
 }: SmartTextProps) {
-  const trimmed = (text || "").trim();
+  const trimmed = normalizeEscapedMarkdown(text || "").trim();
 
   const components = useMemo(() => {
-    if (!entities.length) return undefined;
-    const createProcessor = (tag: string) => {
+    const createProcessor = (tag: string, withId = false, insideLink = false) => {
       const Comp = tag as keyof React.JSX.IntrinsicElements;
-      return ({ children }: { children?: React.ReactNode }) =>
-        React.createElement(
-          Comp,
-          {},
-          processChildren(children, entities, campaignId, worldId, false)
-        );
+      return ({ children }: { children?: React.ReactNode }) => {
+        const props: { id?: string } = {};
+        if (withId) {
+          props.id = slugifyHeading(childrenToText(children));
+        }
+        const processedChildren = entities.length
+          ? processChildren(children, entities, campaignId, worldId, insideLink)
+          : children;
+        return React.createElement(Comp, props, processedChildren);
+      };
     };
     return {
       p: createProcessor("p"),
       li: createProcessor("li"),
       td: createProcessor("td"),
       th: createProcessor("th"),
-      h1: createProcessor("h1"),
-      h2: createProcessor("h2"),
-      h3: createProcessor("h3"),
+      h1: createProcessor("h1", true),
+      h2: createProcessor("h2", true),
+      h3: createProcessor("h3", true),
       blockquote: createProcessor("blockquote"),
+      strong: createProcessor("strong"),
+      em: createProcessor("em"),
+      a: ({
+        href,
+        children,
+      }: {
+        href?: string;
+        children?: React.ReactNode;
+      }) =>
+        renderLink({
+          href,
+          children: entities.length
+            ? processChildren(children, entities, campaignId, worldId, true)
+            : children,
+        }),
+      hr: () => <hr className="my-6 border-hero-border/70" />,
     };
   }, [entities, campaignId, worldId]);
 
@@ -197,6 +258,7 @@ export function SmartText({
         prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
         prose-a:text-hero-vibrant prose-a:hover:underline
         prose-img:rounded-md prose-img:max-w-full prose-img:my-2
+        prose-hr:border-hero-border/70 prose-hr:my-6
         ${className}`}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>

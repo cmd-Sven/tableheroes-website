@@ -460,8 +460,14 @@ export async function getLoreEntriesByWorld(worldId: string) {
 
 // Get All Lore Entries: lore-queries.ts (RSC) – hier keine Duplikation.
 
-/** Status, in denen Spieler Kampagnen-Inhalte sehen dürfen (kein „Active“ — das ist kein campaign_members-Status). */
-const PLAYER_LORE_MEMBER_STATUSES = ["Accepted", "Approved", "Drafting", "In_Review"] as const;
+/** Status, in denen Spieler Kampagnen-Inhalte sehen dürfen. */
+const PLAYER_LORE_MEMBER_STATUSES = [
+  "Approved",
+  "Active",
+  "Drafting",
+  "In_Review",
+  "Changes_Proposed",
+] as const;
 
 export type GetLoreByIdOptions = {
   /**

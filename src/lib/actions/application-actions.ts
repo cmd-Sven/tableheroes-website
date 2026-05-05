@@ -56,10 +56,10 @@ export async function applyToCampaign(
   const existing = existingRaw as { id: string; status: string } | null;
 
   if (existing) {
-    if (existing.status === "Applied" || existing.status === "Pending") {
+    if (existing.status === "Applied") {
       return { success: false, error: "Du hast dich bereits beworben." };
     }
-    if (existing.status === "Accepted") {
+    if (existing.status === "Approved" || existing.status === "Active") {
       return {
         success: false,
         error: "Du bist bereits Mitglied dieser Kampagne.",

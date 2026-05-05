@@ -191,7 +191,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                       isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
                     ].join(" ")}
                     style={{
-                      backgroundImage: "url('/images/icon-empty.png')",
+                      backgroundImage: "url('/images/icon-empty.svg')",
                       backgroundSize: "contain",
                       backgroundRepeat: "no-repeat",
                       backgroundPosition: "center",

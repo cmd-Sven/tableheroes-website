@@ -1,4 +1,5 @@
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { createAdminClient } from "@/src/lib/supabase/server";
 
 type SupabaseLike = {
   from: (t: string) => any;
@@ -47,14 +48,24 @@ export async function persistSessionLiveBackground(
       ? String(backgroundUrl).trim()
       : null;
 
-  const { data: existing } = await supabase
+  let writeClient = supabase;
+  try {
+    writeClient = createAdminClient();
+  } catch (error) {
+    console.warn(
+      "[persistSessionLiveBackground] Admin-Client nicht verfügbar, verwende RLS-Client.",
+      error,
+    );
+  }
+
+  const { data: existing } = await writeClient
     .from("session_live_states")
-    .select("id")
+    .select("session_id")
     .eq("session_id", sessionId)
     .maybeSingle();
 
   if (existing) {
-    const { error: upErr } = await supabase
+    const { error: upErr } = await writeClient
       .from("session_live_states")
       .update({ background_url: trimmed })
       .eq("session_id", sessionId);
@@ -73,14 +84,32 @@ export async function persistSessionLiveBackground(
       return { ok: false, message: upErr.message || "Speichern fehlgeschlagen.", status: 500 };
     }
   } else {
-    // Minimaler Insert: vermeidet PostgREST-Fehler, wenn optionale Spalten in der DB fehlen
-    // (Schema-Cache). Weitere Spalten setzen Migration / ensureSessionPrepLiveState.
-    const { error: insErr } = await supabase.from("session_live_states").insert({
+    const insertPayload = {
       session_id: sessionId,
       background_url: trimmed,
+      weather: "Klar",
+      temperature: "normal",
+      temperature_value: 15,
+      current_time: "Tagsüber",
+      current_location: null,
+      journal_text: null,
+      system_logs: [],
+      visible_npc_ids: [],
+      visible_faction_ids: [],
+      is_background_manual_override: false,
+      is_combat_mode: false,
+      current_turn_index: 0,
       scribe_id: userId,
-    });
+    };
+    const { error: insErr } = await writeClient.from("session_live_states").insert(insertPayload);
     if (insErr) {
+      console.error("Supabase Insert Error:", insErr);
+      console.error("[persistSessionLiveBackground] Insert Context:", {
+        payload: insertPayload,
+        session,
+        campaign,
+        userId,
+      });
       return {
         ok: false,
         message: insErr.message || "Live-Zustand konnte nicht angelegt werden.",

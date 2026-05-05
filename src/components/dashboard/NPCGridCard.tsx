@@ -47,10 +47,11 @@ type Props = {
 };
 
 export function NPCGridCard({ npc, campaignId, worldId, isGM = false, onDelete, onToggleVisibility }: Props) {
-  const detailHref = worldId
-    ? `/dashboard/worlds/${worldId}/npcs/${npc.id}`
-    : campaignId
-      ? `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`
+  /** Kampagnenkontext hat Vorrang (z. B. Händler/Shop nur im Kampagnen-NPC-Formular). */
+  const detailHref = campaignId
+    ? `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`
+    : worldId
+      ? `/dashboard/worlds/${worldId}/npcs/${npc.id}`
       : "#";
   const showVisibilityToggle = Boolean(campaignId && isGM && onToggleVisibility);
   const [isPending, startTransition] = useTransition();
@@ -83,8 +84,8 @@ export function NPCGridCard({ npc, campaignId, worldId, isGM = false, onDelete, 
   };
 
   const handleCardClick = () => {
-    if (worldId) window.location.href = `/dashboard/worlds/${worldId}/npcs/${npc.id}`;
-    else if (campaignId) window.location.href = `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`;
+    if (campaignId) window.location.href = `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`;
+    else if (worldId) window.location.href = `/dashboard/worlds/${worldId}/npcs/${npc.id}`;
   };
   // Status Badge Color
   const getStatusBadgeColor = (status: string | null) => {

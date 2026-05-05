@@ -9,6 +9,9 @@ const openai = new OpenAI({
 export type LootSuggestionItem = {
   name: string;
   desc: string;
+  /** Vor Identifikation: wirklicher Gegenstandsname ohne magische Boni (z. B. „Langschwert“ statt „Langschwert +1“). */
+  mundaneName?: string;
+  mundaneDesc?: string;
   rarity: string;
   price: number;
   isMagical: boolean;
@@ -83,12 +86,15 @@ Kontext der Szene:\n${ctx}`;
   const items: LootSuggestionItem[] = itemsRaw.slice(0, 8).map((row) => {
     const o = row as Record<string, unknown>;
     const rarity = String(o.rarity ?? "common").trim().toLowerCase();
+    const isMagical = Boolean(o.isMagical ?? o.is_magical);
     return {
       name: String(o.name ?? "Fundstück").trim().slice(0, 160),
       desc: String(o.desc ?? "").trim().slice(0, 800),
+      mundaneName: String(o.mundaneName ?? "").trim().slice(0, 160) || undefined,
+      mundaneDesc: String(o.mundaneDesc ?? "").trim().slice(0, 800) || undefined,
       rarity: rarity || "common",
       price: clampInt(o.price, 0, 50000),
-      isMagical: Boolean(o.isMagical ?? o.is_magical),
+      isMagical,
     };
   });
 

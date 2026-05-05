@@ -46,7 +46,7 @@ export default async function FactionDetailPageRoute({ params }: Props) {
     // Expliziter Cast gegen 'never'
     const membership = membershipRaw as { status: string } | null;
 
-    if (!membership || !["Accepted", "Drafting", "In_Review"].includes(membership.status)) {
+    if (!membership || !["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes(membership.status)) {
       redirect("/dashboard");
     }
   }

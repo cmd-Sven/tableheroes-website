@@ -83,7 +83,7 @@ export async function sendMessage(
     )
       .select("user_id")
       .eq("campaign_id", input.campaignId)
-      .in("status", ["Accepted", "Approved"])
+      .in("status", ["Approved", "Active"])
       .neq("user_id", user.id);
 
     const memberCount = ((members as any[]) || []).length;
@@ -127,7 +127,7 @@ export async function sendMessage(
   )
     .select("user_id, campaign_id")
     .eq("user_id", input.recipientUserId)
-    .eq("status", "Accepted")
+    .eq("status", "Approved")
     .in("campaign_id", Array.from(gmCampaignIds))
     .limit(1);
 

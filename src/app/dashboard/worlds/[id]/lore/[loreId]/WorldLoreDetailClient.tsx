@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Edit2, X, Plus, BookOpen, FolderTree, Loader2 } from "lucide-react";
 import { LoreHeaderImageSlider } from "@/src/components/dashboard/campaigns/lore/LoreImageSlider";
 import { SmartText } from "@/src/components/ui/SmartText";
+import { TableOfContents } from "@/src/components/ui/TableOfContents";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
@@ -502,12 +503,18 @@ export function WorldLoreDetailClient({
           )}
 
           {lore.description ? (
-            <SmartText
-              text={lore.description}
-              entities={entities}
-              worldId={worldId}
-              emptyMessage="Keine Beschreibung."
-            />
+            <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+              <TableOfContents
+                content={lore.description}
+                className="self-start lg:sticky lg:top-24"
+              />
+              <SmartText
+                text={lore.description}
+                entities={entities}
+                worldId={worldId}
+                emptyMessage="Keine Beschreibung."
+              />
+            </div>
           ) : (
             <p className="font-libre text-gray-500 italic">Keine Beschreibung.</p>
           )}

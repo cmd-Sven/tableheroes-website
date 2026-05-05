@@ -39,7 +39,7 @@ export default async function GMInboxPage({ params }: Props) {
       "id, user_id, character_id, application_message, users:user_id(id, username)",
     )
     .eq("campaign_id", campaignId)
-    .in("status", ["Applied", "Pending"])
+    .eq("status", "Applied")
     .order("created_at", { ascending: true });
 
   const pendingApplications: PendingApplicationItem[] = (appliedRows || []).map(

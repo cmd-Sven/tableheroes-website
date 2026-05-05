@@ -49,6 +49,7 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
   useEffect(() => {
     console.log("[MemberDetailManager] Initialisiert mit:", {
       username: member.username,
+      lifetimePoints: member.lifetimePoints,
       totalPoints: member.totalPoints,
       achievementsCount: member.achievements.length,
       achievements: member.achievements,
@@ -306,10 +307,13 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
             {/* Current Points */}
             <div className="rounded border border-hero-border/40 bg-hero-dark/30 p-4 mb-4">
               <p className="font-barlow text-xs uppercase text-gray-500 mb-1">
-                Aktueller Punktestand
+                Aktuelles Guthaben
               </p>
               <p className="font-barlow font-extrabold text-3xl text-accent-gold">
                 {member.totalPoints.toLocaleString("de-DE")}
+              </p>
+              <p className="mt-1 font-barlow text-xs uppercase text-gray-500">
+                Lifetime XP: {member.lifetimePoints.toLocaleString("de-DE")}
               </p>
             </div>
 

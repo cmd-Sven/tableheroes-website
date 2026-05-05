@@ -49,7 +49,7 @@ type Member = {
   user: {
     username: string;
     avatar_url: string | null;
-    current_rank?: string | null;
+    campaign_rank?: string | null;
   };
   character?: {
     id: string;
@@ -513,7 +513,7 @@ export function MembersManagement({
                     <>
                       <select
                         className="rounded-md border border-hero-border bg-background-dark px-2 py-1 text-xs font-barlow uppercase text-gray-300 hover:border-hero-vibrant focus:border-hero-vibrant outline-none"
-                        defaultValue={member.user.current_rank ?? ""}
+                        defaultValue={member.user.campaign_rank ?? ""}
                         onChange={async (e) => {
                           const newRank = e.target.value;
                           try {

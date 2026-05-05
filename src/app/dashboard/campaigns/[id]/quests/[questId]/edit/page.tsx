@@ -86,7 +86,7 @@ export default async function EditQuestPage({ params }: Props) {
       )
     `)
     .eq("campaign_id", campaignId)
-    .eq("status", "Accepted");
+    .eq("status", "Approved");
 
   const members = membersRaw as any[] | null;
 

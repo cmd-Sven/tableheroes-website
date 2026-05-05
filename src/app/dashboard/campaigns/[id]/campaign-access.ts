@@ -37,7 +37,7 @@ export async function getCampaignAccess(campaignId: string): Promise<CampaignAcc
       .eq("campaign_id", campaignId)
       .eq("user_id", user.id)
       .single();
-    isAcceptedMember = ["Accepted", "Drafting", "In_Review"].includes((membership as any)?.status ?? "");
+    isAcceptedMember = ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes((membership as any)?.status ?? "");
   }
 
   const hasAccess = isGM || isAcceptedMember;

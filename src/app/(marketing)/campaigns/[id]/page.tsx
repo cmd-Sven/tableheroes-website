@@ -94,11 +94,11 @@ export default async function PublicCampaignPage({ params }: Props) {
 
   const campaign = campaignParsed.data;
 
-  // Fetch Accepted Members (ohne deep joins – FK zu characters fehlt)
+  // Fetch approved members (ohne deep joins – FK zu characters fehlt)
   const { data: membersRaw } = await (supabase.from("campaign_members") as any)
     .select("id, user_id, character_id")
     .eq("campaign_id", id)
-    .eq("status", "Accepted")
+    .in("status", ["Approved", "Active"])
     .order("created_at", { ascending: true });
 
   const memberRows = (membersRaw as any[]) ?? [];
@@ -149,7 +149,7 @@ export default async function PublicCampaignPage({ params }: Props) {
   const nextSession: GameSession | null =
     sessionCandidates.find((r) => {
       const st = String(r.status || "");
-      if (["Cancelled", "Completed", "Ended"].includes(st)) return false;
+      if (["Cancelled", "Completed"].includes(st)) return false;
       return r.visible_on_public_landing !== false;
     }) ?? null;
 
@@ -159,7 +159,7 @@ export default async function PublicCampaignPage({ params }: Props) {
   } = await supabase.auth.getUser();
 
   // 2. Check membership status (only if user exists)
-  let membershipStatus: "none" | "applied" | "accepted" | "pending" | "rejected" | "drafting" | "in_review" = "none";
+  let membershipStatus: "none" | "applied" | "approved" | "active" | "rejected" | "removed" | "drafting" | "in_review" | "changes_proposed" = "none";
   let userHasCharacter = false;
   let userCharacterName: string | null = null;
   let characterStatus: string | null = null;
@@ -179,16 +179,22 @@ export default async function PublicCampaignPage({ params }: Props) {
 
     if (typedMembership) {
       const status = typedMembership.status;
-      if (status === "Accepted") {
-        membershipStatus = "accepted";
-      } else if (status === "Applied" || status === "Pending") {
+      if (status === "Approved") {
+        membershipStatus = "approved";
+      } else if (status === "Active") {
+        membershipStatus = "active";
+      } else if (status === "Applied") {
         membershipStatus = "applied";
       } else if (status === "Rejected") {
         membershipStatus = "rejected";
+      } else if (status === "Removed") {
+        membershipStatus = "removed";
       } else if (status === "Drafting") {
         membershipStatus = "drafting";
       } else if (status === "In_Review") {
         membershipStatus = "in_review";
+      } else if (status === "Changes_Proposed") {
+        membershipStatus = "changes_proposed";
       } else {
         membershipStatus = "applied";
       }

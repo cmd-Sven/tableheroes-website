@@ -137,7 +137,7 @@ export default async function MyCampaignsPage() {
   )
     .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
     .eq("user_id", user.id)
-    .in("status", ["Accepted", "Approved"]);
+    .in("status", ["Approved", "Active"]);
 
   const memberships = (membershipsRaw as any[]) || [];
   let characterIds = [...new Set(memberships.map((m: any) => m.character_id).filter(Boolean))];
@@ -150,7 +150,7 @@ export default async function MyCampaignsPage() {
       .select("id, name, class, race, level, avatar_url, campaign_id")
       .eq("user_id", user.id)
       .in("campaign_id", campaignIds)
-      .in("status", ["Active", "Alive"]);
+      .in("status", ["Active"]);
     for (const m of membershipsWithoutChar) {
       const char = (fallbackChars as any[])?.find((c: any) => c.campaign_id === m.campaign_id);
       if (char) {

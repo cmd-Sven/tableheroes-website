@@ -5,6 +5,35 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isValidShopArchetypeKey } from "@/src/lib/shop-archetypes";
 
+type BulkShopItemInput = {
+  name: string;
+  description?: string | null;
+  base_price_gp: number;
+  is_magical?: boolean;
+  is_legal?: boolean;
+  rarity?: string;
+  item_type?: string;
+  is_ration_package?: boolean;
+};
+
+const VALID_RARITIES = new Set([
+  "common",
+  "uncommon",
+  "rare",
+  "very rare",
+  "legendary",
+]);
+
+const VALID_ITEM_TYPES = new Set([
+  "weapon",
+  "armor",
+  "potion",
+  "gear",
+  "material",
+  "service",
+  "quest",
+]);
+
 async function assertGmForCampaign(campaignId: string) {
   const supabase = await createClient();
   const {
@@ -12,10 +41,9 @@ async function assertGmForCampaign(campaignId: string) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const { data: campaignRaw, error: campErr } = await (
-    supabase.from("campaigns") as any
-  )
-    .select("*")
+  const { data: campaignRaw, error: campErr } = await supabase
+    .from("campaigns")
+    .select("gm_id, owner_id")
     .eq("id", campaignId)
     .single();
   if (campErr || !campaignRaw) {
@@ -34,6 +62,28 @@ async function assertGmForCampaign(campaignId: string) {
     (campaignOwnerId !== null && campaignOwnerId === currentUserId);
   if (!isGm) throw new Error("Nur der Spielleiter kann Shops verwalten.");
   return { supabase, userId: user.id };
+}
+
+function normalizeShopItem(item: BulkShopItemInput, shopId: string, index: number) {
+  const name = String(item.name ?? "").trim();
+  if (!name) throw new Error("Ein Shop-Item hat keinen Namen.");
+
+  const rarity = String(item.rarity ?? "common").trim().toLowerCase();
+  const itemType = String(item.item_type ?? "gear").trim().toLowerCase();
+  const price = Math.max(0, Math.round(Number(item.base_price_gp) || 0));
+
+  return {
+    shop_id: shopId,
+    sort_order: index,
+    name: name.slice(0, 160),
+    description: item.description ? String(item.description).trim().slice(0, 1200) : null,
+    base_price_gp: price,
+    is_magical: Boolean(item.is_magical),
+    is_legal: item.is_legal !== false,
+    rarity: VALID_RARITIES.has(rarity) ? rarity : "common",
+    item_type: VALID_ITEM_TYPES.has(itemType) ? itemType : "gear",
+    is_ration_package: Boolean(item.is_ration_package),
+  };
 }
 
 export async function createCampaignShop(formData: FormData) {
@@ -74,7 +124,7 @@ export async function createCampaignShop(formData: FormData) {
     ? price_modifier_percent
     : 0;
 
-  const { error } = await (supabase.from("campaign_shops") as any).insert({
+  const { error } = await supabase.from("campaign_shops").insert({
     campaign_id: campaignId,
     name,
     shop_mode,
@@ -98,7 +148,8 @@ export async function deleteCampaignShop(formData: FormData) {
 
   const { supabase } = await assertGmForCampaign(campaignId);
 
-  const { error } = await (supabase.from("campaign_shops") as any)
+  const { error } = await supabase
+    .from("campaign_shops")
     .delete()
     .eq("id", shopId)
     .eq("campaign_id", campaignId);
@@ -109,4 +160,50 @@ export async function deleteCampaignShop(formData: FormData) {
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}/shops`);
+}
+
+export async function bulkInsertCampaignShopItems(
+  campaignId: string,
+  shopId: string,
+  items: BulkShopItemInput[],
+) {
+  if (!campaignId || !shopId) throw new Error("Kampagne oder Shop fehlt.");
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("Keine Items zum Speichern vorhanden.");
+  }
+
+  const { supabase } = await assertGmForCampaign(campaignId);
+
+  const { data: shopRaw, error: shopError } = await supabase
+    .from("campaign_shops")
+    .select("id, campaign_id")
+    .eq("id", shopId)
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (shopError || !shopRaw) {
+    throw new Error("Shop wurde nicht gefunden.");
+  }
+
+  const { data: existingItems } = await supabase
+    .from("campaign_shop_items")
+    .select("sort_order")
+    .eq("shop_id", shopId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+
+  const startOrder = Number(existingItems?.[0]?.sort_order ?? -1) + 1;
+  const rows = items
+    .slice(0, 30)
+    .map((item, index) => normalizeShopItem(item, shopId, startOrder + index));
+
+  const { error } = await supabase.from("campaign_shop_items").insert(rows);
+
+  if (error) {
+    console.error("bulkInsertCampaignShopItems", error);
+    throw new Error("Shop-Inventar konnte nicht gespeichert werden.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}/shops`);
+  return { inserted: rows.length };
 }

@@ -15,6 +15,11 @@ import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import {
+  isSessionStatusLive,
+  isSessionStatusScheduled,
+  isSessionStatusScheduledOrLive,
+} from "@/src/lib/session-status";
 import { getCharacterFactionReputations } from "./reputation-queries";
 import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import type {
@@ -206,10 +211,8 @@ export async function loadCampaignDetailPageData(
 
   // Geplant (Scheduled) oder Live — auch nach Startzeit sichtbar (verspäteter Start / Beitreten)
   const now = new Date();
-  const upcomingSessions = (sessions || []).filter(
-    (s: any) =>
-      !["Completed", "Cancelled"].includes(s.status) &&
-      (s.status === "Live" || s.status === "Scheduled"),
+  const upcomingSessions = (sessions || []).filter((s: any) =>
+    isSessionStatusScheduledOrLive(s.status),
   );
 
   // RSVP-Status für geplante Sessions (GM: kann Session starten?)
@@ -255,7 +258,7 @@ export async function loadCampaignDetailPageData(
         }
       }
       upcomingSessionsWithRsvp = upcomingSessions.map((s: any) => {
-        if (s.status !== "Scheduled")
+        if (!isSessionStatusScheduled(s.status))
           return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
         const sessionRows = rowsBySession.get(s.id) ?? [];
         const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
@@ -547,14 +550,14 @@ export async function loadCampaignDetailPageData(
   };
   if (isGM) {
     const list = (upcomingSessionsWithRsvp as any[]) || [];
-    const live = list.find((s: any) => s.status === "Live");
-    const scheduled = list.find((s: any) => s.status === "Scheduled");
+    const live = list.find((s: any) => isSessionStatusLive(s.status));
+    const scheduled = list.find((s: any) => isSessionStatusScheduled(s.status));
     const featured = live ?? scheduled ?? list[0] ?? null;
 
     if (featured) {
       const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
       const byUser = new Map(rows.map((r) => [r.user_id, r]));
-      const allowGmConfirm = featured.status === "Scheduled";
+      const allowGmConfirm = isSessionStatusScheduled(featured.status);
 
       const players: GmTerminePayload["players"] = acceptedMembers
         .filter((m: any) => m.user_id && m.user_id !== userId)
@@ -635,8 +638,9 @@ export async function loadCampaignDetailPageData(
           status: String(featured.status),
           rsvpDeadlineDays,
           isLive: featured.is_live !== false,
-          canStart:
-            featured.status === "Scheduled" ? Boolean(featured.canStart) : false,
+          canStart: isSessionStatusScheduled(featured.status)
+            ? Boolean(featured.canStart)
+            : false,
           pendingCount: Number(featured.pendingCount ?? 0),
           gmPrepComplete:
             (featured as { gm_prep_complete?: boolean }).gm_prep_complete !== false,

@@ -308,6 +308,7 @@ export type Database = {
           created_at: string
           gp_remaining: number
           id: string
+          identify_requests: Json
           items_json: Json
           name: string
           sp_remaining: number
@@ -318,6 +319,7 @@ export type Database = {
           created_at?: string
           gp_remaining?: number
           id?: string
+          identify_requests?: Json
           items_json?: Json
           name: string
           sp_remaining?: number
@@ -328,6 +330,7 @@ export type Database = {
           created_at?: string
           gp_remaining?: number
           id?: string
+          identify_requests?: Json
           items_json?: Json
           name?: string
           sp_remaining?: number
@@ -2674,6 +2677,7 @@ export type Database = {
           current_loot_id: string | null
           current_turn_index: number
           destroyed_fate_coins: number
+          dummy_player_count: number
           downtime_active: boolean
           downtime_current_day: number
           downtime_total_days: number
@@ -2708,6 +2712,7 @@ export type Database = {
           current_loot_id?: string | null
           current_turn_index?: number
           destroyed_fate_coins?: number
+          dummy_player_count?: number
           downtime_active?: boolean
           downtime_current_day?: number
           downtime_total_days?: number
@@ -2742,6 +2747,7 @@ export type Database = {
           current_loot_id?: string | null
           current_turn_index?: number
           destroyed_fate_coins?: number
+          dummy_player_count?: number
           downtime_active?: boolean
           downtime_current_day?: number
           downtime_total_days?: number

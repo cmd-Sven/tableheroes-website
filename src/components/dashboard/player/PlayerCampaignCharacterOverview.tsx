@@ -8,7 +8,6 @@ import {
   User,
   Globe,
   Sparkles,
-  Coins,
   Trophy,
   BookOpen,
   Users,
@@ -17,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
+import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 
 type Relationship = {
   relationship_type: string;
@@ -104,7 +104,7 @@ function buildContactPreview(
   return [...repItems, ...npcItems].sort((a, b) => b.t - a.t).slice(0, 3);
 }
 
-type EditModal = "languages" | "xp" | "gold" | "biography" | null;
+type EditModal = "languages" | "xp" | "biography" | null;
 
 type Props = {
   campaignId: string;
@@ -136,7 +136,6 @@ export function PlayerCampaignCharacterOverview({
   const [modal, setModal] = useState<EditModal>(null);
   const [draftLangs, setDraftLangs] = useState<string[]>([]);
   const [draftXp, setDraftXp] = useState(0);
-  const [draftGold, setDraftGold] = useState(0);
   const [draftBio, setDraftBio] = useState("");
 
   const savedLangIds = normalizeLangIds(character.languages);
@@ -166,7 +165,6 @@ export function PlayerCampaignCharacterOverview({
   const openModal = (m: Exclude<EditModal, null>) => {
     if (m === "languages") setDraftLangs([...savedLangIds]);
     if (m === "xp") setDraftXp(Number(character.experience_points ?? 0));
-    if (m === "gold") setDraftGold(Number(character.pocket_gold ?? 0));
     if (m === "biography") setDraftBio(character.biography ?? "");
     setModal(m);
   };
@@ -223,22 +221,6 @@ export function PlayerCampaignCharacterOverview({
     });
   };
 
-  const saveGold = () => {
-    startTransition(async () => {
-      try {
-        await updateCharacterPlayer({
-          character_id: character.id,
-          campaign_id: campaignId,
-          pocket_gold: Math.max(0, Math.floor(draftGold) || 0),
-        });
-        closeModal();
-        router.refresh();
-      } catch (e: unknown) {
-        alert((e as Error).message || "Speichern fehlgeschlagen.");
-      }
-    });
-  };
-
   const saveBiography = () => {
     startTransition(async () => {
       try {
@@ -260,7 +242,6 @@ export function PlayerCampaignCharacterOverview({
   const langs =
     langCount > 0 ? (character.language_names ?? []).filter(Boolean).join(", ") : "—";
   const xp = Number(character.experience_points ?? 0);
-  const gold = Number(character.pocket_gold ?? 0);
   const rels = character.character_relationships ?? [];
   const preview = buildContactPreview(campaignId, factionReputations, rels);
 
@@ -274,7 +255,7 @@ export function PlayerCampaignCharacterOverview({
     <section className="rounded-xl border border-stone-700/40 bg-player-paper p-6 space-y-6">
       {modal ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-100 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="overview-edit-modal-title"
@@ -293,7 +274,6 @@ export function PlayerCampaignCharacterOverview({
               >
                 {modal === "languages" && "Sprachen"}
                 {modal === "xp" && "Erfahrungspunkte"}
-                {modal === "gold" && "Goldbeutel"}
                 {modal === "biography" && "Biografie"}
               </h3>
               <button
@@ -349,20 +329,6 @@ export function PlayerCampaignCharacterOverview({
                   />
                 </div>
               )}
-              {modal === "gold" && (
-                <div>
-                  <label className="mb-2 block font-barlow text-xs font-bold uppercase text-stone-500">
-                    Gold (mitgeführt)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={draftGold}
-                    onChange={(e) => setDraftGold(parseInt(e.target.value, 10) || 0)}
-                    className={inputClass}
-                  />
-                </div>
-              )}
               {modal === "biography" && (
                 <div>
                   <label className="mb-2 block font-barlow text-xs font-bold uppercase text-stone-500">
@@ -392,7 +358,6 @@ export function PlayerCampaignCharacterOverview({
                 onClick={() => {
                   if (modal === "languages") saveLanguages();
                   else if (modal === "xp") saveXp();
-                  else if (modal === "gold") saveGold();
                   else if (modal === "biography") saveBiography();
                 }}
                 className="inline-flex items-center gap-2 rounded border border-amber-900/60 bg-amber-900/90 px-4 py-2 font-barlow text-sm font-bold uppercase text-amber-50 hover:bg-amber-800 disabled:opacity-50"
@@ -500,26 +465,15 @@ export function PlayerCampaignCharacterOverview({
         </button>
       </div>
 
-      <div
-        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${marbleTile}`}
-      >
-        <div className="flex items-start gap-2">
-          <Coins className="h-5 w-5 text-accent-gold shrink-0 mt-0.5" />
-          <div>
-            <p className="font-barlow font-bold text-xs uppercase text-stone-400">Goldbeutel</p>
-            <p className="font-libre text-gray-100 mt-1 tabular-nums">
-              {gold.toLocaleString("de-DE")} (mitgeführt)
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => openModal("gold")}
-          className="btn-player-edit-gold shrink-0"
-        >
-          Bearbeiten
-        </button>
-      </div>
+      <CharacterWealthInventoryCard
+        character={{
+          id: character.id,
+          name: character.name,
+          class: character.class,
+          level: character.level,
+          avatar_url: character.avatar_url ?? null,
+        }}
+      />
 
       <div className={marbleTile}>
         <div className="flex items-center gap-2 mb-2">

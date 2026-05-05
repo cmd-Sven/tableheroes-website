@@ -7,6 +7,7 @@ import { useState } from "react";
 import { User, Sword, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCharacter } from "@/src/app/dashboard/characters/actions";
+import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 
 export type HeroSliderCharacter = {
   id: string;
@@ -34,10 +35,10 @@ const getStatusLabel = (status?: string): string => {
       return "Abgelehnt";
     case "Dead":
       return "Tot";
-    case "Paused":
-      return "Pausiert";
-    case "Alive":
-      return "Lebend";
+    case "Draft":
+      return "Entwurf";
+    case "Approved":
+      return "Freigegeben";
     default:
       return status ? String(status) : "Lebend";
   }
@@ -54,6 +55,8 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
   const [deleteModal, setDeleteModal] = useState<HeroSliderCharacter | null>(
     null,
   );
+  const [inventoryModal, setInventoryModal] =
+    useState<HeroSliderCharacter | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleConfirmDelete = async () => {
@@ -132,18 +135,38 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
                 </div>
               </Link>
               {allowDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setDeleteModal(c);
-                  }}
-                  className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-gray-300 hover:text-accent-blood hover:bg-black/80 transition-colors"
-                  title="Charakter löschen"
-                  aria-label="Charakter löschen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setInventoryModal(c);
+                    }}
+                    className="absolute left-2 top-2 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
+                    title={`Rucksack von ${c.name} öffnen`}
+                    aria-label={`Rucksack von ${c.name} öffnen`}
+                  >
+                    <Image
+                      src="/images/Session_ui/rucksack.png"
+                      alt=""
+                      width={34}
+                      height={34}
+                      className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setDeleteModal(c);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-gray-300 hover:text-accent-blood hover:bg-black/80 transition-colors"
+                    title="Charakter löschen"
+                    aria-label="Charakter löschen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
               )}
             </div>
           ))}
@@ -198,6 +221,19 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
           </div>
         </div>
       )}
+
+      {inventoryModal ? (
+        <PrivateInventoryModal
+          character={{
+            id: inventoryModal.id,
+            name: inventoryModal.name,
+            class: inventoryModal.class,
+            level: inventoryModal.level ?? null,
+            avatar_url: inventoryModal.avatar_url ?? null,
+          }}
+          onClose={() => setInventoryModal(null)}
+        />
+      ) : null}
     </section>
   );
 }

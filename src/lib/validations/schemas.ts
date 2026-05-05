@@ -10,7 +10,8 @@ export const CampaignSchema = z.object({
   system: z.string(),
   description: z.string().optional().nullable(),
   gm_id: z.string().uuid(),
-  status: z.string(),
+  owner_id: z.string().uuid().optional().nullable(),
+  status: z.enum(["Active", "Paused", "Archived"]),
   is_published: z.boolean(),
   max_players: z.number().int().nullable().optional(),
 });
@@ -26,7 +27,16 @@ export const CampaignMembershipSchema = z.object({
   campaign_id: z.string().uuid(),
   user_id: z.string().uuid(),
   role: z.string(),
-  status: z.enum(["Applied", "Pending", "Accepted", "Rejected", "Drafting", "In_Review"]),
+  status: z.enum([
+    "Applied",
+    "In_Review",
+    "Drafting",
+    "Changes_Proposed",
+    "Approved",
+    "Active",
+    "Rejected",
+    "Removed",
+  ]),
   application_message: z.string().optional().nullable(),
   // Nicht immer vorhanden, daher optional/nullable
   character_id: z.string().uuid().optional().nullable(),
@@ -52,6 +62,17 @@ export const CharacterSchema = z.object({
   class: z.string(),
   level: z.number().int(),
   backstory_summary: z.string().optional().nullable(),
+  status: z
+    .enum([
+      "Draft",
+      "Pending_Approval",
+      "Approved",
+      "Active",
+      "Archived",
+      "Dead",
+      "Rejected",
+    ])
+    .optional(),
   check_results: z.array(CheckResultSchema).optional().nullable(),
 });
 

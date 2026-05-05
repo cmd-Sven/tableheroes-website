@@ -6,7 +6,10 @@ import { getPointsForLevel } from "@/src/lib/utils/rank-utils";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
 
 type Props = {
+  /** Aktuell ausgebbares Punkteguthaben. */
   totalPoints: number;
+  /** Lebenslang verdiente Punkte fuer Level-Fortschritt. */
+  lifetimePoints: number;
   level: number;
   nextLevelPoints: number;
   currentLevelBase: number;
@@ -15,12 +18,13 @@ type Props = {
 
 export function PointsPageClient({
   totalPoints,
+  lifetimePoints,
   level,
   nextLevelPoints,
   currentLevelBase,
   pointsLog,
 }: Props) {
-  const gainedInLevel = Math.max(0, totalPoints - currentLevelBase);
+  const gainedInLevel = Math.max(0, lifetimePoints - currentLevelBase);
   const requiredForLevel =
     nextLevelPoints - currentLevelBase > 0 ? nextLevelPoints - currentLevelBase : 1;
   const progress = Math.max(
@@ -68,7 +72,7 @@ export function PointsPageClient({
                 {totalPoints.toLocaleString("de-DE")}
               </p>
               <p className="font-barlow text-sm text-accent-gold">
-                Level {level}
+                Level {level} · {lifetimePoints.toLocaleString("de-DE")} Lifetime XP
               </p>
             </div>
           </div>
@@ -128,7 +132,7 @@ export function PointsPageClient({
                 Level {lvl}
               </span>
               <span className="ml-2 font-libre text-gray-300">
-                ab {pointsRequired.toLocaleString("de-DE")} Punkte
+                ab {pointsRequired.toLocaleString("de-DE")} Lifetime XP
               </span>
             </div>
           ))}

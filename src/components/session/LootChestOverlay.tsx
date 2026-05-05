@@ -2,14 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Coins, Gift, Loader2, Package, X } from "lucide-react";
+import { Coins, Loader2, Package, X } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/client";
 import { toast } from "sonner";
-import {
-  claimLootItemFromContainer,
-  takeAllLootGoldFromContainer,
-  type LootItemRow,
-} from "@/src/lib/actions/loot-actions";
+import { takeAllLootGoldFromContainer } from "@/src/lib/actions/loot-actions";
 
 type ContainerRow = {
   id: string;
@@ -19,32 +15,12 @@ type ContainerRow = {
   items_json: unknown;
 };
 
-const RARITY_CLASS: Record<string, string> = {
-  common: "border-gray-500/50 bg-gray-900/70 text-gray-200",
-  uncommon: "border-emerald-500/50 bg-emerald-950/50 text-emerald-200",
-  rare: "border-sky-500/50 bg-sky-950/50 text-sky-200",
-  "very rare": "border-violet-500/50 bg-violet-950/50 text-violet-200",
-  legendary: "border-accent-gold/70 bg-accent-gold/15 text-accent-gold",
-};
-
-function parseItems(raw: unknown): LootItemRow[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const o = row as Record<string, unknown>;
-      const id = String(o.id ?? "").trim();
-      if (!id) return null;
-      return {
-        id,
-        name: String(o.name ?? "Gegenstand").slice(0, 160),
-        desc: String(o.desc ?? ""),
-        rarity: String(o.rarity ?? "common").toLowerCase(),
-        price: Math.max(0, Math.round(Number(o.price ?? 0))),
-        isMagical: Boolean(o.isMagical ?? o.is_magical),
-      };
-    })
-    .filter((x): x is LootItemRow => x != null);
+function countLootItems(raw: unknown): number {
+  if (!Array.isArray(raw)) return 0;
+  return raw.filter((row) => {
+    if (!row || typeof row !== "object") return false;
+    return String((row as Record<string, unknown>).id ?? "").trim().length > 0;
+  }).length;
 }
 
 type Props = {
@@ -60,7 +36,6 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [isGoldPending, startGold] = useTransition();
-  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   const loadRow = useCallback(async () => {
     setLoadError(null);
@@ -106,18 +81,13 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
     };
   }, [supabase, containerId, loadRow]);
 
-  const items = useMemo(() => parseItems(row?.items_json), [row?.items_json]);
+  const itemsCount = useMemo(() => countLootItems(row?.items_json), [row?.items_json]);
   const gp = Math.max(0, Math.round(Number(row?.gp_remaining ?? 0)));
   const sp = Math.max(0, Math.round(Number(row?.sp_remaining ?? 0)));
   const hasGold = gp > 0 || sp > 0;
-  const hasItems = items.length > 0;
+  const hasItems = itemsCount > 0;
   const canInteract = Boolean(characterId) && !isGM;
   const isEmpty = !hasGold && !hasItems;
-
-  function rarityClass(r: string) {
-    const key = r.trim().toLowerCase();
-    return RARITY_CLASS[key] ?? RARITY_CLASS.common;
-  }
 
   function handleTakeAllGold() {
     if (!characterId || isGM) {
@@ -133,25 +103,6 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
       toast.success("Gold übernommen.");
       await loadRow();
     });
-  }
-
-  async function handleClaimItem(itemId: string) {
-    if (!characterId || isGM) {
-      toast.message("Nur Spieler mit eigenem Charakter können Items einstecken.");
-      return;
-    }
-    setClaimingId(itemId);
-    try {
-      const res = await claimLootItemFromContainer(sessionId, characterId, containerId, itemId);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success("Item ins Inventar gelegt.");
-      await loadRow();
-    } finally {
-      setClaimingId(null);
-    }
   }
 
   if (loadError) {
@@ -192,7 +143,7 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
           </span>
           <span className="font-libre text-[9px] text-gray-400">
             {hasGold ? `${gp} gp / ${sp} sp` : "Kein Gold"}{" "}
-            {hasItems ? `· ${items.length} Item(s)` : ""}
+            {hasItems ? `· ${itemsCount} Item(s)` : ""}
           </span>
         </motion.button>
       </div>
@@ -226,9 +177,9 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
                   </h2>
                   <p className="font-libre text-xs text-gray-400">
                     {isGM
-                      ? "Spieler öffnen die Truhe mit ihrem Charakter."
+                      ? "Münzen hier verteilen — Gegenstände liegen als Karten auf der Bühne."
                       : canInteract
-                        ? "Nimm Gold oder steck dir Gegenstände ein."
+                        ? "Münzen übernehmen. Gegenstände nimmst du über die Karten auf der Bühne auf."
                         : "Verknüpfe einen Charakter mit deinem Account, um Beute zu nehmen."}
                   </p>
                 </div>
@@ -268,44 +219,9 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
                 ) : null}
 
                 {hasItems ? (
-                  <div>
-                    <div className="mb-2 flex items-center gap-2 font-barlow text-[10px] font-bold uppercase text-gray-400">
-                      <Gift className="h-4 w-4 text-accent-gold" />
-                      Gegenstände
-                    </div>
-                    <ul className="space-y-3">
-                      {items.map((it) => (
-                        <li
-                          key={it.id}
-                          className={`rounded-xl border p-3 ${rarityClass(it.rarity)}`}
-                        >
-                          <div className="mb-1 font-cinzel text-base font-bold text-accent-gold">
-                            {it.name}
-                          </div>
-                          <p className="mb-2 whitespace-pre-wrap font-libre text-xs leading-relaxed text-gray-200">
-                            {it.desc || "—"}
-                          </p>
-                          <div className="mb-2 flex flex-wrap gap-2 font-barlow text-[10px] uppercase text-gray-400">
-                            <span>{it.rarity}</span>
-                            {it.price ? <span>{it.price} gp</span> : null}
-                            {it.isMagical ? <span className="text-accent-gold">Magisch</span> : null}
-                          </div>
-                          <button
-                            type="button"
-                            disabled={!canInteract || claimingId === it.id}
-                            onClick={() => void handleClaimItem(it.id)}
-                            className="w-full rounded border border-hero-border/80 bg-background-dark/80 py-1.5 font-barlow text-[10px] font-extrabold uppercase text-gray-200 hover:border-accent-gold/60 hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {claimingId === it.id ? (
-                              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                            ) : (
-                              "Einstecken"
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <p className="rounded-xl border border-amber-900/30 bg-black/25 px-3 py-2 font-libre text-xs text-gray-400">
+                    {itemsCount} Gegenstand/Gegenstände auf der Bühne — Identifikation und „Einstecken“ dort.
+                  </p>
                 ) : null}
 
                 {!hasGold && !hasItems ? (

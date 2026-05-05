@@ -11,7 +11,7 @@ export async function getPointsLog(
 
   const { data, error } = await (supabase.from("points_log") as any)
     .select(
-      "id, user_id, amount, reason, created_at, created_by, users:created_by ( username )",
+      "id, user_id, amount, reason, created_at, created_by, catalog_item_id, users:created_by ( username )",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })

@@ -8,7 +8,6 @@ import {
   Skull,
   Heart,
   Archive,
-  Pause,
   ArrowRight,
   Trash2,
   Swords,
@@ -38,13 +37,11 @@ type Props = {
 };
 
 function getStatusBadge(status: string | null | undefined) {
-  const statusValue = status || "Alive";
-  const isAlive = statusValue === "Alive";
+  const statusValue = status || "Active";
   const isActive = statusValue === "Active";
   const isPending = statusValue === "Pending_Approval";
   const isDead = statusValue === "Dead";
   const isArchived = statusValue === "Archived";
-  const isPaused = statusValue === "Paused";
 
   let bgColor = "bg-green-900/30";
   let textColor = "text-green-400";
@@ -76,12 +73,6 @@ function getStatusBadge(status: string | null | undefined) {
     borderColor = "border-gray-600";
     icon = <Archive className="h-3.5 w-3.5" />;
     label = "Archiviert";
-  } else if (isPaused) {
-    bgColor = "bg-yellow-900/30";
-    textColor = "text-yellow-400";
-    borderColor = "border-yellow-700";
-    icon = <Pause className="h-3.5 w-3.5" />;
-    label = "Pausiert";
   }
 
   return (
@@ -98,7 +89,7 @@ export function CharacterCard({ character, allowDelete = false }: Props) {
   const router = useRouter();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const status = character.status || "Alive";
+  const status = character.status || "Active";
   const { campaign } = character;
 
   const handleConfirmDelete = async () => {

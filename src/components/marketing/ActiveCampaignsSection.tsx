@@ -93,7 +93,7 @@ export function ActiveCampaignsSection() {
               .filter((s) => {
                 if (!s.start_time || new Date(s.start_time) <= now) return false;
                 const st = String(s.status || "");
-                if (["Cancelled", "Completed", "Ended"].includes(st)) return false;
+                if (["Cancelled", "Completed"].includes(st)) return false;
                 return true;
               })
               .sort(
@@ -167,7 +167,7 @@ export function ActiveCampaignsSection() {
             .from("campaign_members") as any)
             .select("user_id, status")
             .eq("campaign_id", c.id)
-            .eq("status", "Accepted");
+            .eq("status", "Approved");
 
           if (membersError) {
             console.error(`Member Fetch Error for Campaign ${c.id}:`, membersError);

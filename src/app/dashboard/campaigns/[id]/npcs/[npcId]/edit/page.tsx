@@ -62,6 +62,10 @@ export default async function EditNPCPage({ params }: Props) {
   // 5. Load factions and locations
   const factions = await getFactions(campaignId);
   const loreEntries = await getLoreEntries(campaignId);
+  const { data: shopsRaw } = await (supabase.from("campaign_shops") as any)
+    .select("id, name, price_modifier_percent")
+    .eq("campaign_id", campaignId)
+    .order("name", { ascending: true });
   
   const locations = (loreEntries || [])
     .filter((entry: any) => isLocationType(entry.type))
@@ -86,6 +90,14 @@ export default async function EditNPCPage({ params }: Props) {
         initialData={npc as any}
         factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
         locations={locations}
+        shops={(shopsRaw || []).map((shop: any) => ({
+          id: String(shop.id),
+          name: String(shop.name),
+          price_modifier_percent:
+            typeof shop.price_modifier_percent === "number"
+              ? shop.price_modifier_percent
+              : null,
+        }))}
       />
     </div>
   );

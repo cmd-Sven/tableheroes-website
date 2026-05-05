@@ -27,7 +27,7 @@ export async function getLoreEntries(campaignId: string) {
       .select("id")
       .eq("campaign_id", campaignId)
       .eq("user_id", user.id)
-      .in("status", ["Accepted", "Approved", "Drafting", "In_Review"])
+      .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"])
       .maybeSingle();
     if (!member) return [];
   }

@@ -12,6 +12,7 @@ import {
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
 import Link from "next/link";
+import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 
 type Culture = { id: string; name: string };
 type Language = { id: string; name: string };
@@ -57,7 +58,6 @@ type Props = {
     avatar_storage_path?: string | null;
     status?: string;
     experience_points?: number;
-    pocket_gold?: number;
     character_relationships?: Relationship[];
   };
   cultures: Culture[];
@@ -86,7 +86,6 @@ export function MyCharacterSection({
     race: character.race,
     level: character.level,
     experience_points: Number(character.experience_points ?? 0),
-    pocket_gold: Number(character.pocket_gold ?? 0),
     biography: character.biography ?? "",
     culture_lore_id: character.culture_lore_id ?? "",
     languages: savedLangIds,
@@ -200,7 +199,6 @@ export function MyCharacterSection({
           avatar_url: nextAvatarUrl,
           avatar_storage_path: nextAvatarPath,
           experience_points: form.experience_points,
-          pocket_gold: form.pocket_gold,
         });
 
         const prevPath = character.avatar_storage_path ?? null;
@@ -315,21 +313,15 @@ export function MyCharacterSection({
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />
           </div>
-          <div id="character-gold" className="scroll-mt-24">
-            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Goldbeutel (mitgeführt)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={form.pocket_gold}
-              onChange={(e) =>
-                setForm((p) => ({
-                  ...p,
-                  pocket_gold: Math.max(0, parseInt(e.target.value, 10) || 0),
-                }))
-              }
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+          <div id="character-gold" className="scroll-mt-24 sm:col-span-2">
+            <CharacterWealthInventoryCard
+              character={{
+                id: character.id,
+                name: character.name,
+                class: character.class,
+                level: character.level,
+                avatar_url: character.avatar_url ?? null,
+              }}
             />
           </div>
           <div className="sm:col-span-2 lg:col-span-3 space-y-3">

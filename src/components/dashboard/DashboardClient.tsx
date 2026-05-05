@@ -55,6 +55,7 @@ export type ProfileHeaderData = {
   bannerPositionY?: number;
   memberSince: string | null;
   rank: string;
+  lifetimePoints: number;
   totalPoints: number;
   favoriteAchievements: { id: string; name: string; icon?: string | null }[];
   showRank?: boolean;
@@ -100,6 +101,7 @@ type Props = {
   dashboardLayout: LayoutItem[] | string[] | undefined;
   newAcceptances: { id: string; campaignId: string; campaignName: string }[];
   totalPoints: number;
+  lifetimePoints: number;
   achievements: { id: string; name: string; icon?: string | null }[];
   membershipsWithGm: MembershipWithGm[];
   heroCharacters: HeroSliderCharacter[];
@@ -139,6 +141,7 @@ export function DashboardClient({
   dashboardLayout,
   newAcceptances,
   totalPoints,
+  lifetimePoints,
   achievements,
   membershipsWithGm,
   heroCharacters,
@@ -207,7 +210,13 @@ export function DashboardClient({
       id: "points",
       title: "Punkte",
       icon: <Star className="h-5 w-5" />,
-      content: <PointsCard totalPoints={totalPoints} pointsHistory={pointsHistory} />,
+      content: (
+        <PointsCard
+          totalPoints={totalPoints}
+          lifetimePoints={lifetimePoints}
+          pointsHistory={pointsHistory}
+        />
+      ),
       colSpan: 1 as const,
     },
     {
