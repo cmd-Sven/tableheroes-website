@@ -9,7 +9,7 @@ export type LootItemRow = {
   isMagical: boolean;
   /** true = voller Name/Beschreibung (magisch); bei magisch ohne Identifikation: mundane* / unbekannt */
   identified?: boolean;
-  /** Anzeige & Inventar vor Identifikation (z. B. „Langschwert“ ohne +1) */
+  /** Vor Identifikation: deutscher Tarntitel (z. B. „Eine dreckige Flasche …“) — darf den echten Typ nicht verraten. */
   mundaneName?: string;
   mundaneDesc?: string;
 };
@@ -30,11 +30,22 @@ export type LootDraftPayload = {
   items: LootItemRow[];
 };
 
-export function fallbackMundaneName(fullName: string): string {
-  const s = String(fullName ?? "").trim();
-  if (!s) return "Gegenstand";
-  const cut = s.split(/[+(]/)[0]?.trim();
-  return cut && cut.length > 0 ? cut : "Gegenstand";
+export const LOOT_UNIDENTIFIED_NAME_FALLBACK = "Unbestimmter Fund";
+
+export const LOOT_UNIDENTIFIED_DESC_FALLBACK =
+  "Aussehen, Material und Zweck lassen sich nicht sicher erkennen — nichts verrät offenbar die wahre Natur.";
+
+/** Bühnen- / Inventar-Anzeige vor Identifikation (magisch + !identified). */
+export function disguisedLootTitle(it: LootItemRow): string {
+  if (!it.isMagical || it.identified) return it.name;
+  const m = it.mundaneName?.trim();
+  return m && m.length > 0 ? m.slice(0, 160) : LOOT_UNIDENTIFIED_NAME_FALLBACK;
+}
+
+export function disguisedLootDesc(it: LootItemRow): string {
+  if (!it.isMagical || it.identified) return it.desc;
+  const m = it.mundaneDesc?.trim();
+  return m && m.length > 0 ? m : LOOT_UNIDENTIFIED_DESC_FALLBACK;
 }
 
 export function parseLootItemRow(raw: unknown): LootItemRow | null {

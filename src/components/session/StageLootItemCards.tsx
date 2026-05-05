@@ -12,7 +12,8 @@ import {
   resolveLootItemIdentify,
 } from "@/src/lib/actions/loot-actions";
 import {
-  fallbackMundaneName,
+  disguisedLootDesc,
+  disguisedLootTitle,
   parseIdentifyRequests,
   parseLootItemRow,
   type LootIdentifyRequestRow,
@@ -49,14 +50,7 @@ function useTemporaryStageGlow() {
 }
 
 function displayLootItem(it: LootItemRow): { title: string; desc: string } {
-  if (!it.isMagical || it.identified) {
-    return { title: it.name, desc: it.desc };
-  }
-  const title = (it.mundaneName || fallbackMundaneName(it.name)).slice(0, 160);
-  const desc =
-    (it.mundaneDesc && it.mundaneDesc.trim()) ||
-    "Magische Eigenschaften noch nicht erkannt — wirkt wie gewöhnliche Ausrüstung.";
-  return { title, desc };
+  return { title: disguisedLootTitle(it), desc: disguisedLootDesc(it) };
 }
 
 function StageLootItemCard({

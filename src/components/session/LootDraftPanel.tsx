@@ -350,14 +350,14 @@ export function LootDraftPanel({
                       type="text"
                       value={it.mundaneName ?? ""}
                       onChange={(e) => updateItem(it.id, { mundaneName: e.target.value })}
-                      placeholder="Anzeigename z. B. Langschwert"
+                      placeholder="z. B. Eine dreckige Flasche mit undefinierbarem Inhalt"
                       className="w-full rounded border border-hero-dark/80 bg-slate-900 px-1.5 py-0.5 font-barlow text-[10px] text-white outline-none focus:border-accent-gold"
                     />
                     <textarea
                       value={it.mundaneDesc ?? ""}
                       onChange={(e) => updateItem(it.id, { mundaneDesc: e.target.value })}
                       rows={2}
-                      placeholder="Beschreibung ohne magische Boni …"
+                      placeholder="Nur Aussehen/Gefühl — kein Itemtyp, keine Wirkung …"
                       className="w-full resize-none rounded border border-hero-dark/80 bg-slate-900 px-1.5 py-0.5 font-libre text-[10px] text-gray-300 outline-none focus:border-accent-gold"
                     />
                   </div>

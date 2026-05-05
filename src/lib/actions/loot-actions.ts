@@ -4,8 +4,10 @@ import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import type { Json } from "@/src/lib/database.types";
 import {
-  fallbackMundaneName,
+  disguisedLootTitle,
   lootItemToJson,
+  LOOT_UNIDENTIFIED_DESC_FALLBACK,
+  LOOT_UNIDENTIFIED_NAME_FALLBACK,
   parseIdentifyRequests,
   parseLootItemRow,
   type LootDraftPayload,
@@ -108,12 +110,10 @@ export async function publishLootToSession(
     const sp = Math.max(0, Math.round(draft.sp));
     const itemsJson = draft.items.map((it) => {
       const isMagical = Boolean(it.isMagical);
-      const mundaneName = (it.mundaneName ?? "").trim() || (isMagical ? fallbackMundaneName(it.name) : it.name);
+      const mundaneName =
+        (it.mundaneName ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_NAME_FALLBACK : it.name);
       const mundaneDesc =
-        (it.mundaneDesc ?? "").trim() ||
-        (isMagical
-          ? "Magische Spuren, aber noch keine klare Identität — wirkt wie gewöhnliche Ausrüstung."
-          : it.desc);
+        (it.mundaneDesc ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_DESC_FALLBACK : it.desc);
       return {
         id: String(it.id).trim(),
         name: it.name,
@@ -286,10 +286,8 @@ export async function claimLootItemFromContainer(
 
     const knownMagical = Boolean(p.isMagical) && Boolean(p.identified);
     const useMundane = Boolean(p.isMagical) && !p.identified;
-    const invName = (useMundane ? (p.mundaneName || fallbackMundaneName(p.name)) : p.name).slice(0, 160);
-    const mundaneBody =
-      (p.mundaneDesc && p.mundaneDesc.trim()) ||
-      "Magische Eigenschaften sind nicht identifiziert — du behandelst den Fund wie gewöhnliche Ausrüstung.";
+    const invName = (useMundane ? (p.mundaneName?.trim() || LOOT_UNIDENTIFIED_NAME_FALLBACK) : p.name).slice(0, 160);
+    const mundaneBody = (p.mundaneDesc && p.mundaneDesc.trim()) || LOOT_UNIDENTIFIED_DESC_FALLBACK;
     const descParts = useMundane
       ? [mundaneBody, `Seltenheit (geschätzt): ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null]
       : [p.desc, `Seltenheit: ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null].filter(Boolean);
@@ -388,7 +386,7 @@ export async function requestLootItemIdentify(
     }
 
     const reqId = crypto.randomUUID();
-    const itemLabel = (item.mundaneName || fallbackMundaneName(item.name)).slice(0, 160);
+    const itemLabel = disguisedLootTitle(item).slice(0, 160);
     pending = [
       ...pending,
       {
