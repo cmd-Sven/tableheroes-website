@@ -638,3 +638,58 @@ export async function gmClearLootGoldFromStage(
     return { ok: false, error: msg };
   }
 }
+
+export type CampaignShopLootPickRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  base_price_gp: number;
+  is_magical: boolean;
+  rarity: string;
+};
+
+/** Alle Shop-Items der Kampagne (über Shops) — Auswahl für manuelle Truhen-Beute. */
+export async function listCampaignShopItemsForLootDraft(
+  campaignId: string,
+): Promise<{ ok: true; items: CampaignShopLootPickRow[] } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann den Katalog laden." };
+    }
+
+    const { data: shops, error: shopsErr } = await supabase.from("campaign_shops").select("id").eq("campaign_id", campaignId);
+    if (shopsErr) return { ok: false, error: shopsErr.message ?? "Shops konnten nicht geladen werden." };
+
+    const shopIds = ((shops ?? []) as { id: string }[]).map((s) => String(s.id)).filter(Boolean);
+    if (shopIds.length === 0) return { ok: true, items: [] };
+
+    const { data: rows, error: itemsErr } = await supabase
+      .from("campaign_shop_items")
+      .select("id, name, description, base_price_gp, is_magical, rarity")
+      .in("shop_id", shopIds)
+      .order("name", { ascending: true });
+
+    if (itemsErr) return { ok: false, error: itemsErr.message ?? "Shop-Items konnten nicht geladen werden." };
+
+    const items = ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+      id: String(r.id ?? ""),
+      name: String(r.name ?? "Gegenstand"),
+      description: r.description != null ? String(r.description) : null,
+      base_price_gp: Math.max(0, Math.round(Number(r.base_price_gp ?? 0))),
+      is_magical: Boolean(r.is_magical),
+      rarity: String(r.rarity ?? "common").toLowerCase(),
+    })).filter((r) => r.id.length > 0);
+
+    return { ok: true, items };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
