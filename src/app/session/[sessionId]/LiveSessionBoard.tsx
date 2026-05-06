@@ -67,7 +67,6 @@ import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoins
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
 import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
 import { LootGmModal } from "@/src/components/session/LootGmModal";
-import { LootChestOverlay } from "@/src/components/session/LootChestOverlay";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
@@ -104,6 +103,8 @@ type LiveState = {
   active_shop_id?: string | null;
   active_merchant_npc_id?: string | null;
   current_loot_id?: string | null;
+  /** True: NPC-Karten ausblenden (geschlossene Beute-Truhe). */
+  loot_hide_npcs?: boolean | null;
   fate_coins?: FateCoin[] | null;
   destroyed_fate_coins?: number | null;
   /** GM: 0–3 reine UI-Platzhalter „Spieler 1–3“ (kein Account / kein Log). */
@@ -179,6 +180,7 @@ function normalizeLiveRow(row: unknown): LiveState {
       3,
       Math.max(0, Math.round(Number(r.dummy_player_count ?? 0)) || 0),
     ),
+    loot_hide_npcs: Boolean(r.loot_hide_npcs ?? false),
   };
 }
 
@@ -2688,15 +2690,7 @@ export function LiveSessionBoard({
                     isCombatMode={!!liveState?.is_combat_mode}
                   />
                 ) : null}
-                {liveState?.current_loot_id ? (
-                  <LootChestOverlay
-                    sessionId={sessionId}
-                    containerId={liveState.current_loot_id}
-                    characterId={currentPlayerCharacter?.id ?? null}
-                    isGM={isGM}
-                  />
-                ) : null}
-                {sortedActiveNpcs.length > 0 && (
+                {sortedActiveNpcs.length > 0 && !liveState?.loot_hide_npcs ? (
                   <div
                     className={
                       sortedActiveNpcs.length === 1
@@ -2728,7 +2722,7 @@ export function LiveSessionBoard({
                       })}
                     </AnimatePresence>
                   </div>
-                )}
+                ) : null}
 
                 {activeFactions.length > 0 && (
                   <div className="rounded-xl border border-amber-900/40 bg-black/35 p-4 backdrop-blur-sm">
@@ -2937,7 +2931,7 @@ export function LiveSessionBoard({
           sessionId={sessionId}
           campaignId={campaignId}
           activeLootId={liveState?.current_loot_id ?? null}
-          onClearStageLoot={() => updateLiveState({ current_loot_id: null })}
+          onClearStageLoot={() => updateLiveState({ current_loot_id: null, loot_hide_npcs: false })}
           onPublished={async () => {
             await refreshLiveState();
             router.refresh();

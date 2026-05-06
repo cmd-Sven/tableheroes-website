@@ -305,6 +305,7 @@ export type Database = {
       campaign_loot_containers: {
         Row: {
           campaign_id: string
+          chest_opened: boolean
           created_at: string
           gp_remaining: number
           id: string
@@ -316,6 +317,7 @@ export type Database = {
         }
         Insert: {
           campaign_id: string
+          chest_opened?: boolean
           created_at?: string
           gp_remaining?: number
           id?: string
@@ -327,6 +329,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string
+          chest_opened?: boolean
           created_at?: string
           gp_remaining?: number
           id?: string
@@ -2689,6 +2692,7 @@ export type Database = {
           is_background_manual_override: boolean
           is_combat_mode: boolean
           journal_text: string | null
+          loot_hide_npcs: boolean
           physically_present_user_ids: string[]
           scribe_id: string | null
           session_id: string
@@ -2724,6 +2728,7 @@ export type Database = {
           is_background_manual_override?: boolean
           is_combat_mode?: boolean
           journal_text?: string | null
+          loot_hide_npcs?: boolean
           physically_present_user_ids?: string[]
           scribe_id?: string | null
           session_id: string
@@ -2759,6 +2764,7 @@ export type Database = {
           is_background_manual_override?: boolean
           is_combat_mode?: boolean
           journal_text?: string | null
+          loot_hide_npcs?: boolean
           physically_present_user_ids?: string[]
           scribe_id?: string | null
           session_id?: string

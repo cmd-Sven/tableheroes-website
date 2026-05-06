@@ -135,6 +135,7 @@ export async function publishLootToSession(
         gp_remaining: gp,
         sp_remaining: sp,
         items_json: itemsJson as unknown as Json,
+        chest_opened: false,
       })
       .select("id")
       .single();
@@ -147,7 +148,7 @@ export async function publishLootToSession(
 
     const { error: upErr } = await (supabase as any)
       .from("session_live_states")
-      .update({ current_loot_id: containerId })
+      .update({ current_loot_id: containerId, loot_hide_npcs: true })
       .eq("session_id", sessionId);
 
     if (upErr) {
@@ -547,6 +548,90 @@ export async function gmRemoveLootItemFromStage(
       .eq("id", containerId);
 
     if (upErr) return { ok: false, error: upErr.message ?? "Konnte nicht entfernen." };
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function openLootChestOnStage(
+  sessionId: string,
+  campaignId: string,
+  containerId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann die Truhe öffnen." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== campaignId) {
+      return { ok: false, error: "Session passt nicht zur Kampagne." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({ chest_opened: true })
+      .eq("id", containerId);
+
+    if (boxErr) return { ok: false, error: boxErr.message ?? "Truhe konnte nicht geöffnet werden." };
+
+    const { error: liveErr } = await (supabase as any)
+      .from("session_live_states")
+      .update({ loot_hide_npcs: false })
+      .eq("session_id", sessionId);
+
+    if (liveErr) return { ok: false, error: liveErr.message ?? "Bühnen-Status konnte nicht aktualisiert werden." };
+
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function gmClearLootGoldFromStage(
+  sessionId: string,
+  campaignId: string,
+  containerId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann Gold von der Bühne nehmen." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== campaignId) {
+      return { ok: false, error: "Session passt nicht zur Kampagne." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({ gp_remaining: 0, sp_remaining: 0 })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Gold konnte nicht geleert werden." };
     return { ok: true };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
