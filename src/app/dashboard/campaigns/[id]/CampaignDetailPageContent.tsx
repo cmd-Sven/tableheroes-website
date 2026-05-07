@@ -64,6 +64,9 @@ export function CampaignDetailPageContent({
     sessions,
     upcomingSessions,
     upcomingSessionsWithRsvp,
+    focusSession,
+    otherUpcomingSessions,
+    pastSessionsForCampaignTab,
     sessionArchives,
     now,
     npcs,
@@ -412,6 +415,9 @@ export function CampaignDetailPageContent({
       campaignId={id}
       isGM={isGM}
       characterStatus={!isGM ? (myCharacter as any)?.status : undefined}
+      focusSession={(focusSession as any) ?? null}
+      otherUpcomingSessions={(otherUpcomingSessions || []) as any}
+      pastSessionRows={(pastSessionsForCampaignTab || []) as any}
       upcomingSessions={(upcomingSessionsWithRsvp || []) as any}
       archives={(sessionArchives || []) as any}
       locations={loreEntries

@@ -2330,7 +2330,7 @@ export function LiveSessionBoard({
             </aside>
 
             <div
-              className={`relative min-h-[calc(48vh+120px)] overflow-hidden bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
+              className={`relative min-h-[calc(48vh+120px)] overflow-x-hidden overflow-y-auto bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
                 stageDropHighlight
                   ? "ring-2 ring-accent-gold ring-inset"
                   : ""
@@ -2681,14 +2681,16 @@ export function LiveSessionBoard({
                   />
                 ) : null}
                 {liveState?.current_loot_id ? (
-                  <StageLootItemCards
-                    sessionId={sessionId}
-                    campaignId={campaignId}
-                    containerId={liveState.current_loot_id}
-                    characterId={currentPlayerCharacter?.id ?? null}
-                    isGM={isGM}
-                    isCombatMode={!!liveState?.is_combat_mode}
-                  />
+                  <div className="relative z-20 w-full shrink-0 overflow-x-visible overflow-y-visible py-1">
+                    <StageLootItemCards
+                      sessionId={sessionId}
+                      campaignId={campaignId}
+                      containerId={liveState.current_loot_id}
+                      characterId={currentPlayerCharacter?.id ?? null}
+                      isGM={isGM}
+                      isCombatMode={!!liveState?.is_combat_mode}
+                    />
+                  </div>
                 ) : null}
                 {sortedActiveNpcs.length > 0 && !liveState?.loot_hide_npcs ? (
                   <div

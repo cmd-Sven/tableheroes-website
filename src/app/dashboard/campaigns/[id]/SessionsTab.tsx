@@ -10,10 +10,16 @@ import {
   MoreVertical,
   Square,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Radio,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   deleteSession,
   cancelSession,
@@ -25,6 +31,7 @@ import {
   PastSessionsGallery,
   type SessionArchiveItem,
 } from "@/src/components/dashboard/campaigns/PastSessionsGallery";
+import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
 
 type SessionItem = {
   id: string;
@@ -35,12 +42,24 @@ type SessionItem = {
   status: string;
   canStart?: boolean;
   pendingCount?: number;
-  /** true wenn mindestens ein Spieler mit Zusage/Via Online */
   hasAcceptedRsvps?: boolean;
-  /** false = GM muss Planung abschließen (neue Termine); undefined = ältere Daten ohne Spalte */
   gm_prep_complete?: boolean;
   registration_closed_on_landing?: boolean | null;
 };
+
+function formatSessionDateTime(startTime: string) {
+  const startDate = new Date(startTime);
+  const formattedDate = new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(startDate);
+  const formattedTime = new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(startDate);
+  return { formattedDate, formattedTime, startDate };
+}
 
 /** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */
 function SessionActionsDropdown({
@@ -57,9 +76,7 @@ function SessionActionsDropdown({
   onDelete: () => void;
   onCancel?: () => void;
   onEnd?: () => void;
-  /** true = nur Absagen möglich, false = Löschen möglich */
   hasAcceptedRsvps?: boolean;
-  /** true = Live-Session, nur „Session beenden“ anzeigen */
   isLive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -157,9 +174,12 @@ function SessionActionsDropdown({
 type Props = {
   campaignId: string;
   isGM: boolean;
-  /** Spieler: Nur bei Status 'Active' darf der Spieler Sessions betreten. */
   characterStatus?: string;
-  upcomingSessions: Array<SessionItem>;
+  focusSession: SessionItem | null;
+  otherUpcomingSessions: SessionItem[];
+  pastSessionRows: SessionItem[];
+  /** Vollständige aktive Liste (Fokus zuerst) */
+  upcomingSessions: SessionItem[];
   archives?: SessionArchiveItem[];
   locations: Array<{ id: string; name: string; type: string }>;
   npcs: Array<{ id: string; name: string; title: string | null }>;
@@ -169,7 +189,10 @@ export function SessionsTab({
   campaignId,
   isGM,
   characterStatus,
-  upcomingSessions,
+  focusSession,
+  otherUpcomingSessions,
+  pastSessionRows,
+  upcomingSessions: _upcomingSessions,
   archives = [],
   locations,
   npcs,
@@ -179,6 +202,7 @@ export function SessionsTab({
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
   const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isStarting, startTransition] = useTransition();
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const router = useRouter();
 
   const handleSuccess = () => {
@@ -242,6 +266,97 @@ export function SessionsTab({
     });
   };
 
+  async function copySessionLink(sessionId: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/session/${sessionId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Session-Link kopiert.");
+    } catch {
+      toast.error("Link konnte nicht kopiert werden.");
+    }
+  }
+
+  function renderSessionActions(session: SessionItem) {
+    const live = isSessionStatusLive(session.status);
+    const scheduled = isSessionStatusScheduled(session.status);
+    const st = String(session.status ?? "").toLowerCase();
+    const terminal = st === "completed" || st === "cancelled";
+    if (!isGM || (!scheduled && !live && !terminal)) return null;
+    return (
+      <SessionActionsDropdown
+        isStarting={isStarting}
+        onEdit={() => setEditingSession(session)}
+        onDelete={() => handleDelete(session.id)}
+        onCancel={() => handleCancel(session.id)}
+        onEnd={() => handleEndSession(session.id)}
+        hasAcceptedRsvps={session.hasAcceptedRsvps}
+        isLive={live}
+      />
+    );
+  }
+
+  function renderScheduledGmControls(session: SessionItem) {
+    if (!isGM || !isSessionStatusScheduled(session.status)) return null;
+    return (
+      <>
+        <Link
+          href={`/session/${session.id}`}
+          className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/20 transition-colors"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Vorbereiten
+        </Link>
+        {session.canStart ? (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={() => handleStartSession(session.id)}
+              disabled={isStarting}
+              className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
+            >
+              Session starten
+            </button>
+            {(session.pendingCount ?? 0) > 0 && (
+              <span className="font-libre text-[10px] text-amber-400">
+                Warnung: {session.pendingCount} ohne Zusage/Freigabe
+              </span>
+            )}
+          </div>
+        ) : (session.pendingCount ?? 0) === 0 && session.gm_prep_complete === false ? (
+          <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
+            <span
+              className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
+              title="Vorbereitung abschließen, dann starten."
+            >
+              Planung offen
+            </span>
+            <button
+              type="button"
+              onClick={() => handleMarkPrepComplete(session.id)}
+              disabled={isStarting}
+              className="inline-flex items-center gap-1 rounded border border-hero-border bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant disabled:opacity-50"
+            >
+              Planung abschließen
+            </button>
+          </div>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
+            title="Jeder Spieler braucht eine Zusage (oder Via Online) oder deine manuelle Freigabe."
+          >
+            Noch {(session.pendingCount ?? 0)} Spieler ohne Zusage/Freigabe
+          </span>
+        )}
+      </>
+    );
+  }
+
+  const hasActiveFocus = focusSession != null;
+  const hasOther = otherUpcomingSessions.length > 0;
+  const hasPastRows = pastSessionRows.length > 0;
+  const hasAnyUpcoming = hasActiveFocus || hasOther;
+
   return (
     <>
       <StartSessionBackgroundModal
@@ -254,168 +369,222 @@ export function SessionsTab({
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-hero-dark">
           <h2 className="font-barlow font-bold text-xl text-white uppercase flex items-center gap-2">
             <Calendar className="h-5 w-5 text-accent-gold" />
-            Nächste Sessions
+            Termine
           </h2>
           {isGM && (
             <button
+              type="button"
               onClick={() => setIsWizardOpen(true)}
               className="flex items-center gap-1 rounded bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
             >
               <Wand2 className="h-4 w-4" />
-              🪄 Session planen
+              Session planen
             </button>
           )}
         </div>
 
-        {!upcomingSessions || upcomingSessions.length === 0 ? (
+        {!hasAnyUpcoming ? (
           <p className="font-libre text-gray-400 text-center py-8">
-            Noch keine geplanten Sessions.
+            Kein aktiver oder geplanter Termin. Lege eine neue Session an oder öffne das Archiv.
           </p>
-        ) : (
-          <div className="space-y-3">
-            {upcomingSessions.map((session) => {
-              const startDate = new Date(session.start_time);
-              const formattedDate = new Intl.DateTimeFormat("de-DE", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(startDate);
-              const formattedTime = new Intl.DateTimeFormat("de-DE", {
-                hour: "2-digit",
-                minute: "2-digit",
-              }).format(startDate);
+        ) : null}
 
-              const isLive = session.status === "Live";
-              const isScheduled = session.status === "Scheduled";
-              const isEnded = session.status === "Completed";
-
-              return (
-                <div
-                  key={session.id}
-                  className={`flex items-center justify-between rounded border bg-background-dark p-4 transition-colors group ${
-                    isLive
-                      ? "border-red-700/70 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
-                      : "border-hero-border/30 hover:border-hero-vibrant"
-                  }`}
-                >
-                  <div>
-                    <p className="font-barlow font-bold text-white group-hover:text-hero-vibrant transition-colors">
-                      {session.title || "Session"} • {formattedDate} • {formattedTime} Uhr
-                    </p>
-                    <p className="font-libre text-xs text-gray-500">
-                      {session.type === "GameSession" ? "Spielabend" : session.type}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {isGM && (isScheduled || isEnded || isLive) && (
-                      <SessionActionsDropdown
-                        isStarting={isStarting}
-                        onEdit={() => setEditingSession(session)}
-                        onDelete={() => handleDelete(session.id)}
-                        onCancel={() => handleCancel(session.id)}
-                        onEnd={() => handleEndSession(session.id)}
-                        hasAcceptedRsvps={session.hasAcceptedRsvps}
-                        isLive={isLive}
-                      />
-                    )}
-                    <span
-                      className={`rounded px-2 py-1 font-barlow font-bold uppercase text-xs ${
-                        isLive
-                          ? "bg-red-900/40 text-red-300 border border-red-600/70"
-                          : isScheduled
-                          ? "bg-blue-900/30 text-blue-400 border border-blue-700/60"
-                          : "bg-gray-700/30 text-gray-400 border border-gray-600/60"
-                      }`}
-                    >
-                      {session.status}
-                    </span>
-
-                    {isLive && (
-                      canJoinSession ? (
+        {focusSession ? (
+          <div className="mb-8">
+            <p className="mb-3 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
+              {isSessionStatusLive(focusSession.status) ? "Aktuell" : "Nächster Termin"}
+            </p>
+            {(() => {
+              const { formattedDate, formattedTime } = formatSessionDateTime(focusSession.start_time);
+              const live = isSessionStatusLive(focusSession.status);
+              const scheduled = isSessionStatusScheduled(focusSession.status);
+              const CardInner = (
+                <div className="relative overflow-hidden rounded-xl border-2 border-hero-border/50 bg-background-dark p-6 md:p-8">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      {live ? (
+                        <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-red-500/70 bg-red-950/50 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-widest text-red-200">
+                          <Radio className="h-3.5 w-3.5 animate-pulse text-red-400" />
+                          Jetzt live
+                        </span>
+                      ) : null}
+                      <h3 className="font-cinzel text-2xl font-bold text-white md:text-3xl">
+                        {focusSession.title || "Session"}
+                      </h3>
+                      <p className="mt-2 font-barlow text-sm uppercase text-accent-gold">
+                        {formattedDate} · {formattedTime} Uhr
+                      </p>
+                      <p className="mt-1 font-libre text-xs text-gray-500">
+                        {focusSession.type === "GameSession" ? "Spielabend" : focusSession.type}
+                      </p>
+                    </div>
+                    <div className="flex flex-shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                      {renderSessionActions(focusSession)}
+                      {isGM && live ? (
                         <button
                           type="button"
-                          onClick={() => handleJoinLive(session.id)}
-                          className="inline-flex items-center gap-1 rounded bg-red-900/60 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-red-200 hover:bg-red-800/80 transition-colors animate-pulse"
+                          onClick={() => void copySessionLink(focusSession.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent-gold/60 bg-accent-gold/10 px-4 py-2.5 font-barlow text-xs font-extrabold uppercase text-accent-gold hover:bg-accent-gold/20"
                         >
-                          🔴 Laufender Session beitreten
+                          <Copy className="h-4 w-4" />
+                          Session-Link kopieren
                         </button>
-                      ) : (
-                        <span className="font-libre text-[10px] text-gray-500 italic" title="Charakter muss vom GM freigeschaltet sein (Status Active).">
-                          Freischaltung ausstehend
-                        </span>
-                      )
-                    )}
-
-                    {isScheduled && isGM && (
-                      <Link
-                        href={`/session/${session.id}`}
-                        className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/20 transition-colors"
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Vorbereiten
-                      </Link>
-                    )}
-
-                    {isScheduled && isGM && (
-                      session.canStart ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleStartSession(session.id)}
-                            disabled={isStarting}
-                            className="inline-flex items-center gap-1 rounded bg-hero-vibrant px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-background-dark hover:bg-hero-dark transition-colors disabled:opacity-50"
-                          >
-                            🚀 Session starten
-                          </button>
-                          {(session.pendingCount ?? 0) > 0 && (
-                            <span className="font-libre text-[10px] text-amber-400">
-                              Warnung: {session.pendingCount} ohne Zusage/Freigabe
-                            </span>
-                          )}
-                        </div>
-                      ) : (session.pendingCount ?? 0) === 0 &&
-                        session.gm_prep_complete === false ? (
-                        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
-                          <span
-                            className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
-                            title="Vorbereitung abschließen, dann starten."
-                          >
-                            Planung offen
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleMarkPrepComplete(session.id)}
-                            disabled={isStarting}
-                            className="inline-flex items-center gap-1 rounded border border-hero-border bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:border-hero-vibrant disabled:opacity-50"
-                          >
-                            Planung abschließen
-                          </button>
-                        </div>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1 rounded bg-amber-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-amber-400 border border-amber-700/60"
-                          title="Jeder Spieler braucht eine Zusage (oder Via Online) oder deine manuelle Freigabe in der Übersicht „Termine & Spielplan“."
+                      ) : null}
+                      {live && canJoinSession ? (
+                        <button
+                          type="button"
+                          onClick={() => handleJoinLive(focusSession.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-700 px-6 py-3 font-barlow text-sm font-extrabold uppercase tracking-wide text-white shadow-lg hover:bg-red-600"
                         >
-                          Noch {(session.pendingCount ?? 0)} Spieler ohne Zusage/Freigabe
+                          Sitzung beitreten
+                        </button>
+                      ) : live && !canJoinSession ? (
+                        <span className="font-libre text-xs text-gray-500 italic">
+                          Freischaltung ausstehend (Charakter Status Active).
                         </span>
-                      )
-                    )}
-
-                    {isEnded && !isLive && (
-                      <span className="font-libre text-[11px] text-gray-500">
-                        Beendet
-                      </span>
-                    )}
+                      ) : null}
+                      {scheduled && isGM ? renderScheduledGmControls(focusSession) : null}
+                    </div>
                   </div>
                 </div>
               );
-            })}
+
+              return live ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0, scale: [1, 1.012, 1] }}
+                  transition={{
+                    opacity: { duration: 0.35 },
+                    y: { duration: 0.35 },
+                    scale: { duration: 2.4, repeat: Infinity, ease: "easeInOut" },
+                  }}
+                  className="rounded-xl shadow-[0_0_28px_rgba(220,38,38,0.25)]"
+                >
+                  {CardInner}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                >
+                  {CardInner}
+                </motion.div>
+              );
+            })()}
+          </div>
+        ) : null}
+
+        {hasOther ? (
+          <div className="mb-8">
+            <h3 className="mb-3 font-barlow text-xs font-bold uppercase text-gray-500">Weitere geplante Termine</h3>
+            <div className="space-y-2">
+              {otherUpcomingSessions.map((session) => {
+                const { formattedDate, formattedTime } = formatSessionDateTime(session.start_time);
+                const live = isSessionStatusLive(session.status);
+                const scheduled = isSessionStatusScheduled(session.status);
+                return (
+                  <div
+                    key={session.id}
+                    className={`flex flex-col gap-3 rounded-lg border bg-background-dark/90 p-3 sm:flex-row sm:items-center sm:justify-between ${
+                      live ? "border-red-800/50" : "border-hero-border/30"
+                    }`}
+                  >
+                    <div>
+                      <p className="font-barlow font-bold text-sm text-white">
+                        {session.title || "Session"} · {formattedDate} · {formattedTime}
+                      </p>
+                      <span
+                        className={`mt-1 inline-block rounded px-2 py-0.5 font-barlow text-[9px] font-bold uppercase ${
+                          live ? "bg-red-900/40 text-red-200" : "bg-blue-900/30 text-blue-300"
+                        }`}
+                      >
+                        {session.status}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {renderSessionActions(session)}
+                      {live && canJoinSession ? (
+                        <button
+                          type="button"
+                          onClick={() => handleJoinLive(session.id)}
+                          className="rounded bg-red-900/60 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-red-100 hover:bg-red-800"
+                        >
+                          Beitreten
+                        </button>
+                      ) : null}
+                      {scheduled && isGM ? renderScheduledGmControls(session) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {(hasPastRows || archives.length > 0) && (
+          <div className="mt-6 border-t border-hero-dark/60 pt-4">
+            <button
+              type="button"
+              onClick={() => setArchiveOpen((o) => !o)}
+              className="mb-3 flex w-full items-center justify-between rounded-lg border border-hero-border/40 bg-background-dark/60 px-4 py-3 font-barlow text-sm font-bold uppercase text-gray-300 hover:border-accent-gold/40 hover:text-accent-gold"
+            >
+              <span>Vergangene Sessions / Archiv</span>
+              {archiveOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </button>
+            {archiveOpen ? (
+              <div className="space-y-4">
+                {hasPastRows ? (
+                  <ul className="space-y-2">
+                    {pastSessionRows.map((session) => {
+                      const { formattedDate, formattedTime } = formatSessionDateTime(session.start_time);
+                      const st = String(session.status ?? "").toLowerCase();
+                      const label =
+                        st === "cancelled"
+                          ? "Abgesagt"
+                          : st === "completed"
+                            ? "Beendet"
+                            : isSessionStatusLive(session.status)
+                              ? "Verwaiste Live-Session"
+                              : session.status;
+                      return (
+                        <li
+                          key={session.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded border border-hero-dark/50 bg-black/25 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-barlow text-xs font-bold text-gray-300">
+                              {session.title || "Session"}
+                            </p>
+                            <p className="font-libre text-[10px] text-gray-500">
+                              {formattedDate} {formattedTime} · {label}
+                            </p>
+                          </div>
+                          {isGM ? (
+                            <SessionActionsDropdown
+                              isStarting={isStarting}
+                              onEdit={() => setEditingSession(session)}
+                              onDelete={() => handleDelete(session.id)}
+                              hasAcceptedRsvps={session.hasAcceptedRsvps}
+                            />
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {archives.length > 0 ? (
+                  <PastSessionsGallery campaignId={campaignId} archives={archives} />
+                ) : null}
+              </div>
+            ) : null}
           </div>
         )}
-      </div>
 
-      <PastSessionsGallery campaignId={campaignId} archives={archives} />
+        {!hasPastRows && archives.length > 0 && !hasAnyUpcoming ? (
+          <PastSessionsGallery campaignId={campaignId} archives={archives} />
+        ) : null}
+      </div>
 
       {isGM && (
         <>
@@ -441,4 +610,3 @@ export function SessionsTab({
     </>
   );
 }
-

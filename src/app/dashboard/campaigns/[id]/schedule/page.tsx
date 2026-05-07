@@ -50,8 +50,8 @@ export default async function CampaignSchedulePage({ params }: Props) {
   const initialDay =
     scheduleDayNum != null && !Number.isNaN(scheduleDayNum) ? scheduleDayNum : null;
 
-  const [upcomingSessionsWithRsvp, loreEntries, npcs] = await Promise.all([
-    loadUpcomingSessionsWithRsvpForGm(campaignId),
+  const [sessionsPayload, loreEntries, npcs] = await Promise.all([
+    loadUpcomingSessionsWithRsvpForGm(campaignId, user.id),
     getLoreEntries(campaignId),
     getNPCs(campaignId, user.id, true),
   ]);
@@ -108,7 +108,11 @@ export default async function CampaignSchedulePage({ params }: Props) {
         <SessionsTab
           campaignId={campaignId}
           isGM
-          upcomingSessions={upcomingSessionsWithRsvp as any}
+          focusSession={(sessionsPayload.focusSession as any) ?? null}
+          otherUpcomingSessions={(sessionsPayload.otherUpcomingSessions || []) as any}
+          pastSessionRows={(sessionsPayload.pastSessionsForCampaignTab || []) as any}
+          upcomingSessions={(sessionsPayload.upcomingSessionsWithRsvp || []) as any}
+          archives={[]}
           locations={locations}
           npcs={sessionsTabNpcs}
         />

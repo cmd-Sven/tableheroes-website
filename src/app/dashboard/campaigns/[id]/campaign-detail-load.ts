@@ -18,8 +18,8 @@ import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import {
   isSessionStatusLive,
   isSessionStatusScheduled,
-  isSessionStatusScheduledOrLive,
 } from "@/src/lib/session-status";
+import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
 import { getCharacterFactionReputations } from "./reputation-queries";
 import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import type {
@@ -194,26 +194,29 @@ export async function loadCampaignDetailPageData(
     gm_confirmed: boolean;
   }[] = [];
 
-  // Fetch Sessions
+  // Fetch Sessions (alle Status — Aufteilung Fokus / aktiv / Archiv)
   const { data: sessionsRaw } = await (supabase.from("sessions") as any)
     .select("*")
     .eq("campaign_id", id)
     .order("start_time", { ascending: true });
 
-  // Expliziter Cast gegen 'never' - Präziser Typ für Sessions
-  const sessions = sessionsRaw as Array<{
-    id: string;
-    title: string | null;
-    start_time: string;
-    type: string;
-    status: string;
-  }> | null;
+  const sessions =
+    (sessionsRaw as Array<{
+      id: string;
+      title: string | null;
+      start_time: string;
+      type: string;
+      status: string;
+    }> | null) ?? null;
 
-  // Geplant (Scheduled) oder Live — auch nach Startzeit sichtbar (verspäteter Start / Beitreten)
   const now = new Date();
-  const upcomingSessions = (sessions || []).filter((s: any) =>
-    isSessionStatusScheduledOrLive(s.status),
+  const { focus, otherActive, pastArchiveRows } = partitionCampaignSessionsForTab(
+    (sessions ?? []) as any,
+    now,
   );
+
+  /** Aktive Termine: Fokus zuerst, dann übrige geplante/live (chronologisch). */
+  const upcomingSessions = [...(focus ? [focus] : []), ...otherActive];
 
   // RSVP-Status für geplante Sessions (GM: kann Session starten?)
   let upcomingSessionsWithRsvp: Array<{
@@ -227,7 +230,7 @@ export async function loadCampaignDetailPageData(
   }> = upcomingSessions as any[];
   if (isGM && upcomingSessions.length > 0) {
     const scheduledIds = upcomingSessions
-      .filter((s: any) => s.status === "Scheduled")
+      .filter((s: any) => isSessionStatusScheduled(s.status))
       .map((s: any) => s.id);
     if (scheduledIds.length > 0) {
       const [membersRes, rsvpsRes] = await Promise.all([
@@ -550,9 +553,9 @@ export async function loadCampaignDetailPageData(
   };
   if (isGM) {
     const list = (upcomingSessionsWithRsvp as any[]) || [];
-    const live = list.find((s: any) => isSessionStatusLive(s.status));
-    const scheduled = list.find((s: any) => isSessionStatusScheduled(s.status));
-    const featured = live ?? scheduled ?? list[0] ?? null;
+    const featured = focus
+      ? list.find((s: any) => s.id === focus.id) ?? list[0] ?? null
+      : list.find((s: any) => isSessionStatusLive(s.status)) ?? list[0] ?? null;
 
     if (featured) {
       const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
@@ -1041,6 +1044,13 @@ export async function loadCampaignDetailPageData(
     .order("archived_at", { ascending: false });
   const sessionArchives = (sessionArchivesRaw as any[]) || [];
 
+  const focusSessionForTab = focus
+    ? ((upcomingSessionsWithRsvp as any[]).find((x) => x.id === focus.id) ?? null)
+    : null;
+  const otherUpcomingSessionsForTab = (upcomingSessionsWithRsvp as any[]).filter(
+    (x) => x.id !== (focusSessionForTab as { id?: string } | null)?.id,
+  );
+
   const pageData = {
     campaign,
     world,
@@ -1058,6 +1068,9 @@ export async function loadCampaignDetailPageData(
     sessions,
     upcomingSessions,
     upcomingSessionsWithRsvp,
+    focusSession: focusSessionForTab,
+    otherUpcomingSessions: otherUpcomingSessionsForTab,
+    pastSessionsForCampaignTab: pastArchiveRows,
     sessionArchives,
     now,
     npcs,

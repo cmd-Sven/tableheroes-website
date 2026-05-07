@@ -1,8 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
-import {
-  isSessionStatusScheduled,
-  isSessionStatusScheduledOrLive,
-} from "@/src/lib/session-status";
+import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
+import { isSessionStatusScheduled } from "@/src/lib/session-status";
 import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
 
 export type SessionTabRow = Record<string, unknown> & {
@@ -16,13 +14,20 @@ export type SessionTabRow = Record<string, unknown> & {
   hasAcceptedRsvps?: boolean;
 };
 
+export type GmSessionsTabPayload = {
+  upcomingSessionsWithRsvp: SessionTabRow[];
+  focusSession: SessionTabRow | null;
+  otherUpcomingSessions: SessionTabRow[];
+  pastSessionsForCampaignTab: SessionTabRow[];
+};
+
 /**
- * Lädt geplante (Scheduled) und laufende (Live) Sessions inkl. RSVP für den GM (SessionsTab).
- * Scheduled bleibt sichtbar auch nach Startzeit — verspäteter Live-Start / Beitreten möglich.
+ * Geplante / laufende Sessions inkl. RSVP (GM) — Fokus-Session zuerst, Archiv getrennt.
  */
 export async function loadUpcomingSessionsWithRsvpForGm(
   campaignId: string,
-): Promise<SessionTabRow[]> {
+  gmUserId: string,
+): Promise<GmSessionsTabPayload> {
   const supabase = await createClient();
   const { data: sessionsRaw } = await (supabase.from("sessions") as any)
     .select("*")
@@ -30,21 +35,19 @@ export async function loadUpcomingSessionsWithRsvpForGm(
     .order("start_time", { ascending: true });
 
   const sessions = (sessionsRaw || []) as SessionTabRow[];
-  const upcomingSessions = sessions.filter((s) =>
-    isSessionStatusScheduledOrLive(s.status),
+  const now = new Date();
+  const { focus, otherActive, pastArchiveRows } = partitionCampaignSessionsForTab(
+    sessions,
+    now,
   );
+
+  const upcomingSessions = [...(focus ? [focus] : []), ...otherActive];
 
   let upcomingSessionsWithRsvp: SessionTabRow[] = upcomingSessions;
   const scheduledIds = upcomingSessions
     .filter((s) => isSessionStatusScheduled(s.status))
     .map((s) => s.id);
   if (scheduledIds.length > 0) {
-    const { data: campRow } = await (supabase.from("campaigns") as any)
-      .select("gm_id")
-      .eq("id", campaignId)
-      .maybeSingle();
-    const gmId = String((campRow as { gm_id?: string } | null)?.gm_id ?? "");
-
     const [membersRes, rsvpsRes] = await Promise.all([
       (supabase.from("campaign_members") as any)
         .select("user_id")
@@ -83,20 +86,32 @@ export async function loadUpcomingSessionsWithRsvpForGm(
         return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
       }
       const sessionRows = rowsBySession.get(s.id) ?? [];
-      const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
-      const playerIds = [...memberIds].filter((uid) => uid !== gmId);
+      const byUser = new Map(sessionRows.map((r) => [r.user_id, r]));
+      const playerIds = [...memberIds].filter((uid) => uid !== gmUserId);
       const pendingCount = playerIds.filter(
         (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
       ).length;
       const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,
-        canStart: prepOk,
+        canStart: pendingCount === 0 && prepOk,
         pendingCount,
         hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
       };
     });
   }
 
-  return upcomingSessionsWithRsvp;
+  const focusSession = focus
+    ? upcomingSessionsWithRsvp.find((x) => x.id === focus.id) ?? null
+    : null;
+  const otherUpcomingSessions = upcomingSessionsWithRsvp.filter(
+    (x) => x.id !== focusSession?.id,
+  );
+
+  return {
+    upcomingSessionsWithRsvp,
+    focusSession,
+    otherUpcomingSessions,
+    pastSessionsForCampaignTab: pastArchiveRows,
+  };
 }

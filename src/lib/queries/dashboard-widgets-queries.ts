@@ -15,6 +15,7 @@ import {
   isSessionStatusScheduled,
   isSessionStatusTerminal,
 } from "@/src/lib/session-status";
+import { isStaleLiveSession, sortSessionsForDashboardFocus } from "@/src/lib/session-focus";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
@@ -373,7 +374,7 @@ export async function getUpcomingSessionsForUser(
   const now = new Date();
   const staleLiveThresholdMs = 48 * 60 * 60 * 1000; // 48 Stunden
   // Nächste Termine: Scheduled (auch nach Startzeit) oder Live (max. 48h seit Start, sonst verwaist).
-  const sessions = allSessions
+  const sessionsFiltered = allSessions
     .filter((s: any) => !isSessionStatusTerminal(s.status))
     .filter((s: any) => {
       if (isSessionStatusLive(s.status)) {
@@ -384,8 +385,8 @@ export async function getUpcomingSessionsForUser(
         return true;
       }
       return isSessionStatusScheduled(s.status);
-    })
-    .slice(0, limit);
+    });
+  const sessions = sortSessionsForDashboardFocus(sessionsFiltered as any, now).slice(0, limit);
 
   if (sessions.length === 0) return [];
 
@@ -563,11 +564,18 @@ export async function getPastSessionsForUser(
 
   const now = new Date();
   const sessions = allSessions
-    .filter(
-      (s: any) =>
-        ["Completed"].includes(s.status) ||
-        (s.start_time && new Date(s.start_time) <= now)
-    )
+    .filter((s: any) => {
+      if (isSessionStatusTerminal(s.status)) return true;
+      if (isSessionStatusLive(s.status) && isStaleLiveSession(s, now)) return true;
+      if (
+        isSessionStatusScheduled(s.status) &&
+        s.start_time &&
+        new Date(s.start_time).getTime() <= now.getTime()
+      ) {
+        return true;
+      }
+      return false;
+    })
     .slice(0, limit);
 
   if (sessions.length === 0) return [];
