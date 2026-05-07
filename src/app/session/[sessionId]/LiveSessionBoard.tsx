@@ -209,8 +209,10 @@ function normalizeStageVisibilityPatch(value: unknown): Partial<StageVisibilityP
 /** Ohne passende session_id ist React-State wirkungslos (Updates/Stage) — nicht als „geladen“ zählen. */
 function isViableLiveState(row: unknown, expectedSessionId: string): boolean {
   if (row == null || typeof row !== "object") return false;
-  const sid = String((row as Record<string, unknown>).session_id ?? "");
-  return sid.length > 0 && sid === expectedSessionId;
+  const sid = String((row as Record<string, unknown>).session_id ?? "").trim();
+  const exp = String(expectedSessionId ?? "").trim();
+  if (!sid || !exp) return false;
+  return sid.toLowerCase() === exp.toLowerCase();
 }
 
 const TEMPERATURE_MIN = -40;
@@ -1220,7 +1222,9 @@ export function LiveSessionBoard({
         }
         if (!base) {
           alert(
-            "Session-Zustand konnte nicht geladen werden. Bitte Seite neu laden. In Supabase: Migration session_live_states (Spalten + Realtime) ausführen.",
+            "Session-Zustand konnte nicht geladen werden. Bitte Seite neu laden. " +
+              "In der Browser-Konsole nach „ensureSessionPrepLiveState“ oder „session_live_states“ suchen. " +
+              "In Supabase: Migrationen für session_live_states (inkl. ensure_session_prep_live_state) ausführen.",
           );
           return;
         }

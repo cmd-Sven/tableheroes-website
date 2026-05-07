@@ -480,19 +480,57 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     current_time: "Tagsüber",
     current_location: null,
     journal_text: null,
-    system_logs: [],
-    visible_npc_ids: [],
-    visible_faction_ids: [],
+    system_logs: [] as unknown[],
+    visible_npc_ids: [] as string[],
+    visible_faction_ids: [] as string[],
     is_background_manual_override: false,
     is_combat_mode: false,
     current_turn_index: 0,
     scribe_id: user.id,
+    fate_coins: [] as unknown[],
+    destroyed_fate_coins: 0,
+    downtime_active: false,
+    downtime_type: "travel",
+    downtime_current_day: 1,
+    downtime_total_days: 1,
+    fap_allocations: {} as Record<string, unknown>,
+    physically_present_user_ids: [] as string[],
+    loot_hide_npcs: false,
+    dummy_player_count: 0,
   };
 
-  const { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
+  let { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
     .insert(insertPayload)
     .select()
     .single();
+
+  const looksLikeMissingColumn = (msg: string) =>
+    /column|schema cache|could not find|does not exist/i.test(msg);
+
+  if (insertError && looksLikeMissingColumn(String(insertError.message ?? ""))) {
+    const leanPayload = {
+      session_id: sessionId,
+      weather: "Klar",
+      temperature: "normal",
+      temperature_value: 15,
+      current_time: "Tagsüber",
+      current_location: null,
+      journal_text: null,
+      system_logs: [] as unknown[],
+      visible_npc_ids: [] as string[],
+      visible_faction_ids: [] as string[],
+      is_background_manual_override: false,
+      is_combat_mode: false,
+      current_turn_index: 0,
+      scribe_id: user.id,
+    };
+    const second = await (writeClient.from("session_live_states") as any)
+      .insert(leanPayload)
+      .select()
+      .single();
+    insertError = second.error;
+    inserted = second.data;
+  }
 
   if (insertError) {
     console.error("Supabase Insert Error:", insertError);

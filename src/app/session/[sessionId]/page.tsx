@@ -412,7 +412,12 @@ export default async function SessionPage({ params, searchParams }: Props) {
       forcePlayerView={forcePlayerView}
       userId={user.id}
       initialLiveState={
-        liveState ? serializeForClient(liveState) : null
+        liveState
+          ? ({
+              ...(serializeForClient(liveState) as Record<string, unknown>),
+              session_id: sessionId,
+            } as any)
+          : null
       }
       partyCharacters={serializeForClient(partyCharacters)}
       allCampaignNpcs={serializeForClient(allCampaignNpcs || [])}
