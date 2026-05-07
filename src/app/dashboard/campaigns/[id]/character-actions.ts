@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { getGmCampaignMembersWithCharacters } from "./members-actions";
 import { getCharacterWizardLoreData as loadCharacterWizardLoreData } from "./character-queries";
 
@@ -497,6 +498,8 @@ export async function updateCharacterPlayer(data: {
   current_location_id?: string | null;
   avatar_url?: string | null;
   avatar_storage_path?: string | null;
+  /** Zuschnitt Porträt (JSON wie npcs.image_display) */
+  avatar_display?: unknown | null;
   experience_points?: number;
   pocket_gold?: number;
 }) {
@@ -555,6 +558,15 @@ export async function updateCharacterPlayer(data: {
       ? data.avatar_storage_path.trim()
       : null;
   }
+  if (data.avatar_display !== undefined) {
+    if (data.avatar_display == null) {
+      updates.avatar_display = null;
+    } else {
+      updates.avatar_display = imageDisplayToJson(
+        normalizeImageDisplay(data.avatar_display),
+      );
+    }
+  }
   if (data.experience_points !== undefined) {
     const n = Math.max(0, Math.floor(Number(data.experience_points) || 0));
     updates.experience_points = n;
@@ -564,9 +576,22 @@ export async function updateCharacterPlayer(data: {
     updates.pocket_gold = n;
   }
 
-  const { error } = await (supabase.from("characters") as any)
+  let { error } = await (supabase.from("characters") as any)
     .update(updates)
     .eq("id", data.character_id);
+
+  const errMsg = String(error?.message ?? "").toLowerCase();
+  if (
+    error &&
+    "avatar_display" in updates &&
+    (errMsg.includes("avatar_display") || errMsg.includes("schema cache") || errMsg.includes("column"))
+  ) {
+    const { avatar_display: _omit, ...withoutAvatarDisplay } = updates;
+    const second = await (supabase.from("characters") as any)
+      .update(withoutAvatarDisplay)
+      .eq("id", data.character_id);
+    error = second.error;
+  }
 
   if (error) throw new Error(error.message || "Fehler beim Speichern.");
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);

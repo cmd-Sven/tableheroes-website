@@ -11,6 +11,10 @@ import {
   uploadCharacterPortrait,
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
+import type { ImageDisplaySettings } from "@/src/lib/image-display";
+import { normalizeImageDisplay } from "@/src/lib/image-display";
 import Link from "next/link";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 
@@ -56,6 +60,8 @@ type Props = {
     location_name?: string | null;
     avatar_url?: string | null;
     avatar_storage_path?: string | null;
+    /** Zuschnitt / Fokus (wie NPC-Bilddarstellung) */
+    avatar_display?: unknown;
     status?: string;
     experience_points?: number;
     character_relationships?: Relationship[];
@@ -98,6 +104,13 @@ export function MyCharacterSection({
   );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+  const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
+    normalizeImageDisplay(character.avatar_display),
+  );
+
+  useEffect(() => {
+    setAvatarDisplay(normalizeImageDisplay(character.avatar_display));
+  }, [character.avatar_display, character.avatar_url, character.avatar_storage_path]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -198,6 +211,7 @@ export function MyCharacterSection({
           current_location_id: form.current_location_id || null,
           avatar_url: nextAvatarUrl,
           avatar_storage_path: nextAvatarPath,
+          avatar_display: nextAvatarUrl ? normalizeImageDisplay(avatarDisplay) : null,
           experience_points: form.experience_points,
         });
 
@@ -328,21 +342,23 @@ export function MyCharacterSection({
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
               Charakterbild
             </label>
+            <p className="font-libre text-xs text-gray-500">
+              Bild hochladen oder per URL einbinden. Den Ausschnitt stellst du wie bei NPC-Portraits ein
+              (Cover/Contain, Fokus).
+            </p>
             <div className="flex flex-wrap items-start gap-4">
-              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border-2 border-hero-border bg-hero-dark">
-                {(avatarBlobUrl || form.avatar_url.trim()) ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- blob URLs
-                  <img
-                    src={avatarBlobUrl || form.avatar_url.trim()}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center font-libre text-[10px] text-gray-500 px-1 text-center">
-                    Kein Bild
-                  </div>
-                )}
-              </div>
+              {avatarBlobUrl || form.avatar_url.trim() ? (
+                <CharacterAvatarImage
+                  src={avatarBlobUrl || form.avatar_url.trim()}
+                  avatarDisplay={avatarDisplay}
+                  className="h-28 w-28 shrink-0 rounded-lg border-2 border-hero-border bg-hero-dark"
+                  alt=""
+                />
+              ) : (
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-hero-border/60 bg-hero-dark/40 px-2 text-center font-libre text-[10px] text-gray-500">
+                  Kein Bild
+                </div>
+              )}
               <div className="min-w-0 flex-1 space-y-2">
                 <input
                   type="file"
@@ -360,7 +376,9 @@ export function MyCharacterSection({
                   }}
                 />
                 <p className="font-libre text-xs text-gray-500">
-                  Bild hochladen (max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB, JPEG/PNG/WebP) oder URL nutzen.
+                  Upload max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB (JPEG/PNG/WebP). URL
+                  und Upload schließen sich beim Speichern gegenseitig nicht aus: zuletzt gewähltes Bild
+                  zählt (Upload hat Vorrang).
                 </p>
                 {(form.avatar_url.trim() || avatarBlobUrl) && (
                   <button
@@ -369,6 +387,7 @@ export function MyCharacterSection({
                       setAvatarFile(null);
                       setForm((p) => ({ ...p, avatar_url: "" }));
                       setAvatarStoragePath(null);
+                      setAvatarDisplay(normalizeImageDisplay(null));
                     }}
                     className="text-sm font-libre text-red-400 hover:underline"
                   >
@@ -385,11 +404,19 @@ export function MyCharacterSection({
               value={form.avatar_url}
               onChange={(e) => {
                 setForm((p) => ({ ...p, avatar_url: e.target.value }));
-                setAvatarStoragePath(null);
+                if (e.target.value.trim()) setAvatarStoragePath(null);
               }}
               placeholder="https://…"
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
             />
+            {(form.avatar_url.trim() || avatarBlobUrl) ? (
+              <ImageUrlDisplayEditor
+                value={avatarDisplay}
+                onChange={setAvatarDisplay}
+                previewUrl={avatarBlobUrl || form.avatar_url.trim() || null}
+                previewAspectClassName="aspect-[3/4] max-w-[220px]"
+              />
+            ) : null}
           </div>
           {cultureOptions.length > 0 && (
             <div>

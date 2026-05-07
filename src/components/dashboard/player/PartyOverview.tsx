@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { Users, User } from "lucide-react";
 import type { PartyMember } from "@/src/app/dashboard/campaigns/[id]/player-dashboard/page";
+import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 
 type Props = {
   party: PartyMember[];
@@ -34,12 +34,11 @@ export function PartyOverview({ party, hideTitle = false, embedded = false }: Pr
             >
               <div className="relative aspect-[4/3] bg-hero-dark/60">
                 {member.avatar_url ? (
-                  <Image
+                  <CharacterAvatarImage
                     src={member.avatar_url}
-                    alt=""
-                    fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 768px) 100vw, 33vw"
+                    avatarDisplay={member.avatar_display}
+                    className="absolute inset-0 h-full w-full"
+                    alt={member.name}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">

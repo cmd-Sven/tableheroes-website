@@ -9,6 +9,7 @@ import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries"
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -168,6 +169,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     race: string | null;
     level: number | null;
     avatar_url: string | null;
+    avatar_display?: unknown | null;
     playerUserId?: string | null;
     rations_count: number;
     starvation_days: number;
@@ -192,6 +194,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
           ? c.level
           : null,
       avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+      avatar_display: null,
       playerUserId:
         c.member_user_id != null ? String(c.member_user_id) : null,
       ...survivalFromPartyRow(c as Record<string, unknown>),
@@ -215,6 +218,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
               ? c.level
               : null,
           avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+          avatar_display: null,
           ...survivalFromPartyRow(c as Record<string, unknown>),
         }),
       );
@@ -272,10 +276,23 @@ export default async function SessionPage({ params, searchParams }: Props) {
               ? c.level
               : null,
           avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+          avatar_display: null,
           playerUserId: charToPlayer.get(String(c.id)) ?? null,
           ...survivalFromPartyRow(c as Record<string, unknown>),
         }));
     }
+  }
+
+  if (partyCharacters.length > 0) {
+    const dispMap = await fetchAvatarDisplayMapForCampaign(
+      supabase,
+      campaignId,
+      partyCharacters.map((p) => p.id),
+    );
+    partyCharacters = partyCharacters.map((pc) => ({
+      ...pc,
+      avatar_display: dispMap.get(pc.id) ?? pc.avatar_display ?? null,
+    }));
   }
 
   // 5. Load campaign NPCs (Sichtbarkeit aus campaign_visibility)

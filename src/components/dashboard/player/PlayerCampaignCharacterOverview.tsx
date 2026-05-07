@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
+import { CharacterAvatarImage } from "./CharacterAvatarImage";
 
 type Relationship = {
   relationship_type: string;
@@ -53,6 +53,8 @@ type Character = {
   biography: string | null;
   /** Charakterportrait (URL), falls gesetzt */
   avatar_url?: string | null;
+  /** Zuschnitt Porträt (wie NPC image_display) */
+  avatar_display?: unknown;
   languages?: unknown;
   language_names?: string[];
   experience_points?: number;
@@ -374,18 +376,13 @@ export function PlayerCampaignCharacterOverview({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5 min-w-0 flex-1">
           {avatarSrc ? (
             <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg border-2 border-amber-900/45 shadow-md bg-stone-900/20">
-              <Image
+              <CharacterAvatarImage
                 src={avatarSrc}
-                alt=""
-                fill
-                className="object-cover"
+                avatarDisplay={character.avatar_display}
+                asNextImage
                 sizes="128px"
-                unoptimized={
-                  avatarSrc.startsWith("http://") ||
-                  avatarSrc.startsWith("data:") ||
-                  avatarSrc.includes("localhost") ||
-                  avatarSrc.includes("supabase.co")
-                }
+                className="h-full w-full"
+                alt={character.name}
               />
               {nextSessionConfirmed ? (
                 <span

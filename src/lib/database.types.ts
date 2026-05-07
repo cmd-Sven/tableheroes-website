@@ -844,6 +844,7 @@ export type Database = {
       characters: {
         Row: {
           age: number | null
+          avatar_display: Json | null
           avatar_storage_path: string | null
           avatar_url: string | null
           backstory_summary: string | null
@@ -872,6 +873,7 @@ export type Database = {
         }
         Insert: {
           age?: number | null
+          avatar_display?: Json | null
           avatar_storage_path?: string | null
           avatar_url?: string | null
           backstory_summary?: string | null
@@ -900,6 +902,7 @@ export type Database = {
         }
         Update: {
           age?: number | null
+          avatar_display?: Json | null
           avatar_storage_path?: string | null
           avatar_url?: string | null
           backstory_summary?: string | null

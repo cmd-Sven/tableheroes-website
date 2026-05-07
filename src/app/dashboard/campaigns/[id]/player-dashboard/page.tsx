@@ -8,6 +8,7 @@ import { getLoreEntries } from "../lore-queries";
 import { getNPCs } from "../npc-queries";
 import { getFactionsWithMembers } from "../factions-queries";
 import { getCharacterFactionReputations } from "../reputation-queries";
+import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -31,6 +32,7 @@ export type PartyMember = {
   level?: number;
   culture?: string;
   avatar_url?: string | null;
+  avatar_display?: unknown | null;
 };
 
 export default async function PlayerDashboardPage({ params }: Props) {
@@ -196,7 +198,7 @@ export default async function PlayerDashboardPage({ params }: Props) {
     );
   }
 
-  const party: PartyMember[] = (partyCharacters || []).map((c: any) => ({
+  let party: PartyMember[] = (partyCharacters || []).map((c: any) => ({
     id: c.id,
     name: c.name,
     class: c.class ?? "",
@@ -206,6 +208,13 @@ export default async function PlayerDashboardPage({ params }: Props) {
     avatar_url:
       c.avatar_url?.trim?.() ||
       (c.user_id ? userAvatarMap.get(c.user_id) ?? null : null),
+    avatar_display: null,
+  }));
+  const partyIds = party.map((p) => p.id);
+  const dispMap = await fetchAvatarDisplayMapForCampaign(supabase, campaignId, partyIds);
+  party = party.map((p) => ({
+    ...p,
+    avatar_display: dispMap.get(p.id) ?? null,
   }));
 
   return (

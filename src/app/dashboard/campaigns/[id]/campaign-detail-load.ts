@@ -15,6 +15,7 @@ import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 import {
   isSessionStatusLive,
   isSessionStatusScheduled,
@@ -844,6 +845,13 @@ export async function loadCampaignDetailPageData(
       avatar_url:
         c.avatar_url?.trim?.() ||
         (c.user_id ? userAvatarMap.get(c.user_id) ?? null : null),
+      avatar_display: null,
+    }));
+    const partyIds = party.map((p) => p.id);
+    const dispMap = await fetchAvatarDisplayMapForCampaign(supabase, id, partyIds);
+    party = party.map((p) => ({
+      ...p,
+      avatar_display: dispMap.get(p.id) ?? null,
     }));
   }
 

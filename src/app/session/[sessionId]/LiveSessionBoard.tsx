@@ -68,6 +68,7 @@ import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPa
 import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
 import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
+import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
 import {
@@ -338,6 +339,7 @@ type PartyCharacter = {
   race: string | null;
   level: number | null;
   avatar_url: string | null;
+  avatar_display?: unknown | null;
   /** Spieler-Account (für Presence: ausgegraut bis Tab offen) */
   playerUserId?: string | null;
   rations_count: number;
@@ -2840,12 +2842,14 @@ export function LiveSessionBoard({
                             }`}
                           >
                             {pc.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- Externe Charakter-Avatare aus Userdaten
-                              <img
-                                src={pc.avatar_url}
-                                alt={pc.name}
-                                className="h-full w-full object-cover"
-                              />
+                              <div className="absolute inset-0 overflow-hidden rounded-full">
+                                <CharacterAvatarImage
+                                  src={pc.avatar_url}
+                                  avatarDisplay={pc.avatar_display}
+                                  className="h-full w-full"
+                                  alt={pc.name}
+                                />
+                              </div>
                             ) : (
                               <span className="font-barlow text-4xl text-accent-gold">
                                 {pc.name[0]?.toUpperCase()}

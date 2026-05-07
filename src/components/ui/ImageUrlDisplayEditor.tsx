@@ -118,17 +118,27 @@ export function ImageUrlDisplayEditor({
             className={`relative w-full max-w-md overflow-hidden rounded-md border border-hero-border ${previewAspectClassName}`}
             style={imageDisplayBackdropStyle(d)}
           >
-            <Image
-              src={previewUrl.trim()}
-              alt=""
-              fill
-              className="select-none"
-              style={imageDisplayObjectStyle(d)}
-              sizes="(max-width: 768px) 100vw, 448px"
-              onError={(e) => {
-                e.currentTarget.style.opacity = "0.3";
-              }}
-            />
+            {previewUrl.trim().startsWith("blob:") ? (
+              // eslint-disable-next-line @next/next/no-img-element -- lokale Vorschau nach Dateiwahl
+              <img
+                src={previewUrl.trim()}
+                alt=""
+                className="absolute inset-0 h-full w-full select-none"
+                style={imageDisplayObjectStyle(d)}
+              />
+            ) : (
+              <Image
+                src={previewUrl.trim()}
+                alt=""
+                fill
+                className="select-none"
+                style={imageDisplayObjectStyle(d)}
+                sizes="(max-width: 768px) 100vw, 448px"
+                onError={(e) => {
+                  e.currentTarget.style.opacity = "0.3";
+                }}
+              />
+            )}
           </div>
         </div>
       ) : null}
