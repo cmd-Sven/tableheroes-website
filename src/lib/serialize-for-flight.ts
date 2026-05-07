@@ -9,6 +9,8 @@ export function serializeForClient<T>(value: T): T {
         if (v === undefined) return null;
         if (typeof v === "bigint") return Number(v);
         if (typeof v === "function" || typeof v === "symbol") return undefined;
+        if (v instanceof Map) return Object.fromEntries(v as Map<unknown, unknown>);
+        if (v instanceof Set) return [...(v as Set<unknown>)];
         if (typeof v === "object" && v !== null && !Array.isArray(v)) {
           if (Object.prototype.toString.call(v) === "[object Date]") {
             return (v as Date).toISOString();
@@ -31,6 +33,8 @@ function walkSerialize(v: unknown, path: Set<object> = new Set(), depth = 0): un
   if (t === "undefined" || t === "function" || t === "symbol") return null;
   if (t !== "object") return v;
   if (v instanceof Date) return v.toISOString();
+  if (v instanceof Map) return Object.fromEntries(v as Map<unknown, unknown>);
+  if (v instanceof Set) return [...(v as Set<unknown>)];
   if (Array.isArray(v)) return v.map((x) => walkSerialize(x, path, depth + 1));
   const obj = v as object;
   if (path.has(obj)) return null;

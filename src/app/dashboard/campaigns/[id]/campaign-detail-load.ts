@@ -15,6 +15,7 @@ import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 import {
   isSessionStatusLive,
@@ -780,9 +781,11 @@ export async function loadCampaignDetailPageData(
     userHasCharacter = !!myCharacter;
   }
 
-  /** Klientenseitige Ansichten nutzen dieselbe Zeile wie myCharacter; Flight-Serialisierung erfolgt für die gesamte Payload unten. */
+  /** Spieler-Charakter: gleiche Flight-Härtung wie GM-Editor-Route. */
   const myCharacterForClient =
-    !isGM && myCharacter ? myCharacter : null;
+    !isGM && myCharacter
+      ? serializeCharacterForEditorClient(myCharacter as Record<string, unknown>)
+      : null;
 
   // ============================================================================
   // PLAYER: Load discoveries + party for direct player-dashboard view

@@ -82,35 +82,36 @@ export function MyCharacterSection({
   locations,
   factionReputations = [],
 }: Props) {
+  const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
-  const savedLangIds = normalizeLangIds(character.languages);
+  const savedLangIds = normalizeLangIds(character?.languages);
 
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
-    name: character.name,
-    class: character.class,
-    race: character.race,
-    level: character.level,
-    experience_points: Number(character.experience_points ?? 0),
-    biography: character.biography ?? "",
-    culture_lore_id: character.culture_lore_id ?? "",
+    name: character?.name ?? "",
+    class: character?.class ?? "",
+    race: character?.race ?? "",
+    level: Math.max(1, Math.round(Number(character?.level ?? 1)) || 1),
+    experience_points: Number(character?.experience_points ?? 0),
+    biography: character?.biography ?? "",
+    culture_lore_id: character?.culture_lore_id ?? "",
     languages: savedLangIds,
-    faction_membership: character.faction_membership ?? "",
-    current_location_id: character.current_location_id ?? "",
-    avatar_url: character.avatar_url ?? "",
+    faction_membership: character?.faction_membership ?? "",
+    current_location_id: character?.current_location_id ?? "",
+    avatar_url: character?.avatar_url ?? "",
   });
   const [avatarStoragePath, setAvatarStoragePath] = useState(
-    character.avatar_storage_path ?? null,
+    character?.avatar_storage_path ?? null,
   );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
   const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
-    normalizeImageDisplay(character.avatar_display),
+    normalizeImageDisplay(character?.avatar_display),
   );
 
   useEffect(() => {
-    setAvatarDisplay(normalizeImageDisplay(character.avatar_display));
-  }, [character.avatar_display, character.avatar_url, character.avatar_storage_path]);
+    setAvatarDisplay(normalizeImageDisplay(character?.avatar_display));
+  }, [character?.avatar_display, character?.avatar_url, character?.avatar_storage_path]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -123,47 +124,47 @@ export function MyCharacterSection({
   }, [avatarFile]);
 
   const cultureOptions = useMemo(() => {
-    const cid = form.culture_lore_id || character.culture_lore_id || "";
+    const cid = form.culture_lore_id || character?.culture_lore_id || "";
     const list = cultures.map((c) => ({ ...c }));
     if (cid && !list.some((x) => x.id === cid)) {
       list.push({
         id: cid,
-        name: character.culture_name?.trim() || "Gespeicherte Kultur",
+        name: character?.culture_name?.trim() || "Gespeicherte Kultur",
       });
     }
     return list;
-  }, [cultures, form.culture_lore_id, character.culture_lore_id, character.culture_name]);
+  }, [cultures, form.culture_lore_id, character?.culture_lore_id, character?.culture_name]);
 
   const factionOptions = useMemo(() => {
-    const fid = form.faction_membership || character.faction_membership || "";
+    const fid = form.faction_membership || character?.faction_membership || "";
     const list = factions.map((f) => ({ ...f }));
     if (fid && !list.some((x) => x.id === fid)) {
       list.push({
         id: fid,
-        name: character.faction_name?.trim() || "Gespeicherte Fraktion",
+        name: character?.faction_name?.trim() || "Gespeicherte Fraktion",
       });
     }
     return list;
-  }, [factions, form.faction_membership, character.faction_membership, character.faction_name]);
+  }, [factions, form.faction_membership, character?.faction_membership, character?.faction_name]);
 
   const locationOptions = useMemo(() => {
-    const lid = form.current_location_id || character.current_location_id || "";
+    const lid = form.current_location_id || character?.current_location_id || "";
     const list = locations.map((l) => ({ ...l }));
     if (lid && !list.some((x) => x.id === lid)) {
       list.push({
         id: lid,
-        name: character.location_name?.trim() || "Gespeicherter Ort",
+        name: character?.location_name?.trim() || "Gespeicherter Ort",
         type: "",
       });
     }
     return list;
-  }, [locations, form.current_location_id, character.current_location_id, character.location_name]);
+  }, [locations, form.current_location_id, character?.current_location_id, character?.location_name]);
 
   /** Freigegebene Sprachen + alle aktuell gewählten IDs (auch wenn Visibility später ändert) */
   const languageOptions = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
     for (const l of languages) map.set(l.id, l);
-    const names = character.language_names ?? [];
+    const names = character?.language_names ?? [];
     for (const id of form.languages) {
       if (!map.has(id)) {
         const idx = savedLangIds.indexOf(id);
@@ -175,9 +176,13 @@ export function MyCharacterSection({
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [languages, form.languages, character.language_names, savedLangIds]);
+  }, [languages, form.languages, character?.language_names, savedLangIds]);
 
   const handleSave = () => {
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     startTransition(async () => {
       try {
         let nextAvatarUrl = form.avatar_url.trim() || null;
@@ -185,7 +190,7 @@ export function MyCharacterSection({
 
         if (avatarFile) {
           const r = await uploadCharacterPortrait(avatarFile, {
-            characterId: character.id,
+            characterId,
           });
           if ("error" in r) {
             alert(r.error);
@@ -198,7 +203,7 @@ export function MyCharacterSection({
         if (!nextAvatarUrl) nextAvatarPath = null;
 
         await updateCharacterPlayer({
-          character_id: character.id,
+          character_id: characterId,
           campaign_id: campaignId,
           name: form.name,
           class: form.class,
@@ -215,7 +220,7 @@ export function MyCharacterSection({
           experience_points: form.experience_points,
         });
 
-        const prevPath = character.avatar_storage_path ?? null;
+        const prevPath = character?.avatar_storage_path ?? null;
         if (prevPath && prevPath !== nextAvatarPath) {
           await removeProfileMediaAsset(prevPath);
         }
@@ -237,8 +242,8 @@ export function MyCharacterSection({
     }));
   };
 
-  const relationships = character.character_relationships ?? [];
-  const isPendingApproval = character.status === "Pending_Approval";
+  const relationships = character?.character_relationships ?? [];
+  const isPendingApproval = character?.status === "Pending_Approval";
 
   const saveButton = (
     <button
@@ -330,11 +335,11 @@ export function MyCharacterSection({
           <div id="character-gold" className="scroll-mt-24 sm:col-span-2">
             <CharacterWealthInventoryCard
               character={{
-                id: character.id,
-                name: character.name,
-                class: character.class,
-                level: character.level,
-                avatar_url: character.avatar_url ?? null,
+                id: characterId,
+                name: character?.name ?? "",
+                class: character?.class ?? "",
+                level: Math.max(1, Math.round(Number(character?.level ?? 1)) || 1),
+                avatar_url: character?.avatar_url ?? null,
               }}
             />
           </div>
@@ -617,7 +622,7 @@ export function MyCharacterSection({
                       rep.reputation >= -20 ? "Vorsicht" :
                       rep.reputation >= -50 ? "Feindlich / Schulden" :
                       "Gehasster Feind";
-                    const isPrimary = character.faction_membership === rep.faction_id;
+                    const isPrimary = character?.faction_membership === rep.faction_id;
                     const colorClasses = getReputationColorClasses(rep.reputation);
                     return (
                       <Link

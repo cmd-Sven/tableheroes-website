@@ -595,6 +595,7 @@ export async function updateCharacterPlayer(data: {
 
   if (error) throw new Error(error.message || "Fehler beim Speichern.");
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
   return { success: true };
 }
 

@@ -100,6 +100,7 @@ export function GMCharacterEditorPage({
   initialFactionReputations,
   currentUserId,
 }: Props) {
+  const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [reputations, setReputations] = useState<FactionReputation[]>(
@@ -110,26 +111,32 @@ export function GMCharacterEditorPage({
   const [newRepFactionId, setNewRepFactionId] = useState("");
   const [newRepValue, setNewRepValue] = useState(0);
   const [newRepRank, setNewRepRank] = useState("");
-  const [status, setStatus] = useState(character.status || "Active");
-  const [level, setLevel] = useState(character.level || 1);
-  const [biography, setBiography] = useState(character.biography || "");
-  const [charName, setCharName] = useState(character.name);
-  const [characterClass, setCharacterClass] = useState(character.class);
-  const [charRace, setCharRace] = useState(character.race);
-  const [cultureLoreId, setCultureLoreId] = useState(character.culture_lore_id ?? "");
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() =>
-    normalizeLanguageIds(character.languages),
+  const [status, setStatus] = useState(character?.status ?? "Active");
+  const [level, setLevel] = useState(() =>
+    Math.max(1, Math.round(Number(character?.level ?? 1)) || 1),
   );
-  const [factionMembership, setFactionMembership] = useState(character.faction_membership ?? "");
-  const [currentLocationId, setCurrentLocationId] = useState(character.current_location_id ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(character.avatar_url ?? "");
+  const [biography, setBiography] = useState(character?.biography ?? "");
+  const [charName, setCharName] = useState(character?.name ?? "");
+  const [characterClass, setCharacterClass] = useState(character?.class ?? "");
+  const [charRace, setCharRace] = useState(character?.race ?? "");
+  const [cultureLoreId, setCultureLoreId] = useState(character?.culture_lore_id ?? "");
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() =>
+    normalizeLanguageIds(character?.languages),
+  );
+  const [factionMembership, setFactionMembership] = useState(
+    character?.faction_membership ?? "",
+  );
+  const [currentLocationId, setCurrentLocationId] = useState(
+    character?.current_location_id ?? "",
+  );
+  const [avatarUrl, setAvatarUrl] = useState(character?.avatar_url ?? "");
   const [avatarStoragePath, setAvatarStoragePath] = useState(
-    character.avatar_storage_path ?? null,
+    character?.avatar_storage_path ?? null,
   );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
   const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
-    normalizeImageDisplay(character.avatar_display),
+    normalizeImageDisplay(character?.avatar_display),
   );
   const [relationships, setRelationships] = useState<
     Array<{
@@ -139,11 +146,11 @@ export function GMCharacterEditorPage({
       description: string;
     }>
   >(
-    (character.character_relationships || []).map((rel) => ({
-      id: rel.id,
-      npc_id: rel.npcs?.id || "",
-      relationship_type: rel.relationship_type,
-      description: rel.description || "",
+    (character?.character_relationships ?? []).map((rel) => ({
+      id: rel?.id ? String(rel.id) : undefined,
+      npc_id: rel?.npcs?.id ? String(rel.npcs.id) : "",
+      relationship_type: String(rel?.relationship_type ?? ""),
+      description: rel?.description != null ? String(rel.description) : "",
     }))
   );
 
@@ -160,31 +167,31 @@ export function GMCharacterEditorPage({
   }, [languages, selectedLanguages]);
 
   const cultureOptions = useMemo(() => {
-    const cid = character.culture_lore_id ?? "";
+    const cid = character?.culture_lore_id ?? "";
     const list = [...cultures];
     if (cid && !list.some((x) => x.id === cid)) {
       list.push({ id: cid, name: "Gespeicherter Eintrag" });
     }
     return list;
-  }, [cultures, character.culture_lore_id]);
+  }, [cultures, character?.culture_lore_id]);
 
   const factionOptionsForChar = useMemo(() => {
-    const fid = character.faction_membership ?? "";
+    const fid = character?.faction_membership ?? "";
     const list = [...factionChoices];
     if (fid && !list.some((x) => x.id === fid)) {
       list.push({ id: fid, name: "Gespeicherter Eintrag" });
     }
     return list;
-  }, [factionChoices, character.faction_membership]);
+  }, [factionChoices, character?.faction_membership]);
 
   const locationOptions = useMemo(() => {
-    const lid = character.current_location_id ?? "";
+    const lid = character?.current_location_id ?? "";
     const list = [...locations];
     if (lid && !list.some((x) => x.id === lid)) {
       list.push({ id: lid, name: "Gespeicherter Eintrag", type: "" });
     }
     return list;
-  }, [locations, character.current_location_id]);
+  }, [locations, character?.current_location_id]);
 
   const toggleLanguage = (id: string) => {
     setSelectedLanguages((prev) =>
@@ -197,8 +204,8 @@ export function GMCharacterEditorPage({
   }, [initialFactionReputations]);
 
   useEffect(() => {
-    setAvatarDisplay(normalizeImageDisplay(character.avatar_display));
-  }, [character.avatar_display, character.avatar_url, character.avatar_storage_path]);
+    setAvatarDisplay(normalizeImageDisplay(character?.avatar_display));
+  }, [character?.avatar_display, character?.avatar_url, character?.avatar_storage_path]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -233,15 +240,19 @@ export function GMCharacterEditorPage({
 
   const handleDeleteCharacter = () => {
     if (isPending) return;
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     if (
       !confirm(
-        `Charakter „${character.name}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
+        `Charakter „${character?.name ?? "Unbekannt"}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
       )
     )
       return;
     startTransition(async () => {
       try {
-        await deleteCharacterByGM(character.id, campaignId);
+        await deleteCharacterByGM(characterId, campaignId);
         router.push(`/dashboard/campaigns/${campaignId}?tab=members`);
         router.refresh();
       } catch (error) {
@@ -252,6 +263,10 @@ export function GMCharacterEditorPage({
 
   const handleSave = () => {
     if (isPending) return;
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -260,7 +275,7 @@ export function GMCharacterEditorPage({
 
         if (avatarFile) {
           const r = await uploadCharacterPortrait(avatarFile, {
-            characterId: character.id,
+            characterId,
           });
           if ("error" in r) {
             alert(r.error);
@@ -273,11 +288,11 @@ export function GMCharacterEditorPage({
         if (!nextAvatarUrl) nextAvatarPath = null;
 
         await updateCharacterByGM({
-          character_id: character.id,
+          character_id: characterId,
           campaign_id: campaignId,
           status,
           level,
-          name: charName.trim() || character.name,
+          name: charName.trim() || (character?.name ?? "Unbenannt"),
           class: characterClass,
           race: charRace,
           biography: biography || null,
@@ -293,7 +308,7 @@ export function GMCharacterEditorPage({
           ),
         });
 
-        const prevPath = character.avatar_storage_path ?? null;
+        const prevPath = character?.avatar_storage_path ?? null;
         if (
           prevPath &&
           prevPath !== nextAvatarPath &&
@@ -313,16 +328,20 @@ export function GMCharacterEditorPage({
 
   const handleAddReputation = async () => {
     if (!newRepFactionId || repPending) return;
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     setRepPending(true);
     try {
       await upsertCharacterFactionReputation({
         campaign_id: campaignId,
-        character_id: character.id,
+        character_id: characterId,
         faction_id: newRepFactionId,
         reputation: newRepValue,
         rank: newRepRank.trim() || null,
       });
-      const list = await getCharacterFactionReputations(character.id, campaignId);
+      const list = await getCharacterFactionReputations(characterId, campaignId);
       setReputations(list);
       setNewRepFactionId("");
       setNewRepValue(0);
@@ -350,11 +369,15 @@ export function GMCharacterEditorPage({
 
   const handleUpdateReputation = async (rep: FactionReputation, updates: { reputation?: number; rank?: string | null }) => {
     if (repPending) return;
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     setRepPending(true);
     try {
       await upsertCharacterFactionReputation({
         campaign_id: campaignId,
-        character_id: character.id,
+        character_id: characterId,
         faction_id: rep.faction_id,
         reputation: updates.reputation ?? rep.reputation,
         rank: updates.rank !== undefined ? updates.rank : rep.rank,
@@ -388,7 +411,7 @@ export function GMCharacterEditorPage({
           Charakter verwalten
         </h1>
         <p className="font-libre text-lg text-gray-300 mt-2">
-          {character.name} — {character.class}, {character.race}
+          {character?.name ?? ""} — {character?.class ?? ""}, {character?.race ?? ""}
         </p>
       </div>
 

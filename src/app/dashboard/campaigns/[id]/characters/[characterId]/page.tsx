@@ -8,6 +8,7 @@ import { getFactionsWithMembers } from "../../factions-queries";
 import { getNPCs } from "../../npc-queries";
 import { getCharacterFactionReputations } from "../../reputation-queries";
 import { GMCharacterEditorPage } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
+import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 
 type Props = {
@@ -62,9 +63,9 @@ export default async function GMCharacterEditPage({ params }: Props) {
     campaignId,
   );
 
-  /** RSC/Flight: JSONB (modification_log), volle NPC-Zeilen u. ä. nicht roh an Client geben. */
-  const charRecord = character as Record<string, unknown>;
-  const { modification_log: _unusedModLog, ...characterForClient } = charRecord;
+  const characterForEditor = serializeCharacterForEditorClient(
+    character as Record<string, unknown>,
+  );
 
   const npcsForEditor = (npcs as any[]).map((n) => ({
     id: String(n.id),
@@ -89,7 +90,7 @@ export default async function GMCharacterEditPage({ params }: Props) {
       </Link>
 
       <GMCharacterEditorPage
-        character={serializeForClient(characterForClient) as any}
+        character={characterForEditor as any}
         campaignId={campaignId}
         currentUserId={userId}
         npcs={serializeForClient(npcsForEditor)}
