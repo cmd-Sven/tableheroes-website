@@ -91,6 +91,7 @@ export default async function GMCharacterEditPage({ params }: Props) {
       <GMCharacterEditorPage
         character={serializeForClient(characterForClient) as any}
         campaignId={campaignId}
+        currentUserId={userId}
         npcs={serializeForClient(npcsForEditor)}
         factions={serializeForClient(factionsSlim)}
         cultures={serializeForClient(editorOpts.cultures)}

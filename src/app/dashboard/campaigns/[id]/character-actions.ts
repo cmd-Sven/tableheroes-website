@@ -53,7 +53,7 @@ export async function getCharacterForMemberByUserId(
 }
 
 const GM_CHARACTER_BASE_SELECT =
-  "id, name, class, race, level, status, biography, avatar_url, modification_log, culture_lore_id, languages, faction_membership, current_location_id";
+  "id, name, class, race, level, status, biography, avatar_url, avatar_storage_path, avatar_display, modification_log, culture_lore_id, languages, faction_membership, current_location_id";
 
 /**
  * Lädt eine Charakterzeile für die GM-Ansicht.
@@ -617,6 +617,9 @@ export async function updateCharacterByGM(data: {
   faction_membership?: string | null;
   current_location_id?: string | null;
   avatar_url?: string | null;
+  avatar_storage_path: string | null;
+  /** Zuschnitt Porträt (JSON wie npcs.image_display) */
+  avatar_display: unknown | null;
   relationships: Array<{
     id?: string;
     npc_id: string;
@@ -681,21 +684,45 @@ export async function updateCharacterByGM(data: {
   try {
     const langArr = Array.isArray(data.languages) ? data.languages.map(String) : [];
 
-    const { error: updateError } = await (supabase.from("characters") as any)
-      .update({
-        status: data.status,
-        level: data.level,
-        name: (data.name ?? "").trim() || "Unbenannt",
-        class: data.class,
-        race: data.race,
-        biography: data.biography ?? null,
-        culture_lore_id: data.culture_lore_id ?? null,
-        languages: langArr,
-        faction_membership: data.faction_membership ?? null,
-        current_location_id: data.current_location_id ?? null,
-        avatar_url: data.avatar_url?.trim() ? data.avatar_url.trim() : null,
-      })
+    const avatarDisplayJson =
+      data.avatar_display == null
+        ? null
+        : imageDisplayToJson(normalizeImageDisplay(data.avatar_display));
+
+    const rowUpdate: Record<string, unknown> = {
+      status: data.status,
+      level: data.level,
+      name: (data.name ?? "").trim() || "Unbenannt",
+      class: data.class,
+      race: data.race,
+      biography: data.biography ?? null,
+      culture_lore_id: data.culture_lore_id ?? null,
+      languages: langArr,
+      faction_membership: data.faction_membership ?? null,
+      current_location_id: data.current_location_id ?? null,
+      avatar_url: data.avatar_url?.trim() ? data.avatar_url.trim() : null,
+      avatar_storage_path: data.avatar_storage_path?.trim()
+        ? data.avatar_storage_path.trim()
+        : null,
+      avatar_display: avatarDisplayJson,
+    };
+
+    let { error: updateError } = await (supabase.from("characters") as any)
+      .update(rowUpdate)
       .eq("id", data.character_id);
+
+    const errMsg = String(updateError?.message ?? "").toLowerCase();
+    if (
+      updateError &&
+      "avatar_display" in rowUpdate &&
+      (errMsg.includes("avatar_display") || errMsg.includes("schema cache") || errMsg.includes("column"))
+    ) {
+      const { avatar_display: _omit, ...withoutAvatarDisplay } = rowUpdate;
+      const second = await (supabase.from("characters") as any)
+        .update(withoutAvatarDisplay)
+        .eq("id", data.character_id);
+      updateError = second.error;
+    }
 
     if (updateError) {
       console.error("Update Character Error:", updateError);

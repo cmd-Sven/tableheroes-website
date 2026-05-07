@@ -5,6 +5,7 @@ import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { isSessionStatusTerminal } from "@/src/lib/session-status";
+import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 
 /**
@@ -806,6 +807,66 @@ export async function endSession(sessionId: string) {
   }
 
   return { success: true, campaignId: (session as any).campaign_id };
+}
+
+/**
+ * GM: Geplante Termine, deren Startzeit mehr als 24h zurückliegt und die nie live gingen,
+ * werden wie „Session beenden“ abgewickelt (Archiv-Eintrag, Status Completed).
+ * Keine Absage-DMs an Spieler (im Gegensatz zu „Absagen“).
+ */
+export async function expirePastScheduledSessionsForCampaign(
+  campaignId: string,
+): Promise<{ closedCount: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { closedCount: 0 };
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, owner_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+
+  if (!isCampaignGm(campaign, user.id)) return { closedCount: 0 };
+
+  const { data: rows } = await (supabase.from("sessions") as any)
+    .select("id, status, start_time")
+    .eq("campaign_id", campaignId);
+
+  const now = new Date();
+  const candidates = ((rows as { id: string; status: string; start_time: string }[]) || []).filter(
+    (r) =>
+      isMissedScheduledSession(
+        {
+          id: String(r.id),
+          status: String(r.status ?? ""),
+          start_time: String(r.start_time ?? ""),
+        },
+        now,
+      ),
+  );
+
+  let closedCount = 0;
+  for (const r of candidates) {
+    try {
+      await endSession(String(r.id));
+      closedCount += 1;
+    } catch (e) {
+      console.warn("[expirePastScheduledSessionsForCampaign] endSession:", r.id, e);
+    }
+  }
+
+  if (closedCount > 0) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  }
+  return { closedCount };
 }
 
 // ============================================================================

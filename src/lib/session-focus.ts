@@ -5,7 +5,11 @@ import {
 } from "@/src/lib/session-status";
 
 const STALE_LIVE_MS = 48 * 60 * 60 * 1000;
-const SCHEDULED_GRACE_MS = 24 * 60 * 60 * 1000;
+/** Nach Ablauf dieses Fensters ab geplantem Start gilt ein „Scheduled“-Termin als verpasst (nicht mehr „kommend“). */
+export const SCHEDULED_STALE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** @deprecated Alias — gleiche Bedeutung wie SCHEDULED_STALE_GRACE_MS */
+const SCHEDULED_GRACE_MS = SCHEDULED_STALE_GRACE_MS;
 
 /** Live-Session, deren Start mehr als 48h zurückliegt („verwaist“). */
 export function isStaleLiveSession(
@@ -23,9 +27,33 @@ export type SessionFocusRow = {
   [key: string]: unknown;
 };
 
+/** Geplanter Termin, dessen Start länger als die Toleranz zurückliegt (nie gestartet / hängengeblieben). */
+export function isMissedScheduledSession<T extends SessionFocusRow>(
+  session: T,
+  now: Date = new Date(),
+): boolean {
+  if (!isSessionStatusScheduled(session.status)) return false;
+  if (!session.start_time) return false;
+  const startMs = new Date(session.start_time).getTime();
+  if (Number.isNaN(startMs)) return false;
+  return startMs < now.getTime() - SCHEDULED_STALE_GRACE_MS;
+}
+
+/** Geplant, Start liegt in der Vergangenheit, aber noch innerhalb des Toleranzfensters (nicht „verpasst“). */
+export function isScheduledInGraceOverdue<T extends SessionFocusRow>(
+  session: T,
+  now: Date = new Date(),
+): boolean {
+  if (!isSessionStatusScheduled(session.status) || !session.start_time) return false;
+  const startMs = new Date(session.start_time).getTime();
+  if (Number.isNaN(startMs)) return false;
+  if (startMs >= now.getTime()) return false;
+  return startMs >= now.getTime() - SCHEDULED_STALE_GRACE_MS;
+}
+
 /**
- * Fokus-Termin: zuerst nicht-verwaiste Live-Session, sonst zeitlich nächste geplante Session
- * (mit 24h-Toleranz für leicht überfällige Scheduled).
+ * Fokus-Termin: zuerst nicht-verwaiste Live-Session, sonst zeitlich nächste **noch gültige**
+ * geplante Session (innerhalb der Toleranz nach Start; verpasste Termine nie als Fokus).
  */
 export function pickCampaignFocusSession<T extends SessionFocusRow>(
   sessions: T[],
@@ -34,6 +62,7 @@ export function pickCampaignFocusSession<T extends SessionFocusRow>(
   const active = sessions.filter((s) => {
     if (isSessionStatusTerminal(s.status)) return false;
     if (isStaleLiveSession(s, now)) return false;
+    if (isMissedScheduledSession(s, now)) return false;
     return isSessionStatusLive(s.status) || isSessionStatusScheduled(s.status);
   });
 
@@ -49,9 +78,8 @@ export function pickCampaignFocusSession<T extends SessionFocusRow>(
   const sorted = [...sched].sort(
     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
   );
-  const graceMs = now.getTime() - SCHEDULED_GRACE_MS;
-  const picked =
-    sorted.find((s) => new Date(s.start_time).getTime() >= graceMs) ?? sorted[0];
+  const graceCutoff = now.getTime() - SCHEDULED_GRACE_MS;
+  const picked = sorted.find((s) => new Date(s.start_time).getTime() >= graceCutoff);
   return picked ?? null;
 }
 
@@ -72,6 +100,7 @@ export function partitionCampaignSessionsForTab<T extends SessionFocusRow>(
     .filter((s) => {
       if (isSessionStatusTerminal(s.status)) return true;
       if (isStaleLiveSession(s, now)) return true;
+      if (isMissedScheduledSession(s, now)) return true;
       return false;
     })
     .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
@@ -81,6 +110,7 @@ export function partitionCampaignSessionsForTab<T extends SessionFocusRow>(
       if (focus && s.id === focus.id) return false;
       if (isSessionStatusTerminal(s.status)) return false;
       if (isStaleLiveSession(s, now)) return false;
+      if (isMissedScheduledSession(s, now)) return false;
       return isSessionStatusLive(s.status) || isSessionStatusScheduled(s.status);
     })
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
@@ -96,6 +126,7 @@ export function sortSessionsForDashboardFocus<T extends SessionFocusRow>(
   const active = sessions.filter((s) => {
     if (isSessionStatusTerminal(s.status)) return false;
     if (isStaleLiveSession(s, now)) return false;
+    if (isMissedScheduledSession(s, now)) return false;
     if (!isSessionStatusLive(s.status) && !isSessionStatusScheduled(s.status)) return false;
     return true;
   });

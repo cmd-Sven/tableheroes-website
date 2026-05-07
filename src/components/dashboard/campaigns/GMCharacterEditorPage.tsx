@@ -14,6 +14,17 @@ import {
   upsertCharacterFactionReputation,
   deleteCharacterFactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
+import {
+  PROFILE_MEDIA_ACCEPT_MIME,
+  PROFILE_MEDIA_MAX_BYTES,
+  removeProfileMediaAsset,
+  uploadCharacterPortrait,
+  validateProfileImageFile,
+} from "@/src/lib/profile-media";
+import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
+import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
+import type { ImageDisplaySettings } from "@/src/lib/image-display";
+import { normalizeImageDisplay } from "@/src/lib/image-display";
 
 function normalizeLanguageIds(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -33,6 +44,8 @@ type Character = {
   faction_membership?: string | null;
   current_location_id?: string | null;
   avatar_url?: string | null;
+  avatar_storage_path?: string | null;
+  avatar_display?: unknown;
   character_relationships?: Array<{
     id: string;
     relationship_type: string;
@@ -71,6 +84,8 @@ type Props = {
   factionChoices?: Faction[];
   /** Vom Server geladen (RSC); nach router.refresh() aktualisiert */
   initialFactionReputations: FactionReputation[];
+  /** Angemeldeter GM — nur eigene Storage-Pfade beim Ersetzen löschen */
+  currentUserId: string;
 };
 
 export function GMCharacterEditorPage({
@@ -83,6 +98,7 @@ export function GMCharacterEditorPage({
   locations = [],
   factionChoices = [],
   initialFactionReputations,
+  currentUserId,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -107,6 +123,14 @@ export function GMCharacterEditorPage({
   const [factionMembership, setFactionMembership] = useState(character.faction_membership ?? "");
   const [currentLocationId, setCurrentLocationId] = useState(character.current_location_id ?? "");
   const [avatarUrl, setAvatarUrl] = useState(character.avatar_url ?? "");
+  const [avatarStoragePath, setAvatarStoragePath] = useState(
+    character.avatar_storage_path ?? null,
+  );
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+  const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
+    normalizeImageDisplay(character.avatar_display),
+  );
   const [relationships, setRelationships] = useState<
     Array<{
       id?: string;
@@ -172,6 +196,20 @@ export function GMCharacterEditorPage({
     setReputations(initialFactionReputations);
   }, [initialFactionReputations]);
 
+  useEffect(() => {
+    setAvatarDisplay(normalizeImageDisplay(character.avatar_display));
+  }, [character.avatar_display, character.avatar_url, character.avatar_storage_path]);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarBlobUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(avatarFile);
+    setAvatarBlobUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [avatarFile]);
+
   const handleAddRelationship = () => {
     setRelationships([
       ...relationships,
@@ -217,6 +255,23 @@ export function GMCharacterEditorPage({
 
     startTransition(async () => {
       try {
+        let nextAvatarUrl = avatarUrl.trim() || null;
+        let nextAvatarPath = avatarStoragePath;
+
+        if (avatarFile) {
+          const r = await uploadCharacterPortrait(avatarFile, {
+            characterId: character.id,
+          });
+          if ("error" in r) {
+            alert(r.error);
+            return;
+          }
+          nextAvatarUrl = r.publicUrl;
+          nextAvatarPath = r.path;
+        }
+
+        if (!nextAvatarUrl) nextAvatarPath = null;
+
         await updateCharacterByGM({
           character_id: character.id,
           campaign_id: campaignId,
@@ -230,11 +285,24 @@ export function GMCharacterEditorPage({
           languages: selectedLanguages,
           faction_membership: factionMembership || null,
           current_location_id: currentLocationId || null,
-          avatar_url: avatarUrl.trim() || null,
+          avatar_url: nextAvatarUrl,
+          avatar_storage_path: nextAvatarPath,
+          avatar_display: nextAvatarUrl ? normalizeImageDisplay(avatarDisplay) : null,
           relationships: relationships.filter(
             (r) => r.npc_id && r.relationship_type
           ),
         });
+
+        const prevPath = character.avatar_storage_path ?? null;
+        if (
+          prevPath &&
+          prevPath !== nextAvatarPath &&
+          prevPath.startsWith(`${currentUserId}/`)
+        ) {
+          await removeProfileMediaAsset(prevPath);
+        }
+
+        setAvatarFile(null);
         router.push(`/dashboard/campaigns/${campaignId}?tab=members`);
         router.refresh();
       } catch (error: unknown) {
@@ -360,18 +428,87 @@ export function GMCharacterEditorPage({
               disabled={isPending}
             />
           </div>
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div className="sm:col-span-2 lg:col-span-3 space-y-3">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">
-              Avatar-URL (Bild-Link)
+              Charakterbild
+            </label>
+            <p className="font-libre text-xs text-gray-500">
+              Bild hochladen oder per URL einbinden. Den Ausschnitt stellst du wie bei NPC-Portraits ein
+              (Cover/Contain, Fokus).
+            </p>
+            <div className="flex flex-wrap items-start gap-4">
+              {avatarBlobUrl || avatarUrl.trim() ? (
+                <CharacterAvatarImage
+                  src={avatarBlobUrl || avatarUrl.trim()}
+                  avatarDisplay={avatarDisplay}
+                  className="h-28 w-28 shrink-0 rounded-lg border-2 border-hero-border bg-hero-dark"
+                  alt=""
+                />
+              ) : (
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-hero-border/60 bg-hero-dark/40 px-2 text-center font-libre text-[10px] text-gray-500">
+                  Kein Bild
+                </div>
+              )}
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  type="file"
+                  accept={PROFILE_MEDIA_ACCEPT_MIME.join(",")}
+                  className="block w-full max-w-md text-sm text-gray-300 file:mr-2 file:rounded file:border file:border-hero-border file:bg-hero-dark file:px-2 file:py-1 file:font-barlow file:text-xs file:uppercase file:text-hero-vibrant"
+                  disabled={isPending}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f) return;
+                    const msg = validateProfileImageFile(f);
+                    if (msg) {
+                      alert(msg);
+                      return;
+                    }
+                    setAvatarFile(f);
+                  }}
+                />
+                <p className="font-libre text-xs text-gray-500">
+                  Upload max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB (JPEG/PNG/WebP). Upload hat
+                  beim Speichern Vorrang vor der URL.
+                </p>
+                {(avatarUrl.trim() || avatarBlobUrl) && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => {
+                      setAvatarFile(null);
+                      setAvatarUrl("");
+                      setAvatarStoragePath(null);
+                      setAvatarDisplay(normalizeImageDisplay(null));
+                    }}
+                    className="text-sm font-libre text-red-400 hover:underline"
+                  >
+                    Bild entfernen
+                  </button>
+                )}
+              </div>
+            </div>
+            <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-400">
+              Bild-URL (optional, statt Upload)
             </label>
             <input
               type="url"
               value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
+              onChange={(e) => {
+                setAvatarUrl(e.target.value);
+                if (e.target.value.trim()) setAvatarStoragePath(null);
+              }}
               placeholder="https://…"
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
               disabled={isPending}
             />
+            {(avatarUrl.trim() || avatarBlobUrl) ? (
+              <ImageUrlDisplayEditor
+                value={avatarDisplay}
+                onChange={setAvatarDisplay}
+                previewUrl={avatarBlobUrl || avatarUrl.trim() || null}
+                previewAspectClassName="aspect-[3/4] max-w-[220px]"
+              />
+            ) : null}
           </div>
           {cultureOptions.length > 0 && (
             <div>

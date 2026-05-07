@@ -29,6 +29,12 @@ export async function loadUpcomingSessionsWithRsvpForGm(
   gmUserId: string,
 ): Promise<GmSessionsTabPayload> {
   const supabase = await createClient();
+  try {
+    const { expirePastScheduledSessionsForCampaign } = await import("./session-actions");
+    await expirePastScheduledSessionsForCampaign(campaignId);
+  } catch (e) {
+    console.warn("[loadUpcomingSessionsWithRsvpForGm] expirePastScheduledSessionsForCampaign:", e);
+  }
   const { data: sessionsRaw } = await (supabase.from("sessions") as any)
     .select("*")
     .eq("campaign_id", campaignId)

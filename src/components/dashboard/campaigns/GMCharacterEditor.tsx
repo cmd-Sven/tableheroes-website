@@ -9,6 +9,7 @@ import {
   upsertCharacterFactionReputation,
   deleteCharacterFactionReputation,
 } from "@/src/app/dashboard/campaigns/[id]/reputation-actions";
+import { normalizeImageDisplay } from "@/src/lib/image-display";
 
 function normalizeLangIds(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -28,6 +29,8 @@ type Character = {
   faction_membership?: string | null;
   current_location_id?: string | null;
   avatar_url?: string | null;
+  avatar_storage_path?: string | null;
+  avatar_display?: unknown;
   character_relationships?: Array<{
     id: string;
     relationship_type: string;
@@ -130,6 +133,7 @@ export function GMCharacterEditor({
 
     startTransition(async () => {
       try {
+        const avUrl = (character.avatar_url ?? "").trim() || null;
         await updateCharacterByGM({
           character_id: character.id,
           campaign_id: campaignId,
@@ -143,7 +147,9 @@ export function GMCharacterEditor({
           languages: normalizeLangIds(character.languages),
           faction_membership: character.faction_membership ?? null,
           current_location_id: character.current_location_id ?? null,
-          avatar_url: character.avatar_url ?? null,
+          avatar_url: avUrl,
+          avatar_storage_path: character.avatar_storage_path?.trim() || null,
+          avatar_display: avUrl ? normalizeImageDisplay(character.avatar_display) : null,
           relationships: relationships.filter(
             (r) => r.npc_id && r.relationship_type
           ),

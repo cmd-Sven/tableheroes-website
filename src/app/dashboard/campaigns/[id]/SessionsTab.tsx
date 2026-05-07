@@ -32,6 +32,10 @@ import {
   type SessionArchiveItem,
 } from "@/src/components/dashboard/campaigns/PastSessionsGallery";
 import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
+import {
+  isMissedScheduledSession,
+  isScheduledInGraceOverdue,
+} from "@/src/lib/session-focus";
 
 type SessionItem = {
   id: string;
@@ -59,6 +63,28 @@ function formatSessionDateTime(startTime: string) {
     minute: "2-digit",
   }).format(startDate);
   return { formattedDate, formattedTime, startDate };
+}
+
+function pastSessionStatusLabel(session: SessionItem): string {
+  if (isMissedScheduledSession(session)) {
+    return "Nicht gestartet (Termin vorbei)";
+  }
+  const st = String(session.status ?? "").toLowerCase();
+  if (st === "cancelled") return "Abgesagt";
+  if (st === "completed") return "Beendet / archiviert";
+  if (isSessionStatusLive(session.status)) return "Verwaiste Live-Session";
+  return session.status;
+}
+
+function sessionCardBorderClass(session: SessionItem): string {
+  const live = isSessionStatusLive(session.status);
+  const scheduled = isSessionStatusScheduled(session.status);
+  if (live) return "border-red-800/50";
+  if (scheduled && isScheduledInGraceOverdue(session)) {
+    return "border-amber-600/50 ring-1 ring-amber-900/40";
+  }
+  if (scheduled) return "border-emerald-800/40";
+  return "border-hero-border/30";
 }
 
 /** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */
@@ -392,20 +418,33 @@ export function SessionsTab({
         {focusSession ? (
           <div className="mb-8">
             <p className="mb-3 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
-              {isSessionStatusLive(focusSession.status) ? "Aktuell" : "Nächster Termin"}
+              {isSessionStatusLive(focusSession.status)
+                ? "Aktuell"
+                : isScheduledInGraceOverdue(focusSession)
+                  ? "Nächster Termin (Start liegt zurück — noch im Toleranzfenster)"
+                  : "Nächster Termin"}
             </p>
             {(() => {
               const { formattedDate, formattedTime } = formatSessionDateTime(focusSession.start_time);
               const live = isSessionStatusLive(focusSession.status);
               const scheduled = isSessionStatusScheduled(focusSession.status);
+              const graceOverdue = isScheduledInGraceOverdue(focusSession);
+              const borderClass = sessionCardBorderClass(focusSession);
               const CardInner = (
-                <div className="relative overflow-hidden rounded-xl border-2 border-hero-border/50 bg-background-dark p-6 md:p-8">
+                <div
+                  className={`relative overflow-hidden rounded-xl border-2 bg-background-dark p-6 md:p-8 ${borderClass}`}
+                >
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                       {live ? (
                         <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-red-500/70 bg-red-950/50 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-widest text-red-200">
                           <Radio className="h-3.5 w-3.5 animate-pulse text-red-400" />
                           Jetzt live
+                        </span>
+                      ) : null}
+                      {scheduled && graceOverdue ? (
+                        <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-600/70 bg-amber-950/40 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-widest text-amber-100">
+                          Überfällig (noch startbar, 24h-Toleranz)
                         </span>
                       ) : null}
                       <h3 className="font-cinzel text-2xl font-bold text-white md:text-3xl">
@@ -483,20 +522,25 @@ export function SessionsTab({
                 const { formattedDate, formattedTime } = formatSessionDateTime(session.start_time);
                 const live = isSessionStatusLive(session.status);
                 const scheduled = isSessionStatusScheduled(session.status);
+                const graceOverdue = isScheduledInGraceOverdue(session);
+                const rowBorder = sessionCardBorderClass(session);
                 return (
                   <div
                     key={session.id}
-                    className={`flex flex-col gap-3 rounded-lg border bg-background-dark/90 p-3 sm:flex-row sm:items-center sm:justify-between ${
-                      live ? "border-red-800/50" : "border-hero-border/30"
-                    }`}
+                    className={`flex flex-col gap-3 rounded-lg border-2 bg-background-dark/90 p-3 sm:flex-row sm:items-center sm:justify-between ${rowBorder}`}
                   >
                     <div>
+                      {graceOverdue && scheduled ? (
+                        <p className="mb-1 font-barlow text-[9px] font-bold uppercase text-amber-400">
+                          Überfällig (Toleranzfenster)
+                        </p>
+                      ) : null}
                       <p className="font-barlow font-bold text-sm text-white">
                         {session.title || "Session"} · {formattedDate} · {formattedTime}
                       </p>
                       <span
                         className={`mt-1 inline-block rounded px-2 py-0.5 font-barlow text-[9px] font-bold uppercase ${
-                          live ? "bg-red-900/40 text-red-200" : "bg-blue-900/30 text-blue-300"
+                          live ? "bg-red-900/40 text-red-200" : graceOverdue ? "bg-amber-900/40 text-amber-100" : "bg-emerald-900/30 text-emerald-200"
                         }`}
                       >
                         {session.status}
@@ -538,15 +582,7 @@ export function SessionsTab({
                   <ul className="space-y-2">
                     {pastSessionRows.map((session) => {
                       const { formattedDate, formattedTime } = formatSessionDateTime(session.start_time);
-                      const st = String(session.status ?? "").toLowerCase();
-                      const label =
-                        st === "cancelled"
-                          ? "Abgesagt"
-                          : st === "completed"
-                            ? "Beendet"
-                            : isSessionStatusLive(session.status)
-                              ? "Verwaiste Live-Session"
-                              : session.status;
+                      const label = pastSessionStatusLabel(session);
                       return (
                         <li
                           key={session.id}

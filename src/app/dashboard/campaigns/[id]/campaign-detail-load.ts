@@ -20,7 +20,7 @@ import {
   isSessionStatusLive,
   isSessionStatusScheduled,
 } from "@/src/lib/session-status";
-import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
+import { partitionCampaignSessionsForTab, isMissedScheduledSession } from "@/src/lib/session-focus";
 import { getCharacterFactionReputations } from "./reputation-queries";
 import type { RsvpStatus } from "@/src/lib/types/dashboard-widgets";
 import type {
@@ -194,6 +194,20 @@ export async function loadCampaignDetailPageData(
     rsvp_status: string;
     gm_confirmed: boolean;
   }[] = [];
+
+  if (isGM) {
+    try {
+      const { expirePastScheduledSessionsForCampaign } = await import(
+        "./session-actions",
+      );
+      await expirePastScheduledSessionsForCampaign(id);
+    } catch (e) {
+      console.warn(
+        "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
+        e,
+      );
+    }
+  }
 
   // Fetch Sessions (alle Status — Aufteilung Fokus / aktiv / Archiv)
   const { data: sessionsRaw } = await (supabase.from("sessions") as any)
@@ -554,9 +568,29 @@ export async function loadCampaignDetailPageData(
   };
   if (isGM) {
     const list = (upcomingSessionsWithRsvp as any[]) || [];
-    const featured = focus
-      ? list.find((s: any) => s.id === focus.id) ?? list[0] ?? null
-      : list.find((s: any) => isSessionStatusLive(s.status)) ?? list[0] ?? null;
+    const notMissed = (s: { id?: unknown; status?: unknown; start_time?: unknown }) =>
+      !isMissedScheduledSession(
+        {
+          id: String(s.id ?? ""),
+          status: String(s.status ?? ""),
+          start_time: String(s.start_time ?? ""),
+        },
+        now,
+      );
+    const validUpcoming = list.filter(notMissed);
+    const focusOk =
+      focus &&
+      notMissed({
+        id: (focus as any).id,
+        status: (focus as any).status,
+        start_time: (focus as any).start_time,
+      });
+    const featured =
+      focusOk && validUpcoming.some((s: any) => String(s.id) === String((focus as any).id))
+        ? validUpcoming.find((s: any) => String(s.id) === String((focus as any).id))!
+        : validUpcoming.find((s: any) => isSessionStatusLive(s.status)) ??
+          validUpcoming.find((s: any) => isSessionStatusScheduled(s.status)) ??
+          null;
 
     if (featured) {
       const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
@@ -873,57 +907,69 @@ export async function loadCampaignDetailPageData(
     rsvpDeadlineEndIso: string | null;
   } | null = null;
 
-  if (!isGM && hasAccess && upcomingSessions.length > 0) {
-    const s = upcomingSessions[0] as any;
-    const { data: rsvpRowsRaw } = await (supabase.from("session_rsvps") as any)
-      .select("user_id, rsvp_status, gm_confirmed")
-      .eq("session_id", s.id);
-    const rsvpRows =
-      (rsvpRowsRaw as {
-        user_id: string;
-        rsvp_status: string;
-        gm_confirmed?: boolean;
-      }[]) || [];
-    const mine = rsvpRows.find((r) => r.user_id === userId);
-    const raw = mine?.rsvp_status;
-    let userRsvp: RsvpStatus | null = null;
-    if (raw === "Zusage" || raw === "Via Online" || raw === "Absage") {
-      userRsvp = raw;
+  if (!isGM && hasAccess) {
+    const notMissed = (s: { id?: unknown; status?: unknown; start_time?: unknown }) =>
+      !isMissedScheduledSession(
+        {
+          id: String(s.id ?? ""),
+          status: String(s.status ?? ""),
+          start_time: String(s.start_time ?? ""),
+        },
+        now,
+      );
+    const nextForPlayer = upcomingSessions.find(notMissed) ?? null;
+    if (nextForPlayer) {
+      const s = nextForPlayer as any;
+      const { data: rsvpRowsRaw } = await (supabase.from("session_rsvps") as any)
+        .select("user_id, rsvp_status, gm_confirmed")
+        .eq("session_id", s.id);
+      const rsvpRows =
+        (rsvpRowsRaw as {
+          user_id: string;
+          rsvp_status: string;
+          gm_confirmed?: boolean;
+        }[]) || [];
+      const mine = rsvpRows.find((r) => r.user_id === userId);
+      const raw = mine?.rsvp_status;
+      let userRsvp: RsvpStatus | null = null;
+      if (raw === "Zusage" || raw === "Via Online" || raw === "Absage") {
+        userRsvp = raw;
+      }
+      const isAttendingNextSession = isPlayerReadyForSessionStart(
+        mine
+          ? {
+              rsvp_status: mine.rsvp_status,
+              gm_confirmed: !!mine.gm_confirmed,
+            }
+          : null,
+      );
+      const deadlineDays = s.rsvp_deadline_days ?? null;
+      const startDate = new Date(String(s.start_time));
+      let deadline: Date | null = null;
+      if (deadlineDays) {
+        deadline = new Date(startDate);
+        deadline.setDate(deadline.getDate() - Number(deadlineDays));
+        deadline.setHours(23, 59, 59, 999);
+      }
+      const deadlineReached = !!deadline && new Date() >= deadline;
+      const viaOnlineCount = rsvpRows.filter((r) => r.rsvp_status === "Via Online").length;
+      const viaOnlineTaken = s.is_live !== false && viaOnlineCount >= 1;
+      playerNextSessionData = {
+        session: {
+          id: String(s.id),
+          title: s.title != null ? String(s.title) : null,
+          start_time: String(s.start_time),
+          status: String(s.status),
+          rsvp_deadline_days: s.rsvp_deadline_days ?? null,
+          is_live: s.is_live,
+        },
+        userRsvp,
+        isAttendingNextSession,
+        deadlineReached,
+        viaOnlineTaken,
+        rsvpDeadlineEndIso: deadline ? deadline.toISOString() : null,
+      };
     }
-    const isAttendingNextSession = isPlayerReadyForSessionStart(
-      mine
-        ? {
-            rsvp_status: mine.rsvp_status,
-            gm_confirmed: !!mine.gm_confirmed,
-          }
-        : null,
-    );
-    const deadlineDays = s.rsvp_deadline_days ?? null;
-    const startDate = new Date(String(s.start_time));
-    let deadline: Date | null = null;
-    if (deadlineDays) {
-      deadline = new Date(startDate);
-      deadline.setDate(deadline.getDate() - Number(deadlineDays));
-      deadline.setHours(23, 59, 59, 999);
-    }
-    const deadlineReached = !!deadline && new Date() >= deadline;
-    const viaOnlineCount = rsvpRows.filter((r) => r.rsvp_status === "Via Online").length;
-    const viaOnlineTaken = s.is_live !== false && viaOnlineCount >= 1;
-    playerNextSessionData = {
-      session: {
-        id: String(s.id),
-        title: s.title != null ? String(s.title) : null,
-        start_time: String(s.start_time),
-        status: String(s.status),
-        rsvp_deadline_days: s.rsvp_deadline_days ?? null,
-        is_live: s.is_live,
-      },
-      userRsvp,
-      isAttendingNextSession,
-      deadlineReached,
-      viaOnlineTaken,
-      rsvpDeadlineEndIso: deadline ? deadline.toISOString() : null,
-    };
   }
 
   // ============================================================================
