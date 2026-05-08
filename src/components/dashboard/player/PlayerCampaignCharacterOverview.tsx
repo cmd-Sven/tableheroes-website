@@ -84,24 +84,34 @@ function buildContactPreview(
   href: string;
 }> {
   const relRev = [...relationships].reverse();
-  const repItems = reputations.map((r) => ({
-    kind: "faction" as const,
-    t: new Date(r.updated_at).getTime(),
-    key: `f-${r.id}`,
-    title: r.faction_name,
-    detail: `Ruf ${r.reputation > 0 ? "+" : ""}${r.reputation}${r.rank ? ` · ${r.rank}` : ""}`,
-    href: `/dashboard/campaigns/${campaignId}/factions/${r.faction_id}`,
-  }));
+  const repItems = reputations.map((r) => {
+    const parsed = Date.parse(String(r.updated_at ?? ""));
+    const t = Number.isFinite(parsed) ? parsed : 0;
+    const repNum = Number(r.reputation);
+    const repSafe = Number.isFinite(repNum) ? repNum : 0;
+    return {
+      kind: "faction" as const,
+      t,
+      key: `f-${r.id}`,
+      title: r.faction_name ?? "",
+      detail: `Ruf ${repSafe > 0 ? "+" : ""}${repSafe}${r.rank ? ` · ${r.rank}` : ""}`,
+      href: `/dashboard/campaigns/${campaignId}/factions/${r.faction_id}`,
+    };
+  });
   const npcItems = relRev
     .filter((rel) => rel.npcs?.id)
-    .map((rel, i) => ({
-      kind: "npc" as const,
-      t: -(i + 1),
-      key: `n-${rel.npcs!.id}-${i}`,
-      title: rel.npcs!.name,
-      detail: rel.relationship_type,
-      href: `/dashboard/campaigns/${campaignId}/npcs/${rel.npcs!.id}`,
-    }));
+    .map((rel, i) => {
+      const nid = String(rel.npcs?.id ?? "");
+      const nname = String(rel.npcs?.name ?? "");
+      return {
+        kind: "npc" as const,
+        t: -(i + 1),
+        key: `n-${nid}-${i}`,
+        title: nname || "Kontakt",
+        detail: String(rel.relationship_type ?? ""),
+        href: `/dashboard/campaigns/${campaignId}/npcs/${nid}`,
+      };
+    });
 
   return [...repItems, ...npcItems].sort((a, b) => b.t - a.t).slice(0, 3);
 }
@@ -111,7 +121,7 @@ type EditModal = "languages" | "xp" | "biography" | null;
 type Props = {
   campaignId: string;
   character: Character;
-  factionReputations: FactionRep[];
+  factionReputations?: FactionRep[];
   lastAchievement: LastAchievement;
   /** Nächster Termin in der Kampagne: als „dabei“ gezählt (Zusage / Online / SL-Freigabe) */
   nextSessionConfirmed?: boolean;
@@ -128,11 +138,12 @@ const inputClass =
 export function PlayerCampaignCharacterOverview({
   campaignId,
   character,
-  factionReputations,
+  factionReputations = [],
   lastAchievement,
   nextSessionConfirmed = false,
   availableLanguages,
 }: Props) {
+  const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [modal, setModal] = useState<EditModal>(null);
@@ -140,12 +151,12 @@ export function PlayerCampaignCharacterOverview({
   const [draftXp, setDraftXp] = useState(0);
   const [draftBio, setDraftBio] = useState("");
 
-  const savedLangIds = normalizeLangIds(character.languages);
+  const savedLangIds = normalizeLangIds(character?.languages);
 
   const languageChoices = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
     for (const l of availableLanguages) map.set(l.id, l);
-    const names = character.language_names ?? [];
+    const names = character?.language_names ?? [];
     for (const id of savedLangIds) {
       if (!map.has(id)) {
         const idx = savedLangIds.indexOf(id);
@@ -162,12 +173,12 @@ export function PlayerCampaignCharacterOverview({
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [availableLanguages, savedLangIds, character.language_names, draftLangs]);
+  }, [availableLanguages, savedLangIds, character?.language_names, draftLangs]);
 
   const openModal = (m: Exclude<EditModal, null>) => {
     if (m === "languages") setDraftLangs([...savedLangIds]);
-    if (m === "xp") setDraftXp(Number(character.experience_points ?? 0));
-    if (m === "biography") setDraftBio(character.biography ?? "");
+    if (m === "xp") setDraftXp(Number(character?.experience_points ?? 0));
+    if (m === "biography") setDraftBio(character?.biography ?? "");
     setModal(m);
   };
 
@@ -192,10 +203,14 @@ export function PlayerCampaignCharacterOverview({
   }, [modal]);
 
   const saveLanguages = () => {
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     startTransition(async () => {
       try {
         await updateCharacterPlayer({
-          character_id: character.id,
+          character_id: characterId,
           campaign_id: campaignId,
           languages: draftLangs,
         });
@@ -208,10 +223,14 @@ export function PlayerCampaignCharacterOverview({
   };
 
   const saveXp = () => {
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     startTransition(async () => {
       try {
         await updateCharacterPlayer({
-          character_id: character.id,
+          character_id: characterId,
           campaign_id: campaignId,
           experience_points: Math.max(0, Math.floor(draftXp) || 0),
         });
@@ -224,10 +243,14 @@ export function PlayerCampaignCharacterOverview({
   };
 
   const saveBiography = () => {
+    if (!characterId) {
+      alert("Charakter-ID fehlt.");
+      return;
+    }
     startTransition(async () => {
       try {
         await updateCharacterPlayer({
-          character_id: character.id,
+          character_id: characterId,
           campaign_id: campaignId,
           biography: draftBio.trim() || null,
         });
@@ -239,12 +262,12 @@ export function PlayerCampaignCharacterOverview({
     });
   };
 
-  const avatarSrc = character.avatar_url?.trim() || null;
-  const langCount = character.language_names?.filter(Boolean).length ?? 0;
+  const avatarSrc = character?.avatar_url?.trim() || null;
+  const langCount = character?.language_names?.filter(Boolean).length ?? 0;
   const langs =
-    langCount > 0 ? (character.language_names ?? []).filter(Boolean).join(", ") : "—";
-  const xp = Number(character.experience_points ?? 0);
-  const rels = character.character_relationships ?? [];
+    langCount > 0 ? (character?.language_names ?? []).filter(Boolean).join(", ") : "—";
+  const xp = Number(character?.experience_points ?? 0);
+  const rels = character?.character_relationships ?? [];
   const preview = buildContactPreview(campaignId, factionReputations, rels);
 
   const toggleLang = (id: string) => {
@@ -378,11 +401,11 @@ export function PlayerCampaignCharacterOverview({
             <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg border-2 border-amber-900/45 shadow-md bg-stone-900/20">
               <CharacterAvatarImage
                 src={avatarSrc}
-                avatarDisplay={character.avatar_display}
+                avatarDisplay={character?.avatar_display}
                 asNextImage
                 sizes="128px"
                 className="h-full w-full"
-                alt={character.name}
+                alt={character?.name ?? ""}
               />
               {nextSessionConfirmed ? (
                 <span
@@ -397,7 +420,7 @@ export function PlayerCampaignCharacterOverview({
           <div className="min-w-0 flex-1">
             <h2 className="font-barlow font-extrabold text-2xl uppercase tracking-wide text-stone-900 flex flex-wrap items-center gap-2">
               <User className="h-7 w-7 text-amber-800 shrink-0" aria-hidden />
-              {character.name}
+              {character?.name ?? ""}
               {!avatarSrc && nextSessionConfirmed ? (
                 <span className="rounded bg-hero-vibrant/90 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-black">
                   Next session: confirmed
@@ -405,7 +428,7 @@ export function PlayerCampaignCharacterOverview({
               ) : null}
             </h2>
             <p className="font-libre text-sm text-stone-700 mt-1">
-              Stufe {character.level} · {character.class} · {character.race}
+              Stufe {character?.level ?? 1} · {character?.class ?? ""} · {character?.race ?? ""}
             </p>
           </div>
         </div>
@@ -414,11 +437,11 @@ export function PlayerCampaignCharacterOverview({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className={marbleTile}>
           <p className="font-barlow font-bold text-xs uppercase text-stone-400">Klasse</p>
-          <p className="font-libre text-gray-100 mt-1">{character.class}</p>
+          <p className="font-libre text-gray-100 mt-1">{character?.class ?? ""}</p>
         </div>
         <div className={marbleTile}>
           <p className="font-barlow font-bold text-xs uppercase text-stone-400">Rasse</p>
-          <p className="font-libre text-gray-100 mt-1">{character.race}</p>
+          <p className="font-libre text-gray-100 mt-1">{character?.race ?? ""}</p>
         </div>
       </div>
 
@@ -464,11 +487,11 @@ export function PlayerCampaignCharacterOverview({
 
       <CharacterWealthInventoryCard
         character={{
-          id: character.id,
-          name: character.name,
-          class: character.class,
-          level: character.level,
-          avatar_url: character.avatar_url ?? null,
+          id: characterId || (character?.id ?? ""),
+          name: character?.name ?? "",
+          class: character?.class ?? "",
+          level: Math.max(1, Math.round(Number(character?.level ?? 1)) || 1),
+          avatar_url: character?.avatar_url ?? null,
         }}
       />
 
@@ -494,7 +517,9 @@ export function PlayerCampaignCharacterOverview({
               Biografie &amp; Hintergrund
             </p>
             <p className="font-libre text-sm text-stone-300 mt-1 line-clamp-3 whitespace-pre-wrap">
-              {character.biography?.trim() ? character.biography : "Noch keine Biografie."}
+              {character?.biography?.trim()
+                ? (character?.biography ?? "")
+                : "Noch keine Biografie."}
             </p>
           </div>
         </div>
