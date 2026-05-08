@@ -387,6 +387,24 @@ export async function updateSessionStageDeck(
 // Session-Hintergrund: POST /api/sessions/[sessionId]/live-background (kein Server Action,
 // damit Next 16 die Stage-Prep-Seite nicht per RSC neu rendert).
 
+/** PostgREST: Spalte im API-Schema-Cache nicht (Migration fehlt / Cache veraltet). */
+function isPostgrestUnknownColumnError(insertError: unknown): boolean {
+  const e = insertError as { code?: string; message?: string };
+  if (e?.code === "PGRST204") return true;
+  const msg = String(e?.message ?? "");
+  return (
+    /could not find the '[^']+' column/i.test(msg) &&
+    (/schema cache/i.test(msg) || /not in the schema cache/i.test(msg))
+  );
+}
+
+function parseUnknownColumnFromPostgrestMessage(message: string): string | null {
+  const m = message.match(/Could not find the '([^']+)' column/i);
+  if (m?.[1]) return m[1];
+  const m2 = message.match(/"([^"]+)" column of 'session_live_states'/i);
+  return m2?.[1] ?? null;
+}
+
 function logSupabaseInsertError(context: string, insertError: unknown) {
   const e = insertError as {
     message?: string;
@@ -412,6 +430,27 @@ function logSupabaseInsertError(context: string, insertError: unknown) {
       console.error(`${context} Supabase Insert Error (not JSON-serializable)`);
     }
   }
+}
+
+/** Kernfelder ohne neuere Spalten (z. B. temperature) — für sehr alte PostgREST-Caches / DBs. */
+function buildSessionPrepCoreInsertPayload(
+  sessionId: string,
+  scribeUserId: string,
+): Record<string, unknown> {
+  return {
+    session_id: sessionId,
+    scribe_id: scribeUserId,
+    weather: "Klar",
+    current_time: "Tagsüber",
+    current_location: null,
+    journal_text: null,
+    system_logs: [],
+    visible_npc_ids: [],
+    visible_faction_ids: [],
+    is_background_manual_override: false,
+    is_combat_mode: false,
+    current_turn_index: 0,
+  };
 }
 
 /** Kein undefined im Insert — PostgREST/JS-Client; optionale FK/JSON explizit null / {}. */
@@ -545,41 +584,71 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     );
   }
 
-  const insertPayload = buildSessionPrepLiveStateInsertPayload(sessionId, user.id);
+  let insertPayload: Record<string, unknown> = {
+    ...buildSessionPrepLiveStateInsertPayload(sessionId, user.id),
+  };
 
   try {
-    let { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
-      .insert(insertPayload)
-      .select()
-      .single();
+    let inserted: Record<string, unknown> | null = null;
+    let insertError: unknown = null;
 
-    const looksLikeMissingColumn = (msg: string) =>
-      /column|schema cache|could not find|does not exist/i.test(msg);
-
-    if (insertError && looksLikeMissingColumn(String(insertError.message ?? ""))) {
-      logSupabaseInsertError("[ensureSessionPrepLiveState] first insert", insertError);
-      const leanPayload: Record<string, unknown> = {
-        session_id: sessionId,
-        weather: "Klar",
-        temperature: "normal",
-        temperature_value: 15,
-        current_time: "Tagsüber",
-        current_location: null,
-        journal_text: null,
-        system_logs: [],
-        visible_npc_ids: [],
-        visible_faction_ids: [],
-        is_background_manual_override: false,
-        is_combat_mode: false,
-        current_turn_index: 0,
-        scribe_id: user.id,
-      };
-      const second = await (writeClient.from("session_live_states") as any)
-        .insert(leanPayload)
+    /** PGRST204: unbekannte Spalte → Feld entfernen und erneut (ältere API-Caches / fehlende Migrationen). */
+    for (let stripAttempt = 0; stripAttempt < 40; stripAttempt++) {
+      const res = await (writeClient.from("session_live_states") as any)
+        .insert(insertPayload)
         .select()
         .single();
-      insertError = second.error;
-      inserted = second.data;
+      insertError = res.error;
+      inserted = res.data as Record<string, unknown> | null;
+      if (!insertError && inserted) {
+        break;
+      }
+      if (!isPostgrestUnknownColumnError(insertError)) {
+        break;
+      }
+      const msg = String((insertError as { message?: string }).message ?? "");
+      const badCol = parseUnknownColumnFromPostgrestMessage(msg);
+      if (badCol && Object.prototype.hasOwnProperty.call(insertPayload, badCol)) {
+        const next = { ...insertPayload };
+        delete next[badCol];
+        insertPayload = next;
+        console.warn(
+          `[ensureSessionPrepLiveState] PostgREST kennt Spalte '${badCol}' nicht — Insert ohne dieses Feld wiederholt.`,
+        );
+        continue;
+      }
+      break;
+    }
+
+    /** Fallback: minimale Zeile + erneut Strip-Retry (ohne temperature & Co.). */
+    if (insertError) {
+      insertPayload = buildSessionPrepCoreInsertPayload(sessionId, user.id);
+      for (let stripAttempt = 0; stripAttempt < 25; stripAttempt++) {
+        const res = await (writeClient.from("session_live_states") as any)
+          .insert(insertPayload)
+          .select()
+          .single();
+        insertError = res.error;
+        inserted = res.data as Record<string, unknown> | null;
+        if (!insertError && inserted) {
+          break;
+        }
+        if (!isPostgrestUnknownColumnError(insertError)) {
+          break;
+        }
+        const msg = String((insertError as { message?: string }).message ?? "");
+        const badCol = parseUnknownColumnFromPostgrestMessage(msg);
+        if (badCol && Object.prototype.hasOwnProperty.call(insertPayload, badCol)) {
+          const next = { ...insertPayload };
+          delete next[badCol];
+          insertPayload = next;
+          console.warn(
+            `[ensureSessionPrepLiveState] (Kern-Payload) PostgREST kennt Spalte '${badCol}' nicht — Feld entfernt, erneuter Versuch.`,
+          );
+          continue;
+        }
+        break;
+      }
     }
 
     if (insertError) {
