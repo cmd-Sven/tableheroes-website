@@ -287,7 +287,7 @@ export function GMCharacterEditorPage({
 
         if (!nextAvatarUrl) nextAvatarPath = null;
 
-        await updateCharacterByGM({
+        const result = await updateCharacterByGM({
           character_id: characterId,
           campaign_id: campaignId,
           status,
@@ -307,6 +307,10 @@ export function GMCharacterEditorPage({
             (r) => r.npc_id && r.relationship_type
           ),
         });
+        if (!result.ok) {
+          alert(result.error);
+          return;
+        }
 
         const prevPath = character?.avatar_storage_path ?? null;
         if (

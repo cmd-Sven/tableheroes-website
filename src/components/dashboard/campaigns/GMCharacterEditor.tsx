@@ -134,7 +134,7 @@ export function GMCharacterEditor({
     startTransition(async () => {
       try {
         const avUrl = (character.avatar_url ?? "").trim() || null;
-        await updateCharacterByGM({
+        const result = await updateCharacterByGM({
           character_id: character.id,
           campaign_id: campaignId,
           status,
@@ -154,6 +154,10 @@ export function GMCharacterEditor({
             (r) => r.npc_id && r.relationship_type
           ),
         });
+        if (!result.ok) {
+          alert(result.error);
+          return;
+        }
         onClose();
         window.location.reload();
       } catch (error: any) {

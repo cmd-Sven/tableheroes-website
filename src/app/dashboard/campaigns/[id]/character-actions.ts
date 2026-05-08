@@ -627,62 +627,61 @@ export async function updateCharacterByGM(data: {
     relationship_type: string;
     description?: string;
   }>;
-}) {
-  const supabase = await createClient();
-
-  // 1. Auth Check
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht authentifiziert.");
-
-  // 2. Check if user is GM of this campaign
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, world_id")
-    .eq("id", data.campaign_id)
-    .single();
-
-  const campaign = campaignRaw as { gm_id: string; world_id: string | null } | null;
-
-  if (!campaign) {
-    throw new Error("Kampagne nicht gefunden.");
-  }
-
-  if (campaign.gm_id !== user.id) {
-    throw new Error("Nur der Spielleiter kann Charaktere verwalten.");
-  }
-
-  if (campaign.world_id) {
-    await validatePlayerSelectionsAgainstCampaignVisibility(supabase, {
-      campaignId: data.campaign_id,
-      worldId: campaign.world_id,
-      actorUserId: user.id,
-      campaignGmId: campaign.gm_id,
-      faction_id: data.faction_membership ?? null,
-      location_id: data.current_location_id ?? null,
-      culture_lore_id: data.culture_lore_id ?? null,
-      languages: data.languages ?? [],
-    });
-  }
-
-  // 3. Verify character belongs to this campaign
-  const { data: characterRaw, error: charCheckError } = await (
-    supabase.from("characters") as any
-  )
-    .select("id, campaign_id")
-    .eq("id", data.character_id)
-    .eq("campaign_id", data.campaign_id)
-    .single();
-
-  const character = characterRaw as { id: string; campaign_id: string } | null;
-
-  if (charCheckError || !character) {
-    throw new Error(
-      "Charakter nicht gefunden oder gehört nicht zu dieser Kampagne.",
-    );
-  }
-
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
+    const supabase = await createClient();
+
+    // 1. Auth Check
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, error: "Nicht authentifiziert." };
+    }
+
+    // 2. Kampagnen-SL oder owner_id (wie getCampaignAccess)
+    const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+      .select("gm_id, owner_id, world_id")
+      .eq("id", data.campaign_id)
+      .single();
+
+    const campaign = campaignRaw as {
+      gm_id: string;
+      owner_id?: string | null;
+      world_id: string | null;
+    } | null;
+
+    if (!campaign) {
+      return { ok: false, error: "Kampagne nicht gefunden." };
+    }
+
+    const ownerId = campaign.owner_id ?? null;
+    const canManageCharacters =
+      user.id === campaign.gm_id ||
+      (ownerId != null && String(ownerId).trim() !== "" && user.id === ownerId);
+
+    if (!canManageCharacters) {
+      return { ok: false, error: "Nur der Spielleiter kann Charaktere verwalten." };
+    }
+
+    // 3. Verify character belongs to this campaign
+    const { data: characterRaw, error: charCheckError } = await (
+      supabase.from("characters") as any
+    )
+      .select("id, campaign_id")
+      .eq("id", data.character_id)
+      .eq("campaign_id", data.campaign_id)
+      .single();
+
+    const character = characterRaw as { id: string; campaign_id: string } | null;
+
+    if (charCheckError || !character) {
+      return {
+        ok: false,
+        error: "Charakter nicht gefunden oder gehört nicht zu dieser Kampagne.",
+      };
+    }
+
     const langArr = Array.isArray(data.languages) ? data.languages.map(String) : [];
 
     const avatarDisplayJson =
@@ -804,10 +803,16 @@ export async function updateCharacterByGM(data: {
 
     revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
     revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
-    return { success: true };
-  } catch (error: any) {
-    console.error("Update Character By GM Error:", error);
-    throw error;
+    return { ok: true };
+  } catch (error: unknown) {
+    console.error("[updateCharacterByGM]", error);
+    const msg =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "Speichern fehlgeschlagen.";
+    return { ok: false, error: msg };
   }
 }
 
@@ -958,10 +963,16 @@ export async function deleteCharacterByGM(characterId: string, campaignId: strin
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
+    .select("gm_id, owner_id")
     .eq("id", campaignId)
     .single();
-  if (!campaign || (campaign as { gm_id: string }).gm_id !== user.id) {
+  const c = campaign as { gm_id: string; owner_id?: string | null } | null;
+  const ownerId = c?.owner_id ?? null;
+  const canDelete =
+    c &&
+    (user.id === c.gm_id ||
+      (ownerId != null && String(ownerId).trim() !== "" && user.id === ownerId));
+  if (!canDelete) {
     throw new Error("Nur der GM kann Charaktere entfernen.");
   }
 
