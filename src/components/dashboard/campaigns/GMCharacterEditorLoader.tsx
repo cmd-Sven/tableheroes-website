@@ -1,13 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { GMCharacterEditorPage } from "./GMCharacterEditorPage";
 import {
   loadGmCharacterEditorData,
   type GmCharacterEditorLoadPayload,
 } from "@/src/app/dashboard/campaigns/[id]/characters/gm-character-editor-load-action";
+import type { GMCharacterEditorPageProps } from "./GMCharacterEditorPage";
+
+const GMCharacterEditorPage = dynamic(
+  () =>
+    import("./GMCharacterEditorPage").then((m) => m.GMCharacterEditorPage),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-lg border border-hero-dark bg-background-card p-8 text-center font-libre text-gray-300">
+        Editor wird vorbereitet…
+      </div>
+    ),
+  },
+);
 
 type Props = {
   campaignId: string;
@@ -101,11 +115,11 @@ export function GMCharacterEditorLoader({
     );
   }
 
-  return (
-    <GMCharacterEditorPage
-      campaignId={campaignId}
-      currentUserId={currentUserId}
-      {...state.data}
-    />
-  );
+  const editorProps: GMCharacterEditorPageProps = {
+    campaignId,
+    currentUserId,
+    ...state.data,
+  };
+
+  return <GMCharacterEditorPage {...editorProps} />;
 }

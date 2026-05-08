@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Sidebar } from "@/src/components/dashboard/Sidebar";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -106,13 +107,23 @@ export default async function DashboardLayout({
   return (
     <SidebarWidthProvider initialCollapsed={sidebarCollapsed}>
       <div className="flex h-screen overflow-hidden bg-background-dark">
-        {/* Sidebar (Fixed) */}
-        <Sidebar
-          user={userData}
-          initialCollapsed={sidebarCollapsed}
-          pendingApplicationsCount={pendingApplicationsCount}
-          maintenanceMode={maintenanceMode}
-        />
+        {/* useSearchParams() in Sidebar: Suspense verhindert RSC-/Prerender-Abbrüche (Next 16). */}
+        <Suspense
+          fallback={
+            <aside
+              className="fixed inset-y-0 left-0 z-40 hidden shrink-0 border-r border-hero-border bg-background-card md:block"
+              style={{ width: sidebarWidth }}
+              aria-label="Navigation wird geladen"
+            />
+          }
+        >
+          <Sidebar
+            user={userData}
+            initialCollapsed={sidebarCollapsed}
+            pendingApplicationsCount={pendingApplicationsCount}
+            maintenanceMode={maintenanceMode}
+          />
+        </Suspense>
 
         {/* Main Content Area (Flexible) */}
         <main
