@@ -801,8 +801,14 @@ export async function updateCharacterByGM(data: {
       }
     }
 
-    revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
-    revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
+    try {
+      revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
+      revalidatePath(
+        `/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`,
+      );
+    } catch (revErr) {
+      console.warn("[updateCharacterByGM] revalidatePath:", revErr);
+    }
     return { ok: true };
   } catch (error: unknown) {
     console.error("[updateCharacterByGM]", error);

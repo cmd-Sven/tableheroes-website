@@ -1,4 +1,5 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCampaignAccess } from "../../campaign-access";
@@ -7,9 +8,26 @@ import { getCharacterEditorLoreOptionsForGm } from "../../character-queries";
 import { getFactionsWithMembers } from "../../factions-queries";
 import { getNPCs } from "../../npc-queries";
 import { getCharacterFactionReputations } from "../../reputation-queries";
-import { GMCharacterEditorPage } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+
+/** Client-only: vermeidet Hydration-Mismatches (#418) mit komplexem Formular / Slidern / File-Inputs. */
+const GMCharacterEditorPage = nextDynamic(
+  () =>
+    import("@/src/components/dashboard/campaigns/GMCharacterEditorPage").then(
+      (m) => m.GMCharacterEditorPage,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-lg border border-hero-dark bg-background-card p-10 text-center font-libre text-gray-300">
+        Charakter-Editor wird geladen…
+      </div>
+    ),
+  },
+);
+
+export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ id: string; characterId: string }>;
@@ -63,9 +81,32 @@ export default async function GMCharacterEditPage({ params }: Props) {
     campaignId,
   );
 
-  const characterForEditor = serializeCharacterForEditorClient(
-    character as Record<string, unknown>,
-  );
+  let characterForEditor: Record<string, unknown>;
+  try {
+    characterForEditor = serializeCharacterForEditorClient(
+      character as Record<string, unknown>,
+    );
+  } catch (err) {
+    console.error("[GMCharacterEditPage] serializeCharacterForEditorClient:", err);
+    const c = character as Record<string, unknown>;
+    characterForEditor = serializeForClient({
+      id: String(c.id ?? characterId),
+      name: String(c.name ?? ""),
+      class: String(c.class ?? ""),
+      race: String(c.race ?? ""),
+      level: 1,
+      status: String(c.status ?? "Active"),
+      biography: c.biography != null ? String(c.biography) : "",
+      avatar_url: c.avatar_url != null ? String(c.avatar_url) : "",
+      avatar_storage_path: c.avatar_storage_path ?? null,
+      avatar_display: null,
+      culture_lore_id: c.culture_lore_id != null ? String(c.culture_lore_id) : "",
+      languages: [],
+      faction_membership: c.faction_membership != null ? String(c.faction_membership) : "",
+      current_location_id: c.current_location_id != null ? String(c.current_location_id) : "",
+      character_relationships: [],
+    }) as Record<string, unknown>;
+  }
 
   const npcsForEditor = (npcs as any[]).map((n) => ({
     id: String(n.id),
