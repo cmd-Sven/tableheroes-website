@@ -3,12 +3,11 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
-import {
-  getCharacterFactionReputations as loadCharacterFactionReputations,
-  type FactionReputation,
-} from "./reputation-queries";
+import { getCharacterFactionReputations as loadCharacterFactionReputations } from "./reputation-queries";
+import type { FactionReputation } from "./reputation-queries";
 
-export type { FactionReputation };
+/** Nur Typ — explizit von reputation-queries re-exportieren (kein Laufzeit-Binding). */
+export type { FactionReputation } from "./reputation-queries";
 
 /** Server Action für Client; Server Components: reputation-queries importieren. */
 export async function getCharacterFactionReputations(

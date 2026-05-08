@@ -605,6 +605,8 @@ export async function archiveSession(
   sessionId: string,
   campaignId: string,
   sessionName?: string | null,
+  /** true z. B. bei expirePastScheduledSessionsForCampaign während RSC-Render — kein revalidatePath. */
+  skipRevalidate = false,
 ) {
   const supabase = await createClient();
 
@@ -782,7 +784,7 @@ export async function archiveSession(
 // ============================================================================
 // End Session (Archive Journal & Mark as Completed)
 // ============================================================================
-export async function endSession(sessionId: string) {
+export async function endSession(sessionId: string, skipRevalidate = false) {
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -840,7 +842,7 @@ export async function endSession(sessionId: string) {
   }
 
   // Revalidate nur Kampagne; /session/ nicht invalidieren (Digest bei offener Oberfläche).
-  if ((session as any).campaign_id) {
+  if (!skipRevalidate && (session as any).campaign_id) {
     revalidatePath(`/dashboard/campaigns/${(session as any).campaign_id}`);
   }
 
@@ -894,16 +896,14 @@ export async function expirePastScheduledSessionsForCampaign(
   let closedCount = 0;
   for (const r of candidates) {
     try {
-      await endSession(String(r.id));
+      await endSession(String(r.id), true);
       closedCount += 1;
     } catch (e) {
       console.warn("[expirePastScheduledSessionsForCampaign] endSession:", r.id, e);
     }
   }
 
-  if (closedCount > 0) {
-    revalidatePath(`/dashboard/campaigns/${campaignId}`);
-  }
+  // Kein revalidatePath hier: läuft oft während loadCampaignDetailPageData (RSC) — würde Next.js verbieten.
   return { closedCount };
 }
 
