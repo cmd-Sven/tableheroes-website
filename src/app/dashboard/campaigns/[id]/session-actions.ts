@@ -387,6 +387,77 @@ export async function updateSessionStageDeck(
 // Session-Hintergrund: POST /api/sessions/[sessionId]/live-background (kein Server Action,
 // damit Next 16 die Stage-Prep-Seite nicht per RSC neu rendert).
 
+function logSupabaseInsertError(context: string, insertError: unknown) {
+  const e = insertError as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  };
+  console.error(`${context} Supabase Insert Error Message:`, e?.message ?? insertError);
+  console.error(`${context} Supabase Insert Error Details:`, e?.details ?? "No details");
+  console.error(`${context} Supabase Insert Error Hint:`, e?.hint ?? "No hint");
+  console.error(`${context} Supabase Insert Error Code:`, e?.code ?? "No code");
+  if (insertError && typeof insertError === "object") {
+    console.error(
+      `${context} Supabase Insert Error keys:`,
+      Object.getOwnPropertyNames(insertError),
+    );
+    try {
+      console.error(
+        `${context} Supabase Insert Error JSON:`,
+        JSON.stringify(insertError, null, 2),
+      );
+    } catch {
+      console.error(`${context} Supabase Insert Error (not JSON-serializable)`);
+    }
+  }
+}
+
+/** Kein undefined im Insert — PostgREST/JS-Client; optionale FK/JSON explizit null / {}. */
+function buildSessionPrepLiveStateInsertPayload(
+  sessionId: string,
+  scribeUserId: string,
+): Record<string, unknown> {
+  return {
+    session_id: sessionId,
+    weather: "Klar",
+    temperature: "normal",
+    temperature_value: 15,
+    current_time: "Tagsüber",
+    current_location: null,
+    current_location_lore_id: null,
+    current_location_id: null,
+    current_loot_id: null,
+    journal_text: null,
+    system_logs: [],
+    visible_npc_ids: [],
+    visible_faction_ids: [],
+    is_background_manual_override: false,
+    is_combat_mode: false,
+    current_turn_index: 0,
+    scribe_id: scribeUserId,
+    fate_coins: [],
+    destroyed_fate_coins: 0,
+    downtime_active: false,
+    downtime_type: "travel",
+    downtime_current_day: 1,
+    downtime_total_days: 1,
+    fap_allocations: {},
+    physically_present_user_ids: [],
+    loot_hide_npcs: false,
+    dummy_player_count: 0,
+    active_shop_id: null,
+    active_merchant_npc_id: null,
+    background_url: null,
+    in_game_date: null,
+    in_game_time: null,
+    weather_intensity: null,
+    weather_preset: null,
+    weather_temperature: null,
+  };
+}
+
 // ============================================================================
 // GM: Live-State-Zeile für Vorbereitung / Live — unabhängig von RSVP
 // ============================================================================
@@ -462,7 +533,9 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     }
   }
 
-  let writeClient: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient> = supabase;
+  /** Service Role umgeht RLS beim Anlegen; sonst GM-Session (RLS insert_gm_owner). */
+  let writeClient: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient> =
+    supabase;
   try {
     writeClient = createAdminClient();
   } catch (error) {
@@ -472,84 +545,72 @@ export async function ensureSessionPrepLiveState(sessionId: string) {
     );
   }
 
-  const insertPayload = {
-    session_id: sessionId,
-    weather: "Klar",
-    temperature: "normal",
-    temperature_value: 15,
-    current_time: "Tagsüber",
-    current_location: null,
-    journal_text: null,
-    system_logs: [] as unknown[],
-    visible_npc_ids: [] as string[],
-    visible_faction_ids: [] as string[],
-    is_background_manual_override: false,
-    is_combat_mode: false,
-    current_turn_index: 0,
-    scribe_id: user.id,
-    fate_coins: [] as unknown[],
-    destroyed_fate_coins: 0,
-    downtime_active: false,
-    downtime_type: "travel",
-    downtime_current_day: 1,
-    downtime_total_days: 1,
-    fap_allocations: {} as Record<string, unknown>,
-    physically_present_user_ids: [] as string[],
-    loot_hide_npcs: false,
-    dummy_player_count: 0,
-  };
+  const insertPayload = buildSessionPrepLiveStateInsertPayload(sessionId, user.id);
 
-  let { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
-    .insert(insertPayload)
-    .select()
-    .single();
-
-  const looksLikeMissingColumn = (msg: string) =>
-    /column|schema cache|could not find|does not exist/i.test(msg);
-
-  if (insertError && looksLikeMissingColumn(String(insertError.message ?? ""))) {
-    const leanPayload = {
-      session_id: sessionId,
-      weather: "Klar",
-      temperature: "normal",
-      temperature_value: 15,
-      current_time: "Tagsüber",
-      current_location: null,
-      journal_text: null,
-      system_logs: [] as unknown[],
-      visible_npc_ids: [] as string[],
-      visible_faction_ids: [] as string[],
-      is_background_manual_override: false,
-      is_combat_mode: false,
-      current_turn_index: 0,
-      scribe_id: user.id,
-    };
-    const second = await (writeClient.from("session_live_states") as any)
-      .insert(leanPayload)
+  try {
+    let { data: inserted, error: insertError } = await (writeClient.from("session_live_states") as any)
+      .insert(insertPayload)
       .select()
       .single();
-    insertError = second.error;
-    inserted = second.data;
-  }
 
-  if (insertError) {
-    console.error("Supabase Insert Error:", insertError);
-    console.error("[ensureSessionPrepLiveState] Insert Context:", {
-      payload: insertPayload,
-      session,
-      campaign,
-      userId: user.id,
-    });
-    const { data: existingAfterFail } = await (supabase.from("session_live_states") as any)
-      .select("*")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-    const rr = existingAfterFail as Record<string, unknown> | null;
-    return rr ? (serializeForClient(rr) as Record<string, unknown>) : null;
-  }
+    const looksLikeMissingColumn = (msg: string) =>
+      /column|schema cache|could not find|does not exist/i.test(msg);
 
-  const ins = inserted as Record<string, unknown> | null;
-  return ins ? (serializeForClient(ins) as Record<string, unknown>) : null;
+    if (insertError && looksLikeMissingColumn(String(insertError.message ?? ""))) {
+      logSupabaseInsertError("[ensureSessionPrepLiveState] first insert", insertError);
+      const leanPayload: Record<string, unknown> = {
+        session_id: sessionId,
+        weather: "Klar",
+        temperature: "normal",
+        temperature_value: 15,
+        current_time: "Tagsüber",
+        current_location: null,
+        journal_text: null,
+        system_logs: [],
+        visible_npc_ids: [],
+        visible_faction_ids: [],
+        is_background_manual_override: false,
+        is_combat_mode: false,
+        current_turn_index: 0,
+        scribe_id: user.id,
+      };
+      const second = await (writeClient.from("session_live_states") as any)
+        .insert(leanPayload)
+        .select()
+        .single();
+      insertError = second.error;
+      inserted = second.data;
+    }
+
+    if (insertError) {
+      logSupabaseInsertError("[ensureSessionPrepLiveState]", insertError);
+      console.error("[ensureSessionPrepLiveState] Insert Context:", {
+        payload: insertPayload,
+        session,
+        campaign,
+        userId: user.id,
+        usedAdminClient: writeClient !== supabase,
+      });
+      const { data: existingAfterFail } = await (supabase.from("session_live_states") as any)
+        .select("*")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      const rr = existingAfterFail as Record<string, unknown> | null;
+      if (rr) {
+        return serializeForClient(rr) as Record<string, unknown>;
+      }
+      throw new Error("Fehler beim Erstellen der Bühnen-Datenbank.");
+    }
+
+    const ins = inserted as Record<string, unknown> | null;
+    return ins ? (serializeForClient(ins) as Record<string, unknown>) : null;
+  } catch (e) {
+    if (e instanceof Error && e.message === "Fehler beim Erstellen der Bühnen-Datenbank.") {
+      throw e;
+    }
+    console.error("[ensureSessionPrepLiveState] unexpected exception:", e);
+    throw new Error("Fehler beim Erstellen der Bühnen-Datenbank.");
+  }
 }
 
 type ChronicleEntry = {

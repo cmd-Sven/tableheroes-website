@@ -136,9 +136,13 @@ export default async function SessionPage({ params, searchParams }: Props) {
     !liveState &&
     !["Completed", "Cancelled"].includes(session.status)
   ) {
-    const ensured = await ensureSessionPrepLiveState(sessionId);
-    if (ensured) {
-      liveState = ensured as typeof liveState;
+    try {
+      const ensured = await ensureSessionPrepLiveState(sessionId);
+      if (ensured) {
+        liveState = ensured as typeof liveState;
+      }
+    } catch (e) {
+      console.error("[session page] ensureSessionPrepLiveState:", e);
     }
   }
 

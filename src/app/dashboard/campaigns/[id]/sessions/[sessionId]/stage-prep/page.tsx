@@ -68,7 +68,11 @@ export default async function SessionStagePrepPage({ params }: Props) {
   }
 
   if (!["Completed", "Cancelled"].includes(session.status)) {
-    await ensureSessionPrepLiveState(sessionId);
+    try {
+      await ensureSessionPrepLiveState(sessionId);
+    } catch (e) {
+      console.error("[stage-prep] ensureSessionPrepLiveState:", e);
+    }
   }
 
   /** Nur background_url: kleinste Payload, keine unbekannten Spalten-Typen für RSC/Flight. */
