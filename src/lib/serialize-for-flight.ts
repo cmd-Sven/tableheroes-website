@@ -1,24 +1,37 @@
+const jsonReplacer = (_k: string, v: unknown) => {
+  if (v === undefined) return null;
+  if (typeof v === "bigint") return Number(v);
+  if (typeof v === "function" || typeof v === "symbol") return undefined;
+  if (v instanceof Map) return Object.fromEntries(v as Map<unknown, unknown>);
+  if (v instanceof Set) return [...(v as Set<unknown>)];
+  if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+    if (Object.prototype.toString.call(v) === "[object Date]") {
+      return (v as Date).toISOString();
+    }
+  }
+  return v;
+};
+
+/**
+ * Holzhammer: `JSON.parse(JSON.stringify(...))` mit BigInt/Date/Map/Set — reine JSON-Werte,
+ * keine Supabase-Row-Proxies oder Date-Instanzen (RSC / Server-Action-Rückgaben).
+ */
+export function toPlainJsonClone<T>(value: T): T {
+  try {
+    return JSON.parse(JSON.stringify(value, jsonReplacer)) as T;
+  } catch (e) {
+    console.error("[toPlainJsonClone] failed, fallback walkSerialize:", e);
+    return walkSerialize(value) as T;
+  }
+}
+
 /**
  * Macht Werte RSC-/Flight-sicher: entfernt nicht serialisierbare Typen (z. B. undefined,
  * BigInt → Number, Date → ISO-String, schluckt typische JSONB-/DB-Strukturen zu reinen JSON-Objekten).
  */
 export function serializeForClient<T>(value: T): T {
   try {
-    return JSON.parse(
-      JSON.stringify(value, (_k, v) => {
-        if (v === undefined) return null;
-        if (typeof v === "bigint") return Number(v);
-        if (typeof v === "function" || typeof v === "symbol") return undefined;
-        if (v instanceof Map) return Object.fromEntries(v as Map<unknown, unknown>);
-        if (v instanceof Set) return [...(v as Set<unknown>)];
-        if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-          if (Object.prototype.toString.call(v) === "[object Date]") {
-            return (v as Date).toISOString();
-          }
-        }
-        return v;
-      }),
-    ) as T;
+    return JSON.parse(JSON.stringify(value, jsonReplacer)) as T;
   } catch (e) {
     console.error("[serializeForClient] JSON stringify failed, falling back to structured clone walk:", e);
     return walkSerialize(value) as T;

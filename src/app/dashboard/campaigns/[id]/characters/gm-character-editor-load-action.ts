@@ -7,7 +7,7 @@ import { getFactionsWithMembers } from "../factions-queries";
 import { getNPCs } from "../npc-queries";
 import { getCharacterFactionReputations } from "../reputation-queries";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
-import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { serializeForClient, toPlainJsonClone } from "@/src/lib/serialize-for-flight";
 import type { GMCharacterEditorPageProps } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
 
 export type GmCharacterEditorLoadPayload = Omit<
@@ -65,6 +65,9 @@ export async function loadGmCharacterEditorData(
       return { ok: true, status: "not_found" };
     }
 
+    /** Holzhammer: Row-Objekte / Dates / BigInt vor Editor-Serialisierung zu reinem JSON. */
+    const characterPlain = toPlainJsonClone(character) as Record<string, unknown>;
+
     const factionReputations = await getCharacterFactionReputations(
       characterId,
       campaignId,
@@ -72,12 +75,12 @@ export async function loadGmCharacterEditorData(
 
     let characterForEditor: Record<string, unknown>;
     try {
-      characterForEditor = serializeCharacterForEditorClient(
-        character as Record<string, unknown>,
-      );
+      characterForEditor = toPlainJsonClone(
+        serializeCharacterForEditorClient(characterPlain),
+      ) as Record<string, unknown>;
     } catch (err) {
       console.error("[loadGmCharacterEditorData] serializeCharacterForEditorClient:", err);
-      const ch = character as Record<string, unknown>;
+      const ch = characterPlain;
       characterForEditor = serializeForClient({
         id: String(ch.id ?? characterId),
         name: String(ch.name ?? ""),
@@ -124,9 +127,13 @@ export async function loadGmCharacterEditorData(
       ) as GMCharacterEditorPageProps["initialFactionReputations"],
     };
 
-    return { ok: true, status: "ready", data: serializeForClient(payload) };
+    return {
+      ok: true,
+      status: "ready",
+      data: toPlainJsonClone(serializeForClient(payload)) as GmCharacterEditorLoadPayload,
+    };
   } catch (e) {
-    console.error("[loadGmCharacterEditorData]", e);
+    console.error("FATAL ERROR LOAD CHARACTER:", e);
     return { ok: false, error: "load_failed" };
   }
 }
