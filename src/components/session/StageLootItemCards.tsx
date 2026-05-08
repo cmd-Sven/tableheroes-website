@@ -475,10 +475,8 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
       void chestMotion.start({
         rotate: [0, -7, 6, -4, 3, 0],
         transition: {
-          type: "spring",
-          stiffness: 260,
-          damping: 16,
-          mass: 0.85,
+          duration: 0.58,
+          ease: [0.34, 1.25, 0.64, 1],
         },
       });
     }
