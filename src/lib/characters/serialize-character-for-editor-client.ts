@@ -6,6 +6,32 @@ const DROP_KEYS = new Set([
   "constructor",
 ]);
 
+/** Nur diese Keys dürfen in die Flight-Payload — verhindert Abstürze durch unbekannte / exotische DB-Spalten. */
+const ALLOWED_EDITOR_KEYS = new Set([
+  "id",
+  "name",
+  "class",
+  "race",
+  "level",
+  "status",
+  "biography",
+  "avatar_url",
+  "avatar_storage_path",
+  "avatar_display",
+  "culture_lore_id",
+  "languages",
+  "faction_membership",
+  "current_location_id",
+  "character_relationships",
+  "experience_points",
+  "pocket_gold",
+  /** Anzeige-Namen (Joins aus campaign-detail-load, nicht in GM-Select) */
+  "culture_name",
+  "faction_name",
+  "location_name",
+  "language_names",
+]);
+
 /**
  * Bereitet eine Charakterzeile aus Supabase für RSC → Client (GM-/Spieler-Editor) auf:
  * entfernt schwere / riskante Felder, normalisiert Beziehungen und JSONB-artige Werte,
@@ -18,6 +44,7 @@ export function serializeCharacterForEditorClient(
 
   for (const [key, val] of Object.entries(raw)) {
     if (DROP_KEYS.has(key)) continue;
+    if (!ALLOWED_EDITOR_KEYS.has(key)) continue;
     out[key] = val;
   }
 
@@ -56,6 +83,17 @@ export function serializeCharacterForEditorClient(
     out.languages = (out.languages as unknown[]).map((x) => String(x));
   }
 
+  if (out.language_names == null) {
+    out.language_names = [];
+  } else if (!Array.isArray(out.language_names)) {
+    out.language_names = [];
+  } else {
+    out.language_names = (out.language_names as unknown[]).map((x) => String(x));
+  }
+  if (out.culture_name != null) out.culture_name = String(out.culture_name);
+  if (out.faction_name != null) out.faction_name = String(out.faction_name);
+  if (out.location_name != null) out.location_name = String(out.location_name);
+
   if (out.name != null) out.name = String(out.name);
   if (out.class != null) out.class = String(out.class);
   if (out.race != null) out.race = String(out.race);
@@ -90,6 +128,10 @@ export function serializeCharacterForEditorClient(
     } catch {
       out.avatar_display = null;
     }
+  }
+
+  for (const k of Object.keys(out)) {
+    if (!ALLOWED_EDITOR_KEYS.has(k)) delete out[k];
   }
 
   return serializeForClient(out) as Record<string, unknown>;

@@ -40,14 +40,34 @@ export async function getCharacterFactionReputations(
     ((factionRows as { id: string; name: string }[]) ?? []).map((f) => [f.id, f.name]),
   );
 
-  return items.map((r: any) => ({
-    id: r.id,
-    faction_id: r.faction_id,
-    faction_name: factionMap.get(r.faction_id) ?? "Unbekannt",
-    reputation: r.reputation ?? 0,
-    rank: r.rank ?? null,
-    gm_notes: r.gm_notes,
-    updated_at:
-      r.updated_at != null ? String(r.updated_at) : new Date(0).toISOString(),
-  }));
+  return items.map((r: any) => {
+    const repNum = Number(r.reputation);
+    const reputation = Number.isFinite(repNum)
+      ? Math.max(-100, Math.min(100, Math.round(repNum)))
+      : 0;
+    const notes = r.gm_notes;
+    const gm_notes =
+      notes == null || typeof notes === "string"
+        ? (notes as string | null)
+        : typeof notes === "object"
+          ? (() => {
+              try {
+                return JSON.stringify(notes);
+              } catch {
+                return null;
+              }
+            })()
+          : String(notes);
+
+    return {
+      id: String(r.id ?? ""),
+      faction_id: String(r.faction_id ?? ""),
+      faction_name: String(factionMap.get(r.faction_id) ?? "Unbekannt"),
+      reputation,
+      rank: r.rank != null ? String(r.rank) : null,
+      gm_notes,
+      updated_at:
+        r.updated_at != null ? String(r.updated_at) : new Date(0).toISOString(),
+    };
+  });
 }
