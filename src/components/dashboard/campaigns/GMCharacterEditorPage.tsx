@@ -71,7 +71,7 @@ type Faction = { id: string; name: string };
 type LoreOpt = { id: string; name: string };
 type LocOpt = { id: string; name: string; type: string };
 
-type Props = {
+export type GMCharacterEditorPageProps = {
   character: Character;
   campaignId: string;
   npcs: NPC[];
@@ -87,6 +87,8 @@ type Props = {
   /** Angemeldeter GM — nur eigene Storage-Pfade beim Ersetzen löschen */
   currentUserId: string;
 };
+
+type Props = GMCharacterEditorPageProps;
 
 export function GMCharacterEditorPage({
   character,

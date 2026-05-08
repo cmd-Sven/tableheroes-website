@@ -1,5 +1,4 @@
 import Link from "next/link";
-import nextDynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCampaignAccess } from "../../campaign-access";
@@ -8,24 +7,9 @@ import { getCharacterEditorLoreOptionsForGm } from "../../character-queries";
 import { getFactionsWithMembers } from "../../factions-queries";
 import { getNPCs } from "../../npc-queries";
 import { getCharacterFactionReputations } from "../../reputation-queries";
+import { GMCharacterEditorPageClient } from "@/src/components/dashboard/campaigns/GMCharacterEditorPageClient";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
-
-/** Client-only: vermeidet Hydration-Mismatches (#418) mit komplexem Formular / Slidern / File-Inputs. */
-const GMCharacterEditorPage = nextDynamic(
-  () =>
-    import("@/src/components/dashboard/campaigns/GMCharacterEditorPage").then(
-      (m) => m.GMCharacterEditorPage,
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="rounded-lg border border-hero-dark bg-background-card p-10 text-center font-libre text-gray-300">
-        Charakter-Editor wird geladen…
-      </div>
-    ),
-  },
-);
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +114,7 @@ export default async function GMCharacterEditPage({ params }: Props) {
         Zurück zur Kampagne
       </Link>
 
-      <GMCharacterEditorPage
+      <GMCharacterEditorPageClient
         character={characterForEditor as any}
         campaignId={campaignId}
         currentUserId={userId}
