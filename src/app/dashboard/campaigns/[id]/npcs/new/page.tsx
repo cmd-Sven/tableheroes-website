@@ -5,9 +5,19 @@ import { getFactions } from "../../factions-actions";
 import { getAllLocations } from "../../location-actions";
 import { getWorldByCampaign } from "../../world-queries";
 
+import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
+
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ prefill_name?: string; prefill_relationship?: string; prefill_description?: string }>;
+  searchParams: Promise<{
+    prefill_name?: string;
+    prefill_relationship?: string;
+    prefill_description?: string;
+    chronicle_session?: string;
+    chronicle_kind?: string;
+    chronicle_index?: string;
+  }>;
 };
 
 export default async function CreateNPCPage({ params, searchParams }: Props) {
@@ -38,9 +48,18 @@ export default async function CreateNPCPage({ params, searchParams }: Props) {
   // GM: NPCs werden in der Welt angelegt – Redirect zur Welt-NPC-Wizard-Seite (NarrativeNPCWizard)
   if (campaign.world_id) {
     const q = new URLSearchParams();
-    if (prefillName) q.set("prefill_name", prefillName);
+    if (prefillName) {
+      q.set("prefill_name", prefillName);
+      q.set("prefillName", prefillName);
+    }
     if (prefillRelationship) q.set("prefill_relationship", prefillRelationship);
     if (prefillDescription) q.set("prefill_description", prefillDescription);
+    const chronicle = parseChronicleImportFromSearchParams(search);
+    if (chronicle) {
+      q.set("chronicle_session", chronicle.chronicle_session);
+      q.set("chronicle_kind", chronicle.chronicle_kind);
+      q.set("chronicle_index", String(chronicle.chronicle_index));
+    }
     const query = q.toString();
     redirect(`/dashboard/worlds/${campaign.world_id}/npcs/create${query ? `?${query}` : ""}`);
   }

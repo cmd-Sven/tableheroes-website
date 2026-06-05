@@ -16,6 +16,8 @@ import {
 } from "@/src/lib/image-display";
 import { getDeitiesByWorld, saveDeityFromLore, type DeityRelationshipInput } from "@/src/app/dashboard/worlds/deity-actions";
 import { saveReligionFromLore, type ReligionHolidayInput, type ReligionImportantFigureInput } from "@/src/app/dashboard/worlds/religion-actions";
+import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type AdditionalImage = {
   url: string;
@@ -59,6 +61,10 @@ type Props = {
   initialType?: string;
   /** Vorbelegter Name (z. B. aus einem Weltenbau-Task) */
   initialName?: string;
+  /** Vorbelegte Beschreibung (z. B. Session-Chronist) */
+  initialDescription?: string;
+  /** Nach Session-Chronist-Import: Vorschlag als importiert markieren */
+  chronicleImport?: ChronicleImportRef;
   /** Vorbelegte Gottheitsdaten beim Bearbeiten einer bestehenden Gottheit */
   initialDeityFields?: {
     epithet?: string | null;
@@ -84,7 +90,9 @@ export function LoreForm({
   initialParentId,
   initialType,
   initialName,
+  initialDescription,
   initialDeityFields,
+  chronicleImport,
   onSuccess,
   successRedirectHref,
 }: Props) {
@@ -136,7 +144,7 @@ export function LoreForm({
     image_url: "",
     image_display: { ...DEFAULT_IMAGE_DISPLAY } as ImageDisplaySettings,
     additional_images: [] as AdditionalImage[],
-    description: "",
+    description: initialDescription || "",
     gm_notes: "",
     stories_and_legends: [] as StorySection[],
     race_subtypes: "",
@@ -360,10 +368,23 @@ export function LoreForm({
         if (isEditMode && initialData) {
           await updateLoreEntry(initialData.id, payload);
         } else {
-          await createLoreEntry({
+          const created = await createLoreEntry({
             ...(worldId ? { world_id: worldId } : campaignId ? { campaign_id: campaignId } : {}),
             ...payload,
           } as any);
+
+          if (chronicleImport && created?.id) {
+            try {
+              await markChronicleInboxItemImported(
+                chronicleImport.sessionId,
+                chronicleImport.kind,
+                chronicleImport.index,
+                String(created.id),
+              );
+            } catch (importErr) {
+              console.warn("[LoreForm] Chronicle-Import markieren fehlgeschlagen:", importErr);
+            }
+          }
         }
 
         // Wenn es sich um eine Gottheit in einer Welt handelt, parallel in der Götter-Tabelle speichern

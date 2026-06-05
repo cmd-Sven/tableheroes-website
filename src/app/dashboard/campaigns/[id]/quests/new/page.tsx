@@ -4,15 +4,36 @@ import { QuestForm } from "@/src/components/dashboard/campaigns/quests/QuestForm
 import { getNPCs } from "../../npc-queries";
 import { getLoreEntries } from "../../lore-queries";
 import { isLocationType } from "@/src/lib/lore-types";
+import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ quest_giver_id?: string }>;
+  searchParams: Promise<{
+    quest_giver_id?: string;
+    prefill_title?: string;
+    prefill_description?: string;
+    chronicle_session?: string;
+    chronicle_kind?: string;
+    chronicle_index?: string;
+  }>;
 };
+
+function toChronicleImportRef(
+  parsed: ReturnType<typeof parseChronicleImportFromSearchParams>,
+): ChronicleImportRef | undefined {
+  if (!parsed || parsed.chronicle_kind !== "quest") return undefined;
+  return {
+    sessionId: parsed.chronicle_session,
+    kind: "quest",
+    index: parsed.chronicle_index,
+  };
+}
 
 export default async function CreateQuestPage({ params, searchParams }: Props) {
   const { id: campaignId } = await params;
-  const { quest_giver_id: questGiverIdFromQuery } = await searchParams;
+  const search = await searchParams;
+  const { quest_giver_id: questGiverIdFromQuery } = search;
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -74,11 +95,16 @@ export default async function CreateQuestPage({ params, searchParams }: Props) {
     character_data: m.characters || null,
   }));
 
+  const chronicleImport = toChronicleImportRef(parseChronicleImportFromSearchParams(search));
+
   return (
     <div className="container mx-auto p-6">
       <QuestForm
         campaignId={campaignId}
         defaultQuestGiverId={questGiverIdFromQuery || undefined}
+        defaultTitle={search.prefill_title?.trim() || undefined}
+        defaultDescription={search.prefill_description?.trim() || undefined}
+        chronicleImport={chronicleImport}
         npcs={(npcs || []).map((npc: any) => ({
           id: npc.id,
           name: npc.name,

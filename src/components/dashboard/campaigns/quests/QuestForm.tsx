@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Sparkles, Loader2, Plus, Trash2 } from "lucide-react";
 import { createQuest, updateQuest, getQuestParticipants, syncQuestParticipants } from "@/src/app/dashboard/campaigns/[id]/quest-actions";
 import { generateQuest } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
+import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type Character = {
   id: string;
@@ -56,6 +58,9 @@ type Props = {
   campaignId: string;
   initialData?: Quest | null;
   defaultQuestGiverId?: string;
+  defaultTitle?: string;
+  defaultDescription?: string;
+  chronicleImport?: ChronicleImportRef;
   npcs: Array<{ id: string; name: string; title: string | null; role: string | null }>;
   locations: Array<{ id: string; name: string; type: string }>;
   characters?: Character[];
@@ -86,7 +91,7 @@ type Participant = {
   role_description: string;
 };
 
-export function QuestForm({ campaignId, initialData, defaultQuestGiverId, npcs, locations, characters = [], members = [], onSuccess }: Props) {
+export function QuestForm({ campaignId, initialData, defaultQuestGiverId, defaultTitle, defaultDescription, chronicleImport, npcs, locations, characters = [], members = [], onSuccess }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -128,13 +133,13 @@ export function QuestForm({ campaignId, initialData, defaultQuestGiverId, npcs, 
       loadParticipants();
     } else {
       setFormData({
-        title: "",
+        title: defaultTitle || "",
         type: "Side Quest",
         status: "Active",
         quest_giver_id: defaultQuestGiverId || "",
         location_id: "",
         assigned_character_id: "",
-        description: "",
+        description: defaultDescription || "",
         rewards: "",
         gm_notes: "",
         is_revealed: false,
@@ -142,7 +147,7 @@ export function QuestForm({ campaignId, initialData, defaultQuestGiverId, npcs, 
       setQuestTargetType("group");
       setParticipants([]);
     }
-  }, [initialData, defaultQuestGiverId]);
+  }, [initialData, defaultQuestGiverId, defaultTitle, defaultDescription]);
 
   const loadParticipants = async () => {
     if (!initialData?.id) return;
@@ -252,6 +257,19 @@ export function QuestForm({ campaignId, initialData, defaultQuestGiverId, npcs, 
           }));
         
         await syncQuestParticipants(questId, validParticipants);
+
+        if (chronicleImport && !isEditMode) {
+          try {
+            await markChronicleInboxItemImported(
+              chronicleImport.sessionId,
+              chronicleImport.kind,
+              chronicleImport.index,
+              questId,
+            );
+          } catch (importErr) {
+            console.warn("[QuestForm] Chronicle-Import markieren fehlgeschlagen:", importErr);
+          }
+        }
 
         if (onSuccess) {
           onSuccess();

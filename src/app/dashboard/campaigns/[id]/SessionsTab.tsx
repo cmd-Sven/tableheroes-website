@@ -30,6 +30,8 @@ import {
   setPlanningDummyPlayerCount,
 } from "./session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
+import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import {
   PastSessionsGallery,
   type SessionArchiveItem,
@@ -54,7 +56,13 @@ type SessionItem = {
   registration_closed_on_landing?: boolean | null;
   /** Aus session_live_states — Platzhalter am Tisch (0–3) */
   planning_dummy_player_count?: number;
+  transcription_mode?: string | null;
 };
+
+function parseTranscriptionMode(value: unknown): TranscriptionMode | null {
+  if (value === "table" || value === "jitsi") return value;
+  return null;
+}
 
 function formatSessionDateTime(startTime: string) {
   const startDate = new Date(startTime);
@@ -224,6 +232,7 @@ function SessionActionsDropdown({
 
 type Props = {
   campaignId: string;
+  worldId?: string | null;
   isGM: boolean;
   characterStatus?: string;
   focusSession: SessionItem | null;
@@ -238,6 +247,7 @@ type Props = {
 
 export function SessionsTab({
   campaignId,
+  worldId = null,
   isGM,
   characterStatus,
   focusSession,
@@ -609,6 +619,16 @@ export function SessionsTab({
                       </div>
                     </div>
                   ) : null}
+                  {isGM && scheduled ? (
+                    <div className="mt-4 border-t border-hero-border/30 pt-4">
+                      <SessionChronistModeControl
+                        sessionId={focusSession.id}
+                        initialMode={parseTranscriptionMode(focusSession.transcription_mode)}
+                        variant="compact"
+                        onModeChange={() => router.refresh()}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
 
@@ -651,8 +671,9 @@ export function SessionsTab({
                 return (
                   <div
                     key={session.id}
-                    className={`flex flex-col gap-3 rounded-lg border-2 bg-background-dark/90 p-3 sm:flex-row sm:items-center sm:justify-between ${rowBorder}`}
+                    className={`flex flex-col gap-3 rounded-lg border-2 bg-background-dark/90 p-3 ${rowBorder}`}
                   >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       {graceOverdue && scheduled ? (
                         <p className="mb-1 font-barlow text-[9px] font-bold uppercase text-amber-400">
@@ -683,6 +704,15 @@ export function SessionsTab({
                       ) : null}
                       {scheduled && isGM ? renderScheduledGmControls(session) : null}
                     </div>
+                    </div>
+                    {scheduled && isGM ? (
+                      <SessionChronistModeControl
+                        sessionId={session.id}
+                        initialMode={parseTranscriptionMode(session.transcription_mode)}
+                        variant="compact"
+                        onModeChange={() => router.refresh()}
+                      />
+                    ) : null}
                   </div>
                 );
               })}
@@ -734,7 +764,12 @@ export function SessionsTab({
                   </ul>
                 ) : null}
                 {archives.length > 0 ? (
-                  <PastSessionsGallery campaignId={campaignId} archives={archives} />
+                  <PastSessionsGallery
+                    campaignId={campaignId}
+                    worldId={worldId}
+                    isGM={isGM}
+                    archives={archives}
+                  />
                 ) : null}
               </div>
             ) : null}
@@ -742,7 +777,12 @@ export function SessionsTab({
         )}
 
         {!hasPastRows && archives.length > 0 && !hasAnyUpcoming ? (
-          <PastSessionsGallery campaignId={campaignId} archives={archives} />
+          <PastSessionsGallery
+            campaignId={campaignId}
+            worldId={worldId}
+            isGM={isGM}
+            archives={archives}
+          />
         ) : null}
       </div>
 

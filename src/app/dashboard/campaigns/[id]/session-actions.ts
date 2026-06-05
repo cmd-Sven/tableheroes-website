@@ -23,6 +23,7 @@ export async function createSessionWithScenes(formData: {
     gm_notes?: string;
     order: number;
   }>;
+  transcription_mode?: "table" | "jitsi";
 }) {
   const supabase = await createClient();
 
@@ -55,6 +56,7 @@ export async function createSessionWithScenes(formData: {
       end_time: formData.end_time,
       status: "Scheduled",
       gm_prep_complete: false,
+      transcription_mode: formData.transcription_mode ?? "table",
     })
     .select()
     .single();
@@ -381,6 +383,32 @@ export async function updateSessionStageDeck(
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  return { success: true };
+}
+
+export async function updateSessionTranscriptionMode(
+  sessionId: string,
+  mode: "table" | "jitsi",
+) {
+  const supabase = await createClient();
+  const { updateSessionTranscriptionModeDb } = await import(
+    "@/src/lib/session-chronicle/transcription-server"
+  );
+  const result = await updateSessionTranscriptionModeDb(supabase, sessionId, mode);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("campaign_id")
+    .eq("id", sessionId)
+    .single();
+  const campaignId = (sessionRaw as { campaign_id?: string } | null)?.campaign_id;
+  if (campaignId) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
+    revalidatePath(
+      `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`,
+    );
+  }
   return { success: true };
 }
 
@@ -905,6 +933,19 @@ export async function archiveSession(
   }
 
   const archive = archiveRaw as { id: string };
+
+  try {
+    const { seedPlayerRecapDraftForArchive } = await import("./player-recap-actions");
+    await seedPlayerRecapDraftForArchive(supabase, {
+      id: archive.id,
+      campaign_id: campaignId,
+      session_id: sessionId,
+      encountered_npcs: encounteredNpcs,
+      visited_locations: visitedLocations,
+    });
+  } catch (recapErr) {
+    console.warn("[archiveSession] Spieler-Chronik-Entwurf:", recapErr);
+  }
 
   if (archiveNpcIds.length > 0) {
     const reputationRows = archiveNpcIds.map((npcId) => ({

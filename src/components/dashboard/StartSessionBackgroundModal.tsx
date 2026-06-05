@@ -1,8 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ImageIcon, Loader2, X } from "lucide-react";
-import { startSession } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { ImageIcon, Loader2, Mic, X } from "lucide-react";
+import {
+  startSession,
+  updateSessionTranscriptionMode,
+} from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import {
+  RECORDING_NOTICE_TEXT,
+  TRANSCRIPTION_MODE_LABELS,
+  type TranscriptionMode,
+} from "@/src/lib/session-chronicle/constants";
 
 type Props = {
   open: boolean;
@@ -14,6 +22,7 @@ type Props = {
 
 /**
  * Vor „Session starten“: Hintergrund-URL setzen oder bewusst ohne Bild starten.
+ * Fehlt transcription_mode → Modus + Aufzeichnungshinweis abfragen.
  */
 export function StartSessionBackgroundModal({
   open,
@@ -25,14 +34,53 @@ export function StartSessionBackgroundModal({
   const [noBackground, setNoBackground] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [plannedMode, setPlannedMode] = useState<TranscriptionMode | null>(null);
+  const [modeLoading, setModeLoading] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<TranscriptionMode>("table");
+  const [recordingNoticeAck, setRecordingNoticeAck] = useState(false);
 
   useEffect(() => {
     if (open) {
       setUrl("");
       setNoBackground(false);
       setErr(null);
+      setRecordingNoticeAck(false);
+      setSelectedMode("table");
+      setPlannedMode(null);
     }
   }, [open, sessionId]);
+
+  useEffect(() => {
+    if (!open || !sessionId) return;
+    let cancelled = false;
+    setModeLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/sessions/${encodeURIComponent(sessionId)}/transcription/status`,
+          { credentials: "same-origin" },
+        );
+        const data = (await res.json().catch(() => ({}))) as {
+          plannedMode?: TranscriptionMode | null;
+        };
+        if (!cancelled && res.ok) {
+          setPlannedMode(data.plannedMode ?? null);
+          if (data.plannedMode === "table" || data.plannedMode === "jitsi") {
+            setSelectedMode(data.plannedMode);
+          }
+        }
+      } catch {
+        /* optional */
+      } finally {
+        if (!cancelled) setModeLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sessionId]);
+
+  const needsModeChoice = plannedMode == null && !modeLoading;
 
   async function handleSubmit() {
     if (!sessionId) return;
@@ -40,6 +88,10 @@ export function StartSessionBackgroundModal({
       setErr(
         "Bitte eine Bild-URL eintragen oder „Ohne Hintergrund starten“ aktivieren.",
       );
+      return;
+    }
+    if (needsModeChoice && !recordingNoticeAck) {
+      setErr("Bitte den Aufzeichnungshinweis bestätigen und einen Modus wählen.");
       return;
     }
     setErr(null);
@@ -61,6 +113,10 @@ export function StartSessionBackgroundModal({
             j.error || "Hintergrund konnte nicht gespeichert werden.",
           );
         }
+      }
+
+      if (needsModeChoice) {
+        await updateSessionTranscriptionMode(sessionId, selectedMode);
       }
 
       await startSession(sessionId);
@@ -143,6 +199,60 @@ export function StartSessionBackgroundModal({
           </span>
         </label>
 
+        {modeLoading ? (
+          <p className="mb-4 flex items-center gap-2 font-libre text-sm text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Chronist-Einstellungen laden…
+          </p>
+        ) : null}
+
+        {needsModeChoice ? (
+          <div className="mb-4 rounded border border-red-500/30 bg-red-950/20 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Mic className="h-4 w-4 text-red-400" />
+              <span className="font-barlow text-xs font-bold uppercase text-red-300">
+                Chronist-Modus fehlt
+              </span>
+            </div>
+            <p className="font-libre text-xs text-gray-300 mb-3">{RECORDING_NOTICE_TEXT}</p>
+            <div className="space-y-2 mb-3">
+              {(["table", "jitsi"] as TranscriptionMode[]).map((mode) => (
+                <label
+                  key={mode}
+                  className="flex cursor-pointer items-center gap-2 font-libre text-sm text-gray-300"
+                >
+                  <input
+                    type="radio"
+                    name="start-chronist-mode"
+                    checked={selectedMode === mode}
+                    onChange={() => setSelectedMode(mode)}
+                    disabled={busy}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  {TRANSCRIPTION_MODE_LABELS[mode]}
+                </label>
+              ))}
+            </div>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={recordingNoticeAck}
+                onChange={(e) => setRecordingNoticeAck(e.target.checked)}
+                disabled={busy}
+                className="mt-1 h-4 w-4 rounded border-hero-border text-red-500"
+              />
+              <span className="font-libre text-xs text-gray-300">
+                Hinweis zur Aufzeichnung verstanden — Modus wird für diese Session
+                gespeichert.
+              </span>
+            </label>
+          </div>
+        ) : plannedMode ? (
+          <p className="mb-4 font-libre text-xs text-gray-500">
+            Chronist: {TRANSCRIPTION_MODE_LABELS[plannedMode]} (Bühnenvorbereitung)
+          </p>
+        ) : null}
+
         {err ? (
           <p className="mb-4 font-libre text-sm text-red-400">{err}</p>
         ) : null}
@@ -159,7 +269,7 @@ export function StartSessionBackgroundModal({
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={busy}
+            disabled={busy || modeLoading}
             className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-xs text-black hover:bg-yellow-500 disabled:opacity-50"
           >
             {busy ? (

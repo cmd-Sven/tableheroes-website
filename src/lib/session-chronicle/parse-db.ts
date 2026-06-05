@@ -8,6 +8,7 @@ import type {
   SpontaneousNpcDraft,
   SpontaneousQuestDraft,
 } from "./types";
+import type { PlayerRecapRecord } from "./player-recap-types";
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -111,5 +112,27 @@ export function parsePlayerRecap(value: unknown): PlayerRecapPayload | null {
     },
     link_entities: asArray(r.link_entities),
     generated_at: asString(r.generated_at, new Date().toISOString()),
+  };
+}
+
+export function parsePlayerRecapRecord(value: unknown): PlayerRecapRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const r = value as Record<string, unknown>;
+  if (r.status === "draft" || r.status === "published") {
+    const recap = parsePlayerRecap(r.recap);
+    if (!recap) return null;
+    return {
+      status: r.status,
+      published_at:
+        r.published_at != null ? asString(r.published_at) : null,
+      recap,
+    };
+  }
+  const flat = parsePlayerRecap(value);
+  if (!flat) return null;
+  return {
+    status: "published",
+    published_at: flat.generated_at,
+    recap: flat,
   };
 }

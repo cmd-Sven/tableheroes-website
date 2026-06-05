@@ -33,7 +33,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
 
   const { data: sessionRaw, error: sessionErr } = await (supabase.from("sessions") as any)
     .select(
-      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids",
+      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode",
     )
     .eq("id", sessionId)
     .single();
@@ -45,6 +45,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     status: string;
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
+    transcription_mode?: string | null;
   } | null;
 
   if (sessionErr || !session || session.campaign_id !== campaignId) {
@@ -133,6 +134,13 @@ export default async function SessionStagePrepPage({ params }: Props) {
           : null
       }
       initialBackgroundUrl={initialBackgroundUrl}
+      initialTranscriptionMode={
+        session.transcription_mode === "jitsi"
+          ? "jitsi"
+          : session.transcription_mode === "table"
+            ? "table"
+            : null
+      }
     />
   );
 }

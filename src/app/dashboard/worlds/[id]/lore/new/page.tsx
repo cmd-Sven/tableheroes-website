@@ -4,11 +4,34 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LoreForm } from "@/src/components/dashboard/campaigns/lore/LoreForm";
 import { getLoreEntriesByWorld } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { isLocationType } from "@/src/lib/lore-types";
+import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ parentId?: string; type?: string; deityName?: string; name?: string }>;
+  searchParams: Promise<{
+    parentId?: string;
+    type?: string;
+    deityName?: string;
+    name?: string;
+    description?: string;
+    chronicle_session?: string;
+    chronicle_kind?: string;
+    chronicle_index?: string;
+  }>;
 };
+
+function toChronicleImportRef(
+  parsed: ReturnType<typeof parseChronicleImportFromSearchParams>,
+): ChronicleImportRef | undefined {
+  if (!parsed || parsed.chronicle_kind !== "location") return undefined;
+  return {
+    sessionId: parsed.chronicle_session,
+    kind: "location",
+    index: parsed.chronicle_index,
+  };
+}
 
 export default async function WorldNewLorePage({ params, searchParams }: Props) {
   const { id: worldId } = await params;
@@ -35,7 +58,6 @@ export default async function WorldNewLorePage({ params, searchParams }: Props) 
     type: entry.type,
   }));
 
-  // Initialer Name: z.B. für Religionen aus einem Weltenbau-Task ("Religion zu [Gottheit]")
   let initialName: string | undefined = undefined;
   if (sp.name && sp.name.trim()) {
     initialName = sp.name.trim();
@@ -43,7 +65,6 @@ export default async function WorldNewLorePage({ params, searchParams }: Props) 
     initialName = `${sp.deityName.trim()} - Religion`;
   }
 
-  // Falls wir mit ?deityName=... kommen, direkt die verknüpfte Gottheit auswählen
   let initialReligionDeityId: string | undefined = undefined;
   if (sp.deityName && sp.deityName.trim()) {
     try {
@@ -60,6 +81,9 @@ export default async function WorldNewLorePage({ params, searchParams }: Props) 
     }
   }
 
+  const chronicleImport = toChronicleImportRef(parseChronicleImportFromSearchParams(sp));
+  const createMode = sp.type && isLocationType(sp.type) ? ("location" as const) : ("lore" as const);
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <Link
@@ -73,12 +97,14 @@ export default async function WorldNewLorePage({ params, searchParams }: Props) 
         worldId={worldId}
         parentOptions={parentOptions}
         world={{ id: world.id, name: world.name }}
-        createMode="lore"
+        createMode={createMode}
         successRedirectHref={sp.parentId ? `/dashboard/worlds/${worldId}/lore/${sp.parentId}` : `/dashboard/worlds/${worldId}/lore`}
         initialParentId={sp.parentId ?? undefined}
         initialType={sp.type ?? undefined}
         initialName={initialName}
+        initialDescription={sp.description?.trim() || undefined}
         initialReligionDeityId={initialReligionDeityId}
+        chronicleImport={chronicleImport}
       />
     </div>
   );

@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, Calendar, MapPin, Users } from "lucide-react";
+import { useState } from "react";
+import { BookOpen, Calendar, MapPin, ScrollText, Users } from "lucide-react";
+import { PlayerRecapEditor } from "@/src/components/chronicle/PlayerRecapEditor";
+import { PlayerRecapView } from "@/src/components/chronicle/PlayerRecapView";
+import { parsePlayerRecapRecord } from "@/src/lib/session-chronicle/parse-db";
+import type { PlayerRecapRecord } from "@/src/lib/session-chronicle/player-recap-types";
 
 type ChronicleEntry = {
   id?: string;
@@ -26,6 +31,7 @@ export type SessionArchiveItem = {
   chronicle_snapshot: ChronicleEntry[] | null;
   encountered_npcs: ArchiveRef[] | null;
   visited_locations: ArchiveRef[] | null;
+  player_recap?: unknown;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -45,9 +51,13 @@ function normalizeEntries(entries: ChronicleEntry[] | null | undefined) {
 
 export function PastSessionsGallery({
   campaignId,
+  worldId = null,
+  isGM = false,
   archives,
 }: {
   campaignId: string;
+  worldId?: string | null;
+  isGM?: boolean;
   archives: SessionArchiveItem[];
 }) {
   const searchParams = useSearchParams();
@@ -55,6 +65,11 @@ export function PastSessionsGallery({
   const selectedArchive =
     archives.find((archive) => archive.id === selectedArchiveId) ?? archives[0] ?? null;
   const entries = normalizeEntries(selectedArchive?.chronicle_snapshot);
+  const recapRecord: PlayerRecapRecord | null = selectedArchive
+    ? parsePlayerRecapRecord(selectedArchive.player_recap)
+    : null;
+  const playerRecapPublished = recapRecord?.status === "published";
+  const [detailTab, setDetailTab] = useState<"logbook" | "recap">("logbook");
 
   return (
     <section className="rounded-lg border border-amber-900/60 bg-linear-to-br from-background-card via-emerald-950/60 to-background-dark p-6 shadow-xl">
@@ -64,7 +79,7 @@ export function PastSessionsGallery({
             Vergangene Sessions
           </h2>
           <p className="font-libre text-xs text-gray-400">
-            Logbuch, besuchte Orte und Begegnungen aus abgeschlossenen Spielabenden.
+            Logbuch, besuchte Orte und — nach GM-Freigabe — die Spieler-Chronik.
           </p>
         </div>
         <BookOpen className="h-6 w-6 text-accent-gold" />
@@ -80,6 +95,7 @@ export function PastSessionsGallery({
           <aside className="space-y-2">
             {archives.map((archive) => {
               const selected = archive.id === selectedArchive?.id;
+              const recap = parsePlayerRecapRecord(archive.player_recap);
               return (
                 <Link
                   key={archive.id}
@@ -97,6 +113,15 @@ export function PastSessionsGallery({
                     <Calendar className="h-3 w-3" />
                     {formatDate(archive.archived_at)}
                   </span>
+                  {recap?.status === "published" ? (
+                    <span className="mt-1 block font-barlow text-[9px] uppercase text-emerald-400">
+                      Chronik freigegeben
+                    </span>
+                  ) : recap?.status === "draft" && isGM ? (
+                    <span className="mt-1 block font-barlow text-[9px] uppercase text-amber-400/90">
+                      Chronik-Entwurf
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -104,43 +129,95 @@ export function PastSessionsGallery({
 
           {selectedArchive ? (
             <article className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
-              <div className="rounded-xl border border-amber-900/50 bg-[#21180d]/85 p-5 shadow-inner">
-                <h3 className="font-cinzel text-xl font-bold text-accent-gold">
-                  {selectedArchive.session_name}
-                </h3>
-                <p className="mb-4 font-libre text-xs text-amber-100/70">
-                  Archiviert am {formatDate(selectedArchive.archived_at)}
-                </p>
-                <div className="space-y-3">
-                  {entries.length > 0 ? (
-                    entries.map((entry, index) => {
-                      const isSystem =
-                        String(entry.type ?? "").toLowerCase().includes("system") ||
-                        entry.author_name === "System";
-                      return (
-                        <div
-                          key={entry.id ?? `${selectedArchive.id}-${index}`}
-                          className={`rounded border px-4 py-3 ${
-                            isSystem
-                              ? "border-accent-gold/35 bg-accent-gold/10 italic text-amber-100"
-                              : "border-amber-900/45 bg-black/20 text-gray-100"
-                          }`}
-                        >
-                          <p className="font-libre text-sm leading-relaxed">
-                            {entry.text || "Leerer Eintrag"}
-                          </p>
-                          <p className="mt-2 font-barlow text-[10px] uppercase tracking-wide text-gray-500">
-                            {entry.author_name || "Chronik"} · {formatDate(entry.at)}
-                          </p>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="font-libre text-sm italic text-gray-500">
-                      Für diese Session wurden keine Chronikeinträge gespeichert.
-                    </p>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2 border-b border-hero-border/30 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetailTab("logbook")}
+                    className={`rounded px-3 py-1.5 font-barlow text-[10px] font-bold uppercase ${
+                      detailTab === "logbook"
+                        ? "bg-accent-gold/20 text-accent-gold"
+                        : "text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    GM-Logbuch
+                  </button>
+                  {(isGM || playerRecapPublished) && (
+                    <button
+                      type="button"
+                      onClick={() => setDetailTab("recap")}
+                      className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 font-barlow text-[10px] font-bold uppercase ${
+                        detailTab === "recap"
+                          ? "bg-purple-900/40 text-purple-200"
+                          : "text-gray-500 hover:text-gray-300"
+                      }`}
+                    >
+                      <ScrollText className="h-3.5 w-3.5" />
+                      Spieler-Chronik
+                    </button>
                   )}
                 </div>
+
+                {detailTab === "recap" ? (
+                  isGM ? (
+                    <PlayerRecapEditor
+                      campaignId={campaignId}
+                      worldId={worldId}
+                      archiveId={selectedArchive.id}
+                      initialRecord={recapRecord}
+                    />
+                  ) : playerRecapPublished && recapRecord ? (
+                    <PlayerRecapView
+                      campaignId={campaignId}
+                      worldId={worldId}
+                      recap={recapRecord.recap}
+                      openLinksInNewTab
+                    />
+                  ) : (
+                    <p className="font-libre text-sm text-gray-500">
+                      Die Spieler-Chronik wurde noch nicht freigegeben.
+                    </p>
+                  )
+                ) : (
+                  <div className="rounded-xl border border-amber-900/50 bg-[#21180d]/85 p-5 shadow-inner">
+                    <h3 className="font-cinzel text-xl font-bold text-accent-gold">
+                      {selectedArchive.session_name}
+                    </h3>
+                    <p className="mb-4 font-libre text-xs text-amber-100/70">
+                      Archiviert am {formatDate(selectedArchive.archived_at)}
+                    </p>
+                    <div className="space-y-3">
+                      {entries.length > 0 ? (
+                        entries.map((entry, index) => {
+                          const isSystem =
+                            String(entry.type ?? "").toLowerCase().includes("system") ||
+                            entry.author_name === "System";
+                          return (
+                            <div
+                              key={entry.id ?? `${selectedArchive.id}-${index}`}
+                              className={`rounded border px-4 py-3 ${
+                                isSystem
+                                  ? "border-accent-gold/35 bg-accent-gold/10 italic text-amber-100"
+                                  : "border-amber-900/45 bg-black/20 text-gray-100"
+                              }`}
+                            >
+                              <p className="font-libre text-sm leading-relaxed">
+                                {entry.text || "Leerer Eintrag"}
+                              </p>
+                              <p className="mt-2 font-barlow text-[10px] uppercase tracking-wide text-gray-500">
+                                {entry.author_name || "Chronik"} · {formatDate(entry.at)}
+                              </p>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="font-libre text-sm italic text-gray-500">
+                          Für diese Session wurden keine Chronikeinträge gespeichert.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <aside className="space-y-4">

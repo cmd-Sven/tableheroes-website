@@ -15,6 +15,10 @@ import {
   Search,
 } from "lucide-react";
 import { createSessionWithScenes, getSessionWizardContext } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import {
+  TRANSCRIPTION_MODE_LABELS,
+  type TranscriptionMode,
+} from "@/src/lib/session-chronicle/constants";
 import { createNPC } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { createLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { generateNPC, generateLore } from "@/src/app/dashboard/campaigns/[id]/ai-actions";
@@ -202,6 +206,7 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
 
   /** Schritt 3: geplante Handlung (frei, keine KI-Pflicht) */
   const [plotNotes, setPlotNotes] = useState("");
+  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("table");
 
   const loreLocations = useMemo(
     () => locations.filter((l) => isLocationType(l.type)),
@@ -244,6 +249,7 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
     setSelectedNPCIds([]);
     setNpcSearch("");
     setPlotNotes("");
+    setTranscriptionMode("table");
     setRecapText("");
     setWizardContext(null);
     setIsGenerating(null);
@@ -378,6 +384,7 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           location_id: selectedLocationId || null,
+          transcription_mode: transcriptionMode,
           scenes: [
             {
               title: sceneTitle,
@@ -539,6 +546,42 @@ export function SessionWizardModal({ campaignId, isOpen, onClose, locations, npc
                       <option value="6">6 Stunden</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t border-hero-border/40 pt-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-accent-gold" />
+                  <h4 className="font-barlow text-sm font-bold uppercase text-white">
+                    Session-Chronist
+                  </h4>
+                </div>
+                <p className="mb-3 font-libre text-xs text-gray-500">
+                  Wie soll die Session später aufgezeichnet werden? Du kannst das auch in den Terminen
+                  oder in der Vorbereitung ändern.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {(["table", "jitsi"] as TranscriptionMode[]).map((mode) => (
+                    <label
+                      key={mode}
+                      className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-2 ${
+                        transcriptionMode === mode
+                          ? "border-hero-vibrant bg-hero-vibrant/15 text-hero-vibrant"
+                          : "border-hero-border/60 bg-slate-900 text-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="wizard-chronist-mode"
+                        checked={transcriptionMode === mode}
+                        onChange={() => setTranscriptionMode(mode)}
+                        className="border-hero-border text-hero-vibrant"
+                      />
+                      <span className="font-barlow text-xs font-bold uppercase">
+                        {TRANSCRIPTION_MODE_LABELS[mode]}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
 

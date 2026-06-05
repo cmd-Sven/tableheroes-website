@@ -5,11 +5,33 @@ import { ArrowLeft } from "lucide-react";
 import { getFactionsByWorld } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { getAllLocationsByWorld } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { NarrativeNPCWizard } from "@/src/components/worlds/NarrativeNPCWizard";
+import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ locationId?: string; prefillName?: string; factionId?: string }>;
+  searchParams: Promise<{
+    locationId?: string;
+    prefillName?: string;
+    prefill_name?: string;
+    prefill_description?: string;
+    factionId?: string;
+    chronicle_session?: string;
+    chronicle_kind?: string;
+    chronicle_index?: string;
+  }>;
 };
+
+function toChronicleImportRef(
+  parsed: ReturnType<typeof parseChronicleImportFromSearchParams>,
+): ChronicleImportRef | undefined {
+  if (!parsed || parsed.chronicle_kind !== "npc") return undefined;
+  return {
+    sessionId: parsed.chronicle_session,
+    kind: "npc",
+    index: parsed.chronicle_index,
+  };
+}
 
 export default async function WorldNPCCreatePage({ params, searchParams }: Props) {
   const { id: worldId } = await params;
@@ -58,6 +80,9 @@ export default async function WorldNPCCreatePage({ params, searchParams }: Props
     .filter((l) => l.type === "Sprache")
     .map((l) => ({ id: String(l.id), name: String(l.name) }));
 
+  const prefillName = sp.prefillName ?? sp.prefill_name ?? undefined;
+  const chronicleImport = toChronicleImportRef(parseChronicleImportFromSearchParams(sp));
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Link
@@ -74,8 +99,10 @@ export default async function WorldNPCCreatePage({ params, searchParams }: Props
         factions={factionList}
         locations={locationList}
         initialLocationId={sp.locationId ?? undefined}
-        initialPrefillName={sp.prefillName ?? undefined}
+        initialPrefillName={prefillName}
+        initialBriefing={sp.prefill_description ?? undefined}
         linkFactionId={sp.factionId ?? undefined}
+        chronicleImport={chronicleImport}
         races={races}
         religions={religions}
         deities={deities}

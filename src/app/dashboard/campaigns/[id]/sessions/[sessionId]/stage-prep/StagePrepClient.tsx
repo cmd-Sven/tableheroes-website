@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
 import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 
 type CampaignNpc = {
   id: string;
@@ -29,6 +31,7 @@ type Props = {
   stageDeckNpcIds: string[] | null;
   stageDeckFactionIds: string[] | null;
   initialBackgroundUrl: string | null;
+  initialTranscriptionMode: TranscriptionMode | null;
 };
 
 const marblePanelStyle: CSSProperties = {
@@ -58,6 +61,7 @@ export function StagePrepClient({
   stageDeckNpcIds,
   stageDeckFactionIds,
   initialBackgroundUrl,
+  initialTranscriptionMode,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -394,6 +398,18 @@ export function StagePrepClient({
                 style={{ backgroundImage: `url(${bgUrl})` }}
               />
             ) : null}
+          </section>
+
+          <section
+            className="rounded-lg border border-hero-dark p-6 shadow-lg lg:col-span-2"
+            style={marblePanelStyle}
+          >
+            <SessionChronistModeControl
+              sessionId={sessionId}
+              initialMode={initialTranscriptionMode}
+              variant="full"
+              onModeChange={() => router.refresh()}
+            />
           </section>
         </div>
 

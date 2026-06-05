@@ -76,6 +76,15 @@ import { CharacterAvatarImage } from "@/src/components/dashboard/player/Characte
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
+import { ChronicleRecorderPanel } from "@/src/components/session/ChronicleRecorderPanel";
+import { ChronicleInboxFeed } from "@/src/components/chronicle/ChronicleInboxFeed";
+import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import { ChronicleMicTestPanel } from "@/src/components/session/ChronicleMicTestPanel";
+import { ChronicleRecordingTopBar } from "@/src/components/session/ChronicleRecordingTopBar";
+import { useSessionChronicleRecorder } from "@/src/hooks/useSessionChronicleRecorder";
+import { useSessionTranscriptionStatus } from "@/src/hooks/useSessionTranscriptionStatus";
+import { useMicMonitor } from "@/src/hooks/useMicMonitor";
+import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import {
   resolveSessionDayPhase,
   SESSION_DAY_PHASE_ORDER,
@@ -807,6 +816,7 @@ type ActiveQuest = {
 type Props = {
   sessionId: string;
   campaignId: string;
+  worldId: string | null;
   sessionStatus: string;
   isGM: boolean;
   forcePlayerView?: boolean;
@@ -826,11 +836,13 @@ type Props = {
   sessionLocationLoreReadable?: boolean;
   /** Nur GM: Shop-Templates für schnelle Händler-Zuweisung auf der Bühne */
   campaignShops?: LiveCampaignShopOption[];
+  transcriptionMode?: "table" | "jitsi" | null;
 };
 
 export function LiveSessionBoard({
   sessionId,
   campaignId,
+  worldId,
   sessionStatus,
   isGM: actualUserIsGM,
   forcePlayerView = false,
@@ -845,6 +857,7 @@ export function LiveSessionBoard({
   loreLocationOptions = [],
   sessionLocationLoreReadable = false,
   campaignShops = [],
+  transcriptionMode = null,
 }: Props) {
   const router = useRouter();
   /** Cookie-Session (RLS): nicht supabaseClient.ts (nur Anon ohne Auth). */
@@ -877,6 +890,9 @@ export function LiveSessionBoard({
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
   const [lootGmModalOpen, setLootGmModalOpen] = useState(false);
+  const [activeTranscriptionMode, setActiveTranscriptionMode] = useState<
+    TranscriptionMode | null
+  >(transcriptionMode);
   const [npcMerchantOverrides, setNpcMerchantOverrides] = useState<
     Record<string, { is_merchant: boolean; shop_id: string | null }>
   >({});
@@ -896,6 +912,10 @@ export function LiveSessionBoard({
       }),
     [allCampaignNpcs, npcMerchantOverrides],
   );
+
+  useEffect(() => {
+    setActiveTranscriptionMode(transcriptionMode);
+  }, [transcriptionMode]);
 
   useEffect(() => {
     liveStateRef.current = liveState;
@@ -1021,6 +1041,27 @@ export function LiveSessionBoard({
   );
 
   const isPrepMode = sessionStatus === "Scheduled";
+  const chronistTableMode =
+    activeTranscriptionMode === "table" || activeTranscriptionMode === null;
+
+  const prepMicTest = useMicMonitor();
+  const chronicleRecorder = useSessionChronicleRecorder({
+    sessionId,
+    enabled: isGM && sessionStatus === "Live" && chronistTableMode,
+    plannedMode: activeTranscriptionMode,
+  });
+  const { status: liveTranscriptionStatus } = useSessionTranscriptionStatus(
+    sessionId,
+    chronistTableMode && sessionStatus === "Live",
+  );
+
+  const gmMicActive =
+    chronicleRecorder.phase === "recording" ||
+    chronicleRecorder.phase === "paused" ||
+    (isPrepMode && prepMicTest.isActive);
+
+  const topBarTranscriptionStatus =
+    sessionStatus === "Live" ? liveTranscriptionStatus : null;
   const weatherCondition = getWeatherCondition(liveState);
   const dayPhase = resolveSessionDayPhase(liveState?.current_time);
 
@@ -1800,6 +1841,38 @@ export function LiveSessionBoard({
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {!isGM && sessionStatus === "Live" && chronistTableMode ? (
+            <ChronicleRecordingTopBar
+              role="player"
+              transcriptionStatus={topBarTranscriptionStatus}
+              showWhenIdle
+            />
+          ) : null}
+          {isGM && chronistTableMode && (sessionStatus === "Live" || isPrepMode) ? (
+            <ChronicleRecordingTopBar
+              role="gm"
+              transcriptionStatus={topBarTranscriptionStatus}
+              micActive={gmMicActive}
+              waveformLevels={
+                chronicleRecorder.phase === "recording" ||
+                chronicleRecorder.phase === "paused"
+                  ? chronicleRecorder.waveformLevels
+                  : prepMicTest.waveformLevels
+              }
+              hasSignal={
+                chronicleRecorder.phase === "recording" ||
+                chronicleRecorder.phase === "paused"
+                  ? chronicleRecorder.hasSignal
+                  : prepMicTest.hasSignal
+              }
+              deviceLabel={
+                chronicleRecorder.phase === "recording" ||
+                chronicleRecorder.phase === "paused"
+                  ? chronicleRecorder.deviceLabel
+                  : prepMicTest.deviceLabel
+              }
+            />
+          ) : null}
           {isGM ? (
             <button
               type="button"
@@ -2191,6 +2264,41 @@ export function LiveSessionBoard({
               <div className="flex items-center justify-center py-1">
                 <SessionDayPhaseIndicator phase={dayPhase} />
               </div>
+
+              {isGM && isPrepMode ? (
+                <>
+                  <SessionChronistModeControl
+                    sessionId={sessionId}
+                    initialMode={activeTranscriptionMode}
+                    variant="sidebar"
+                    onModeChange={setActiveTranscriptionMode}
+                  />
+                  {chronistTableMode ? (
+                    <ChronicleMicTestPanel variant="sidebar" monitor={prepMicTest} />
+                  ) : null}
+                </>
+              ) : null}
+
+              {isGM && sessionStatus === "Live" && chronistTableMode ? (
+                <ChronicleRecorderPanel
+                  sessionId={sessionId}
+                  plannedMode={activeTranscriptionMode}
+                  recorder={chronicleRecorder}
+                />
+              ) : null}
+
+              {isGM && sessionStatus === "Live" && chronistTableMode ? (
+                <ChronicleInboxFeed
+                  campaignId={campaignId}
+                  sessionId={sessionId}
+                  worldId={worldId}
+                  variant="compact"
+                  npcNames={allCampaignNpcs.map((n) => ({
+                    id: n.id,
+                    name: n.name,
+                  }))}
+                />
+              ) : null}
 
               {isGM ? (
                 <GmSlideSettingsPanel

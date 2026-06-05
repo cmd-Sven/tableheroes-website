@@ -21,6 +21,8 @@ import { generateNPC, regenerateNPCSection, type GeneratedNPCResult, type Reroll
 import { createNPC, getNPCsByWorld } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { linkPlannedMemberByNameToNpc } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { insertWorldTasksBatch } from "@/src/app/dashboard/worlds/world-tasks-actions";
+import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
+import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -50,6 +52,7 @@ type Props = {
   deities?: Array<{ id: string; name: string }>;
   /** Optional: Sprachen aus Welt-Lore (Type = \"Sprache\"). */
   languages?: Array<{ id: string; name: string }>;
+  chronicleImport?: ChronicleImportRef;
   onSuccess?: (npcId: string) => void;
   onError?: (message: string) => void;
 };
@@ -69,6 +72,7 @@ export function NarrativeNPCWizard({
   religions = [],
   deities = [],
   languages = [],
+  chronicleImport,
   onSuccess,
   onError,
 }: Props) {
@@ -212,6 +216,18 @@ export function NarrativeNPCWizard({
             } catch (e) {
               console.warn("Verknüpfung Fraktions-Mitglied ↔ NPC:", e);
             }
+          }
+        }
+        if (chronicleImport) {
+          try {
+            await markChronicleInboxItemImported(
+              chronicleImport.sessionId,
+              chronicleImport.kind,
+              chronicleImport.index,
+              npcId,
+            );
+          } catch (importErr) {
+            console.warn("[NarrativeNPCWizard] Chronicle-Import markieren fehlgeschlagen:", importErr);
           }
         }
         onSuccess?.(npcId);

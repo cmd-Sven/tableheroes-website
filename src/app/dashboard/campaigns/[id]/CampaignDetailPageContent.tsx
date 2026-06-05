@@ -413,6 +413,7 @@ export function CampaignDetailPageContent({
   const SessionsTabContent = (
     <SessionsTab
       campaignId={id}
+      worldId={campaignWorldId ?? null}
       isGM={isGM}
       characterStatus={!isGM ? (myCharacter as any)?.status : undefined}
       focusSession={(focusSession as any) ?? null}

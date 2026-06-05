@@ -80,7 +80,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids")
+    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode")
     .eq("id", sessionId)
     .single();
 
@@ -90,6 +90,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     status: string;
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
+    transcription_mode?: string | null;
   } | null;
 
   if (sessionError || !session) {
@@ -98,13 +99,14 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 2. Load Campaign to determine GM
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id")
+    .select("gm_id, owner_id, world_id")
     .eq("id", (session as any).campaign_id)
     .single();
 
   const campaign = campaignRaw as {
     gm_id?: string | null;
     owner_id?: string | null;
+    world_id?: string | null;
   } | null;
 
   if (!campaign) {
@@ -424,6 +426,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     <LiveSessionBoard
       sessionId={sessionId}
       campaignId={(session as any).campaign_id as string}
+      worldId={campaign.world_id ?? null}
       sessionStatus={session.status}
       isGM={isGM}
       forcePlayerView={forcePlayerView}
@@ -451,6 +454,13 @@ export default async function SessionPage({ params, searchParams }: Props) {
       loreLocationOptions={serializeForClient(loreLocationOptions)}
       sessionLocationLoreReadable={sessionLocationLoreReadable}
       campaignShops={serializeForClient(campaignShopsForLive)}
+      transcriptionMode={
+        session.transcription_mode === "jitsi"
+          ? "jitsi"
+          : session.transcription_mode === "table"
+            ? "table"
+            : null
+      }
     />
   );
 }
