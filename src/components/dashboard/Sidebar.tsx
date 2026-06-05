@@ -33,6 +33,7 @@ import {
   Award,
   Trophy,
   Megaphone,
+  Mic,
   Newspaper,
   Hammer,
   Coins,
@@ -400,6 +401,12 @@ export function Sidebar({
                 tab: undefined,
               },
               {
+                href: `/dashboard/campaigns/${campaignId}/chronist`,
+                label: "Chronist",
+                icon: Mic,
+                tab: undefined,
+              },
+              {
                 href: `/dashboard/campaigns/${campaignId}/gm-inbox`,
                 label: "GM Inbox",
                 icon: Inbox,
@@ -748,6 +755,7 @@ export function Sidebar({
                     isActive={
                       pathname === item.href ||
                       (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox")) ||
+                      (item.href?.includes("/chronist") && pathname.includes("/chronist")) ||
                       (!!pathname && item.href.endsWith("/bestarium") && pathname.startsWith(item.href))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}

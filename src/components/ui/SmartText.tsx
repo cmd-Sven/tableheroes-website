@@ -21,6 +21,8 @@ type SmartTextProps = {
   worldId?: string | null;
   emptyMessage?: string;
   className?: string;
+  /** Spieler-Chronik: Wiki-Links in neuem Tab öffnen */
+  openInNewTab?: boolean;
 };
 
 function escapeRegex(s: string): string {
@@ -50,7 +52,8 @@ function processTextWithEntities(
   text: string,
   entities: EntityForSmartText[],
   campaignId: string | null | undefined,
-  worldId: string | null | undefined
+  worldId: string | null | undefined,
+  openInNewTab: boolean,
 ): React.ReactNode[] {
   if (!entities.length) return [text];
 
@@ -86,6 +89,8 @@ function processTextWithEntities(
           <Link
             key={`${entity.id}-${m.index}`}
             href={url}
+            target={openInNewTab ? "_blank" : undefined}
+            rel={openInNewTab ? "noopener noreferrer" : undefined}
             className="text-hero-vibrant underline hover:text-hero-vibrant/90"
           >
             {matched}
@@ -106,7 +111,8 @@ function processChildren(
   entities: EntityForSmartText[],
   campaignId: string | null | undefined,
   worldId: string | null | undefined,
-  insideLink: boolean
+  insideLink: boolean,
+  openInNewTab: boolean,
 ): React.ReactNode {
   if (insideLink) return children;
 
@@ -116,7 +122,8 @@ function processChildren(
         child,
         entities,
         campaignId,
-        worldId
+        worldId,
+        openInNewTab,
       );
     }
     if (React.isValidElement(child)) {
@@ -132,7 +139,8 @@ function processChildren(
             entities,
             campaignId,
             worldId,
-            type === "a"
+            type === "a",
+            openInNewTab,
           ),
         });
       }
@@ -157,14 +165,21 @@ function childrenToText(children: React.ReactNode): string {
 function renderLink({
   href,
   children,
+  openInNewTab = false,
 }: {
   href?: string;
   children?: React.ReactNode;
+  openInNewTab?: boolean;
 }) {
   if (!href) return <>{children}</>;
   if (href.startsWith("/")) {
     return (
-      <Link href={href} className="text-hero-vibrant underline hover:text-hero-vibrant/90">
+      <Link
+        href={href}
+        target={openInNewTab ? "_blank" : undefined}
+        rel={openInNewTab ? "noopener noreferrer" : undefined}
+        className="text-hero-vibrant underline hover:text-hero-vibrant/90"
+      >
         {children}
       </Link>
     );
@@ -188,6 +203,7 @@ export function SmartText({
   worldId,
   emptyMessage = "Keine Beschreibung vorhanden.",
   className = "",
+  openInNewTab = false,
 }: SmartTextProps) {
   const trimmed = normalizeEscapedMarkdown(text || "").trim();
 
@@ -200,7 +216,7 @@ export function SmartText({
           props.id = slugifyHeading(childrenToText(children));
         }
         const processedChildren = entities.length
-          ? processChildren(children, entities, campaignId, worldId, insideLink)
+          ? processChildren(children, entities, campaignId, worldId, insideLink, openInNewTab)
           : children;
         return React.createElement(Comp, props, processedChildren);
       };
@@ -226,12 +242,13 @@ export function SmartText({
         renderLink({
           href,
           children: entities.length
-            ? processChildren(children, entities, campaignId, worldId, true)
+            ? processChildren(children, entities, campaignId, worldId, true, openInNewTab)
             : children,
+          openInNewTab,
         }),
       hr: () => <hr className="my-6 border-hero-border/70" />,
     };
-  }, [entities, campaignId, worldId]);
+  }, [entities, campaignId, worldId, openInNewTab]);
 
   if (!trimmed) {
     return (
