@@ -10,6 +10,8 @@ import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/cam
 import { isLocationType } from "@/src/lib/lore-types";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
+import { getCampaignShops } from "@/src/app/dashboard/campaigns/[id]/shop-queries";
+import type { LiveCampaignShopOption } from "./StageNpcShopControls";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -407,6 +409,17 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   const normalizedQuests = normalizeActiveQuests(activeQuests ?? []);
 
+  let campaignShopsForLive: LiveCampaignShopOption[] = [];
+  if (viewAsGM) {
+    const { shops } = await getCampaignShops((session as any).campaign_id);
+    campaignShopsForLive = shops.map((shop) => ({
+      id: shop.id,
+      name: shop.name,
+      shop_mode: shop.shop_mode,
+      archetype_key: shop.archetype_key,
+    }));
+  }
+
   return (
     <LiveSessionBoard
       sessionId={sessionId}
@@ -437,6 +450,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
       activeQuests={serializeForClient(normalizedQuests)}
       loreLocationOptions={serializeForClient(loreLocationOptions)}
       sessionLocationLoreReadable={sessionLocationLoreReadable}
+      campaignShops={serializeForClient(campaignShopsForLive)}
     />
   );
 }

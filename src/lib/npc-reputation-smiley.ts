@@ -1,5 +1,12 @@
+/** GM-Anzeige auf der Bühne, z. B. „+15“ oder „−20“. */
+export function formatNpcReputationScore(raw: number): string {
+  const s = Math.round(Number.isFinite(raw) ? raw : 0);
+  if (s > 0) return `+${s}`;
+  return String(s);
+}
+
 /**
- * Bühnen-Ruf (campaign_npc_reputation.reputation_score): nur Smiley, keine Zahl für Spieler.
+ * Bühnen-Ruf (campaign_npc_reputation.reputation_score): Smiley für Spieler-Reaktionen.
  * Neutralband −5 … +5, darüber freundlicher, darunter negativer (bis sehr niedrig).
  */
 export function npcReputationSmileyFromScore(raw: number): string {

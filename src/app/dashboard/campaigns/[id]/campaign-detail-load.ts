@@ -668,6 +668,20 @@ export async function loadCampaignDetailPageData(
       const rsvpDeadlineDays =
         parsedDays != null && !Number.isNaN(parsedDays) ? parsedDays : null;
 
+      let planningDummySlotCount = 0;
+      const { data: liveDummyRow } = await (supabase.from("session_live_states") as any)
+        .select("dummy_player_count")
+        .eq("session_id", String(featured.id))
+        .maybeSingle();
+      planningDummySlotCount = Math.min(
+        3,
+        Math.max(
+          0,
+          Math.round(Number((liveDummyRow as { dummy_player_count?: unknown } | null)?.dummy_player_count ?? 0)) ||
+            0,
+        ),
+      );
+
       gmTermineSpielplan = {
         campaignId: id,
         nextSession: {
@@ -683,6 +697,7 @@ export async function loadCampaignDetailPageData(
           pendingCount: Number(featured.pendingCount ?? 0),
           gmPrepComplete:
             (featured as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
+          planningDummySlotCount,
         },
         players,
       };
@@ -1107,6 +1122,11 @@ export async function loadCampaignDetailPageData(
   const otherUpcomingSessionsForTab = (upcomingSessionsWithRsvp as any[]).filter(
     (x) => x.id !== (focusSessionForTab as { id?: string } | null)?.id,
   );
+
+  if (isGM && focusSessionForTab && gmTermineSpielplan.nextSession?.planningDummySlotCount != null) {
+    (focusSessionForTab as { planning_dummy_player_count?: number }).planning_dummy_player_count =
+      gmTermineSpielplan.nextSession.planningDummySlotCount;
+  }
 
   const pageData = {
     campaign,

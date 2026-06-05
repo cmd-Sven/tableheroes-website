@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Map as MapIcon, Sword, Plus } from "lucide-react";
 import Image from "next/image";
+import { loadGmMyCampaignCardModels } from "@/src/app/dashboard/my-campaigns/gm-my-campaign-cards-data";
+import { GmMyCampaignCard } from "@/src/components/dashboard/my-campaigns/GmMyCampaignCard";
 
 const GM_MAX_CAMPAIGNS = 3;
 
@@ -44,10 +46,12 @@ export default async function MyCampaignsPage() {
 
   if (isGM) {
     const { data: campaignsRaw } = await (supabase.from("campaigns") as any)
-      .select("id, name, system, banner_url")
+      .select("id, name, system, banner_url, status")
       .eq("gm_id", user.id)
       .order("created_at", { ascending: false });
     const campaigns = (campaignsRaw as any[]) || [];
+
+    const gmCardModels = await loadGmMyCampaignCardModels(supabase, campaigns);
 
     const canCreateMore = campaigns.length < GM_MAX_CAMPAIGNS;
 
@@ -95,36 +99,9 @@ export default async function MyCampaignsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {campaigns.map((c: any) => (
-              <Link
-                key={c.id}
-                href={`/dashboard/campaigns/${c.id}`}
-                className="block rounded-md border border-hero-border bg-background-card overflow-hidden shadow-lg hover:border-hero-vibrant transition-colors group"
-              >
-                {c.banner_url ? (
-                  <div className="relative h-32 w-full bg-hero-dark">
-                    <Image
-                      src={c.banner_url}
-                      alt=""
-                      fill
-                      className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-32 w-full bg-hero-dark/50 flex items-center justify-center">
-                    <MapIcon className="h-10 w-10 text-hero-vibrant/50" />
-                  </div>
-                )}
-                <div className="p-4">
-                  <h3 className="font-cinzel font-bold text-lg text-white mb-1 group-hover:text-accent-gold transition-colors truncate">
-                    {c.name || "Unbenannt"}
-                  </h3>
-                  <p className="font-barlow font-bold text-gray-500 uppercase text-xs">
-                    {c.system || "System offen"}
-                  </p>
-                </div>
-              </Link>
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {gmCardModels.map((model) => (
+              <GmMyCampaignCard key={model.id} model={model} />
             ))}
           </div>
         )}

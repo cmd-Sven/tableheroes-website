@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Copy,
   Radio,
+  Archive,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
@@ -25,6 +26,8 @@ import {
   cancelSession,
   endSession,
   markSessionPlanningComplete,
+  archiveScheduledSessionQuietly,
+  setPlanningDummyPlayerCount,
 } from "./session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 import {
@@ -49,6 +52,8 @@ type SessionItem = {
   hasAcceptedRsvps?: boolean;
   gm_prep_complete?: boolean;
   registration_closed_on_landing?: boolean | null;
+  /** Aus session_live_states — Platzhalter am Tisch (0–3) */
+  planning_dummy_player_count?: number;
 };
 
 function formatSessionDateTime(startTime: string) {
@@ -87,23 +92,27 @@ function sessionCardBorderClass(session: SessionItem): string {
   return "border-hero-border/30";
 }
 
-/** Dropdown mit Bearbeiten/Löschen/Absagen/Beenden für GM */
+/** Dropdown mit Bearbeiten/Löschen/Absagen/Archivieren/Beenden für GM */
 function SessionActionsDropdown({
   isStarting,
   onEdit,
   onDelete,
   onCancel,
+  onArchiveQuiet,
   onEnd,
   hasAcceptedRsvps,
   isLive,
+  isScheduled,
 }: {
   isStarting: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onCancel?: () => void;
+  onArchiveQuiet?: () => void;
   onEnd?: () => void;
   hasAcceptedRsvps?: boolean;
   isLive?: boolean;
+  isScheduled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -160,7 +169,7 @@ function SessionActionsDropdown({
                 <Pencil className="h-4 w-4" />
                 Bearbeiten
               </button>
-              {hasAcceptedRsvps && onCancel ? (
+              {isScheduled && onCancel ? (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -172,9 +181,25 @@ function SessionActionsDropdown({
                   className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
                 >
                   <Calendar className="h-4 w-4" />
-                  Absagen
+                  Absagen (Zugesagte informiert)
                 </button>
-              ) : (
+              ) : null}
+              {isScheduled && onArchiveQuiet ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onArchiveQuiet();
+                  }}
+                  disabled={isStarting}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-gray-300 hover:bg-hero-dark hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <Archive className="h-4 w-4" />
+                  Archivieren (ohne Nachricht)
+                </button>
+              ) : null}
+              {!hasAcceptedRsvps ? (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -188,7 +213,7 @@ function SessionActionsDropdown({
                   <Trash2 className="h-4 w-4" />
                   Löschen
                 </button>
-              )}
+              ) : null}
             </>
           )}
         </div>
@@ -269,7 +294,12 @@ export function SessionsTab({
   };
 
   const handleCancel = (sessionId: string) => {
-    if (!confirm("Termin absagen? Zugesagte Spieler erhalten eine Benachrichtigung in ihrer Nachrichten-Karte.")) return;
+    if (
+      !confirm(
+        "Termin absagen? Nur Spieler mit Zusage oder „Via Online“ erhalten eine Nachricht in ihrer Nachrichten-Karte.",
+      )
+    )
+      return;
     startTransition(async () => {
       try {
         await cancelSession(sessionId);
@@ -288,6 +318,35 @@ export function SessionsTab({
         router.refresh();
       } catch (err: unknown) {
         alert((err as Error).message || "Fehler beim Beenden der Session.");
+      }
+    });
+  };
+
+  const handleArchiveQuiet = (sessionId: string) => {
+    if (
+      !confirm(
+        "Diesen geplanten Termin ohne Benachrichtigung an Spieler archivieren? Er verschwindet aus der Übersicht (Status: abgeschlossen).",
+      )
+    )
+      return;
+    startTransition(async () => {
+      try {
+        await archiveScheduledSessionQuietly(sessionId);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Archivieren fehlgeschlagen.");
+      }
+    });
+  };
+
+  const handlePlanningDummy = (sessionId: string, next: number) => {
+    if (isStarting) return;
+    startTransition(async () => {
+      try {
+        await setPlanningDummyPlayerCount(sessionId, next);
+        router.refresh();
+      } catch (err: unknown) {
+        alert((err as Error).message || "Platzhalter konnten nicht gespeichert werden.");
       }
     });
   };
@@ -315,9 +374,13 @@ export function SessionsTab({
         onEdit={() => setEditingSession(session)}
         onDelete={() => handleDelete(session.id)}
         onCancel={() => handleCancel(session.id)}
+        onArchiveQuiet={
+          scheduled ? () => handleArchiveQuiet(session.id) : undefined
+        }
         onEnd={() => handleEndSession(session.id)}
         hasAcceptedRsvps={session.hasAcceptedRsvps}
         isLive={live}
+        isScheduled={scheduled}
       />
     );
   }
@@ -485,6 +548,67 @@ export function SessionsTab({
                       {scheduled && isGM ? renderScheduledGmControls(focusSession) : null}
                     </div>
                   </div>
+                  {isGM && (scheduled || live) ? (
+                    <div className="mt-4 border-t border-hero-border/30 pt-4">
+                      <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                        Platzhalter am Tisch
+                      </p>
+                      <p className="mt-1 font-libre text-xs text-gray-500">
+                        Rein physisch — wie in der Live-Session: kein Account, kein Rucksack, kein
+                        Tracking.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1 rounded border border-hero-border/50 bg-hero-dark/40 p-1">
+                          <button
+                            type="button"
+                            disabled={isStarting || (focusSession.planning_dummy_player_count ?? 0) <= 0}
+                            onClick={() =>
+                              handlePlanningDummy(
+                                focusSession.id,
+                                Math.max(
+                                  0,
+                                  (Math.round(Number(focusSession.planning_dummy_player_count ?? 0)) ||
+                                    0) - 1,
+                                ),
+                              )
+                            }
+                            className="grid h-8 w-8 place-items-center rounded font-barlow text-lg font-bold text-white hover:bg-hero-dark disabled:opacity-40"
+                            aria-label="Platzhalter entfernen"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[3.5rem] text-center font-barlow text-sm font-bold text-accent-gold">
+                            {Math.min(
+                              3,
+                              Math.max(
+                                0,
+                                Math.round(Number(focusSession.planning_dummy_player_count ?? 0)) || 0,
+                              ),
+                            )}{" "}
+                            / 3
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isStarting || (focusSession.planning_dummy_player_count ?? 0) >= 3}
+                            onClick={() =>
+                              handlePlanningDummy(
+                                focusSession.id,
+                                Math.min(
+                                  3,
+                                  (Math.round(Number(focusSession.planning_dummy_player_count ?? 0)) ||
+                                    0) + 1,
+                                ),
+                              )
+                            }
+                            className="grid h-8 w-8 place-items-center rounded font-barlow text-lg font-bold text-white hover:bg-hero-dark disabled:opacity-40"
+                            aria-label="Platzhalter hinzufügen"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
 

@@ -6,6 +6,7 @@ import { Coins } from "lucide-react";
 import { getCharacterInventory } from "@/src/lib/actions/character-inventory-actions";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import type { CharacterWealth } from "@/src/types/inventory";
+import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
 
 type CharacterSummary = {
   id: string;
@@ -26,14 +27,6 @@ function emptyWealth(characterId: string): CharacterWealth {
     pp: 0,
     gem_data: [],
   };
-}
-
-function coinBadge(label: string, value: number) {
-  return (
-    <span className="rounded border border-white/10 bg-black/25 px-2 py-1 font-barlow text-xs font-bold uppercase text-stone-100">
-      {label} <span className="text-accent-gold">{value.toLocaleString("de-DE")}</span>
-    </span>
-  );
 }
 
 export function CharacterWealthInventoryCard({
@@ -85,25 +78,20 @@ export function CharacterWealthInventoryCard({
             <p className="font-barlow font-bold text-xs uppercase text-stone-400">
               Währung & Rucksack
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {coinBadge("GP", wealth.gp)}
-              {coinBadge("SP", wealth.sp)}
-              {coinBadge("CP", wealth.cp)}
-              {coinBadge("EP", wealth.ep)}
-              {coinBadge("PP", wealth.pp)}
-            </div>
+            <DndCoinWalletRow pouch={wealth} className="mt-2" />
             <p className="mt-2 font-libre text-sm text-stone-300">
               Gesamtwert inkl. Edelsteine:{" "}
-              <span className="font-barlow font-bold text-accent-gold">
+              <span className="inline-flex items-center gap-1 font-barlow font-bold text-accent-gold">
                 {totalGoldValue.toLocaleString("de-DE", {
                   maximumFractionDigits: 2,
-                })}{" "}
-                GP
+                })}
+                <DndCoinIcon code="gp" size="sm" />
               </span>
             </p>
             {gemTotal > 0 ? (
-              <p className="font-libre text-xs text-stone-500">
-                Edelsteine: {gemTotal.toLocaleString("de-DE")} GP geschätzt
+              <p className="inline-flex items-center gap-1 font-libre text-xs text-stone-500">
+                Edelsteine: {gemTotal.toLocaleString("de-DE")}{" "}
+                <DndCoinIcon code="gp" size="xs" /> geschätzt
               </p>
             ) : null}
             {error ? <p className="mt-1 font-libre text-xs text-red-300">{error}</p> : null}

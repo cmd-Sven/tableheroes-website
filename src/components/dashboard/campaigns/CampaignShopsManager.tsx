@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   createCampaignShop,
@@ -90,7 +91,7 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                 onChange={() => setShopMode("unique")}
                 className="border-hero-dark text-hero-vibrant focus:ring-hero-vibrant"
               />
-              Unique (eigener Katalog, später)
+              Unique (eigener Warenkatalog)
             </label>
           </fieldset>
 
@@ -141,7 +142,27 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                 Positiv = teurer, negativ = günstiger (Basispreise aus Vorlage).
               </p>
             </div>
-          ) : null}
+          ) : (
+            <div>
+              <label
+                htmlFor="price_modifier_percent_unique"
+                className="mb-2 block font-barlow font-bold uppercase text-xs text-gray-300"
+              >
+                Preismodifikator (%)
+              </label>
+              <input
+                id="price_modifier_percent_unique"
+                name="price_modifier_percent"
+                type="number"
+                defaultValue={0}
+                step={1}
+                className="w-full max-w-xs rounded bg-slate-900 border border-hero-dark p-2 text-white focus:border-hero-vibrant outline-none"
+              />
+              <p className="mt-1 font-libre text-xs text-gray-500">
+                Optional: wirkt auf alle Preise im eigenen Katalog.
+              </p>
+            </div>
+          )}
 
           <div>
             <label
@@ -210,7 +231,16 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                           </span>
                         </>
                       ) : (
-                        "—"
+                        <>
+                          Eigener Katalog
+                          {s.price_modifier_percent !== 0 ? (
+                            <span className="text-gray-500">
+                              {" "}
+                              ({s.price_modifier_percent > 0 ? "+" : ""}
+                              {s.price_modifier_percent}%)
+                            </span>
+                          ) : null}
+                        </>
                       )}
                     </td>
                     <td className="py-3 pr-4">
@@ -232,6 +262,14 @@ export function CampaignShopsManager({ campaignId, shops }: Props) {
                       )}
                     </td>
                     <td className="py-3">
+                      {s.shop_mode === "unique" ? (
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/shops/${s.id}`}
+                          className="mb-2 block rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-hero-vibrant transition-colors hover:bg-hero-vibrant hover:text-white"
+                        >
+                          Katalog bearbeiten
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => setAiShop(s)}

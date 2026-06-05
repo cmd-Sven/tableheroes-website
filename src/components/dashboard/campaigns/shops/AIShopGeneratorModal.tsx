@@ -323,7 +323,7 @@ export function AIShopGeneratorModal({
                             className="w-24 rounded border border-hero-dark bg-slate-900 p-2 text-right font-libre text-white outline-none focus:border-accent-gold"
                             title="Basispreis in Goldmuenzen (gp)"
                           />
-                          <span className="font-barlow text-xs font-bold uppercase text-accent-gold">gp</span>
+                          <span className="font-barlow text-xs font-bold uppercase text-accent-gold">GM</span>
                           <button
                             type="button"
                             onClick={() => removeItem(index)}

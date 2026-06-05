@@ -1,5 +1,6 @@
 "use server";
 
+import { addCharacterWealthGpSp } from "@/src/lib/character-gold";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import type { Json } from "@/src/lib/database.types";
@@ -42,46 +43,6 @@ async function assertLiveLootMatches(
     .maybeSingle();
   const cur = (live as { current_loot_id?: string | null } | null)?.current_loot_id;
   return cur != null && String(cur) === String(containerId);
-}
-
-async function addWealthGpSp(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  characterId: string,
-  addGp: number,
-  addSp: number,
-): Promise<void> {
-  const addG = Math.max(0, Math.round(addGp));
-  const addS = Math.max(0, Math.round(addSp));
-  if (addG === 0 && addS === 0) return;
-
-  const { data: existing } = await (supabase as any)
-    .from("character_wealth")
-    .select("gp, sp, cp, ep, pp, gem_data")
-    .eq("character_id", characterId)
-    .maybeSingle();
-
-  if (existing) {
-    const ex = existing as Record<string, unknown>;
-    const gp = Math.max(0, Math.round(Number(ex.gp ?? 0)) + addG);
-    const sp = Math.max(0, Math.round(Number(ex.sp ?? 0)) + addS);
-    const { error } = await (supabase as any)
-      .from("character_wealth")
-      .update({ gp, sp })
-      .eq("character_id", characterId);
-    if (error) throw new Error(error.message ?? "Vermögen konnte nicht aktualisiert werden.");
-    return;
-  }
-
-  const { error } = await (supabase as any).from("character_wealth").insert({
-    character_id: characterId,
-    gp: addG,
-    sp: addS,
-    cp: 0,
-    ep: 0,
-    pp: 0,
-    gem_data: [],
-  });
-  if (error) throw new Error(error.message ?? "Vermögen konnte nicht angelegt werden.");
 }
 
 export async function publishLootToSession(
@@ -213,7 +174,7 @@ export async function takeAllLootGoldFromContainer(
       return { ok: true };
     }
 
-    await addWealthGpSp(supabase, characterId, takeGp, takeSp);
+    await addCharacterWealthGpSp(supabase, characterId, takeGp, takeSp);
 
     const { error: upErr } = await (supabase as any)
       .from("campaign_loot_containers")

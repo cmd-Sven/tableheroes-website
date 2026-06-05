@@ -4,7 +4,7 @@ import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
-import { isSessionStatusTerminal } from "@/src/lib/session-status";
+import { isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 
@@ -225,7 +225,7 @@ export async function startSession(sessionId: string) {
       weather: "Klar",
       temperature: "normal",
       temperature_value: 15,
-      current_time: "Tagsüber",
+      current_time: "Tag",
       current_location: null,
       journal_text: null,
       system_logs: [],
@@ -441,7 +441,7 @@ function buildSessionPrepCoreInsertPayload(
     session_id: sessionId,
     scribe_id: scribeUserId,
     weather: "Klar",
-    current_time: "Tagsüber",
+    current_time: "Tag",
     current_location: null,
     journal_text: null,
     system_logs: [],
@@ -463,7 +463,7 @@ function buildSessionPrepLiveStateInsertPayload(
     weather: "Klar",
     temperature: "normal",
     temperature_value: 15,
-    current_time: "Tagsüber",
+    current_time: "Tag",
     current_location: null,
     current_location_lore_id: null,
     current_location_id: null,
@@ -790,19 +790,65 @@ export async function archiveSession(
     .maybeSingle();
 
   const liveState = (liveStateRaw ?? {}) as Record<string, unknown>;
-  const npcIds = normalizeStringIds(liveState.visible_npc_ids);
+  const visibleNpcIds = normalizeStringIds(liveState.visible_npc_ids);
   const locationId =
     liveState.current_location_lore_id != null
       ? String(liveState.current_location_lore_id)
       : null;
 
-  let encounteredNpcs: Array<{ id: string; name: string }> = [];
-  if (npcIds.length > 0) {
+  const reputationTouchedNpcIds = new Set<string>();
+  if (session.start_time) {
+    const { data: touchedRepRows } = await (supabase.from(
+      "campaign_npc_reputation",
+    ) as any)
+      .select("npc_id")
+      .eq("campaign_id", campaignId)
+      .gte("updated_at", session.start_time);
+
+    for (const row of (touchedRepRows as Array<{ npc_id: string }> | null) ?? []) {
+      reputationTouchedNpcIds.add(String(row.npc_id));
+    }
+  }
+
+  const archiveNpcIds = Array.from(
+    new Set([...visibleNpcIds, ...reputationTouchedNpcIds]),
+  );
+
+  const reputationScoreByNpc = new Map<string, number>();
+  if (archiveNpcIds.length > 0) {
+    const { data: repScoreRows } = await (supabase.from(
+      "campaign_npc_reputation",
+    ) as any)
+      .select("npc_id, reputation_score")
+      .eq("campaign_id", campaignId)
+      .in("npc_id", archiveNpcIds);
+
+    for (const row of (repScoreRows as Array<{
+      npc_id: string;
+      reputation_score: number;
+    }> | null) ?? []) {
+      reputationScoreByNpc.set(
+        String(row.npc_id),
+        Number(row.reputation_score ?? 0),
+      );
+    }
+  }
+
+  let encounteredNpcs: Array<{
+    id: string;
+    name: string;
+    reputation_score: number;
+  }> = [];
+  if (visibleNpcIds.length > 0) {
     const { data: npcRows } = await (supabase.from("npcs") as any)
       .select("id, name")
-      .in("id", npcIds);
+      .in("id", visibleNpcIds);
     encounteredNpcs = ((npcRows as Array<{ id: string; name: string }> | null) ?? [])
-      .map((npc) => ({ id: String(npc.id), name: String(npc.name ?? "Unbekannt") }));
+      .map((npc) => ({
+        id: String(npc.id),
+        name: String(npc.name ?? "Unbekannt"),
+        reputation_score: reputationScoreByNpc.get(String(npc.id)) ?? 0,
+      }));
   }
 
   let visitedLocations: Array<{ id: string | null; name: string }> = [];
@@ -860,10 +906,11 @@ export async function archiveSession(
 
   const archive = archiveRaw as { id: string };
 
-  if (npcIds.length > 0) {
-    const reputationRows = npcIds.map((npcId) => ({
+  if (archiveNpcIds.length > 0) {
+    const reputationRows = archiveNpcIds.map((npcId) => ({
       campaign_id: campaignId,
       npc_id: npcId,
+      reputation_score: reputationScoreByNpc.get(npcId) ?? 0,
       last_seen_session_id: archive.id,
       last_seen_location_id: locationId,
       last_seen_at: archivedAt,
@@ -1178,6 +1225,102 @@ export async function deleteSession(sessionId: string) {
 }
 
 // ============================================================================
+// GM: Geplanten Termin still archivieren (Completed) — keine Nachrichten an Spieler
+// ============================================================================
+export async function archiveScheduledSessionQuietly(sessionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  if (!session) throw new Error("Session nicht gefunden.");
+
+  if (!isSessionStatusScheduled(session.status)) {
+    throw new Error(
+      "Nur geplante (nicht gestartete) Termine können ohne Benachrichtigung archiviert werden.",
+    );
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, owner_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
+    throw new Error("Nur der Spielleiter kann den Termin archivieren.");
+  }
+
+  await endSession(sessionId);
+  revalidatePath("/dashboard/my-campaigns");
+  return { success: true, campaignId: session.campaign_id };
+}
+
+// ============================================================================
+// GM: Platzhalter am Tisch (0–3) für Vorbereitung / Live — session_live_states
+// ============================================================================
+export async function setPlanningDummyPlayerCount(sessionId: string, count: number) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const n = Math.min(3, Math.max(0, Math.round(Number(count)) || 0));
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as { id: string; campaign_id: string; status: string } | null;
+  if (!session) throw new Error("Session nicht gefunden.");
+  if (isSessionStatusTerminal(session.status)) {
+    throw new Error("Session ist bereits abgeschlossen oder abgesagt.");
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, owner_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+  if (!isCampaignGm(campaign, user.id)) {
+    throw new Error("Nur der Spielleiter kann Platzhalter setzen.");
+  }
+
+  await ensureSessionPrepLiveState(sessionId);
+
+  const { error: updError } = await (supabase.from("session_live_states") as any)
+    .update({ dummy_player_count: n })
+    .eq("session_id", sessionId);
+
+  if (updError) {
+    console.error("[setPlanningDummyPlayerCount]", updError);
+    throw new Error(updError.message || "Platzhalter konnten nicht gespeichert werden.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath("/dashboard/my-campaigns");
+  return { success: true, dummy_player_count: n };
+}
+
+// ============================================================================
 // Cancel Session (GM only) – Status auf Cancelled, Nachrichten an zugesagte Spieler
 // ============================================================================
 export async function cancelSession(sessionId: string) {
@@ -1211,7 +1354,7 @@ export async function cancelSession(sessionId: string) {
     throw new Error("Nur der GM kann einen Termin absagen.");
   }
 
-  if (session.status === "Live") {
+  if (isSessionStatusLive(session.status)) {
     throw new Error("Eine laufende Session kann nicht abgesagt werden. Beende sie zuerst.");
   }
 
@@ -1257,5 +1400,6 @@ export async function cancelSession(sessionId: string) {
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath("/dashboard/my-campaigns");
   return { success: true };
 }

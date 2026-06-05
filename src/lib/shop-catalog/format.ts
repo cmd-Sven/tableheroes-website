@@ -1,3 +1,8 @@
+import {
+  catalogItemToCopper,
+  formatCopper,
+  formatCoinPouch,
+} from "@/src/lib/dnd-currency";
 import type { DamageTypeDe, ShopCatalogItem } from "./types";
 
 function damageTypeLabel(t: DamageTypeDe): string {
@@ -7,18 +12,12 @@ function damageTypeLabel(t: DamageTypeDe): string {
 }
 
 export function formatItemPrice(item: ShopCatalogItem): string {
+  const cp = catalogItemToCopper(item);
+  if (cp > 0) {
+    return formatCopper(cp);
+  }
   if (item.priceLabel) return item.priceLabel;
-  const parts: string[] = [];
-  if (item.priceGp != null && item.priceGp > 0) {
-    parts.push(`${item.priceGp} GP`);
-  }
-  if (item.priceSp != null && item.priceSp > 0) {
-    parts.push(`${item.priceSp} SP`);
-  }
-  if (item.priceCp != null && item.priceCp > 0) {
-    parts.push(`${item.priceCp} CP`);
-  }
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return "—";
 }
 
 export function formatItemDetails(item: ShopCatalogItem): string {
@@ -75,3 +74,9 @@ export function formatItemDetails(item: ShopCatalogItem): string {
 
   return lines.length > 0 ? lines.join(" · ") : "—";
 }
+
+export function formatCatalogItemPriceParts(item: ShopCatalogItem): string {
+  return formatItemPrice(item);
+}
+
+export { formatCoinPouch, formatCopper };

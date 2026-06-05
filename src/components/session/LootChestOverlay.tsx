@@ -6,6 +6,7 @@ import { Coins, Loader2, Package, X } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/client";
 import { toast } from "sonner";
 import { takeAllLootGoldFromContainer } from "@/src/lib/actions/loot-actions";
+import { DndCoinDisplay } from "@/src/components/currency/DndCoinDisplay";
 
 type ContainerRow = {
   id: string;
@@ -141,8 +142,8 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
           <span className="max-w-[12rem] truncate font-barlow text-[10px] font-extrabold uppercase tracking-wide text-hero-vibrant">
             {row?.name ?? "Beute"}
           </span>
-          <span className="font-libre text-[9px] text-gray-400">
-            {hasGold ? `${gp} gp / ${sp} sp` : "Kein Gold"}{" "}
+          <span className="font-libre text-[9px] text-gray-400 inline-flex flex-wrap items-center gap-1">
+            {hasGold ? <DndCoinDisplay pouch={{ gp, sp }} size="xs" /> : "Kein Geld"}{" "}
             {hasItems ? `· ${itemsCount} Item(s)` : ""}
           </span>
         </motion.button>
@@ -200,9 +201,9 @@ export function LootChestOverlay({ sessionId, containerId, characterId, isGM }: 
                       <Coins className="h-4 w-4" />
                       Münzen
                     </div>
-                    <p className="mb-2 font-libre text-sm text-gray-200">
-                      {gp} Gold, {sp} Silber
-                    </p>
+                    <div className="mb-2">
+                      <DndCoinDisplay pouch={{ gp, sp }} size="md" />
+                    </div>
                     <button
                       type="button"
                       disabled={!canInteract || isGoldPending}

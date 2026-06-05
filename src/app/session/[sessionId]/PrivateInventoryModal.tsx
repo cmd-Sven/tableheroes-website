@@ -28,6 +28,10 @@ import {
   type InventoryCategory,
 } from "@/src/types/inventory";
 import { ItemEditorModal } from "./ItemEditorModal";
+import { DND_COIN_TYPES, type DndCoinCode } from "@/src/lib/dnd-currency";
+import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
+
+const COIN_FIELD_ORDER: DndCoinCode[] = ["pp", "gp", "ep", "sp", "cp"];
 
 type InventoryTab = InventoryCategory;
 
@@ -100,17 +104,24 @@ function emptyWealth(characterId: string): CharacterWealth {
   };
 }
 
-function currencyField(label: string, value: number, onChange: (value: number) => void) {
+function currencyField(
+  code: DndCoinCode,
+  value: number,
+  onChange: (value: number) => void,
+) {
+  const meta = DND_COIN_TYPES.find((row) => row.code === code);
   return (
     <label className="block">
-      <span className="mb-1 block font-barlow text-[10px] font-bold uppercase text-accent-gold/80">
-        {label}
+      <span className="mb-1 flex items-center gap-1.5">
+        <DndCoinIcon code={code} size="sm" />
+        <span className="sr-only">{meta?.name ?? code}</span>
       </span>
       <input
         type="number"
         min={0}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={meta?.name ?? code}
         className="w-full rounded bg-black/35 px-2 py-1.5 font-barlow text-xs font-bold text-white outline-none focus:bg-black/55"
       />
     </label>
@@ -363,21 +374,18 @@ export function PrivateInventoryModal({
               <p className="font-libre text-sm text-slate-100">Inventar wird geladen...</p>
             ) : activeTab === "CoinGem" ? (
               <div className="space-y-3">
+                <div className="rounded-xl bg-black/25 p-3">
+                  <h3 className="mb-2 font-barlow text-xs font-bold uppercase text-accent-gold">
+                    Münzbeutel
+                  </h3>
+                  <DndCoinWalletRow pouch={wealthDraft} />
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
-                  {currencyField("GP", wealthDraft.gp, (gp) =>
-                    setWealthDraft((current) => ({ ...current, gp })),
-                  )}
-                  {currencyField("SP", wealthDraft.sp, (sp) =>
-                    setWealthDraft((current) => ({ ...current, sp })),
-                  )}
-                  {currencyField("CP", wealthDraft.cp, (cp) =>
-                    setWealthDraft((current) => ({ ...current, cp })),
-                  )}
-                  {currencyField("EP", wealthDraft.ep, (ep) =>
-                    setWealthDraft((current) => ({ ...current, ep })),
-                  )}
-                  {currencyField("PP", wealthDraft.pp, (pp) =>
-                    setWealthDraft((current) => ({ ...current, pp })),
+                  {COIN_FIELD_ORDER.map((code) =>
+                    currencyField(code, wealthDraft[code], (next) =>
+                      setWealthDraft((current) => ({ ...current, [code]: next })),
+                    ),
                   )}
                 </div>
 
@@ -413,18 +421,24 @@ export function PrivateInventoryModal({
                           placeholder="Name"
                           className="rounded bg-black/35 px-2 py-1.5 font-libre text-xs text-white outline-none focus:bg-black/55"
                         />
-                        <input
-                          type="number"
-                          min={0}
-                          value={gem.estimated_value}
-                          onChange={(e) =>
-                            updateGem(index, {
-                              estimated_value: Number(e.target.value),
-                            })
-                          }
-                          placeholder="Wert"
-                          className="rounded bg-black/35 px-2 py-1.5 font-barlow text-xs font-bold text-white outline-none focus:bg-black/55"
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            value={gem.estimated_value}
+                            onChange={(e) =>
+                              updateGem(index, {
+                                estimated_value: Number(e.target.value),
+                              })
+                            }
+                            placeholder="Wert"
+                            aria-label="Geschätzter Wert in Goldmünzen"
+                            className="w-full rounded bg-black/35 py-1.5 pl-2 pr-7 font-barlow text-xs font-bold text-white outline-none focus:bg-black/55"
+                          />
+                          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2">
+                            <DndCoinIcon code="gp" size="xs" />
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() =>
@@ -446,8 +460,9 @@ export function PrivateInventoryModal({
                     <span className="font-libre text-xs text-slate-100">
                       Edelstein-Summe
                     </span>
-                    <span className="font-barlow text-base font-extrabold text-accent-gold">
-                      {gemTotal} GP
+                    <span className="inline-flex items-center gap-1 font-barlow text-base font-extrabold text-accent-gold">
+                      {gemTotal.toLocaleString("de-DE")}
+                      <DndCoinIcon code="gp" size="sm" />
                     </span>
                   </div>
                 </div>

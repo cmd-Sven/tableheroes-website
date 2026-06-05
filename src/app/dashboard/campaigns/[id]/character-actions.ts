@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { getGmCampaignMembersWithCharacters } from "./members-actions";
 import { getCharacterWizardLoreData as loadCharacterWizardLoreData } from "./character-queries";
+import { updateCharacterRowWithSchemaFallback } from "@/src/lib/characters/character-update-fallback";
+import { setCharacterGoldGp } from "@/src/lib/character-gold";
 
 /**
  * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
@@ -571,29 +573,23 @@ export async function updateCharacterPlayer(data: {
     const n = Math.max(0, Math.floor(Number(data.experience_points) || 0));
     updates.experience_points = n;
   }
+  let pocketGoldToSet: number | undefined;
   if (data.pocket_gold !== undefined) {
-    const n = Math.max(0, Math.floor(Number(data.pocket_gold) || 0));
-    updates.pocket_gold = n;
+    pocketGoldToSet = Math.max(0, Math.floor(Number(data.pocket_gold) || 0));
   }
 
-  let { error } = await (supabase.from("characters") as any)
-    .update(updates)
-    .eq("id", data.character_id);
-
-  const errMsg = String(error?.message ?? "").toLowerCase();
-  if (
-    error &&
-    "avatar_display" in updates &&
-    (errMsg.includes("avatar_display") || errMsg.includes("schema cache") || errMsg.includes("column"))
-  ) {
-    const { avatar_display: _omit, ...withoutAvatarDisplay } = updates;
-    const second = await (supabase.from("characters") as any)
-      .update(withoutAvatarDisplay)
-      .eq("id", data.character_id);
-    error = second.error;
-  }
+  const { error } = await updateCharacterRowWithSchemaFallback(
+    supabase,
+    data.character_id,
+    updates,
+  );
 
   if (error) throw new Error(error.message || "Fehler beim Speichern.");
+
+  if (pocketGoldToSet !== undefined) {
+    const goldResult = await setCharacterGoldGp(supabase, data.character_id, pocketGoldToSet);
+    if (goldResult.error) throw new Error(goldResult.error);
+  }
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
   return { success: true };
@@ -707,22 +703,11 @@ export async function updateCharacterByGM(data: {
       avatar_display: avatarDisplayJson,
     };
 
-    let { error: updateError } = await (supabase.from("characters") as any)
-      .update(rowUpdate)
-      .eq("id", data.character_id);
-
-    const errMsg = String(updateError?.message ?? "").toLowerCase();
-    if (
-      updateError &&
-      "avatar_display" in rowUpdate &&
-      (errMsg.includes("avatar_display") || errMsg.includes("schema cache") || errMsg.includes("column"))
-    ) {
-      const { avatar_display: _omit, ...withoutAvatarDisplay } = rowUpdate;
-      const second = await (supabase.from("characters") as any)
-        .update(withoutAvatarDisplay)
-        .eq("id", data.character_id);
-      updateError = second.error;
-    }
+    const { error: updateError } = await updateCharacterRowWithSchemaFallback(
+      supabase,
+      data.character_id,
+      rowUpdate,
+    );
 
     if (updateError) {
       console.error("Update Character Error:", updateError);

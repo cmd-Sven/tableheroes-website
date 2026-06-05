@@ -47,13 +47,14 @@ function getNpcReputationModifier(npcReputation: number): number | null {
   return -40;
 }
 
-export function calculateDynamicPrice(
-  basePrice: number,
+/** Preis in Kupfer nach Ruf/Modifikator (D&D 5e). */
+export function calculateDynamicPriceCp(
+  basePriceCp: number,
   shopModifierPercent: number,
   locationReputation: number,
   npcReputation: number,
 ): number | null {
-  if (!Number.isFinite(basePrice) || basePrice < 0) return null;
+  if (!Number.isFinite(basePriceCp) || basePriceCp < 0) return null;
 
   const npcModifier = getNpcReputationModifier(npcReputation);
   if (npcModifier == null) return null;
@@ -63,5 +64,35 @@ export function calculateDynamicPrice(
     getLocationReputationModifier(locationReputation) +
     npcModifier;
 
-  return Math.max(0, Math.round(basePrice * (1 + totalModifier / 100)));
+  return Math.max(0, Math.round(basePriceCp * (1 + totalModifier / 100)));
 }
+
+/** @deprecated Nutze calculateDynamicPriceCp — erwartet Kupferwert. */
+export function calculateDynamicPrice(
+  basePrice: number,
+  shopModifierPercent: number,
+  locationReputation: number,
+  npcReputation: number,
+): number | null {
+  return calculateDynamicPriceCp(
+    Math.round(basePrice * 100),
+    shopModifierPercent,
+    locationReputation,
+    npcReputation,
+  );
+}
+
+/** Verkaufspreis an den Händler (50 % des Kaufpreises, min. 1 KM). */
+export function calculateSellPriceCp(dynamicBuyPriceCp: number): number {
+  if (!Number.isFinite(dynamicBuyPriceCp) || dynamicBuyPriceCp <= 0) return 0;
+  return Math.max(1, Math.floor(dynamicBuyPriceCp * 0.5));
+}
+
+export function calculateSellPrice(dynamicBuyPrice: number): number {
+  return calculateSellPriceCp(Math.round(dynamicBuyPrice * 100));
+}
+
+export {
+  parsePurchasePriceCopperFromDescription,
+  parsePurchasePriceCopperFromDescription as parsePurchasePriceFromDescription,
+} from "@/src/lib/dnd-currency";

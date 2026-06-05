@@ -17,6 +17,7 @@ import type { ImageDisplaySettings } from "@/src/lib/image-display";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
 import Link from "next/link";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
+import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
 
 type Culture = { id: string; name: string };
 type Language = { id: string; name: string };
@@ -275,6 +276,24 @@ export function MyCharacterSection({
         </div>
       )}
 
+      <ClientMountGate
+        fallback={
+          <div className="space-y-6 animate-pulse" aria-hidden>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i}>
+                  <div className="mb-1 h-3 w-16 rounded bg-hero-dark/50" />
+                  <div className="h-10 rounded border border-hero-dark/40 bg-slate-900/40" />
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="mb-1 h-3 w-20 rounded bg-hero-dark/50" />
+              <div className="h-32 rounded border border-hero-dark/40 bg-slate-900/40" />
+            </div>
+          </div>
+        }
+      >
       <div className="space-y-6">
         {/* Basis-Daten */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -684,6 +703,7 @@ export function MyCharacterSection({
           {saveButton}
         </div>
       </div>
+      </ClientMountGate>
     </section>
   );
 }

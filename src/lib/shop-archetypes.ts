@@ -32,11 +32,4 @@ export function isValidShopArchetypeKey(key: string): key is ShopArchetypeKey {
   return SHOP_ARCHETYPE_KEYS.has(key);
 }
 
-/** Kassandra / D&D – Anzeige (Phase später: Goldbeutel) */
-export const KASSANDRA_COINS = [
-  { code: "cp", dnd: "Kupfer (cp)", name: "Scherben" },
-  { code: "sp", dnd: "Silber (sp)", name: "Lunate" },
-  { code: "ep", dnd: "Elektrum (ep)", name: "Farum" },
-  { code: "gp", dnd: "Gold (gp)", name: "Auren" },
-  { code: "pp", dnd: "Platin (pp)", name: "Vattrus" },
-] as const;
+export { DND_COIN_TYPES, KASSANDRA_COINS } from "@/src/lib/dnd-currency";

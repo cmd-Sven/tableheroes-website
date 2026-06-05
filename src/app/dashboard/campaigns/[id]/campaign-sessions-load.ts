@@ -114,6 +114,24 @@ export async function loadUpcomingSessionsWithRsvpForGm(
     (x) => x.id !== focusSession?.id,
   );
 
+  if (focusSession) {
+    const { data: liveDummyRow } = await (supabase.from("session_live_states") as any)
+      .select("dummy_player_count")
+      .eq("session_id", String(focusSession.id))
+      .maybeSingle();
+    const planningDummySlotCount = Math.min(
+      3,
+      Math.max(
+        0,
+        Math.round(
+          Number((liveDummyRow as { dummy_player_count?: unknown } | null)?.dummy_player_count ?? 0),
+        ) || 0,
+      ),
+    );
+    (focusSession as { planning_dummy_player_count?: number }).planning_dummy_player_count =
+      planningDummySlotCount;
+  }
+
   return {
     upcomingSessionsWithRsvp,
     focusSession,

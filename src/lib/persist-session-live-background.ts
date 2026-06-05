@@ -90,7 +90,7 @@ export async function persistSessionLiveBackground(
       weather: "Klar",
       temperature: "normal",
       temperature_value: 15,
-      current_time: "Tagsüber",
+      current_time: "Tag",
       current_location: null,
       journal_text: null,
       system_logs: [],

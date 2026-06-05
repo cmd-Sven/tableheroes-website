@@ -854,6 +854,7 @@ export type Database = {
           created_at: string | null
           culture_lore_id: string | null
           current_location_id: string | null
+          experience_points: number
           faction_membership: string | null
           fears: string | null
           goals: string | null
@@ -863,6 +864,7 @@ export type Database = {
           name: string
           personality_adjectives: string[] | null
           physical_traits: string | null
+          pocket_gold: number
           profession: string | null
           race: string | null
           rations_count: number
@@ -883,6 +885,7 @@ export type Database = {
           created_at?: string | null
           culture_lore_id?: string | null
           current_location_id?: string | null
+          experience_points?: number
           faction_membership?: string | null
           fears?: string | null
           goals?: string | null
@@ -892,6 +895,7 @@ export type Database = {
           name: string
           personality_adjectives?: string[] | null
           physical_traits?: string | null
+          pocket_gold?: number
           profession?: string | null
           race?: string | null
           rations_count?: number
@@ -912,6 +916,7 @@ export type Database = {
           created_at?: string | null
           culture_lore_id?: string | null
           current_location_id?: string | null
+          experience_points?: number
           faction_membership?: string | null
           fears?: string | null
           goals?: string | null
@@ -921,6 +926,7 @@ export type Database = {
           name?: string
           personality_adjectives?: string[] | null
           physical_traits?: string | null
+          pocket_gold?: number
           profession?: string | null
           race?: string | null
           rations_count?: number

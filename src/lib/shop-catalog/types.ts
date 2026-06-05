@@ -26,7 +26,9 @@ export type ShopCatalogItem = {
   priceGp?: number;
   priceSp?: number;
   priceCp?: number;
-  /** Wenn gesetzt, wird dieser Text statt berechneter Münzen angezeigt */
+  priceEp?: number;
+  pricePp?: number;
+  /** Nur wenn kein fester Münzpreis (z. B. SL-Preis) */
   priceLabel?: string;
   weightLb?: number;
   /** Waffe */

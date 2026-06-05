@@ -2,11 +2,13 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCampaignAccess } from "../campaign-access";
-import { getCampaignShops } from "../shop-queries";
+import { getCampaignShops, getCampaignNpcsForMerchantAssignment } from "../shop-queries";
 import { CampaignShopsManager } from "@/src/components/dashboard/campaigns/CampaignShopsManager";
+import { CampaignMerchantAssignment } from "@/src/components/dashboard/campaigns/CampaignMerchantAssignment";
 import { ShopArchetypeCatalogBrowser } from "@/src/components/dashboard/campaigns/ShopArchetypeCatalogBrowser";
+import { DndCoinIcon } from "@/src/components/currency/DndCoinDisplay";
 import {
-  KASSANDRA_COINS,
+  DND_COIN_TYPES,
   SHOP_ARCHETYPES,
 } from "@/src/lib/shop-archetypes";
 
@@ -18,6 +20,7 @@ export default async function CampaignShopsPage({ params }: Props) {
   if (!isGM) redirect(`/dashboard/campaigns/${campaignId}`);
 
   const { shops, loadError } = await getCampaignShops(campaignId);
+  const merchantNpcs = await getCampaignNpcsForMerchantAssignment(campaignId);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -41,7 +44,7 @@ export default async function CampaignShopsPage({ params }: Props) {
           unten (z. B. Waffenmeister, Rüstungsschmied, Alchemist) plus
           optionalem Preismodifikator in Prozent.{" "}
           <strong className="font-libre text-gray-100">Unique</strong> ist ein
-          eigener Katalog mit frei definierbaren Positionen (Erweiterung folgt).
+          eigener Warenkatalog mit frei definierbaren Positionen (Item-Editor).
         </p>
       </div>
 
@@ -49,17 +52,17 @@ export default async function CampaignShopsPage({ params }: Props) {
 
       <div className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg">
         <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
-          Währung (Kassandra)
+          Währung (D&amp;D 5e)
         </h2>
         <p className="font-libre text-sm text-gray-300 leading-relaxed mb-3">
-          Für Anzeige und spätere Buchungen: D&amp;D-Münzen mit
-          Kassandra-Namen.
+          Offizielles Münzsystem des Spielerhandbuchs — Umtausch wie in D&amp;D 5e:
+          1 Platin = 10 Gold = 100 Silber = 1.000 Kupfer; 1 Elektrum = 5 Silber.
         </p>
         <ul className="grid gap-2 sm:grid-cols-2 font-libre text-sm text-gray-200">
-          {KASSANDRA_COINS.map((c) => (
-            <li key={c.code}>
-              <span className="text-accent-gold">{c.name}</span>
-              <span className="text-gray-500"> — {c.dnd}</span>
+          {DND_COIN_TYPES.map((c) => (
+            <li key={c.code} className="inline-flex items-center gap-2">
+              <DndCoinIcon code={c.code} size="sm" />
+              <span className="text-gray-500">{c.name}</span>
             </li>
           ))}
         </ul>
@@ -96,6 +99,12 @@ export default async function CampaignShopsPage({ params }: Props) {
       ) : null}
 
       <CampaignShopsManager campaignId={campaignId} shops={shops} />
+
+      <CampaignMerchantAssignment
+        campaignId={campaignId}
+        shops={shops}
+        npcs={merchantNpcs}
+      />
     </div>
   );
 }

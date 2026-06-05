@@ -7,11 +7,12 @@ import {
 } from "@/src/lib/shop-archetypes";
 import {
   formatItemDetails,
-  formatItemPrice,
   getCatalogEntryCount,
   getCatalogForArchetype,
   hasCatalogContent,
 } from "@/src/lib/shop-catalog";
+import { catalogItemToCopper } from "@/src/lib/dnd-currency";
+import { DndCoinDisplay } from "@/src/components/currency/DndCoinDisplay";
 
 function groupByCatalogGroup<T extends { catalogGroup?: string }>(
   items: T[],
@@ -124,7 +125,14 @@ export function ShopArchetypeCatalogBrowser() {
                         {item.rarity ?? "—"}
                       </td>
                       <td className="py-2.5 pr-3 whitespace-nowrap text-accent-gold">
-                        {formatItemPrice(item)}
+                        {(() => {
+                          const cp = catalogItemToCopper(item);
+                          if (cp > 0) {
+                            return <DndCoinDisplay totalCp={cp} size="sm" />;
+                          }
+                          if (item.priceLabel) return item.priceLabel;
+                          return "—";
+                        })()}
                       </td>
                       <td className="py-2.5 pr-3 whitespace-nowrap">
                         {item.weightLb != null ? `${item.weightLb} lb.` : "—"}

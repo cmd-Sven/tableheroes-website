@@ -15,6 +15,7 @@ import {
   resolveLootItemIdentify,
   takeAllLootGoldFromContainer,
 } from "@/src/lib/actions/loot-actions";
+import { DndCoinDisplay } from "@/src/components/currency/DndCoinDisplay";
 import {
   disguisedLootDesc,
   disguisedLootTitle,
@@ -759,9 +760,9 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
             <Coins className="h-4 w-4 shrink-0" />
             Münzen in der Truhe
           </div>
-          <p className="mb-2 font-libre text-sm text-gray-200">
-            {gp} Gold · {sp} Silber
-          </p>
+          <div className="mb-2">
+            <DndCoinDisplay pouch={{ gp, sp }} size="md" />
+          </div>
           <div className="flex flex-wrap gap-2">
             {!isGM && characterId ? (
               <button

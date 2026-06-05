@@ -39,7 +39,6 @@ import {
   PlusCircle,
   LayoutGrid,
   Snowflake,
-  ShoppingBag,
   Sun,
   Swords,
   Gift,
@@ -63,6 +62,11 @@ import {
 } from "@/src/lib/session-weather";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
+import {
+  StageNpcShopControls,
+  type LiveCampaignShopOption,
+} from "./StageNpcShopControls";
+import { updateNpcMerchantAssignment } from "@/src/app/dashboard/campaigns/[id]/shop-actions";
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
 import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
@@ -70,12 +74,22 @@ import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
+import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
+import {
+  resolveSessionDayPhase,
+  SESSION_DAY_PHASE_ORDER,
+  sessionDayPhaseLabel,
+  type SessionDayPhase,
+} from "@/src/lib/session-day-phase";
 import {
   parseFapAllocations,
   type FapAllocationsMap,
 } from "@/src/lib/downtime-fap-types";
-import { npcReputationSmileyFromScore } from "@/src/lib/npc-reputation-smiley";
+import {
+  formatNpcReputationScore,
+  npcReputationSmileyFromScore,
+} from "@/src/lib/npc-reputation-smiley";
 import { sortNpcsByLocationPriority } from "@/src/lib/npc-stage-display";
 
 type LiveState = {
@@ -454,6 +468,10 @@ function StageNpcCard({
   onReaction,
   onRemove,
   onToggleShop,
+  onAssignMerchantAndOpen,
+  campaignShops,
+  isShopOpen,
+  isShopBusy,
 }: {
   npc: CampaignNpc;
   isSingle: boolean;
@@ -466,6 +484,10 @@ function StageNpcCard({
   onReaction: (npcId: string, amount: number) => void;
   onRemove: (npcId: string) => void;
   onToggleShop: (npc: CampaignNpc) => void;
+  onAssignMerchantAndOpen: (npc: CampaignNpc, shopId: string) => void;
+  campaignShops: LiveCampaignShopOption[];
+  isShopOpen: boolean;
+  isShopBusy: boolean;
 }) {
   const showGlow = useTemporaryStageGlow();
   const cardTitle = [npc.name, npc.title].filter(Boolean).join(" — ");
@@ -567,11 +589,11 @@ function StageNpcCard({
               -
             </button>
               <span
-                className="flex min-w-[2.5rem] items-center justify-center px-1 text-2xl leading-none"
-                title={isGM ? `Ruf ${reputationScore > 0 ? "+" : ""}${reputationScore} (nur SL)` : undefined}
-                aria-hidden={!isGM}
+                className="flex min-w-[3.25rem] items-center justify-center px-1.5 font-barlow text-sm font-extrabold tabular-nums leading-none text-accent-gold"
+                title={`Ruf ${formatNpcReputationScore(reputationScore)}`}
+                aria-label={`Ruf ${formatNpcReputationScore(reputationScore)}`}
               >
-                {npcReputationSmileyFromScore(reputationScore)}
+                {formatNpcReputationScore(reputationScore)}
               </span>
             <button
               type="button"
@@ -597,20 +619,16 @@ function StageNpcCard({
             >
               <X className="h-4 w-4" />
             </button>
-            {npc.is_merchant && npc.shop_id ? (
-              <button
-                type="button"
-                aria-label={`Shop von ${npc.name} für Spieler öffnen oder schließen`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleShop(npc);
-                }}
-                className="absolute left-0 top-10 inline-flex items-center gap-1 rounded-full border border-accent-gold/70 bg-background-dark/95 px-2.5 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold shadow-lg backdrop-blur transition-colors hover:bg-accent-gold hover:text-black"
-                title="Shop für Spieler öffnen/schließen"
-              >
-                <ShoppingBag className="h-3 w-3" />
-                Shop
-              </button>
+            {isGM ? (
+              <StageNpcShopControls
+                npcName={npc.name}
+                isMerchant={Boolean(npc.is_merchant && npc.shop_id)}
+                isShopOpen={isShopOpen}
+                shops={campaignShops}
+                isBusy={isShopBusy}
+                onAssignAndOpen={(shopId) => onAssignMerchantAndOpen(npc, shopId)}
+                onToggleShop={() => onToggleShop(npc)}
+              />
             ) : null}
           </div>
         )}
@@ -806,6 +824,8 @@ type Props = {
   loreLocationOptions?: LoreLocationOption[];
   /** Spieler dürfen Lore-Link nur sehen, wenn Eintrag für sie revealed ist */
   sessionLocationLoreReadable?: boolean;
+  /** Nur GM: Shop-Templates für schnelle Händler-Zuweisung auf der Bühne */
+  campaignShops?: LiveCampaignShopOption[];
 };
 
 export function LiveSessionBoard({
@@ -824,6 +844,7 @@ export function LiveSessionBoard({
   activeQuests,
   loreLocationOptions = [],
   sessionLocationLoreReadable = false,
+  campaignShops = [],
 }: Props) {
   const router = useRouter();
   /** Cookie-Session (RLS): nicht supabaseClient.ts (nur Anon ohne Auth). */
@@ -856,6 +877,25 @@ export function LiveSessionBoard({
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
   const [lootGmModalOpen, setLootGmModalOpen] = useState(false);
+  const [npcMerchantOverrides, setNpcMerchantOverrides] = useState<
+    Record<string, { is_merchant: boolean; shop_id: string | null }>
+  >({});
+  const [isShopBusy, startShopTransition] = useTransition();
+
+  const campaignNpcs = useMemo(
+    () =>
+      allCampaignNpcs.map((npc) => {
+        const patch = npcMerchantOverrides[String(npc.id)];
+        return patch
+          ? {
+              ...npc,
+              is_merchant: patch.is_merchant,
+              shop_id: patch.shop_id,
+            }
+          : npc;
+      }),
+    [allCampaignNpcs, npcMerchantOverrides],
+  );
 
   useEffect(() => {
     liveStateRef.current = liveState;
@@ -982,6 +1022,7 @@ export function LiveSessionBoard({
 
   const isPrepMode = sessionStatus === "Scheduled";
   const weatherCondition = getWeatherCondition(liveState);
+  const dayPhase = resolveSessionDayPhase(liveState?.current_time);
 
   useEffect(() => {
     setBackgroundUrl(initialLiveState?.background_url || null);
@@ -1276,8 +1317,8 @@ export function LiveSessionBoard({
   }, [liveState?.visible_npc_ids]);
 
   const activeNpcs = useMemo(
-    () => allCampaignNpcs.filter((npc) => activeNpcIds.has(String(npc.id))),
-    [allCampaignNpcs, activeNpcIds],
+    () => campaignNpcs.filter((npc) => activeNpcIds.has(String(npc.id))),
+    [campaignNpcs, activeNpcIds],
   );
 
   const sortedActiveNpcs = useMemo(
@@ -1291,7 +1332,7 @@ export function LiveSessionBoard({
 
   const gmNpcSearchRows = useMemo(
     () =>
-      allCampaignNpcs.map((n) => ({
+      campaignNpcs.map((n) => ({
         id: String(n.id),
         name: n.name,
         title: n.title ?? null,
@@ -1300,7 +1341,7 @@ export function LiveSessionBoard({
         current_location_id: n.current_location_id ?? null,
         home_location_id: n.home_location_id ?? null,
       })),
-    [allCampaignNpcs],
+    [campaignNpcs],
   );
 
   useEffect(() => {
@@ -1333,15 +1374,15 @@ export function LiveSessionBoard({
 
   const npcStagePool = useMemo(() => {
     if (stageDeckNpcIds == null) {
-      return allCampaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
+      return campaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
     }
     const deck = stageDeckNpcIds.map((id) => String(id)).filter(Boolean);
     if (deck.length === 0) {
-      return allCampaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
+      return campaignNpcs.map((n) => ({ ...n, id: String(n.id) }));
     }
     const allowed = new Set(deck);
-    return allCampaignNpcs.filter((n) => allowed.has(String(n.id)));
-  }, [allCampaignNpcs, stageDeckNpcIds]);
+    return campaignNpcs.filter((n) => allowed.has(String(n.id)));
+  }, [campaignNpcs, stageDeckNpcIds]);
 
   const factionStagePool = useMemo(() => {
     if (stageDeckFactionIds == null) {
@@ -1567,6 +1608,42 @@ export function LiveSessionBoard({
       active_merchant_npc_id: String(npc.id),
     });
     writeSystemLog("shop", `${npc.name} öffnet den Shop für die Gruppe.`);
+  }
+
+  function assignMerchantAndOpenShop(npc: CampaignNpc, shopId: string) {
+    if (!isGM) return;
+    const npcId = String(npc.id);
+    const trimmedShopId = shopId.trim();
+    if (!trimmedShopId) return;
+
+    startShopTransition(async () => {
+      try {
+        const result = await updateNpcMerchantAssignment(
+          campaignId,
+          npcId,
+          true,
+          trimmedShopId,
+        );
+        if (!result.success) {
+          alert(result.error || "Händler konnte nicht zugewiesen werden.");
+          return;
+        }
+
+        setNpcMerchantOverrides((current) => ({
+          ...current,
+          [npcId]: { is_merchant: true, shop_id: trimmedShopId },
+        }));
+
+        updateLiveState({
+          active_shop_id: trimmedShopId,
+          active_merchant_npc_id: npcId,
+        });
+        writeSystemLog("shop", `${npc.name} öffnet den Shop für die Gruppe.`);
+      } catch (err: unknown) {
+        console.error("[LiveSessionBoard] assignMerchantAndOpenShop:", err);
+        alert((err as Error)?.message || "Händler konnte nicht zugewiesen werden.");
+      }
+    });
   }
 
   function assignScribe(nextScribeId: string | null) {
@@ -1972,21 +2049,38 @@ export function LiveSessionBoard({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 rounded border border-amber-900/60 bg-background-dark/80 px-3 py-2">
-                <Clock className="h-4 w-4 text-accent-gold" />
+              <div className="flex items-center gap-2 rounded border border-amber-900/60 bg-[#132e1b] px-3 py-2">
+                <Clock className="h-4 w-4 shrink-0 text-accent-gold" />
                 {isGM ? (
-                  <input
-                    type="text"
-                    defaultValue={liveState?.current_time || ""}
-                    placeholder="Zeit"
-                    onBlur={(e) =>
-                      updateLiveState({ current_time: e.target.value || null })
-                    }
-                    className="min-w-[120px] flex-1 bg-transparent text-sm text-white focus:outline-none"
-                  />
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                      Tageszeit
+                    </span>
+                    <select
+                      value={dayPhase}
+                      onChange={(e) =>
+                        updateLiveState({
+                          current_time: sessionDayPhaseLabel(
+                            e.target.value as SessionDayPhase,
+                          ),
+                        })
+                      }
+                      className="w-full rounded border border-amber-900/60 bg-[#0a1f10] px-2 py-1.5 text-sm text-white focus:border-accent-gold outline-none"
+                    >
+                      {SESSION_DAY_PHASE_ORDER.map((phase) => (
+                        <option
+                          key={phase}
+                          value={phase}
+                          className="bg-white text-slate-950"
+                        >
+                          {sessionDayPhaseLabel(phase)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 ) : (
                   <span className="font-libre text-sm text-gray-200">
-                    {liveState?.current_time || "Zeit unbekannt"}
+                    {sessionDayPhaseLabel(dayPhase)}
                   </span>
                 )}
               </div>
@@ -2093,6 +2187,10 @@ export function LiveSessionBoard({
                   })}
                 </div>
               </GmSlideSettingsPanel>
+
+              <div className="flex items-center justify-center py-1">
+                <SessionDayPhaseIndicator phase={dayPhase} />
+              </div>
 
               {isGM ? (
                 <GmSlideSettingsPanel
@@ -2675,6 +2773,14 @@ export function LiveSessionBoard({
                     shopId={liveState.active_shop_id}
                     merchantNpcId={liveState.active_merchant_npc_id ?? null}
                     characterId={currentPlayerCharacter?.id ?? null}
+                    isGM={isGM}
+                    partyCharacters={displayPartyCharacters
+                      .filter((pc) => !pc.isSessionDummy && pc.id)
+                      .map((pc) => ({
+                        id: pc.id,
+                        name: pc.name,
+                        playerUserId: pc.playerUserId ?? null,
+                      }))}
                     onClose={
                       isGM
                         ? () =>
@@ -2725,6 +2831,13 @@ export function LiveSessionBoard({
                             onReaction={handleNpcReaction}
                             onRemove={(npcId) => removeFromStage("npc", npcId)}
                             onToggleShop={toggleShopForNpc}
+                            onAssignMerchantAndOpen={assignMerchantAndOpenShop}
+                            campaignShops={campaignShops}
+                            isShopOpen={
+                              liveState?.active_shop_id === npc.shop_id &&
+                              liveState?.active_merchant_npc_id === String(npc.id)
+                            }
+                            isShopBusy={isShopBusy}
                           />
                         );
                       })}
