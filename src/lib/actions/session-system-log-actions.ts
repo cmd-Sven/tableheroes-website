@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { mirrorSystemLogToChronicle } from "@/src/lib/session-chronicle/transcription-server";
 
 function normalizeSystemLogs(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value)
@@ -102,6 +103,12 @@ export async function createSystemLog(
 
   if (updateError) {
     throw new Error(updateError.message || "System-Log konnte nicht gespeichert werden.");
+  }
+
+  try {
+    await mirrorSystemLogToChronicle(writeClient, sessionId, type, nextLog.text, nextLog.at);
+  } catch (mirrorErr) {
+    console.warn("[createSystemLog] Chronist-Marker:", mirrorErr);
   }
 
   return nextLog;

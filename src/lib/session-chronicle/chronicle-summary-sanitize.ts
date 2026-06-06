@@ -1,9 +1,9 @@
 import type {
   ChronicleChunkSummary,
   LiveMarker,
-  SpontaneousNpcDraft,
   SpontaneousQuestDraft,
 } from "./types";
+import { isDndTableActionText } from "./chronicle-dnd-table-actions";
 
 const NPC_FIELD_LABELS = new Set([
   "wahrnehmung",
@@ -42,10 +42,14 @@ function parseNpcFieldLine(text: string): { field: string; content: string } | n
   return { field: normalizeLabel(m[1]), content: m[2].trim() };
 }
 
-/** Quest-Eintrag, der eigentlich NSC-Metadaten (Skill-Checks, Motivation) ist. */
+/** Quest-Eintrag, der NSC-Metadaten oder Tisch-Würfelproben ist — keine Story-Quest. */
 export function isLikelyMisclassifiedQuest(quest: SpontaneousQuestDraft): boolean {
   const title = quest.title.trim();
   if (!title) return true;
+
+  const combined = [quest.title, quest.objective, quest.giver].filter(Boolean).join(" ");
+  if (isDndTableActionText(combined)) return true;
+
   if (isNpcFieldLabel(title)) return true;
   if (/^(wahrnehmung|motiv\s*erkennen|motivation|motiv|persönlichkeit|aussehen|verhalten|wissen)\s*:/i.test(title)) {
     return true;

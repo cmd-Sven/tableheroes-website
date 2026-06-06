@@ -3,6 +3,7 @@
 import { addCharacterWealthGpSp } from "@/src/lib/character-gold";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
 import type { Json } from "@/src/lib/database.types";
 import {
   disguisedLootTitle,
@@ -115,6 +116,16 @@ export async function publishLootToSession(
     if (upErr) {
       await (supabase as any).from("campaign_loot_containers").delete().eq("id", containerId);
       return { ok: false, error: upErr.message ?? "Live-State konnte nicht verknüpft werden." };
+    }
+
+    try {
+      await createSystemLog(
+        sessionId,
+        "loot_publish",
+        `Loot-Gun: „${draft.name.trim()}“ erscheint auf der Bühne (${itemsJson.length} Gegenstände${gp || sp ? `, ${gp} gp / ${sp} sp` : ""}).`,
+      );
+    } catch (logErr) {
+      console.warn("[publishLootToSession] System-Log:", logErr);
     }
 
     return { ok: true, containerId };

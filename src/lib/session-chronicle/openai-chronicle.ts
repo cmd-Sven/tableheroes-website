@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
+import { CHRONICLE_TABLE_ACTIONS_PROMPT_HINT } from "./chronicle-dnd-table-actions";
+import { CHRONICLE_GM_BOARD_PROMPT_HINT } from "./chronicle-gm-board-events";
 
 let client: OpenAI | null = null;
 
@@ -61,5 +63,9 @@ NIEMALS als Quest klassifizieren:
 - Wenn der SL einen NSC beschreibt (auch nach Quest-Marker), gehört das in spontaneous_npcs — nicht in spontaneous_quests.
 
 Eine echte Quest braucht ein erkennbares Aufgaben-Ziel für die Spieler (z. B. „Bringt das Artefakt zum Tempel“), nicht nur NSC-Metadaten.
+
+${CHRONICLE_TABLE_ACTIONS_PROMPT_HINT}
+
+${CHRONICLE_GM_BOARD_PROMPT_HINT}
 
 - discovered_loot: konkrete Beute, keine vagen Formulierungen.`;

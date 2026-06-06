@@ -1,5 +1,11 @@
 import type { LiveMarker } from "./types";
 import { LIVE_MARKER_LABELS } from "./constants";
+import { CHRONICLE_TABLE_ACTIONS_PROMPT_HINT } from "./chronicle-dnd-table-actions";
+import {
+  CHRONICLE_GM_BOARD_PROMPT_HINT,
+  formatGmBoardEventsForPrompt,
+  type GmBoardEventRow,
+} from "./chronicle-gm-board-events";
 
 export function formatLiveMarkersForPrompt(markers: LiveMarker[]): string {
   if (!markers.length) return "Keine Live-Marker in diesem Segment.";
@@ -20,6 +26,7 @@ export function buildSummarizeUserPrompt(params: {
   transcript: string;
   previousRecap: string | null;
   liveMarkers: LiveMarker[];
+  gmBoardEvents?: GmBoardEventRow[];
 }): string {
   const parts = [
     `Session: ${params.sessionTitle?.trim() || "Unbenannte Session"}`,
@@ -37,7 +44,12 @@ export function buildSummarizeUserPrompt(params: {
     "Live-Marker des Spielleiters in diesem Segment (Thema des Abschnitts — kein blindes Klassifikations-Etikett):",
     formatLiveMarkersForPrompt(params.liveMarkers),
     "",
-    "Hinweis: Text über NSC-Motivation, Wahrnehmung/Insight oder Persönlichkeit ist KEINE Quest — ordne solche Inhalte spontaneous_npcs zu.",
+    "Hinweis: NSC-Motivation, Wahrnehmung/Insight und D&D-Würfelproben (Fertigkeiten, DC, W20) sind KEINE Quest — Fokus auf Story, NSCs und Lore.",
+    CHRONICLE_TABLE_ACTIONS_PROMPT_HINT,
+    "",
+    "Digital protokollierte GM-Board-Aktionen in diesem Segment:",
+    formatGmBoardEventsForPrompt(params.gmBoardEvents ?? []),
+    CHRONICLE_GM_BOARD_PROMPT_HINT,
     "",
     "Transkript (Whisper, Deutsch):",
     params.transcript.trim(),

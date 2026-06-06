@@ -1,6 +1,7 @@
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { createAdminClient } from "@/src/lib/supabase/server";
 import {
+  AUDIO_CHUNK_DURATION_MS,
   AUDIO_CHUNK_OVERLAP_MS,
   JITSI_ROOM_URL,
   SESSION_AUDIO_BUCKET,
@@ -508,6 +509,38 @@ export async function appendLiveMarker(
   }
 
   return { ok: true as const, chunkIndex: targetIndex!, markers: nextMarkers };
+}
+
+/** Spiegelt ein System-Log als gm_action-Marker in die laufende Chronist-Aufnahme. */
+export async function mirrorSystemLogToChronicle(
+  supabase: SupabaseLike,
+  sessionId: string,
+  logType: string,
+  text: string,
+  atIso: string,
+): Promise<void> {
+  const writeClient = resolveWriteClient(supabase);
+  const { data: tsRaw } = await writeClient
+    .from("session_transcription_sessions")
+    .select("id, status, started_at")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const ts = tsRaw as { id: string; status: string; started_at: string | null } | null;
+  if (!ts?.started_at) return;
+  if (ts.status !== "recording" && ts.status !== "paused") return;
+
+  const recStart = new Date(ts.started_at).getTime();
+  const atMs = Math.max(0, new Date(atIso).getTime() - recStart);
+  const chunkIndex = Math.floor(atMs / AUDIO_CHUNK_DURATION_MS);
+  const label = `${logType}: ${text}`.slice(0, 480);
+
+  await appendLiveMarker(
+    supabase,
+    sessionId,
+    { type: "gm_action", at_ms: atMs, label },
+    chunkIndex,
+  );
 }
 
 export async function uploadTranscriptionChunk(

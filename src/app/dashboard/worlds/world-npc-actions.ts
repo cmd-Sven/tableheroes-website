@@ -486,10 +486,11 @@ AUFGABE:
 2. MAPPING: Wenn etwas erwähnt wird, das zu einer bestehenden Fraktion, einem bestehenden Ort ODER einem bestehenden NPC passt, verknüpfe es (existing_id, existing_name). Achte dabei auch auf leicht abweichende Schreibweisen oder Spitznamen – wenn ein NPC "Joshu'rak" heißt und "Joshurak" im Briefing steht, ist das derselbe NPC!
 3. INKUBATION: Wenn eine Entität erwähnt wird, die WIRKLICH NICHT in den obigen Listen existiert, markiere sie als NEU. Schlage NIEMALS einen NPC, Ort oder eine Fraktion als "neu" vor, wenn ein gleichnamiger oder sehr ähnlich benannter Eintrag bereits in den Listen steht.
 
-WICHTIG — KEINE Entitäten aus NPC-Metadaten:
+WICHTIG — KEINE Entitäten aus NPC-Metadaten oder Tisch-Mechanik (D&D 5e):
 - "Wahrnehmung", "Motiv erkennen", "Motivation", "Persönlichkeit", "Aussehen", "Verhalten", "Wissen", "Biografie", "Geschätzt", "Ort in Session" sind Feldbezeichnungen aus NSC-Briefings oder Skill-Checks — KEINE Quests, Aufgaben, Orte oder Personen.
-- Erfinde keine new_entities aus solchen Labels oder aus Zeilen wie "Motivation: …" / "Wahrnehmung: …".
-- Eine Quest/Aufgabe ist nur dann relevant, wenn im Briefing ein klarer Spieler-Auftrag mit Ziel genannt wird — nicht bei NSC-Eigenschaften.
+- Würfelproben auf Fertigkeiten/Attribute (Heimlichkeit, Athletik, Überzeugen, Rettungswürfe …), DC-Angaben, W20-Ergebnisse und kritische Erfolge sind Tisch-Aktionen — KEINE Story-Quests. Sie können die Richtung der Szene vorgeben, werden aber nicht digital als Quest erfasst.
+- Erfinde keine new_entities aus solchen Labels, Proben oder Zeilen wie "Motivation: …" / "Wahrnehmung DC 15: …".
+- Eine Quest/Aufgabe ist nur dann relevant, wenn im Briefing ein klarer Spieler-Auftrag mit Ziel genannt wird — nicht bei NSC-Eigenschaften oder Würfelergebnissen.
 
 Antworte NUR mit einem JSON-Objekt mit genau drei Feldern (Deutsch wo sinnvoll):
 - "mappings": Array von { "mention": "Text aus dem Briefing", "entity_type": "location"|"faction"|"npc", "existing_id": "uuid oder null", "existing_name": "Name oder null" }. Nur Einträge, wo du eine Zuordnung machst (ob existierend oder neu).

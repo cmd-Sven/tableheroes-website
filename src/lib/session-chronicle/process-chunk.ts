@@ -10,7 +10,11 @@ import {
   parseChronicleChunkSummary,
 } from "./summarize-chunk";
 import { sanitizeChronicleChunkSummary } from "./chronicle-summary-sanitize";
+import {
+  filterGmBoardEventsForChunk,
+} from "./chronicle-gm-board-events";
 import type { ChronicleChunkSummary, LiveMarker } from "./types";
+import type { GmBoardEventRow } from "./chronicle-gm-board-events";
 import { SESSION_AUDIO_BUCKET } from "./constants";
 import { createAdminClient } from "@/src/lib/supabase/server";
 import { parseChronicleStateRow } from "./parse-db";
@@ -65,6 +69,7 @@ export async function summarizeChunkTranscript(params: {
   transcript: string;
   previousRecap: string | null;
   liveMarkers: LiveMarker[];
+  gmBoardEvents?: GmBoardEventRow[];
 }): Promise<ChronicleChunkSummary> {
   const openai = getOpenAIClient();
   const userPrompt = buildSummarizeUserPrompt(params);
@@ -124,11 +129,11 @@ export async function processTranscriptionChunk(
 
   const { data: tsRaw } = await (admin as any)
     .from("session_transcription_sessions")
-    .select("id")
+    .select("id, started_at")
     .eq("session_id", sessionId)
     .maybeSingle();
 
-  const ts = tsRaw as { id: string } | null;
+  const ts = tsRaw as { id: string; started_at: string | null } | null;
   if (!ts) {
     return { ok: false, message: "Keine Transcription-Session." };
   }
@@ -230,6 +235,18 @@ export async function processTranscriptionChunk(
 
   const markers = Array.isArray(chunk.live_markers) ? chunk.live_markers : [];
 
+  const { data: liveStateRaw } = await (admin as any)
+    .from("session_live_states")
+    .select("system_logs")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const gmBoardEvents = filterGmBoardEventsForChunk(
+    (liveStateRaw as { system_logs?: unknown } | null)?.system_logs,
+    ts.started_at,
+    chunkIndex,
+  );
+
   try {
     const summary = await summarizeChunkTranscript({
       sessionTitle: session.title,
@@ -237,6 +254,7 @@ export async function processTranscriptionChunk(
       transcript,
       previousRecap: state.story_recap,
       liveMarkers: markers,
+      gmBoardEvents,
     });
 
     const merged = mergeChronicleChunkSummary(state, summary, chunkIndex);

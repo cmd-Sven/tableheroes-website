@@ -48,6 +48,12 @@ import {
 import {
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import {
+  compareCombatInitiative,
+  normalizeCombatConditions,
+  type CombatConditionId,
+} from "@/src/lib/combat-initiative";
+import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
@@ -326,9 +332,12 @@ function normalizeCombatParticipants(rows: unknown[]): CombatParticipant[] {
         name: String(r.name ?? ""),
         type,
         initiative_value: Number(r.initiative_value ?? 0),
+        initiative_label:
+          r.initiative_label != null ? String(r.initiative_label) : null,
         sort_order: Number(r.sort_order ?? 0),
         image_url: r.image_url != null ? String(r.image_url) : null,
         is_active: r.is_active !== false,
+        conditions: normalizeCombatConditions(r.conditions),
       };
     })
     .filter((row) => row.id && row.name);
@@ -439,9 +448,11 @@ type CombatParticipant = {
   name: string;
   type: "player" | "monster";
   initiative_value: number;
+  initiative_label: string | null;
   sort_order: number;
   image_url: string | null;
   is_active: boolean;
+  conditions: CombatConditionId[];
 };
 
 type CombatTokenPayload = {
@@ -1507,12 +1518,7 @@ export function LiveSessionBoard({
     () =>
       [...combatParticipants]
         .filter((participant) => participant.is_active)
-        .sort(
-          (a, b) =>
-            b.initiative_value - a.initiative_value ||
-            a.sort_order - b.sort_order ||
-            a.name.localeCompare(b.name),
-        ),
+        .sort(compareCombatInitiative),
     [combatParticipants],
   );
   const activeCombatParticipant =
@@ -1651,12 +1657,22 @@ export function LiveSessionBoard({
           .map(String)
           .filter((npcId) => npcId !== sid),
       });
+      const npc = allCampaignNpcs.find((entry) => String(entry.id) === sid);
+      writeSystemLog(
+        "stage_remove",
+        `${npc?.name ?? "Ein NSC"} verlässt die Bühne.`,
+      );
     } else {
       updateLiveState({
         visible_faction_ids: (base.visible_faction_ids || [])
           .map(String)
           .filter((factionId) => factionId !== sid),
       });
+      const faction = allCampaignFactions.find((entry) => String(entry.id) === sid);
+      writeSystemLog(
+        "stage_remove",
+        `${faction?.name ?? "Eine Fraktion"} verlässt die Bühne.`,
+      );
     }
   }
 
@@ -1749,16 +1765,23 @@ export function LiveSessionBoard({
     const previousValue = normalizeTemperatureValue(liveStateRef.current?.temperature_value);
     updateLiveState({ temperature_value: nextValue });
 
-    if (previousValue >= 0 && nextValue < 0) {
-      writeSystemLog(
-        "temperature_cold",
-        "Eine klirrende Kälte zieht auf, die euch den Atem gefrieren lässt.",
-      );
-    } else if (previousValue < 35 && nextValue >= 35) {
-      writeSystemLog(
-        "temperature_hot",
-        "Die Hitze wird drückend und flimmert über dem Boden.",
-      );
+    if (nextValue !== previousValue) {
+      if (previousValue >= 0 && nextValue < 0) {
+        writeSystemLog(
+          "temperature_cold",
+          "Eine klirrende Kälte zieht auf, die euch den Atem gefrieren lässt.",
+        );
+      } else if (previousValue < 35 && nextValue >= 35) {
+        writeSystemLog(
+          "temperature_hot",
+          "Die Hitze wird drückend und flimmert über dem Boden.",
+        );
+      } else {
+        writeSystemLog(
+          "temperature",
+          `Temperatur am Tisch auf ${nextValue}° gesetzt.`,
+        );
+      }
     }
   }
 
@@ -1818,9 +1841,11 @@ export function LiveSessionBoard({
       name: token.name,
       type: token.type,
       initiative_value: 10,
+      initiative_label: "10",
       sort_order: combatParticipants.length,
       image_url: token.image_url,
       is_active: true,
+      conditions: [],
     });
     if (error) alert(error.message);
   }
@@ -1851,7 +1876,12 @@ export function LiveSessionBoard({
 
   async function updateCombatParticipant(
     participantId: string,
-    patch: Partial<Pick<CombatParticipant, "initiative_value" | "is_active">>,
+    patch: Partial<
+      Pick<
+        CombatParticipant,
+        "initiative_value" | "initiative_label" | "is_active" | "conditions"
+      >
+    >,
   ) {
     if (!isGM) return;
     const { error } = await ((supabase as any).from("combat_participants") as any)
@@ -1949,12 +1979,19 @@ export function LiveSessionBoard({
           {isGM ? (
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const starting = !liveState?.is_combat_mode;
                 updateLiveState({
-                  is_combat_mode: !liveState?.is_combat_mode,
+                  is_combat_mode: starting,
                   current_turn_index: 0,
-                })
-              }
+                });
+                writeSystemLog(
+                  starting ? "combat_start" : "combat_end",
+                  starting
+                    ? "Der Spielleiter leitet einen Kampf ein."
+                    : "Der Kampfmodus wird beendet.",
+                );
+              }}
               className={`inline-flex items-center gap-2 rounded-lg border-2 px-4 py-2 font-barlow text-xs font-extrabold uppercase tracking-wide transition-colors ${
                 liveState?.is_combat_mode
                   ? "border-red-600 bg-red-950/70 text-red-100 shadow-[0_0_20px_rgba(127,29,29,0.45)] hover:bg-red-900/80"
@@ -2768,107 +2805,14 @@ export function LiveSessionBoard({
             </div>
             {liveState?.is_combat_mode ? (
               <div className="absolute inset-x-4 top-4 z-20">
-                <div
-                  onDragOver={(e) => {
-                    if (!isGM) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.dataTransfer.dropEffect = "copy";
-                  }}
-                  onDrop={dropCombatToken}
-                  className="min-h-24 rounded-2xl border border-amber-900/70 bg-linear-to-r from-background-card/90 via-emerald-950/80 to-background-dark/90 px-4 py-3 shadow-2xl backdrop-blur-md"
-                >
-                  <div className="mb-2 flex items-center justify-end gap-3">
-                    {isGM ? (
-                      <button
-                        type="button"
-                        onClick={nextCombatTurn}
-                        disabled={sortedCombatParticipants.length === 0}
-                        className="rounded border border-accent-gold/70 bg-accent-gold/15 px-4 py-2 font-barlow text-xs font-extrabold uppercase text-accent-gold hover:bg-accent-gold/25 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Nächster Zug
-                      </button>
-                    ) : null}
-                  </div>
-                  {sortedCombatParticipants.length === 0 ? (
-                    <div
-                      className="min-h-12 rounded-xl border border-dashed border-amber-900/70 bg-black/20"
-                      aria-label="Leere Initiative-Zeitleiste"
-                    />
-                  ) : (
-                    <div className="flex max-w-full items-end gap-4 overflow-x-auto px-4 pb-7 pt-10">
-                      {sortedCombatParticipants.map((participant) => {
-                        const active = participant.id === activeCombatParticipant?.id;
-                        return (
-                          <motion.div
-                            key={participant.id}
-                            className="relative flex shrink-0 flex-col items-center gap-2"
-                            animate={active ? { scale: 1.08 } : { scale: 1 }}
-                            transition={{ type: "spring", damping: 18, stiffness: 220 }}
-                          >
-                            {active ? (
-                              <motion.div
-                                className="absolute -top-8 text-xl text-accent-gold drop-shadow-[0_0_8px_rgba(202,185,38,0.75)]"
-                                animate={{ y: [0, -4, 0] }}
-                                transition={{ duration: 1.2, repeat: Infinity }}
-                              >
-                                ▼
-                              </motion.div>
-                            ) : null}
-                            <div
-                              className={`grid h-17.5 w-17.5 place-items-center overflow-hidden rounded-full border bg-slate-950 ${
-                                active
-                                  ? "border-accent-gold ring-2 ring-accent-gold/45 ring-offset-2 ring-offset-background-dark shadow-[0_0_14px_rgba(202,185,38,0.55)]"
-                                  : "border-amber-900/70"
-                              }`}
-                            >
-                              {participant.image_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- Combat token
-                                <img
-                                  src={participant.image_url}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <span className="font-barlow text-lg font-extrabold text-accent-gold">
-                                  {participant.type === "monster"
-                                    ? participant.name.replace("Monster ", "")
-                                    : participant.name[0]}
-                                </span>
-                              )}
-                            </div>
-                            <input
-                              type="number"
-                              value={participant.initiative_value}
-                              onChange={(e) =>
-                                void updateCombatParticipant(participant.id, {
-                                  initiative_value: Number(e.target.value) || 0,
-                                })
-                              }
-                              disabled={!isGM}
-                              className="w-14 rounded border border-zinc-600 bg-zinc-950 px-1 py-0.5 text-center font-barlow text-xs font-bold text-zinc-100 outline-none focus:border-accent-gold disabled:opacity-70"
-                              aria-label={`Initiative für ${participant.name}`}
-                            />
-                            {isGM ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void updateCombatParticipant(participant.id, {
-                                    is_active: false,
-                                  })
-                                }
-                                className="absolute -right-2 top-0 grid h-6 w-6 place-items-center rounded-full border border-red-700/70 bg-red-950/90 text-red-200 hover:bg-red-800"
-                                aria-label={`${participant.name} entfernen`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            ) : null}
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <CombatInitiativeBar
+                  participants={sortedCombatParticipants}
+                  activeParticipantId={activeCombatParticipant?.id ?? null}
+                  isGM={isGM}
+                  onNextTurn={nextCombatTurn}
+                  onUpdateParticipant={updateCombatParticipant}
+                  onDropToken={dropCombatToken}
+                />
                 {isGM ? (
                   <div className="mt-2 rounded-2xl border border-amber-900/45 bg-background-dark/65 px-3 py-2 shadow-2xl backdrop-blur-md">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -3249,7 +3193,10 @@ export function LiveSessionBoard({
           sessionId={sessionId}
           campaignId={campaignId}
           activeLootId={liveState?.current_loot_id ?? null}
-          onClearStageLoot={() => updateLiveState({ current_loot_id: null, loot_hide_npcs: false })}
+          onClearStageLoot={() => {
+            updateLiveState({ current_loot_id: null, loot_hide_npcs: false });
+            writeSystemLog("loot_clear", "Die Beute-Truhe verschwindet von der Bühne.");
+          }}
           onPublished={async () => {
             await refreshLiveState();
             router.refresh();

@@ -31,6 +31,7 @@ export const LIVE_MARKER_TYPES = [
   "location",
   "quest",
   "pause",
+  "gm_action",
 ] as const;
 export type LiveMarkerType = (typeof LIVE_MARKER_TYPES)[number];
 
@@ -39,12 +40,16 @@ export const LIVE_MARKER_LABELS: Record<LiveMarkerType, string> = {
   location: "Ort",
   quest: "Quest",
   pause: "Pause",
+  gm_action: "GM-Aktion",
 };
 
 /** Kurze GM-Rückmeldung nach Setzen eines Live-Markers. */
 export function liveMarkerFeedbackMessage(type: LiveMarkerType): string {
   if (type === "pause") {
     return "Pause markiert — Aufnahme pausiert.";
+  }
+  if (type === "gm_action") {
+    return "GM-Aktion protokolliert.";
   }
   return `Markierung „${LIVE_MARKER_LABELS[type]}“ gesetzt.`;
 }

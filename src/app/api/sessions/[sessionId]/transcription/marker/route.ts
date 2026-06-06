@@ -29,7 +29,8 @@ export async function POST(request: Request, context: Ctx) {
     body.type !== "npc" &&
     body.type !== "location" &&
     body.type !== "quest" &&
-    body.type !== "pause"
+    body.type !== "pause" &&
+    body.type !== "gm_action"
   ) {
     return NextResponse.json({ error: "Ungültiger Marker-Typ." }, { status: 400 });
   }
