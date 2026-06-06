@@ -13,6 +13,12 @@ import {
   sessionDayPhaseLabel,
 } from "@/src/lib/session-day-phase";
 import type { SessionWrapUpPreview, SessionWrapUpTask } from "./types";
+import { getAllAchievements } from "@/src/lib/actions/achievement-actions";
+import {
+  normalizeUserIdList,
+  resolveSessionParticipationPlayers,
+} from "@/src/lib/session-participation/resolve-participants";
+import { SESSION_PARTICIPATION_BASE_POINTS } from "@/src/lib/session-participation/constants";
 
 function normalizeStringIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -44,7 +50,7 @@ export async function loadSessionWrapUpPreview(
   if (!user) return null;
 
   const { data: sessionRaw } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, title, status, start_time")
+    .select("id, campaign_id, title, status, start_time, participation_rewards_settled_at")
     .eq("id", sessionId)
     .single();
 
@@ -54,6 +60,7 @@ export async function loadSessionWrapUpPreview(
     title: string | null;
     status: string;
     start_time: string | null;
+    participation_rewards_settled_at: string | null;
   } | null;
 
   if (!session) return null;
@@ -258,6 +265,58 @@ export async function loadSessionWrapUpPreview(
       "System-Log und getroffene NSCs landen im Session-Archiv. Die Live-Bühne dieser Session wird zurückgesetzt.",
   });
 
+  const { data: memberRowsRaw } = await (supabase.from("campaign_members") as any)
+    .select("user_id, character_id, users:user_id ( username )")
+    .eq("campaign_id", session.campaign_id)
+    .in("status", ["Approved", "Active"]);
+
+  const memberRowsBase = ((memberRowsRaw ?? []) as Array<Record<string, unknown>>).map(
+    (row) => {
+      const users = row.users as { username?: string } | null;
+      return {
+        user_id: String(row.user_id),
+        username: String(users?.username ?? "Spieler"),
+        character_id:
+          row.character_id != null ? String(row.character_id) : null,
+      };
+    },
+  );
+
+  const characterIds = memberRowsBase
+    .map((m) => m.character_id)
+    .filter((id): id is string => Boolean(id));
+
+  const characterNameById = new Map<string, string>();
+  if (characterIds.length > 0) {
+    const { data: charRows } = await (supabase.from("characters") as any)
+      .select("id, name")
+      .in("id", characterIds);
+    for (const row of (charRows as Array<{ id: string; name: string }> | null) ?? []) {
+      characterNameById.set(String(row.id), String(row.name ?? ""));
+    }
+  }
+
+  const memberRows = memberRowsBase.map((row) => ({
+    user_id: row.user_id,
+    username: row.username,
+    character_name: row.character_id
+      ? characterNameById.get(row.character_id) ?? null
+      : null,
+  }));
+
+  const campaignGm = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  };
+  const participationPlayers = resolveSessionParticipationPlayers({
+    memberRows,
+    onlinePresentUserIds: normalizeUserIdList(live.online_present_user_ids),
+    physicallyPresentUserIds: normalizeUserIdList(live.physically_present_user_ids),
+    gmUserIds: [campaignGm.gm_id, campaignGm.owner_id].filter(Boolean).map(String),
+  });
+
+  const achievements = await getAllAchievements();
+
   return {
     sessionId,
     sessionTitle: session.title,
@@ -296,6 +355,16 @@ export async function loadSessionWrapUpPreview(
           startTime: nextSessionRow.start_time,
         }
       : null,
+    participation: {
+      basePointsPerPlayer: SESSION_PARTICIPATION_BASE_POINTS,
+      alreadySettled: Boolean(session.participation_rewards_settled_at),
+      players: participationPlayers,
+      achievements: achievements.map((a) => ({
+        id: a.id,
+        name: a.name,
+        pointsAwarded: a.points_awarded,
+      })),
+    },
     followUpTasks,
   };
 }

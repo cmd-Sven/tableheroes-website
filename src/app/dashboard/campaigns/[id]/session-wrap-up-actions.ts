@@ -3,8 +3,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
-import { loadSessionWrapUpPreview } from "@/src/lib/session-wrap-up/load-session-wrap-up";
 import type { SessionWrapUpPreview } from "@/src/lib/session-wrap-up/types";
+import { loadSessionWrapUpPreview } from "@/src/lib/session-wrap-up/load-session-wrap-up";
+import { settleSessionParticipationRewards as settleParticipationRewardsImpl } from "@/src/lib/session-wrap-up/settle-participation-rewards";
+import type { SettleSessionParticipationInput } from "@/src/lib/session-wrap-up/participation-types";
 import { ensureSessionPrepLiveState } from "./session-actions";
 import { resilientUpdateSessionLiveState } from "@/src/lib/session-live-state-resilient";
 
@@ -17,6 +19,13 @@ export async function getSessionWrapUpPreview(
   sessionId: string,
 ): Promise<SessionWrapUpPreview | null> {
   return loadSessionWrapUpPreview(sessionId);
+}
+
+export async function settleSessionParticipationRewards(
+  sessionId: string,
+  input: SettleSessionParticipationInput,
+) {
+  return settleParticipationRewardsImpl(sessionId, input);
 }
 
 /** Bühne, Wetter & Szene von einer Session in den nächsten Termin übernehmen. */

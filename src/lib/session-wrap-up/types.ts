@@ -40,6 +40,23 @@ export type SessionWrapUpPreview = {
     title: string | null;
     startTime: string;
   } | null;
+  participation: {
+    basePointsPerPlayer: number;
+    alreadySettled: boolean;
+    players: Array<{
+      userId: string;
+      username: string;
+      characterName: string | null;
+      presence: "online" | "physical" | "both" | null;
+      eligible: boolean;
+      basePoints: number;
+    }>;
+    achievements: Array<{
+      id: string;
+      name: string;
+      pointsAwarded: number;
+    }>;
+  };
   followUpTasks: SessionWrapUpTask[];
 };
 

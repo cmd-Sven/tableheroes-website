@@ -58,6 +58,7 @@ import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUp
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
+import { registerSessionOnlinePresence } from "@/src/lib/actions/session-presence-actions";
 import { StageDeckHand } from "./StageDeckHand";
 import {
   formatWeatherSummary,
@@ -1300,11 +1301,18 @@ export function LiveSessionBoard({
       })
       .on("presence", { event: "sync" }, () => {
         const st = channel.presenceState();
-        setPresentUserIds(new Set(Object.keys(st)));
+        const ids = new Set(Object.keys(st));
+        setPresentUserIds(ids);
+        if (!isGM && ids.has(userId)) {
+          void registerSessionOnlinePresence(sessionId);
+        }
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ user_id: userId });
+          if (!isGM) {
+            void registerSessionOnlinePresence(sessionId);
+          }
         }
       });
 

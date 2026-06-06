@@ -5,19 +5,28 @@ import { useEffect, useState, useTransition } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  Award,
   Cloud,
+  Coins,
   Info,
   Loader2,
   MapPin,
   Mic,
+  Plus,
   Power,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
 import {
   carryOverSessionBoardState,
   getSessionWrapUpPreview,
+  settleSessionParticipationRewards,
 } from "@/src/app/dashboard/campaigns/[id]/session-wrap-up-actions";
+import type {
+  SessionParticipationAchievementInput,
+  SessionParticipationExtraInput,
+} from "@/src/lib/session-wrap-up/participation-types";
 import { endSession } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import {
   formatWrapUpDuration,
@@ -60,6 +69,13 @@ function TaskIcon({ kind }: { kind: SessionWrapUpTask["kind"] }) {
   return <Info className="h-4 w-4 shrink-0 text-gray-400" />;
 }
 
+function presenceLabel(presence: "online" | "physical" | "both" | null): string {
+  if (presence === "both") return "Online & am Tisch";
+  if (presence === "online") return "Eingeloggt";
+  if (presence === "physical") return "Physisch am Tisch";
+  return "Nicht erkannt";
+}
+
 export function SessionEndWrapUpModal({
   open,
   onClose,
@@ -72,12 +88,25 @@ export function SessionEndWrapUpModal({
   const [preview, setPreview] = useState<SessionWrapUpPreview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [carryOver, setCarryOver] = useState(true);
+  const [includedPlayerIds, setIncludedPlayerIds] = useState<Set<string>>(new Set());
+  const [enableExtraPoints, setEnableExtraPoints] = useState(false);
+  const [extraPointsByUser, setExtraPointsByUser] = useState<
+    Record<string, { points: string; reason: string }>
+  >({});
+  const [enableAchievements, setEnableAchievements] = useState(false);
+  const [achievementRows, setAchievementRows] = useState<
+    SessionParticipationAchievementInput[]
+  >([{ userId: "", achievementId: "" }]);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
     setLoadError(null);
     setPreview(null);
+    setEnableExtraPoints(false);
+    setEnableAchievements(false);
+    setExtraPointsByUser({});
+    setAchievementRows([{ userId: "", achievementId: "" }]);
     void getSessionWrapUpPreview(sessionId)
       .then((data) => {
         if (!data) {
@@ -86,6 +115,18 @@ export function SessionEndWrapUpModal({
         }
         setPreview(data);
         setCarryOver(Boolean(data.nextSession && data.board.hasCarryOverContent));
+        setIncludedPlayerIds(
+          new Set(
+            data.participation.players.filter((p) => p.eligible).map((p) => p.userId),
+          ),
+        );
+        const firstEligible = data.participation.players.find((p) => p.eligible);
+        setAchievementRows([
+          {
+            userId: firstEligible?.userId ?? "",
+            achievementId: data.participation.achievements[0]?.id ?? "",
+          },
+        ]);
       })
       .catch(() => {
         setLoadError("Übersicht konnte nicht geladen werden.");
@@ -121,6 +162,38 @@ export function SessionEndWrapUpModal({
           );
           if (!carryResult.ok) {
             throw new Error(carryResult.error);
+          }
+        }
+
+        if (!preview.participation.alreadySettled) {
+          const extras: SessionParticipationExtraInput[] = [];
+          if (enableExtraPoints) {
+            for (const userId of includedPlayerIds) {
+              const row = extraPointsByUser[userId];
+              const points = Number(row?.points ?? 0);
+              if (!Number.isFinite(points) || points === 0) continue;
+              if (!row?.reason?.trim() || row.reason.trim().length < 3) {
+                throw new Error("Bitte für Extrapunkte einen Grund angeben (mind. 3 Zeichen).");
+              }
+              extras.push({
+                userId,
+                points,
+                reason: row.reason.trim(),
+              });
+            }
+          }
+
+          const achievements: SessionParticipationAchievementInput[] = enableAchievements
+            ? achievementRows.filter((row) => row.userId && row.achievementId)
+            : [];
+
+          const settleResult = await settleSessionParticipationRewards(sessionId, {
+            participantUserIds: Array.from(includedPlayerIds),
+            extras,
+            achievements,
+          });
+          if (!settleResult.ok) {
+            throw new Error(settleResult.error);
           }
         }
 
@@ -260,6 +333,245 @@ export function SessionEndWrapUpModal({
                     </li>
                   ) : null}
                 </ul>
+              </section>
+
+              <section className="rounded-lg border border-hero-vibrant/30 bg-hero-vibrant/5 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-hero-vibrant" />
+                  <h3 className="font-barlow text-xs font-bold uppercase text-hero-vibrant">
+                    Teilnahme & Spieler-Punkte
+                  </h3>
+                </div>
+                {preview.participation.alreadySettled ? (
+                  <p className="font-libre text-sm text-gray-400">
+                    Teilnahme-Punkte für diese Session wurden bereits verbucht.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="font-libre text-sm text-gray-300 leading-relaxed">
+                      Jeder Spieler mit erfolgreicher Teilnahme erhält{" "}
+                      <strong className="text-white">
+                        {preview.participation.basePointsPerPlayer} Punkte
+                      </strong>{" "}
+                      (eingeloggt in der Live-Session oder vom SL als physisch anwesend
+                      markiert).
+                    </p>
+                    <ul className="space-y-2">
+                      {preview.participation.players.map((player) => {
+                        const checked = includedPlayerIds.has(player.userId);
+                        return (
+                          <li
+                            key={player.userId}
+                            className="flex flex-wrap items-center gap-2 rounded-lg border border-hero-border/25 bg-background-dark/50 px-3 py-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!player.eligible}
+                              onChange={(e) => {
+                                setIncludedPlayerIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(player.userId);
+                                  else next.delete(player.userId);
+                                  return next;
+                                });
+                              }}
+                              className="h-4 w-4 rounded border-hero-border text-hero-vibrant disabled:opacity-40"
+                              aria-label={`${player.username} Teilnahme-Punkte`}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-barlow text-sm font-bold text-white">
+                                {player.username}
+                                {player.characterName ? (
+                                  <span className="font-normal text-gray-400">
+                                    {" "}
+                                    · {player.characterName}
+                                  </span>
+                                ) : null}
+                              </p>
+                              <p className="font-libre text-xs text-gray-500">
+                                {presenceLabel(player.presence)}
+                              </p>
+                            </div>
+                            <span className="font-barlow text-xs font-bold text-hero-vibrant">
+                              {player.eligible
+                                ? `+${preview.participation.basePointsPerPlayer} Pkt.`
+                                : "—"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-hero-border/20 bg-background-dark/40 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={enableExtraPoints}
+                        onChange={(e) => setEnableExtraPoints(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-hero-border text-hero-vibrant"
+                      />
+                      <span className="font-libre text-sm text-gray-300">
+                        <span className="font-barlow text-xs font-bold uppercase text-gray-200">
+                          Extrapunkte für besondere Aktionen?
+                        </span>
+                        <span className="mt-1 block text-xs text-gray-500">
+                          Optional pro ausgewähltem Spieler — Betrag und kurzer Grund.
+                        </span>
+                      </span>
+                    </label>
+
+                    {enableExtraPoints ? (
+                      <div className="space-y-2 pl-1">
+                        {preview.participation.players
+                          .filter((p) => includedPlayerIds.has(p.userId))
+                          .map((player) => (
+                            <div
+                              key={`extra-${player.userId}`}
+                              className="grid gap-2 rounded-lg border border-hero-border/20 bg-black/20 p-3 sm:grid-cols-[1fr_5rem_1fr]"
+                            >
+                              <span className="self-center font-barlow text-xs font-bold uppercase text-gray-300">
+                                {player.username}
+                              </span>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                placeholder="Pkt."
+                                value={extraPointsByUser[player.userId]?.points ?? ""}
+                                onChange={(e) =>
+                                  setExtraPointsByUser((prev) => ({
+                                    ...prev,
+                                    [player.userId]: {
+                                      points: e.target.value,
+                                      reason: prev[player.userId]?.reason ?? "",
+                                    },
+                                  }))
+                                }
+                                className="rounded border border-hero-border bg-background-dark px-2 py-1.5 font-barlow text-sm text-white"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Grund (z. B. Held der Stunde)"
+                                value={extraPointsByUser[player.userId]?.reason ?? ""}
+                                onChange={(e) =>
+                                  setExtraPointsByUser((prev) => ({
+                                    ...prev,
+                                    [player.userId]: {
+                                      points: prev[player.userId]?.points ?? "",
+                                      reason: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white sm:col-span-1"
+                              />
+                            </div>
+                          ))}
+                      </div>
+                    ) : null}
+
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-hero-border/20 bg-background-dark/40 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={enableAchievements}
+                        onChange={(e) => setEnableAchievements(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-hero-border text-accent-gold"
+                      />
+                      <span className="font-libre text-sm text-gray-300">
+                        <span className="font-barlow text-xs font-bold uppercase text-accent-gold">
+                          Achievement für besondere Leistung?
+                        </span>
+                        <span className="mt-1 block text-xs text-gray-500">
+                          Wähle Spieler und Achievement aus der bestehenden Übersicht.
+                        </span>
+                      </span>
+                    </label>
+
+                    {enableAchievements ? (
+                      <div className="space-y-2">
+                        {achievementRows.map((row, index) => (
+                          <div
+                            key={`ach-${index}`}
+                            className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-gold/20 bg-black/20 p-3"
+                          >
+                            <Award className="h-4 w-4 shrink-0 text-accent-gold" />
+                            <select
+                              value={row.userId}
+                              onChange={(e) =>
+                                setAchievementRows((prev) =>
+                                  prev.map((entry, i) =>
+                                    i === index
+                                      ? { ...entry, userId: e.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              className="min-w-[8rem] flex-1 rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white"
+                            >
+                              <option value="">Spieler wählen…</option>
+                              {preview.participation.players
+                                .filter((p) => includedPlayerIds.has(p.userId))
+                                .map((p) => (
+                                  <option key={p.userId} value={p.userId}>
+                                    {p.username}
+                                  </option>
+                                ))}
+                            </select>
+                            <select
+                              value={row.achievementId}
+                              onChange={(e) =>
+                                setAchievementRows((prev) =>
+                                  prev.map((entry, i) =>
+                                    i === index
+                                      ? { ...entry, achievementId: e.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              className="min-w-[10rem] flex-1 rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white"
+                            >
+                              <option value="">Achievement wählen…</option>
+                              {preview.participation.achievements.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                  {a.pointsAwarded > 0 ? ` (+${a.pointsAwarded} Pkt.)` : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAchievementRows((prev) =>
+                                  prev.filter((_, i) => i !== index),
+                                )
+                              }
+                              disabled={achievementRows.length <= 1}
+                              className="rounded border border-red-800/50 p-2 text-red-300 hover:bg-red-950/40 disabled:opacity-30"
+                              aria-label="Zeile entfernen"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAchievementRows((prev) => [
+                              ...prev,
+                              {
+                                userId: prev[0]?.userId ?? "",
+                                achievementId:
+                                  preview.participation.achievements[0]?.id ?? "",
+                              },
+                            ])
+                          }
+                          className="inline-flex items-center gap-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:text-white"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Weiteres Achievement
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </section>
 
               {preview.nextSession ? (
