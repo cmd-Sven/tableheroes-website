@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { loadSessionWrapUpPreview } from "@/src/lib/session-wrap-up/load-session-wrap-up";
 import type { SessionWrapUpPreview } from "@/src/lib/session-wrap-up/types";
 import { ensureSessionPrepLiveState } from "./session-actions";
+import { resilientUpdateSessionLiveState } from "@/src/lib/session-live-state-resilient";
 
 function normalizeStringIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -101,12 +102,14 @@ export async function carryOverSessionBoardState(
     loot_hide_npcs: false,
   };
 
-  const { error } = await (supabase.from("session_live_states") as any)
-    .update(carryPatch)
-    .eq("session_id", targetSessionId);
+  const { error } = await resilientUpdateSessionLiveState(
+    supabase,
+    targetSessionId,
+    carryPatch,
+  );
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: error.message ?? "Live-State konnte nicht übernommen werden." };
   }
 
   revalidatePath(`/dashboard/campaigns/${source.campaign_id}`);
