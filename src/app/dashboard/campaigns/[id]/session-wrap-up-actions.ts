@@ -1,0 +1,115 @@
+"use server";
+
+import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { revalidatePath } from "next/cache";
+import { loadSessionWrapUpPreview } from "@/src/lib/session-wrap-up/load-session-wrap-up";
+import type { SessionWrapUpPreview } from "@/src/lib/session-wrap-up/types";
+import { ensureSessionPrepLiveState } from "./session-actions";
+
+function normalizeStringIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(String).filter((id) => id.length > 0);
+}
+
+export async function getSessionWrapUpPreview(
+  sessionId: string,
+): Promise<SessionWrapUpPreview | null> {
+  return loadSessionWrapUpPreview(sessionId);
+}
+
+/** Bühne, Wetter & Szene von einer Session in den nächsten Termin übernehmen. */
+export async function carryOverSessionBoardState(
+  sourceSessionId: string,
+  targetSessionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+  const { data: sessionsRaw } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, status")
+    .in("id", [sourceSessionId, targetSessionId]);
+
+  const sessions = (sessionsRaw ?? []) as Array<{
+    id: string;
+    campaign_id: string;
+    status: string;
+  }>;
+
+  if (sessions.length !== 2) {
+    return { ok: false, error: "Session nicht gefunden." };
+  }
+
+  const source = sessions.find((s) => s.id === sourceSessionId);
+  const target = sessions.find((s) => s.id === targetSessionId);
+  if (!source || !target) {
+    return { ok: false, error: "Session nicht gefunden." };
+  }
+  if (source.campaign_id !== target.campaign_id) {
+    return { ok: false, error: "Termine gehören nicht zur gleichen Kampagne." };
+  }
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", source.campaign_id)
+    .single();
+
+  if (!isCampaignGm(campaignRaw as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+    return { ok: false, error: "Nur der GM kann Einstellungen übernehmen." };
+  }
+
+  const { data: sourceLiveRaw } = await (supabase.from("session_live_states") as any)
+    .select("*")
+    .eq("session_id", sourceSessionId)
+    .maybeSingle();
+
+  if (!sourceLiveRaw) {
+    return { ok: false, error: "Kein Live-Zustand zum Übernehmen vorhanden." };
+  }
+
+  const sourceLive = sourceLiveRaw as Record<string, unknown>;
+
+  await ensureSessionPrepLiveState(targetSessionId);
+
+  const carryPatch: Record<string, unknown> = {
+    visible_npc_ids: normalizeStringIds(sourceLive.visible_npc_ids),
+    visible_faction_ids: normalizeStringIds(sourceLive.visible_faction_ids),
+    weather: sourceLive.weather ?? "Klar",
+    weather_preset: sourceLive.weather_preset ?? null,
+    weather_intensity: sourceLive.weather_intensity ?? null,
+    weather_temperature: sourceLive.weather_temperature ?? null,
+    temperature: sourceLive.temperature ?? "normal",
+    temperature_value: Number(sourceLive.temperature_value ?? 15),
+    current_time: sourceLive.current_time ?? "Tag",
+    current_location: sourceLive.current_location ?? null,
+    current_location_lore_id: sourceLive.current_location_lore_id ?? null,
+    current_location_id: sourceLive.current_location_id ?? null,
+    in_game_date: sourceLive.in_game_date ?? null,
+    in_game_time: sourceLive.in_game_time ?? null,
+    background_url: sourceLive.background_url ?? null,
+    is_background_manual_override: Boolean(sourceLive.is_background_manual_override ?? false),
+    is_combat_mode: false,
+    current_turn_index: 0,
+    journal_text: null,
+    system_logs: [],
+    active_shop_id: null,
+    active_merchant_npc_id: null,
+    current_loot_id: null,
+    loot_hide_npcs: false,
+  };
+
+  const { error } = await (supabase.from("session_live_states") as any)
+    .update(carryPatch)
+    .eq("session_id", targetSessionId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/dashboard/campaigns/${source.campaign_id}`);
+  revalidatePath(`/session/${targetSessionId}`);
+  return { ok: true };
+}

@@ -41,5 +41,13 @@ export const LIVE_MARKER_LABELS: Record<LiveMarkerType, string> = {
   pause: "Pause",
 };
 
+/** Kurze GM-Rückmeldung nach Setzen eines Live-Markers. */
+export function liveMarkerFeedbackMessage(type: LiveMarkerType): string {
+  if (type === "pause") {
+    return "Pause markiert — Aufnahme pausiert.";
+  }
+  return `Markierung „${LIVE_MARKER_LABELS[type]}“ gesetzt.`;
+}
+
 /** Storage-Bucket für Audio-Chunks (Supabase Storage). */
 export const SESSION_AUDIO_BUCKET = "session-audio-chunks";

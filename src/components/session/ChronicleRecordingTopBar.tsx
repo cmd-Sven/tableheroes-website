@@ -12,9 +12,14 @@ type Props = {
   /** GM während Aufnahme / Test */
   waveformLevels?: number[];
   hasSignal?: boolean;
+  peakLevel?: number;
   micActive?: boolean;
   deviceLabel?: string | null;
   compactWaveform?: boolean;
+  /** GM: Aufnahme-Dialog öffnen (wenn idle). */
+  onStartRecording?: () => void;
+  onStopRecording?: () => void;
+  onTogglePause?: () => void;
 };
 
 function statusLabel(status: TranscriptionStatus | null): string {
@@ -38,13 +43,19 @@ export function ChronicleRecordingTopBar({
   showWhenIdle = false,
   waveformLevels = [],
   hasSignal = false,
+  peakLevel = 0,
   micActive = false,
   deviceLabel = null,
   compactWaveform = true,
+  onStartRecording,
+  onStopRecording,
+  onTogglePause,
 }: Props) {
   const status = transcriptionStatus;
-  const isRecording = status === "recording";
+  const isRecording = status === "recording" || (micActive && !status);
   const isPaused = status === "paused";
+  const isActive = isRecording || isPaused;
+  const isIdle = !isActive;
   const visible =
     role === "player" ||
     showWhenIdle ||
@@ -76,7 +87,7 @@ export function ChronicleRecordingTopBar({
         />
       </div>
 
-      {!playerOnly && micActive && waveformLevels.length > 0 ? (
+      {!playerOnly && micActive && !isActive && waveformLevels.length > 0 ? (
         <MicLevelVisual
           levels={waveformLevels}
           active={micActive}
@@ -85,7 +96,7 @@ export function ChronicleRecordingTopBar({
         />
       ) : null}
 
-      {!playerOnly && micActive ? (
+      {!playerOnly && micActive && !isActive ? (
         <MicSignalBadge
           hasSignal={hasSignal}
           isActive={micActive}
@@ -107,6 +118,42 @@ export function ChronicleRecordingTopBar({
           ? "Mikro-Test"
           : statusLabel(status)}
       </span>
+
+      {!playerOnly && isIdle && onStartRecording ? (
+        <button
+          type="button"
+          onClick={onStartRecording}
+          className="ml-1 rounded border border-red-500/60 bg-red-950/50 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-red-200 hover:bg-red-900/50"
+        >
+          Aufnahme starten
+        </button>
+      ) : null}
+
+      {!playerOnly && isActive && onTogglePause ? (
+        <button
+          type="button"
+          onClick={onTogglePause}
+          className="ml-1 rounded border border-amber-700/50 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-amber-200 hover:bg-amber-950/40"
+        >
+          {isPaused ? "Fortsetzen" : "Pause"}
+        </button>
+      ) : null}
+
+      {!playerOnly && isActive && onStopRecording ? (
+        <button
+          type="button"
+          onClick={onStopRecording}
+          className="ml-1 rounded border border-red-600 bg-red-900/60 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-red-100 hover:bg-red-800/70"
+        >
+          Beenden
+        </button>
+      ) : null}
+
+      {playerOnly && isActive ? (
+        <span className="font-libre text-[10px] text-red-200 sm:text-xs">
+          Audio wird aufgezeichnet
+        </span>
+      ) : null}
     </div>
   );
 }

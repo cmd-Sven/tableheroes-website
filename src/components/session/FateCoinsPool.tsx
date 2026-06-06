@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, RotateCcw, Settings, Skull, X } from "lucide-react";
+import { GmBoardSettingsModal } from "@/src/components/session/GmBoardSettingsModal";
 import {
   destroyFateCoin,
   flipFateCoin,
@@ -267,28 +268,22 @@ export function FateCoinsPool({
       </div>
 
       {useCollapsibleGm ? (
-        <AnimatePresence initial={false}>
-          {gmSettingsOpen ? (
-            <motion.div
-              key="fate-gm-panel"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-2 rounded-lg border border-white/20 bg-white/10 p-3 backdrop-blur-md"
-            >
-              <PoolResetControls
-                destroyedCount={destroyedCount}
-                isPending={isPending}
-                whiteCount={whiteCount}
-                blackCount={blackCount}
-                setWhiteCount={setWhiteCount}
-                setBlackCount={setBlackCount}
-                onReset={handleReset}
-              />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <GmBoardSettingsModal
+          open={gmSettingsOpen}
+          onClose={() => onGmSettingsToggle?.()}
+          title="Schicksalsmünzen: Einstellungen"
+          size="md"
+        >
+          <PoolResetControls
+            destroyedCount={destroyedCount}
+            isPending={isPending}
+            whiteCount={whiteCount}
+            blackCount={blackCount}
+            setWhiteCount={setWhiteCount}
+            setBlackCount={setBlackCount}
+            onReset={handleReset}
+          />
+        </GmBoardSettingsModal>
       ) : null}
 
       {showInlineControlsBlock ? (

@@ -48,21 +48,23 @@ export function useMicMonitor() {
     const tick = () => {
       const analyser = analyserRef.current;
       if (analyser) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
+        const data = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(data);
         const step = Math.max(1, Math.floor(data.length / BAR_COUNT));
         const levels: number[] = [];
         let max = 0;
         for (let i = 0; i < BAR_COUNT; i++) {
           let sum = 0;
-          for (let j = 0; j < step; j++) sum += data[i * step + j] ?? 0;
-          const level = sum / step / 255;
+          for (let j = 0; j < step; j++) {
+            sum += Math.abs(((data[i * step + j] ?? 128) - 128) / 128);
+          }
+          const level = Math.min(1, sum / step);
           levels.push(level);
           if (level > max) max = level;
         }
         setWaveformLevels(levels);
         setPeakLevel(max);
-        if (max >= SIGNAL_THRESHOLD) setHasSignal(true);
+        setHasSignal(max >= SIGNAL_THRESHOLD);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -145,21 +147,23 @@ export function useAnalyserLevels(analyser: AnalyserNode | null, enabled: boolea
     }
 
     const tick = () => {
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(data);
+      const data = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(data);
       const step = Math.max(1, Math.floor(data.length / BAR_COUNT));
       const levels: number[] = [];
       let max = 0;
       for (let i = 0; i < BAR_COUNT; i++) {
         let sum = 0;
-        for (let j = 0; j < step; j++) sum += data[i * step + j] ?? 0;
-        const level = sum / step / 255;
+        for (let j = 0; j < step; j++) {
+          sum += Math.abs(((data[i * step + j] ?? 128) - 128) / 128);
+        }
+        const level = Math.min(1, sum / step);
         levels.push(level);
         if (level > max) max = level;
       }
       setWaveformLevels(levels);
       setPeakLevel(max);
-      if (max >= SIGNAL_THRESHOLD) setHasSignal(true);
+      setHasSignal(max >= SIGNAL_THRESHOLD);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);

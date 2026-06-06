@@ -9,6 +9,7 @@ import {
   mergeChronicleChunkSummary,
   parseChronicleChunkSummary,
 } from "./summarize-chunk";
+import { sanitizeChronicleChunkSummary } from "./chronicle-summary-sanitize";
 import type { ChronicleChunkSummary, LiveMarker } from "./types";
 import { SESSION_AUDIO_BUCKET } from "./constants";
 import { createAdminClient } from "@/src/lib/supabase/server";
@@ -87,7 +88,7 @@ export async function summarizeChunkTranscript(params: {
     throw new Error("KI-Antwort war kein gültiges JSON.");
   }
 
-  return parseChronicleChunkSummary(parsed);
+  return sanitizeChronicleChunkSummary(parseChronicleChunkSummary(parsed), params.liveMarkers);
 }
 
 type ProcessResult =

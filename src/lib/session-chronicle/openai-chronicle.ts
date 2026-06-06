@@ -48,5 +48,18 @@ Regeln:
 - spontaneous_* Arrays dürfen leer sein.
 - location.type: bevorzugt ${VALID_LORE_TYPES.slice(0, 12).join(", ")} … (sonst passender Typ).
 - Keine erfundenen Spielercharakter-Namen als NSC.
-- Live-Marker des SL (NSC/Ort/Quest/Pause) haben Priorität — berücksichtige sie im Recap.
+- Live-Marker des SL (NSC/Ort/Quest/Pause) markieren das THEMA des nächsten Abschnitts — sie sind KEIN automatisches Klassifikations-Etikett für jeden Satz danach.
+
+WICHTIG — Marker vs. Inhalt:
+- Marker „Wichtiger NSC“: Figurbeschreibung, Motivation, Persönlichkeit, Aussehen, Verhalten → spontaneous_npcs (NICHT Quest).
+- Marker „Ort“: Ortsbeschreibung → spontaneous_locations (NICHT Quest).
+- Marker „Quest“: NUR echte Spieler-Aufträge mit erkennbarem Ziel/Auftrag → spontaneous_quests.
+
+NIEMALS als Quest klassifizieren:
+- NPC-Feldbezeichnungen oder Skill-Check-Kategorien: „Wahrnehmung“, „Motiv erkennen“, „Motivation“, „Persönlichkeit“, „Aussehen“, „Verhalten“, „Wissen“, „DC 15“ o.ä.
+- Charaktereigenschaften, Hintergrundmotivation oder was Spieler bei Proben über einen NSC erfahren würden.
+- Wenn der SL einen NSC beschreibt (auch nach Quest-Marker), gehört das in spontaneous_npcs — nicht in spontaneous_quests.
+
+Eine echte Quest braucht ein erkennbares Aufgaben-Ziel für die Spieler (z. B. „Bringt das Artefakt zum Tempel“), nicht nur NSC-Metadaten.
+
 - discovered_loot: konkrete Beute, keine vagen Formulierungen.`;

@@ -24,13 +24,13 @@ import { toast } from "sonner";
 import {
   deleteSession,
   cancelSession,
-  endSession,
   markSessionPlanningComplete,
   archiveScheduledSessionQuietly,
   setPlanningDummyPlayerCount,
 } from "./session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import {
   PastSessionsGallery,
@@ -264,6 +264,7 @@ export function SessionsTab({
   const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isStarting, startTransition] = useTransition();
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [wrapUpSessionId, setWrapUpSessionId] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSuccess = () => {
@@ -321,15 +322,7 @@ export function SessionsTab({
   };
 
   const handleEndSession = (sessionId: string) => {
-    if (!confirm("Session beenden? Das Journal wird ins Logbuch übernommen.")) return;
-    startTransition(async () => {
-      try {
-        await endSession(sessionId);
-        router.refresh();
-      } catch (err: unknown) {
-        alert((err as Error).message || "Fehler beim Beenden der Session.");
-      }
-    });
+    setWrapUpSessionId(sessionId);
   };
 
   const handleArchiveQuiet = (sessionId: string) => {
@@ -805,6 +798,17 @@ export function SessionsTab({
               onSuccess={handleSuccess}
             />
           )}
+          <SessionEndWrapUpModal
+            open={wrapUpSessionId != null}
+            onClose={() => setWrapUpSessionId(null)}
+            sessionId={wrapUpSessionId ?? ""}
+            campaignId={campaignId}
+            isRecordingActive={false}
+            onComplete={(path) => {
+              setWrapUpSessionId(null);
+              router.push(path);
+            }}
+          />
         </>
       )}
     </>

@@ -46,9 +46,9 @@ import {
   UserRound,
 } from "lucide-react";
 import {
-  endSession,
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
@@ -81,6 +81,11 @@ import { ChronicleInboxFeed } from "@/src/components/chronicle/ChronicleInboxFee
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
 import { ChronicleMicTestPanel } from "@/src/components/session/ChronicleMicTestPanel";
 import { ChronicleRecordingTopBar } from "@/src/components/session/ChronicleRecordingTopBar";
+import {
+  ChronicleLiveMarkerBar,
+} from "@/src/components/session/ChronicleLiveMarkerBar";
+import { ChronicleRecordingNoticeModal } from "@/src/components/session/ChronicleRecordingNoticeModal";
+import { ChronicleMicMonitor } from "@/src/components/session/ChronicleMicMonitor";
 import { useSessionChronicleRecorder } from "@/src/hooks/useSessionChronicleRecorder";
 import { useSessionTranscriptionStatus } from "@/src/hooks/useSessionTranscriptionStatus";
 import { useMicMonitor } from "@/src/hooks/useMicMonitor";
@@ -1015,6 +1020,8 @@ export function LiveSessionBoard({
   const [downtimePlayerDismissed, setDowntimePlayerDismissed] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
+  const [wrapUpOpen, setWrapUpOpen] = useState(false);
+  const [recordingNoticeModalOpen, setRecordingNoticeModalOpen] = useState(false);
   const [stageFactionSearch, setStageFactionSearch] = useState("");
   const [npcSearchModalOpen, setNpcSearchModalOpen] = useState(false);
   const [stageDropHighlight, setStageDropHighlight] = useState(false);
@@ -1039,6 +1046,10 @@ export function LiveSessionBoard({
   const [presentUserIds, setPresentUserIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [chronistPanelOpen, setChronistPanelOpen] = useState(true);
+  const chronistStartFlowRef = useRef<(() => void) | null>(null);
+  const chronistStopFlowRef = useRef<(() => void) | null>(null);
+  const chronistSettingsFlowRef = useRef<(() => void) | null>(null);
 
   const isPrepMode = sessionStatus === "Scheduled";
   const chronistTableMode =
@@ -1061,7 +1072,48 @@ export function LiveSessionBoard({
     (isPrepMode && prepMicTest.isActive);
 
   const topBarTranscriptionStatus =
-    sessionStatus === "Live" ? liveTranscriptionStatus : null;
+    sessionStatus === "Live"
+      ? chronicleRecorder.phase === "recording"
+        ? "recording"
+        : chronicleRecorder.phase === "paused"
+          ? "paused"
+          : liveTranscriptionStatus
+      : null;
+
+  const recordingNoticeStatus =
+    sessionStatus === "Live" &&
+    chronistTableMode &&
+    (topBarTranscriptionStatus === "recording" ||
+      topBarTranscriptionStatus === "paused")
+      ? topBarTranscriptionStatus
+      : null;
+
+  useEffect(() => {
+    if (
+      isGM ||
+      !recordingNoticeStatus ||
+      sessionStatus !== "Live" ||
+      !chronistTableMode
+    ) {
+      return;
+    }
+    const key = `th-recording-notice-${sessionId}`;
+    try {
+      if (sessionStorage.getItem(key) === "1") return;
+    } catch {
+      /* ignore storage errors */
+    }
+    setRecordingNoticeModalOpen(true);
+  }, [isGM, recordingNoticeStatus, sessionId, sessionStatus, chronistTableMode]);
+
+  function dismissRecordingNotice() {
+    try {
+      sessionStorage.setItem(`th-recording-notice-${sessionId}`, "1");
+    } catch {
+      /* ignore storage errors */
+    }
+    setRecordingNoticeModalOpen(false);
+  }
   const weatherCondition = getWeatherCondition(liveState);
   const dayPhase = resolveSessionDayPhase(liveState?.current_time);
 
@@ -1845,13 +1897,28 @@ export function LiveSessionBoard({
             <ChronicleRecordingTopBar
               role="player"
               transcriptionStatus={topBarTranscriptionStatus}
-              showWhenIdle
             />
           ) : null}
           {isGM && chronistTableMode && (sessionStatus === "Live" || isPrepMode) ? (
             <ChronicleRecordingTopBar
               role="gm"
               transcriptionStatus={topBarTranscriptionStatus}
+              showWhenIdle
+              onStartRecording={
+                sessionStatus === "Live"
+                  ? () => chronistStartFlowRef.current?.()
+                  : undefined
+              }
+              onStopRecording={
+                sessionStatus === "Live"
+                  ? () => chronistStopFlowRef.current?.()
+                  : undefined
+              }
+              onTogglePause={
+                sessionStatus === "Live"
+                  ? () => void chronicleRecorder.togglePause()
+                  : undefined
+              }
               micActive={gmMicActive}
               waveformLevels={
                 chronicleRecorder.phase === "recording" ||
@@ -1864,6 +1931,12 @@ export function LiveSessionBoard({
                 chronicleRecorder.phase === "paused"
                   ? chronicleRecorder.hasSignal
                   : prepMicTest.hasSignal
+              }
+              peakLevel={
+                chronicleRecorder.phase === "recording" ||
+                chronicleRecorder.phase === "paused"
+                  ? chronicleRecorder.peakLevel
+                  : prepMicTest.peakLevel
               }
               deviceLabel={
                 chronicleRecorder.phase === "recording" ||
@@ -1934,29 +2007,7 @@ export function LiveSessionBoard({
           {isGM && !isPrepMode && (
             <button
               type="button"
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    "Session wirklich beenden? Das Journal wird gespeichert.",
-                  )
-                ) {
-                  return;
-                }
-                if (isEnding) return;
-                startEndTransition(async () => {
-                  try {
-                    const result = await endSession(sessionId);
-                    const targetCampaignId =
-                      (result as any)?.campaignId || campaignId;
-                    router.push(`/dashboard/campaigns/${targetCampaignId}`);
-                  } catch (err: any) {
-                    alert(
-                      err?.message ||
-                        "Fehler beim Beenden der Session. Bitte erneut versuchen.",
-                    );
-                  }
-                });
-              }}
+              onClick={() => setWrapUpOpen(true)}
               disabled={isEnding}
               className="inline-flex items-center gap-1 rounded border border-red-700 bg-red-900/60 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-red-200 hover:bg-red-800/80 transition-colors disabled:opacity-50"
             >
@@ -1982,6 +2033,14 @@ export function LiveSessionBoard({
           </button>
         </div>
       </div>
+
+      {recordingNoticeStatus && recordingNoticeModalOpen ? (
+        <ChronicleRecordingNoticeModal
+          open={recordingNoticeModalOpen}
+          onClose={dismissRecordingNotice}
+          status={recordingNoticeStatus}
+        />
+      ) : null}
 
       {isPrepMode && isGM && (
         <div className="relative z-10 border-b border-accent-gold/30 bg-accent-gold/10 px-6 py-2">
@@ -2202,6 +2261,7 @@ export function LiveSessionBoard({
                 open={weatherGmSettingsOpen}
                 onToggle={() => setWeatherGmSettingsOpen((v) => !v)}
                 settingsLabel="Wetter auswählen"
+                modalSize="lg"
                 preview={
                   <div
                     className="flex min-h-36 items-center justify-center p-2"
@@ -2279,11 +2339,37 @@ export function LiveSessionBoard({
                 </>
               ) : null}
 
+              {isGM && sessionStatus === "Live" && !chronistTableMode ? (
+                <div className="rounded border border-amber-900/50 bg-amber-950/30 p-3 space-y-2">
+                  <p className="font-libre text-xs text-amber-100/90">
+                    Chronist-Aufnahme ist nur im <strong>Tisch-Modus</strong> verfügbar
+                    (Jitsi folgt später). Bitte Modus wechseln:
+                  </p>
+                  <SessionChronistModeControl
+                    sessionId={sessionId}
+                    initialMode={activeTranscriptionMode}
+                    variant="sidebar"
+                    onModeChange={setActiveTranscriptionMode}
+                  />
+                </div>
+              ) : null}
+
               {isGM && sessionStatus === "Live" && chronistTableMode ? (
                 <ChronicleRecorderPanel
                   sessionId={sessionId}
                   plannedMode={activeTranscriptionMode}
                   recorder={chronicleRecorder}
+                  panelOpen={chronistPanelOpen}
+                  onPanelOpenChange={setChronistPanelOpen}
+                  registerStartFlow={(fn) => {
+                    chronistStartFlowRef.current = fn;
+                  }}
+                  registerStopFlow={(fn) => {
+                    chronistStopFlowRef.current = fn;
+                  }}
+                  registerSettingsFlow={(fn) => {
+                    chronistSettingsFlowRef.current = fn;
+                  }}
                 />
               ) : null}
 
@@ -2422,6 +2508,7 @@ export function LiveSessionBoard({
                     open={tablePresenceGmSettingsOpen}
                     onToggle={() => setTablePresenceGmSettingsOpen((v) => !v)}
                     settingsLabel="Spieler physisch am Tisch"
+                    modalSize="lg"
                     preview={
                       <div className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-md">
                         <Armchair className="h-10 w-10 text-accent-gold" aria-hidden />
@@ -2862,7 +2949,7 @@ export function LiveSessionBoard({
               </div>
             ) : null}
             {!stageHasDeckContent ? (
-              <div className="relative z-10 flex h-full min-h-[calc(48vh+120px)] items-center justify-center px-4 text-center">
+              <div className="pointer-events-none relative z-[1] flex h-full min-h-[calc(48vh+120px)] items-center justify-center px-4 text-center">
                 <p className="max-w-md rounded-lg border border-white/10 bg-black/45 px-5 py-4 font-libre text-sm text-gray-300 backdrop-blur-sm">
                   {isGM
                     ? "Noch nichts auf der Bühne. Ziehe Karten aus dem Deck unten hierher oder nutze Stage live."
@@ -3752,6 +3839,35 @@ export function LiveSessionBoard({
           </div>
         </div>
       )}
+      {isGM && sessionStatus === "Live" && chronistTableMode ? (
+        <ChronicleMicMonitor
+          recorder={chronicleRecorder}
+          onOpenSettings={() => chronistSettingsFlowRef.current?.()}
+        />
+      ) : null}
+      {isGM && sessionStatus === "Live" && chronistTableMode ? (
+        <ChronicleLiveMarkerBar recorder={chronicleRecorder} />
+      ) : null}
+
+      <SessionEndWrapUpModal
+        open={wrapUpOpen}
+        onClose={() => setWrapUpOpen(false)}
+        sessionId={sessionId}
+        campaignId={campaignId}
+        isRecordingActive={
+          chronicleRecorder.phase === "recording" ||
+          chronicleRecorder.phase === "paused" ||
+          liveTranscriptionStatus === "recording" ||
+          liveTranscriptionStatus === "paused"
+        }
+        onStopRecording={() => chronicleRecorder.stopRecording()}
+        onComplete={(path) => {
+          setWrapUpOpen(false);
+          startEndTransition(() => {
+            router.push(path);
+          });
+        }}
+      />
       <style>{`
         @keyframes npc-reaction-float {
           0% {

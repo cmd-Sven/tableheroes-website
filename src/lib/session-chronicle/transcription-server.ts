@@ -110,6 +110,97 @@ export async function authorizeTranscriptionGm(
   };
 }
 
+/** GM oder akzeptiertes Kampagnen-Mitglied (Lesen / Status-Anzeige). */
+export async function authorizeTranscriptionCampaignAccess(
+  supabase: SupabaseLike,
+  sessionId: string,
+): Promise<TranscriptionAuthResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Nicht authentifiziert.", status: 401 };
+  }
+
+  const { data: sessionRaw, error: sessionError } = await supabase
+    .from("sessions")
+    .select("id, campaign_id, status, transcription_mode")
+    .eq("id", sessionId)
+    .single();
+
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    status: string;
+    transcription_mode?: string | null;
+  } | null;
+
+  if (sessionError || !session) {
+    return { ok: false, message: "Session nicht gefunden.", status: 404 };
+  }
+
+  const { data: campaignRaw } = await supabase
+    .from("campaigns")
+    .select("gm_id, owner_id")
+    .eq("id", session.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+  } | null;
+
+  if (isCampaignGm(campaign, user.id)) {
+    const plannedMode =
+      session.transcription_mode === "jitsi"
+        ? "jitsi"
+        : session.transcription_mode === "table"
+          ? "table"
+          : null;
+    return {
+      ok: true,
+      ctx: {
+        userId: user.id,
+        sessionId,
+        campaignId: session.campaign_id,
+        sessionStatus: session.status,
+        plannedMode,
+      },
+    };
+  }
+
+  const { data: membership } = await supabase
+    .from("campaign_members")
+    .select("status")
+    .eq("campaign_id", session.campaign_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const memberStatus = (membership as { status?: string } | null)?.status ?? "";
+  const isMember = ["Approved", "Active"].includes(memberStatus);
+  if (!isMember) {
+    return { ok: false, message: "Kein Zugriff auf diese Session.", status: 403 };
+  }
+
+  const plannedMode =
+    session.transcription_mode === "jitsi"
+      ? "jitsi"
+      : session.transcription_mode === "table"
+        ? "table"
+        : null;
+
+  return {
+    ok: true,
+    ctx: {
+      userId: user.id,
+      sessionId,
+      campaignId: session.campaign_id,
+      sessionStatus: session.status,
+      plannedMode,
+    },
+  };
+}
+
 function resolveWriteClient(supabase: SupabaseLike): SupabaseLike {
   try {
     return createAdminClient() as unknown as SupabaseLike;
@@ -294,6 +385,53 @@ export async function setTranscriptionPaused(
   }
 
   return { ok: true as const, status: nextStatus };
+}
+
+export async function stopTranscriptionRecording(
+  supabase: SupabaseLike,
+  sessionId: string,
+) {
+  const auth = await authorizeTranscriptionGm(supabase, sessionId, {
+    requireLive: true,
+  });
+  if (!auth.ok) return auth;
+
+  const writeClient = resolveWriteClient(supabase);
+  const now = new Date().toISOString();
+
+  const { data: rowRaw } = await writeClient
+    .from("session_transcription_sessions")
+    .select("id, status")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const row = rowRaw as { id: string; status: string } | null;
+  if (!row) {
+    return {
+      ok: false as const,
+      message: "Keine Chronist-Session aktiv.",
+      status: 404,
+    };
+  }
+
+  if (row.status === "stopped" || row.status === "idle") {
+    return { ok: true as const, status: "stopped" as const };
+  }
+
+  const { error } = await writeClient
+    .from("session_transcription_sessions")
+    .update({
+      status: "stopped",
+      stopped_at: now,
+      updated_at: now,
+    })
+    .eq("id", row.id);
+
+  if (error) {
+    return { ok: false as const, message: error.message, status: 500 };
+  }
+
+  return { ok: true as const, status: "stopped" as const };
 }
 
 export async function appendLiveMarker(
@@ -483,7 +621,7 @@ export async function uploadTranscriptionChunk(
 }
 
 export async function getTranscriptionStatus(supabase: SupabaseLike, sessionId: string) {
-  const auth = await authorizeTranscriptionGm(supabase, sessionId);
+  const auth = await authorizeTranscriptionCampaignAccess(supabase, sessionId);
   if (!auth.ok) return auth;
 
   const { data: tsRaw } = await supabase

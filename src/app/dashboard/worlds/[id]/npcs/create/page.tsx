@@ -6,6 +6,7 @@ import { getFactionsByWorld } from "@/src/app/dashboard/campaigns/[id]/factions-
 import { getAllLocationsByWorld } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { NarrativeNPCWizard } from "@/src/components/worlds/NarrativeNPCWizard";
 import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
+import type { WorldBlueprint } from "@/src/types/world";
 import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
 
 type Props = {
@@ -96,6 +97,7 @@ export default async function WorldNPCCreatePage({ params, searchParams }: Props
       <NarrativeNPCWizard
         worldId={worldId}
         worldName={world.name}
+        worldBlueprint={(world.blueprint as WorldBlueprint) ?? null}
         factions={factionList}
         locations={locationList}
         initialLocationId={sp.locationId ?? undefined}

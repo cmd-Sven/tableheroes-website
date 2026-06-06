@@ -7,6 +7,7 @@ import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { sendMessage } from "@/src/lib/actions/message-actions";
+import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
 
 /**
  * Server Action: Create Session with Scenes
@@ -957,7 +958,8 @@ export async function archiveSession(
       last_seen_at: archivedAt,
     }));
 
-    const { error: reputationError } = await (supabase.from(
+    const admin = createAdminClient();
+    const { error: reputationError } = await (admin.from(
       "campaign_npc_reputation",
     ) as any).upsert(reputationRows, {
       onConflict: "campaign_id,npc_id",
@@ -1040,6 +1042,10 @@ export async function endSession(sessionId: string, skipRevalidate = false) {
 
   if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM kann eine Session beenden.");
+  }
+
+  if (isSessionStatusLive(session.status)) {
+    await stopTranscriptionRecording(supabase, sessionId);
   }
 
   // 4. Archive live state before cleanup/close.

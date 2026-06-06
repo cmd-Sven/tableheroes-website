@@ -1,0 +1,107 @@
+"use client";
+
+import { ImageIcon, Loader2, RefreshCw, SkipForward, Sparkles } from "lucide-react";
+
+type Props = {
+  npcName: string;
+  appearancePreview: string;
+  imageUrl: string | null;
+  portraitSkipped: boolean;
+  isGenerating: boolean;
+  canGenerate: boolean;
+  disabledReason?: string;
+  onGenerate: () => void;
+  onSkip: () => void;
+  onClearSkip: () => void;
+};
+
+export function NpcPortraitStep({
+  npcName,
+  appearancePreview,
+  imageUrl,
+  portraitSkipped,
+  isGenerating,
+  canGenerate,
+  disabledReason,
+  onGenerate,
+  onSkip,
+  onClearSkip,
+}: Props) {
+  return (
+    <div className="space-y-6">
+      <p className="font-libre text-gray-200 text-sm">
+        Optional: Lasse ein Charakterportrait im D&D-5e-Art-Stil deiner Welt erzeugen. Du kannst
+        den Schritt auch überspringen und später ein Bild hochladen.
+      </p>
+
+      <div className="rounded-lg border border-hero-border bg-slate-900/40 p-4">
+        <p className="font-barlow font-bold text-xs uppercase text-gray-400 mb-2">Aussehen (Grundlage)</p>
+        <p className="font-libre text-sm text-gray-300 line-clamp-4">{appearancePreview || "—"}</p>
+      </div>
+
+      <div className="flex flex-col items-center gap-4">
+        {imageUrl ? (
+          <div className="relative w-full max-w-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={`Portrait von ${npcName}`}
+              className="w-full rounded-lg border-2 border-accent-gold/50 shadow-lg object-cover aspect-square"
+            />
+          </div>
+        ) : portraitSkipped ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-hero-border bg-slate-900/30 p-8 w-full max-w-sm text-center">
+            <SkipForward className="h-10 w-10 text-gray-500" />
+            <p className="font-libre text-sm text-gray-400">Portrait übersprungen</p>
+            <button
+              type="button"
+              onClick={onClearSkip}
+              className="text-xs font-barlow uppercase text-hero-vibrant hover:underline"
+            >
+              Doch generieren
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-hero-border bg-slate-900/30 p-8 w-full max-w-sm text-center">
+            <ImageIcon className="h-12 w-12 text-gray-600" />
+            <p className="font-libre text-sm text-gray-400">Noch kein Portrait</p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3 justify-center">
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={isGenerating || !canGenerate}
+            className="inline-flex items-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold text-sm uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : imageUrl ? (
+              <RefreshCw className="h-4 w-4" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {imageUrl ? "Neu generieren" : "Portrait generieren"}
+          </button>
+
+          {!imageUrl && !portraitSkipped && (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-2 rounded border border-hero-border px-4 py-2 font-barlow font-bold text-sm uppercase text-gray-400 hover:text-white disabled:opacity-50"
+            >
+              <SkipForward className="h-4 w-4" />
+              Überspringen
+            </button>
+          )}
+        </div>
+
+        {!canGenerate && disabledReason && (
+          <p className="font-libre text-xs text-amber-200/80 text-center max-w-md">{disabledReason}</p>
+        )}
+      </div>
+    </div>
+  );
+}

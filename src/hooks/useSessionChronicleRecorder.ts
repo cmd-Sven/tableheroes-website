@@ -76,6 +76,12 @@ export function useSessionChronicleRecorder({
           setPhase("paused");
         } else if (data.transcriptionSession.status === "recording") {
           setPhase((p) => (p === "idle" ? "recording" : p));
+        } else if (
+          data.transcriptionSession.status === "stopped" ||
+          data.transcriptionSession.status === "idle"
+        ) {
+          setPhase("idle");
+          setRecordingStartedAt(null);
         }
         const maxIdx = (data.chunks ?? []).reduce(
           (max, c) => Math.max(max, Number(c.chunk_index ?? 0)),
@@ -110,22 +116,24 @@ export function useSessionChronicleRecorder({
     const tick = () => {
       const analyser = analyserRef.current;
       if (analyser) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
+        const data = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(data);
         const bars = 24;
         const step = Math.max(1, Math.floor(data.length / bars));
         const levels: number[] = [];
         let max = 0;
         for (let i = 0; i < bars; i++) {
           let sum = 0;
-          for (let j = 0; j < step; j++) sum += data[i * step + j] ?? 0;
-          const level = sum / step / 255;
+          for (let j = 0; j < step; j++) {
+            sum += Math.abs(((data[i * step + j] ?? 128) - 128) / 128);
+          }
+          const level = Math.min(1, sum / step);
           levels.push(level);
           if (level > max) max = level;
         }
         setWaveformLevels(levels);
         setPeakLevel(max);
-        if (max >= 0.06) setHasSignal(true);
+        setHasSignal(max >= 0.05);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -360,18 +368,26 @@ export function useSessionChronicleRecorder({
   }, [phase, sessionId]);
 
   const addMarker = useCallback(
-    async (type: LiveMarkerType, label?: string) => {
+    async (type: LiveMarkerType, label?: string): Promise<boolean> => {
+      if (phaseRef.current !== "recording" && phaseRef.current !== "paused") {
+        return false;
+      }
+
       const atMs =
         recordingStartedAt != null ? Math.max(0, Date.now() - recordingStartedAt) : 0;
       const marker: LiveMarker = { type, at_ms: atMs, label: label?.trim() || undefined };
       chunkMarkersRef.current.push(marker);
 
       if (type === "pause") {
-        await togglePause();
+        try {
+          await togglePause();
+        } catch {
+          return false;
+        }
       }
 
       try {
-        await fetch(
+        const res = await fetch(
           `/api/sessions/${encodeURIComponent(sessionId)}/transcription/marker`,
           {
             method: "POST",
@@ -385,12 +401,61 @@ export function useSessionChronicleRecorder({
             }),
           },
         );
+        if (!res.ok) {
+          return false;
+        }
       } catch {
         /* Marker lokal gespeichert, Upload folgt mit Chunk */
       }
+
+      return true;
     },
     [currentChunkIndex, recordingStartedAt, sessionId, togglePause],
   );
+
+  const waitForUploadQueue = useCallback(async () => {
+    let attempts = 0;
+    while (
+      (uploadQueueRef.current.length > 0 || uploadBusyRef.current) &&
+      attempts < 120
+    ) {
+      await new Promise((r) => window.setTimeout(r, 250));
+      attempts += 1;
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    const locallyActive =
+      phaseRef.current === "recording" || phaseRef.current === "paused";
+
+    setError(null);
+    try {
+      if (locallyActive) {
+        mediaRecorderRef.current?.stop();
+        await new Promise((r) => window.setTimeout(r, 400));
+        workerRef.current?.postMessage({ type: "flush" });
+        await new Promise((r) => window.setTimeout(r, 600));
+        await waitForUploadQueue();
+      }
+
+      const res = await fetch(
+        `/api/sessions/${encodeURIComponent(sessionId)}/transcription/stop`,
+        { method: "POST", credentials: "same-origin" },
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || "Aufnahme konnte nicht beendet werden.");
+      }
+
+      teardownCapture();
+      setPhase("idle");
+      setServerStatus("stopped");
+      setRecordingStartedAt(null);
+      setWaveformLevels(Array.from({ length: 24 }, () => 0));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Stop fehlgeschlagen.");
+    }
+  }, [sessionId, teardownCapture, waitForUploadQueue]);
 
   const elapsedMs =
     recordingStartedAt != null && (phase === "recording" || phase === "paused")
@@ -412,6 +477,7 @@ export function useSessionChronicleRecorder({
     elapsedMs,
     startRecording,
     togglePause,
+    stopRecording,
     addMarker,
     refreshStatus,
     isTableMode: plannedMode === "table" || plannedMode === null,

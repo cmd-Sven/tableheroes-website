@@ -4,6 +4,12 @@ import OpenAI from "openai";
 import { createClient } from "@/src/lib/supabase/server";
 import type { WorldBlueprint } from "@/src/types/world";
 import { NPCSchema } from "@/src/lib/validations/schemas";
+import {
+  buildPortraitArtStyle,
+  buildPortraitImagePrompt,
+} from "@/src/lib/npc-portrait-style";
+
+const PROFILE_MEDIA_BUCKET = "profile-media";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -480,6 +486,11 @@ AUFGABE:
 2. MAPPING: Wenn etwas erwähnt wird, das zu einer bestehenden Fraktion, einem bestehenden Ort ODER einem bestehenden NPC passt, verknüpfe es (existing_id, existing_name). Achte dabei auch auf leicht abweichende Schreibweisen oder Spitznamen – wenn ein NPC "Joshu'rak" heißt und "Joshurak" im Briefing steht, ist das derselbe NPC!
 3. INKUBATION: Wenn eine Entität erwähnt wird, die WIRKLICH NICHT in den obigen Listen existiert, markiere sie als NEU. Schlage NIEMALS einen NPC, Ort oder eine Fraktion als "neu" vor, wenn ein gleichnamiger oder sehr ähnlich benannter Eintrag bereits in den Listen steht.
 
+WICHTIG — KEINE Entitäten aus NPC-Metadaten:
+- "Wahrnehmung", "Motiv erkennen", "Motivation", "Persönlichkeit", "Aussehen", "Verhalten", "Wissen", "Biografie", "Geschätzt", "Ort in Session" sind Feldbezeichnungen aus NSC-Briefings oder Skill-Checks — KEINE Quests, Aufgaben, Orte oder Personen.
+- Erfinde keine new_entities aus solchen Labels oder aus Zeilen wie "Motivation: …" / "Wahrnehmung: …".
+- Eine Quest/Aufgabe ist nur dann relevant, wenn im Briefing ein klarer Spieler-Auftrag mit Ziel genannt wird — nicht bei NSC-Eigenschaften.
+
 Antworte NUR mit einem JSON-Objekt mit genau drei Feldern (Deutsch wo sinnvoll):
 - "mappings": Array von { "mention": "Text aus dem Briefing", "entity_type": "location"|"faction"|"npc", "existing_id": "uuid oder null", "existing_name": "Name oder null" }. Nur Einträge, wo du eine Zuordnung machst (ob existierend oder neu).
 - "new_entities": Array von { "type": "location"|"faction"|"npc", "proposed_name": "Vorschlag", "description": "1-2 Sätze" }. Nur Entitäten, die noch nicht in der Welt existieren. Den Haupt-NPC des Briefings (den gerade erstellten Charakter) NIEMALS hier aufnehmen. Und NIEMALS einen NPC vorschlagen, der bereits in der NPC-Liste existiert!
@@ -551,6 +562,85 @@ Antworte NUR mit einem JSON-Objekt mit genau drei Feldern (Deutsch wo sinnvoll):
   const summary = typeof raw.summary === "string" ? raw.summary.trim() : "";
 
   return { mappings, new_entities, summary };
+}
+
+// ============================================================================
+// NPC-Portrait (DALL·E) aus bestätigtem Aussehen
+// ============================================================================
+
+export type GenerateNPCPortraitInput = {
+  name: string;
+  appearance: string;
+  race?: string;
+  age?: string;
+  gender?: string;
+  role?: string;
+  styleOverride?: string;
+};
+
+export async function generateNPCPortrait(
+  worldId: string,
+  input: GenerateNPCPortraitInput,
+): Promise<{ imageUrl: string }> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY ist nicht konfiguriert.");
+  }
+
+  const appearance = input.appearance?.trim();
+  if (!appearance || appearance.length < 20) {
+    throw new Error("Bitte bestätige zuerst eine ausreichend detaillierte Aussehensbeschreibung.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { blueprint } = await loadWorldAndAuth(worldId);
+  const artStyle = buildPortraitArtStyle(blueprint);
+  const prompt = buildPortraitImagePrompt({
+    name: input.name.trim() || "Unnamed NPC",
+    appearance,
+    race: input.race?.trim(),
+    age: input.age?.trim(),
+    gender: input.gender?.trim(),
+    role: input.role?.trim(),
+    artStyle,
+    styleOverride: input.styleOverride?.trim(),
+  });
+
+  const response = await openai.images.generate({
+    model: "dall-e-3",
+    prompt,
+    n: 1,
+    size: "1024x1024",
+    quality: "standard",
+    response_format: "b64_json",
+  });
+
+  const b64 = response.data?.[0]?.b64_json;
+  if (!b64) {
+    throw new Error("Die Bild-KI hat kein Bild zurückgegeben.");
+  }
+
+  const buffer = Buffer.from(b64, "base64");
+  const path = `${user.id}/npcs/${worldId}/portrait-${Date.now()}.png`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(PROFILE_MEDIA_BUCKET)
+    .upload(path, buffer, {
+      contentType: "image/png",
+      cacheControl: "31536000",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Bild-Upload fehlgeschlagen: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { imageUrl: urlData.publicUrl };
 }
 
 // ============================================================================

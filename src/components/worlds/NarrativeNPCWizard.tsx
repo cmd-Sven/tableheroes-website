@@ -15,14 +15,19 @@ import {
   MapPin,
   ListTodo,
   RefreshCw,
+  ImageIcon,
+  Palette,
 } from "lucide-react";
 import { processBriefing, type ProcessBriefingResult, type BriefingNewEntity } from "@/src/app/dashboard/worlds/world-npc-actions";
-import { generateNPC, regenerateNPCSection, type GeneratedNPCResult, type RerollSection } from "@/src/app/dashboard/worlds/world-npc-actions";
+import { generateNPC, regenerateNPCSection, generateNPCPortrait, type GeneratedNPCResult, type RerollSection } from "@/src/app/dashboard/worlds/world-npc-actions";
 import { createNPC, getNPCsByWorld } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { linkPlannedMemberByNameToNpc } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { insertWorldTasksBatch } from "@/src/app/dashboard/worlds/world-tasks-actions";
 import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
 import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
+import type { WorldBlueprint } from "@/src/types/world";
+import { NpcAppearanceConfirmStep } from "@/src/components/worlds/npc-wizard/NpcAppearanceConfirmStep";
+import { NpcPortraitStep } from "@/src/components/worlds/npc-wizard/NpcPortraitStep";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -34,6 +39,7 @@ const RELATION_TYPES = [
 type Props = {
   worldId: string;
   worldName: string;
+  worldBlueprint?: WorldBlueprint | null;
   factions: Array<{ id: string; name: string }>;
   locations: Array<{ id: string; name: string; type: string }>;
   /** Vorbefüllung aus Hook-Aufgabe (world_tasks), z. B. proposed_name + description. */
@@ -58,10 +64,12 @@ type Props = {
 };
 
 const stepTransition = { type: "tween" as const, duration: 0.3 };
+type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export function NarrativeNPCWizard({
   worldId,
   worldName,
+  worldBlueprint = null,
   factions,
   locations,
   initialBriefing,
@@ -77,8 +85,9 @@ export function NarrativeNPCWizard({
   onError,
 }: Props) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<WizardStep>(1);
   const [isPending, startTransition] = useTransition();
+  const [isPortraitPending, startPortraitTransition] = useTransition();
 
   const [step1Name, setStep1Name] = useState(initialPrefillName ?? "");
   const [homeLocationId, setHomeLocationId] = useState<string | null>(initialLocationId ?? null);
@@ -89,12 +98,25 @@ export function NarrativeNPCWizard({
   const [briefing, setBriefing] = useState(initialBriefing ?? "");
   const [briefingResult, setBriefingResult] = useState<ProcessBriefingResult | null>(null);
   const [persona, setPersona] = useState<GeneratedNPCResult | null>(null);
+  const [confirmedAppearance, setConfirmedAppearance] = useState("");
+  const [portraitAge, setPortraitAge] = useState("");
+  const [portraitGender, setPortraitGender] = useState("");
+  const [artStyleNote, setArtStyleNote] = useState("");
+  const [appearanceConfirmed, setAppearanceConfirmed] = useState(false);
+  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
+  const [portraitSkipped, setPortraitSkipped] = useState(false);
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(linkFactionId ?? null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(initialLocationId ?? null);
   const [linkedNpcId, setLinkedNpcId] = useState<string | null>(null);
   const [linkedNpcRelationType, setLinkedNpcRelationType] = useState<string>("Andere");
   const [worldNPCs, setWorldNPCs] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    if (persona?.appearance && !confirmedAppearance) {
+      setConfirmedAppearance(persona.appearance);
+    }
+  }, [persona?.appearance, confirmedAppearance]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +158,10 @@ export function NarrativeNPCWizard({
         const prompt = `${namePart}${racePart}${locationPart}${homePart}${briefingPart}`.trim() || "Erstelle einen passenden NPC.";
         const data = await generateNPC(worldId, { prompt, includeSecret: false });
         setPersona(data);
+        setConfirmedAppearance(data.appearance ?? "");
+        setAppearanceConfirmed(false);
+        setPortraitUrl(null);
+        setPortraitSkipped(false);
       } catch (e: any) {
         const msg = e?.message || "Fehler bei der Persona-Generierung.";
         onError?.(msg);
@@ -158,6 +184,12 @@ export function NarrativeNPCWizard({
         });
         const updated = { ...persona, [section]: result[section] ?? persona[section] };
         setPersona(updated);
+        if (section === "appearance") {
+          setConfirmedAppearance(String(updated.appearance ?? ""));
+          setAppearanceConfirmed(false);
+          setPortraitUrl(null);
+          setPortraitSkipped(false);
+        }
       } catch (e: any) {
         const msg = e?.message || "Fehler beim Neugenerieren.";
         onError?.(msg);
@@ -168,7 +200,37 @@ export function NarrativeNPCWizard({
     });
   };
 
-  const handleStep4Manifest = () => {
+  const handleConfirmAppearance = () => {
+    setAppearanceConfirmed(true);
+    if (persona) {
+      setPersona({ ...persona, appearance: confirmedAppearance.trim() });
+    }
+  };
+
+  const handleGeneratePortrait = () => {
+    if (!appearanceConfirmed) return;
+    startPortraitTransition(async () => {
+      try {
+        const result = await generateNPCPortrait(worldId, {
+          name: step1Name.trim() || persona?.name || "NPC",
+          appearance: confirmedAppearance,
+          race: race.trim() || persona?.race || undefined,
+          age: portraitAge.trim() || undefined,
+          gender: portraitGender.trim() || undefined,
+          role: persona?.role ?? undefined,
+          styleOverride: artStyleNote.trim() || undefined,
+        });
+        setPortraitUrl(result.imageUrl);
+        setPortraitSkipped(false);
+      } catch (e: any) {
+        const msg = e?.message || "Fehler bei der Portrait-Generierung.";
+        onError?.(msg);
+        if (typeof window !== "undefined") alert(msg);
+      }
+    });
+  };
+
+  const handleStep6Manifest = () => {
     if (!persona) return;
     startTransition(async () => {
       try {
@@ -184,9 +246,10 @@ export function NarrativeNPCWizard({
           status: persona.status ?? "Alive",
           alignment: persona.alignment ?? undefined,
           description: persona.description ?? undefined,
-          appearance: persona.appearance ?? undefined,
+          appearance: (confirmedAppearance.trim() || persona.appearance) ?? undefined,
           personality_traits: persona.personality_traits ?? undefined,
           gm_notes: persona.gm_notes ?? undefined,
+          image_url: portraitUrl ?? undefined,
           narrative_hooks: (persona.narrative_hooks ?? undefined)?.map((h) => ({ ...h, name: h.name ?? undefined })) ?? undefined,
           check_results: (persona.check_results ?? undefined) as any,
           faction_id: selectedFactionId ?? undefined,
@@ -243,7 +306,10 @@ export function NarrativeNPCWizard({
   const newEntities = briefingResult?.new_entities ?? [];
   const canGoStep2 = !!briefingResult;
   const canGoStep3 = !!persona;
-  const canGoStep4 = !!persona;
+  const canGoStep4 = !!persona && appearanceConfirmed;
+  const canGoStep5 = !!persona && appearanceConfirmed && (!!portraitUrl || portraitSkipped);
+  const canGoStep6 = !!persona;
+  const displayName = step1Name.trim() || persona?.name || "NPC";
 
   return (
     <div className="rounded-lg border border-hero-border bg-background-card p-6 shadow-xl">
@@ -252,7 +318,7 @@ export function NarrativeNPCWizard({
           Narrativer NPC-Architekt
         </h1>
         <span className="font-barlow font-bold text-sm uppercase text-gray-400">
-          Schritt {step} von 4
+          Schritt {step} von 6
         </span>
       </div>
 
@@ -602,7 +668,7 @@ export function NarrativeNPCWizard({
           </motion.div>
         )}
 
-        {step === 3 && (
+        {step === 3 && persona && (
           <motion.div
             key="step3"
             initial={{ opacity: 0, x: -20 }}
@@ -611,8 +677,72 @@ export function NarrativeNPCWizard({
             transition={stepTransition}
           >
             <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Schritt 3: Aussehen bestätigen
+            </h2>
+            <NpcAppearanceConfirmStep
+              appearance={confirmedAppearance}
+              onAppearanceChange={(value) => {
+                setConfirmedAppearance(value);
+                setAppearanceConfirmed(false);
+                setPortraitUrl(null);
+                setPortraitSkipped(false);
+              }}
+              age={portraitAge}
+              onAgeChange={setPortraitAge}
+              gender={portraitGender}
+              onGenderChange={setPortraitGender}
+              artStyleNote={artStyleNote}
+              onArtStyleNoteChange={setArtStyleNote}
+              worldBlueprint={worldBlueprint}
+              appearanceConfirmed={appearanceConfirmed}
+              onConfirm={handleConfirmAppearance}
+            />
+          </motion.div>
+        )}
+
+        {step === 4 && persona && (
+          <motion.div
+            key="step4"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={stepTransition}
+          >
+            <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Schritt 4: Charakterportrait
+            </h2>
+            <NpcPortraitStep
+              npcName={displayName}
+              appearancePreview={confirmedAppearance}
+              imageUrl={portraitUrl}
+              portraitSkipped={portraitSkipped}
+              isGenerating={isPortraitPending}
+              canGenerate={appearanceConfirmed}
+              disabledReason={
+                !appearanceConfirmed
+                  ? "Bitte bestätige zuerst das Aussehen in Schritt 3."
+                  : undefined
+              }
+              onGenerate={handleGeneratePortrait}
+              onSkip={() => setPortraitSkipped(true)}
+              onClearSkip={() => setPortraitSkipped(false)}
+            />
+          </motion.div>
+        )}
+
+        {step === 5 && (
+          <motion.div
+            key="step5"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={stepTransition}
+          >
+            <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Schritt 3: Soziale Verwebung & To-Do
+              Schritt 5: Soziale Verwebung & To-Do
             </h2>
             <p className="font-libre text-gray-200 mb-4">
               Zusammenfassung der Beziehungen und Zugehörigkeiten. Neue Entitäten werden nach dem Speichern als Aufgaben angelegt.
@@ -681,9 +811,9 @@ export function NarrativeNPCWizard({
           </motion.div>
         )}
 
-        {step === 4 && (
+        {step === 6 && (
           <motion.div
-            key="step4"
+            key="step6"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
@@ -691,7 +821,7 @@ export function NarrativeNPCWizard({
           >
             <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              Schritt 4: Manifestation
+              Schritt 6: Manifestation
             </h2>
             <p className="font-libre text-gray-200 mb-4">
               NPC wird in der Welt gespeichert. Alle neuen Entitäten aus dem Briefing werden als offene Aufgaben (World Tasks) angelegt.
@@ -701,6 +831,11 @@ export function NarrativeNPCWizard({
                 <p className="font-libre text-gray-300 mb-2">
                   <strong className="text-hero-vibrant">{persona.name}</strong> wird angelegt.
                 </p>
+                {portraitUrl && (
+                  <p className="font-libre text-sm text-accent-gold mb-2">
+                    Charakterportrait wird mit gespeichert.
+                  </p>
+                )}
                 {newEntities.length > 0 && (
                   <p className="font-libre text-sm text-gray-400">
                     {newEntities.length} Aufgabe(n) werden in der Welt-Übersicht erscheinen.
@@ -708,7 +843,7 @@ export function NarrativeNPCWizard({
                 )}
                 <button
                   type="button"
-                  onClick={handleStep4Manifest}
+                  onClick={handleStep6Manifest}
                   disabled={isPending}
                   className="mt-4 inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold text-sm uppercase text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-50"
                 >
@@ -724,21 +859,23 @@ export function NarrativeNPCWizard({
       <div className="mt-8 flex justify-between border-t border-hero-border pt-4">
         <button
           type="button"
-          onClick={() => setStep((s) => (s > 1 ? (s - 1) as 1 | 2 | 3 | 4 : 1))}
+          onClick={() => setStep((s) => (s > 1 ? ((s - 1) as WizardStep) : 1))}
           disabled={step === 1}
           className="inline-flex items-center gap-2 rounded border border-hero-border px-4 py-2 font-barlow font-bold text-sm uppercase text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ArrowLeft className="h-4 w-4" />
           Zurück
         </button>
-        {step < 4 && (
+        {step < 6 && (
           <button
             type="button"
-            onClick={() => setStep((s) => (s < 4 ? (s + 1) as 1 | 2 | 3 | 4 : 4))}
+            onClick={() => setStep((s) => (s < 6 ? ((s + 1) as WizardStep) : 6))}
             disabled={
               (step === 1 && !canGoStep2) ||
               (step === 2 && !canGoStep3) ||
-              (step === 3 && !canGoStep4)
+              (step === 3 && !canGoStep4) ||
+              (step === 4 && !canGoStep5) ||
+              (step === 5 && !canGoStep6)
             }
             className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold text-sm uppercase text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-40 disabled:cursor-not-allowed"
           >

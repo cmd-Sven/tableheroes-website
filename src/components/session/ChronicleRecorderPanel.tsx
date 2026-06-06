@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   LIVE_MARKER_LABELS,
   LIVE_MARKER_TYPES,
@@ -14,9 +14,10 @@ import {
   type UseSessionChronicleRecorderReturn,
 } from "@/src/hooks/useSessionChronicleRecorder";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
-import { MicLevelVisual, MicSignalBadge } from "@/src/components/session/MicLevelVisual";
+import { GmBoardSettingsModal } from "@/src/components/session/GmBoardSettingsModal";
 import { ChronicleChunkProcessingList } from "@/src/components/session/ChronicleChunkProcessingList";
-import { Loader2, Mic, MicOff, Pause, Play, Radio } from "lucide-react";
+import { setLiveMarkerWithFeedback } from "@/src/components/session/live-marker-feedback";
+import { Loader2, Mic, MicOff, Pause, Play, Radio, Square } from "lucide-react";
 
 export type { UseSessionChronicleRecorderReturn };
 
@@ -25,21 +26,29 @@ type Props = {
   plannedMode: TranscriptionMode | null;
   /** Optional: Recorder vom Parent (Top-Bar + Sidebar teilen sich den State). */
   recorder?: UseSessionChronicleRecorderReturn;
+  /** Gesteuertes Aufklappen des Panels (z. B. von Top-Bar-Button). */
+  panelOpen?: boolean;
+  onPanelOpenChange?: (open: boolean) => void;
+  /** Parent kann den Aufnahme-Dialog öffnen (Top-Bar „Aufnahme“). */
+  registerStartFlow?: (openStartFlow: () => void) => void;
+  registerStopFlow?: (stopFlow: () => void) => void;
+  /** Parent kann das Chronist-Modal öffnen (z. B. vom fixed Mikro-Monitor). */
+  registerSettingsFlow?: (openSettings: () => void) => void;
 };
 
-function formatElapsed(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-export function ChronicleRecorderPanel({ sessionId, plannedMode, recorder: externalRecorder }: Props) {
-  const [panelOpen, setPanelOpen] = useState(false);
+export function ChronicleRecorderPanel({
+  sessionId,
+  plannedMode,
+  recorder: externalRecorder,
+  panelOpen: panelOpenProp,
+  onPanelOpenChange,
+  registerStartFlow,
+  registerStopFlow,
+  registerSettingsFlow,
+}: Props) {
+  const [internalPanelOpen, setInternalPanelOpen] = useState(true);
+  const panelOpen = panelOpenProp ?? internalPanelOpen;
+  const setPanelOpen = onPanelOpenChange ?? setInternalPanelOpen;
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeAck, setNoticeAck] = useState(false);
   const [pendingMode, setPendingMode] = useState<TranscriptionMode>(
@@ -94,7 +103,6 @@ export function ChronicleRecorderPanel({ sessionId, plannedMode, recorder: exter
   }, [sessionId, recorder.uploadQueueSize, recorder.currentChunkIndex]);
 
   const isActive = recorder.phase === "recording" || recorder.phase === "paused";
-  const micLive = isActive;
   const statusLabel =
     recorder.phase === "recording"
       ? "Aufnahme läuft"
@@ -110,232 +118,244 @@ export function ChronicleRecorderPanel({ sessionId, plannedMode, recorder: exter
     await recorder.startRecording(pendingMode, true);
   }
 
-  function openStartFlow() {
+  const openStartFlow = useCallback(() => {
     setPendingMode(plannedMode ?? "table");
     setNoticeAck(false);
     setNoticeOpen(true);
-  }
+    setPanelOpen(true);
+  }, [plannedMode, setPanelOpen]);
+
+  const openSettingsFlow = useCallback(() => {
+    setPanelOpen(true);
+  }, [setPanelOpen]);
+
+  useEffect(() => {
+    registerStartFlow?.(openStartFlow);
+  }, [registerStartFlow, openStartFlow]);
+
+  useEffect(() => {
+    registerSettingsFlow?.(openSettingsFlow);
+  }, [registerSettingsFlow, openSettingsFlow]);
+
+  const confirmStop = useCallback(() => {
+    if (
+      !window.confirm(
+        "Aufnahme wirklich beenden? Der aktuelle Audio-Chunk wird noch hochgeladen.",
+      )
+    ) {
+      return;
+    }
+    void recorder.stopRecording();
+  }, [recorder]);
+
+  useEffect(() => {
+    registerStopFlow?.(confirmStop);
+  }, [registerStopFlow, confirmStop]);
 
   const markerButtons = LIVE_MARKER_TYPES.filter((t) => t !== "pause");
 
+  const settingsContent = (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <Radio className="h-4 w-4 text-accent-gold" />
+        <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+          Session-Chronist
+        </span>
+      </div>
+
+      <p className="font-libre text-xs text-gray-400 leading-relaxed">
+        Modus:{" "}
+        <strong className="text-gray-200">
+          {TRANSCRIPTION_MODE_LABELS[plannedMode ?? "table"]}
+        </strong>
+        {plannedMode === "jitsi" ? (
+          <span className="block mt-1 text-gray-500">
+            Jitsi-Aufnahme folgt in Phase 4. Bitte vorerst Tisch-Modus wählen.
+          </span>
+        ) : null}
+      </p>
+
+      {recorder.error ? (
+        <p className="font-libre text-xs text-red-400">{recorder.error}</p>
+      ) : null}
+
+      {recorder.uploadQueueSize > 0 ? (
+        <p className="font-libre text-[10px] text-gray-500">
+          Upload-Warteschlange: {recorder.uploadQueueSize} Chunk(s)
+        </p>
+      ) : null}
+
+      <ChronicleChunkProcessingList chunks={chunkRows} />
+
+      <div className="flex flex-wrap gap-2">
+        {!isActive ? (
+          <button
+            type="button"
+            onClick={openStartFlow}
+            disabled={recorder.phase === "starting" || plannedMode === "jitsi"}
+            className="inline-flex items-center gap-1.5 rounded border border-red-500/60 bg-red-950/40 px-3 py-2 font-barlow text-[10px] font-bold uppercase text-red-300 hover:bg-red-900/40 disabled:opacity-50"
+          >
+            {recorder.phase === "starting" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Mic className="h-3.5 w-3.5" />
+            )}
+            Aufnahme starten
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => void recorder.togglePause()}
+              className="inline-flex items-center gap-1.5 rounded border border-amber-900/60 bg-background-dark px-3 py-2 font-barlow text-[10px] font-bold uppercase text-gray-200 hover:border-accent-gold"
+            >
+              {recorder.phase === "paused" ? (
+                <>
+                  <Play className="h-3.5 w-3.5" /> Fortsetzen
+                </>
+              ) : (
+                <>
+                  <Pause className="h-3.5 w-3.5" /> Pause
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void setLiveMarkerWithFeedback(recorder.addMarker, "pause")}
+              className="inline-flex items-center gap-1.5 rounded border border-hero-border/50 px-3 py-2 font-barlow text-[10px] font-bold uppercase text-gray-400 hover:text-white"
+            >
+              <Pause className="h-3.5 w-3.5" />
+              {LIVE_MARKER_LABELS.pause}
+            </button>
+            <button
+              type="button"
+              onClick={confirmStop}
+              className="inline-flex items-center gap-1.5 rounded border border-red-600 bg-red-900/60 px-3 py-2 font-barlow text-[10px] font-bold uppercase text-red-100 hover:bg-red-800/70"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+              Aufnahme beenden
+            </button>
+          </>
+        )}
+      </div>
+
+      {isActive ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {markerButtons.map((type) => (
+            <MarkerButton
+              key={type}
+              type={type}
+              label={LIVE_MARKER_LABELS[type]}
+              onClick={() => void setLiveMarkerWithFeedback(recorder.addMarker, type)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {isActive ? (
+        <p className="font-barlow text-[9px] uppercase text-gray-600">
+          Chunk #{recorder.currentChunkIndex + 1} · 10-Min-Segmente
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <>
-      <GmSlideSettingsPanel
-        isGM
-        open={panelOpen}
-        onToggle={() => setPanelOpen((v) => !v)}
-        settingsLabel="Chronist steuern"
-        preview={
-          <div className="flex w-full flex-col items-center gap-2 py-2">
-            <div className="flex items-center gap-2">
-              {isActive ? (
-                <Mic className="h-5 w-5 text-red-400 animate-pulse" />
-              ) : (
-                <MicOff className="h-5 w-5 text-gray-500" />
-              )}
+      {isActive ? (
+        <GmBoardSettingsModal
+          open={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          title="Chronist steuern"
+          size="xl"
+        >
+          {settingsContent}
+        </GmBoardSettingsModal>
+      ) : (
+        <GmSlideSettingsPanel
+          isGM
+          open={panelOpen}
+          onToggle={() => setPanelOpen(!panelOpen)}
+          settingsLabel="Chronist steuern"
+          modalSize="xl"
+          preview={
+            <div className="flex w-full items-center justify-center gap-2 py-2">
+              <MicOff className="h-5 w-5 text-gray-500" />
               <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
                 {statusLabel}
               </span>
             </div>
-            <MicLevelVisual
-              levels={recorder.waveformLevels}
-              active={micLive}
-              className="w-full px-2"
-            />
-            <MicSignalBadge
-              hasSignal={recorder.hasSignal}
-              isActive={micLive}
-              deviceLabel={recorder.deviceLabel}
-              compact
-            />
-            {isActive ? (
-              <span className="font-barlow text-xs text-accent-gold">
-                {formatElapsed(recorder.elapsedMs)}
-              </span>
-            ) : null}
-          </div>
-        }
-      >
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-            <Radio className="h-4 w-4 text-accent-gold" />
-            <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
-              Session-Chronist
-            </span>
-          </div>
-
-          <p className="font-libre text-xs text-gray-400 leading-relaxed">
-            Modus:{" "}
-            <strong className="text-gray-200">
-              {TRANSCRIPTION_MODE_LABELS[plannedMode ?? "table"]}
-            </strong>
-            {plannedMode === "jitsi" ? (
-              <span className="block mt-1 text-gray-500">
-                Jitsi-Aufnahme folgt in Phase 4. Bitte vorerst Tisch-Modus wählen.
-              </span>
-            ) : null}
-          </p>
-
-          {recorder.error ? (
-            <p className="font-libre text-xs text-red-400">{recorder.error}</p>
-          ) : null}
-
-          {isActive ? (
-            <div className="rounded border border-emerald-900/40 bg-[#0a1f10]/80 p-2">
-              <MicLevelVisual levels={recorder.waveformLevels} active={micLive} />
-              <div className="mt-2">
-                <MicSignalBadge
-                  hasSignal={recorder.hasSignal}
-                  isActive={micLive}
-                  deviceLabel={recorder.deviceLabel}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {recorder.uploadQueueSize > 0 ? (
-            <p className="font-libre text-[10px] text-gray-500">
-              Upload-Warteschlange: {recorder.uploadQueueSize} Chunk(s)
-            </p>
-          ) : null}
-
-          <ChronicleChunkProcessingList chunks={chunkRows} />
-
-          <div className="flex flex-wrap gap-2">
-            {!isActive ? (
-              <button
-                type="button"
-                onClick={openStartFlow}
-                disabled={
-                  recorder.phase === "starting" || plannedMode === "jitsi"
-                }
-                className="inline-flex items-center gap-1.5 rounded border border-red-500/60 bg-red-950/40 px-3 py-2 font-barlow text-[10px] font-bold uppercase text-red-300 hover:bg-red-900/40 disabled:opacity-50"
-              >
-                {recorder.phase === "starting" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Mic className="h-3.5 w-3.5" />
-                )}
-                Aufnahme starten
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void recorder.togglePause()}
-                  className="inline-flex items-center gap-1.5 rounded border border-amber-900/60 bg-background-dark px-3 py-2 font-barlow text-[10px] font-bold uppercase text-gray-200 hover:border-accent-gold"
-                >
-                  {recorder.phase === "paused" ? (
-                    <>
-                      <Play className="h-3.5 w-3.5" /> Fortsetzen
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="h-3.5 w-3.5" /> Pause
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void recorder.addMarker("pause")}
-                  className="inline-flex items-center gap-1.5 rounded border border-hero-border/50 px-3 py-2 font-barlow text-[10px] font-bold uppercase text-gray-400 hover:text-white"
-                >
-                  <Pause className="h-3.5 w-3.5" />
-                  {LIVE_MARKER_LABELS.pause}
-                </button>
-              </>
-            )}
-          </div>
-
-          {isActive ? (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {markerButtons.map((type) => (
-                <MarkerButton
-                  key={type}
-                  type={type}
-                  label={LIVE_MARKER_LABELS[type]}
-                  onClick={() => void recorder.addMarker(type)}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          {isActive ? (
-            <p className="font-barlow text-[9px] uppercase text-gray-600">
-              Chunk #{recorder.currentChunkIndex + 1} · 10-Min-Segmente
-            </p>
-          ) : null}
-        </div>
-      </GmSlideSettingsPanel>
+          }
+        >
+          {settingsContent}
+        </GmSlideSettingsPanel>
+      )}
 
       {noticeOpen ? (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4"
-          role="dialog"
-          aria-modal="true"
+        <GmBoardSettingsModal
+          open={noticeOpen}
+          onClose={() => setNoticeOpen(false)}
+          title="Aufzeichnungshinweis"
+          size="md"
+          zIndexClass="z-[190]"
         >
-          <div className="w-full max-w-md rounded-lg border border-red-500/40 bg-background-card p-6 shadow-2xl">
-            <h3 className="font-barlow text-lg font-bold uppercase text-red-300">
-              Aufzeichnungshinweis
-            </h3>
-            <p className="mt-3 font-libre text-sm text-gray-300 leading-relaxed">
-              {RECORDING_NOTICE_TEXT}
-            </p>
+          <p className="font-libre text-sm text-gray-300 leading-relaxed">
+            {RECORDING_NOTICE_TEXT}
+          </p>
 
-            {plannedMode == null ? (
-              <fieldset className="mt-4 space-y-2">
-                <legend className="font-barlow text-[10px] font-bold uppercase text-gray-500">
-                  Chronist-Modus
-                </legend>
-                {(["table", "jitsi"] as TranscriptionMode[]).map((mode) => (
-                  <label
-                    key={mode}
-                    className="flex cursor-pointer items-center gap-2 font-libre text-sm text-gray-300"
-                  >
-                    <input
-                      type="radio"
-                      name="chronist-mode"
-                      checked={pendingMode === mode}
-                      onChange={() => setPendingMode(mode)}
-                      className="border-hero-border text-hero-vibrant"
-                    />
-                    {TRANSCRIPTION_MODE_LABELS[mode]}
-                  </label>
-                ))}
-              </fieldset>
-            ) : null}
+          {plannedMode == null ? (
+            <fieldset className="mt-4 space-y-2">
+              <legend className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                Chronist-Modus
+              </legend>
+              {(["table", "jitsi"] as TranscriptionMode[]).map((mode) => (
+                <label
+                  key={mode}
+                  className="flex cursor-pointer items-center gap-2 font-libre text-sm text-gray-300"
+                >
+                  <input
+                    type="radio"
+                    name="chronist-mode"
+                    checked={pendingMode === mode}
+                    onChange={() => setPendingMode(mode)}
+                    className="border-hero-border text-hero-vibrant"
+                  />
+                  {TRANSCRIPTION_MODE_LABELS[mode]}
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
 
-            <label className="mt-4 flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={noticeAck}
-                onChange={(e) => setNoticeAck(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-hero-border text-red-500"
-              />
-              <span className="font-libre text-sm text-gray-300">
-                Ich habe alle Anwesenden informiert und starte die Aufzeichnung.
-              </span>
-            </label>
+          <label className="mt-4 flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              checked={noticeAck}
+              onChange={(e) => setNoticeAck(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-hero-border text-red-500"
+            />
+            <span className="font-libre text-sm text-gray-300">
+              Ich habe alle Anwesenden informiert und starte die Aufzeichnung.
+            </span>
+          </label>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setNoticeOpen(false)}
-                className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                disabled={!noticeAck || pendingMode === "jitsi"}
-                onClick={() => void confirmStart()}
-                className="rounded border border-red-500 bg-red-600/80 px-4 py-2 font-barlow text-xs font-bold uppercase text-white disabled:opacity-50"
-              >
-                Aufnahme starten
-              </button>
-            </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNoticeOpen(false)}
+              className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              disabled={!noticeAck || pendingMode === "jitsi"}
+              onClick={() => void confirmStart()}
+              className="rounded border border-red-500 bg-red-600/80 px-4 py-2 font-barlow text-xs font-bold uppercase text-white disabled:opacity-50"
+            >
+              Aufnahme starten
+            </button>
           </div>
-        </div>
+        </GmBoardSettingsModal>
       ) : null}
     </>
   );

@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ChevronRight, ExternalLink, Sparkles } from "lucide-react";
+import { GmBoardSettingsModal } from "@/src/components/session/GmBoardSettingsModal";
+import {
+  chronicleImportFlowHint,
+  getChronicleInboxItemDetails,
+} from "@/src/lib/session-chronicle/inbox-item-details";
 import {
   buildChronicleImportUrl,
   type InboxImportUrlContext,
@@ -14,6 +18,7 @@ import {
 } from "@/src/lib/session-chronicle/inbox";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
 import type { ChronicleInboxItem, SessionChronicleState } from "@/src/lib/session-chronicle/types";
+import { useEffect, useMemo, useState } from "react";
 
 type Props = {
   campaignId: string;
@@ -45,6 +50,87 @@ function itemSubtitle(item: ChronicleInboxItem): string | null {
   return null;
 }
 
+function InboxItemDetailModal({
+  item,
+  href,
+  onClose,
+}: {
+  item: ChronicleInboxItem;
+  href: string | null;
+  onClose: () => void;
+}) {
+  const details = getChronicleInboxItemDetails(item);
+  const title = inboxItemTitle(item);
+
+  return (
+    <GmBoardSettingsModal
+      open
+      onClose={onClose}
+      title={`KI-Vorschlag: ${KIND_LABEL[item.kind]}`}
+      size="lg"
+      zIndexClass="z-[160]"
+    >
+      <div className="space-y-4">
+        <div>
+          <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+            Erkannt als
+          </p>
+          <p className="mt-1 font-barlow text-lg font-bold text-white">{title}</p>
+        </div>
+
+        {details.length > 0 ? (
+          <dl className="space-y-3 rounded-lg border border-hero-border/30 bg-background-dark/50 p-3">
+            {details.map((line) => (
+              <div key={line.label}>
+                <dt className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                  {line.label}
+                </dt>
+                <dd className="mt-0.5 font-libre text-sm leading-relaxed text-gray-200 whitespace-pre-wrap">
+                  {line.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="font-libre text-sm text-gray-400">
+            Die KI hat außer dem Namen noch keine weiteren Details extrahiert.
+          </p>
+        )}
+
+        <p className="rounded-lg border border-accent-gold/25 bg-accent-gold/5 px-3 py-2.5 font-libre text-xs leading-relaxed text-gray-300">
+          {chronicleImportFlowHint(item)}
+        </p>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400"
+          >
+            Schließen
+          </button>
+          {href ? (
+            <Link
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded border border-accent-gold/50 bg-accent-gold/15 px-4 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/25"
+              onClick={onClose}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Im Maker übernehmen
+            </Link>
+          ) : (
+            <span className="font-libre text-xs text-amber-400">
+              Import derzeit nicht möglich (z. B. fehlende Welt).
+            </span>
+          )}
+        </div>
+      </div>
+    </GmBoardSettingsModal>
+  );
+}
+
 export function ChronicleInboxFeed({
   campaignId,
   sessionId,
@@ -56,6 +142,7 @@ export function ChronicleInboxFeed({
   maxItems,
 }: Props) {
   const [state, setState] = useState<SessionChronicleState | null>(initialState);
+  const [detailItem, setDetailItem] = useState<ChronicleInboxItem | null>(null);
   const limit = maxItems ?? (variant === "compact" ? 4 : 24);
 
   useEffect(() => {
@@ -100,105 +187,140 @@ export function ChronicleInboxFeed({
     npcNames,
   };
 
+  const detailHref = detailItem ? buildChronicleImportUrl(urlCtx, detailItem) : null;
+
   if (pendingTotal === 0 && variant === "compact") return null;
 
   return (
-    <div
-      className={
-        variant === "compact"
-          ? "rounded border border-hero-border/30 bg-[#0a1f10]/80 p-2"
-          : "space-y-2"
-      }
-    >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 font-barlow text-[9px] font-bold uppercase text-gray-500">
-          <Sparkles className="h-3.5 w-3.5 text-accent-gold" />
-          KI-Vorschläge
-          {pendingTotal > 0 ? (
-            <span className="rounded-full bg-accent-gold/20 px-1.5 py-0.5 text-[8px] text-accent-gold">
-              {pendingTotal} neu
-            </span>
+    <>
+      <div
+        className={
+          variant === "compact"
+            ? "rounded border border-hero-border/30 bg-[#0a1f10]/80 p-2"
+            : "space-y-2"
+        }
+      >
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-2 font-barlow text-[9px] font-bold uppercase text-gray-500">
+            <Sparkles className="h-3.5 w-3.5 text-accent-gold" />
+            KI-Vorschläge
+            {pendingTotal > 0 ? (
+              <span className="rounded-full bg-accent-gold/20 px-1.5 py-0.5 text-[8px] text-accent-gold">
+                {pendingTotal} neu
+              </span>
+            ) : null}
+          </p>
+          {variant === "compact" ? (
+            <Link
+              href={`/dashboard/campaigns/${campaignId}/chronist`}
+              className="font-barlow text-[8px] font-bold uppercase text-hero-vibrant hover:text-white"
+            >
+              Alle
+            </Link>
           ) : null}
-        </p>
-        {variant === "compact" ? (
-          <Link
-            href={`/dashboard/campaigns/${campaignId}/chronist`}
-            className="font-barlow text-[8px] font-bold uppercase text-hero-vibrant hover:text-white"
+        </div>
+
+        {items.length === 0 ? (
+          <p className="font-libre text-[10px] text-gray-500">
+            {variant === "compact"
+              ? "Noch keine offenen Vorschläge."
+              : "Keine offenen Vorschläge für diese Session."}
+          </p>
+        ) : (
+          <ul
+            className={
+              variant === "compact"
+                ? "max-h-36 space-y-1 overflow-y-auto"
+                : "grid gap-2 sm:grid-cols-2"
+            }
           >
-            Alle
-          </Link>
-        ) : null}
+            {items.map((item) => {
+              const href = buildChronicleImportUrl(urlCtx, item);
+              const subtitle = itemSubtitle(item);
+              const detailCount = getChronicleInboxItemDetails(item).length;
+
+              return (
+                <li
+                  key={`${item.kind}-${item.index}`}
+                  className={
+                    variant === "compact"
+                      ? "rounded border border-hero-border/20 bg-background-dark/40 px-2 py-1.5"
+                      : "rounded border border-hero-border/30 bg-hero-dark/30 px-3 py-2"
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => setDetailItem(item)}
+                    className="flex w-full items-start justify-between gap-2 text-left transition-colors hover:opacity-90"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-barlow text-[8px] uppercase text-gray-500">
+                        {KIND_LABEL[item.kind]}
+                      </span>
+                      <span
+                        className={`block font-libre text-gray-200 ${variant === "compact" ? "truncate text-[11px]" : "text-sm"}`}
+                        title={inboxItemTitle(item)}
+                      >
+                        {inboxItemTitle(item)}
+                      </span>
+                      {subtitle ? (
+                        <span className="block truncate font-libre text-[10px] text-gray-500">
+                          {subtitle}
+                        </span>
+                      ) : null}
+                      {detailCount > 0 ? (
+                        <span className="mt-0.5 block font-libre text-[9px] text-gray-600">
+                          {detailCount} Detail{detailCount === 1 ? "" : "s"} · Tippen für Vorschau
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 block font-libre text-[9px] text-gray-600">
+                          Tippen für Details
+                        </span>
+                      )}
+                    </div>
+                    <ChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-gray-500" />
+                  </button>
+
+                  {variant === "full" && href ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDetailItem(item)}
+                        className="rounded border border-hero-border/40 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-gray-400 hover:text-white"
+                      >
+                        Details
+                      </button>
+                      <Link
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Import
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {variant === "full" && item.kind === "location" && !worldId ? (
+                    <p className="mt-1 font-libre text-[10px] text-amber-400/90">
+                      Kampagne ohne Welt — Ort-Import nicht möglich.
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
-      {items.length === 0 ? (
-        <p className="font-libre text-[10px] text-gray-500">
-          {variant === "compact"
-            ? "Noch keine offenen Vorschläge."
-            : "Keine offenen Vorschläge für diese Session."}
-        </p>
-      ) : (
-        <ul className={variant === "compact" ? "max-h-36 space-y-1 overflow-y-auto" : "grid gap-2 sm:grid-cols-2"}>
-          {items.map((item) => {
-            const href = buildChronicleImportUrl(urlCtx, item);
-            const subtitle = itemSubtitle(item);
-            return (
-              <li
-                key={`${item.kind}-${item.index}`}
-                className={
-                  variant === "compact"
-                    ? "rounded border border-hero-border/20 bg-background-dark/40 px-2 py-1.5"
-                    : "rounded border border-hero-border/30 bg-hero-dark/30 px-3 py-2"
-                }
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="font-barlow text-[8px] uppercase text-gray-500">
-                      {KIND_LABEL[item.kind]}
-                    </span>
-                    <span
-                      className={`block truncate font-libre text-gray-200 ${variant === "compact" ? "text-[11px]" : "text-sm"}`}
-                    >
-                      {inboxItemTitle(item)}
-                    </span>
-                    {subtitle ? (
-                      <span className="block truncate font-libre text-[10px] text-gray-500">
-                        {subtitle}
-                      </span>
-                    ) : null}
-                  </div>
-                  {variant === "full" && href ? (
-                    <Link
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex shrink-0 items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Import
-                    </Link>
-                  ) : null}
-                </div>
-                {variant === "compact" && href ? (
-                  <Link
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 font-barlow text-[8px] font-bold uppercase text-hero-vibrant hover:text-white"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Übernehmen
-                  </Link>
-                ) : null}
-                {variant === "full" && item.kind === "location" && !worldId ? (
-                  <p className="mt-1 font-libre text-[10px] text-amber-400/90">
-                    Kampagne ohne Welt — Ort-Import nicht möglich.
-                  </p>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+      {detailItem ? (
+        <InboxItemDetailModal
+          item={detailItem}
+          href={detailHref}
+          onClose={() => setDetailItem(null)}
+        />
+      ) : null}
+    </>
   );
 }

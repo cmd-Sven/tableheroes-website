@@ -4,35 +4,78 @@ type Props = {
   levels: number[];
   active?: boolean;
   compact?: boolean;
+  /** Gold (Standard), Rot (Live-Aufnahme) oder Emerald (Monitor-Widget). */
+  variant?: "default" | "recording" | "monitor";
+  peakLevel?: number;
   className?: string;
 };
+
+function barColor(variant: Props["variant"], active: boolean, level: number): string {
+  if (!active) return "bg-gray-600/50";
+  if (variant === "recording") {
+    return level > 0.45
+      ? "bg-red-400"
+      : level > 0.15
+        ? "bg-red-500/90"
+        : "bg-red-700/80";
+  }
+  if (variant === "monitor") {
+    return level > 0.45
+      ? "bg-emerald-300"
+      : level > 0.12
+        ? "bg-emerald-500/90"
+        : "bg-emerald-800/70";
+  }
+  return "bg-accent-gold/85";
+}
 
 export function MicLevelVisual({
   levels,
   active = true,
   compact = false,
+  variant = "default",
+  peakLevel,
   className = "",
 }: Props) {
-  const height = compact ? 32 : 64;
+  const height = compact ? 32 : variant === "monitor" ? 48 : 64;
+  const barWidth = compact ? 3 : variant === "monitor" ? 4 : 6;
+
   return (
-    <div
-      className={`flex items-end justify-center gap-0.5 px-1 ${className}`}
-      style={{ height: `${height}px` }}
-      aria-hidden
-    >
-      {levels.map((level, i) => (
+    <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
+      <div
+        className="flex items-end justify-center gap-px px-0.5"
+        style={{ height: `${height}px` }}
+        aria-hidden
+      >
+        {levels.map((level, i) => (
+          <div
+            key={i}
+            className={`rounded-sm transition-[height] duration-75 ${barColor(variant, active, level)}`}
+            style={{
+              width: `${barWidth}px`,
+              height: `${Math.max(compact ? 3 : 4, Math.round(level * (height - 4)))}px`,
+              opacity: active ? 0.4 + level * 0.6 : 0.25,
+            }}
+          />
+        ))}
+      </div>
+      {peakLevel != null && active ? (
         <div
-          key={i}
-          className={`rounded-sm transition-[height] duration-75 ${
-            active ? "bg-accent-gold/85" : "bg-gray-600/50"
-          }`}
-          style={{
-            width: compact ? "3px" : "6px",
-            height: `${Math.max(compact ? 3 : 4, Math.round(level * (height - 4)))}px`,
-            opacity: active ? 0.35 + level * 0.65 : 0.25,
-          }}
-        />
-      ))}
+          className="h-1 overflow-hidden rounded-full bg-black/40"
+          aria-hidden
+        >
+          <div
+            className={`h-full rounded-full transition-[width] duration-75 ${
+              variant === "recording"
+                ? "bg-red-400"
+                : variant === "monitor"
+                  ? "bg-emerald-400"
+                  : "bg-accent-gold"
+            }`}
+            style={{ width: `${Math.min(100, Math.round(peakLevel * 100))}%` }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

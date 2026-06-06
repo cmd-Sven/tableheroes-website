@@ -8,6 +8,37 @@ export function useSessionTranscriptionStatus(sessionId: string, enabled: boolea
   const [status, setStatus] = useState<TranscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const applyStatus = useCallback((value: unknown) => {
+    if (
+      value === "recording" ||
+      value === "paused" ||
+      value === "stopped" ||
+      value === "idle"
+    ) {
+      setStatus(value);
+      return;
+    }
+    setStatus(null);
+  }, []);
+
+  const loadFromApi = useCallback(async () => {
+    if (!enabled || !sessionId) return;
+    try {
+      const res = await fetch(
+        `/api/sessions/${encodeURIComponent(sessionId)}/transcription/status`,
+        { credentials: "same-origin" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        transcriptionSession?: { status?: string };
+      };
+      if (res.ok) {
+        applyStatus(data.transcriptionSession?.status ?? null);
+      }
+    } catch {
+      /* fallback below */
+    }
+  }, [applyStatus, enabled, sessionId]);
+
   const load = useCallback(async () => {
     if (!enabled || !sessionId) {
       setStatus(null);
@@ -22,20 +53,12 @@ export function useSessionTranscriptionStatus(sessionId: string, enabled: boolea
       .maybeSingle();
 
     if (!error && data) {
-      const s = (data as { status?: string }).status;
-      if (
-        s === "recording" ||
-        s === "paused" ||
-        s === "stopped" ||
-        s === "idle"
-      ) {
-        setStatus(s);
-      }
-    } else if (!data) {
-      setStatus(null);
+      applyStatus((data as { status?: string }).status);
+    } else {
+      await loadFromApi();
     }
     setLoading(false);
-  }, [enabled, sessionId]);
+  }, [applyStatus, enabled, loadFromApi, sessionId]);
 
   useEffect(() => {
     if (!enabled || !sessionId) return;
@@ -55,23 +78,20 @@ export function useSessionTranscriptionStatus(sessionId: string, enabled: boolea
         },
         (payload) => {
           const row = payload.new as { status?: string } | null;
-          const s = row?.status;
-          if (
-            s === "recording" ||
-            s === "paused" ||
-            s === "stopped" ||
-            s === "idle"
-          ) {
-            setStatus(s);
-          }
+          applyStatus(row?.status ?? null);
         },
       )
       .subscribe();
 
+    const pollId = window.setInterval(() => {
+      void loadFromApi();
+    }, 5000);
+
     return () => {
+      window.clearInterval(pollId);
       void supabase.removeChannel(channel);
     };
-  }, [enabled, sessionId, load]);
+  }, [enabled, sessionId, load, loadFromApi, applyStatus]);
 
   return { status, loading, reload: load };
 }

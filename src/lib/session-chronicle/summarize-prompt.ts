@@ -34,8 +34,10 @@ export function buildSummarizeUserPrompt(params: {
   }
   parts.push(
     "",
-    "Live-Marker des Spielleiters in diesem Segment:",
+    "Live-Marker des Spielleiters in diesem Segment (Thema des Abschnitts — kein blindes Klassifikations-Etikett):",
     formatLiveMarkersForPrompt(params.liveMarkers),
+    "",
+    "Hinweis: Text über NSC-Motivation, Wahrnehmung/Insight oder Persönlichkeit ist KEINE Quest — ordne solche Inhalte spontaneous_npcs zu.",
     "",
     "Transkript (Whisper, Deutsch):",
     params.transcript.trim(),
