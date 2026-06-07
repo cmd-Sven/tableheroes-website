@@ -15,6 +15,7 @@ import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { findLatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 import {
@@ -1115,6 +1116,14 @@ export async function loadCampaignDetailPageData(
     .eq("campaign_id", id)
     .order("archived_at", { ascending: false });
   const sessionArchives = (sessionArchivesRaw as any[]) || [];
+  const latestPublishedPlayerRecap = findLatestPublishedPlayerRecap(
+    sessionArchives.map((row) => ({
+      id: String(row.id),
+      session_name: row.session_name,
+      archived_at: String(row.archived_at ?? ""),
+      player_recap: row.player_recap,
+    })),
+  );
 
   const focusSessionForTab = focus
     ? ((upcomingSessionsWithRsvp as any[]).find((x) => x.id === focus.id) ?? null)
@@ -1149,6 +1158,7 @@ export async function loadCampaignDetailPageData(
     otherUpcomingSessions: otherUpcomingSessionsForTab,
     pastSessionsForCampaignTab: pastArchiveRows,
     sessionArchives,
+    latestPublishedPlayerRecap,
     now,
     npcs,
     factions,

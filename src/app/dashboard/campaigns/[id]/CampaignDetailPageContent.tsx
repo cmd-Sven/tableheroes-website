@@ -33,6 +33,7 @@ import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlid
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
 import { PlayerCampaignCharacterOverview } from "@/src/components/dashboard/player/PlayerCampaignCharacterOverview";
 import { PlayerCampaignNextSession } from "@/src/components/dashboard/player/PlayerCampaignNextSession";
+import { LastSessionRecapCard } from "@/src/components/chronicle/LastSessionRecapCard";
 import { PlayerRsvpDeadlineBanner } from "@/src/components/dashboard/player/PlayerRsvpDeadlineBanner";
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { CampaignSessionLandingVisibility } from "./CampaignSessionLandingVisibility";
@@ -68,6 +69,7 @@ export function CampaignDetailPageContent({
     otherUpcomingSessions,
     pastSessionsForCampaignTab,
     sessionArchives,
+    latestPublishedPlayerRecap,
     now,
     npcs,
     factions,
@@ -421,6 +423,7 @@ export function CampaignDetailPageContent({
       pastSessionRows={(pastSessionsForCampaignTab || []) as any}
       upcomingSessions={(upcomingSessionsWithRsvp || []) as any}
       archives={(sessionArchives || []) as any}
+      latestPublishedPlayerRecap={latestPublishedPlayerRecap}
       locations={loreEntries
         .filter((l: any) => isLocationType(l.type))
         .map((l: any) => ({ id: String(l.id), name: String(l.name ?? ""), type: String(l.type ?? "") }))
@@ -821,6 +824,13 @@ export function CampaignDetailPageContent({
             hasCharacter={!!myCharacterForClient}
           />
         )}
+        {!isGM && latestPublishedPlayerRecap ? (
+          <LastSessionRecapCard
+            campaignId={id}
+            worldId={campaignWorldId ?? null}
+            recap={latestPublishedPlayerRecap}
+          />
+        ) : null}
       </section>
     </div>
   );

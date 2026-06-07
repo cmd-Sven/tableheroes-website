@@ -36,6 +36,8 @@ import {
   PastSessionsGallery,
   type SessionArchiveItem,
 } from "@/src/components/dashboard/campaigns/PastSessionsGallery";
+import { LastSessionRecapCard } from "@/src/components/chronicle/LastSessionRecapCard";
+import type { LatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
 import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
 import {
   isMissedScheduledSession,
@@ -241,6 +243,7 @@ type Props = {
   /** Vollständige aktive Liste (Fokus zuerst) */
   upcomingSessions: SessionItem[];
   archives?: SessionArchiveItem[];
+  latestPublishedPlayerRecap?: LatestPublishedPlayerRecap | null;
   locations: Array<{ id: string; name: string; type: string }>;
   npcs: Array<{ id: string; name: string; title: string | null }>;
 };
@@ -255,6 +258,7 @@ export function SessionsTab({
   pastSessionRows,
   upcomingSessions: _upcomingSessions,
   archives = [],
+  latestPublishedPlayerRecap = null,
   locations,
   npcs,
 }: Props) {
@@ -483,6 +487,14 @@ export function SessionsTab({
 
         {focusSession ? (
           <div className="mb-8">
+            {!isGM && latestPublishedPlayerRecap ? (
+              <LastSessionRecapCard
+                campaignId={campaignId}
+                worldId={worldId}
+                recap={latestPublishedPlayerRecap}
+                className="mb-6"
+              />
+            ) : null}
             <p className="mb-3 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
               {isSessionStatusLive(focusSession.status)
                 ? "Aktuell"
