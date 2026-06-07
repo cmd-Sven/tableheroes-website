@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ArrowLeft, Loader2, Mic, RefreshCw } from "lucide-react";
 import type { CampaignChronicleRow } from "@/src/lib/session-chronicle/campaign-chronicle-load";
 import { RECORDING_NOTICE_TEXT } from "@/src/lib/session-chronicle/constants";
@@ -29,6 +29,25 @@ export function ChronicleDashboard({ campaignId, worldId, npcNames, rows }: Prop
   const router = useRouter();
   const [busyChunk, setBusyChunk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const hasActiveProcessing = rows.some((row) =>
+    row.chunks.some(
+      (chunk) =>
+        chunk.has_audio &&
+        (chunk.whisper_status === "pending" ||
+          chunk.whisper_status === "processing" ||
+          chunk.summarize_status === "pending" ||
+          chunk.summarize_status === "processing"),
+    ),
+  );
+
+  useEffect(() => {
+    if (!hasActiveProcessing) return;
+    const id = window.setInterval(() => {
+      startTransition(() => router.refresh());
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [hasActiveProcessing, router]);
 
   async function retryChunk(sessionId: string, chunkIndex: number) {
     const key = `${sessionId}:${chunkIndex}`;
@@ -69,9 +88,9 @@ export function ChronicleDashboard({ campaignId, worldId, npcNames, rows }: Prop
           Session-Chronist
         </h1>
         <p className="mt-2 font-libre text-sm text-gray-300 leading-relaxed">
-          Whisper-Transkription und KI-Zusammenfassung laufen nach jedem Audio-Chunk
-          automatisch. Offene Vorschläge kannst du direkt in die NSC-, Ort- und Quest-Maker
-          übernehmen.
+          Whisper-Transkription und KI-Zusammenfassung starten nach jedem Audio-Chunk
+          automatisch im Hintergrund. Das kann einige Minuten dauern — auch nach
+          Session-Ende.
         </p>
         <p className="mt-1 font-libre text-xs text-gray-500">{RECORDING_NOTICE_TEXT}</p>
       </div>
@@ -123,13 +142,34 @@ export function ChronicleDashboard({ campaignId, worldId, npcNames, rows }: Prop
 
               {row.chunks.length > 0 ? (
                 <div>
-                  <p className="mb-2 font-barlow text-[10px] font-bold uppercase text-gray-500">
-                    Audio-Chunks
-                  </p>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                      Audio-Chunks
+                    </p>
+                    {row.chunks.some(
+                      (chunk) =>
+                        chunk.has_audio &&
+                        (chunk.whisper_status !== "done" ||
+                          chunk.summarize_status !== "done"),
+                    ) ? (
+                      <p className="font-libre text-[10px] text-amber-300/90">
+                        Whisper + KI laufen nach der Aufnahme im Hintergrund — Session-Ende
+                        heißt nicht automatisch „fertig“. Bei „pending“ auf Verarbeiten klicken.
+                      </p>
+                    ) : null}
+                  </div>
                   <ul className="space-y-2">
                     {row.chunks.map((c) => {
                       const key = `${row.sessionId}:${c.chunk_index}`;
                       const busy = busyChunk === key || isPending;
+                      const needsProcessing =
+                        c.has_audio &&
+                        (c.whisper_status === "pending" ||
+                          c.whisper_status === "processing" ||
+                          c.summarize_status === "pending" ||
+                          c.summarize_status === "processing" ||
+                          c.whisper_status === "failed" ||
+                          c.summarize_status === "failed");
                       return (
                         <li
                           key={c.chunk_index}
@@ -138,23 +178,32 @@ export function ChronicleDashboard({ campaignId, worldId, npcNames, rows }: Prop
                           <span className="font-barlow font-bold text-gray-300">
                             #{c.chunk_index + 1}
                           </span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 font-barlow text-[9px] uppercase ${statusBadge(c.whisper_status)}`}
-                          >
-                            Whisper: {c.whisper_status}
-                          </span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 font-barlow text-[9px] uppercase ${statusBadge(c.summarize_status)}`}
-                          >
-                            KI: {c.summarize_status}
-                          </span>
+                          {!c.has_audio ? (
+                            <span className="rounded bg-gray-800 px-1.5 py-0.5 font-barlow text-[9px] uppercase text-gray-400">
+                              Kein Audio (bereinigt)
+                            </span>
+                          ) : (
+                            <>
+                              <span
+                                className={`rounded px-1.5 py-0.5 font-barlow text-[9px] uppercase ${statusBadge(c.whisper_status)}`}
+                              >
+                                Whisper: {c.whisper_status}
+                              </span>
+                              <span
+                                className={`rounded px-1.5 py-0.5 font-barlow text-[9px] uppercase ${statusBadge(c.summarize_status)}`}
+                              >
+                                KI: {c.summarize_status}
+                              </span>
+                            </>
+                          )}
                           {c.error_message ? (
                             <span className="font-libre text-red-400 truncate max-w-xs" title={c.error_message}>
                               {c.error_message}
                             </span>
                           ) : null}
                           {(c.whisper_status === "failed" ||
-                            c.summarize_status === "failed") && (
+                            c.summarize_status === "failed" ||
+                            needsProcessing) && (
                             <button
                               type="button"
                               disabled={busy}
@@ -166,7 +215,9 @@ export function ChronicleDashboard({ campaignId, worldId, npcNames, rows }: Prop
                               ) : (
                                 <RefreshCw className="h-3 w-3" />
                               )}
-                              Erneut
+                              {c.whisper_status === "failed" || c.summarize_status === "failed"
+                                ? "Erneut"
+                                : "Verarbeiten"}
                             </button>
                           )}
                         </li>

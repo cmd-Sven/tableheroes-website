@@ -19,7 +19,11 @@ import { SESSION_AUDIO_BUCKET } from "./constants";
 import { createAdminClient } from "@/src/lib/supabase/server";
 import { parseChronicleStateRow } from "./parse-db";
 import { emptyChronicleState } from "./types";
-import { ensureChronicleState } from "./transcription-server";
+import { ensureChronicleState, compactOrphanTranscriptionChunks } from "./transcription-server";
+import {
+  loadCampaignPartyRoster,
+  type CampaignPartyRosterEntry,
+} from "./campaign-party-roster";
 import { after } from "next/server";
 
 function guessAudioFilename(storagePath: string): string {
@@ -70,6 +74,7 @@ export async function summarizeChunkTranscript(params: {
   previousRecap: string | null;
   liveMarkers: LiveMarker[];
   gmBoardEvents?: GmBoardEventRow[];
+  partyRoster?: CampaignPartyRosterEntry[];
 }): Promise<ChronicleChunkSummary> {
   const openai = getOpenAIClient();
   const userPrompt = buildSummarizeUserPrompt(params);
@@ -158,7 +163,12 @@ export async function processTranscriptionChunk(
     return { ok: false, message: "Chunk nicht gefunden.", chunkIndex };
   }
   if (!chunk.storage_path) {
-    return { ok: false, message: "Chunk hat noch keine Audio-Datei.", chunkIndex };
+    return {
+      ok: false,
+      message:
+        "Für diesen Eintrag wurde kein Audio hochgeladen — nur ein Marker ohne Aufnahme. Seite neu laden; leere Einträge werden automatisch bereinigt.",
+      chunkIndex,
+    };
   }
 
   const force = options?.force === true;
@@ -180,7 +190,12 @@ export async function processTranscriptionChunk(
 
   let transcript = chunk.transcript_text?.trim() ?? "";
 
-  if (!options?.skipWhisper && (!transcript || force || chunk.whisper_status === "failed")) {
+  const whisperIncomplete =
+    chunk.whisper_status === "pending" ||
+    chunk.whisper_status === "processing" ||
+    chunk.whisper_status === "failed";
+
+  if (!options?.skipWhisper && (force || whisperIncomplete || !transcript)) {
     await (admin as any)
       .from("session_transcription_chunks")
       .update({ whisper_status: "processing", error_message: null })
@@ -247,6 +262,13 @@ export async function processTranscriptionChunk(
     chunkIndex,
   );
 
+  let partyRoster: CampaignPartyRosterEntry[] = [];
+  try {
+    partyRoster = await loadCampaignPartyRoster(session.campaign_id);
+  } catch (e: unknown) {
+    console.warn("[processTranscriptionChunk] Party-Roster konnte nicht geladen werden.", e);
+  }
+
   try {
     const summary = await summarizeChunkTranscript({
       sessionTitle: session.title,
@@ -255,6 +277,7 @@ export async function processTranscriptionChunk(
       previousRecap: state.story_recap,
       liveMarkers: markers,
       gmBoardEvents,
+      partyRoster,
     });
 
     const merged = mergeChronicleChunkSummary(state, summary, chunkIndex);
@@ -304,6 +327,44 @@ export async function summarizeTranscriptionChunkOnly(
   });
 }
 
+async function listIncompleteTranscriptionChunkIndexes(
+  sessionId: string,
+): Promise<number[]> {
+  const admin = createAdminClient();
+
+  const { data: tsRaw } = await (admin as any)
+    .from("session_transcription_sessions")
+    .select("id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const ts = tsRaw as { id: string } | null;
+  if (!ts) return [];
+
+  const { data: chunksRaw } = await (admin as any)
+    .from("session_transcription_chunks")
+    .select("chunk_index, whisper_status, summarize_status, storage_path")
+    .eq("transcription_session_id", ts.id)
+    .order("chunk_index", { ascending: true });
+
+  const chunks = (chunksRaw ?? []) as Array<{
+    chunk_index: number;
+    whisper_status: string;
+    summarize_status: string;
+    storage_path: string | null;
+  }>;
+
+  return chunks
+    .filter((chunk) => {
+      if (!chunk.storage_path) return false;
+      return (
+        chunk.whisper_status !== "done" ||
+        chunk.summarize_status !== "done"
+      );
+    })
+    .map((chunk) => chunk.chunk_index);
+}
+
 /** Nach Audio-Upload: Whisper + Zusammenfassung im Hintergrund. */
 export function scheduleTranscriptionChunkProcessing(
   sessionId: string,
@@ -314,6 +375,39 @@ export function scheduleTranscriptionChunkProcessing(
       await processTranscriptionChunk(sessionId, chunkIndex);
     } catch (e: unknown) {
       console.error("[scheduleTranscriptionChunkProcessing]", sessionId, chunkIndex, e);
+    }
+  });
+}
+
+/** Nach Aufnahme-Ende / Session-Abschluss: offene Chunks nachholen. */
+export function schedulePendingTranscriptionChunksProcessing(sessionId: string) {
+  after(async () => {
+    try {
+      const admin = createAdminClient();
+      const { data: tsRaw } = await (admin as any)
+        .from("session_transcription_sessions")
+        .select("id")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      if (tsRaw) {
+        await compactOrphanTranscriptionChunks(admin as any, (tsRaw as { id: string }).id);
+      }
+
+      const indexes = await listIncompleteTranscriptionChunkIndexes(sessionId);
+      for (const chunkIndex of indexes) {
+        try {
+          await processTranscriptionChunk(sessionId, chunkIndex);
+        } catch (e: unknown) {
+          console.error(
+            "[schedulePendingTranscriptionChunksProcessing]",
+            sessionId,
+            chunkIndex,
+            e,
+          );
+        }
+      }
+    } catch (e: unknown) {
+      console.error("[schedulePendingTranscriptionChunksProcessing]", sessionId, e);
     }
   });
 }

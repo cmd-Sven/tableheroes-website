@@ -135,8 +135,9 @@ export async function loadSessionWrapUpPreview(
   if (ts?.id) {
     const { data: chunkRows } = await (supabase as any)
       .from("session_transcription_chunks")
-      .select("whisper_status, summarize_status, duration_ms")
-      .eq("transcription_session_id", ts.id);
+      .select("whisper_status, summarize_status, duration_ms, storage_path")
+      .eq("transcription_session_id", ts.id)
+      .not("storage_path", "is", null);
 
     chunks = (chunkRows ?? []) as typeof chunks;
   }

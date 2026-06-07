@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
+import { schedulePendingTranscriptionChunksProcessing } from "@/src/lib/session-chronicle/process-chunk";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function POST(_request: Request, context: Ctx) {
   if (!result.ok) {
     return NextResponse.json({ error: result.message }, { status: result.status });
   }
+
+  schedulePendingTranscriptionChunksProcessing(sessionId);
 
   return NextResponse.json({ success: true, status: result.status });
 }

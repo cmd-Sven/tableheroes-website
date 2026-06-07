@@ -432,7 +432,92 @@ export async function stopTranscriptionRecording(
     return { ok: false as const, message: error.message, status: 500 };
   }
 
+  await compactOrphanTranscriptionChunks(writeClient, row.id);
+
   return { ok: true as const, status: "stopped" as const };
+}
+
+async function resolveActiveMarkerChunkIndex(
+  writeClient: SupabaseLike,
+  transcriptionSessionId: string,
+  requestedIndex?: number,
+): Promise<number> {
+  const { data: maxUploadedRow } = await writeClient
+    .from("session_transcription_chunks")
+    .select("chunk_index")
+    .eq("transcription_session_id", transcriptionSessionId)
+    .not("storage_path", "is", null)
+    .order("chunk_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const maxUploaded = maxUploadedRow
+    ? Number((maxUploadedRow as { chunk_index: number }).chunk_index)
+    : -1;
+  const openIndex = Math.max(0, maxUploaded + 1);
+
+  if (requestedIndex == null || !Number.isFinite(requestedIndex)) {
+    return openIndex;
+  }
+
+  return Math.min(Math.max(0, requestedIndex), openIndex);
+}
+
+/** Marker-only Zeilen ohne Audio in den letzten echten Chunk überführen. */
+export async function compactOrphanTranscriptionChunks(
+  writeClient: SupabaseLike,
+  transcriptionSessionId: string,
+): Promise<{ merged: number; removed: number }> {
+  const { data: chunksRaw } = await writeClient
+    .from("session_transcription_chunks")
+    .select("id, chunk_index, storage_path, live_markers")
+    .eq("transcription_session_id", transcriptionSessionId)
+    .order("chunk_index", { ascending: true });
+
+  const chunks = (chunksRaw ?? []) as Array<{
+    id: string;
+    chunk_index: number;
+    storage_path: string | null;
+    live_markers: LiveMarker[];
+  }>;
+
+  const orphans = chunks.filter((chunk) => !chunk.storage_path);
+  if (orphans.length === 0) {
+    return { merged: 0, removed: 0 };
+  }
+
+  const withAudio = chunks.filter((chunk) => chunk.storage_path);
+  const target = withAudio.length > 0 ? withAudio[withAudio.length - 1] : null;
+
+  let merged = 0;
+  let removed = 0;
+
+  for (const orphan of orphans) {
+    const markers = Array.isArray(orphan.live_markers) ? orphan.live_markers : [];
+    if (target && markers.length > 0) {
+      const existing = Array.isArray(target.live_markers) ? target.live_markers : [];
+      const nextMarkers = [...existing, ...markers];
+      const { error } = await writeClient
+        .from("session_transcription_chunks")
+        .update({ live_markers: nextMarkers })
+        .eq("id", target.id);
+      if (error) {
+        return { merged, removed };
+      }
+      target.live_markers = nextMarkers;
+      merged += markers.length;
+    }
+
+    const { error: deleteError } = await writeClient
+      .from("session_transcription_chunks")
+      .delete()
+      .eq("id", orphan.id);
+    if (!deleteError) {
+      removed += 1;
+    }
+  }
+
+  return { merged, removed };
 }
 
 export async function appendLiveMarker(
@@ -463,17 +548,11 @@ export async function appendLiveMarker(
     };
   }
 
-  let targetIndex = chunkIndex;
-  if (targetIndex == null) {
-    const { data: maxRow } = await writeClient
-      .from("session_transcription_chunks")
-      .select("chunk_index")
-      .eq("transcription_session_id", ts.id)
-      .order("chunk_index", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    targetIndex = Number((maxRow as { chunk_index?: number } | null)?.chunk_index ?? 0);
-  }
+  const targetIndex = await resolveActiveMarkerChunkIndex(
+    writeClient,
+    ts.id,
+    chunkIndex,
+  );
 
   const { data: chunkRaw } = await writeClient
     .from("session_transcription_chunks")
@@ -532,8 +611,8 @@ export async function mirrorSystemLogToChronicle(
 
   const recStart = new Date(ts.started_at).getTime();
   const atMs = Math.max(0, new Date(atIso).getTime() - recStart);
-  const chunkIndex = Math.floor(atMs / AUDIO_CHUNK_DURATION_MS);
   const label = `${logType}: ${text}`.slice(0, 480);
+  const chunkIndex = await resolveActiveMarkerChunkIndex(writeClient, ts.id);
 
   await appendLiveMarker(
     supabase,
@@ -633,6 +712,13 @@ export async function uploadTranscriptionChunk(
     live_markers: mergedMarkers,
     whisper_status: "pending",
     summarize_status: "pending",
+    ...(existingChunk
+      ? {
+          transcript_text: null,
+          error_message: null,
+          summarized_at: null,
+        }
+      : {}),
   };
 
   const { error: chunkError } = existingChunk

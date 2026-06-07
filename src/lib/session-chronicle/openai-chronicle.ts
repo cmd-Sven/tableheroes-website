@@ -50,6 +50,8 @@ Regeln:
 - spontaneous_* Arrays dürfen leer sein.
 - location.type: bevorzugt ${VALID_LORE_TYPES.slice(0, 12).join(", ")} … (sonst passender Typ).
 - Keine erfundenen Spielercharakter-Namen als NSC.
+- Wenn eine Party-Liste mitgeliefert wird: Im story_recap nur Charakternamen verwenden. Echte Tischnamen und Charakternamen aus der Liste sind dieselbe Person — z. B. „Sonja" im Transkript = Charakter Sajeri.
+- Plattform-Profilnamen der Spieler sind intern und gehören nicht in den story_recap.
 - Live-Marker des SL (NSC/Ort/Quest/Pause) markieren das THEMA des nächsten Abschnitts — sie sind KEIN automatisches Klassifikations-Etikett für jeden Satz danach.
 
 WICHTIG — Marker vs. Inhalt:

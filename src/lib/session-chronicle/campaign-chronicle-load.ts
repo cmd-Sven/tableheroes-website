@@ -1,6 +1,7 @@
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
 import { countPendingInboxItems, listChronicleInboxItems } from "@/src/lib/session-chronicle/inbox";
+import { compactOrphanTranscriptionChunks } from "@/src/lib/session-chronicle/transcription-server";
 import type { SessionChronicleState } from "@/src/lib/session-chronicle/types";
 
 export type CampaignChronicleRow = {
@@ -16,6 +17,7 @@ export type CampaignChronicleRow = {
     error_message: string | null;
     duration_ms: number | null;
     created_at: string;
+    has_audio: boolean;
   }>;
 };
 
@@ -65,10 +67,15 @@ export async function loadCampaignChronicleOverview(
   const chunksByTs = new Map<string, CampaignChronicleRow["chunks"]>();
 
   if (tsIds.length > 0) {
+    const admin = createAdminClient();
+    for (const tsId of tsIds) {
+      await compactOrphanTranscriptionChunks(admin as any, tsId);
+    }
+
     const { data: chunksRaw } = await (supabase as any)
       .from("session_transcription_chunks")
       .select(
-        "transcription_session_id, chunk_index, whisper_status, summarize_status, error_message, duration_ms, created_at",
+        "transcription_session_id, chunk_index, whisper_status, summarize_status, error_message, duration_ms, created_at, storage_path",
       )
       .in("transcription_session_id", tsIds)
       .order("chunk_index", { ascending: true });
@@ -82,6 +89,7 @@ export async function loadCampaignChronicleOverview(
         error_message: string | null;
         duration_ms: number | null;
         created_at: string;
+        storage_path: string | null;
       };
       const list = chunksByTs.get(r.transcription_session_id) ?? [];
       list.push({
@@ -91,6 +99,7 @@ export async function loadCampaignChronicleOverview(
         error_message: r.error_message,
         duration_ms: r.duration_ms,
         created_at: r.created_at,
+        has_audio: Boolean(r.storage_path),
       });
       chunksByTs.set(r.transcription_session_id, list);
     }
@@ -107,7 +116,9 @@ export async function loadCampaignChronicleOverview(
         sessionStatus: s.status,
         state,
         pendingInbox: countPendingInboxItems(state),
-        chunks: tsId ? (chunksByTs.get(tsId) ?? []) : [],
+        chunks: tsId
+          ? (chunksByTs.get(tsId) ?? []).filter((chunk) => chunk.has_audio)
+          : [],
       };
     });
 }

@@ -8,6 +8,7 @@ import { isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal 
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
+import { schedulePendingTranscriptionChunksProcessing } from "@/src/lib/session-chronicle/process-chunk";
 
 /**
  * Server Action: Create Session with Scenes
@@ -1046,6 +1047,7 @@ export async function endSession(sessionId: string, skipRevalidate = false) {
 
   if (isSessionStatusLive(session.status)) {
     await stopTranscriptionRecording(supabase, sessionId);
+    schedulePendingTranscriptionChunksProcessing(sessionId);
   }
 
   // 4. Archive live state before cleanup/close.

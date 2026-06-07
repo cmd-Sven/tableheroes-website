@@ -3,8 +3,9 @@ import type { VisibilityEntityType } from "@/src/app/dashboard/campaigns/[id]/ca
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import type { PlayerRecapPayload, SessionChronicleState } from "./types";
 import { emptyPlayerRecapPayload } from "./player-recap-types";
+import { buildRecapStarterMarkdown } from "./player-recap-starter";
 
-type ArchiveRef = { id?: string | null; name?: string | null };
+export type ArchiveRef = { id?: string | null; name?: string | null };
 
 type BuildInput = {
   campaignId: string;
@@ -139,7 +140,12 @@ export function buildPlayerRecapPayload(input: BuildInput): PlayerRecapPayload {
     base.sections.loot = [...state.discovered_loot].filter(Boolean);
   }
 
-  base.summary_md = summaryParts.join("\n\n") || "In dieser Session gab es noch keine Chronist-Zusammenfassung.";
+  base.summary_md =
+    summaryParts.join("\n\n") ||
+    buildRecapStarterMarkdown({
+      visitedLocations: input.visitedLocations,
+      encounteredNpcs: input.encounteredNpcs,
+    });
   base.link_entities = linkEntities;
   base.generated_at = new Date().toISOString();
   return base;

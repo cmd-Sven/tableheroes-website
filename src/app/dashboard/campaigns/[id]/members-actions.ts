@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 
 export type MemberWithCharacter = {
@@ -8,6 +9,7 @@ export type MemberWithCharacter = {
   character_id: string | null;
   status: string;
   campaign_rank: string | null;
+  player_table_name: string | null;
   application_message: string | null;
   user: {
     id: string;
@@ -58,7 +60,9 @@ export async function getGmCampaignMembersWithCharacters(
 
   const { data: members, error: membersError } = await supabase
     .from("campaign_members")
-    .select("id, user_id, character_id, status, application_message, campaign_rank")
+    .select(
+      "id, user_id, character_id, status, application_message, campaign_rank, player_table_name",
+    )
     .eq("campaign_id", campaignId)
     .order("created_at", { ascending: true });
 
@@ -73,6 +77,7 @@ export async function getGmCampaignMembersWithCharacters(
     character_id: string | null;
     status: string;
     campaign_rank: string | null;
+    player_table_name: string | null;
     application_message: string | null;
   }[];
 
@@ -179,4 +184,47 @@ export async function getGmCampaignMembersWithCharacters(
     inReview: mapped.filter((m) => m.status === "In_Review" || m.status === "Changes_Proposed"),
     accepted: mapped.filter((m) => m.status === "Approved" || m.status === "Active"),
   };
+}
+
+export async function updateMemberPlayerTableName(
+  campaignId: string,
+  memberId: string,
+  playerTableName: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Nicht authentifiziert." };
+  }
+
+  const { data: campaignRaw } = await supabase
+    .from("campaigns")
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .single();
+
+  const campaign = campaignRaw as { gm_id?: string | null; owner_id?: string | null } | null;
+  if (
+    !campaign ||
+    (campaign.gm_id !== user.id &&
+      !(campaign.owner_id && String(campaign.owner_id) === user.id))
+  ) {
+    return { ok: false, error: "Nur der Spielleiter kann Tischnamen pflegen." };
+  }
+
+  const normalized = playerTableName?.trim() ? playerTableName.trim().slice(0, 120) : null;
+
+  const { error } = await (supabase.from("campaign_members") as any)
+    .update({ player_table_name: normalized })
+    .eq("id", memberId)
+    .eq("campaign_id", campaignId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  return { ok: true };
 }

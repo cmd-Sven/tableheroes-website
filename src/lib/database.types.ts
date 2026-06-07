@@ -358,6 +358,7 @@ export type Database = {
           created_at: string | null
           has_seen_acceptance: boolean | null
           id: string
+          player_table_name: string | null
           role: string | null
           status: string | null
           user_id: string
@@ -370,6 +371,7 @@ export type Database = {
           created_at?: string | null
           has_seen_acceptance?: boolean | null
           id?: string
+          player_table_name?: string | null
           role?: string | null
           status?: string | null
           user_id: string
@@ -382,6 +384,7 @@ export type Database = {
           created_at?: string | null
           has_seen_acceptance?: boolean | null
           id?: string
+          player_table_name?: string | null
           role?: string | null
           status?: string | null
           user_id?: string

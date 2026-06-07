@@ -6,6 +6,8 @@ import {
   formatGmBoardEventsForPrompt,
   type GmBoardEventRow,
 } from "./chronicle-gm-board-events";
+import { formatPartyRosterForPrompt } from "./campaign-party-roster";
+import type { CampaignPartyRosterEntry } from "./campaign-party-roster";
 
 export function formatLiveMarkersForPrompt(markers: LiveMarker[]): string {
   if (!markers.length) return "Keine Live-Marker in diesem Segment.";
@@ -27,11 +29,19 @@ export function buildSummarizeUserPrompt(params: {
   previousRecap: string | null;
   liveMarkers: LiveMarker[];
   gmBoardEvents?: GmBoardEventRow[];
+  partyRoster?: CampaignPartyRosterEntry[];
 }): string {
   const parts = [
     `Session: ${params.sessionTitle?.trim() || "Unbenannte Session"}`,
     `Chunk-Index: ${params.chunkIndex} (~10 Minuten Audio)`,
   ];
+  if (params.partyRoster && params.partyRoster.length > 0) {
+    parts.push(
+      "",
+      "Spieler-Party (Charakter vs. Ansprache am Tisch — Aliase im Transkript auf Charakternamen normalisieren):",
+      formatPartyRosterForPrompt(params.partyRoster),
+    );
+  }
   if (params.previousRecap?.trim()) {
     parts.push(
       "",

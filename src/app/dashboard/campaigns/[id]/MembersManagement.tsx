@@ -39,6 +39,7 @@ import { GMCharacterReview } from "@/src/components/dashboard/GMCharacterReview"
 import { CharacterChangesView } from "@/src/components/dashboard/CharacterChangesView";
 import { MemberDetailManager } from "@/src/components/campaigns/MemberDetailManager";
 import { getMemberDetails, type MemberDetailData } from "@/src/lib/actions/point-actions";
+import { updateMemberPlayerTableName } from "./members-actions";
 
 type Member = {
   id: string;
@@ -46,6 +47,7 @@ type Member = {
   status: string;
   application_message: string | null;
   character_id?: string | null;
+  player_table_name?: string | null;
   user: {
     username: string;
     avatar_url: string | null;
@@ -71,6 +73,78 @@ type NPC = {
   faction_id?: string | null;
   factions?: { name: string } | null;
 };
+
+function MemberTableNameField({
+  campaignId,
+  memberId,
+  initialValue,
+  characterName,
+  platformUsername,
+}: {
+  campaignId: string;
+  memberId: string;
+  initialValue: string | null | undefined;
+  characterName: string;
+  platformUsername: string;
+}) {
+  const [value, setValue] = useState(initialValue?.trim() ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue?.trim() ?? "");
+  }, [initialValue, memberId]);
+
+  async function save(nextValue: string) {
+    setSaving(true);
+    try {
+      const result = await updateMemberPlayerTableName(
+        campaignId,
+        memberId,
+        nextValue.trim() || null,
+      );
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Tischname gespeichert.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded border border-hero-border/20 bg-background-card/40 px-3 py-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
+          <span className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+            Echter Name am Tisch
+          </span>
+          <input
+            type="text"
+            value={value}
+            disabled={saving}
+            placeholder="z. B. Sonja"
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={() => {
+              const trimmed = value.trim();
+              if (trimmed === (initialValue?.trim() ?? "")) return;
+              void save(value);
+            }}
+            className="rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white placeholder:text-gray-600 focus:border-accent-gold outline-none disabled:opacity-60"
+          />
+        </label>
+        <p className="pb-1 font-libre text-[10px] text-gray-500 leading-snug">
+          Profil: <span className="text-gray-400">{platformUsername}</span>
+          {" · "}
+          Figur: <span className="text-accent-gold">{characterName}</span>
+        </p>
+      </div>
+      <p className="mt-1.5 font-libre text-[10px] text-gray-600">
+        Für Chronist &amp; Recap: Ansprachen wie „Sonja" werden der Figur zugeordnet.
+      </p>
+    </div>
+  );
+}
 
 type MembersManagementProps = {
   campaignId: string;
@@ -453,6 +527,18 @@ export function MembersManagement({
 
       {/* Accepted Members (The Party) */}
       <div>
+        {isGM && acceptedMembers.some((m) => m.character_id || m.character?.name) ? (
+          <div className="mb-4 rounded-lg border border-purple-900/40 bg-purple-950/15 px-4 py-3">
+            <p className="font-barlow text-xs font-bold uppercase text-purple-200">
+              Namen für Audio-Auswertung
+            </p>
+            <p className="mt-1 font-libre text-sm text-gray-300 leading-relaxed">
+              Trage pro Spieler den <strong className="text-white">echten Namen am Tisch</strong> ein
+              (z. B. Sonja). Der Plattform-Profilname muss das nicht sein. Der Chronist ordnet
+              Transkript-Ansprachen dann der Figur zu (z. B. Sajeri).
+            </p>
+          </div>
+        ) : null}
         <h3 className="font-cinzel font-bold text-lg text-accent-gold mb-4">
           Die Party ({acceptedMembers.filter((m) => m.character_id).length})
         </h3>
@@ -466,8 +552,9 @@ export function MembersManagement({
             {acceptedMembers.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center justify-between rounded border border-hero-border/30 bg-background-dark p-4 hover:border-hero-vibrant transition-colors group"
+                className="rounded border border-hero-border/30 bg-background-dark p-4 hover:border-hero-vibrant transition-colors group"
               >
+                <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="h-10 w-10 rounded-full bg-hero-dark text-white font-bold flex items-center justify-center">
                     {member.user.avatar_url ? (
@@ -635,6 +722,16 @@ export function MembersManagement({
                     <UserX className="h-5 w-5" />
                   </button>
                 </div>
+                </div>
+                {isGM && member.character?.name ? (
+                  <MemberTableNameField
+                    campaignId={campaignId}
+                    memberId={member.id}
+                    initialValue={member.player_table_name}
+                    characterName={member.character.name}
+                    platformUsername={member.user.username}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
