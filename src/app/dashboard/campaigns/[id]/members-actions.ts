@@ -34,6 +34,83 @@ export type MemberWithCharacter = {
   } | null;
 };
 
+const CAMPAIGN_MEMBER_BASE_SELECT =
+  "id, user_id, character_id, status, application_message, campaign_rank";
+
+async function loadCampaignMemberRows(
+  supabase: ReturnType<typeof createAdminClient>,
+  campaignId: string,
+): Promise<{
+  rows: Array<{
+    id: string;
+    user_id: string;
+    character_id: string | null;
+    status: string;
+    campaign_rank: string | null;
+    player_table_name: string | null;
+    application_message: string | null;
+  }>;
+  error: { message: string } | null;
+}> {
+  const { data: withTableName, error: withTableNameError } = await supabase
+    .from("campaign_members")
+    .select(`${CAMPAIGN_MEMBER_BASE_SELECT}, player_table_name`)
+    .eq("campaign_id", campaignId)
+    .order("created_at", { ascending: true });
+
+  if (!withTableNameError) {
+    return {
+      rows: (withTableName ?? []) as Array<{
+        id: string;
+        user_id: string;
+        character_id: string | null;
+        status: string;
+        campaign_rank: string | null;
+        player_table_name: string | null;
+        application_message: string | null;
+      }>,
+      error: null,
+    };
+  }
+
+  const missingColumn =
+    withTableNameError.message.includes("player_table_name") ||
+    withTableNameError.message.includes("schema cache");
+
+  if (!missingColumn) {
+    return { rows: [], error: withTableNameError };
+  }
+
+  console.warn(
+    "[loadCampaignMemberRows] player_table_name fehlt — Fallback ohne Spalte. Migration 20260607120000 ausführen.",
+  );
+
+  const { data: fallbackRows, error: fallbackError } = await supabase
+    .from("campaign_members")
+    .select(CAMPAIGN_MEMBER_BASE_SELECT)
+    .eq("campaign_id", campaignId)
+    .order("created_at", { ascending: true });
+
+  if (fallbackError) {
+    return { rows: [], error: fallbackError };
+  }
+
+  return {
+    rows: ((fallbackRows ?? []) as Array<{
+      id: string;
+      user_id: string;
+      character_id: string | null;
+      status: string;
+      campaign_rank: string | null;
+      application_message: string | null;
+    }>).map((row) => ({
+      ...row,
+      player_table_name: null,
+    })),
+    error: null,
+  };
+}
+
 /**
  * GM: Lädt alle Kampagnenmitglieder inkl. Charaktere (Service-Role, RLS-Bypass).
  * Ohne SUPABASE_SERVICE_ROLE_KEY: Fallback auf Session-Client — GM darf per RLS dieselben Zeilen lesen.
@@ -58,28 +135,15 @@ export async function getGmCampaignMembersWithCharacters(
     allowRepairWrites = false;
   }
 
-  const { data: members, error: membersError } = await supabase
-    .from("campaign_members")
-    .select(
-      "id, user_id, character_id, status, application_message, campaign_rank, player_table_name",
-    )
-    .eq("campaign_id", campaignId)
-    .order("created_at", { ascending: true });
+  const { rows: memberList, error: membersError } = await loadCampaignMemberRows(
+    supabase,
+    campaignId,
+  );
 
   if (membersError) {
     console.error("[getGmCampaignMembersWithCharacters] members error:", membersError);
     return { drafting: [], inReview: [], accepted: [] };
   }
-
-  const memberList = (members || []) as {
-    id: string;
-    user_id: string;
-    character_id: string | null;
-    status: string;
-    campaign_rank: string | null;
-    player_table_name: string | null;
-    application_message: string | null;
-  }[];
 
   const userIds = [...new Set(memberList.map((m) => m.user_id).filter(Boolean))];
   let charIds: string[] = [
@@ -222,7 +286,15 @@ export async function updateMemberPlayerTableName(
     .eq("campaign_id", campaignId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    const missingColumn =
+      error.message.includes("player_table_name") ||
+      error.message.includes("schema cache");
+    return {
+      ok: false,
+      error: missingColumn
+        ? "Tischnamen sind noch nicht verfügbar — bitte Supabase-Migration 20260607120000 ausführen."
+        : error.message,
+    };
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);

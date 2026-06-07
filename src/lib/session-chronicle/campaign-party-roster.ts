@@ -34,16 +34,36 @@ export async function loadCampaignPartyRoster(
 ): Promise<CampaignPartyRosterEntry[]> {
   const admin = createAdminClient();
 
-  const { data: membersRaw } = await (admin.from("campaign_members") as any)
+  const { data: membersRaw, error: membersError } = await (admin.from("campaign_members") as any)
     .select("user_id, character_id, player_table_name, status")
     .eq("campaign_id", campaignId)
     .in("status", ["Approved", "Active"]);
 
-  const members = (membersRaw ?? []) as Array<{
+  let members = (membersRaw ?? []) as Array<{
     user_id: string;
     character_id: string | null;
     player_table_name: string | null;
   }>;
+
+  if (membersError) {
+    const missingColumn =
+      membersError.message.includes("player_table_name") ||
+      membersError.message.includes("schema cache");
+    if (!missingColumn) {
+      return [];
+    }
+    const { data: fallbackRaw } = await (admin.from("campaign_members") as any)
+      .select("user_id, character_id, status")
+      .eq("campaign_id", campaignId)
+      .in("status", ["Approved", "Active"]);
+    members = ((fallbackRaw ?? []) as Array<{
+      user_id: string;
+      character_id: string | null;
+    }>).map((row) => ({
+      ...row,
+      player_table_name: null,
+    }));
+  }
 
   const characterIds = [
     ...new Set(
