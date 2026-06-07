@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { sessionRequiresCharacter } from "@/src/lib/session-type";
 
 export type RsvpStatus = "Zusage" | "Absage" | "Via Online";
 
@@ -39,7 +40,7 @@ async function playerHasCharacterForCampaign(
 export async function setSessionRsvp(
   sessionId: string,
   rsvpStatus: RsvpStatus,
-  context?: { campaignId: string; isLive: boolean }
+  context?: { campaignId: string; isLive: boolean; sessionType?: string | null }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const {
@@ -49,6 +50,7 @@ export async function setSessionRsvp(
 
   let campaignId: string;
   let isLive: boolean;
+  let sessionType: string | null = context?.sessionType ?? null;
 
   if (context) {
     campaignId = context.campaignId;
@@ -65,7 +67,7 @@ export async function setSessionRsvp(
     }
   } else {
     const { data: session, error } = await (supabase.from("sessions") as any)
-      .select("id, campaign_id, is_live")
+      .select("id, campaign_id, is_live, type")
       .eq("id", sessionId)
       .single();
 
@@ -76,6 +78,7 @@ export async function setSessionRsvp(
     if (!session) return { success: false, error: "Session nicht gefunden." };
     campaignId = session.campaign_id as string;
     isLive = session.is_live !== false;
+    sessionType = (session as { type?: string | null }).type ?? null;
   }
 
   const { data: campaignRow } = await (supabase.from("campaigns") as any)
@@ -85,7 +88,8 @@ export async function setSessionRsvp(
   const isCampaignGm = (campaignRow as { gm_id?: string } | null)?.gm_id === user.id;
 
   const hasChar = await playerHasCharacterForCampaign(supabase, user.id, campaignId);
-  if (!hasChar && !isCampaignGm) {
+  const needsCharacter = sessionRequiresCharacter(sessionType);
+  if (needsCharacter && !hasChar && !isCampaignGm) {
     return {
       success: false,
       error:

@@ -11,8 +11,18 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-    --font-sans: var(--font-barlow);
-    --font-serif: var(--font-libre);
+  --font-sans: var(--font-barlow);
+  --font-serif: var(--font-libre);
+
+  /* TableHeroes Markenfarben (aus tailwind.config.ts) */
+  --color-hero-dark: #217d42;
+  --color-hero-vibrant: #379806;
+  --color-hero-border: #23c763;
+  --color-accent-gold: #cab926;
+  --color-accent-white: #ffffff;
+  --color-accent-blood: #58180d;
+  --color-background-dark: #0a1f10;
+  --color-background-card: #132e1b;
 }
 
 body {
@@ -659,4 +669,123 @@ button.bg-hero-gold[disabled] {
 
 .btn-player-edit-gold:active {
   transform: scale(0.98);
+}
+
+/* Marketing SubNavbar – präsente CTA-Buttons */
+.marketing-nav-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  line-height: 1.25rem;
+  transition: all 0.2s ease;
+  background: linear-gradient(180deg, #d4c44a 0%, #cab926 45%, #a89d1e 100%);
+  color: #1a1408;
+  border: 1px solid rgba(168, 157, 30, 0.65);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(202, 185, 38, 0.25);
+}
+
+.marketing-nav-btn-primary:hover {
+  background: linear-gradient(180deg, #efe26a 0%, #e6d73a 40%, #cab926 100%);
+  box-shadow:
+    0 0 24px rgba(202, 185, 38, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.marketing-nav-btn-discord {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  line-height: 1.25rem;
+  transition: all 0.2s ease;
+  background: linear-gradient(180deg, #6875f5 0%, #5865f2 50%, #4752c4 100%);
+  color: #ffffff;
+  border: 1px solid rgba(114, 137, 218, 0.7);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(88, 101, 242, 0.35);
+}
+
+.marketing-nav-btn-discord:hover {
+  background: linear-gradient(180deg, #7983f7 0%, #6875f5 45%, #5865f2 100%);
+  box-shadow:
+    0 0 22px rgba(88, 101, 242, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Hero Slide Box auf der Startseite */
+.marketing-hero-slide-box {
+  background-color: #132e1b;
+  background-image: linear-gradient(
+    165deg,
+    rgba(55, 152, 6, 0.12) 0%,
+    rgba(19, 46, 27, 0.98) 38%,
+    rgba(10, 31, 16, 0.99) 100%
+  );
+  border: 1px solid rgba(202, 185, 38, 0.45);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(35, 199, 99, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.marketing-hero-slide-tab {
+  flex: 1;
+  padding: 0.625rem 0.5rem;
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: #9ca3af;
+}
+
+.marketing-hero-slide-tab:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+}
+
+.marketing-hero-slide-tab--active {
+  background-color: rgba(202, 185, 38, 0.22);
+  color: #e6d73a;
+  box-shadow: inset 0 -2px 0 #cab926;
+}
+
+.marketing-hero-slide-tablist {
+  display: flex;
+  border-bottom: 1px solid rgba(202, 185, 38, 0.3);
+  background: linear-gradient(180deg, rgba(33, 125, 66, 0.35) 0%, rgba(19, 46, 27, 0.6) 100%);
+}
+
+/* Marketing-Landingpage: Sektions-H2 (grün, ohne Umrandung) */
+.marketing-section-h2 {
+  display: block;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-family: var(--font-barlow), sans-serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  color: #4ade80;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }

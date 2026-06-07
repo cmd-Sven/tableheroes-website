@@ -16,6 +16,7 @@ import {
   isSessionStatusTerminal,
 } from "@/src/lib/session-status";
 import { isStaleLiveSession, sortSessionsForDashboardFocus } from "@/src/lib/session-focus";
+import { sessionRequiresCharacter, parseSessionType } from "@/src/lib/session-type";
 
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
@@ -336,7 +337,7 @@ export async function getUpcomingSessionsForUser(
   let sessionsError: unknown = null;
 
   const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
+    .select("id, title, start_time, status, campaign_id, type, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
     .order("start_time", { ascending: true })
     .limit(limit * 3);
@@ -507,6 +508,8 @@ export async function getUpcomingSessionsForUser(
       rsvps,
       deadlineReached,
       viaOnlineTaken,
+      sessionType: parseSessionType(s.type),
+      requiresCharacter: sessionRequiresCharacter(s.type),
     };
   });
 
@@ -542,7 +545,7 @@ export async function getPastSessionsForUser(
 
   let allSessions: any[] = [];
   const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, status, campaign_id, rsvp_deadline_days, is_live")
+    .select("id, title, start_time, status, campaign_id, type, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
     .order("start_time", { ascending: false })
     .limit(limit * 3);
@@ -665,6 +668,8 @@ export async function getPastSessionsForUser(
       rsvps,
       deadlineReached,
       viaOnlineTaken: s.is_live !== false && viaOnlineCount >= 1,
+      sessionType: parseSessionType(s.type),
+      requiresCharacter: sessionRequiresCharacter(s.type),
     };
   });
 }

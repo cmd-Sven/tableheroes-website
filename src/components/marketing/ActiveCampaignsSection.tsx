@@ -263,7 +263,7 @@ export function ActiveCampaignsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5 }}
-              className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block"
+              className="marketing-section-h2"
             >
               Aktuelle Runden in Osnabrück &amp; Online
             </motion.h2>

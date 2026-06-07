@@ -304,6 +304,11 @@ export function Sidebar({
           icon: Users,
         },
         {
+          href: "/dashboard/admin/events",
+          label: "Community-Termine",
+          icon: Calendar,
+        },
+        {
           href: "/dashboard/admin/news",
           label: "Plattform-News",
           icon: Newspaper,

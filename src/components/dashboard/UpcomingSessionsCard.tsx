@@ -12,7 +12,19 @@ import type {
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
 import { setSessionRsvp, setGmConfirmed, updateSessionRsvpSettings } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import { setCommunityEventRsvp } from "@/src/lib/actions/community-event-actions";
 import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
+import { getSessionTypeLabel } from "@/src/lib/session-type";
+import { APP_TIMEZONE, formatSessionTimeDe } from "@/src/lib/datetime/berlin";
+
+function formatUpcomingSessionDate(iso: string) {
+  return new Intl.DateTimeFormat("de-DE", {
+    timeZone: APP_TIMEZONE,
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(iso));
+}
 
 type Props = {
   sessions: UpcomingSession[];
@@ -127,25 +139,20 @@ function SessionRowPlayer({
   const startDate = new Date(session.startTime);
   const isLive = session.status === "Live";
 
-  const formattedDate = new Intl.DateTimeFormat("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  }).format(startDate);
-
-  const formattedTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(startDate);
+  const formattedDate = formatUpcomingSessionDate(session.startTime);
+  const formattedTime = formatSessionTimeDe(session.startTime);
 
   const handleRsvpChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as RsvpStatus;
     if (!value) return;
     startTransition(async () => {
-      const res = await setSessionRsvp(session.id, value, {
-        campaignId: session.campaignId,
-        isLive: session.isLive,
-      });
+      const res = session.isCommunityEvent
+        ? await setCommunityEventRsvp(session.id, value, { isLive: session.isLive })
+        : await setSessionRsvp(session.id, value, {
+            campaignId: session.campaignId,
+            isLive: session.isLive,
+            sessionType: session.sessionType,
+          });
       if (!res.success || res.error) {
         alert(res.error || "Rückmeldung konnte nicht gespeichert werden.");
         return;
@@ -159,6 +166,7 @@ function SessionRowPlayer({
   const confirmed = confirmedAttendees(session);
   const userPlaying = isPlayingRsvp(session.userRsvp);
   const userDeclined = session.userRsvp === "Absage";
+  const showCharacterBlock = !!rsvpBlocked && session.requiresCharacter;
 
   return (
     <div
@@ -183,9 +191,11 @@ function SessionRowPlayer({
       <div className="relative z-10 p-4 sm:p-5">
         <Link
           href={
-            isLive
+            isLive && !session.isCommunityEvent
               ? `/session/${session.id}`
-              : `/dashboard/campaigns/${session.campaignId}`
+              : session.isCommunityEvent
+                ? "/dashboard/sessions"
+                : `/dashboard/campaigns/${session.campaignId}`
           }
           className="block"
         >
@@ -196,8 +206,13 @@ function SessionRowPlayer({
                 {session.campaignName}
               </p>
               <h3 className="font-cinzel font-bold text-base text-white group-hover:text-accent-gold transition-colors truncate">
-                {session.title || "Nächste Session"}
+                {session.title || "Nächster Termin"}
               </h3>
+              <p className="mt-0.5 font-barlow text-[9px] uppercase text-gray-500">
+                {session.isCommunityEvent
+                  ? session.communityEventKind ?? "Community-Termin"
+                  : getSessionTypeLabel(session.sessionType)}
+              </p>
             </div>
 
             {/* Status Badge */}
@@ -299,7 +314,7 @@ function SessionRowPlayer({
         {/* RSVP Dropdown (nur bei geplanten Sessions) */}
         {isScheduled && (
           <div className="mt-3 pt-3 border-t border-hero-border/20" onClick={(e) => e.stopPropagation()}>
-            {rsvpBlocked ? (
+            {showCharacterBlock ? (
               <p className="font-libre text-xs text-gray-400 leading-relaxed">
                 Rückmeldung nur mit Charakter möglich.{" "}
                 <Link
@@ -356,16 +371,8 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
   const isLive = session.status === "Live";
   const isScheduled = session.status === "Scheduled";
 
-  const formattedDate = new Intl.DateTimeFormat("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  }).format(startDate);
-
-  const formattedTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(startDate);
+  const formattedDate = formatUpcomingSessionDate(session.startTime);
+  const formattedTime = formatSessionTimeDe(session.startTime);
 
   const allReadyForSessionStart =
     session.rsvps.length > 0 &&
@@ -499,17 +506,14 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
 /* Vergangene Session (read-only, kein Betreten)                       */
 /* ------------------------------------------------------------------ */
 function PastSessionRow({ session }: { session: UpcomingSession }) {
-  const startDate = new Date(session.startTime);
   const formattedDate = new Intl.DateTimeFormat("de-DE", {
+    timeZone: APP_TIMEZONE,
     weekday: "short",
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(startDate);
-  const formattedTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(startDate);
+  }).format(new Date(session.startTime));
+  const formattedTime = formatSessionTimeDe(session.startTime);
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-hero-dark/50 bg-background-card/70 opacity-90">

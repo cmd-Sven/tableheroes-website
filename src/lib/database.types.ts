@@ -3616,7 +3616,7 @@ export type Database = {
         | "Romance"
         | "Family"
         | "Unknown"
-      session_type: "Recruitment" | "GameSession"
+      session_type: "Recruitment" | "GameSession" | "Event" | "Planning"
       user_primary_role: "Player" | "GameMaster" | "Moderator" | "Admin"
     }
     CompositeTypes: {
@@ -3790,7 +3790,7 @@ export const Constants = {
         "Family",
         "Unknown",
       ],
-      session_type: ["Recruitment", "GameSession"],
+      session_type: ["Recruitment", "GameSession", "Event", "Planning"],
       user_primary_role: ["Player", "GameMaster", "Moderator", "Admin"],
     },
   },

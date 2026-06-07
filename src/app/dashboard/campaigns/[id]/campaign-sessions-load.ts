@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
 import { isSessionStatusScheduled } from "@/src/lib/session-status";
 import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
+import { sessionSupportsLiveBoard } from "@/src/lib/session-type";
 
 export type SessionTabRow = Record<string, unknown> & {
   id: string;
@@ -91,6 +92,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       if (!isSessionStatusScheduled(s.status)) {
         return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
       }
+      const isGameSession = sessionSupportsLiveBoard(s.type);
       const sessionRows = rowsBySession.get(s.id) ?? [];
       const byUser = new Map(sessionRows.map((r) => [r.user_id, r]));
       const playerIds = [...memberIds].filter((uid) => uid !== gmUserId);
@@ -100,8 +102,8 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,
-        canStart: pendingCount === 0 && prepOk,
-        pendingCount,
+        canStart: isGameSession && pendingCount === 0 && prepOk,
+        pendingCount: isGameSession ? pendingCount : 0,
         hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
       };
     });

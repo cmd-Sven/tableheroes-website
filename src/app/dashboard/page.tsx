@@ -4,9 +4,9 @@ import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
 import {
   getRandomLoreEntry,
   getDailyComic,
-  getUpcomingSessionsForUser,
   getPendingCharacterCampaignsForUser,
 } from "@/src/lib/queries/dashboard-widgets-queries";
+import { mergeUpcomingAppointments } from "@/src/lib/queries/community-events-queries";
 import { getNewsForDashboard } from "@/src/lib/queries/news-queries";
 import {
   getGMNotifications,
@@ -334,7 +334,7 @@ async function loadPlayerDashboardData(userId: string) {
     getRandomLoreEntry(userId),
     getDailyComic(),
     getNewsForDashboard(userId),
-    getUpcomingSessionsForUser(userId),
+    mergeUpcomingAppointments(userId),
     getPlayerMessages(userId),
     getPointsLog(userId, 5),
     getUnreadInboxMessages(userId),
@@ -349,10 +349,12 @@ async function loadPlayerDashboardData(userId: string) {
       s.status === "Scheduled" &&
       !s.userRsvp &&
       s.deadlineReached &&
-      !noRsvpCampaignIds.has(s.campaignId)
+      (s.isCommunityEvent || !noRsvpCampaignIds.has(s.campaignId))
   );
   const sessionRsvpHref = firstPendingRsvpSession
-    ? `/dashboard/campaigns/${firstPendingRsvpSession.campaignId}?tab=sessions`
+    ? firstPendingRsvpSession.isCommunityEvent
+      ? "/dashboard/sessions"
+      : `/dashboard/campaigns/${firstPendingRsvpSession.campaignId}?tab=sessions`
     : null;
 
   console.log("[Dashboard] Points History geladen für User:", userId, "Anzahl:", pointsHistory.length);
@@ -443,7 +445,7 @@ async function loadGMDashboardData(userId: string) {
     getDailyComic(),
 
     // 5. Upcoming Sessions
-    getUpcomingSessionsForUser(userId),
+    mergeUpcomingAppointments(userId),
 
     // 6. GM Notifications (System-Meldungen)
     getGMNotifications(userId),

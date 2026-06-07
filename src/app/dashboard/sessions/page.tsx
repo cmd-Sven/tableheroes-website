@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Calendar, History } from "lucide-react";
 import {
-  getUpcomingSessionsForUser,
-  getPastSessionsForUser,
   getPendingCharacterCampaignsForUser,
 } from "@/src/lib/queries/dashboard-widgets-queries";
+import {
+  mergeUpcomingAppointments,
+  mergePastAppointments,
+} from "@/src/lib/queries/community-events-queries";
 import { UpcomingSessionsCard, PastSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 
 export default async function SessionsPage() {
@@ -18,8 +20,8 @@ export default async function SessionsPage() {
   if (!user) redirect("/");
 
   const [upcomingSessions, pastSessions, pendingCharacterCampaigns] = await Promise.all([
-    getUpcomingSessionsForUser(user.id, 50),
-    getPastSessionsForUser(user.id, 20),
+    mergeUpcomingAppointments(user.id, 50),
+    mergePastAppointments(user.id, 20),
     getPendingCharacterCampaignsForUser(user.id),
   ]);
   const rsvpBlockedCampaignIds = pendingCharacterCampaigns.map((c) => c.campaignId);
@@ -39,7 +41,7 @@ export default async function SessionsPage() {
             Termine
           </h1>
           <p className="mt-2 font-libre text-gray-400">
-            Geplante und laufende Sessions. Beendete Termine können nicht mehr betreten werden.
+            Geplante Sessions und Community-Termine. Beendete Termine können nicht mehr betreten werden.
           </p>
         </div>
       </div>
@@ -60,7 +62,7 @@ export default async function SessionsPage() {
                 Keine Termine geplant
               </h3>
               <p className="max-w-sm mx-auto font-libre text-gray-400">
-                Sobald eine Session geplant wird, erscheint sie hier.
+                Sobald ein Termin geplant wird, erscheint er hier.
               </p>
             </div>
           ) : (

@@ -11,6 +11,68 @@ import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcri
 import { schedulePendingTranscriptionChunksProcessing } from "@/src/lib/session-chronicle/process-chunk";
 
 /**
+ * Server Action: Einfachen Kampagne-Termin anlegen (Event / Spielplanung).
+ * Keine Szenen, keine Live-Bühne — RSVP nur mit Spielerprofil.
+ */
+export async function createCampaignEvent(formData: {
+  campaign_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  type: "Planning";
+  description?: string | null;
+  rsvp_deadline_days?: 1 | 2 | 3 | null;
+  is_live?: boolean;
+}) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id")
+    .eq("id", formData.campaign_id)
+    .single();
+
+  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  if (!campaign || campaign.gm_id !== user.id) {
+    throw new Error("Nur der GM kann Termine erstellen.");
+  }
+
+  if (!formData.title.trim()) {
+    throw new Error("Bitte gib einen Titel ein.");
+  }
+
+  const { data: session, error: sessionError } = await (supabase.from("sessions") as any)
+    .insert({
+      campaign_id: formData.campaign_id,
+      title: formData.title.trim(),
+      description: formData.description?.trim() || null,
+      type: formData.type,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      status: "Scheduled",
+      gm_prep_complete: true,
+      is_live: formData.is_live ?? true,
+      rsvp_deadline_days: formData.rsvp_deadline_days ?? 2,
+    })
+    .select()
+    .single();
+
+  if (sessionError || !session) {
+    console.error("Create Campaign Event Error:", sessionError);
+    throw new Error(sessionError?.message || "Fehler beim Erstellen des Termins.");
+  }
+
+  revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/sessions");
+  return session;
+}
+
+/**
  * Server Action: Create Session with Scenes
  */
 export async function createSessionWithScenes(formData: {

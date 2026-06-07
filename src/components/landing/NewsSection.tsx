@@ -136,7 +136,7 @@ export function NewsSection() {
       {/* Z-30: Content-Ebene (Überschrift + Karten) */}
       <div className="relative z-30 max-w-6xl mx-auto px-4 md:px-8">
         <div className="mb-6 md:mb-8 text-center">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 mt-8 inline-block">
+          <h2 className="marketing-section-h2">
             Neuigkeiten aus den Reichen
           </h2>
         </div>

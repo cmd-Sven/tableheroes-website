@@ -5,6 +5,7 @@ import {
 } from "@/src/lib/session-status";
 import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
 import { expirePastScheduledSessionsForCampaign } from "@/src/app/dashboard/campaigns/[id]/session-actions";
+import { formatSessionDateTimeDe } from "@/src/lib/datetime/berlin";
 
 export type GmMyCampaignCardModel = {
   id: string;
@@ -30,20 +31,6 @@ type SessionRow = {
   start_time: string;
   status: string;
 };
-
-function formatSessionDateTimeDe(startTime: string) {
-  const startDate = new Date(startTime);
-  const formattedDate = new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(startDate);
-  const formattedTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(startDate);
-  return { formattedDate, formattedTime };
-}
 
 function deriveSessionSummary(sessions: SessionRow[], now: Date) {
   const { focus, otherActive } = partitionCampaignSessionsForTab(sessions, now);

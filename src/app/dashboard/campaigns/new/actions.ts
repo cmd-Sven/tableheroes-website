@@ -3,6 +3,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseBerlinDateTimeLocal } from "@/src/lib/datetime/berlin";
 
 export async function createCampaignAction(formData: FormData) {
   const supabase = await createClient();
@@ -88,8 +89,8 @@ export async function createCampaignAction(formData: FormData) {
 
   // Erste Sitzung anlegen (nur wenn Datum angegeben)
   if (firstSessionDate && firstSessionDate.trim() !== "") {
-    const sessionStart = new Date(firstSessionDate);
-    const sessionEnd = new Date(sessionStart.getTime() + 4 * 60 * 60 * 1000); // +4h
+    const sessionStart = parseBerlinDateTimeLocal(firstSessionDate.trim());
+    const sessionEnd = new Date(sessionStart.getTime() + 4 * 60 * 60 * 1000);
 
     const sessionPayload = {
       campaign_id: campaignId,

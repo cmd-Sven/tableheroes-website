@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { HeroSection } from "@/src/components/marketing/HeroSection";
 import { SubNavbar } from "@/src/components/marketing/SubNavbar";
 import { FeatureTabsSection } from "@/src/components/marketing/FeatureTabsSection";
@@ -12,17 +11,12 @@ import { ImageSliderSection } from "@/src/components/marketing/ImageSliderSectio
 import { FaqSection } from "@/src/components/marketing/FaqSection";
 import { NewsSection } from "@/src/components/landing/NewsSection";
 
-type HeroContentType = "updates" | "membership" | "discord" | "login";
-
 export default function MarketingLandingPage() {
-  const [heroContent, setHeroContent] = useState<HeroContentType>("updates");
-
   return (
     <main>
-      <HeroSection heroContent={heroContent} />
+      <HeroSection />
 
-      {/* Sub-Navigation Bar */}
-      <SubNavbar activeContent={heroContent} onContentChange={setHeroContent} />
+      <SubNavbar />
 
       {/* Active Campaigns - direkt nach Hero für maximale Visibility */}
       <ActiveCampaignsSection />

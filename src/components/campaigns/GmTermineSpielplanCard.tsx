@@ -27,6 +27,7 @@ import {
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 import { setGmConfirmed } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
+import { APP_TIMEZONE } from "@/src/lib/datetime/berlin";
 
 export type GmTerminePlayerRsvp = {
   userId: string;
@@ -59,15 +60,15 @@ type Props = {
 };
 
 function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
   return new Intl.DateTimeFormat("de-DE", {
+    timeZone: APP_TIMEZONE,
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(d);
+  }).format(new Date(iso));
 }
 
 function deadlineSummary(startTime: string, days: number | null): string {
@@ -78,6 +79,7 @@ function deadlineSummary(startTime: string, days: number | null): string {
   const deadline = new Date(start);
   deadline.setDate(deadline.getDate() - days);
   const formatted = new Intl.DateTimeFormat("de-DE", {
+    timeZone: APP_TIMEZONE,
     day: "2-digit",
     month: "long",
     year: "numeric",

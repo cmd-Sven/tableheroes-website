@@ -93,10 +93,15 @@ export function CampaignScheduleForm({
       try {
         const result = await generateRecurringSessions(campaignId);
         setGenMsg(
-          `${result.created} neue Termine erstellt` +
-            (result.skipped > 0
-              ? ` (${result.skipped} bestehende übersprungen)`
-              : ""),
+          [
+            `${result.created} neue Termine erstellt`,
+            result.skipped > 0 ? `${result.skipped} bestehende übersprungen` : null,
+            result.realigned > 0
+              ? `${result.realigned} Uhrzeit(en) auf Spielplan korrigiert`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
         );
         setTimeout(() => setGenMsg(null), 5000);
       } catch (err: any) {

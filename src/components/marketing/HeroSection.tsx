@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, AnimatePresence, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring, MotionValue } from "framer-motion";
 import Image from "next/image";
 import { EmberRainOverlayMemo as EmberRainOverlay } from "@/src/components/marketing/EmberRainOverlay";
 import { CloudFogOverlayMemo as CloudFogOverlay } from "@/src/components/marketing/CloudFogOverlay";
 import { DragonCanvas } from "@/src/components/marketing/DragonCanvas";
+import { HeroSlideBox } from "@/src/components/marketing/HeroSlideBox";
 
 // Parallax Layer Configuration
 // yRange in Pixel: sehr dezente vertikale Verschiebung (entgegengesetzt zur Scrollrichtung)
@@ -262,13 +263,7 @@ function ParallaxBackground() {
   );
 }
 
-type HeroContentType = "updates" | "membership" | "discord" | "login";
-
-interface HeroSectionProps {
-  heroContent?: HeroContentType;
-}
-
-export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
+export function HeroSection() {
   return (
     <section
       id="hero"
@@ -337,11 +332,9 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
             </p>
           </div>
 
-          {/* Container für Pergament-Box und Feder - Mobile: nach H1/Text */}
-          <div className="relative order-3 md:order-2">
-            <AnimatePresence mode="wait">
-              <HeroContentBox key={heroContent} content={heroContent} />
-            </AnimatePresence>
+          {/* Hero Slide Box */}
+          <div className="relative order-3 md:order-2 flex justify-center md:justify-end">
+            <HeroSlideBox />
             
             {/* Schwebende Feder */}
             <motion.div
@@ -464,74 +457,5 @@ export function HeroSection({ heroContent = "updates" }: HeroSectionProps) {
         </motion.div>
       </div>
     </section>
-  );
-}
-
-interface HeroContentBoxProps {
-  content: HeroContentType;
-}
-
-function HeroContentBox({ content }: HeroContentBoxProps) {
-  const getContent = () => {
-    switch (content) {
-      case "membership":
-        return {
-          title: "Mitglied werden",
-          text: "Um Table-Heroes Mitglied zu werden musst Du dich vorab registrieren und erhälst Zugriff auf das Spieler-Dashboard. Dort hast Du die Möglichkeit aktuelle Kampagnen einzusehen, dich auf diese zu bewerben oder Dein Dashboard einzurichten. Behalte die News im Auge für die nächsten Updates und besuche unseren Discord!",
-        };
-      case "updates":
-      default:
-        return {
-          title: "Das Abenteuer beginnt!",
-          text: "Die ersten mutigen Helden strömen herbei um sich den Abenteuern anzuschließen die auf sie warten.",
-          additionalText: "Registriert Euch und bleibt informiert. Die nächsten Termine folgen bald!",
-          membershipNote: undefined,
-        };
-    }
-  };
-
-  const contentData = getContent();
-
-  return (
-    <motion.div
-      key={content}
-      initial={{ opacity: 0, x: 50 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -50 }}
-      transition={{ duration: 0.4, ease: "easeInOut" }}
-      className="rounded-2xl shadow-2xl flex flex-col justify-center gap-4 w-full max-w-3xl min-h-[300px] md:min-h-[400px] py-12 px-8 md:py-16 md:px-12"
-      style={{
-        willChange: "transform, opacity",
-        backgroundImage: "url('/images/scroll-paper.png')",
-        backgroundSize: "100% 100%",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
-      }}
-    >
-      <div>
-        <h3 className="font-barlow font-semibold uppercase tracking-wide text-slate-900 text-sm drop-shadow-sm">
-          {contentData.title}
-        </h3>
-        <p className="mt-2 font-libre text-slate-800 text-sm leading-relaxed drop-shadow-sm">
-          {contentData.text}
-        </p>
-      </div>
-
-      {contentData.additionalText && (
-        <div className="mt-3">
-          <p className="font-libre text-slate-700 text-sm leading-relaxed drop-shadow-sm">
-            {contentData.additionalText}
-          </p>
-        </div>
-      )}
-
-      {contentData.membershipNote && (
-        <div className="mt-4 pt-3 border-t border-slate-300/30">
-          <p className="font-barlow font-semibold text-slate-600 text-xs uppercase tracking-wide drop-shadow-sm">
-            {contentData.membershipNote}
-          </p>
-        </div>
-      )}
-    </motion.div>
   );
 }

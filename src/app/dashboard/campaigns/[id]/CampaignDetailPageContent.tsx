@@ -38,6 +38,7 @@ import { PlayerRsvpDeadlineBanner } from "@/src/components/dashboard/player/Play
 import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacterSection";
 import { CampaignSessionLandingVisibility } from "./CampaignSessionLandingVisibility";
 import type { CampaignDetailPageData } from "./campaign-detail-load";
+import { sessionRequiresCharacter } from "@/src/lib/session-type";
 
 export function CampaignDetailPageContent({
   campaignId,
@@ -839,10 +840,12 @@ export function CampaignDetailPageContent({
     tab === "overview" &&
     !isGM &&
     hasAccess &&
-    !!myCharacterForClient &&
     playerNextSessionData &&
     playerNextSessionData.session.status === "Scheduled" &&
-    !playerNextSessionData.userRsvp;
+    !playerNextSessionData.userRsvp &&
+    (sessionRequiresCharacter(playerNextSessionData.session.type)
+      ? !!myCharacterForClient
+      : true);
 
   return (
     <div className="space-y-8">

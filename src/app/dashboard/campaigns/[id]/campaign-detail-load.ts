@@ -916,6 +916,7 @@ export async function loadCampaignDetailPageData(
       status: string;
       rsvp_deadline_days?: number | null;
       is_live?: boolean;
+      type?: string | null;
     };
     userRsvp: RsvpStatus | null;
     /** Zusage / Via Online oder GM-Freigabe – für Badge „Next session: confirmed“ */
@@ -981,6 +982,7 @@ export async function loadCampaignDetailPageData(
           status: String(s.status),
           rsvp_deadline_days: s.rsvp_deadline_days ?? null,
           is_live: s.is_live,
+          type: s.type != null ? String(s.type) : "GameSession",
         },
         userRsvp,
         isAttendingNextSession,

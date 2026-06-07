@@ -62,4 +62,12 @@ export type UpcomingSession = {
   deadlineReached: boolean;
   /** Bei is_live: true wenn Via-Online-Platz bereits vergeben. */
   viaOnlineTaken: boolean;
+  /** Termin-Typ (GameSession, Event, Planning, …). */
+  sessionType: string;
+  /** false für Event/Planning — RSVP ohne Charakter möglich. */
+  requiresCharacter: boolean;
+  /** Community-Termin ohne Kampagne (Admin). */
+  isCommunityEvent?: boolean;
+  communityEventKind?: string;
+  location?: string | null;
 };

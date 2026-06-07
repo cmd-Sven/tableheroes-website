@@ -15,9 +15,11 @@ import {
   Copy,
   Radio,
   Archive,
+  Plus,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { SessionWizardModal } from "@/src/components/dashboard/SessionWizardModal";
+import { CampaignEventModal } from "@/src/components/dashboard/CampaignEventModal";
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -43,6 +45,7 @@ import {
   isMissedScheduledSession,
   isScheduledInGraceOverdue,
 } from "@/src/lib/session-focus";
+import { getSessionTypeLabel, sessionSupportsLiveBoard } from "@/src/lib/session-type";
 
 type SessionItem = {
   id: string;
@@ -66,17 +69,11 @@ function parseTranscriptionMode(value: unknown): TranscriptionMode | null {
   return null;
 }
 
+import { formatSessionDateTimeDe } from "@/src/lib/datetime/berlin";
+
 function formatSessionDateTime(startTime: string) {
+  const { formattedDate, formattedTime } = formatSessionDateTimeDe(startTime);
   const startDate = new Date(startTime);
-  const formattedDate = new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(startDate);
-  const formattedTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(startDate);
   return { formattedDate, formattedTime, startDate };
 }
 
@@ -264,6 +261,7 @@ export function SessionsTab({
 }: Props) {
   const canJoinSession = isGM || characterStatus === "Active";
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
   const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isStarting, startTransition] = useTransition();
@@ -394,6 +392,13 @@ export function SessionsTab({
 
   function renderScheduledGmControls(session: SessionItem) {
     if (!isGM || !isSessionStatusScheduled(session.status)) return null;
+    if (!sessionSupportsLiveBoard(session.type)) {
+      return (
+        <p className="font-libre text-[10px] text-gray-500 italic max-w-xs text-right">
+          Termin ohne Live-Bühne — Spieler melden sich per RSVP an.
+        </p>
+      );
+    }
     return (
       <>
         <Link
@@ -468,14 +473,24 @@ export function SessionsTab({
             Termine
           </h2>
           {isGM && (
-            <button
-              type="button"
-              onClick={() => setIsWizardOpen(true)}
-              className="flex items-center gap-1 rounded bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
-            >
-              <Wand2 className="h-4 w-4" />
-              Session planen
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEventModalOpen(true)}
+                className="flex items-center gap-1 rounded border border-hero-border bg-background-dark px-3 py-1.5 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:border-hero-vibrant transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Spielplanung
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsWizardOpen(true)}
+                className="flex items-center gap-1 rounded bg-hero-dark px-3 py-1.5 font-barlow font-bold uppercase text-xs text-white hover:bg-hero-vibrant transition-colors"
+              >
+                <Wand2 className="h-4 w-4" />
+                Spielabend planen
+              </button>
+            </div>
           )}
         </div>
 
@@ -532,12 +547,12 @@ export function SessionsTab({
                         {formattedDate} · {formattedTime} Uhr
                       </p>
                       <p className="mt-1 font-libre text-xs text-gray-500">
-                        {focusSession.type === "GameSession" ? "Spielabend" : focusSession.type}
+                        {getSessionTypeLabel(focusSession.type)}
                       </p>
                     </div>
                     <div className="flex flex-shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                       {renderSessionActions(focusSession)}
-                      {isGM && live ? (
+                      {isGM && live && sessionSupportsLiveBoard(focusSession.type) ? (
                         <button
                           type="button"
                           onClick={() => void copySessionLink(focusSession.id)}
@@ -547,7 +562,7 @@ export function SessionsTab({
                           Session-Link kopieren
                         </button>
                       ) : null}
-                      {live && canJoinSession ? (
+                      {live && canJoinSession && sessionSupportsLiveBoard(focusSession.type) ? (
                         <button
                           type="button"
                           onClick={() => handleJoinLive(focusSession.id)}
@@ -555,7 +570,7 @@ export function SessionsTab({
                         >
                           Sitzung beitreten
                         </button>
-                      ) : live && !canJoinSession ? (
+                      ) : live && !canJoinSession && sessionSupportsLiveBoard(focusSession.type) ? (
                         <span className="font-libre text-xs text-gray-500 italic">
                           Freischaltung ausstehend (Charakter Status Active).
                         </span>
@@ -563,7 +578,7 @@ export function SessionsTab({
                       {scheduled && isGM ? renderScheduledGmControls(focusSession) : null}
                     </div>
                   </div>
-                  {isGM && (scheduled || live) ? (
+                  {isGM && (scheduled || live) && sessionSupportsLiveBoard(focusSession.type) ? (
                     <div className="mt-4 border-t border-hero-border/30 pt-4">
                       <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
                         Platzhalter am Tisch
@@ -624,7 +639,7 @@ export function SessionsTab({
                       </div>
                     </div>
                   ) : null}
-                  {isGM && scheduled ? (
+                  {isGM && scheduled && sessionSupportsLiveBoard(focusSession.type) ? (
                     <div className="mt-4 border-t border-hero-border/30 pt-4">
                       <SessionChronistModeControl
                         sessionId={focusSession.id}
@@ -698,7 +713,7 @@ export function SessionsTab({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {renderSessionActions(session)}
-                      {live && canJoinSession ? (
+                      {live && canJoinSession && sessionSupportsLiveBoard(session.type) ? (
                         <button
                           type="button"
                           onClick={() => handleJoinLive(session.id)}
@@ -710,7 +725,7 @@ export function SessionsTab({
                       {scheduled && isGM ? renderScheduledGmControls(session) : null}
                     </div>
                     </div>
-                    {scheduled && isGM ? (
+                    {scheduled && isGM && sessionSupportsLiveBoard(session.type) ? (
                       <SessionChronistModeControl
                         sessionId={session.id}
                         initialMode={parseTranscriptionMode(session.transcription_mode)}
@@ -799,6 +814,12 @@ export function SessionsTab({
             onClose={() => setIsWizardOpen(false)}
             locations={locations}
             npcs={npcs}
+            onSuccess={handleSuccess}
+          />
+          <CampaignEventModal
+            campaignId={campaignId}
+            isOpen={isEventModalOpen}
+            onClose={() => setIsEventModalOpen(false)}
             onSuccess={handleSuccess}
           />
           {editingSession && (
