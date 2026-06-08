@@ -70,8 +70,10 @@ export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Pr
     setDiscordSendingId(npc.id);
     try {
       const result = await sendCampaignEntityToDiscord(campaignId, "npc", npc.id);
-      if (result.success) toast.success(`„${npc.name}" an Discord gesendet.`);
-      else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
+      if (result.success) {
+        if (result.error) toast.warning(result.error);
+        else toast.success(`„${npc.name}" an Discord gesendet.`);
+      } else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
     } finally {
       setDiscordSendingId(null);
     }

@@ -586,8 +586,10 @@ export function NPCDetailPage({
     setDiscordSending(true);
     void sendCampaignEntityToDiscord(campaignId, "npc", npc.id)
       .then((result) => {
-        if (result.success) toast.success(`„${npc.name}" an Discord gesendet.`);
-        else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
+        if (result.success) {
+          if (result.error) toast.warning(result.error);
+          else toast.success(`„${npc.name}" an Discord gesendet.`);
+        } else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
       })
       .finally(() => setDiscordSending(false));
   };

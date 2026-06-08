@@ -194,7 +194,16 @@ export async function notifyCampaignEntityRevealed(
   });
 
   const result = await postDiscordEmbed(webhook, embed);
-  if (!result.ok) logDiscordError("notifyCampaignEntityRevealed", result.error);
+  if (!result.ok) {
+    logDiscordError("notifyCampaignEntityRevealed", result.error);
+    return result;
+  }
+  if (result.imageOmitted && entity.imageUrl) {
+    return {
+      ok: true,
+      error: "Nachricht gesendet, aber das Bild konnte nicht eingebettet werden.",
+    };
+  }
   return result;
 }
 

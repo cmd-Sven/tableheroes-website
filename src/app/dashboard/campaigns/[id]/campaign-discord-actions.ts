@@ -204,7 +204,11 @@ export async function sendCampaignEntityToDiscord(
   }
 
   const result = await notifyCampaignEntityRevealed(campaignId, entityType, entityId);
-  return result.ok
-    ? { success: true }
-    : { success: false, error: result.error ?? "Discord-Versand fehlgeschlagen." };
+  if (!result.ok) {
+    return { success: false, error: result.error ?? "Discord-Versand fehlgeschlagen." };
+  }
+  if (result.error) {
+    return { success: true, error: result.error };
+  }
+  return { success: true };
 }

@@ -42,18 +42,34 @@ function stripEmbedMedia(embed: DiscordEmbed): DiscordEmbed {
   return { ...embed, image: undefined, thumbnail: undefined };
 }
 
-/** Sendet Embed; bei 400 ohne Bild/Thumbnail erneut versuchen. */
+/** Sendet Embed; bei 400 zuerst Thumbnail, dann ohne Bild erneut versuchen. */
 export async function postDiscordEmbed(
   webhookUrl: string,
   embed: DiscordEmbed,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; imageOmitted?: boolean }> {
   const first = await postDiscordWebhook(webhookUrl, { embeds: [embed] });
   if (first.ok || !embedHasMedia(embed)) return first;
+
+  const mediaUrl = embed.image?.url ?? embed.thumbnail?.url;
+  if (mediaUrl && embed.image?.url) {
+    const thumbRetry = await postDiscordWebhook(webhookUrl, {
+      embeds: [{ ...embed, image: undefined, thumbnail: { url: mediaUrl } }],
+    });
+    if (thumbRetry.ok) {
+      console.warn("[discord] Embed nur mit Thumbnail gesendet (Großbild abgelehnt).");
+      return { ok: true, imageOmitted: true };
+    }
+  }
 
   const retry = await postDiscordWebhook(webhookUrl, {
     embeds: [stripEmbedMedia(embed)],
   });
-  if (retry.ok) return retry;
+  if (retry.ok) {
+    console.warn(
+      "[discord] Embed ohne Bild gesendet (Bild-URL von Discord abgelehnt oder nicht erreichbar).",
+    );
+    return { ok: true, imageOmitted: true };
+  }
 
   return {
     ok: false,
