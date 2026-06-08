@@ -7,6 +7,7 @@ import {
   createNewsPost,
   updateNewsPost,
   deleteNewsPost,
+  sendNewsPostToDiscord,
 } from "@/src/lib/actions/news-actions";
 import {
   NEWS_CATEGORIES,
@@ -18,6 +19,7 @@ import {
   Edit,
   Loader2,
   AlertTriangle,
+  Send,
   Bold,
   Italic,
   Heading2,
@@ -44,6 +46,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [discordSendingId, setDiscordSendingId] = useState<string | null>(null);
   const [form, setForm] = useState<NewsPostInsert>({
     title: "",
     category: "Web-Update",
@@ -103,6 +106,9 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
         const result = await updateNewsPost(editingId, form);
         if (result.success) {
           toast.success("News gespeichert.");
+          if (result.discordWarning) {
+            toast.warning(`Discord: ${result.discordWarning}`);
+          }
           resetForm();
           router.refresh();
         } else toast.error(result.error);
@@ -110,12 +116,26 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
         const result = await createNewsPost(form);
         if (result.success) {
           toast.success("News erstellt.");
+          if (result.discordWarning) {
+            toast.warning(`Discord: ${result.discordWarning}`);
+          }
           resetForm();
           router.refresh();
         } else toast.error(result.error);
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendDiscord(postId: string) {
+    setDiscordSendingId(postId);
+    try {
+      const result = await sendNewsPostToDiscord(postId);
+      if (result.success) toast.success("News an Discord gesendet.");
+      else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
+    } finally {
+      setDiscordSendingId(null);
     }
   }
 
@@ -444,12 +464,12 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                 ))}
               </select>
               {/* Live-Vorschau */}
-              <div className="mt-2 rounded border border-hero-border/50 overflow-hidden bg-hero-dark/30 w-full max-w-lg aspect-video flex items-center justify-center relative">
+              <div className="mt-2 rounded border border-hero-border/50 overflow-hidden bg-hero-dark/30 w-full max-w-lg aspect-square flex items-center justify-center relative">
                 {form.image_url ? (
                   <img
                     src={form.image_url}
                     alt="Vorschau"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                       const next = (e.target as HTMLImageElement)
@@ -468,7 +488,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                   <img
                     src={PLACEHOLDER_IMAGE}
                     alt=""
-                    className="w-full h-full object-cover opacity-60"
+                    className="w-full h-full object-contain opacity-60"
                   />
                 </div>
               </div>
@@ -573,6 +593,21 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {post.is_published ? (
+                    <button
+                      type="button"
+                      onClick={() => handleSendDiscord(post.id)}
+                      disabled={!!discordSendingId || saving}
+                      className="rounded p-2 text-[#aeb4ff] hover:bg-[#5865F2]/20 transition-colors disabled:opacity-50"
+                      title="An Discord senden"
+                    >
+                      {discordSendingId === post.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => fillForm(post)}

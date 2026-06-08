@@ -1,6 +1,18 @@
 "use client";
 
-import { Info, User, Shield, Trash2, Eye, EyeOff, Star, AlertCircle, ScrollText } from "lucide-react";
+import {
+  Info,
+  User,
+  Shield,
+  Trash2,
+  Eye,
+  EyeOff,
+  Star,
+  AlertCircle,
+  ScrollText,
+  Send,
+  Loader2,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -44,9 +56,20 @@ type Props = {
   isGM?: boolean;
   onDelete?: (npc: NPC) => void;
   onToggleVisibility?: (npc: NPC) => void;
+  onSendDiscord?: (npc: NPC) => void;
+  discordSendingId?: string | null;
 };
 
-export function NPCGridCard({ npc, campaignId, worldId, isGM = false, onDelete, onToggleVisibility }: Props) {
+export function NPCGridCard({
+  npc,
+  campaignId,
+  worldId,
+  isGM = false,
+  onDelete,
+  onToggleVisibility,
+  onSendDiscord,
+  discordSendingId = null,
+}: Props) {
   /** Kampagnenkontext hat Vorrang (z. B. Händler/Shop nur im Kampagnen-NPC-Formular). */
   const detailHref = campaignId
     ? `/dashboard/campaigns/${campaignId}/npcs/${npc.id}`
@@ -195,6 +218,23 @@ export function NPCGridCard({ npc, campaignId, worldId, isGM = false, onDelete, 
               title={npc.is_revealed ? "Für Spieler sichtbar" : "Verborgen"}
             >
               {npc.is_revealed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            </button>
+          )}
+          {showVisibilityToggle && npc.is_revealed && onSendDiscord && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendDiscord(npc);
+              }}
+              disabled={discordSendingId === npc.id}
+              className="p-1.5 rounded text-[#5865F2] hover:bg-[#5865F2]/15 transition-colors disabled:opacity-50"
+              title="An Discord senden"
+            >
+              {discordSendingId === npc.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </button>
           )}
           {onDelete && (

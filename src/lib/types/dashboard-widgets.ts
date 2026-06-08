@@ -70,4 +70,6 @@ export type UpcomingSession = {
   isCommunityEvent?: boolean;
   communityEventKind?: string;
   location?: string | null;
+  /** GM-Spielplanung vor Kampagnenstart — Einladungs-Optik im Dashboard. */
+  isPlanningInvitation?: boolean;
 };

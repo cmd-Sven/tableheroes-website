@@ -20,9 +20,11 @@ import {
   Scroll,
   Plus,
   SlidersHorizontal,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import Image from "next/image";
 import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import {
@@ -38,6 +40,7 @@ import {
   toggleNPCReveal,
   deleteNPC,
 } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { sendCampaignEntityToDiscord } from "@/src/app/dashboard/campaigns/[id]/campaign-discord-actions";
 import { upsertCampaignNote } from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { updateNPCCurrentLocation } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
@@ -577,6 +580,18 @@ export function NPCDetailPage({
     });
   };
 
+  const [discordSending, setDiscordSending] = useState(false);
+
+  const handleSendDiscord = () => {
+    setDiscordSending(true);
+    void sendCampaignEntityToDiscord(campaignId, "npc", npc.id)
+      .then((result) => {
+        if (result.success) toast.success(`„${npc.name}" an Discord gesendet.`);
+        else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
+      })
+      .finally(() => setDiscordSending(false));
+  };
+
   const handleDelete = () => {
     if (
       !confirm(
@@ -676,6 +691,20 @@ export function NPCDetailPage({
                   <EyeOff className="h-6 w-6" />
                 )}
               </button>
+              {isRevealed ? (
+                <button
+                  onClick={handleSendDiscord}
+                  disabled={discordSending || isPending}
+                  className="p-2 rounded text-[#aeb4ff] hover:text-[#5865F2] hover:bg-[#5865F2]/15 transition-colors disabled:opacity-50"
+                  title="An Discord senden"
+                >
+                  {discordSending ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <Send className="h-6 w-6" />
+                  )}
+                </button>
+              ) : null}
               <button
                 onClick={handleDelete}
                 disabled={isPending}

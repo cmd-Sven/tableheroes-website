@@ -776,6 +776,73 @@ button.bg-hero-gold[disabled] {
   background: linear-gradient(180deg, rgba(33, 125, 66, 0.35) 0%, rgba(19, 46, 27, 0.6) 100%);
 }
 
+/* News-Markdown (Landing, Dashboard, Admin-Vorschau) */
+.news-markdown-body {
+  font-family: var(--font-libre), serif;
+  color: #e5e7eb;
+  line-height: 1.625;
+  max-width: none;
+}
+.news-markdown-body p {
+  margin: 0.5rem 0;
+}
+.news-markdown-body h1,
+.news-markdown-body h2,
+.news-markdown-body h3 {
+  font-family: var(--font-cinzel), serif;
+  color: #cab926;
+  font-weight: 700;
+}
+.news-markdown-body h1 {
+  font-size: 1.5rem;
+  margin: 1rem 0 0.75rem;
+}
+.news-markdown-body h2 {
+  font-size: 1.25rem;
+  margin: 1rem 0 0.5rem;
+}
+.news-markdown-body h3 {
+  font-size: 1.125rem;
+  margin: 0.75rem 0 0.5rem;
+}
+.news-markdown-body strong,
+.news-markdown-body b {
+  font-weight: 700;
+  color: #ffffff;
+}
+.news-markdown-body em,
+.news-markdown-body i {
+  font-style: italic;
+  color: #d1d5db;
+}
+.news-markdown-body ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+.news-markdown-body ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style-type: decimal;
+}
+.news-markdown-body li {
+  margin: 0.125rem 0;
+}
+.news-markdown-body blockquote {
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  border-left: 4px solid rgba(202, 185, 38, 0.6);
+  font-style: italic;
+  color: #d1d5db;
+}
+.news-markdown-body a {
+  color: #379806;
+  text-decoration: underline;
+}
+.news-markdown-body a:hover {
+  color: rgba(55, 152, 6, 0.9);
+}
+
 /* Marketing-Landingpage: Sektions-H2 (grün, ohne Umrandung) */
 .marketing-section-h2 {
   display: block;

@@ -11,13 +11,14 @@ function communityEventToUpcoming(
   deadlineReached: boolean,
 ): UpcomingSession {
   const kindLabel = COMMUNITY_EVENT_KIND_LABELS[event.event_kind] ?? event.event_kind;
+  const isPlanningInvitation = event.event_kind === "Spielplanung";
   return {
     id: event.id,
     title: event.title,
     startTime: event.start_time,
     status: event.status === "Scheduled" ? "Scheduled" : event.status,
     campaignId: "",
-    campaignName: "TableHeroes Community",
+    campaignName: isPlanningInvitation ? "Einladung" : "TableHeroes Community",
     campaignBannerUrl: null,
     participants: [],
     rsvpDeadlineDays: event.rsvp_deadline_days,
@@ -31,6 +32,7 @@ function communityEventToUpcoming(
     isCommunityEvent: true,
     communityEventKind: kindLabel,
     location: event.location,
+    isPlanningInvitation,
   };
 }
 
@@ -157,4 +159,30 @@ export async function mergePastAppointments(
   return [...sessions, ...community]
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
     .slice(0, limit);
+}
+
+/** Öffentliche Community-Termine für die Landingpage (anon lesbar). */
+export async function getPublicCommunityEventsForLanding(limit = 6): Promise<CommunityEvent[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await (supabase as any)
+    .from("community_events")
+    .select("*")
+    .eq("visible_on_landing", true)
+    .eq("status", "Scheduled")
+    .gte("start_time", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order("start_time", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    // Tabelle noch nicht migriert (PGRST205) — still leer, kein Client-Console-Spam
+    if (
+      error.code !== "PGRST205" &&
+      !String(error.message).includes("schema cache")
+    ) {
+      console.error("[getPublicCommunityEventsForLanding]", error);
+    }
+    return [];
+  }
+  return (data as CommunityEvent[]) ?? [];
 }

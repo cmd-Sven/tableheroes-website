@@ -101,9 +101,55 @@ export async function getNewsPostById(id: string): Promise<NewsPost | null> {
   return data as NewsPost;
 }
 
+async function loadNewsPostForDiscord(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+): Promise<NewsPost | null> {
+  const { data: post } = await (supabase.from("news_posts") as any)
+    .select(
+      "id, title, category, content, image_url, is_published, show_on_dashboard, show_on_landingpage, created_at, updated_at",
+    )
+    .eq("id", id)
+    .single();
+  return (post as NewsPost) ?? null;
+}
+
+export async function sendNewsPostToDiscord(
+  id: string,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Nicht angemeldet." };
+
+  const { data: profile } = await (supabase.from("users") as any)
+    .select("primary_role, is_super_admin")
+    .eq("id", user.id)
+    .single();
+  if (
+    (profile as any)?.primary_role !== "Admin" &&
+    !(profile as any)?.is_super_admin
+  ) {
+    return { success: false, error: "Nur Admins können News an Discord senden." };
+  }
+
+  const post = await loadNewsPostForDiscord(supabase, id);
+  if (!post) return { success: false, error: "News nicht gefunden." };
+  if (!post.is_published) {
+    return { success: false, error: "Nur veröffentlichte News können gesendet werden." };
+  }
+
+  const { notifyNewsPublished } = await import("@/src/lib/integrations/discord/notify");
+  const result = await notifyNewsPublished(post);
+  return result.ok
+    ? { success: true }
+    : { success: false, error: result.error ?? "Discord-Versand fehlgeschlagen." };
+}
+
 export async function createNewsPost(
   input: NewsPostInsert
-): Promise<{ success: boolean; id?: string; error?: string }> {
+): Promise<{ success: boolean; id?: string; error?: string; discordWarning?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -135,16 +181,31 @@ export async function createNewsPost(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  const postId = (data as any)?.id as string | undefined;
+  let discordWarning: string | undefined;
+
+  if (postId && input.is_published) {
+    const { notifyNewsPublished } = await import("@/src/lib/integrations/discord/notify");
+    const post = await loadNewsPostForDiscord(supabase, postId);
+    if (post) {
+      const discord = await notifyNewsPublished(post);
+      if (!discord.ok) {
+        discordWarning = discord.error ?? "Discord-Versand fehlgeschlagen.";
+      }
+    }
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/news");
   revalidatePath("/dashboard/admin/news");
-  return { success: true, id: (data as any)?.id };
+  return { success: true, id: postId, discordWarning };
 }
 
 export async function updateNewsPost(
   id: string,
   input: Partial<NewsPostInsert>
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; discordWarning?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -178,15 +239,34 @@ export async function updateNewsPost(
   if (input.show_on_landingpage !== undefined)
     updates.show_on_landingpage = input.show_on_landingpage;
 
+  const { data: beforeRow } = await (supabase.from("news_posts") as any)
+    .select("is_published")
+    .eq("id", id)
+    .single();
+  const wasPublished = !!(beforeRow as { is_published?: boolean } | null)?.is_published;
+
   const { error } = await (supabase.from("news_posts") as any)
     .update(updates)
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
+
+  let discordWarning: string | undefined;
+  const post = await loadNewsPostForDiscord(supabase, id);
+  const newlyPublished = !!post?.is_published && !wasPublished;
+
+  if (newlyPublished && post) {
+    const { notifyNewsPublished } = await import("@/src/lib/integrations/discord/notify");
+    const discord = await notifyNewsPublished(post);
+    if (!discord.ok) {
+      discordWarning = discord.error ?? "Discord-Versand fehlgeschlagen.";
+    }
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/news");
   revalidatePath("/dashboard/admin/news");
-  return { success: true };
+  return { success: true, discordWarning };
 }
 
 export async function deleteNewsPost(

@@ -3,7 +3,9 @@
 import { useState, useMemo } from "react";
 import { User, Search, X, ScrollText, Book } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { NPCGridCard } from "@/src/components/dashboard/NPCGridCard";
+import { sendCampaignEntityToDiscord } from "./campaign-discord-actions";
 import { deleteNPC, toggleNPCReveal } from "./npc-actions";
 
 type NPC = {
@@ -46,6 +48,7 @@ export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Pr
   const [statusFilter, setStatusFilter] = useState<string>("Alle");
   const [raceFilter, setRaceFilter] = useState<string>("Alle");
   const [onlyQuestGivers, setOnlyQuestGivers] = useState(false);
+  const [discordSendingId, setDiscordSendingId] = useState<string | null>(null);
 
   const handleDelete = async (npc: NPC) => {
     try {
@@ -60,6 +63,17 @@ export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Pr
       await toggleNPCReveal(campaignId, npc.id, npc.is_revealed);
     } catch (error: any) {
       alert(error.message || "Fehler beim Ändern der Sichtbarkeit.");
+    }
+  };
+
+  const handleSendDiscord = async (npc: NPC) => {
+    setDiscordSendingId(npc.id);
+    try {
+      const result = await sendCampaignEntityToDiscord(campaignId, "npc", npc.id);
+      if (result.success) toast.success(`„${npc.name}" an Discord gesendet.`);
+      else toast.error(result.error ?? "Discord-Versand fehlgeschlagen.");
+    } finally {
+      setDiscordSendingId(null);
     }
   };
 
@@ -332,6 +346,8 @@ export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Pr
               isGM={isGM}
               onDelete={isGM ? (handleDelete as any) : undefined}
               onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}
+              onSendDiscord={isGM ? (handleSendDiscord as any) : undefined}
+              discordSendingId={discordSendingId}
             />
           ))}
         </div>

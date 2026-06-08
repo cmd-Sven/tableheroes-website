@@ -71,11 +71,11 @@ export function NewsInfoCard({
               return (
                 <li key={post.id} className="p-4">
                   <div className="flex gap-3">
-                    <div className="shrink-0 w-20 h-20 rounded border border-hero-border/40 overflow-hidden bg-hero-dark/50">
+                    <div className="shrink-0 w-20 h-20 rounded border border-hero-border/40 overflow-hidden bg-hero-dark/50 flex items-center justify-center">
                       <img
                         src={thumbSrc}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
                             PLACEHOLDER_IMAGE;
@@ -133,11 +133,11 @@ export function NewsInfoCard({
               const modalSrc = resolveNewsImageUrl(modalPost.image_url);
               if (!modalSrc) return null;
               return (
-                <div className="w-full h-56 md:h-64 shrink-0 overflow-hidden border-b border-hero-border/50">
+                <div className="w-full aspect-square max-h-[min(90vw,22rem)] shrink-0 overflow-hidden border-b border-hero-border/50 bg-hero-dark/40 flex items-center justify-center mx-auto">
                   <img
                     src={modalSrc}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                     }}

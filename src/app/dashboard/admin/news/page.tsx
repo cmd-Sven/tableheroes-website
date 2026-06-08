@@ -4,6 +4,8 @@ import {
   getAllNewsPosts,
   getNewsImageFilenames,
 } from "@/src/lib/actions/news-actions";
+import { getDiscordPlatformNewsWebhook } from "@/src/lib/actions/discord-platform-actions";
+import { DiscordPlatformSettings } from "@/src/components/dashboard/admin/DiscordPlatformSettings";
 import { AdminNewsClient } from "./AdminNewsClient";
 
 export default async function AdminNewsPage() {
@@ -25,9 +27,10 @@ export default async function AdminNewsPage() {
     redirect("/dashboard");
   }
 
-  const [posts, imageFilenames] = await Promise.all([
+  const [posts, imageFilenames, platformDiscordWebhook] = await Promise.all([
     getAllNewsPosts(),
     getNewsImageFilenames(),
+    getDiscordPlatformNewsWebhook(),
   ]);
 
   return (
@@ -41,6 +44,7 @@ export default async function AdminNewsPage() {
           Landingpage anzeigen.
         </p>
       </div>
+      <DiscordPlatformSettings initialWebhookUrl={platformDiscordWebhook} />
       <AdminNewsClient initialPosts={posts} imageOptions={imageFilenames} />
     </div>
   );

@@ -174,11 +174,11 @@ export function NewsSection() {
                   backgroundSize: "cover",
                 }}
               >
-                <div className="w-full h-52 md:h-56 overflow-hidden border-b border-hero-border/60 bg-hero-dark/40">
+                <div className="w-full aspect-square overflow-hidden border-b border-hero-border/60 bg-hero-dark/40 flex items-center justify-center">
                   <img
                     src={imgSrc}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                     }}
@@ -233,11 +233,11 @@ export function NewsSection() {
             >
               <X className="h-6 w-6" />
             </button>
-            <div className="w-full h-56 md:h-64 shrink-0 overflow-hidden border-b border-hero-border/50">
+            <div className="w-full aspect-square max-h-[min(90vw,22rem)] shrink-0 overflow-hidden border-b border-hero-border/50 bg-hero-dark/40 flex items-center justify-center mx-auto">
               <img
                 src={resolveNewsImageUrl(selectedPost.image_url)}
                 alt=""
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                 }}

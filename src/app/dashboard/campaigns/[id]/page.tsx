@@ -1,5 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
+import { getCampaignDiscordSettings } from "./campaign-discord-actions";
 import { loadCampaignDetailPageData } from "./campaign-detail-load";
 import { CampaignDetailPageContent } from "./CampaignDetailPageContent";
 
@@ -34,7 +35,20 @@ export default async function CampaignDetailPage({
 
   const data = await loadCampaignDetailPageData(id, user.id);
 
+  const discordSettings = data.isGM
+    ? (await getCampaignDiscordSettings(id)) ?? {
+        webhookUrl: "",
+        notificationsEnabled: true,
+        configured: false,
+      }
+    : null;
+
   return (
-    <CampaignDetailPageContent campaignId={id} tab={tab} data={data} />
+    <CampaignDetailPageContent
+      campaignId={id}
+      tab={tab}
+      data={data}
+      discordSettings={discordSettings}
+    />
   );
 }

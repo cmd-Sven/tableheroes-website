@@ -213,6 +213,21 @@ export async function publishPlayerRecap(archiveId: string) {
     .eq("id", archiveId);
 
   if (error) throw new Error(error.message);
+
+  const sessionTitle =
+    archive.session_name?.trim() ||
+    (archive.session_id ? "Letzte Session" : "Session-Recap");
+  const { dispatchDiscordNotify, notifyPlayerRecapPublished } = await import(
+    "@/src/lib/integrations/discord/notify"
+  );
+  dispatchDiscordNotify(() =>
+    notifyPlayerRecapPublished({
+      campaignId: archive.campaign_id,
+      sessionTitle,
+      summaryMd: existing.recap.summary_md,
+    }),
+  );
+
   revalidatePath(`/dashboard/campaigns/${archive.campaign_id}`);
   return { ok: true as const, record };
 }

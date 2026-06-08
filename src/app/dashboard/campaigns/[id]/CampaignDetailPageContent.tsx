@@ -26,6 +26,8 @@ import { CharacterCreatorButton } from "./CharacterCreatorButton";
 import { CinematicCampaignHeader } from "@/src/components/dashboard/campaigns/CinematicCampaignHeader";
 import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDescriptionEditor";
 import { CampaignScheduleForm } from "@/src/components/dashboard/campaigns/CampaignScheduleForm";
+import { CampaignDiscordSettings } from "@/src/components/dashboard/campaigns/CampaignDiscordSettings";
+import type { CampaignDiscordSettings as CampaignDiscordSettingsData } from "@/src/app/dashboard/campaigns/[id]/campaign-discord-actions";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 import { OnboardingSettings } from "@/src/components/dashboard/campaigns/OnboardingSettings";
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
@@ -44,10 +46,12 @@ export function CampaignDetailPageContent({
   campaignId,
   tab,
   data,
+  discordSettings,
 }: {
   campaignId: string;
   tab: string;
   data: CampaignDetailPageData;
+  discordSettings: CampaignDiscordSettingsData | null;
 }) {
   const id = campaignId;
   const {
@@ -686,6 +690,10 @@ export function CampaignDetailPageContent({
             initialDuration={campaign.schedule_duration_hours ?? null}
             initialFrequencyNote={campaign.frequency ?? null}
           />
+
+          {discordSettings ? (
+            <CampaignDiscordSettings campaignId={id} initial={discordSettings} />
+          ) : null}
         </div>
         <div className="space-y-6">
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">

@@ -104,11 +104,11 @@ export function NewsArchiveClient({ posts }: Props) {
                   backgroundSize: "cover",
                 }}
               >
-                <div className="w-full h-48 md:h-52 overflow-hidden border-b border-hero-border/60 bg-hero-dark/40">
+                <div className="w-full aspect-square overflow-hidden border-b border-hero-border/60 bg-hero-dark/40 flex items-center justify-center">
                   <img
                     src={imgSrc}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                     }}

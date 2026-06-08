@@ -173,7 +173,9 @@ function SessionRowPlayer({
       className={`group relative block overflow-hidden rounded-lg border transition-all ${
         deadlineHighlight
           ? "border-amber-500/70 shadow-[0_0_16px_rgba(245,158,11,0.25)]"
-          : "border-hero-border/30 hover:border-accent-gold/60 hover:shadow-[0_0_20px_rgba(202,185,38,0.1)]"
+          : session.isPlanningInvitation
+            ? "border-accent-gold/50 shadow-[0_0_18px_rgba(202,185,38,0.12)] hover:border-accent-gold/70"
+            : "border-hero-border/30 hover:border-accent-gold/60 hover:shadow-[0_0_20px_rgba(202,185,38,0.1)]"
       }`}
     >
       {/* Background Image */}
@@ -220,6 +222,10 @@ function SessionRowPlayer({
               <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-900/60 px-3 py-1 font-barlow font-bold uppercase text-[10px] text-red-300 border border-red-600/50 shadow-[0_0_12px_rgba(239,68,68,0.3)] animate-pulse">
                 <Zap className="h-3 w-3" />
                 Live
+              </span>
+            ) : session.isPlanningInvitation ? (
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-accent-gold/20 px-3 py-1 font-barlow font-bold uppercase text-[10px] text-accent-gold border border-accent-gold/50">
+                Einladung
               </span>
             ) : (
               <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-blue-900/40 px-3 py-1 font-barlow font-bold uppercase text-[10px] text-blue-300 border border-blue-700/50">

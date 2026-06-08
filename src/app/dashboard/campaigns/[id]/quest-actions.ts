@@ -238,6 +238,15 @@ export async function toggleQuestReveal(
     throw new Error(error.message);
   }
 
+  if (!currentState) {
+    const { dispatchDiscordNotify, notifyCampaignEntityRevealed } = await import(
+      "@/src/lib/integrations/discord/notify"
+    );
+    dispatchDiscordNotify(async () => {
+      await notifyCampaignEntityRevealed(quest.campaign_id, "quest", questId);
+    });
+  }
+
   revalidatePath(`/dashboard/campaigns/${quest.campaign_id}`);
 }
 

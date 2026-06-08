@@ -11,7 +11,7 @@ import {
   getCommunityEventRsvpCounts,
 } from "@/src/lib/actions/community-event-actions";
 import {
-  COMMUNITY_EVENT_KINDS,
+  ADMIN_COMMUNITY_EVENT_KINDS,
   COMMUNITY_EVENT_KIND_LABELS,
   type CommunityEvent,
   type CommunityEventKind,
@@ -234,7 +234,7 @@ export function AdminEventsClient({ initialEvents, initialRsvpCounts }: Props) {
                 }
                 className="w-full rounded border border-hero-dark bg-slate-900 px-3 py-2 text-white"
               >
-                {COMMUNITY_EVENT_KINDS.map((k) => (
+                {ADMIN_COMMUNITY_EVENT_KINDS.map((k) => (
                   <option key={k} value={k}>
                     {COMMUNITY_EVENT_KIND_LABELS[k]}
                   </option>

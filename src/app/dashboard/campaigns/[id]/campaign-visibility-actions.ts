@@ -1,6 +1,10 @@
 "use server";
 
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import {
+  dispatchDiscordNotify,
+  notifyCampaignEntityRevealed,
+} from "@/src/lib/integrations/discord/notify";
 import { revalidatePath } from "next/cache";
 import type { VisibilityEntityType } from "./campaign-visibility-queries";
 
@@ -49,6 +53,15 @@ export async function setCampaignVisibility(
   }
 
   const admin = createAdminClient();
+
+  const { data: previousRow } = await (admin.from("campaign_visibility") as any)
+    .select("is_revealed")
+    .eq("campaign_id", campaignId)
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .maybeSingle();
+  const wasRevealed = !!(previousRow as { is_revealed?: boolean } | null)?.is_revealed;
+
   const { error } = await (admin.from("campaign_visibility") as any)
     .upsert(
       {
@@ -63,6 +76,12 @@ export async function setCampaignVisibility(
   if (error) {
     console.error("[campaign_visibility] setCampaignVisibility:", error);
     throw new Error(error.message);
+  }
+
+  if (isRevealed && !wasRevealed) {
+    dispatchDiscordNotify(async () => {
+      await notifyCampaignEntityRevealed(campaignId, entityType, entityId);
+    });
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);

@@ -1,4 +1,4 @@
-export type CommunityEventKind = "Stammtisch" | "Feier" | "Sonstiges";
+export type CommunityEventKind = "Stammtisch" | "Feier" | "Sonstiges" | "Spielplanung";
 
 export type CommunityEventStatus = "Scheduled" | "Cancelled" | "Completed";
 
@@ -35,6 +35,19 @@ export const COMMUNITY_EVENT_KIND_LABELS: Record<CommunityEventKind, string> = {
   Stammtisch: "Stammtisch / Treffen",
   Feier: "Feier / Jubiläum",
   Sonstiges: "Sonstiges",
+  Spielplanung: "Spielplanung / Kennenlernen",
 };
 
-export const COMMUNITY_EVENT_KINDS: CommunityEventKind[] = ["Stammtisch", "Feier", "Sonstiges"];
+/** Nur Admin-Community-Termine (GM nutzt Spielplanung separat). */
+export const ADMIN_COMMUNITY_EVENT_KINDS: CommunityEventKind[] = [
+  "Stammtisch",
+  "Feier",
+  "Sonstiges",
+];
+
+export const COMMUNITY_EVENT_KINDS: CommunityEventKind[] = [
+  "Stammtisch",
+  "Feier",
+  "Sonstiges",
+  "Spielplanung",
+];

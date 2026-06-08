@@ -282,6 +282,11 @@ export function Sidebar({
     ...(role === "GameMaster"
       ? [
           {
+            href: "/dashboard/gm/planning-events",
+            label: "Spielplanung (Einladungen)",
+            icon: Calendar,
+          },
+          {
             href: "/dashboard/gm/achievements",
             label: "Achievement anlegen (GM)",
             icon: Trophy,
@@ -306,6 +311,11 @@ export function Sidebar({
         {
           href: "/dashboard/admin/events",
           label: "Community-Termine",
+          icon: Calendar,
+        },
+        {
+          href: "/dashboard/gm/planning-events",
+          label: "Spielplanung (Einladungen)",
           icon: Calendar,
         },
         {
