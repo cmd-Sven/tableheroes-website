@@ -2691,6 +2691,7 @@ export type Database = {
           current_location_lore_id: string | null
           current_loot_id: string | null
           current_turn_index: number
+          combat_round: number
           destroyed_fate_coins: number
           dummy_player_count: number
           downtime_active: boolean

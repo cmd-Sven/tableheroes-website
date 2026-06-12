@@ -8,6 +8,8 @@ import { SmartFactionCombobox } from "./SmartFactionCombobox";
 import { NameInput, RaceInput, RoleInput } from "./WizardInputs";
 import { CheckResultsEditor } from "./CheckResultsEditor";
 import { LOCATION_TYPES } from "@/src/lib/lore-types";
+import { NpcPortraitUploadField } from "./NpcPortraitUploadField";
+import type { ImageDisplaySettings } from "@/src/lib/image-display";
 
 // Types
 type WorldEntity = {
@@ -165,6 +167,10 @@ type WizardContentProps = {
   setFactionsList: React.Dispatch<React.SetStateAction<Array<{ id: string; name: string }>>>;
   setInferenceSuggestions: React.Dispatch<React.SetStateAction<Record<string, InferenceSuggestion[]>>>;
   setSelectedInferenceSuggestions: React.Dispatch<React.SetStateAction<Set<string>>>;
+  portraitFile: File | null;
+  setPortraitFile: React.Dispatch<React.SetStateAction<File | null>>;
+  portraitDisplay: ImageDisplaySettings;
+  setPortraitDisplay: React.Dispatch<React.SetStateAction<ImageDisplaySettings>>;
 };
 
 // WizardContent als separate Komponente
@@ -208,6 +214,10 @@ export function WizardContent({
   setFactionsList,
   setInferenceSuggestions,
   setSelectedInferenceSuggestions,
+  portraitFile,
+  setPortraitFile,
+  portraitDisplay,
+  setPortraitDisplay,
 }: WizardContentProps) {
   return (
     <>
@@ -994,14 +1004,20 @@ export function WizardContent({
 
             <div>
               <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                Bild-URL (optional)
+                Portrait (optional)
               </label>
-              <input
-                type="text"
-                value={wizardData.finalData?.image_url || ""}
-                onChange={(e) => updateFinalData({ image_url: e.target.value })}
-                className="w-full rounded border border-hero-dark bg-slate-900 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                placeholder="https://..."
+              <NpcPortraitUploadField
+                imageUrl={wizardData.finalData?.image_url || ""}
+                portraitFile={portraitFile}
+                onPortraitFileChange={setPortraitFile}
+                imageDisplay={portraitDisplay}
+                onImageDisplayChange={setPortraitDisplay}
+                onClearImage={() => {
+                  setPortraitFile(null);
+                  updateFinalData({ image_url: "" });
+                }}
+                previewAspectClassName="aspect-[3/4] max-w-[200px]"
+                compact
               />
             </div>
 

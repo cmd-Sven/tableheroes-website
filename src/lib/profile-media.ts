@@ -144,3 +144,46 @@ export async function uploadCharacterPortrait(
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
 }
+
+/** NSC-Porträt: `{userId}/npcs/{worldId}/{npcId|new-…}/portrait-{ts}.ext` */
+export async function uploadNpcPortrait(
+  file: File,
+  options: { worldId: string; npcId?: string | null },
+): Promise<{ path: string; publicUrl: string } | { error: string }> {
+  const err = validateProfileImageFile(file);
+  if (err) return { error: err };
+
+  const worldId = options.worldId?.trim();
+  if (!worldId) return { error: "Welt-ID fehlt für den Portrait-Upload." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Nicht angemeldet." };
+
+  const ext = extensionFromMimeOrName(file);
+  const uid = user.id;
+  const npcSegment = options.npcId?.trim()
+    ? options.npcId.trim()
+    : `new-${crypto.randomUUID()}`;
+  const path = `${uid}/npcs/${worldId}/${npcSegment}/portrait-${Date.now()}.${ext}`;
+  const contentType = contentTypeForImageUpload(file);
+
+  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+    contentType,
+  });
+
+  if (error) {
+    const hint =
+      /mime|not supported|invalid/i.test(error.message)
+        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/jpeg“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
+        : "";
+    return { error: `${error.message}${hint}` };
+  }
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}

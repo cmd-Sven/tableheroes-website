@@ -51,7 +51,9 @@ import {
 import {
   compareCombatInitiative,
   normalizeCombatConditions,
+  normalizeCombatParticipantSide,
   type CombatConditionId,
+  type CombatParticipantSide,
 } from "@/src/lib/combat-initiative";
 import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
@@ -136,6 +138,7 @@ type LiveState = {
   is_background_manual_override?: boolean | null;
   is_combat_mode?: boolean | null;
   current_turn_index?: number | null;
+  combat_round?: number | null;
   active_shop_id?: string | null;
   active_merchant_npc_id?: string | null;
   current_loot_id?: string | null;
@@ -217,6 +220,7 @@ function normalizeLiveRow(row: unknown): LiveState {
       Math.max(0, Math.round(Number(r.dummy_player_count ?? 0)) || 0),
     ),
     loot_hide_npcs: Boolean(r.loot_hide_npcs ?? false),
+    combat_round: Math.max(1, Number(r.combat_round ?? 1) || 1),
   };
 }
 
@@ -326,12 +330,15 @@ function normalizeCombatParticipants(rows: unknown[]): CombatParticipant[] {
   return (rows || [])
     .map((row) => {
       const r = row as Record<string, unknown>;
-      const type: CombatParticipant["type"] = r.type === "player" ? "player" : "monster";
+      const type: CombatParticipant["type"] =
+        r.type === "player" ? "player" : r.type === "npc" ? "npc" : "monster";
       return {
         id: String(r.id),
         session_id: String(r.session_id),
         name: String(r.name ?? ""),
         type,
+        npc_id: r.npc_id != null ? String(r.npc_id) : null,
+        side: normalizeCombatParticipantSide(r.side),
         initiative_value: Number(r.initiative_value ?? 0),
         initiative_label:
           r.initiative_label != null ? String(r.initiative_label) : null,
@@ -447,7 +454,9 @@ type CombatParticipant = {
   id: string;
   session_id: string;
   name: string;
-  type: "player" | "monster";
+  type: "player" | "monster" | "npc";
+  npc_id: string | null;
+  side: CombatParticipantSide | null;
   initiative_value: number;
   initiative_label: string | null;
   sort_order: number;
@@ -457,10 +466,30 @@ type CombatParticipant = {
 };
 
 type CombatTokenPayload = {
-  type: "player" | "monster";
+  type: "player" | "monster" | "npc";
   name: string;
   image_url: string | null;
+  npc_id?: string | null;
+  side?: CombatParticipantSide | null;
 };
+
+function buildNpcCombatToken(npc: Pick<CampaignNpc, "id" | "name" | "image_url">): CombatTokenPayload {
+  return {
+    type: "npc",
+    name: npc.name,
+    image_url: npc.image_url,
+    npc_id: String(npc.id),
+  };
+}
+
+function isCombatTokenUsed(
+  token: CombatTokenPayload,
+  names: Set<string>,
+  npcIds: Set<string>,
+): boolean {
+  if (token.type === "npc" && token.npc_id) return npcIds.has(token.npc_id);
+  return names.has(token.name);
+}
 
 type StageCardGlowStyle = CSSProperties & {
   "--glow-color": string;
@@ -487,6 +516,7 @@ function StageNpcCard({
   isSingle,
   isGM,
   isCombatMode,
+  isInInitiative,
   isUpdating,
   reputationScore,
   reactions,
@@ -495,6 +525,7 @@ function StageNpcCard({
   onRemove,
   onToggleShop,
   onAssignMerchantAndOpen,
+  onDragCombatToken,
   campaignShops,
   isShopOpen,
   isShopBusy,
@@ -503,6 +534,7 @@ function StageNpcCard({
   isSingle: boolean;
   isGM: boolean;
   isCombatMode: boolean;
+  isInInitiative: boolean;
   isUpdating: boolean;
   reputationScore: number;
   reactions: ActiveNpcReaction[];
@@ -511,6 +543,7 @@ function StageNpcCard({
   onRemove: (npcId: string) => void;
   onToggleShop: (npc: CampaignNpc) => void;
   onAssignMerchantAndOpen: (npc: CampaignNpc, shopId: string) => void;
+  onDragCombatToken: (event: DragEvent<HTMLElement>, token: CombatTokenPayload) => void;
   campaignShops: LiveCampaignShopOption[];
   isShopOpen: boolean;
   isShopBusy: boolean;
@@ -518,12 +551,20 @@ function StageNpcCard({
   const showGlow = useTemporaryStageGlow();
   const cardTitle = [npc.name, npc.title].filter(Boolean).join(" — ");
   const glowColor = getStageCardGlowColor("npc");
+  const canDragToInitiative = isGM && isCombatMode && !isInInitiative;
 
   return (
     <motion.div
+      draggable={canDragToInitiative}
+      onDragStart={(e) => {
+        if (!canDragToInitiative) return;
+        onDragCombatToken(e as unknown as DragEvent<HTMLElement>, buildNpcCombatToken(npc));
+      }}
       className={`group relative isolate aspect-3/4 w-full max-h-[min(48vh,380px)] overflow-visible rounded-lg transition-transform duration-200 hover:z-10 hover:scale-[1.02] ${
         isSingle ? "max-w-xs" : ""
-      } ${npc.image_url ? "cursor-zoom-in" : "cursor-default"}`}
+      } ${npc.image_url ? "cursor-zoom-in" : "cursor-default"} ${
+        canDragToInitiative ? "cursor-grab active:cursor-grabbing" : ""
+      } ${isInInitiative ? "ring-2 ring-accent-gold/50" : ""}`}
       initial={{ opacity: 0, scale: 1.5, y: 200, rotateZ: -15 }}
       animate={
         isCombatMode
@@ -601,6 +642,17 @@ function StageNpcCard({
 
         {isGM && (
           <div className="absolute inset-x-2 top-2 z-30 flex items-start justify-between gap-2">
+            {canDragToInitiative ? (
+              <span className="pointer-events-none rounded-full border border-accent-gold/50 bg-black/70 px-2 py-0.5 font-barlow text-[9px] font-extrabold uppercase text-accent-gold shadow-lg backdrop-blur">
+                → Initiative
+              </span>
+            ) : isInInitiative ? (
+              <span className="pointer-events-none rounded-full border border-accent-gold/60 bg-accent-gold/15 px-2 py-0.5 font-barlow text-[9px] font-extrabold uppercase text-accent-gold shadow-lg backdrop-blur">
+                In Initiative
+              </span>
+            ) : (
+              <span />
+            )}
             <div className="flex items-center overflow-hidden rounded-full border border-amber-900/70 bg-background-dark/90 shadow-lg backdrop-blur">
             <button
               type="button"
@@ -1542,6 +1594,15 @@ export function LiveSessionBoard({
     () => new Set(combatParticipants.filter((p) => p.is_active).map((p) => p.name)),
     [combatParticipants],
   );
+  const combatParticipantNpcIds = useMemo(
+    () =>
+      new Set(
+        combatParticipants
+          .filter((p) => p.is_active && p.npc_id)
+          .map((p) => String(p.npc_id)),
+      ),
+    [combatParticipants],
+  );
   const combatPlayerTokens = useMemo<CombatTokenPayload[]>(
     () =>
       partyCharacters
@@ -1561,6 +1622,10 @@ export function LiveSessionBoard({
         image_url: null,
       })),
     [],
+  );
+  const combatNpcTokens = useMemo<CombatTokenPayload[]>(
+    () => sortedActiveNpcs.map((npc) => buildNpcCombatToken(npc)),
+    [sortedActiveNpcs],
   );
 
   const filteredNpcsForStageManager = useMemo(() => {
@@ -1843,11 +1908,13 @@ export function LiveSessionBoard({
 
   async function addCombatToken(token: CombatTokenPayload) {
     if (!isGM) return;
-    if (combatParticipantNames.has(token.name)) return;
+    if (isCombatTokenUsed(token, combatParticipantNames, combatParticipantNpcIds)) return;
     const { error } = await ((supabase as any).from("combat_participants") as any).insert({
       session_id: sessionId,
       name: token.name,
       type: token.type,
+      npc_id: token.npc_id ?? null,
+      side: token.side ?? null,
       initiative_value: 10,
       initiative_label: "10",
       sort_order: combatParticipants.length,
@@ -1871,11 +1938,13 @@ export function LiveSessionBoard({
     if (!raw) return;
     try {
       const token = JSON.parse(raw) as CombatTokenPayload;
-      if (token.type !== "player" && token.type !== "monster") return;
+      if (token.type !== "player" && token.type !== "monster" && token.type !== "npc") return;
       void addCombatToken({
         type: token.type,
         name: String(token.name ?? "").trim(),
         image_url: token.image_url != null ? String(token.image_url) : null,
+        npc_id: token.npc_id != null ? String(token.npc_id) : null,
+        side: token.side ?? null,
       });
     } catch {
       /* ignore invalid token payload */
@@ -1887,7 +1956,7 @@ export function LiveSessionBoard({
     patch: Partial<
       Pick<
         CombatParticipant,
-        "initiative_value" | "initiative_label" | "is_active" | "conditions"
+        "initiative_value" | "initiative_label" | "is_active" | "conditions" | "side"
       >
     >,
   ) {
@@ -1901,9 +1970,14 @@ export function LiveSessionBoard({
   function nextCombatTurn() {
     if (!isGM || sortedCombatParticipants.length === 0) return;
     const current = Math.max(0, Number(liveStateRef.current?.current_turn_index ?? 0) || 0);
-    updateLiveState({
-      current_turn_index: (current + 1) % sortedCombatParticipants.length,
-    });
+    const length = sortedCombatParticipants.length;
+    const nextIndex = (current + 1) % length;
+    const patch: Partial<LiveState> = { current_turn_index: nextIndex };
+    if (nextIndex === 0) {
+      patch.combat_round =
+        Math.max(1, Number(liveStateRef.current?.combat_round ?? 1) || 1) + 1;
+    }
+    updateLiveState(patch);
   }
 
   // ---------------------------------------------------------------------------
@@ -1992,6 +2066,7 @@ export function LiveSessionBoard({
                 updateLiveState({
                   is_combat_mode: starting,
                   current_turn_index: 0,
+                  combat_round: starting ? 1 : liveState?.combat_round ?? 1,
                 });
                 writeSystemLog(
                   starting ? "combat_start" : "combat_end",
@@ -2816,6 +2891,11 @@ export function LiveSessionBoard({
                 <CombatInitiativeBar
                   participants={sortedCombatParticipants}
                   activeParticipantId={activeCombatParticipant?.id ?? null}
+                  combatRound={Math.max(1, Number(liveState?.combat_round ?? 1) || 1)}
+                  currentTurnIndex={Math.max(
+                    0,
+                    Number(liveState?.current_turn_index ?? 0) || 0,
+                  )}
                   isGM={isGM}
                   onNextTurn={nextCombatTurn}
                   onUpdateParticipant={updateCombatParticipant}
@@ -2836,9 +2916,13 @@ export function LiveSessionBoard({
                         <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
                           Spieler
                         </span>
-                        <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+                        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
                           {combatPlayerTokens.map((token) => {
-                            const used = combatParticipantNames.has(token.name);
+                            const used = isCombatTokenUsed(
+                              token,
+                              combatParticipantNames,
+                              combatParticipantNpcIds,
+                            );
                             return (
                               <button
                                 key={token.name}
@@ -2847,9 +2931,80 @@ export function LiveSessionBoard({
                                 onDragStart={(e) => dragCombatToken(e, token)}
                                 onClick={() => void addCombatToken(token)}
                                 disabled={used}
-                                className="flex min-w-32 shrink-0 items-center gap-2 rounded-full border border-amber-900/60 bg-black/35 px-2 py-1.5 text-left transition-colors hover:border-accent-gold hover:bg-accent-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                title={token.name}
+                                aria-label={token.name}
+                                className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-900/60 bg-black/35 transition-colors hover:border-accent-gold hover:bg-accent-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
                               >
-                                <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-950">
+                                {token.image_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element -- Combat token
+                                  <img
+                                    src={token.image_url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="font-barlow text-xs font-bold text-accent-gold">
+                                    {token.name[0]}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="min-w-0 xl:w-72">
+                        <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
+                          Monster
+                        </span>
+                        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
+                          {combatMonsterTokens.map((token) => {
+                            const used = isCombatTokenUsed(
+                              token,
+                              combatParticipantNames,
+                              combatParticipantNpcIds,
+                            );
+                            return (
+                              <button
+                                key={token.name}
+                                type="button"
+                                draggable={!used}
+                                onDragStart={(e) => dragCombatToken(e, token)}
+                                onClick={() => void addCombatToken(token)}
+                                disabled={used}
+                                title={token.name}
+                                aria-label={token.name}
+                                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-red-900/60 bg-red-950/50 font-barlow text-[10px] font-extrabold text-red-100 transition-colors hover:border-red-400 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-35"
+                              >
+                                <span className="h-2 w-2 rounded-full bg-red-300/80" aria-hidden />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {combatNpcTokens.length > 0 ? (
+                        <div className="min-w-0 flex-1">
+                          <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
+                            Bühnen-NPCs
+                          </span>
+                          <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
+                            {combatNpcTokens.map((token) => {
+                              const used = isCombatTokenUsed(
+                                token,
+                                combatParticipantNames,
+                                combatParticipantNpcIds,
+                              );
+                              return (
+                                <button
+                                  key={token.npc_id ?? token.name}
+                                  type="button"
+                                  draggable={!used}
+                                  onDragStart={(e) => dragCombatToken(e, token)}
+                                  onClick={() => void addCombatToken(token)}
+                                  disabled={used}
+                                  title={token.name}
+                                  aria-label={token.name}
+                                  className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-violet-900/60 bg-violet-950/35 transition-colors hover:border-violet-400 hover:bg-violet-900/30 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
                                   {token.image_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element -- Combat token
                                     <img
@@ -2862,39 +3017,12 @@ export function LiveSessionBoard({
                                       {token.name[0]}
                                     </span>
                                   )}
-                                </span>
-                                <span className="min-w-0 truncate font-barlow text-[10px] font-bold uppercase text-gray-200">
-                                  {token.name}
-                                </span>
-                              </button>
-                            );
-                          })}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                      <div className="min-w-0 xl:w-72">
-                        <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
-                          Monster
-                        </span>
-                        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                          {combatMonsterTokens.map((token) => {
-                            const used = combatParticipantNames.has(token.name);
-                            return (
-                              <button
-                                key={token.name}
-                                type="button"
-                                draggable={!used}
-                                onDragStart={(e) => dragCombatToken(e, token)}
-                                onClick={() => void addCombatToken(token)}
-                                disabled={used}
-                                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-red-900/60 bg-red-950/50 font-barlow text-[10px] font-extrabold text-red-100 transition-colors hover:border-red-400 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-35"
-                                title={token.name}
-                              >
-                                {token.name.replace("Monster ", "")}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -2971,6 +3099,7 @@ export function LiveSessionBoard({
                             isSingle={sortedActiveNpcs.length === 1}
                             isGM={isGM}
                             isCombatMode={!!liveState?.is_combat_mode}
+                            isInInitiative={combatParticipantNpcIds.has(String(npc.id))}
                             isUpdating={isUpdating}
                             reputationScore={npcReputationScores[String(npc.id)] ?? 0}
                             reactions={reactionsForNpc}
@@ -2979,6 +3108,7 @@ export function LiveSessionBoard({
                             onRemove={(npcId) => removeFromStage("npc", npcId)}
                             onToggleShop={toggleShopForNpc}
                             onAssignMerchantAndOpen={assignMerchantAndOpenShop}
+                            onDragCombatToken={dragCombatToken}
                             campaignShops={campaignShops}
                             isShopOpen={
                               liveState?.active_shop_id === npc.shop_id &&

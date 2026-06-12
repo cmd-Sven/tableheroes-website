@@ -26,13 +26,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
-import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import {
   imageDisplayBackdropStyle,
   imageDisplayObjectStyle,
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
+import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
 import {
   updateNPC,
   updateNPCNotes,
@@ -266,6 +267,8 @@ export function NPCDetailPage({
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [imageDisplayEdit, setImageDisplayEdit] = useState<ImageDisplaySettings | null>(null);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const npcWorldId = worldId ?? (npc as { world_id?: string }).world_id ?? null;
 
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
   const [isEditingPlayerNotes, setIsEditingPlayerNotes] = useState(false);
@@ -455,11 +458,20 @@ export function NPCDetailPage({
         const value = editValues[field];
 
         if (field === "image_url") {
-          updates.image_url = value || null;
-          updates.image_display =
-            value && value.trim() !== ""
-              ? normalizeImageDisplay(imageDisplayEdit ?? npc.image_display)
-              : null;
+          let nextImageUrl = value?.trim() || null;
+          if (portraitFile) {
+            if (!npcWorldId) throw new Error("Welt-Kontext fehlt für den Portrait-Upload.");
+            const upload = await uploadNpcPortrait(portraitFile, {
+              worldId: npcWorldId,
+              npcId: npc.id,
+            });
+            if ("error" in upload) throw new Error(upload.error);
+            nextImageUrl = upload.publicUrl;
+          }
+          updates.image_url = nextImageUrl;
+          updates.image_display = nextImageUrl
+            ? normalizeImageDisplay(imageDisplayEdit ?? npc.image_display)
+            : null;
         } else if (field === "faction_id" || field === "current_location_id") {
           updates[field] = value && value.trim() !== "" ? value : null;
         } else {
@@ -492,14 +504,18 @@ export function NPCDetailPage({
               : null,
           }));
         } else if (field === "image_url") {
+          const savedUrl =
+            portraitFile && updates.image_url
+              ? String(updates.image_url)
+              : value?.trim() || null;
           setNpc((prev) => ({
             ...prev,
-            image_url: value || null,
-            image_display:
-              value && value.trim() !== ""
-                ? normalizeImageDisplay(imageDisplayEdit ?? prev.image_display)
-                : null,
+            image_url: savedUrl,
+            image_display: savedUrl
+              ? normalizeImageDisplay(imageDisplayEdit ?? prev.image_display)
+              : null,
           }));
+          setPortraitFile(null);
         } else {
           setNpc((prev) => ({ ...prev, [field]: value || null }));
         }
@@ -520,6 +536,7 @@ export function NPCDetailPage({
     setEditingField(null);
     setEditValues({});
     setImageDisplayEdit(null);
+    setPortraitFile(null);
   };
 
   const handleStartEdit = (field: string, currentValue: string | null) => {
@@ -527,8 +544,10 @@ export function NPCDetailPage({
     setEditValues({ [field]: currentValue || "" });
     if (field === "image_url") {
       setImageDisplayEdit(normalizeImageDisplay(npc.image_display));
+      setPortraitFile(null);
     } else {
       setImageDisplayEdit(null);
+      setPortraitFile(null);
     }
   };
 
@@ -733,30 +752,20 @@ export function NPCDetailPage({
               canEdit={canEdit}
               isPending={isPending}
               editComponent={
-                <div className="w-48 h-64 lg:w-56 lg:h-72 rounded-xl border-2 border-hero-border bg-hero-dark/50 p-4">
-                  <input
-                    type="url"
-                    value={editValues.image_url || ""}
-                    onChange={(e) =>
-                      setEditValues({
-                        ...editValues,
-                        image_url: e.target.value,
-                      })
-                    }
-                    className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-sm text-gray-200 outline-none focus:border-hero-vibrant"
-                    placeholder="Bild-URL eingeben..."
-                    autoFocus
+                <div className="max-w-md rounded-xl border-2 border-hero-border bg-hero-dark/50 p-4">
+                  <NpcPortraitUploadField
+                    imageUrl={editValues.image_url || npc.image_url || ""}
+                    portraitFile={portraitFile}
+                    onPortraitFileChange={setPortraitFile}
+                    imageDisplay={imageDisplayEdit ?? normalizeImageDisplay(npc.image_display)}
+                    onImageDisplayChange={setImageDisplayEdit}
+                    onClearImage={() => {
+                      setPortraitFile(null);
+                      setEditValues({ image_url: "" });
+                      setImageDisplayEdit(normalizeImageDisplay(null));
+                    }}
+                    previewAspectClassName="aspect-[3/4] w-48 lg:w-56"
                   />
-                  {editValues.image_url && imageDisplayEdit ? (
-                    <div className="mt-3">
-                      <ImageUrlDisplayEditor
-                        value={imageDisplayEdit}
-                        onChange={setImageDisplayEdit}
-                        previewUrl={editValues.image_url}
-                        previewAspectClassName="aspect-[3/4] max-w-[220px]"
-                      />
-                    </div>
-                  ) : null}
                 </div>
               }
             >
@@ -1221,6 +1230,7 @@ export function NPCDetailPage({
                     campaignId={campaignId}
                     worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     emptyMessage="Keine Beschreibung vorhanden."
+                    largeImages
                   />
                 </InlineEditField>
               </GothicSpotlightDescription>
@@ -1259,6 +1269,7 @@ export function NPCDetailPage({
                     campaignId={campaignId}
                     worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     emptyMessage="Keine Beschreibung vorhanden."
+                    largeImages
                   />
                 </InlineEditField>
               </GothicSpotlightDescription>
@@ -1302,6 +1313,7 @@ export function NPCDetailPage({
                     campaignId={campaignId}
                     worldId={worldId ?? (npc as { world_id?: string }).world_id}
                     emptyMessage="Keine Beschreibung vorhanden."
+                    largeImages
                   />
                 </InlineEditField>
               </GothicSpotlightDescription>

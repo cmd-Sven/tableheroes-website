@@ -1,5 +1,7 @@
 /** D&D-5e-Kampfmarkierungen für die Live-Initiative-Leiste. */
 
+export type CombatParticipantSide = "friend" | "nemesis";
+
 export type CombatConditionId =
   | "concentration"
   | "blinded"
@@ -113,4 +115,9 @@ export function normalizeCombatConditions(raw: unknown): CombatConditionId[] {
   return raw
     .map((v) => String(v))
     .filter((id): id is CombatConditionId => allowed.has(id as CombatConditionId));
+}
+
+export function normalizeCombatParticipantSide(raw: unknown): CombatParticipantSide | null {
+  if (raw === "friend" || raw === "nemesis") return raw;
+  return null;
 }

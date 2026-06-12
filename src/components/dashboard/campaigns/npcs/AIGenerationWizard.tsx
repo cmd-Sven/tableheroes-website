@@ -11,6 +11,12 @@ import { type InferenceSuggestion } from "./NPCForm";
 import { useRouter } from "next/navigation";
 import { WizardContent } from "./WizardContent";
 import { createClient } from "@/src/lib/supabase/client";
+import {
+  DEFAULT_IMAGE_DISPLAY,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
+import { uploadNpcPortrait } from "@/src/lib/profile-media";
 
 type WorldEntity = {
   name: string;
@@ -101,6 +107,7 @@ type Props = {
   prefillName?: string;
   prefillRole?: string;
   prefillDescription?: string;
+  worldId?: string;
 };
 
 export function AIGenerationWizard({
@@ -116,6 +123,7 @@ export function AIGenerationWizard({
   prefillName,
   prefillRole,
   prefillDescription,
+  worldId: worldIdProp,
 }: Props) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -133,6 +141,11 @@ export function AIGenerationWizard({
   const [selectedInferenceSuggestions, setSelectedInferenceSuggestions] = useState<Set<string>>(new Set());
   const [locationsList, setLocationsList] = useState(locations);
   const [factionsList, setFactionsList] = useState(factions);
+  const [resolvedWorldId, setResolvedWorldId] = useState<string | null>(worldIdProp ?? null);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [portraitDisplay, setPortraitDisplay] = useState<ImageDisplaySettings>({
+    ...DEFAULT_IMAGE_DISPLAY,
+  });
   const [isAnalyzingWorld, setIsAnalyzingWorld] = useState(false);
   const [worldEntities, setWorldEntities] = useState<{
     locations: WorldEntity[];
@@ -157,6 +170,28 @@ export function AIGenerationWizard({
   useEffect(() => {
     setFactionsList(factions);
   }, [factions]);
+
+  useEffect(() => {
+    if (worldIdProp) {
+      setResolvedWorldId(worldIdProp);
+      return;
+    }
+    let cancelled = false;
+    const supabase = createClient();
+    void (async () => {
+      const { data } = await supabase
+        .from("campaigns")
+        .select("world_id")
+        .eq("id", campaignId)
+        .maybeSingle();
+      if (!cancelled) {
+        setResolvedWorldId((data as { world_id?: string | null } | null)?.world_id ?? null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, worldIdProp]);
 
   // Kampagnen-NPCs beim Start laden (für Step 1: „Existierende NPC verbinden“)
   useEffect(() => {
@@ -709,6 +744,20 @@ export function AIGenerationWizard({
         // Typ-Sicherung für finalData mit unbekannten Properties
         const finalFields = (wizardData.finalData as any);
 
+        let imageUrl: string | undefined = finalFields?.image_url?.trim() || undefined;
+        let imageDisplay: ImageDisplaySettings | null = imageUrl
+          ? normalizeImageDisplay(portraitDisplay)
+          : null;
+        if (portraitFile) {
+          if (!resolvedWorldId) {
+            throw new Error("Welt-Kontext fehlt für den Portrait-Upload.");
+          }
+          const upload = await uploadNpcPortrait(portraitFile, { worldId: resolvedWorldId });
+          if ("error" in upload) throw new Error(upload.error);
+          imageUrl = upload.publicUrl;
+          imageDisplay = normalizeImageDisplay(portraitDisplay);
+        }
+
         const createdNPC = await createNPC({
           campaign_id: campaignId,
           name: wizardData.name,
@@ -721,7 +770,8 @@ export function AIGenerationWizard({
           appearance: finalFields?.appearance || undefined,
           personality_traits: finalFields?.personality_traits || undefined,
           gm_notes: finalFields?.gm_notes || undefined,
-          image_url: finalFields?.image_url || undefined,
+          image_url: imageUrl,
+          image_display: imageDisplay ?? undefined,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId || undefined,
@@ -928,6 +978,10 @@ export function AIGenerationWizard({
     setFactionsList,
     setInferenceSuggestions,
     setSelectedInferenceSuggestions,
+    portraitFile,
+    setPortraitFile,
+    portraitDisplay,
+    setPortraitDisplay,
   };
 
   const content = <WizardContent {...(wizardContentProps as any)} />;

@@ -7,7 +7,6 @@ import {
   markdownToDiscordText,
   recapExcerpt,
   teaserFromText,
-  toDiscordEmbedImageUrl,
   truncateText,
 } from "./format";
 
@@ -37,8 +36,11 @@ function newsCategoryColor(category: string): number {
   return DISCORD_COLORS.gold;
 }
 
-export function buildNewsEmbed(post: NewsPost): DiscordEmbed {
-  const imageUrl = toDiscordEmbedImageUrl(post.image_url);
+export function buildNewsEmbed(
+  post: NewsPost,
+  embedImageUrl?: string | null,
+): DiscordEmbed {
+  const imageUrl = embedImageUrl ?? undefined;
   const readMoreUrl = `${getAppBaseUrl()}/dashboard/news`;
   const readMoreLine = `\n\n[Weiterlesen auf TableHeroes](${readMoreUrl})`;
   const descBudget = DISCORD_NEWS_DESC_BUDGET - readMoreLine.length;
@@ -73,10 +75,11 @@ export function buildRevealEmbed(params: {
   subtitle?: string | null;
   teaser?: string | null;
   imageUrl?: string | null;
+  embedImageUrl?: string | null;
 }): DiscordEmbed {
   const meta = REVEAL_LABELS[params.entityType];
   const detailUrl = entityDetailUrl(params.campaignId, params.entityType, params.entityId);
-  const portraitUrl = toDiscordEmbedImageUrl(params.imageUrl);
+  const portraitUrl = params.embedImageUrl ?? undefined;
   const useLargePortrait =
     params.entityType === "npc" || params.entityType === "bestarium";
   const title = params.subtitle?.trim()

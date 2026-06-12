@@ -28,7 +28,7 @@ export function toAbsoluteAssetUrl(path: string | null | undefined): string | un
   }
 }
 
-export { toDiscordEmbedImageUrl } from "./resolve-image-url";
+export { resolveDiscordEmbedImageUrl, toDiscordEmbedImageUrl } from "./resolve-image-url";
 
 export function truncateText(text: string, max: number): string {
   const t = text.trim();

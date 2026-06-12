@@ -28,6 +28,12 @@ import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-i
 import type { WorldBlueprint } from "@/src/types/world";
 import { NpcAppearanceConfirmStep } from "@/src/components/worlds/npc-wizard/NpcAppearanceConfirmStep";
 import { NpcPortraitStep } from "@/src/components/worlds/npc-wizard/NpcPortraitStep";
+import {
+  DEFAULT_IMAGE_DISPLAY,
+  normalizeImageDisplay,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
+import { uploadNpcPortrait } from "@/src/lib/profile-media";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -104,6 +110,10 @@ export function NarrativeNPCWizard({
   const [artStyleNote, setArtStyleNote] = useState("");
   const [appearanceConfirmed, setAppearanceConfirmed] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [portraitDisplay, setPortraitDisplay] = useState<ImageDisplaySettings>({
+    ...DEFAULT_IMAGE_DISPLAY,
+  });
   const [portraitSkipped, setPortraitSkipped] = useState(false);
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(linkFactionId ?? null);
@@ -221,6 +231,7 @@ export function NarrativeNPCWizard({
           styleOverride: artStyleNote.trim() || undefined,
         });
         setPortraitUrl(result.imageUrl);
+        setPortraitFile(null);
         setPortraitSkipped(false);
       } catch (e: any) {
         const msg = e?.message || "Fehler bei der Portrait-Generierung.";
@@ -234,6 +245,13 @@ export function NarrativeNPCWizard({
     if (!persona) return;
     startTransition(async () => {
       try {
+        let imageUrl = portraitUrl;
+        if (portraitFile) {
+          const upload = await uploadNpcPortrait(portraitFile, { worldId });
+          if ("error" in upload) throw new Error(upload.error);
+          imageUrl = upload.publicUrl;
+        }
+
         const npc = await createNPC({
           world_id: worldId,
           name: step1Name.trim() || persona.name,
@@ -249,7 +267,8 @@ export function NarrativeNPCWizard({
           appearance: (confirmedAppearance.trim() || persona.appearance) ?? undefined,
           personality_traits: persona.personality_traits ?? undefined,
           gm_notes: persona.gm_notes ?? undefined,
-          image_url: portraitUrl ?? undefined,
+          image_url: imageUrl ?? undefined,
+          image_display: imageUrl ? normalizeImageDisplay(portraitDisplay) : undefined,
           narrative_hooks: (persona.narrative_hooks ?? undefined)?.map((h) => ({ ...h, name: h.name ?? undefined })) ?? undefined,
           check_results: (persona.check_results ?? undefined) as any,
           faction_id: selectedFactionId ?? undefined,
@@ -307,7 +326,8 @@ export function NarrativeNPCWizard({
   const canGoStep2 = !!briefingResult;
   const canGoStep3 = !!persona;
   const canGoStep4 = !!persona && appearanceConfirmed;
-  const canGoStep5 = !!persona && appearanceConfirmed && (!!portraitUrl || portraitSkipped);
+  const canGoStep5 =
+    !!persona && appearanceConfirmed && (!!portraitUrl || !!portraitFile || portraitSkipped);
   const canGoStep6 = !!persona;
   const displayName = step1Name.trim() || persona?.name || "NPC";
 
@@ -717,6 +737,10 @@ export function NarrativeNPCWizard({
               npcName={displayName}
               appearancePreview={confirmedAppearance}
               imageUrl={portraitUrl}
+              portraitFile={portraitFile}
+              onPortraitFileChange={setPortraitFile}
+              imageDisplay={portraitDisplay}
+              onImageDisplayChange={setPortraitDisplay}
               portraitSkipped={portraitSkipped}
               isGenerating={isPortraitPending}
               canGenerate={appearanceConfirmed}

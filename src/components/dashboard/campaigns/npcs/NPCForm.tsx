@@ -14,12 +14,13 @@ import { AIGenerationWizard } from "./AIGenerationWizard";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { CheckResultsEditor } from "./CheckResultsEditor";
 import { suggestInferenceRelationsForTarget } from "@/src/app/dashboard/campaigns/[id]/npc-relations-actions";
-import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import {
   DEFAULT_IMAGE_DISPLAY,
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
+import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { NpcPortraitUploadField } from "./NpcPortraitUploadField";
 
 type NPC = {
   id?: string;
@@ -99,6 +100,9 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
 
   // Context NPCs State
   const [imageDisplay, setImageDisplay] = useState<ImageDisplaySettings>({ ...DEFAULT_IMAGE_DISPLAY });
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const effectiveWorldId =
+    worldId ?? (initialData as { world_id?: string } | undefined)?.world_id ?? null;
 
   const [contextNPCs, setContextNPCs] = useState<{
     sameLocation: Array<{ id: string; name: string; image_url: string | null; role: string | null }>;
@@ -229,6 +233,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         check_results: (initialData as any).check_results || [],
       });
       setImageDisplay(normalizeImageDisplay((initialData as { image_display?: unknown }).image_display));
+      setPortraitFile(null);
     } else {
       setFormData({
         name: "",
@@ -372,6 +377,19 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           throw new Error("Bitte wähle ein Shop-Template für diesen Händler aus.");
         }
 
+        let resolvedImageUrl = formData.image_url.trim() || null;
+        if (portraitFile) {
+          if (!effectiveWorldId) {
+            throw new Error("Welt-Kontext fehlt für den Portrait-Upload.");
+          }
+          const upload = await uploadNpcPortrait(portraitFile, {
+            worldId: effectiveWorldId,
+            npcId: initialData?.id,
+          });
+          if ("error" in upload) throw new Error(upload.error);
+          resolvedImageUrl = upload.publicUrl;
+        }
+
         console.log("🔍 [NPCForm] Form submission:", {
           original_current_location_id: formData.current_location_id,
           normalized_current_location_id: normalizedCurrentLocationId,
@@ -401,8 +419,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           appearance: formData.appearance || undefined,
           personality_traits: formData.personality_traits || undefined,
           gm_notes: formData.gm_notes || undefined,
-          image_url: formData.image_url || undefined,
-          image_display: formData.image_url.trim()
+          image_url: resolvedImageUrl || undefined,
+          image_display: resolvedImageUrl
             ? normalizeImageDisplay(imageDisplay)
             : null,
           faction_id: normalizedFactionId,
@@ -820,27 +838,22 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
                 </select>
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Bild URL
+                  Portrait
                 </label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                  placeholder="https://example.com/image.jpg"
+                <NpcPortraitUploadField
+                  imageUrl={formData.image_url}
+                  portraitFile={portraitFile}
+                  onPortraitFileChange={setPortraitFile}
+                  imageDisplay={imageDisplay}
+                  onImageDisplayChange={setImageDisplay}
+                  onClearImage={() => {
+                    setPortraitFile(null);
+                    setFormData((prev) => ({ ...prev, image_url: "" }));
+                    setImageDisplay({ ...DEFAULT_IMAGE_DISPLAY });
+                  }}
                 />
-                {formData.image_url.trim() ? (
-                  <div className="mt-3">
-                    <ImageUrlDisplayEditor
-                      value={imageDisplay}
-                      onChange={setImageDisplay}
-                      previewUrl={formData.image_url}
-                      previewAspectClassName="aspect-[3/4] max-w-[220px]"
-                    />
-                  </div>
-                ) : null}
               </div>
             </div>
 

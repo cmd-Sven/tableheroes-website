@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, type ImgHTMLAttributes } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,6 +23,8 @@ type SmartTextProps = {
   className?: string;
   /** Spieler-Chronik: Wiki-Links in neuem Tab öffnen */
   openInNewTab?: boolean;
+  /** Größere Markdown-Bilder (z. B. NSC-Beschreibungen). */
+  largeImages?: boolean;
 };
 
 function escapeRegex(s: string): string {
@@ -204,6 +206,7 @@ export function SmartText({
   emptyMessage = "Keine Beschreibung vorhanden.",
   className = "",
   openInNewTab = false,
+  largeImages = false,
 }: SmartTextProps) {
   const trimmed = normalizeEscapedMarkdown(text || "").trim();
 
@@ -247,8 +250,21 @@ export function SmartText({
           openInNewTab,
         }),
       hr: () => <hr className="my-6 border-hero-border/70" />,
+      img: ({ src, alt, ...rest }: ImgHTMLAttributes<HTMLImageElement>) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          {...rest}
+          src={typeof src === "string" ? src : undefined}
+          alt={alt ?? ""}
+          className={
+            largeImages
+              ? "my-4 mx-auto w-full max-w-md sm:max-w-lg md:max-w-xl rounded-lg border border-hero-border/60 shadow-lg object-contain"
+              : "my-2 max-w-full rounded-md"
+          }
+        />
+      ),
     };
-  }, [entities, campaignId, worldId, openInNewTab]);
+  }, [entities, campaignId, worldId, openInNewTab, largeImages]);
 
   if (!trimmed) {
     return (
@@ -274,7 +290,7 @@ export function SmartText({
         prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-6 prose-ol:space-y-1
         prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
         prose-a:text-hero-vibrant prose-a:hover:underline
-        prose-img:rounded-md prose-img:max-w-full prose-img:my-2
+        ${largeImages ? "" : "prose-img:rounded-md prose-img:max-w-full prose-img:my-2"}
         prose-hr:border-hero-border/70 prose-hr:my-6
         ${className}`}
     >

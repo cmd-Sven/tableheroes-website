@@ -1,11 +1,17 @@
 "use client";
 
 import { ImageIcon, Loader2, RefreshCw, SkipForward, Sparkles } from "lucide-react";
+import { normalizeImageDisplay, type ImageDisplaySettings } from "@/src/lib/image-display";
+import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
 
 type Props = {
   npcName: string;
   appearancePreview: string;
   imageUrl: string | null;
+  portraitFile: File | null;
+  onPortraitFileChange: (file: File | null) => void;
+  imageDisplay: ImageDisplaySettings;
+  onImageDisplayChange: (value: ImageDisplaySettings) => void;
   portraitSkipped: boolean;
   isGenerating: boolean;
   canGenerate: boolean;
@@ -19,6 +25,10 @@ export function NpcPortraitStep({
   npcName,
   appearancePreview,
   imageUrl,
+  portraitFile,
+  onPortraitFileChange,
+  imageDisplay,
+  onImageDisplayChange,
   portraitSkipped,
   isGenerating,
   canGenerate,
@@ -30,8 +40,8 @@ export function NpcPortraitStep({
   return (
     <div className="space-y-6">
       <p className="font-libre text-gray-200 text-sm">
-        Optional: Lasse ein Charakterportrait im D&D-5e-Art-Stil deiner Welt erzeugen. Du kannst
-        den Schritt auch überspringen und später ein Bild hochladen.
+        Optional: Portrait per KI erzeugen oder direkt hochladen. Du kannst den Schritt auch
+        überspringen und das Bild später in den NSC-Einstellungen ergänzen.
       </p>
 
       <div className="rounded-lg border border-hero-border bg-slate-900/40 p-4">
@@ -101,6 +111,28 @@ export function NpcPortraitStep({
         {!canGenerate && disabledReason && (
           <p className="font-libre text-xs text-amber-200/80 text-center max-w-md">{disabledReason}</p>
         )}
+      </div>
+
+      <div className="rounded-lg border border-hero-border/60 bg-slate-900/30 p-4">
+        <p className="font-barlow font-bold text-xs uppercase text-gray-400 mb-3">
+          Oder Portrait hochladen
+        </p>
+        <NpcPortraitUploadField
+          imageUrl={imageUrl ?? ""}
+          portraitFile={portraitFile}
+          onPortraitFileChange={(file) => {
+            onPortraitFileChange(file);
+            if (file) onClearSkip();
+          }}
+          imageDisplay={imageDisplay}
+          onImageDisplayChange={onImageDisplayChange}
+          onClearImage={() => {
+            onPortraitFileChange(null);
+            onImageDisplayChange(normalizeImageDisplay(null));
+          }}
+          previewAspectClassName="aspect-square max-w-sm"
+          compact
+        />
       </div>
     </div>
   );

@@ -244,6 +244,7 @@ export function WorldNPCDetailClient({
                 entities={entities}
                 worldId={worldId}
                 emptyMessage="Keine Beschreibung vorhanden."
+                largeImages
               />
             </section>
           )}
@@ -258,6 +259,7 @@ export function WorldNPCDetailClient({
                 entities={entities}
                 worldId={worldId}
                 emptyMessage="Kein Aussehen hinterlegt."
+                largeImages
               />
             </section>
           )}
@@ -272,6 +274,7 @@ export function WorldNPCDetailClient({
                 entities={entities}
                 worldId={worldId}
                 emptyMessage="Keine Persönlichkeit hinterlegt."
+                largeImages
               />
             </section>
           )}

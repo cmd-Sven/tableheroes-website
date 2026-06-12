@@ -10,7 +10,7 @@ import {
 } from "./embeds";
 import type { CampaignRevealEntityType } from "./types";
 import { DISCORD_PLATFORM_NEWS_KEY } from "./types";
-import { teaserFromText } from "./format";
+import { resolveDiscordEmbedImageUrl, teaserFromText } from "./format";
 
 function logDiscordError(context: string, error?: string) {
   if (error) {
@@ -161,7 +161,8 @@ export async function notifyNewsPublished(
     return { ok: false, error: "Kein Discord-Webhook für News konfiguriert." };
   }
 
-  const result = await postDiscordEmbed(webhook, buildNewsEmbed(post));
+  const embedImageUrl = await resolveDiscordEmbedImageUrl(post.image_url);
+  const result = await postDiscordEmbed(webhook, buildNewsEmbed(post, embedImageUrl));
   if (!result.ok) logDiscordError("notifyNewsPublished", result.error);
   return result;
 }
@@ -182,6 +183,13 @@ export async function notifyCampaignEntityRevealed(
   }
 
   const campaignName = await getCampaignName(campaignId);
+  const embedImageUrl = await resolveDiscordEmbedImageUrl(entity.imageUrl);
+  if (entity.imageUrl?.trim() && !embedImageUrl) {
+    console.warn(
+      "[discord] Bild-URL konnte nicht für Embed aufgelöst werden:",
+      entity.imageUrl.slice(0, 120),
+    );
+  }
   const embed = buildRevealEmbed({
     campaignId,
     campaignName,
@@ -191,6 +199,7 @@ export async function notifyCampaignEntityRevealed(
     subtitle: entity.subtitle,
     teaser: entity.teaser ? teaserFromText(entity.teaser) : undefined,
     imageUrl: entity.imageUrl,
+    embedImageUrl,
   });
 
   const result = await postDiscordEmbed(webhook, embed);
@@ -198,7 +207,7 @@ export async function notifyCampaignEntityRevealed(
     logDiscordError("notifyCampaignEntityRevealed", result.error);
     return result;
   }
-  if (result.imageOmitted && entity.imageUrl) {
+  if (result.imageOmitted && embedImageUrl) {
     return {
       ok: true,
       error: "Nachricht gesendet, aber das Bild konnte nicht eingebettet werden.",

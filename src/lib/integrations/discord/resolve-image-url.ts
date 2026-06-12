@@ -1,5 +1,8 @@
+import { createAdminClient } from "@/src/lib/supabase/server";
 import { getAppBaseUrl } from "./format";
 import { isSafeStorageRef, parseSupabaseStorageRef } from "./storage-ref";
+
+const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 7;
 
 const PRIVATE_HOST_PATTERNS = [
   /^localhost$/i,
@@ -106,7 +109,43 @@ function buildUrlProxyUrl(source: string): string | undefined {
   return proxy.href;
 }
 
-/** Öffentliche Proxy-URL für Discord-Embeds (Discord lädt von tableheroes.de). */
+function hostnameOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function appHostname(): string | undefined {
+  return hostnameOf(getAppBaseUrl());
+}
+
+function supabaseHostname(): string | undefined {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!base) return undefined;
+  return hostnameOf(base);
+}
+
+async function createSignedStorageUrl(
+  ref: { bucket: string; path: string },
+): Promise<string | undefined> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.storage
+      .from(ref.bucket)
+      .createSignedUrl(ref.path, SIGNED_URL_TTL_SEC);
+    if (!error && data?.signedUrl) return data.signedUrl;
+  } catch {
+    // Service Role fehlt lokal → Fallback unten
+  }
+  return undefined;
+}
+
+/**
+ * Discord lädt Bilder selbst. Externe URLs (Pinterest, imgbb, Supabase) direkt nutzen —
+ * kein Proxy über NEXT_PUBLIC_APP_URL (Domain muss zur Vercel-App zeigen).
+ */
 export function toDiscordEmbedImageUrl(
   raw: string | null | undefined,
 ): string | undefined {
@@ -114,11 +153,42 @@ export function toDiscordEmbedImageUrl(
 
   const storageRef = parseSupabaseStorageRef(raw);
   if (storageRef && isSafeStorageRef(storageRef)) {
-    return buildStorageProxyUrl(storageRef);
+    return resolveDiscordImageSource(raw) ?? buildStorageProxyUrl(storageRef);
   }
 
   const source = resolveDiscordImageSource(raw);
   if (!source || !isAllowedDiscordAssetSource(source)) return undefined;
 
+  const sourceHost = hostnameOf(source);
+  const appHost = appHostname();
+  const supabaseHost = supabaseHostname();
+
+  if (sourceHost && sourceHost !== appHost) {
+    return source;
+  }
+
+  if (sourceHost === supabaseHost) {
+    return source;
+  }
+
+  if (sourceHost === appHost && new URL(source).pathname.startsWith("/images/")) {
+    return source;
+  }
+
   return buildUrlProxyUrl(source);
+}
+
+/** Serverseitig: signierte Storage-URL bevorzugen (privater Bucket). */
+export async function resolveDiscordEmbedImageUrl(
+  raw: string | null | undefined,
+): Promise<string | undefined> {
+  if (!raw?.trim()) return undefined;
+
+  const storageRef = parseSupabaseStorageRef(raw);
+  if (storageRef && isSafeStorageRef(storageRef)) {
+    const signed = await createSignedStorageUrl(storageRef);
+    if (signed) return signed;
+  }
+
+  return toDiscordEmbedImageUrl(raw);
 }

@@ -87,6 +87,7 @@ export default async function EditNPCPage({ params }: Props) {
       </div>
       <NPCForm
         campaignId={campaignId}
+        worldId={(npc as { world_id?: string }).world_id}
         initialData={npc as any}
         factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
         locations={locations}

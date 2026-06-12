@@ -65,6 +65,7 @@ export function AIGenerationWizardEmbedded({ campaignId, factions, locations, wo
               campaignId={campaignId}
               factions={factions}
               locations={locations}
+              worldId={world?.id}
               onClose={handleClose}
               onSuccess={handleSuccess}
               embedded={true}
