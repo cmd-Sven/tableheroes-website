@@ -18,6 +18,94 @@ import {
 import { isStaleLiveSession, sortSessionsForDashboardFocus } from "@/src/lib/session-focus";
 import { sessionRequiresCharacter, parseSessionType } from "@/src/lib/session-type";
 
+const MEMBER_CAMPAIGN_STATUSES = [
+  "Accepted",
+  "Approved",
+  "Active",
+  "Drafting",
+  "In_Review",
+  "Changes_Proposed",
+] as const;
+
+/** Live-Sessions bis 48h nach Start; gleiches Fenster für DB-Vorfilter bei kommenden Terminen. */
+const UPCOMING_SESSION_FETCH_CUTOFF_MS = 48 * 60 * 60 * 1000;
+
+async function resolveUserCampaignIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string[]> {
+  const { data: memberRows } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id")
+    .eq("user_id", userId)
+    .in("status", [...MEMBER_CAMPAIGN_STATUSES]);
+
+  const memberCampaignIds = ((memberRows as any[]) || []).map(
+    (m: any) => m.campaign_id as string,
+  );
+
+  const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
+    .select("id")
+    .or(`gm_id.eq.${userId},owner_id.eq.${userId}`);
+
+  const gmCampaignIds = ((gmCampaignRows as any[]) || []).map((c: any) => c.id as string);
+
+  return [...new Set([...memberCampaignIds, ...gmCampaignIds])];
+}
+
+async function fetchSessionsForCampaignIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  campaignIds: string[],
+  orderAscending: boolean,
+  rowLimit: number,
+  options?: { focusUpcoming?: boolean },
+): Promise<any[]> {
+  if (campaignIds.length === 0) return [];
+
+  const effectiveLimit = options?.focusUpcoming ? Math.max(rowLimit, 80) : rowLimit;
+  const startTimeCutoff = options?.focusUpcoming
+    ? new Date(Date.now() - UPCOMING_SESSION_FETCH_CUTOFF_MS).toISOString()
+    : null;
+
+  const applyFilters = (query: any) => {
+    let q = query.in("campaign_id", campaignIds);
+    if (startTimeCutoff) {
+      q = q.gte("start_time", startTimeCutoff);
+    }
+    return q.order("start_time", { ascending: orderAscending }).limit(effectiveLimit);
+  };
+
+  const { data: d1, error: e1 } = await applyFilters(
+    (supabase.from("sessions") as any).select(
+      "id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live",
+    ),
+  );
+
+  if (!e1) return (d1 as any[]) || [];
+
+  console.error("[fetchSessionsForCampaignIds] Fallback nach Spaltenfehler:", {
+    message: (e1 as { message?: string }).message,
+    code: (e1 as { code?: string }).code,
+  });
+
+  const { data: d2, error: e2 } = await applyFilters(
+    (supabase.from("sessions") as any).select(
+      "id, title, start_time, status, campaign_id, type",
+    ),
+  );
+
+  if (e2) {
+    console.error("[fetchSessionsForCampaignIds] Minimal-Select fehlgeschlagen:", e2);
+    return [];
+  }
+
+  return ((d2 as any[]) || []).map((s) => ({
+    ...s,
+    end_time: null,
+    rsvp_deadline_days: null,
+    is_live: true,
+  }));
+}
+
 const LORE_TEASER_LENGTH = 150;
 const COMIC_IMAGE_DIR = path.join(process.cwd(), "public", "images", "comic");
 const IMAGE_EXTENSIONS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -296,82 +384,22 @@ export async function getUpcomingSessionsForUser(
 ): Promise<UpcomingSession[]> {
   const supabase = await createClient();
 
-  // 1. Alle Kampagnen des Users (als Spieler oder GM)
-  // Session = Termin (Spielsitzung physisch oder online). sessions-Tabelle = Termine.
-  // Accepted, Approved, Active, Drafting, In_Review = Spieler ist Teil der Kampagne
-  const { data: memberRows } = await (
-    supabase.from("campaign_members") as any
-  )
-    .select("campaign_id")
-    .eq("user_id", userId)
-    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
-
-  const memberCampaignIds = (
-    (memberRows as any[]) || []
-  ).map((m: any) => m.campaign_id as string);
-
-  // Auch GM-Kampagnen einbeziehen
-  const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
-    .select("id")
-    .eq("gm_id", userId);
-
-  const gmCampaignIds = (
-    (gmCampaignRows as any[]) || []
-  ).map((c: any) => c.id as string);
-
-  const allCampaignIds = [...new Set([...memberCampaignIds, ...gmCampaignIds])];
+  const allCampaignIds = await resolveUserCampaignIds(supabase, userId);
   if (allCampaignIds.length === 0) {
     if (process.env.NODE_ENV === "development") {
-      console.log("[getUpcomingSessionsForUser] Keine Kampagnen-IDs:", {
-        userId,
-        memberCampaignIds,
-        gmCampaignIds,
-      });
+      console.log("[getUpcomingSessionsForUser] Keine Kampagnen-IDs:", { userId });
     }
     return [];
   }
 
-  // 2. Sessions laden (ohne start_time-Filter in DB, danach client-seitig filtern)
-  // Erst mit allen Spalten versuchen; Fallback ohne rsvp_deadline_days/is_live falls Migration fehlt
-  let allSessions: any[] = [];
-  let sessionsError: unknown = null;
+  const allSessions = await fetchSessionsForCampaignIds(
+    supabase,
+    allCampaignIds,
+    true,
+    limit * 3,
+    { focusUpcoming: true },
+  );
 
-  const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live")
-    .in("campaign_id", allCampaignIds)
-    .order("start_time", { ascending: true })
-    .limit(limit * 3);
-
-  if (e1) {
-    const err = e1 as { message?: string; code?: string; details?: string };
-    const msg = String(err?.message ?? "").toLowerCase();
-    if (msg.includes("column") && (msg.includes("rsvp_deadline_days") || msg.includes("is_live"))) {
-      const { data: d2, error: e2 } = await (supabase.from("sessions") as any)
-        .select("id, title, start_time, status, campaign_id")
-        .in("campaign_id", allCampaignIds)
-        .order("start_time", { ascending: true })
-        .limit(limit * 3);
-      if (e2) {
-        sessionsError = e2;
-      } else {
-        allSessions = ((d2 as any[]) || []).map((s) => ({ ...s, rsvp_deadline_days: null, is_live: true }));
-      }
-    } else {
-      sessionsError = e1;
-    }
-  } else {
-    allSessions = (d1 as any[]) || [];
-  }
-
-  if (sessionsError) {
-    const err = sessionsError as { message?: string; code?: string; details?: string };
-    console.error("[getUpcomingSessionsForUser] Sessions-Fehler:", {
-      message: err?.message,
-      code: err?.code,
-      details: err?.details,
-    });
-    return [];
-  }
   const now = new Date();
   const staleLiveThresholdMs = 48 * 60 * 60 * 1000; // 48 Stunden
   // Nächste Termine: Scheduled (auch nach Startzeit) oder Live (max. 48h seit Start, sonst verwaist).
@@ -420,7 +448,7 @@ export async function getUpcomingSessionsForUser(
     `
     )
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
+    .in("status", [...MEMBER_CAMPAIGN_STATUSES]);
 
   // Gruppiere Teilnehmer nach campaign_id
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
@@ -517,6 +545,15 @@ export async function getUpcomingSessionsForUser(
   return result;
 }
 
+/** Nächster relevanter Termin (Live oder geplant) für Dashboard-Widgets — maximal einer. */
+export async function getNextUpcomingAppointmentForUser(
+  userId: string,
+): Promise<UpcomingSession[]> {
+  const upcoming = await getUpcomingSessionsForUser(userId, 12);
+  if (upcoming.length === 0) return [];
+  return [upcoming[0]];
+}
+
 /**
  * Lädt vergangene/beendete Sessions (Termine) des Users.
  * Beendet = GM hat als abgeschlossen gekennzeichnet (status Completed/Ended)
@@ -529,42 +566,16 @@ export async function getPastSessionsForUser(
 ): Promise<UpcomingSession[]> {
   const supabase = await createClient();
 
-  const { data: memberRows } = await (supabase.from("campaign_members") as any)
-    .select("campaign_id")
-    .eq("user_id", userId)
-    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
-
-  const { data: gmCampaignRows } = await (supabase.from("campaigns") as any)
-    .select("id")
-    .eq("gm_id", userId);
-
-  const memberCampaignIds = ((memberRows as any[]) || []).map((m: any) => m.campaign_id as string);
-  const gmCampaignIds = ((gmCampaignRows as any[]) || []).map((c: any) => c.id as string);
-  const allCampaignIds = [...new Set([...memberCampaignIds, ...gmCampaignIds])];
+  const allCampaignIds = await resolveUserCampaignIds(supabase, userId);
 
   if (allCampaignIds.length === 0) return [];
 
-  let allSessions: any[] = [];
-  const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live")
-    .in("campaign_id", allCampaignIds)
-    .order("start_time", { ascending: false })
-    .limit(limit * 3);
-
-  if (e1) {
-    const err = e1 as { message?: string };
-    const msg = String(err?.message ?? "").toLowerCase();
-    if (msg.includes("column") && (msg.includes("rsvp_deadline_days") || msg.includes("is_live"))) {
-      const { data: d2 } = await (supabase.from("sessions") as any)
-        .select("id, title, start_time, status, campaign_id")
-        .in("campaign_id", allCampaignIds)
-        .order("start_time", { ascending: false })
-        .limit(limit * 3);
-      allSessions = ((d2 as any[]) || []).map((s) => ({ ...s, rsvp_deadline_days: null, is_live: true }));
-    }
-  } else {
-    allSessions = (d1 as any[]) || [];
-  }
+  const allSessions = await fetchSessionsForCampaignIds(
+    supabase,
+    allCampaignIds,
+    false,
+    limit * 3,
+  );
 
   const now = new Date();
   const sessions = allSessions
@@ -597,7 +608,7 @@ export async function getPastSessionsForUser(
   const { data: allMembersRaw } = await (supabase.from("campaign_members") as any)
     .select("campaign_id, user_id, users(id, username, avatar_url), characters(id, name, class, level, avatar_url)")
     .in("campaign_id", sessionCampaignIds)
-    .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"]);
+    .in("status", [...MEMBER_CAMPAIGN_STATUSES]);
 
   const participantsByCampaign = new Map<string, SessionParticipant[]>();
   for (const row of (allMembersRaw as any[]) || []) {

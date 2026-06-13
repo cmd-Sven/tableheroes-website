@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check, Pencil } from "lucide-react";
 import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
-import { canEditSessionSchedule } from "@/src/lib/session-status";
+import { canEditSessionSchedule, isSessionStatusScheduled } from "@/src/lib/session-status";
 import type {
   UpcomingSession,
   SessionParticipant,
@@ -32,6 +32,8 @@ type Props = {
   sessions: UpcomingSession[];
   /** Wenn true: alle Sessions anzeigen, kein "Mehr Termine anzeigen"-Button */
   showAll?: boolean;
+  /** Maximale Anzahl sichtbarer Termine (Standard: 2). GM-Dashboard nutzt 1. */
+  maxVisible?: number;
   /** GM-Ansicht: RSVPs, Deadline, manuelle Bestätigung */
   isGM?: boolean;
   /** Kampagnen-IDs ohne Charakter: RSVP ausgeblendet, Hinweis statt Dropdown */
@@ -164,7 +166,7 @@ function SessionRowPlayer({
   };
 
   const deadlineHighlight = session.deadlineReached && !session.userRsvp;
-  const isScheduled = session.status === "Scheduled";
+  const isScheduled = isSessionStatusScheduled(session.status);
   const confirmed = confirmedAttendees(session);
   const userPlaying = isPlayingRsvp(session.userRsvp);
   const userDeclined = session.userRsvp === "Absage";
@@ -383,7 +385,7 @@ function SessionRowGM({
   const [isPending, startTransition] = useTransition();
   const startDate = new Date(session.startTime);
   const isLive = session.status === "Live";
-  const isScheduled = session.status === "Scheduled";
+  const isScheduled = isSessionStatusScheduled(session.status);
 
   const formattedDate = formatUpcomingSessionDate(session.startTime);
   const formattedTime = formatSessionTimeDe(session.startTime);
@@ -596,6 +598,7 @@ export function PastSessionsCard({ sessions }: { sessions: UpcomingSession[] }) 
 export function UpcomingSessionsCard({
   sessions,
   showAll = false,
+  maxVisible = 2,
   isGM = false,
   rsvpBlockedCampaignIds = [],
 }: Props) {
@@ -620,8 +623,8 @@ export function UpcomingSessionsCard({
     );
   }
 
-  const displaySessions = showAll ? sessions : sessions.slice(0, 2);
-  const hasMore = !showAll && sessions.length > 2;
+  const displaySessions = showAll ? sessions : sessions.slice(0, maxVisible);
+  const hasMore = !showAll && sessions.length > maxVisible;
 
   const blockedSet = new Set(rsvpBlockedCampaignIds);
   const [editingSession, setEditingSession] = useState<UpcomingSession | null>(null);

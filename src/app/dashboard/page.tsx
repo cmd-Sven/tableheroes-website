@@ -422,7 +422,7 @@ async function loadGMDashboardData(userId: string) {
 
     getDailyComic(),
 
-    mergeUpcomingAppointments(userId),
+    mergeUpcomingAppointments(userId, 1),
 
     getGMNotifications(userId),
 
