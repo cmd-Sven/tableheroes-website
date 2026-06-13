@@ -151,7 +151,8 @@ export function useSessionChronicleRecorder({
       formData.append("durationMs", String(item.durationMs));
       formData.append("overlapMs", String(item.overlapMs));
       formData.append("mimeType", item.mimeType);
-      formData.append("audio", item.blob, `chunk-${item.chunkIndex}.webm`);
+      const ext = item.mimeType.includes("ogg") ? "ogg" : "webm";
+      formData.append("audio", item.blob, `chunk-${item.chunkIndex}.${ext}`);
       if (chunkMarkersRef.current.length > 0) {
         formData.append("liveMarkers", JSON.stringify(chunkMarkersRef.current));
         chunkMarkersRef.current = [];
@@ -239,7 +240,7 @@ export function useSessionChronicleRecorder({
           blob,
           durationMs: msg.durationMs,
           overlapMs: msg.overlapMs ?? AUDIO_CHUNK_OVERLAP_MS,
-          mimeType: msg.mimeType,
+          mimeType: msg.mimeType.split(";")[0]?.trim() || "audio/webm",
         });
       };
       workerRef.current = worker;

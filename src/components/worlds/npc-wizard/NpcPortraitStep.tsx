@@ -3,6 +3,7 @@
 import { ImageIcon, Loader2, RefreshCw, SkipForward, Sparkles } from "lucide-react";
 import { normalizeImageDisplay, type ImageDisplaySettings } from "@/src/lib/image-display";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
+import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
 
 type Props = {
   npcName: string;
@@ -13,6 +14,9 @@ type Props = {
   imageDisplay: ImageDisplaySettings;
   onImageDisplayChange: (value: ImageDisplaySettings) => void;
   portraitSkipped: boolean;
+  portraitIsAiGenerated: boolean;
+  uploadRightsConfirmed: boolean;
+  onUploadRightsConfirmedChange: (confirmed: boolean) => void;
   isGenerating: boolean;
   canGenerate: boolean;
   disabledReason?: string;
@@ -30,6 +34,9 @@ export function NpcPortraitStep({
   imageDisplay,
   onImageDisplayChange,
   portraitSkipped,
+  portraitIsAiGenerated,
+  uploadRightsConfirmed,
+  onUploadRightsConfirmedChange,
   isGenerating,
   canGenerate,
   disabledReason,
@@ -51,13 +58,16 @@ export function NpcPortraitStep({
 
       <div className="flex flex-col items-center gap-4">
         {imageUrl ? (
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full max-w-sm space-y-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
               alt={`Portrait von ${npcName}`}
               className="w-full rounded-lg border-2 border-accent-gold/50 shadow-lg object-cover aspect-square"
             />
+            {portraitIsAiGenerated && !portraitFile ? (
+              <NpcPortraitAttribution isAiGenerated className="py-0.5" />
+            ) : null}
           </div>
         ) : portraitSkipped ? (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-hero-border bg-slate-900/30 p-8 w-full max-w-sm text-center">
@@ -130,6 +140,9 @@ export function NpcPortraitStep({
             onPortraitFileChange(null);
             onImageDisplayChange(normalizeImageDisplay(null));
           }}
+          isAiGenerated={portraitIsAiGenerated}
+          uploadRightsConfirmed={uploadRightsConfirmed}
+          onUploadRightsConfirmedChange={onUploadRightsConfirmedChange}
           previewAspectClassName="aspect-square max-w-sm"
           compact
         />

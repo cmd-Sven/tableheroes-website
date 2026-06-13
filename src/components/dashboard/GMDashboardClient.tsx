@@ -5,7 +5,6 @@ import {
   Calendar,
   MapPin,
   Megaphone,
-  MessageSquare,
   Plus,
   Smile,
   Sword,
@@ -13,10 +12,6 @@ import {
 import Link from "next/link";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { CampaignCard } from "@/src/components/dashboard/CampaignCard";
-import {
-  GMNotificationsWidget,
-  type PendingApplication,
-} from "@/src/components/dashboard/GMNotificationsWidget";
 import { GMCommunicationHub } from "@/src/components/dashboard/GMCommunicationHub";
 import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 import { NewsInfoCard } from "@/src/components/dashboard/NewsInfoCard";
@@ -38,7 +33,6 @@ type Campaign = {
 type Props = {
   displayName: string;
   campaigns: Campaign[];
-  pendingApplications: PendingApplication[];
   upcomingSessions: UpcomingSession[];
   dashboardNews: NewsPost[];
   dailyComic: { src: string | null };
@@ -49,7 +43,6 @@ type Props = {
 export function GMDashboardClient({
   displayName,
   campaigns,
-  pendingApplications,
   upcomingSessions,
   dashboardNews,
   dailyComic,
@@ -60,7 +53,6 @@ export function GMDashboardClient({
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
           Willkommen zurück, {displayName}
@@ -70,34 +62,14 @@ export function GMDashboardClient({
         </p>
       </div>
 
-      {/* ================================================================ */}
-      {/* TOP ROW: Meldungs-Zentrale (volle Breite)                        */}
-      {/* ================================================================ */}
-      <DashboardCard
-        title="Meldungs-Zentrale"
-        icon={<Bell className="h-5 w-5" />}
-      >
-        <GMNotificationsWidget applications={pendingApplications} />
-      </DashboardCard>
-
-      {/* ================================================================ */}
-      {/* COMMUNICATION HUB (volle Breite)                                */}
-      {/* ================================================================ */}
-      <DashboardCard
-        title="Kommunikation"
-        icon={<MessageSquare className="h-5 w-5" />}
-      >
+      <DashboardCard title="Meldungs-Zentrale" icon={<Bell className="h-5 w-5" />}>
         <GMCommunicationHub
           notifications={gmNotifications}
           recipientCampaigns={gmRecipientCampaigns}
         />
       </DashboardCard>
 
-      {/* ================================================================ */}
-      {/* MAIN GRID: 3-spaltig auf Desktop                                */}
-      {/* ================================================================ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Nächste Termine */}
         <div className="md:col-span-2 lg:col-span-2">
           <DashboardCard
             title="Nächste Termine"
@@ -107,30 +79,19 @@ export function GMDashboardClient({
           </DashboardCard>
         </div>
 
-        {/* Daily Fun */}
         <div className="md:col-span-1">
-          <DashboardCard
-            title="Daily Fun"
-            icon={<Smile className="h-5 w-5" />}
-          >
+          <DashboardCard title="Daily Fun" icon={<Smile className="h-5 w-5" />}>
             <DailyComicCard src={dailyComic.src} />
           </DashboardCard>
         </div>
 
-        {/* Plattform-News */}
         <div className="md:col-span-2 lg:col-span-3">
-          <DashboardCard
-            title="Plattform-News"
-            icon={<Megaphone className="h-5 w-5" />}
-          >
+          <DashboardCard title="Plattform-News" icon={<Megaphone className="h-5 w-5" />}>
             <NewsInfoCard posts={dashboardNews} />
           </DashboardCard>
         </div>
       </div>
 
-      {/* ================================================================ */}
-      {/* CAMPAIGNS SECTION                                                */}
-      {/* ================================================================ */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2">
@@ -172,9 +133,6 @@ export function GMDashboardClient({
         )}
       </div>
 
-      {/* ================================================================ */}
-      {/* BOTTOM: Player Characters                                        */}
-      {/* ================================================================ */}
       <div className="mt-4">
         <h2 className="font-barlow font-bold text-2xl text-white uppercase border-b border-hero-dark pb-2 mb-4">
           Meine Spieler-Charaktere

@@ -17,6 +17,7 @@ import {
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
 import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 
 type WorldEntity = {
   name: string;
@@ -143,6 +144,7 @@ export function AIGenerationWizard({
   const [factionsList, setFactionsList] = useState(factions);
   const [resolvedWorldId, setResolvedWorldId] = useState<string | null>(worldIdProp ?? null);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [portraitDisplay, setPortraitDisplay] = useState<ImageDisplaySettings>({
     ...DEFAULT_IMAGE_DISPLAY,
   });
@@ -758,6 +760,13 @@ export function AIGenerationWizard({
           imageDisplay = normalizeImageDisplay(portraitDisplay);
         }
 
+        const portraitMeta = buildNpcPortraitMeta({
+          imageUrl,
+          portraitFile,
+          portraitIsAiGenerated: false,
+          uploadRightsConfirmed,
+        });
+
         const createdNPC = await createNPC({
           campaign_id: campaignId,
           name: wizardData.name,
@@ -772,6 +781,8 @@ export function AIGenerationWizard({
           gm_notes: finalFields?.gm_notes || undefined,
           image_url: imageUrl,
           image_display: imageDisplay ?? undefined,
+          image_is_ai_generated: portraitMeta.image_is_ai_generated,
+          image_upload_rights_confirmed: portraitMeta.image_upload_rights_confirmed,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId || undefined,
@@ -980,6 +991,8 @@ export function AIGenerationWizard({
     setSelectedInferenceSuggestions,
     portraitFile,
     setPortraitFile,
+    uploadRightsConfirmed,
+    setUploadRightsConfirmed,
     portraitDisplay,
     setPortraitDisplay,
   };

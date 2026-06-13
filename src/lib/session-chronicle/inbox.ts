@@ -6,8 +6,10 @@ import type {
   SpontaneousQuestDraft,
 } from "./types";
 
-function isPending<T extends { isImported: boolean }>(row: T): boolean {
-  return row.isImported !== true;
+function isPending<T extends { isImported: boolean; isDismissed?: boolean }>(
+  row: T,
+): boolean {
+  return row.isImported !== true && row.isDismissed !== true;
 }
 
 /** Alle noch nicht importierten Vorschläge aus dem laufenden Chronicle-State. */
@@ -74,6 +76,45 @@ export function markQuestImported(
     isImported: true,
     imported_entity_id: entityId,
   });
+}
+
+export function dismissNpc(
+  state: SessionChronicleState,
+  index: number,
+): SessionChronicleState {
+  return patchDraft(state, "spontaneous_npcs", index, { isDismissed: true });
+}
+
+export function dismissLocation(
+  state: SessionChronicleState,
+  index: number,
+): SessionChronicleState {
+  return patchDraft(state, "spontaneous_locations", index, { isDismissed: true });
+}
+
+export function dismissQuest(
+  state: SessionChronicleState,
+  index: number,
+): SessionChronicleState {
+  return patchDraft(state, "spontaneous_quests", index, { isDismissed: true });
+}
+
+/** Alle noch offenen Vorschläge der Session verwerfen. */
+export function dismissAllPendingInboxItems(
+  state: SessionChronicleState,
+): SessionChronicleState {
+  return {
+    ...state,
+    spontaneous_npcs: state.spontaneous_npcs.map((draft) =>
+      isPending(draft) ? { ...draft, isDismissed: true } : draft,
+    ),
+    spontaneous_locations: state.spontaneous_locations.map((draft) =>
+      isPending(draft) ? { ...draft, isDismissed: true } : draft,
+    ),
+    spontaneous_quests: state.spontaneous_quests.map((draft) =>
+      isPending(draft) ? { ...draft, isDismissed: true } : draft,
+    ),
+  };
 }
 
 function patchDraft<

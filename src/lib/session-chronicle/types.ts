@@ -19,6 +19,8 @@ export type SpontaneousNpcDraft = {
   };
   located_in?: string;
   isImported: boolean;
+  /** Vom GM verworfen — erscheint nicht mehr in der Inbox */
+  isDismissed?: boolean;
   /** Nach Import: permanente NPC-ID */
   imported_entity_id?: string | null;
 };
@@ -28,6 +30,7 @@ export type SpontaneousLocationDraft = {
   type: string;
   description?: string;
   isImported: boolean;
+  isDismissed?: boolean;
   imported_entity_id?: string | null;
 };
 
@@ -36,6 +39,7 @@ export type SpontaneousQuestDraft = {
   giver?: string;
   objective?: string;
   isImported: boolean;
+  isDismissed?: boolean;
   imported_entity_id?: string | null;
 };
 

@@ -105,6 +105,12 @@ export function formatSessionDateTimeDe(iso: string | Date): {
   };
 }
 
+/** Wert für HTML datetime-local — Kalenderzeit in Europe/Berlin. */
+export function toBerlinDateTimeLocal(iso: string | Date): string {
+  const { year, month, day, hour, minute } = getBerlinParts(new Date(iso));
+  return `${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}`;
+}
+
 /** Wochentag 0=So … 6=Sa am Berlin-Kalendertag. */
 export function getBerlinWeekday(year: number, month: number, day: number): number {
   const noon = berlinLocalToUtc(year, month, day, 12, 0);

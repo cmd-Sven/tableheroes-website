@@ -612,12 +612,12 @@ export async function generateNPCPortrait(
   });
 
   const response = await openai.images.generate({
-    model: "dall-e-3",
+    model: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
     prompt,
     n: 1,
     size: "1024x1024",
-    quality: "standard",
-    response_format: "b64_json",
+    quality: "medium",
+    output_format: "png",
   });
 
   const b64 = response.data?.[0]?.b64_json;

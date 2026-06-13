@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/src/lib/supabase/server";
 import {
+  dismissAllPendingInboxItems,
+  dismissLocation,
+  dismissNpc,
+  dismissQuest,
   markLocationImported,
   markNpcImported,
   markQuestImported,
@@ -72,7 +76,21 @@ export async function markChronicleInboxItemImported(
     updated = markQuestImported(state, index, trimmedId);
   }
 
-  const { error } = await (auth.supabase as any)
+  return persistChronicleState(
+    auth.supabase,
+    auth.sessionId,
+    auth.campaignId,
+    updated,
+  );
+}
+
+async function persistChronicleState(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  campaignId: string,
+  updated: SessionChronicleState,
+): Promise<MarkChronicleImportResult> {
+  const { error } = await (supabase as any)
     .from("session_chronicle_state")
     .update({
       spontaneous_npcs: updated.spontaneous_npcs,
@@ -84,8 +102,66 @@ export async function markChronicleInboxItemImported(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath(`/dashboard/campaigns/${auth.campaignId}/chronist`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/chronist`);
   revalidatePath(`/session/${sessionId}`);
 
   return { ok: true };
+}
+
+export async function dismissChronicleInboxItem(
+  sessionId: string,
+  kind: "npc" | "location" | "quest",
+  index: number,
+): Promise<MarkChronicleImportResult> {
+  const auth = await authorizeSessionGm(sessionId);
+  if (!auth.ok) return auth;
+
+  const { data: stateRaw } = await (auth.supabase as any)
+    .from("session_chronicle_state")
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const state = parseChronicleStateRow(stateRaw);
+  if (!state) return { ok: false, error: "Chronist-Zustand nicht gefunden." };
+
+  let updated: SessionChronicleState;
+  if (kind === "npc") {
+    updated = dismissNpc(state, index);
+  } else if (kind === "location") {
+    updated = dismissLocation(state, index);
+  } else {
+    updated = dismissQuest(state, index);
+  }
+
+  return persistChronicleState(
+    auth.supabase,
+    auth.sessionId,
+    auth.campaignId,
+    updated,
+  );
+}
+
+export async function dismissAllChronicleInboxItems(
+  sessionId: string,
+): Promise<MarkChronicleImportResult> {
+  const auth = await authorizeSessionGm(sessionId);
+  if (!auth.ok) return auth;
+
+  const { data: stateRaw } = await (auth.supabase as any)
+    .from("session_chronicle_state")
+    .select("*")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  const state = parseChronicleStateRow(stateRaw);
+  if (!state) return { ok: false, error: "Chronist-Zustand nicht gefunden." };
+
+  const updated = dismissAllPendingInboxItems(state);
+  return persistChronicleState(
+    auth.supabase,
+    auth.sessionId,
+    auth.campaignId,
+    updated,
+  );
 }

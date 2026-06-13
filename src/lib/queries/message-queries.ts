@@ -1,4 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { getPendingApplications } from "@/src/lib/queries/application-queries";
+import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
+import { countPendingInboxItems } from "@/src/lib/session-chronicle/inbox";
 
 export type GMNotification = {
   id: string;
@@ -6,6 +9,7 @@ export type GMNotification = {
     | "application"
     | "character_update"
     | "session_completed"
+    | "chronicle_inbox"
     | "system";
   message: string;
   href: string | null;
@@ -59,39 +63,32 @@ export async function getGMNotifications(
     campaignList.map((c: any) => [c.id, c.name]),
   );
 
-  const { data: applicationsRaw } = await (
-    supabase.from("campaign_members") as any
-  )
-    .select("id, campaign_id, user_id, created_at, users ( username, avatar_url )")
-    .in("campaign_id", campaignIds)
-    .eq("status", "Applied")
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  for (const app of (applicationsRaw as any[]) || []) {
-    const username = (app.users as any)?.username ?? "Unbekannt";
-    const campaignName = campaignMap.get(app.campaign_id) ?? "Kampagne";
+  const applications = await getPendingApplications(userId);
+  for (const app of applications) {
+    const username = app.users?.username ?? "Unbekannt";
+    const campaignId = app.campaigns?.id ?? app.campaign_id;
+    const campaignName = app.campaigns?.name ?? campaignMap.get(campaignId) ?? "Kampagne";
     notifications.push({
       id: `app-${app.id}`,
       type: "application",
       message: `Neue Bewerbung von ${username} für „${campaignName}"`,
-      href: `/dashboard/campaigns/${app.campaign_id}/gm-inbox`,
-      campaignId: app.campaign_id,
+      href: `/dashboard/campaigns/${campaignId}/gm-inbox`,
+      campaignId,
       campaignName,
       actorName: username,
-      actorAvatarUrl: (app.users as any)?.avatar_url ?? null,
-      createdAt: app.created_at,
+      actorAvatarUrl: null,
+      createdAt: app.created_at ?? new Date().toISOString(),
     });
   }
 
   const { data: pendingCharsRaw } = await (supabase.from("characters") as any)
     .select(
-      "id, name, campaign_id, user_id, updated_at, users ( username, avatar_url )",
+      "id, name, campaign_id, user_id, updated_at, created_at, users ( username, avatar_url )",
     )
     .in("campaign_id", campaignIds)
-    .eq("status", "Applied")
+    .eq("status", "Pending_Approval")
     .order("updated_at", { ascending: false })
-    .limit(10);
+    .limit(15);
 
   for (const char of (pendingCharsRaw as any[]) || []) {
     const username = (char.users as any)?.username ?? "Unbekannt";
@@ -105,7 +102,44 @@ export async function getGMNotifications(
       campaignName,
       actorName: username,
       actorAvatarUrl: (char.users as any)?.avatar_url ?? null,
-      createdAt: char.updated_at ?? new Date().toISOString(),
+      createdAt: char.updated_at ?? char.created_at ?? new Date().toISOString(),
+    });
+  }
+
+  const { data: chronicleStatesRaw } = await (supabase as any)
+    .from("session_chronicle_state")
+    .select("*")
+    .in("campaign_id", campaignIds);
+
+  const chroniclePendingByCampaign = new Map<string, number>();
+  let latestChronicleAt = new Map<string, string>();
+  for (const row of chronicleStatesRaw ?? []) {
+    const state = parseChronicleStateRow(row);
+    if (!state?.campaign_id) continue;
+    const pending = countPendingInboxItems(state);
+    if (pending <= 0) continue;
+    chroniclePendingByCampaign.set(
+      state.campaign_id,
+      (chroniclePendingByCampaign.get(state.campaign_id) ?? 0) + pending,
+    );
+    const prev = latestChronicleAt.get(state.campaign_id);
+    if (!prev || state.updated_at > prev) {
+      latestChronicleAt.set(state.campaign_id, state.updated_at);
+    }
+  }
+
+  for (const [campaignId, count] of chroniclePendingByCampaign) {
+    const campaignName = campaignMap.get(campaignId) ?? "Kampagne";
+    notifications.push({
+      id: `chronicle-${campaignId}`,
+      type: "chronicle_inbox",
+      message: `${count} Chronist-Vorschlag${count === 1 ? "" : "e"} in „${campaignName}" warten auf Import`,
+      href: `/dashboard/campaigns/${campaignId}/chronist`,
+      campaignId,
+      campaignName,
+      actorName: null,
+      actorAvatarUrl: null,
+      createdAt: latestChronicleAt.get(campaignId) ?? new Date().toISOString(),
     });
   }
 

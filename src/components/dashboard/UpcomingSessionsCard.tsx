@@ -1,10 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check } from "lucide-react";
+import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check, Pencil } from "lucide-react";
+import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
+import { canEditSessionSchedule } from "@/src/lib/session-status";
 import type {
   UpcomingSession,
   SessionParticipant,
@@ -370,7 +372,13 @@ function SessionRowPlayer({
 /* ------------------------------------------------------------------ */
 /* Session-Karte (GM: RSVPs, Deadline, Bestätigung)                   */
 /* ------------------------------------------------------------------ */
-function SessionRowGM({ session }: { session: UpcomingSession }) {
+function SessionRowGM({
+  session,
+  onEditSchedule,
+}: {
+  session: UpcomingSession;
+  onEditSchedule?: () => void;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const startDate = new Date(session.startTime);
@@ -427,6 +435,16 @@ function SessionRowGM({ session }: { session: UpcomingSession }) {
             <p className="font-libre text-xs text-gray-500 mt-1">
               {formattedDate} • {formattedTime} Uhr
             </p>
+            {isScheduled && !session.isCommunityEvent && onEditSchedule ? (
+              <button
+                type="button"
+                onClick={onEditSchedule}
+                className="mt-2 inline-flex items-center gap-1.5 rounded border border-hero-border/50 bg-hero-dark/40 px-2.5 py-1 font-barlow text-[10px] font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Termin ändern
+              </button>
+            ) : null}
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 font-barlow font-bold uppercase text-[10px] ${
             isLive ? "bg-red-900/60 text-red-300" : "bg-blue-900/40 text-blue-300"
@@ -581,6 +599,7 @@ export function UpcomingSessionsCard({
   isGM = false,
   rsvpBlockedCampaignIds = [],
 }: Props) {
+  const router = useRouter();
   if (sessions.length === 0) {
     return (
       <div className="w-full p-4">
@@ -605,12 +624,21 @@ export function UpcomingSessionsCard({
   const hasMore = !showAll && sessions.length > 2;
 
   const blockedSet = new Set(rsvpBlockedCampaignIds);
+  const [editingSession, setEditingSession] = useState<UpcomingSession | null>(null);
 
   return (
     <div className="w-full p-4 space-y-3">
       {displaySessions.map((s) =>
         isGM ? (
-          <SessionRowGM key={s.id} session={s} />
+          <SessionRowGM
+            key={s.id}
+            session={s}
+            onEditSchedule={
+              !s.isCommunityEvent && canEditSessionSchedule(s.status)
+                ? () => setEditingSession(s)
+                : undefined
+            }
+          />
         ) : (
           <SessionRowPlayer
             key={s.id}
@@ -628,6 +656,24 @@ export function UpcomingSessionsCard({
           <ChevronRight className="h-4 w-4" />
         </Link>
       )}
+      {editingSession ? (
+        <SessionEditModal
+          session={{
+            id: editingSession.id,
+            title: editingSession.title,
+            start_time: editingSession.startTime,
+            end_time: editingSession.endTime,
+            status: editingSession.status,
+          }}
+          campaignId={editingSession.campaignId}
+          isOpen
+          onClose={() => setEditingSession(null)}
+          onSuccess={() => {
+            setEditingSession(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -24,7 +24,13 @@ type WorkerOutMessage =
       durationMs: number;
       overlapMs: number;
     }
-  | { type: "flush-ready"; chunkIndex: number; buffer: ArrayBuffer; mimeType: string; durationMs: number };
+  | {
+      type: "flush-ready";
+      chunkIndex: number;
+      buffer: ArrayBuffer;
+      mimeType: string;
+      durationMs: number;
+    };
 
 const SLICE_MS = 1000;
 
@@ -32,7 +38,13 @@ let parts: AudioPart[] = [];
 let accumulatedMs = 0;
 let chunkIndex = 0;
 let overlapTail: AudioPart[] = [];
-let mimeType = "audio/webm;codecs=opus";
+let mimeType = "audio/webm";
+
+function normalizeMimeType(raw: string | undefined): string {
+  const base = (raw ?? "audio/webm").split(";")[0]?.trim().toLowerCase() || "audio/webm";
+  if (base === "audio/ogg" || base === "audio/wav" || base === "audio/webm") return base;
+  return "audio/webm";
+}
 
 function resetState() {
   parts = [];
@@ -51,20 +63,23 @@ function pickOverlapTail(source: AudioPart[]): AudioPart[] {
   return tail;
 }
 
-function buildChunkBuffer(includeOverlap: AudioPart[], body: AudioPart[]): ArrayBuffer {
-  const merged = [...includeOverlap, ...body];
-  const totalLength = merged.reduce((sum, p) => sum + p.buffer.byteLength, 0);
-  const out = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const part of merged) {
-    out.set(new Uint8Array(part.buffer), offset);
-    offset += part.buffer.byteLength;
-  }
-  return out.buffer;
+/** MediaRecorder-Slices müssen als Blob-Liste zusammengefügt werden — kein Byte-Concat. */
+async function buildChunkBuffer(merged: AudioPart[], mime: string): Promise<ArrayBuffer> {
+  if (merged.length === 0) return new ArrayBuffer(0);
+  const blob = new Blob(
+    merged.map((part) => new Blob([part.buffer], { type: mime })),
+    { type: mime },
+  );
+  return blob.arrayBuffer();
 }
 
-function emitChunk(includeOverlap: AudioPart[], body: AudioPart[], durationMs: number) {
-  const buffer = buildChunkBuffer(includeOverlap, body);
+async function emitChunk(
+  includeOverlap: AudioPart[],
+  body: AudioPart[],
+  durationMs: number,
+) {
+  const merged = [...includeOverlap, ...body];
+  const buffer = await buildChunkBuffer(merged, mimeType);
   const msg: WorkerOutMessage = {
     type: "chunk-ready",
     chunkIndex,
@@ -85,7 +100,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
   }
 
   if (msg.type === "audio") {
-    if (msg.mimeType) mimeType = msg.mimeType;
+    if (msg.mimeType) mimeType = normalizeMimeType(msg.mimeType);
     const part: AudioPart = {
       buffer: msg.buffer,
       durationMs: msg.durationMs ?? SLICE_MS,
@@ -94,7 +109,11 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     accumulatedMs += part.durationMs;
 
     if (accumulatedMs >= AUDIO_CHUNK_DURATION_MS) {
-      emitChunk(overlapTail, parts, accumulatedMs + overlapTail.reduce((s, p) => s + p.durationMs, 0));
+      void emitChunk(
+        overlapTail,
+        parts,
+        accumulatedMs + overlapTail.reduce((s, p) => s + p.durationMs, 0),
+      );
       overlapTail = pickOverlapTail(parts);
       parts = [];
       accumulatedMs = 0;
@@ -103,22 +122,25 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
   }
 
   if (msg.type === "flush") {
-    if (msg.mimeType) mimeType = msg.mimeType;
+    if (msg.mimeType) mimeType = normalizeMimeType(msg.mimeType);
     if (parts.length === 0 && overlapTail.length === 0) return;
-    const buffer = buildChunkBuffer(overlapTail, parts);
-    const durationMs =
-      parts.reduce((s, p) => s + p.durationMs, 0) +
-      overlapTail.reduce((s, p) => s + p.durationMs, 0);
-    const out: WorkerOutMessage = {
-      type: "flush-ready",
-      chunkIndex,
-      buffer,
-      mimeType,
-      durationMs,
-    };
-    self.postMessage(out, [buffer]);
-    chunkIndex += 1;
-    resetState();
+    void (async () => {
+      const merged = [...overlapTail, ...parts];
+      const buffer = await buildChunkBuffer(merged, mimeType);
+      const durationMs =
+        parts.reduce((s, p) => s + p.durationMs, 0) +
+        overlapTail.reduce((s, p) => s + p.durationMs, 0);
+      const out: WorkerOutMessage = {
+        type: "flush-ready",
+        chunkIndex,
+        buffer,
+        mimeType,
+        durationMs,
+      };
+      self.postMessage(out, [buffer]);
+      chunkIndex += 1;
+      resetState();
+    })();
   }
 };
 

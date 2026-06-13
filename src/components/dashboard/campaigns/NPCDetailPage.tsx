@@ -33,7 +33,9 @@ import {
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
 import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
+import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
 import {
   updateNPC,
   updateNPCNotes,
@@ -84,6 +86,8 @@ type NPC = {
   gm_notes: string | null;
   image_url: string | null;
   image_display?: unknown;
+  image_is_ai_generated?: boolean | null;
+  image_upload_rights_confirmed?: boolean | null;
   is_revealed: boolean;
   is_favorite?: boolean;
   all_quests?: Quest[];
@@ -268,6 +272,7 @@ export function NPCDetailPage({
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [imageDisplayEdit, setImageDisplayEdit] = useState<ImageDisplaySettings | null>(null);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const npcWorldId = worldId ?? (npc as { world_id?: string }).world_id ?? null;
 
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
@@ -472,6 +477,18 @@ export function NPCDetailPage({
           updates.image_display = nextImageUrl
             ? normalizeImageDisplay(imageDisplayEdit ?? npc.image_display)
             : null;
+
+          if (portraitFile || !nextImageUrl) {
+            const portraitMeta = buildNpcPortraitMeta({
+              imageUrl: nextImageUrl,
+              portraitFile,
+              portraitIsAiGenerated: false,
+              uploadRightsConfirmed,
+            });
+            updates.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+            updates.image_upload_rights_confirmed =
+              portraitMeta.image_upload_rights_confirmed;
+          }
         } else if (field === "faction_id" || field === "current_location_id") {
           updates[field] = value && value.trim() !== "" ? value : null;
         } else {
@@ -514,8 +531,17 @@ export function NPCDetailPage({
             image_display: savedUrl
               ? normalizeImageDisplay(imageDisplayEdit ?? prev.image_display)
               : null,
+            image_is_ai_generated:
+              portraitFile || !savedUrl
+                ? (updates.image_is_ai_generated as boolean | undefined) ?? false
+                : prev.image_is_ai_generated,
+            image_upload_rights_confirmed:
+              portraitFile || !savedUrl
+                ? (updates.image_upload_rights_confirmed as boolean | null | undefined) ?? null
+                : prev.image_upload_rights_confirmed,
           }));
           setPortraitFile(null);
+          setUploadRightsConfirmed(false);
         } else {
           setNpc((prev) => ({ ...prev, [field]: value || null }));
         }
@@ -537,6 +563,7 @@ export function NPCDetailPage({
     setEditValues({});
     setImageDisplayEdit(null);
     setPortraitFile(null);
+    setUploadRightsConfirmed(false);
   };
 
   const handleStartEdit = (field: string, currentValue: string | null) => {
@@ -545,9 +572,11 @@ export function NPCDetailPage({
     if (field === "image_url") {
       setImageDisplayEdit(normalizeImageDisplay(npc.image_display));
       setPortraitFile(null);
+      setUploadRightsConfirmed(false);
     } else {
       setImageDisplayEdit(null);
       setPortraitFile(null);
+      setUploadRightsConfirmed(false);
     }
   };
 
@@ -756,11 +785,18 @@ export function NPCDetailPage({
                   <NpcPortraitUploadField
                     imageUrl={editValues.image_url || npc.image_url || ""}
                     portraitFile={portraitFile}
-                    onPortraitFileChange={setPortraitFile}
+                    onPortraitFileChange={(file) => {
+                      setPortraitFile(file);
+                      if (file) setUploadRightsConfirmed(false);
+                    }}
                     imageDisplay={imageDisplayEdit ?? normalizeImageDisplay(npc.image_display)}
                     onImageDisplayChange={setImageDisplayEdit}
+                    isAiGenerated={npc.image_is_ai_generated === true && !portraitFile}
+                    uploadRightsConfirmed={uploadRightsConfirmed}
+                    onUploadRightsConfirmedChange={setUploadRightsConfirmed}
                     onClearImage={() => {
                       setPortraitFile(null);
+                      setUploadRightsConfirmed(false);
                       setEditValues({ image_url: "" });
                       setImageDisplayEdit(normalizeImageDisplay(null));
                     }}
@@ -769,27 +805,33 @@ export function NPCDetailPage({
                 </div>
               }
             >
-              {npc.image_url ? (
-                <div
-                  className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg"
-                  style={imageDisplayBackdropStyle(normalizeImageDisplay(npc.image_display))}
-                >
-                  <Image
-                    src={npc.image_url}
-                    alt={npc.name}
-                    fill
-                    className="select-none"
-                    style={imageDisplayObjectStyle(normalizeImageDisplay(npc.image_display))}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="w-48 h-64 lg:w-56 lg:h-72 rounded-xl border-2 border-hero-border bg-hero-dark/50 flex items-center justify-center shadow-lg">
-                  <User className="h-24 w-24 text-gray-500" />
-                </div>
-              )}
+              <div className="space-y-1">
+                {npc.image_url ? (
+                  <div
+                    className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg"
+                    style={imageDisplayBackdropStyle(normalizeImageDisplay(npc.image_display))}
+                  >
+                    <Image
+                      src={npc.image_url}
+                      alt={npc.name}
+                      fill
+                      className="select-none"
+                      style={imageDisplayObjectStyle(normalizeImageDisplay(npc.image_display))}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-48 h-64 lg:w-56 lg:h-72 rounded-xl border-2 border-hero-border bg-hero-dark/50 flex items-center justify-center shadow-lg">
+                    <User className="h-24 w-24 text-gray-500" />
+                  </div>
+                )}
+                <NpcPortraitAttribution
+                  isAiGenerated={npc.image_is_ai_generated}
+                  className="w-48 lg:w-56"
+                />
+              </div>
             </InlineEditField>
           </div>
 

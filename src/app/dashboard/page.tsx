@@ -17,7 +17,6 @@ import {
 import { getPointsLog } from "@/src/lib/queries/point-queries";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
 import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
-import type { PendingApplication } from "@/src/components/dashboard/GMNotificationsWidget";
 import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
 
 type UserProfile = {
@@ -161,7 +160,6 @@ export default async function DashboardPage() {
     <GMDashboardClient
       displayName={gmDisplayName}
       campaigns={gmData.campaigns}
-      pendingApplications={gmData.pendingApplications}
       upcomingSessions={gmData.upcomingSessions}
       dashboardNews={gmData.dashboardNews}
       dailyComic={gmData.dailyComic}
@@ -409,48 +407,25 @@ async function loadGMDashboardData(userId: string) {
   // Alle Daten parallel laden für maximale Performance
   const [
     campaignsRes,
-    applicationsRes,
     newsResult,
     dailyComic,
     upcomingSessions,
     gmNotifications,
     gmRecipientCampaigns,
   ] = await Promise.all([
-    // 1. GM-Kampagnen
     (supabase.from("campaigns") as any)
       .select("id, name, system, max_players")
       .eq("gm_id", userId)
       .order("created_at", { ascending: false }),
 
-    // 2. Offene Bewerbungen MIT User-Daten
-    (supabase.from("campaign_members") as any)
-      .select(
-        `
-        id,
-        campaign_id,
-        user_id,
-        created_at,
-        campaigns!inner ( id, name, gm_id ),
-        users ( id, username, avatar_url )
-      `
-      )
-      .eq("campaigns.gm_id", userId)
-      .eq("status", "Applied")
-      .order("created_at", { ascending: false }),
-
-    // 3. News
     getNewsForDashboard(userId),
 
-    // 4. Daily Comic
     getDailyComic(),
 
-    // 5. Upcoming Sessions
     mergeUpcomingAppointments(userId),
 
-    // 6. GM Notifications (System-Meldungen)
     getGMNotifications(userId),
 
-    // 7. GM Recipients (für Messenger)
     getGMRecipients(userId),
   ]);
 
@@ -461,22 +436,8 @@ async function loadGMDashboardData(userId: string) {
     max_players: (c.max_players as number | null) ?? null,
   }));
 
-  // Bewerbungen in das Format für GMNotificationsWidget mappen
-  const pendingApplications: PendingApplication[] = (
-    (applicationsRes.data as any[]) || []
-  ).map((app: any) => ({
-    id: app.id as string,
-    userId: (app.user_id as string) ?? "",
-    username: (app.users as any)?.username ?? "Unbekannt",
-    avatarUrl: (app.users as any)?.avatar_url ?? null,
-    campaignId: (app.campaigns as any)?.id ?? app.campaign_id,
-    campaignName: (app.campaigns as any)?.name ?? "Kampagne",
-    appliedAt: (app.created_at as string | null) ?? null,
-  }));
-
   return {
     campaigns,
-    pendingApplications,
     dashboardNews: newsResult.posts,
     dailyComic,
     upcomingSessions,

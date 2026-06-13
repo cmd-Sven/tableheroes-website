@@ -169,6 +169,8 @@ type WizardContentProps = {
   setSelectedInferenceSuggestions: React.Dispatch<React.SetStateAction<Set<string>>>;
   portraitFile: File | null;
   setPortraitFile: React.Dispatch<React.SetStateAction<File | null>>;
+  uploadRightsConfirmed: boolean;
+  setUploadRightsConfirmed: React.Dispatch<React.SetStateAction<boolean>>;
   portraitDisplay: ImageDisplaySettings;
   setPortraitDisplay: React.Dispatch<React.SetStateAction<ImageDisplaySettings>>;
 };
@@ -216,6 +218,8 @@ export function WizardContent({
   setSelectedInferenceSuggestions,
   portraitFile,
   setPortraitFile,
+  uploadRightsConfirmed,
+  setUploadRightsConfirmed,
   portraitDisplay,
   setPortraitDisplay,
 }: WizardContentProps) {
@@ -1009,11 +1013,17 @@ export function WizardContent({
               <NpcPortraitUploadField
                 imageUrl={wizardData.finalData?.image_url || ""}
                 portraitFile={portraitFile}
-                onPortraitFileChange={setPortraitFile}
+                onPortraitFileChange={(file) => {
+                  setPortraitFile(file);
+                  if (file) setUploadRightsConfirmed(false);
+                }}
                 imageDisplay={portraitDisplay}
                 onImageDisplayChange={setPortraitDisplay}
+                uploadRightsConfirmed={uploadRightsConfirmed}
+                onUploadRightsConfirmedChange={setUploadRightsConfirmed}
                 onClearImage={() => {
                   setPortraitFile(null);
+                  setUploadRightsConfirmed(false);
                   updateFinalData({ image_url: "" });
                 }}
                 previewAspectClassName="aspect-[3/4] max-w-[200px]"

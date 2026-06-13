@@ -40,7 +40,7 @@ import {
 } from "@/src/components/dashboard/campaigns/PastSessionsGallery";
 import { LastSessionRecapCard } from "@/src/components/chronicle/LastSessionRecapCard";
 import type { LatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
-import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
+import { isSessionStatusLive, isSessionStatusScheduled, canEditSessionSchedule } from "@/src/lib/session-status";
 import {
   isMissedScheduledSession,
   isScheduledInGraceOverdue,
@@ -103,6 +103,7 @@ function sessionCardBorderClass(session: SessionItem): string {
 function SessionActionsDropdown({
   isStarting,
   onEdit,
+  onEditSchedule,
   onDelete,
   onCancel,
   onArchiveQuiet,
@@ -110,9 +111,11 @@ function SessionActionsDropdown({
   hasAcceptedRsvps,
   isLive,
   isScheduled,
+  canEditSchedule,
 }: {
   isStarting: boolean;
-  onEdit: () => void;
+  onEdit?: () => void;
+  onEditSchedule?: () => void;
   onDelete: () => void;
   onCancel?: () => void;
   onArchiveQuiet?: () => void;
@@ -120,6 +123,7 @@ function SessionActionsDropdown({
   hasAcceptedRsvps?: boolean;
   isLive?: boolean;
   isScheduled?: boolean;
+  canEditSchedule?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -164,18 +168,33 @@ function SessionActionsDropdown({
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  onEdit();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-gray-300 hover:bg-hero-dark hover:text-hero-vibrant transition-colors"
-              >
-                <Pencil className="h-4 w-4" />
-                Bearbeiten
-              </button>
+              {canEditSchedule && onEditSchedule ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onEditSchedule();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-hero-vibrant hover:bg-hero-dark transition-colors"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Termin ändern
+                </button>
+              ) : onEdit ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onEdit();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-sm uppercase text-gray-300 hover:bg-hero-dark hover:text-hero-vibrant transition-colors"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Bearbeiten
+                </button>
+              ) : null}
               {isScheduled && onCancel ? (
                 <button
                   type="button"
@@ -367,16 +386,30 @@ export function SessionsTab({
     }
   }
 
+  function renderScheduleEditButton(session: SessionItem) {
+    if (!isGM || !canEditSessionSchedule(session.status)) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setEditingSession(session)}
+        className="inline-flex items-center gap-1.5 rounded border border-hero-border/50 bg-hero-dark/50 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant transition-colors"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        Termin ändern
+      </button>
+    );
+  }
+
   function renderSessionActions(session: SessionItem) {
     const live = isSessionStatusLive(session.status);
     const scheduled = isSessionStatusScheduled(session.status);
-    const st = String(session.status ?? "").toLowerCase();
-    const terminal = st === "completed" || st === "cancelled";
-    if (!isGM || (!scheduled && !live && !terminal)) return null;
+    const canSchedule = canEditSessionSchedule(session.status);
+    if (!isGM || (!scheduled && !live)) return null;
     return (
       <SessionActionsDropdown
         isStarting={isStarting}
-        onEdit={() => setEditingSession(session)}
+        onEditSchedule={canSchedule ? () => setEditingSession(session) : undefined}
+        canEditSchedule={canSchedule}
         onDelete={() => handleDelete(session.id)}
         onCancel={() => handleCancel(session.id)}
         onArchiveQuiet={
@@ -546,6 +579,9 @@ export function SessionsTab({
                       <p className="mt-2 font-barlow text-sm uppercase text-accent-gold">
                         {formattedDate} · {formattedTime} Uhr
                       </p>
+                      {scheduled && isGM ? (
+                        <div className="mt-2">{renderScheduleEditButton(focusSession)}</div>
+                      ) : null}
                       <p className="mt-1 font-libre text-xs text-gray-500">
                         {getSessionTypeLabel(focusSession.type)}
                       </p>
@@ -703,6 +739,9 @@ export function SessionsTab({
                       <p className="font-barlow font-bold text-sm text-white">
                         {session.title || "Session"} · {formattedDate} · {formattedTime}
                       </p>
+                      {scheduled && isGM ? (
+                        <div className="mt-1.5">{renderScheduleEditButton(session)}</div>
+                      ) : null}
                       <span
                         className={`mt-1 inline-block rounded px-2 py-0.5 font-barlow text-[9px] font-bold uppercase ${
                           live ? "bg-red-900/40 text-red-200" : graceOverdue ? "bg-amber-900/40 text-amber-100" : "bg-emerald-900/30 text-emerald-200"
@@ -770,12 +809,14 @@ export function SessionsTab({
                               {formattedDate} {formattedTime} · {label}
                             </p>
                           </div>
-                          {isGM ? (
+                          {isGM && isSessionStatusScheduled(session.status) ? (
                             <SessionActionsDropdown
                               isStarting={isStarting}
-                              onEdit={() => setEditingSession(session)}
+                              onEditSchedule={() => setEditingSession(session)}
+                              canEditSchedule
                               onDelete={() => handleDelete(session.id)}
                               hasAcceptedRsvps={session.hasAcceptedRsvps}
+                              isScheduled
                             />
                           ) : null}
                         </li>

@@ -1930,6 +1930,8 @@ export type Database = {
           home_location_id: string | null
           id: string
           image_display: Json | null
+          image_is_ai_generated: boolean
+          image_upload_rights_confirmed: boolean | null
           image_url: string | null
           is_dead: boolean | null
           is_merchant: boolean
@@ -1964,6 +1966,8 @@ export type Database = {
           home_location_id?: string | null
           id?: string
           image_display?: Json | null
+          image_is_ai_generated?: boolean
+          image_upload_rights_confirmed?: boolean | null
           image_url?: string | null
           is_dead?: boolean | null
           is_merchant?: boolean
@@ -1998,6 +2002,8 @@ export type Database = {
           home_location_id?: string | null
           id?: string
           image_display?: Json | null
+          image_is_ai_generated?: boolean
+          image_upload_rights_confirmed?: boolean | null
           image_url?: string | null
           is_dead?: boolean | null
           is_merchant?: boolean
@@ -2920,6 +2926,7 @@ export type Database = {
           is_live: boolean | null
           registration_closed_on_landing: boolean
           rsvp_deadline_days: number | null
+          schedule_customized: boolean
           show_open_slots_on_landing: boolean
           show_session_title_on_landing: boolean
           stage_deck_faction_ids: string[] | null
@@ -2940,6 +2947,7 @@ export type Database = {
           is_live?: boolean | null
           registration_closed_on_landing?: boolean
           rsvp_deadline_days?: number | null
+          schedule_customized?: boolean
           show_open_slots_on_landing?: boolean
           show_session_title_on_landing?: boolean
           stage_deck_faction_ids?: string[] | null
@@ -2960,6 +2968,7 @@ export type Database = {
           is_live?: boolean | null
           registration_closed_on_landing?: boolean
           rsvp_deadline_days?: number | null
+          schedule_customized?: boolean
           show_open_slots_on_landing?: boolean
           show_session_title_on_landing?: boolean
           stage_deck_faction_ids?: string[] | null

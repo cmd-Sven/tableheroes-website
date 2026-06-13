@@ -20,6 +20,11 @@ export function isSessionStatusLive(status: unknown): boolean {
   return normalizeSessionStatusValue(status) === "live";
 }
 
+/** Geplanter Termin — Datum/Uhrzeit darf der GM noch anpassen. */
+export function canEditSessionSchedule(status: unknown): boolean {
+  return isSessionStatusScheduled(status);
+}
+
 /** Kampagne / Sessions-Tab: geplant oder live (nicht beendet / nicht abgesagt). */
 export function isSessionStatusScheduledOrLive(status: unknown): boolean {
   const s = normalizeSessionStatusValue(status);

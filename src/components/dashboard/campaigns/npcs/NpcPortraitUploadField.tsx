@@ -15,6 +15,8 @@ import {
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
 
+import { NpcPortraitAttribution } from "./NpcPortraitAttribution";
+
 type Props = {
   imageUrl: string;
   portraitFile: File | null;
@@ -24,6 +26,10 @@ type Props = {
   onClearImage?: () => void;
   previewAspectClassName?: string;
   compact?: boolean;
+  /** True wenn das angezeigte Bild per KI erzeugt wurde (nicht Upload). */
+  isAiGenerated?: boolean;
+  uploadRightsConfirmed?: boolean;
+  onUploadRightsConfirmedChange?: (confirmed: boolean) => void;
 };
 
 export function NpcPortraitUploadField({
@@ -35,6 +41,9 @@ export function NpcPortraitUploadField({
   onClearImage,
   previewAspectClassName = "aspect-[3/4] max-w-[220px]",
   compact = false,
+  isAiGenerated = false,
+  uploadRightsConfirmed = false,
+  onUploadRightsConfirmedChange,
 }: Props) {
   const blobPreview = useMemo(
     () => (portraitFile ? URL.createObjectURL(portraitFile) : null),
@@ -49,31 +58,35 @@ export function NpcPortraitUploadField({
 
   const previewUrl = blobPreview || imageUrl.trim();
   const hasImage = !!previewUrl;
+  const showAiAttribution = isAiGenerated && hasImage && !blobPreview;
 
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap items-start gap-4">
-        {hasImage ? (
-          <div
-            className={`relative overflow-hidden rounded-xl border-2 border-hero-border shadow-lg ${previewAspectClassName}`}
-            style={imageDisplayBackdropStyle(imageDisplay)}
-          >
-            <Image
-              src={previewUrl}
-              alt="NPC-Portrait Vorschau"
-              fill
-              unoptimized={!!blobPreview}
-              className="select-none"
-              style={imageDisplayObjectStyle(imageDisplay)}
-            />
-          </div>
-        ) : (
-          <div
-            className={`flex items-center justify-center rounded-xl border-2 border-dashed border-hero-border bg-hero-dark/40 ${previewAspectClassName}`}
-          >
-            <User className="h-16 w-16 text-gray-600" />
-          </div>
-        )}
+        <div className="space-y-1">
+          {hasImage ? (
+            <div
+              className={`relative overflow-hidden rounded-xl border-2 border-hero-border shadow-lg ${previewAspectClassName}`}
+              style={imageDisplayBackdropStyle(imageDisplay)}
+            >
+              <Image
+                src={previewUrl}
+                alt="NPC-Portrait Vorschau"
+                fill
+                unoptimized={!!blobPreview}
+                className="select-none"
+                style={imageDisplayObjectStyle(imageDisplay)}
+              />
+            </div>
+          ) : (
+            <div
+              className={`flex items-center justify-center rounded-xl border-2 border-dashed border-hero-border bg-hero-dark/40 ${previewAspectClassName}`}
+            >
+              <User className="h-16 w-16 text-gray-600" />
+            </div>
+          )}
+          {showAiAttribution ? <NpcPortraitAttribution isAiGenerated className="max-w-[220px]" /> : null}
+        </div>
 
         <div className="min-w-0 flex-1 space-y-2">
           <input
@@ -90,8 +103,23 @@ export function NpcPortraitUploadField({
                 return;
               }
               onPortraitFileChange(file);
+              onUploadRightsConfirmedChange?.(false);
             }}
           />
+          {portraitFile && onUploadRightsConfirmedChange ? (
+            <label className="flex cursor-pointer items-start gap-2 rounded border border-hero-border/40 bg-hero-dark/30 p-2.5">
+              <input
+                type="checkbox"
+                checked={uploadRightsConfirmed}
+                onChange={(e) => onUploadRightsConfirmedChange(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-hero-border accent-accent-gold"
+              />
+              <span className="font-libre text-xs leading-relaxed text-gray-300">
+                Ich bestätige, dass ich die Nutzungsrechte an diesem Bild besitze oder eine
+                entsprechende Lizenz habe.
+              </span>
+            </label>
+          ) : null}
           <p className="font-libre text-xs text-gray-500">
             Portrait hochladen (max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB, JPEG/PNG/WebP).
             Wird in TableHeroes gespeichert — kein externer Bild-Link nötig.

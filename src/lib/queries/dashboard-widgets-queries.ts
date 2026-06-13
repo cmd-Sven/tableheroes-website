@@ -337,7 +337,7 @@ export async function getUpcomingSessionsForUser(
   let sessionsError: unknown = null;
 
   const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, status, campaign_id, type, rsvp_deadline_days, is_live")
+    .select("id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
     .order("start_time", { ascending: true })
     .limit(limit * 3);
@@ -497,6 +497,7 @@ export async function getUpcomingSessionsForUser(
       id: s.id,
       title: s.title,
       startTime: s.start_time,
+      endTime: s.end_time ?? null,
       status: s.status,
       campaignId: s.campaign_id,
       campaignName: campaign?.name ?? "Kampagne",
@@ -545,7 +546,7 @@ export async function getPastSessionsForUser(
 
   let allSessions: any[] = [];
   const { data: d1, error: e1 } = await (supabase.from("sessions") as any)
-    .select("id, title, start_time, status, campaign_id, type, rsvp_deadline_days, is_live")
+    .select("id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live")
     .in("campaign_id", allCampaignIds)
     .order("start_time", { ascending: false })
     .limit(limit * 3);
@@ -657,6 +658,7 @@ export async function getPastSessionsForUser(
       id: s.id,
       title: s.title,
       startTime: s.start_time,
+      endTime: s.end_time ?? null,
       status: s.status,
       campaignId: s.campaign_id,
       campaignName: campaign?.name ?? "Kampagne",

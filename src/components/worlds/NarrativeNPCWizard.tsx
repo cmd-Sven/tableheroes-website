@@ -34,6 +34,7 @@ import {
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
 import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -111,6 +112,8 @@ export function NarrativeNPCWizard({
   const [appearanceConfirmed, setAppearanceConfirmed] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [portraitIsAiGenerated, setPortraitIsAiGenerated] = useState(false);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [portraitDisplay, setPortraitDisplay] = useState<ImageDisplaySettings>({
     ...DEFAULT_IMAGE_DISPLAY,
   });
@@ -171,6 +174,8 @@ export function NarrativeNPCWizard({
         setConfirmedAppearance(data.appearance ?? "");
         setAppearanceConfirmed(false);
         setPortraitUrl(null);
+        setPortraitIsAiGenerated(false);
+        setUploadRightsConfirmed(false);
         setPortraitSkipped(false);
       } catch (e: any) {
         const msg = e?.message || "Fehler bei der Persona-Generierung.";
@@ -198,6 +203,8 @@ export function NarrativeNPCWizard({
           setConfirmedAppearance(String(updated.appearance ?? ""));
           setAppearanceConfirmed(false);
           setPortraitUrl(null);
+          setPortraitIsAiGenerated(false);
+          setUploadRightsConfirmed(false);
           setPortraitSkipped(false);
         }
       } catch (e: any) {
@@ -232,6 +239,8 @@ export function NarrativeNPCWizard({
         });
         setPortraitUrl(result.imageUrl);
         setPortraitFile(null);
+        setPortraitIsAiGenerated(true);
+        setUploadRightsConfirmed(false);
         setPortraitSkipped(false);
       } catch (e: any) {
         const msg = e?.message || "Fehler bei der Portrait-Generierung.";
@@ -252,6 +261,13 @@ export function NarrativeNPCWizard({
           imageUrl = upload.publicUrl;
         }
 
+        const portraitMeta = buildNpcPortraitMeta({
+          imageUrl,
+          portraitFile,
+          portraitIsAiGenerated,
+          uploadRightsConfirmed,
+        });
+
         const npc = await createNPC({
           world_id: worldId,
           name: step1Name.trim() || persona.name,
@@ -269,6 +285,8 @@ export function NarrativeNPCWizard({
           gm_notes: persona.gm_notes ?? undefined,
           image_url: imageUrl ?? undefined,
           image_display: imageUrl ? normalizeImageDisplay(portraitDisplay) : undefined,
+          image_is_ai_generated: portraitMeta.image_is_ai_generated,
+          image_upload_rights_confirmed: portraitMeta.image_upload_rights_confirmed,
           narrative_hooks: (persona.narrative_hooks ?? undefined)?.map((h) => ({ ...h, name: h.name ?? undefined })) ?? undefined,
           check_results: (persona.check_results ?? undefined) as any,
           faction_id: selectedFactionId ?? undefined,
@@ -706,6 +724,8 @@ export function NarrativeNPCWizard({
                 setConfirmedAppearance(value);
                 setAppearanceConfirmed(false);
                 setPortraitUrl(null);
+                setPortraitIsAiGenerated(false);
+                setUploadRightsConfirmed(false);
                 setPortraitSkipped(false);
               }}
               age={portraitAge}
@@ -738,10 +758,20 @@ export function NarrativeNPCWizard({
               appearancePreview={confirmedAppearance}
               imageUrl={portraitUrl}
               portraitFile={portraitFile}
-              onPortraitFileChange={setPortraitFile}
+              onPortraitFileChange={(file) => {
+                setPortraitFile(file);
+                if (file) {
+                  setPortraitUrl(null);
+                  setPortraitIsAiGenerated(false);
+                  setUploadRightsConfirmed(false);
+                }
+              }}
               imageDisplay={portraitDisplay}
               onImageDisplayChange={setPortraitDisplay}
               portraitSkipped={portraitSkipped}
+              portraitIsAiGenerated={portraitIsAiGenerated}
+              uploadRightsConfirmed={uploadRightsConfirmed}
+              onUploadRightsConfirmedChange={setUploadRightsConfirmed}
               isGenerating={isPortraitPending}
               canGenerate={appearanceConfirmed}
               disabledReason={

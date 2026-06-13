@@ -4,7 +4,7 @@ import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
-import { isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
+import { canEditSessionSchedule, isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
@@ -1221,12 +1221,27 @@ export async function updateSession(
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: sessionRaw } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id")
+    .select("id, campaign_id, status, start_time, end_time")
     .eq("id", sessionId)
     .single();
 
-  const session = sessionRaw as { id: string; campaign_id: string } | null;
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    status: string | null;
+    start_time: string;
+    end_time: string | null;
+  } | null;
   if (!session) throw new Error("Session nicht gefunden.");
+
+  const scheduleFieldsTouched =
+    data.start_time !== undefined || data.end_time !== undefined;
+
+  if (scheduleFieldsTouched && !canEditSessionSchedule(session.status)) {
+    throw new Error(
+      "Datum und Uhrzeit können nur bei geplanten Terminen geändert werden, die noch nicht stattgefunden haben.",
+    );
+  }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
     .select("id, gm_id, owner_id")
@@ -1244,8 +1259,19 @@ export async function updateSession(
 
   const payload: Record<string, unknown> = {};
   if (data.title !== undefined) payload.title = data.title;
-  if (data.start_time !== undefined) payload.start_time = data.start_time;
-  if (data.end_time !== undefined) payload.end_time = data.end_time;
+  if (data.start_time !== undefined) {
+    payload.start_time = data.start_time;
+    if (data.start_time !== session.start_time) {
+      payload.schedule_customized = true;
+    }
+  }
+  if (data.end_time !== undefined) {
+    payload.end_time = data.end_time;
+    const prevEnd = session.end_time ?? "";
+    if (data.end_time !== prevEnd) {
+      payload.schedule_customized = true;
+    }
+  }
   if (data.status !== undefined) payload.status = data.status;
   if (data.rsvp_deadline_days !== undefined) payload.rsvp_deadline_days = data.rsvp_deadline_days;
   if (data.is_live !== undefined) payload.is_live = data.is_live;
@@ -1276,6 +1302,9 @@ export async function updateSession(
   }
 
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${session.campaign_id}/schedule`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/sessions");
   return { success: true };
 }
 

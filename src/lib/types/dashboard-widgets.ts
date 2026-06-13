@@ -45,6 +45,7 @@ export type UpcomingSession = {
   id: string;
   title: string | null;
   startTime: string;
+  endTime?: string | null;
   status: string;
   campaignId: string;
   campaignName: string;

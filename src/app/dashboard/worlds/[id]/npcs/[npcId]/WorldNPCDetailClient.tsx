@@ -24,6 +24,7 @@ import { toggleSecretGlobal } from "@/src/app/dashboard/campaigns/[id]/secrets-a
 import { CheckResultsEditor } from "@/src/components/dashboard/campaigns/npcs/CheckResultsEditor";
 import { RelationshipWizard } from "@/src/components/worlds/RelationshipWizard";
 import { RelationshipCard } from "@/src/components/worlds/RelationshipCard";
+import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
 import { SmartText } from "@/src/components/ui/SmartText";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import type { RelationshipWithNames } from "@/src/app/dashboard/worlds/relationship-actions";
@@ -168,12 +169,18 @@ export function WorldNPCDetailClient({
       <div className="border-b border-hero-border bg-black/40 p-6 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           {npc.image_url ? (
-            <div className="relative h-40 w-28 md:h-48 md:w-32 rounded-xl overflow-hidden border-2 border-hero-border bg-hero-dark/70 shadow-lg">
-              <Image
-                src={npc.image_url}
-                alt={npc.name}
-                fill
-                className="object-cover"
+            <div className="space-y-1">
+              <div className="relative h-40 w-28 md:h-48 md:w-32 rounded-xl overflow-hidden border-2 border-hero-border bg-hero-dark/70 shadow-lg">
+                <Image
+                  src={npc.image_url}
+                  alt={npc.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <NpcPortraitAttribution
+                isAiGenerated={npc.image_is_ai_generated}
+                className="w-28 md:w-32"
               />
             </div>
           ) : (

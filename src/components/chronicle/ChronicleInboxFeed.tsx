@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, ExternalLink, Sparkles } from "lucide-react";
+import { ChevronRight, ExternalLink, Loader2, Sparkles, Trash2 } from "lucide-react";
+import {
+  dismissAllChronicleInboxItems,
+  dismissChronicleInboxItem,
+} from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
 import { GmBoardSettingsModal } from "@/src/components/session/GmBoardSettingsModal";
 import {
   chronicleImportFlowHint,
@@ -13,12 +17,16 @@ import {
 } from "@/src/lib/session-chronicle/inbox-import-urls";
 import {
   countPendingInboxItems,
+  dismissAllPendingInboxItems,
+  dismissLocation,
+  dismissNpc,
+  dismissQuest,
   inboxItemTitle,
   listChronicleInboxItems,
 } from "@/src/lib/session-chronicle/inbox";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
 import type { ChronicleInboxItem, SessionChronicleState } from "@/src/lib/session-chronicle/types";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 type Props = {
   campaignId: string;
@@ -54,10 +62,14 @@ function InboxItemDetailModal({
   item,
   href,
   onClose,
+  onDismiss,
+  dismissing,
 }: {
   item: ChronicleInboxItem;
   href: string | null;
   onClose: () => void;
+  onDismiss: (item: ChronicleInboxItem) => void;
+  dismissing: boolean;
 }) {
   const details = getChronicleInboxItemDetails(item);
   const title = inboxItemTitle(item);
@@ -104,6 +116,19 @@ function InboxItemDetailModal({
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
+            disabled={dismissing}
+            onClick={() => onDismiss(item)}
+            className="inline-flex items-center gap-1.5 rounded border border-red-500/40 px-4 py-2 font-barlow text-xs font-bold uppercase text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            {dismissing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Verwerfen
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400"
           >
@@ -143,7 +168,47 @@ export function ChronicleInboxFeed({
 }: Props) {
   const [state, setState] = useState<SessionChronicleState | null>(initialState);
   const [detailItem, setDetailItem] = useState<ChronicleInboxItem | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const limit = maxItems ?? (variant === "compact" ? 4 : 24);
+
+  const applyLocalDismiss = useCallback((item: ChronicleInboxItem) => {
+    setState((prev) => {
+      if (!prev) return prev;
+      if (item.kind === "npc") return dismissNpc(prev, item.index);
+      if (item.kind === "location") return dismissLocation(prev, item.index);
+      return dismissQuest(prev, item.index);
+    });
+  }, []);
+
+  const handleDismissItem = useCallback(
+    (item: ChronicleInboxItem, closeDetail = false) => {
+      setActionError(null);
+      startTransition(async () => {
+        const result = await dismissChronicleInboxItem(sessionId, item.kind, item.index);
+        if (!result.ok) {
+          setActionError(result.error);
+          return;
+        }
+        applyLocalDismiss(item);
+        if (closeDetail) setDetailItem(null);
+      });
+    },
+    [applyLocalDismiss, sessionId],
+  );
+
+  const handleDismissAll = useCallback(() => {
+    setActionError(null);
+    startTransition(async () => {
+      const result = await dismissAllChronicleInboxItems(sessionId);
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setState((prev) => (prev ? dismissAllPendingInboxItems(prev) : prev));
+      setDetailItem(null);
+    });
+  }, [sessionId]);
 
   useEffect(() => {
     setState(initialState);
@@ -218,7 +283,26 @@ export function ChronicleInboxFeed({
               Alle
             </Link>
           ) : null}
+          {pendingTotal > 0 ? (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleDismissAll()}
+              className="inline-flex items-center gap-1 font-barlow text-[8px] font-bold uppercase text-red-400 hover:text-red-300 disabled:opacity-50"
+            >
+              {isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+              Alle verwerfen
+            </button>
+          ) : null}
         </div>
+
+        {actionError ? (
+          <p className="mb-2 font-libre text-[10px] text-red-400">{actionError}</p>
+        ) : null}
 
         {items.length === 0 ? (
           <p className="font-libre text-[10px] text-gray-500">
@@ -281,7 +365,7 @@ export function ChronicleInboxFeed({
                     <ChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-gray-500" />
                   </button>
 
-                  {variant === "full" && href ? (
+                  {variant === "full" ? (
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -290,15 +374,26 @@ export function ChronicleInboxFeed({
                       >
                         Details
                       </button>
-                      <Link
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                      {href ? (
+                        <Link
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Import
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleDismissItem(item)}
+                        className="inline-flex items-center gap-1 rounded border border-red-500/30 px-2 py-1 font-barlow text-[8px] font-bold uppercase text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                       >
-                        <ExternalLink className="h-3 w-3" />
-                        Import
-                      </Link>
+                        <Trash2 className="h-3 w-3" />
+                        Verwerfen
+                      </button>
                     </div>
                   ) : null}
 
@@ -319,6 +414,8 @@ export function ChronicleInboxFeed({
           item={detailItem}
           href={detailHref}
           onClose={() => setDetailItem(null)}
+          onDismiss={(item) => handleDismissItem(item, true)}
+          dismissing={isPending}
         />
       ) : null}
     </>

@@ -16,6 +16,8 @@ import {
   User,
   Scroll,
   ShieldCheck,
+  ExternalLink,
+  BookOpen,
 } from "lucide-react";
 import {
   sendMessage,
@@ -44,6 +46,8 @@ function NotificationIcon({ type }: { type: GMNotification["type"] }) {
       return <ScrollText className="h-4 w-4 text-accent-gold" />;
     case "session_completed":
       return <CheckCircle2 className="h-4 w-4 text-hero-vibrant" />;
+    case "chronicle_inbox":
+      return <BookOpen className="h-4 w-4 text-sky-300" />;
     default:
       return <Bell className="h-4 w-4 text-gray-400" />;
   }
@@ -57,6 +61,8 @@ function notificationTypeLabel(type: GMNotification["type"]): string {
       return "Charakter";
     case "session_completed":
       return "Session";
+    case "chronicle_inbox":
+      return "Chronist";
     default:
       return "System";
   }
@@ -70,6 +76,8 @@ function notificationTypeBadgeClass(type: GMNotification["type"]): string {
       return "bg-accent-gold/10 text-accent-gold border-accent-gold/30";
     case "session_completed":
       return "bg-hero-vibrant/10 text-hero-vibrant border-hero-vibrant/30";
+    case "chronicle_inbox":
+      return "bg-sky-950/40 text-sky-300 border-sky-700/40";
     default:
       return "bg-gray-800/40 text-gray-400 border-gray-600/30";
   }
@@ -152,7 +160,6 @@ function NotificationsTab({
 
         const inner = (
           <div className="flex items-start gap-3 p-4 hover:bg-white/[0.02] transition-colors group">
-            {/* Avatar oder Icon */}
             {n.actorAvatarUrl ? (
               <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-hero-border/40 bg-background-dark">
                 <Image
@@ -169,7 +176,6 @@ function NotificationsTab({
               </div>
             )}
 
-            {/* Content */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-0.5">
                 <span
@@ -188,6 +194,13 @@ function NotificationsTab({
                 {n.message}
               </p>
             </div>
+
+            {n.href ? (
+              <span className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-hero-border/50 bg-background-dark px-2.5 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-300 group-hover:border-accent-gold/50 group-hover:text-accent-gold">
+                <ExternalLink className="h-3 w-3" />
+                Ansehen
+              </span>
+            ) : null}
           </div>
         );
 
@@ -520,7 +533,7 @@ export function GMCommunicationHub({
           active={activeTab === "notifications"}
           onClick={() => setActiveTab("notifications")}
           icon={<Bell className="h-3.5 w-3.5" />}
-          label="System-Meldungen"
+          label="Meldungen"
           badge={notifications.length}
         />
         <TabButton

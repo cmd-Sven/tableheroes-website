@@ -21,6 +21,7 @@ import { setCampaignVisibility } from "./campaign-visibility-actions";
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 
 export async function createNPC(formData: {
   campaign_id?: string;
@@ -56,6 +57,8 @@ export async function createNPC(formData: {
   deities?: string[] | null;
   languages?: string[] | null;
   image_display?: unknown;
+  image_is_ai_generated?: boolean;
+  image_upload_rights_confirmed?: boolean | null;
 }) {
   const supabase = await createClient();
 
@@ -208,6 +211,24 @@ export async function createNPC(formData: {
   const validatedCurrentLocationId = await validateLocation(normalizedCurrentLocationId, "current_location_id");
   const validatedHomeLocationId = await validateLocation(normalizedHomeLocationId, "home_location_id");
 
+  const imageUrl = (formData.image_url || "").trim();
+  const portraitMeta = buildNpcPortraitMeta({
+    imageUrl,
+    portraitFile: null,
+    portraitIsAiGenerated: formData.image_is_ai_generated === true,
+    uploadRightsConfirmed: formData.image_upload_rights_confirmed === true,
+  });
+
+  if (
+    imageUrl &&
+    !portraitMeta.image_is_ai_generated &&
+    portraitMeta.image_upload_rights_confirmed !== true
+  ) {
+    throw new Error(
+      "Bitte bestätige die Nutzungsrechte am hochgeladenen Bild oder kennzeichne es als KI-generiert.",
+    );
+  }
+
   // 6. Insert NPC (welt-zentrisch: nur world_id)
   const insertPayload = {
     world_id: worldId,
@@ -224,11 +245,13 @@ export async function createNPC(formData: {
     appearance: formData.appearance || null,
     personality_traits: formData.personality_traits || null,
     alignment: formData.alignment || null,
-    image_url: formData.image_url || null,
+    image_url: imageUrl || null,
     image_display:
-      formData.image_display != null && (formData.image_url || "").trim() !== ""
+      formData.image_display != null && imageUrl !== ""
         ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
         : null,
+    image_is_ai_generated: portraitMeta.image_is_ai_generated,
+    image_upload_rights_confirmed: portraitMeta.image_upload_rights_confirmed,
     narrative_hooks: formData.narrative_hooks && formData.narrative_hooks.length > 0 ? formData.narrative_hooks : null,
     is_secret_antagonist: formData.is_secret_antagonist ?? false,
     is_merchant: formData.is_merchant ?? false,
@@ -462,6 +485,8 @@ export async function updateNPC(
     /** Weltweite Beziehungen zu anderen NPCs (weltbezogen, nicht kampagnenbezogen). Pro Ziel-NPC max. 2 Beziehungstypen. */
     world_relations?: Array<{ target_npc_id: string; relation_types: string[] }> | null;
     image_display?: unknown | null;
+    image_is_ai_generated?: boolean;
+    image_upload_rights_confirmed?: boolean | null;
   }
 ) {
   const supabase = await createClient();
@@ -529,6 +554,29 @@ export async function updateNPC(
       raw == null
         ? null
         : imageDisplayToJson(normalizeImageDisplay(raw));
+  }
+
+  if (
+    updates.image_url !== undefined ||
+    updates.image_is_ai_generated !== undefined ||
+    updates.image_upload_rights_confirmed !== undefined
+  ) {
+    const nextUrl =
+      updates.image_url !== undefined
+        ? (updates.image_url || "").trim() || null
+        : undefined;
+    if (nextUrl !== undefined) {
+      const portraitMeta = buildNpcPortraitMeta({
+        imageUrl: nextUrl,
+        portraitFile: null,
+        portraitIsAiGenerated: updates.image_is_ai_generated === true,
+        uploadRightsConfirmed: updates.image_upload_rights_confirmed === true,
+      });
+      normalizedUpdates.image_url = nextUrl;
+      normalizedUpdates.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+      normalizedUpdates.image_upload_rights_confirmed =
+        portraitMeta.image_upload_rights_confirmed;
+    }
   }
 
   if (updates.world_relations !== undefined) {

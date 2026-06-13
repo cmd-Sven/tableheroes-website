@@ -20,6 +20,7 @@ import {
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
 import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "./NpcPortraitUploadField";
 
 type NPC = {
@@ -101,6 +102,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
   // Context NPCs State
   const [imageDisplay, setImageDisplay] = useState<ImageDisplaySettings>({ ...DEFAULT_IMAGE_DISPLAY });
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const effectiveWorldId =
     worldId ?? (initialData as { world_id?: string } | undefined)?.world_id ?? null;
 
@@ -390,6 +392,36 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           resolvedImageUrl = upload.publicUrl;
         }
 
+        const portraitMetaFields: {
+          image_is_ai_generated?: boolean;
+          image_upload_rights_confirmed?: boolean | null;
+        } = {};
+
+        if (portraitFile) {
+          const portraitMeta = buildNpcPortraitMeta({
+            imageUrl: resolvedImageUrl,
+            portraitFile,
+            portraitIsAiGenerated: false,
+            uploadRightsConfirmed,
+          });
+          portraitMetaFields.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+          portraitMetaFields.image_upload_rights_confirmed =
+            portraitMeta.image_upload_rights_confirmed;
+        } else if (!resolvedImageUrl && initialData?.image_url) {
+          portraitMetaFields.image_is_ai_generated = false;
+          portraitMetaFields.image_upload_rights_confirmed = null;
+        } else if (!isEditMode) {
+          const portraitMeta = buildNpcPortraitMeta({
+            imageUrl: resolvedImageUrl,
+            portraitFile: null,
+            portraitIsAiGenerated: false,
+            uploadRightsConfirmed: false,
+          });
+          portraitMetaFields.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+          portraitMetaFields.image_upload_rights_confirmed =
+            portraitMeta.image_upload_rights_confirmed;
+        }
+
         console.log("🔍 [NPCForm] Form submission:", {
           original_current_location_id: formData.current_location_id,
           normalized_current_location_id: normalizedCurrentLocationId,
@@ -423,6 +455,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           image_display: resolvedImageUrl
             ? normalizeImageDisplay(imageDisplay)
             : null,
+          ...portraitMetaFields,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId,
@@ -845,11 +878,17 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
                 <NpcPortraitUploadField
                   imageUrl={formData.image_url}
                   portraitFile={portraitFile}
-                  onPortraitFileChange={setPortraitFile}
+                  onPortraitFileChange={(file) => {
+                    setPortraitFile(file);
+                    if (file) setUploadRightsConfirmed(false);
+                  }}
                   imageDisplay={imageDisplay}
                   onImageDisplayChange={setImageDisplay}
+                  uploadRightsConfirmed={uploadRightsConfirmed}
+                  onUploadRightsConfirmedChange={setUploadRightsConfirmed}
                   onClearImage={() => {
                     setPortraitFile(null);
+                    setUploadRightsConfirmed(false);
                     setFormData((prev) => ({ ...prev, image_url: "" }));
                     setImageDisplay({ ...DEFAULT_IMAGE_DISPLAY });
                   }}

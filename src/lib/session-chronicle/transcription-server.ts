@@ -656,9 +656,10 @@ export async function uploadTranscriptionChunk(
     };
   }
 
-  const ext = params.mimeType.includes("ogg")
+  const normalizedMime = params.mimeType.split(";")[0]?.trim().toLowerCase() || "audio/webm";
+  const ext = normalizedMime.includes("ogg")
     ? "ogg"
-    : params.mimeType.includes("wav")
+    : normalizedMime.includes("wav")
       ? "wav"
       : "webm";
   const storagePath = `${auth.ctx.campaignId}/${sessionId}/${params.chunkIndex}.${ext}`;
@@ -678,7 +679,7 @@ export async function uploadTranscriptionChunk(
     .from(SESSION_AUDIO_BUCKET)
     .upload(storagePath, params.audio, {
       upsert: true,
-      contentType: params.mimeType,
+      contentType: normalizedMime,
     });
 
   if (uploadError) {

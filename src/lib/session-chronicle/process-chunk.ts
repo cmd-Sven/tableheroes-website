@@ -28,13 +28,19 @@ import { after } from "next/server";
 
 function guessAudioFilename(storagePath: string): string {
   const base = storagePath.split("/").pop() ?? "chunk.webm";
-  return base.includes(".") ? base : `${base}.webm`;
+  if (base.includes(".")) return base;
+  return `${base}.webm`;
 }
 
-function guessMimeType(filename: string): string {
-  if (filename.endsWith(".ogg")) return "audio/ogg";
-  if (filename.endsWith(".wav")) return "audio/wav";
-  if (filename.endsWith(".mp4")) return "audio/mp4";
+function whisperMimeType(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".ogg") || lower.endsWith(".oga")) return "audio/ogg";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  if (lower.endsWith(".mp4") || lower.endsWith(".m4a")) return "audio/mp4";
+  if (lower.endsWith(".mp3") || lower.endsWith(".mpeg") || lower.endsWith(".mpga")) {
+    return "audio/mpeg";
+  }
+  if (lower.endsWith(".flac")) return "audio/flac";
   return "audio/webm";
 }
 
@@ -49,8 +55,12 @@ export async function transcribeChunkAudio(storagePath: string): Promise<string>
   }
 
   const buffer = Buffer.from(await data.arrayBuffer());
+  if (buffer.byteLength < 256) {
+    throw new Error("Audio-Chunk ist leer oder zu klein für Whisper.");
+  }
+
   const filename = guessAudioFilename(storagePath);
-  const mime = guessMimeType(filename);
+  const mime = whisperMimeType(filename);
   const openai = getOpenAIClient();
 
   const file = new File([buffer], filename, { type: mime });
