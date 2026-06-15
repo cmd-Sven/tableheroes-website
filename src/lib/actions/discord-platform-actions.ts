@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isValidDiscordWebhookUrl } from "@/src/lib/integrations/discord/format";
 import {
   getPlatformNewsWebhookForAdmin,
@@ -30,8 +30,13 @@ async function requireAdmin() {
 }
 
 export async function getDiscordPlatformNewsWebhook(): Promise<string> {
-  await requireAdmin();
-  return getPlatformNewsWebhookForAdmin();
+  try {
+    await requireAdmin();
+    return await getPlatformNewsWebhookForAdmin();
+  } catch (e) {
+    console.error("[getDiscordPlatformNewsWebhook]", e);
+    return "";
+  }
 }
 
 export async function saveDiscordPlatformNewsWebhook(
@@ -47,15 +52,32 @@ export async function saveDiscordPlatformNewsWebhook(
     };
   }
 
-  const admin = createAdminClient();
-  const { error } = await (admin as any).from("platform_settings").upsert(
-    {
-      key: DISCORD_PLATFORM_NEWS_KEY,
-      value: { webhook_url: trimmed || null },
-      updated_at: new Date().toISOString(),
-    },
+  const payload = {
+    key: DISCORD_PLATFORM_NEWS_KEY,
+    value: { webhook_url: trimmed || null },
+    updated_at: new Date().toISOString(),
+  };
+
+  const supabase = await createClient();
+  const { error: sessionError } = await (supabase as any).from("platform_settings").upsert(
+    payload,
     { onConflict: "key" },
   );
+  if (!sessionError) return { success: true };
+
+  const admin = tryCreateAdminClient();
+  if (!admin) {
+    return {
+      success: false,
+      error:
+        sessionError.message ||
+        "Webhook konnte nicht gespeichert werden (fehlende Admin-Berechtigung oder Service-Role-Key).",
+    };
+  }
+
+  const { error } = await (admin as any).from("platform_settings").upsert(payload, {
+    onConflict: "key",
+  });
 
   if (error) return { success: false, error: error.message };
   return { success: true };

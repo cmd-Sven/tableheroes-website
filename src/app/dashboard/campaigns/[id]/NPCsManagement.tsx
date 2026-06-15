@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { User, Search, X, ScrollText, Book } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { NPCGridCard } from "@/src/components/dashboard/NPCGridCard";
 import { sendCampaignEntityToDiscord } from "./campaign-discord-actions";
-import { deleteNPC, toggleNPCReveal } from "./npc-actions";
+import { deleteNPC, toggleNPCReveal } from "./npc-campaign-actions";
 
 type NPC = {
   id: string;
@@ -43,6 +44,7 @@ type Props = {
 };
 
 export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Props) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [factionFilter, setFactionFilter] = useState<string>("Alle");
   const [statusFilter, setStatusFilter] = useState<string>("Alle");
@@ -61,8 +63,14 @@ export function NPCsManagement({ campaignId, worldId, npcs, factions, isGM }: Pr
   const handleToggleVisibility = async (npc: NPC) => {
     try {
       await toggleNPCReveal(campaignId, npc.id, npc.is_revealed);
+      toast.success(
+        npc.is_revealed
+          ? `„${npc.name}" ist jetzt verborgen.`
+          : `„${npc.name}" ist für Spieler sichtbar.`,
+      );
+      router.refresh();
     } catch (error: any) {
-      alert(error.message || "Fehler beim Ändern der Sichtbarkeit.");
+      toast.error(error.message || "Fehler beim Ändern der Sichtbarkeit.");
     }
   };
 

@@ -40,10 +40,17 @@ export async function createClient() {
 
 /** Admin-Client mit Service-Role-Key (RLS-Bypass, nur serverseitig verwenden). Erfordert SUPABASE_SERVICE_ROLE_KEY. */
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
+  const client = tryCreateAdminClient();
+  if (!client) {
     throw new Error("createAdminClient: NEXT_PUBLIC_SUPABASE_URL oder SUPABASE_SERVICE_ROLE_KEY fehlt.");
   }
+  return client;
+}
+
+/** Wie createAdminClient, aber ohne Exception (z. B. wenn Service-Role-Key in Production fehlt). */
+export function tryCreateAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
   return createSupabaseClient<Database>(url, key, { auth: { persistSession: false } });
 }

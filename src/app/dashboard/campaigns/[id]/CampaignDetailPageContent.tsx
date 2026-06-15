@@ -437,7 +437,7 @@ export function CampaignDetailPageContent({
     />
   );
 
-  const NPCsTab = !world ? (
+  const NPCsTab = !campaignWorldId ? (
     <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
     <NPCsManagement
@@ -449,7 +449,7 @@ export function CampaignDetailPageContent({
     />
   );
 
-  const FactionsTab = !world ? (
+  const FactionsTab = !campaignWorldId ? (
     <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
     <FactionsManagement
@@ -461,7 +461,7 @@ export function CampaignDetailPageContent({
     />
   );
 
-  const LoreTab = !world ? (
+  const LoreTab = !campaignWorldId ? (
     <WorldRequiredBlocker campaignId={id} isGM={isGM} worlds={gmWorlds} />
   ) : (
     <LoreManagement campaignId={id} worldId={campaignWorldId ?? undefined} loreEntries={loreEntries} isGM={isGM} />

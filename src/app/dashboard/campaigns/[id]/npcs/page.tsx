@@ -1,10 +1,22 @@
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { getCampaignAccess } from "../campaign-access";
 import { getNPCs } from "../npc-queries";
 import { getFactionsWithMembers } from "../factions-queries";
-import { NPCsManagement } from "../NPCsManagement";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
+
+const NPCsManagement = dynamic(
+  () =>
+    import("../NPCsManagement").then((mod) => ({ default: mod.NPCsManagement })),
+  {
+    loading: () => (
+      <div className="rounded-lg border border-hero-border/40 bg-background-card px-6 py-12 text-center font-libre text-gray-400">
+        NPC-Liste wird geladen…
+      </div>
+    ),
+  },
+);
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -27,7 +39,7 @@ export default async function CampaignNPCsPage({ params }: Props) {
         Zurück zur Kampagne
       </Link>
 
-      {!world ? (
+      {!worldId ? (
         <WorldRequiredBlocker campaignId={campaignId} isGM={isGM} worlds={gmWorlds} />
       ) : (
         <NPCsManagement

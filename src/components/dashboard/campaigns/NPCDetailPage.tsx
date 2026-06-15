@@ -40,9 +40,11 @@ import {
   updateNPC,
   updateNPCNotes,
   toggleNPCFavorite,
+} from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import {
   toggleNPCReveal,
   deleteNPC,
-} from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+} from "@/src/app/dashboard/campaigns/[id]/npc-campaign-actions";
 import { sendCampaignEntityToDiscord } from "@/src/app/dashboard/campaigns/[id]/campaign-discord-actions";
 import { upsertCampaignNote } from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { updateNPCCurrentLocation } from "@/src/app/dashboard/campaigns/[id]/location-actions";
@@ -1362,8 +1364,8 @@ export function NPCDetailPage({
             )}
           </div>
 
-          {/* Narrative Hooks - Story Opportunities */}
-          {narrativeHooks && narrativeHooks.length > 0 && (
+          {/* Narrative Hooks - Story Opportunities (nur GM) */}
+          {isGM && narrativeHooks && narrativeHooks.length > 0 && (
             <div
               className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
               style={{

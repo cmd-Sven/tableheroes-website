@@ -333,7 +333,7 @@ export async function loadCampaignDetailPageData(
       // GM: Load everything (no filters)
       factions = await getFactionsWithMembers(id);
       loreEntries = await getLoreEntries(id);
-      quests = await getQuests(id);
+      quests = await getQuests(id, true);
 
       console.log("🔍 [DashboardPage] GM Data loaded:", {
         npcs: npcs.length,
@@ -357,9 +357,9 @@ export async function loadCampaignDetailPageData(
       loreEntries = await getLoreEntries(id);
       console.log("✅ [DashboardPage] Lore loaded:", loreEntries.length, "entries");
 
-      // Quests: is_revealed === true (RLS should handle this, but we can also filter)
+      // Quests: nur freigegebene (is_revealed)
       console.log("🔍 [DashboardPage] Fetching Quests for campaign:", id);
-      quests = await getQuests(id);
+      quests = await getQuests(id, false);
       console.log("✅ [DashboardPage] Quests loaded:", quests.length, "quests");
 
       console.log("🔍 [DashboardPage] Player Data Summary:", {

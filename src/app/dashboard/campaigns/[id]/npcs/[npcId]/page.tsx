@@ -85,6 +85,12 @@ export default async function NPCDetailPageRoute({ params }: Props) {
     }
   }
 
+  const npcVisibility = await getVisibilityForCampaign(campaignId, "npc");
+  const npcWithVisibility = {
+    ...npc,
+    is_revealed: npcVisibility[npcId] ?? false,
+  };
+
   // 8. Spieler-Notiz für diese Kampagne laden (isolierte campaign_notes)
   const campaignNote = await getCampaignNote(campaignId, "npc", npcId);
   const initialCampaignPlayerNote = campaignNote?.content ?? "";
@@ -179,7 +185,7 @@ export default async function NPCDetailPageRoute({ params }: Props) {
 
   return (
     <NPCDetailPage
-      npc={npc}
+      npc={npcWithVisibility}
       campaignId={campaignId}
       worldId={(npc as { world_id?: string }).world_id}
       isGM={isGM}

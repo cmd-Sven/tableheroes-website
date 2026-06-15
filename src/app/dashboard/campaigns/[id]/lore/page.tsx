@@ -25,7 +25,7 @@ export default async function CampaignLorePage({ params }: Props) {
         Zurück zur Kampagne
       </Link>
 
-      {!world ? (
+      {!worldId ? (
         <WorldRequiredBlocker campaignId={campaignId} isGM={isGM} worlds={gmWorlds} />
       ) : (
         <LoreManagement

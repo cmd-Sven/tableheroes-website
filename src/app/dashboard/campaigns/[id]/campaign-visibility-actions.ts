@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import {
   dispatchDiscordNotify,
   notifyCampaignEntityRevealed,
@@ -40,21 +41,22 @@ export async function setCampaignVisibility(
     .eq("id", campaignId)
     .single();
 
-  const campaignAccess = campaign as {
-    gm_id: string | null;
-    owner_id?: string | null;
-  } | null;
-  const canManageVisibility =
-    !!campaignAccess &&
-    (campaignAccess.gm_id === user.id || campaignAccess.owner_id === user.id);
-
-  if (!canManageVisibility) {
+  if (!isCampaignGm(campaign, user.id)) {
     throw new Error("Nur der GM oder Owner kann die Sichtbarkeit ändern.");
   }
 
-  const admin = createAdminClient();
+  let writeClient: Awaited<ReturnType<typeof createClient>>;
+  try {
+    writeClient = createAdminClient() as unknown as Awaited<ReturnType<typeof createClient>>;
+  } catch (err) {
+    console.warn(
+      "[setCampaignVisibility] Kein Admin-Client, nutze Session (RLS):",
+      err,
+    );
+    writeClient = supabase;
+  }
 
-  const { data: previousRow } = await (admin.from("campaign_visibility") as any)
+  const { data: previousRow } = await (writeClient.from("campaign_visibility") as any)
     .select("is_revealed")
     .eq("campaign_id", campaignId)
     .eq("entity_type", entityType)
@@ -62,16 +64,18 @@ export async function setCampaignVisibility(
     .maybeSingle();
   const wasRevealed = !!(previousRow as { is_revealed?: boolean } | null)?.is_revealed;
 
-  const { error } = await (admin.from("campaign_visibility") as any)
-    .upsert(
-      {
-        campaign_id: campaignId,
-        entity_type: entityType,
-        entity_id: entityId,
-        is_revealed: isRevealed,
-      },
-      { onConflict: "campaign_id,entity_type,entity_id" }
-    );
+  const payload: Record<string, unknown> = {
+    campaign_id: campaignId,
+    entity_type: entityType,
+    entity_id: entityId,
+    is_revealed: isRevealed,
+  };
+  if (isRevealed) {
+    payload.revealed_at = new Date().toISOString();
+  }
+
+  const { error } = await (writeClient.from("campaign_visibility") as any)
+    .upsert(payload, { onConflict: "campaign_id,entity_type,entity_id" });
 
   if (error) {
     console.error("[campaign_visibility] setCampaignVisibility:", error);

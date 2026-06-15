@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import { User, Eye, EyeOff, Edit2, Trash2, AlertCircle, Shield } from "lucide-react";
-import { deleteNPC, toggleNPCReveal } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { deleteNPC, toggleNPCReveal } from "@/src/app/dashboard/campaigns/[id]/npc-campaign-actions";
 
 type NPC = {
   id: string;

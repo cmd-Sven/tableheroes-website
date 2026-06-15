@@ -255,8 +255,11 @@ export function NPCRelationsList({
                         Hook
                       </span>
                     </div>
-                    {relation.description && (
+                    {canEdit && relation.description && (
                       <p className="mt-1 font-libre text-sm text-gray-400">
+                        <span className="text-[10px] font-barlow font-bold uppercase text-gray-600">
+                          GM-Notiz:{" "}
+                        </span>
                         {relation.description}
                       </p>
                     )}
@@ -319,8 +322,11 @@ export function NPCRelationsList({
                           {relation.partnerName}
                         </span>
                       </p>
-                      {relation.description && (
+                      {canEdit && relation.description && (
                         <p className="mt-1 font-libre text-sm text-gray-400">
+                          <span className="text-[10px] font-barlow font-bold uppercase text-gray-600">
+                            GM-Notiz:{" "}
+                          </span>
                           {relation.description}
                         </p>
                       )}

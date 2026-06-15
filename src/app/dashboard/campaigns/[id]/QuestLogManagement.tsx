@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, ScrollText } from "lucide-react";
 import { QuestCard } from "@/src/components/dashboard/QuestCard";
 import Link from "next/link";
@@ -92,9 +92,14 @@ type Props = {
 
 export function QuestLogManagement({ campaignId, quests, npcs, locations, characters = [], members = [], isGM }: Props) {
 
+  const visibleQuests = useMemo(
+    () => (isGM ? quests : quests.filter((q) => q.is_revealed)),
+    [quests, isGM],
+  );
+
   // Separate Active and Completed Quests
-  const activeQuests = quests.filter((q) => q.status !== "Completed");
-  const completedQuests = quests.filter((q) => q.status === "Completed");
+  const activeQuests = visibleQuests.filter((q) => q.status !== "Completed");
+  const completedQuests = visibleQuests.filter((q) => q.status === "Completed");
 
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card p-6">
@@ -102,7 +107,7 @@ export function QuestLogManagement({ campaignId, quests, npcs, locations, charac
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-hero-dark">
         <h2 className="font-barlow font-bold text-xl text-white uppercase flex items-center gap-2">
           <ScrollText className="h-5 w-5 text-accent-gold" />
-          Journal / Quests ({quests.length})
+          Journal / Quests ({visibleQuests.length})
         </h2>
         {isGM && (
           <Link

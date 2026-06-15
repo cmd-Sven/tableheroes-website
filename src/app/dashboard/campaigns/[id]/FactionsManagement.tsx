@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Plus, Shield, Search, Filter, X, Globe } from "lucide-react";
 import { FactionGridCard } from "@/src/components/dashboard/FactionGridCard";
-import { FactionDetailModal } from "@/src/components/dashboard/FactionDetailModal";
 import { deleteFaction, toggleFactionReveal } from "./factions-actions";
 import { VALID_FACTION_TYPES } from "@/src/lib/faction-types";
 import { HeroButton } from "@/src/components/ui/HeroButton";
@@ -54,8 +53,6 @@ function getReputationColor(reputation: number): string {
 export function FactionsManagement({ campaignId, worldId, factions, npcs = [], isGM, playerFactionReputations = [] }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [selectedFaction, setSelectedFaction] = useState<Faction | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const handleDelete = async (faction: Faction) => {
     try {
@@ -101,17 +98,6 @@ export function FactionsManagement({ campaignId, worldId, factions, npcs = [], i
 
     return filtered;
   }, [factions, typeFilter, searchQuery, isGM]);
-
-  const handleInfoClick = (faction: Faction) => {
-    setSelectedFaction(faction);
-    setIsDetailModalOpen(true);
-  };
-
-  // Get members for selected faction
-  const factionMembers = useMemo(() => {
-    if (!selectedFaction) return [];
-    return npcs.filter((npc) => npc.faction_id === selectedFaction.id);
-  }, [selectedFaction, npcs]);
 
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card p-6">
@@ -304,7 +290,6 @@ export function FactionsManagement({ campaignId, worldId, factions, npcs = [], i
                 key={faction.id}
                 faction={faction as any}
                 campaignId={campaignId}
-                onInfoClick={handleInfoClick as any}
                 isGM={isGM}
                 onDelete={isGM ? (handleDelete as any) : undefined}
                 onToggleVisibility={isGM ? (handleToggleVisibility as any) : undefined}
@@ -314,18 +299,6 @@ export function FactionsManagement({ campaignId, worldId, factions, npcs = [], i
           })}
         </div>
       )}
-
-      {/* Detail Modal */}
-      <FactionDetailModal
-        faction={selectedFaction}
-        members={factionMembers}
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedFaction(null);
-        }}
-        isGM={isGM}
-      />
     </div>
   );
 }

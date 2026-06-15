@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient } from "@/src/lib/supabase/server";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 

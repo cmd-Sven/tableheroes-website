@@ -49,7 +49,7 @@ export default async function CampaignFactionsPage({ params }: Props) {
         Zurück zur Kampagne
       </Link>
 
-      {!world ? (
+      {!worldId ? (
         <WorldRequiredBlocker campaignId={campaignId} isGM={isGM} worlds={gmWorlds} />
       ) : (
         <FactionsManagement

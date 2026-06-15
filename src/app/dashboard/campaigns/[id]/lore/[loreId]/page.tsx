@@ -156,12 +156,17 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   }
 
   // 5. Check visibility for this campaign (Spieler nur bei campaign_visibility.is_revealed)
-  if (!isGM) {
-    const visibility = await getVisibilityForCampaign(campaignId, "lore");
-    if (!visibility[loreId]) {
-      redirect(`/dashboard/campaigns/${campaignId}?tab=lore`);
-    }
+  const loreVisibility = await getVisibilityForCampaign(campaignId, "lore");
+  const isLoreRevealed = loreVisibility[loreId] ?? false;
+
+  if (!isGM && !isLoreRevealed) {
+    redirect(`/dashboard/campaigns/${campaignId}/lore`);
   }
+
+  const loreWithVisibility = {
+    ...lore,
+    is_revealed: isLoreRevealed,
+  };
 
   // 6. Resolve linked lore metadata (Kultur ↔ Rassen ↔ Sprachen ↔ Religionen)
   let loreMetadata: {
@@ -360,7 +365,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   // 9. Load child lore entries (sub-regions/places)
   let childEntries: Array<{ id: string; name: string; type: string; image_url: string | null; is_revealed: boolean }> = [];
   try {
-    childEntries = await getChildLoreEntries(loreId, campaignId);
+    childEntries = await getChildLoreEntries(loreId, campaignId, isGM);
   } catch (error) {
     console.error("Error loading child lore entries:", error);
   }
@@ -401,7 +406,7 @@ export default async function LoreDetailPageRoute({ params }: Props) {
 
   return (
     <LoreDetailPage
-      lore={{ ...lore, parent } as any}
+      lore={{ ...loreWithVisibility, parent } as any}
       campaignId={campaignId}
       isGM={isGM}
       locationNPCs={safeLocationNPCs}

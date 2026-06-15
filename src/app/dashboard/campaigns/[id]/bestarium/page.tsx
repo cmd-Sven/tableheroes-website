@@ -23,7 +23,7 @@ export default async function CampaignBestariumPage({ params }: Props) {
         Zurück zur Kampagne
       </Link>
 
-      {!world ? (
+      {!worldId ? (
         <WorldRequiredBlocker campaignId={campaignId} isGM={isGM} worlds={gmWorlds} />
       ) : (
         <CampaignBestariumManagement

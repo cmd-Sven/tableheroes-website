@@ -204,6 +204,21 @@ export async function getNPCRelations(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
+  const [{ data: campaignRaw }, { data: profileRaw }] = await Promise.all([
+    (supabase.from("campaigns") as any)
+      .select("gm_id")
+      .eq("id", campaignId)
+      .single(),
+    (supabase.from("users") as any)
+      .select("primary_role")
+      .eq("id", user.id)
+      .single(),
+  ]);
+  const campaign = campaignRaw as { gm_id: string } | null;
+  const profile = profileRaw as { primary_role: string } | null;
+  const canSeeGmNotes =
+    campaign?.gm_id === user.id || profile?.primary_role === "Admin";
+
   // 2. Lade alle Relationen, bei denen die NPC-ID als npc_id_1 ODER npc_id_2 vorkommt
   // Nutze .or() für optimierte bidirektionale Abfrage
   const { data: relations, error } = await (supabase.from("npc_relations") as any)
@@ -289,6 +304,13 @@ export async function getNPCRelations(
         }
       });
     }
+  }
+
+  if (!canSeeGmNotes) {
+    return normalizedRelations.map((rel: any) => ({
+      ...rel,
+      description: null,
+    }));
   }
 
   return normalizedRelations;

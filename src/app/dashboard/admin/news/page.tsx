@@ -27,11 +27,27 @@ export default async function AdminNewsPage() {
     redirect("/dashboard");
   }
 
-  const [posts, imageFilenames, platformDiscordWebhook] = await Promise.all([
-    getAllNewsPosts(),
-    getNewsImageFilenames(),
-    getDiscordPlatformNewsWebhook(),
-  ]);
+  let posts: Awaited<ReturnType<typeof getAllNewsPosts>> = [];
+  let imageFilenames: string[] = [];
+  let platformDiscordWebhook = "";
+
+  try {
+    posts = await getAllNewsPosts();
+  } catch (e) {
+    console.error("[AdminNewsPage] getAllNewsPosts:", e);
+  }
+
+  try {
+    imageFilenames = await getNewsImageFilenames();
+  } catch (e) {
+    console.error("[AdminNewsPage] getNewsImageFilenames:", e);
+  }
+
+  try {
+    platformDiscordWebhook = await getDiscordPlatformNewsWebhook();
+  } catch (e) {
+    console.error("[AdminNewsPage] getDiscordPlatformNewsWebhook:", e);
+  }
 
   return (
     <div className="space-y-8">

@@ -2,6 +2,8 @@
  * Server-only: Lädt Kampagne, prüft Zugriff (GM oder akzeptiertes Mitglied) und optional die Welt.
  * Für Listen-Seiten unter /dashboard/campaigns/[id]/npcs, /factions, /lore.
  */
+import "server-only";
+
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 
@@ -37,7 +39,7 @@ export async function getCampaignAccess(campaignId: string): Promise<CampaignAcc
       .eq("campaign_id", campaignId)
       .eq("user_id", user.id)
       .single();
-    isAcceptedMember = ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes((membership as any)?.status ?? "");
+    isAcceptedMember = ["Accepted", "Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"].includes((membership as any)?.status ?? "");
   }
 
   const hasAccess = isGM || isAcceptedMember;

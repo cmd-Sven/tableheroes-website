@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { User, Plus, Lightbulb, Search, X } from "lucide-react";
 import { NPCGridCard } from "@/src/components/dashboard/NPCGridCard";
-import { deleteNPC } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
+import { deleteNPC } from "@/src/app/dashboard/campaigns/[id]/npc-campaign-actions";
 import { NarrativeNPCWizard } from "@/src/components/worlds/NarrativeNPCWizard";
 import type { WorldTask } from "@/src/app/dashboard/worlds/world-tasks-actions";
 

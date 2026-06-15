@@ -75,6 +75,18 @@ export default async function FactionDetailPageRoute({ params }: Props) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
+  const factionVisibility = await getVisibilityForCampaign(campaignId, "faction");
+  const isRevealed = factionVisibility[factionId] ?? false;
+
+  if (!isGM && !isRevealed) {
+    redirect(`/dashboard/campaigns/${campaignId}/factions`);
+  }
+
+  const factionWithVisibility = {
+    ...faction,
+    is_revealed: isRevealed,
+  };
+
   // 7. Filter NPCs by campaign_visibility (for players, only show revealed or own)
   let visibleNPCs = (faction as any).npcs || [];
   if (!isGM) {
@@ -104,7 +116,7 @@ export default async function FactionDetailPageRoute({ params }: Props) {
 
   return (
     <FactionDetailPage
-      faction={{ ...faction, npcs: visibleNPCs } as any}
+      faction={{ ...factionWithVisibility, npcs: visibleNPCs } as any}
       campaignId={campaignId}
       worldId={(faction as { world_id?: string }).world_id}
       isGM={isGM}

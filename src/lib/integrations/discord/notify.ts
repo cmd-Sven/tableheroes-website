@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { createAdminClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import type { NewsPost } from "@/src/lib/constants/news";
 import { postDiscordEmbed, postDiscordWebhook } from "./client";
 import {
@@ -35,20 +35,45 @@ async function getCampaignWebhook(campaignId: string): Promise<string | null> {
   return row.webhook_url.trim();
 }
 
+function extractPlatformNewsWebhook(
+  data: { value?: { webhook_url?: string } } | null,
+): string | null {
+  const url = data?.value?.webhook_url;
+  return url?.trim() || null;
+}
+
 async function getPlatformNewsWebhook(): Promise<string | null> {
-  const admin = createAdminClient();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await (supabase as any).from("platform_settings")
+      .select("value")
+      .eq("key", DISCORD_PLATFORM_NEWS_KEY)
+      .maybeSingle();
+
+    if (!error && data) {
+      const url = extractPlatformNewsWebhook(data as { value?: { webhook_url?: string } });
+      if (url) return url;
+    } else if (error) {
+      logDiscordError("getPlatformNewsWebhook(session)", error.message);
+    }
+  } catch (e) {
+    logDiscordError("getPlatformNewsWebhook(session)", e instanceof Error ? e.message : String(e));
+  }
+
+  const admin = tryCreateAdminClient();
+  if (!admin) return null;
+
   const { data, error } = await (admin as any).from("platform_settings")
     .select("value")
     .eq("key", DISCORD_PLATFORM_NEWS_KEY)
     .maybeSingle();
 
   if (error) {
-    logDiscordError("getPlatformNewsWebhook", error.message);
+    logDiscordError("getPlatformNewsWebhook(admin)", error.message);
     return null;
   }
 
-  const url = (data as { value?: { webhook_url?: string } } | null)?.value?.webhook_url;
-  return url?.trim() || null;
+  return extractPlatformNewsWebhook(data as { value?: { webhook_url?: string } } | null);
 }
 
 async function getCampaignName(campaignId: string): Promise<string> {

@@ -597,7 +597,11 @@ export async function getChildLocationsForOnboarding(campaignId: string, parentI
 // Get Child Lore Entries (Sub-regions/places)
 // Optional campaignId: wenn gesetzt, wird is_revealed aus campaign_visibility gemerged.
 // ============================================================================
-export async function getChildLoreEntries(parentId: string, campaignId?: string) {
+export async function getChildLoreEntries(
+  parentId: string,
+  campaignId?: string,
+  isGM = false,
+) {
   const supabase = await createClient();
 
   const {
@@ -612,12 +616,16 @@ export async function getChildLoreEntries(parentId: string, campaignId?: string)
   const favoriteIds = new Set((favorites || []).map((f: { lore_id: string }) => f.lore_id));
 
   const { data: children, error } = await (supabase.from("world_lore") as any)
-    .select("id, name, type, image_url, created_at, published_at")
+    .select("id, name, type, image_url, created_at")
     .eq("parent_id", parentId)
     .order("name", { ascending: true });
 
   if (error) {
-    console.error("Fetch Child Lore Entries Error:", error);
+    console.error("Fetch Child Lore Entries Error:", {
+      message: (error as { message?: string }).message,
+      code: (error as { code?: string }).code,
+      details: (error as { details?: string }).details,
+    });
     return [];
   }
 
@@ -628,6 +636,9 @@ export async function getChildLoreEntries(parentId: string, campaignId?: string)
       ...entry,
       is_revealed: visibility[entry.id] ?? false,
     }));
+    if (!isGM) {
+      list = list.filter((entry: any) => entry.is_revealed);
+    }
   } else {
     list = list.map((entry: any) => ({ ...entry, is_revealed: false }));
   }
@@ -637,16 +648,17 @@ export async function getChildLoreEntries(parentId: string, campaignId?: string)
 
   if (childIds.length > 0) {
     const { data: recentSecrets } = await (supabase.from("secrets") as any)
-      .select("lore_id, discovered_at")
-      .in("lore_id", childIds)
+      .select("entity_id, discovered_at")
+      .eq("entity_type", "lore")
+      .in("entity_id", childIds)
       .not("discovered_at", "is", null)
       .order("discovered_at", { ascending: false });
 
     if (recentSecrets) {
-      // Get the most recent discovery per lore entry
       for (const secret of recentSecrets as any[]) {
-        if (secret.lore_id && !latestSecretDiscoveredAt[secret.lore_id]) {
-          latestSecretDiscoveredAt[secret.lore_id] = secret.discovered_at;
+        const loreEntityId = secret.entity_id as string | undefined;
+        if (loreEntityId && !latestSecretDiscoveredAt[loreEntityId]) {
+          latestSecretDiscoveredAt[loreEntityId] = secret.discovered_at;
         }
       }
     }
@@ -656,15 +668,15 @@ export async function getChildLoreEntries(parentId: string, campaignId?: string)
     const hasRecentSecret = latestSecretDiscoveredAt[entry.id]
       ? (Date.now() - new Date(latestSecretDiscoveredAt[entry.id]).getTime()) / (1000 * 60 * 60) < 48
       : false;
-    const isNew = entry.created_at || entry.published_at
-      ? (Date.now() - new Date(entry.created_at || entry.published_at).getTime()) / (1000 * 60 * 60) < 48
+    const isNew = entry.created_at
+      ? (Date.now() - new Date(entry.created_at).getTime()) / (1000 * 60 * 60) < 48
       : false;
 
     return {
       ...entry,
       is_favorite: favoriteIds.has(entry.id),
       latest_secret_discovered_at: latestSecretDiscoveredAt[entry.id] || null,
-      has_recent_secret: hasRecentSecret && !isNew, // Only show UPDATE if not NEW
+      has_recent_secret: hasRecentSecret && !isNew,
     };
   });
 }

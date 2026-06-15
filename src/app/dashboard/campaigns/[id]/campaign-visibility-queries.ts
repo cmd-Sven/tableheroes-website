@@ -1,4 +1,7 @@
-import { createClient } from "@/src/lib/supabase/server";
+import "server-only";
+
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 
 /**
  * Reine Datenabfragen (kein "use server") – sicher importierbar aus Server Components
@@ -22,7 +25,21 @@ export async function getVisibilityForCampaign(
   } = await supabase.auth.getUser();
   if (!user) return {};
 
-  const { data: rows, error } = await (supabase.from("campaign_visibility") as any)
+  const { data: campaign } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+
+  let readClient: Awaited<ReturnType<typeof createClient>> = supabase;
+  if (isCampaignGm(campaign, user.id)) {
+    try {
+      readClient = createAdminClient() as unknown as Awaited<ReturnType<typeof createClient>>;
+    } catch {
+      readClient = supabase;
+    }
+  }
+
+  const { data: rows, error } = await (readClient.from("campaign_visibility") as any)
     .select("entity_id, is_revealed")
     .eq("campaign_id", campaignId)
     .eq("entity_type", entityType);
