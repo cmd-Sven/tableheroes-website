@@ -165,6 +165,8 @@ export function SessionEndWrapUpModal({
           }
         }
 
+        let pointsSkippedDueToConfig = false;
+
         if (!preview.participation.alreadySettled) {
           const extras: SessionParticipationExtraInput[] = [];
           if (enableExtraPoints) {
@@ -195,10 +197,16 @@ export function SessionEndWrapUpModal({
           if (!settleResult.ok) {
             throw new Error(settleResult.error);
           }
+          pointsSkippedDueToConfig = Boolean(settleResult.pointsSkippedDueToConfig);
         }
 
         await endSession(sessionId);
         onComplete(resolveRedirectPath(preview));
+        if (pointsSkippedDueToConfig) {
+          window.alert(
+            "Session wurde archiviert. Teilnahme-Punkte konnten wegen fehlender Server-Konfiguration (SUPABASE_SERVICE_ROLE_KEY) nicht vergeben werden — bitte in Vercel nachziehen.",
+          );
+        }
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : "Session konnte nicht beendet werden.");
       }

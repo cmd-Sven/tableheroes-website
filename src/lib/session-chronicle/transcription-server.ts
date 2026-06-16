@@ -1,5 +1,5 @@
 import { isCampaignGm } from "@/src/lib/campaign-gm";
-import { createAdminClient } from "@/src/lib/supabase/server";
+import { tryCreateAdminClient } from "@/src/lib/supabase/server";
 import {
   AUDIO_CHUNK_DURATION_MS,
   AUDIO_CHUNK_OVERLAP_MS,
@@ -203,12 +203,12 @@ export async function authorizeTranscriptionCampaignAccess(
 }
 
 function resolveWriteClient(supabase: SupabaseLike): SupabaseLike {
-  try {
-    return createAdminClient() as unknown as SupabaseLike;
-  } catch (error) {
-    console.warn("[transcription-server] Admin-Client nicht verfügbar.", error);
+  const admin = tryCreateAdminClient();
+  if (!admin) {
+    console.warn("[transcription-server] Admin-Client nicht verfügbar — verwende RLS-Client.");
     return supabase;
   }
+  return admin as unknown as SupabaseLike;
 }
 
 export async function updateSessionTranscriptionModeDb(

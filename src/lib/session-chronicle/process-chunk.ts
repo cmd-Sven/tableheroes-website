@@ -16,7 +16,7 @@ import {
 import type { ChronicleChunkSummary, LiveMarker } from "./types";
 import type { GmBoardEventRow } from "./chronicle-gm-board-events";
 import { SESSION_AUDIO_BUCKET } from "./constants";
-import { createAdminClient } from "@/src/lib/supabase/server";
+import { createAdminClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { parseChronicleStateRow } from "./parse-db";
 import { emptyChronicleState } from "./types";
 import { ensureChronicleState, compactOrphanTranscriptionChunks } from "./transcription-server";
@@ -44,8 +44,25 @@ function whisperMimeType(filename: string): string {
   return "audio/webm";
 }
 
+const CHRONICLE_ADMIN_CONFIG_ERROR =
+  "Server-Konfiguration fehlt (SUPABASE_SERVICE_ROLE_KEY). Audio-Chunks sind ggf. gespeichert — Verarbeitung ist erst nach Server-Setup möglich.";
+
+function requireChronicleAdminClient():
+  | { ok: true; client: ReturnType<typeof createAdminClient> }
+  | { ok: false; message: string } {
+  const client = tryCreateAdminClient();
+  if (!client) {
+    return { ok: false, message: CHRONICLE_ADMIN_CONFIG_ERROR };
+  }
+  return { ok: true, client };
+}
+
 export async function transcribeChunkAudio(storagePath: string): Promise<string> {
-  const admin = createAdminClient();
+  const adminResult = requireChronicleAdminClient();
+  if (!adminResult.ok) {
+    throw new Error(adminResult.message);
+  }
+  const admin = adminResult.client;
   const { data, error } = await admin.storage
     .from(SESSION_AUDIO_BUCKET)
     .download(storagePath);
@@ -126,7 +143,11 @@ export async function processTranscriptionChunk(
   chunkIndex: number,
   options?: { force?: boolean; skipWhisper?: boolean },
 ): Promise<ProcessResult> {
-  const admin = createAdminClient();
+  const adminResult = requireChronicleAdminClient();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message, chunkIndex };
+  }
+  const admin = adminResult.client;
 
   const { data: sessionRaw } = await (admin.from("sessions") as any)
     .select("id, campaign_id, title")
@@ -340,7 +361,9 @@ export async function summarizeTranscriptionChunkOnly(
 async function listIncompleteTranscriptionChunkIndexes(
   sessionId: string,
 ): Promise<number[]> {
-  const admin = createAdminClient();
+  const adminResult = requireChronicleAdminClient();
+  if (!adminResult.ok) return [];
+  const admin = adminResult.client;
 
   const { data: tsRaw } = await (admin as any)
     .from("session_transcription_sessions")
@@ -393,7 +416,16 @@ export function scheduleTranscriptionChunkProcessing(
 export function schedulePendingTranscriptionChunksProcessing(sessionId: string) {
   after(async () => {
     try {
-      const admin = createAdminClient();
+      const adminResult = requireChronicleAdminClient();
+      if (!adminResult.ok) {
+        console.error(
+          "[schedulePendingTranscriptionChunksProcessing]",
+          sessionId,
+          adminResult.message,
+        );
+        return;
+      }
+      const admin = adminResult.client;
       const { data: tsRaw } = await (admin as any)
         .from("session_transcription_sessions")
         .select("id")

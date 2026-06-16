@@ -1,4 +1,4 @@
-import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { awardAchievement } from "@/src/lib/actions/achievement-actions";
@@ -47,6 +47,7 @@ export async function settleSessionParticipationRewards(
       extraAwarded: number;
       achievementsAwarded: number;
       alreadySettled?: boolean;
+      pointsSkippedDueToConfig?: boolean;
     }
   | { ok: false; error: string }
 > {
@@ -131,11 +132,60 @@ export async function settleSessionParticipationRewards(
       .map(String),
   );
 
-  let admin: ReturnType<typeof createAdminClient>;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { ok: false, error: "Server-Konfiguration fehlt." };
+  const admin = tryCreateAdminClient();
+  const wantsPointAwards =
+    participantIds.some((userId) => allowedUserIds.has(userId) && !gmIds.has(userId)) ||
+    (input.extras ?? []).some((extra) => {
+      const userId = String(extra.userId ?? "");
+      const points = Math.round(Number(extra.points));
+      return (
+        userId &&
+        allowedUserIds.has(userId) &&
+        !gmIds.has(userId) &&
+        Number.isFinite(points) &&
+        points !== 0
+      );
+    }) ||
+    (input.achievements ?? []).some((row) => {
+      const userId = String(row.userId ?? "");
+      const achievementId = String(row.achievementId ?? "");
+      return userId && achievementId && allowedUserIds.has(userId) && !gmIds.has(userId);
+    });
+
+  if (!admin && wantsPointAwards) {
+    console.warn(
+      "[settleSessionParticipationRewards] SUPABASE_SERVICE_ROLE_KEY fehlt — Teilnahme-Punkte werden übersprungen.",
+    );
+  }
+
+  const markSettled = async () => {
+    const { error: markError } = await (supabase.from("sessions") as any)
+      .update({ participation_rewards_settled_at: new Date().toISOString() })
+      .eq("id", sessionId);
+
+    if (
+      markError &&
+      !String(markError.message).includes("participation_rewards_settled_at")
+    ) {
+      return { ok: false as const, error: markError.message };
+    }
+    return { ok: true as const };
+  };
+
+  if (!admin) {
+    const marked = await markSettled();
+    if (!marked.ok) return marked;
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+
+    return {
+      ok: true,
+      baseAwarded: 0,
+      extraAwarded: 0,
+      achievementsAwarded: 0,
+      pointsSkippedDueToConfig: wantsPointAwards,
+    };
   }
 
   const baseReason = buildSessionParticipationReason(session.title, sessionId);
@@ -202,13 +252,8 @@ export async function settleSessionParticipationRewards(
     if (result.awarded) achievementsAwarded += 1;
   }
 
-  const { error: markError } = await (admin.from("sessions") as any)
-    .update({ participation_rewards_settled_at: new Date().toISOString() })
-    .eq("id", sessionId);
-
-  if (markError && !String(markError.message).includes("participation_rewards_settled_at")) {
-    return { ok: false, error: markError.message };
-  }
+  const marked = await markSettled();
+  if (!marked.ok) return marked;
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);

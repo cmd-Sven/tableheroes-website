@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { isSessionStatusLive } from "@/src/lib/session-status";
 import { normalizeUserIdList } from "@/src/lib/session-participation/resolve-participants";
@@ -55,11 +55,9 @@ export async function registerSessionOnlinePresence(
     return { ok: false, error: "Kein Kampagnenmitglied." };
   }
 
-  let admin: ReturnType<typeof createAdminClient>;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { ok: false, error: "Server-Konfiguration fehlt." };
+  const admin = tryCreateAdminClient();
+  if (!admin) {
+    return { ok: true };
   }
 
   const { data: liveRaw } = await (admin.from("session_live_states") as any)

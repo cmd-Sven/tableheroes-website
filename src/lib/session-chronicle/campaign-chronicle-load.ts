@@ -1,4 +1,4 @@
-import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
 import { countPendingInboxItems, listChronicleInboxItems } from "@/src/lib/session-chronicle/inbox";
 import { compactOrphanTranscriptionChunks } from "@/src/lib/session-chronicle/transcription-server";
@@ -67,9 +67,11 @@ export async function loadCampaignChronicleOverview(
   const chunksByTs = new Map<string, CampaignChronicleRow["chunks"]>();
 
   if (tsIds.length > 0) {
-    const admin = createAdminClient();
-    for (const tsId of tsIds) {
-      await compactOrphanTranscriptionChunks(admin as any, tsId);
+    const admin = tryCreateAdminClient();
+    if (admin) {
+      for (const tsId of tsIds) {
+        await compactOrphanTranscriptionChunks(admin as any, tsId);
+      }
     }
 
     const { data: chunksRaw } = await (supabase as any)
