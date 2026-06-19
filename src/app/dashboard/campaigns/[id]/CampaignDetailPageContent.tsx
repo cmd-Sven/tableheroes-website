@@ -102,6 +102,8 @@ export function CampaignDetailPageContent({
     wizardLanguages,
     characterReputations,
     lastPlayerAchievement,
+    foundryProgressionLocked,
+    foundryProgressionLockMessage,
   } = data;
 
   /** Nach serializeForClient kann `now` ISO-String statt Date sein */
@@ -797,6 +799,8 @@ export function CampaignDetailPageContent({
             lastAchievement={lastPlayerAchievement}
             nextSessionConfirmed={playerNextSessionData?.isAttendingNextSession ?? false}
             availableLanguages={wizardLanguages}
+            progressionLocked={foundryProgressionLocked}
+            progressionLockMessage={foundryProgressionLockMessage}
           />
           <Link
             href={`/dashboard/campaigns/${id}?tab=character`}
@@ -950,6 +954,8 @@ export function CampaignDetailPageContent({
             type: String(l.type ?? ""),
           }))}
           factionReputations={characterReputations}
+          progressionLocked={foundryProgressionLocked}
+          progressionLockMessage={foundryProgressionLockMessage}
         />
       )}
       {tab === "settings" && isGM && SettingsTabContent}

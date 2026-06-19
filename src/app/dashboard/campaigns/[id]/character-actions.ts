@@ -6,6 +6,10 @@ import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-displ
 import { getGmCampaignMembersWithCharacters } from "./members-actions";
 import { getCharacterWizardLoreData as loadCharacterWizardLoreData } from "./character-queries";
 import { updateCharacterRowWithSchemaFallback } from "@/src/lib/characters/character-update-fallback";
+import {
+  resolveFoundryProgressionLock,
+  stripFoundryLockedCharacterFields,
+} from "@/src/lib/foundry-sync/progression-lock-server";
 import { setCharacterGoldGp } from "@/src/lib/character-gold";
 
 /**
@@ -578,10 +582,17 @@ export async function updateCharacterPlayer(data: {
     pocketGoldToSet = Math.max(0, Math.floor(Number(data.pocket_gold) || 0));
   }
 
+  const safeUpdates = await stripFoundryLockedCharacterFields(
+    supabase,
+    data.campaign_id,
+    data.character_id,
+    updates,
+  );
+
   const { error } = await updateCharacterRowWithSchemaFallback(
     supabase,
     data.character_id,
-    updates,
+    safeUpdates,
   );
 
   if (error) throw new Error(error.message || "Fehler beim Speichern.");
@@ -685,11 +696,30 @@ export async function updateCharacterByGM(data: {
         ? null
         : imageDisplayToJson(normalizeImageDisplay(data.avatar_display));
 
+    const progressionLock = await resolveFoundryProgressionLock(
+      supabase,
+      data.campaign_id,
+      data.character_id,
+    );
+
+    let level = data.level;
+    let characterClass = data.class;
+    if (progressionLock.locked) {
+      const { data: currentRaw } = await (supabase.from("characters") as any)
+        .select("level, class")
+        .eq("id", data.character_id)
+        .single();
+      level = Number((currentRaw as { level?: number } | null)?.level ?? data.level);
+      characterClass = String(
+        (currentRaw as { class?: string } | null)?.class ?? data.class,
+      );
+    }
+
     const rowUpdate: Record<string, unknown> = {
       status: data.status,
-      level: data.level,
+      level,
       name: (data.name ?? "").trim() || "Unbenannt",
-      class: data.class,
+      class: characterClass,
       race: data.race,
       biography: data.biography ?? null,
       culture_lore_id: data.culture_lore_id ?? null,

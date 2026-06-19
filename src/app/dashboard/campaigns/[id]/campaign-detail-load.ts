@@ -17,6 +17,7 @@ import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { findLatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
+import { resolveFoundryProgressionLock } from "@/src/lib/foundry-sync/progression-lock-server";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 import {
   isSessionStatusLive,
@@ -1111,6 +1112,18 @@ export async function loadCampaignDetailPageData(
     }
   }
 
+  let foundryProgressionLocked = false;
+  let foundryProgressionLockMessage = "";
+  if (myCharacter?.id) {
+    const progressionLock = await resolveFoundryProgressionLock(
+      supabase,
+      id,
+      String(myCharacter.id),
+    );
+    foundryProgressionLocked = progressionLock.locked;
+    foundryProgressionLockMessage = progressionLock.message;
+  }
+
   const { data: sessionArchivesRaw } = await (supabase.from(
     "session_archives",
   ) as any)
@@ -1188,6 +1201,8 @@ export async function loadCampaignDetailPageData(
     wizardLanguages,
     characterReputations,
     lastPlayerAchievement,
+    foundryProgressionLocked,
+    foundryProgressionLockMessage,
   };
 
   /** Ein Durchlauf: alle Supabase-/DB-Typen (BigInt, …) für RSC → Client-Komponenten sicher */

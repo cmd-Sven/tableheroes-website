@@ -7,6 +7,7 @@ import { getFactionsWithMembers } from "../factions-queries";
 import { getNPCs } from "../npc-queries";
 import { getCharacterFactionReputations } from "../reputation-queries";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
+import { resolveFoundryProgressionLock } from "@/src/lib/foundry-sync/progression-lock-server";
 import { serializeForClient, toPlainJsonClone } from "@/src/lib/serialize-for-flight";
 import type { GMCharacterEditorPageProps } from "@/src/components/dashboard/campaigns/GMCharacterEditorPage";
 
@@ -35,12 +36,12 @@ export async function loadGmCharacterEditorData(
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: "not_authenticated" };
 
-    const { data: campaignRaw, error: campErr } = await (supabase.from("campaigns") as any)
-      .select("gm_id, owner_id")
+    const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+      .select("gm_id, owner_id, mode")
       .eq("id", campaignId)
       .maybeSingle();
 
-    if (campErr || !campaignRaw) return { ok: false, error: "campaign_not_found" };
+    if (!campaignRaw) return { ok: false, error: "campaign_not_found" };
 
     const c = campaignRaw as { gm_id: string; owner_id?: string | null };
     const isGm = c.gm_id === user.id || c.owner_id === user.id;
@@ -114,6 +115,12 @@ export async function loadGmCharacterEditorData(
       name: String(f.name ?? ""),
     }));
 
+    const progressionLock = await resolveFoundryProgressionLock(
+      supabase,
+      campaignId,
+      characterId,
+    );
+
     const payload: GmCharacterEditorLoadPayload = {
       character: characterForEditor as GMCharacterEditorPageProps["character"],
       npcs: serializeForClient(npcsForEditor) as GMCharacterEditorPageProps["npcs"],
@@ -125,6 +132,8 @@ export async function loadGmCharacterEditorData(
       initialFactionReputations: serializeForClient(
         factionReputations,
       ) as GMCharacterEditorPageProps["initialFactionReputations"],
+      progressionLocked: progressionLock.locked,
+      progressionLockMessage: progressionLock.message,
     };
 
     return {

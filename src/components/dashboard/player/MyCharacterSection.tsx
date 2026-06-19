@@ -18,6 +18,7 @@ import { normalizeImageDisplay } from "@/src/lib/image-display";
 import Link from "next/link";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
+import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 
 type Culture = { id: string; name: string };
 type Language = { id: string; name: string };
@@ -72,6 +73,8 @@ type Props = {
   factions: Faction[];
   locations: Location[];
   factionReputations?: Array<{ id: string; faction_id: string; faction_name: string; reputation: number; rank?: string | null }>;
+  progressionLocked?: boolean;
+  progressionLockMessage?: string;
 };
 
 export function MyCharacterSection({
@@ -82,6 +85,8 @@ export function MyCharacterSection({
   factions,
   locations,
   factionReputations = [],
+  progressionLocked = false,
+  progressionLockMessage = "",
 }: Props) {
   const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
@@ -276,6 +281,12 @@ export function MyCharacterSection({
         </div>
       )}
 
+      {progressionLocked && progressionLockMessage ? (
+        <div className="mb-4">
+          <FoundryProgressionLockNotice message={progressionLockMessage} />
+        </div>
+      ) : null}
+
       <ClientMountGate
         fallback={
           <div className="space-y-6 animate-pulse" aria-hidden>
@@ -311,8 +322,9 @@ export function MyCharacterSection({
             <input
               type="text"
               value={form.class}
+              readOnly={progressionLocked}
               onChange={(e) => setForm((p) => ({ ...p, class: e.target.value }))}
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div>
@@ -330,8 +342,9 @@ export function MyCharacterSection({
               type="number"
               min={1}
               value={form.level}
+              readOnly={progressionLocked}
               onChange={(e) => setForm((p) => ({ ...p, level: parseInt(e.target.value) || 1 }))}
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div id="character-erfahrung" className="scroll-mt-24">
@@ -342,13 +355,14 @@ export function MyCharacterSection({
               type="number"
               min={0}
               value={form.experience_points}
+              readOnly={progressionLocked}
               onChange={(e) =>
                 setForm((p) => ({
                   ...p,
                   experience_points: Math.max(0, parseInt(e.target.value, 10) || 0),
                 }))
               }
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div id="character-gold" className="scroll-mt-24 sm:col-span-2">

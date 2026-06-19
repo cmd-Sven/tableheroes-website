@@ -17,6 +17,7 @@ import {
 import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/character-actions";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 import { CharacterAvatarImage } from "./CharacterAvatarImage";
+import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 
 type Relationship = {
   relationship_type: string;
@@ -127,6 +128,8 @@ type Props = {
   nextSessionConfirmed?: boolean;
   /** Freigegebene Sprachen (Wizard) – für Sprachen-Modal */
   availableLanguages: { id: string; name: string }[];
+  progressionLocked?: boolean;
+  progressionLockMessage?: string;
 };
 
 const marbleTile =
@@ -142,6 +145,8 @@ export function PlayerCampaignCharacterOverview({
   lastAchievement,
   nextSessionConfirmed = false,
   availableLanguages,
+  progressionLocked = false,
+  progressionLockMessage = "",
 }: Props) {
   const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
@@ -278,6 +283,9 @@ export function PlayerCampaignCharacterOverview({
 
   return (
     <section className="rounded-xl border border-stone-700/40 bg-player-paper p-6 space-y-6">
+      {progressionLocked && progressionLockMessage ? (
+        <FoundryProgressionLockNotice message={progressionLockMessage} />
+      ) : null}
       {modal ? (
         <div
           className="fixed inset-0 z-100 flex items-center justify-center p-4"
@@ -479,9 +487,10 @@ export function PlayerCampaignCharacterOverview({
         <button
           type="button"
           onClick={() => openModal("xp")}
-          className="btn-player-edit-gold shrink-0"
+          disabled={progressionLocked}
+          className="btn-player-edit-gold shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Bearbeiten
+          {progressionLocked ? "Via Foundry" : "Bearbeiten"}
         </button>
       </div>
 

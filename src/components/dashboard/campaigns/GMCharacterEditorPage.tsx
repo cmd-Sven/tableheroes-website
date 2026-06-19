@@ -25,6 +25,7 @@ import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import type { ImageDisplaySettings } from "@/src/lib/image-display";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
+import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 
 function normalizeLanguageIds(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -86,6 +87,8 @@ export type GMCharacterEditorPageProps = {
   initialFactionReputations: FactionReputation[];
   /** Angemeldeter GM — nur eigene Storage-Pfade beim Ersetzen löschen */
   currentUserId: string;
+  progressionLocked?: boolean;
+  progressionLockMessage?: string;
 };
 
 type Props = GMCharacterEditorPageProps;
@@ -101,6 +104,8 @@ export function GMCharacterEditorPage({
   factionChoices = [],
   initialFactionReputations,
   currentUserId,
+  progressionLocked = false,
+  progressionLockMessage = "",
 }: Props) {
   const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
@@ -411,6 +416,9 @@ export function GMCharacterEditorPage({
 
   return (
     <div className="space-y-8">
+      {progressionLocked && progressionLockMessage ? (
+        <FoundryProgressionLockNotice message={progressionLockMessage} />
+      ) : null}
       {/* Header */}
       <div className="rounded-lg border border-hero-dark bg-background-card p-6">
         <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant">
@@ -444,7 +452,8 @@ export function GMCharacterEditorPage({
               value={characterClass}
               onChange={(e) => setCharacterClass(e.target.value)}
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-white outline-none focus:border-accent-gold"
-              disabled={isPending}
+              disabled={isPending || progressionLocked}
+              readOnly={progressionLocked}
             />
           </div>
           <div>
@@ -701,7 +710,8 @@ export function GMCharacterEditorPage({
                   value={level}
                   onChange={(e) => setLevel(parseInt(e.target.value) || 1)}
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                  disabled={isPending}
+                  disabled={isPending || progressionLocked}
+                  readOnly={progressionLocked}
                 />
               </div>
             </div>
