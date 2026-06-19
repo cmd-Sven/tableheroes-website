@@ -6,6 +6,26 @@ export const dynamic = "force-dynamic";
 
 const LOG_PREFIX = "[foundry-sync]";
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-tableheroes-api-key",
+};
+
+function jsonWithCors(
+  body: unknown,
+  init?: { status?: number },
+): NextResponse {
+  return NextResponse.json(body, {
+    status: init?.status,
+    headers: CORS_HEADERS,
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 const payloadSchema = z
   .object({
     foundry_actor_id: z.string().trim().min(1, "foundry_actor_id fehlt."),
@@ -41,7 +61,7 @@ export async function GET() {
   const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!hasUrl || !hasServiceKey) {
-    return NextResponse.json(
+    return jsonWithCors(
       {
         ok: false,
         endpoint: "foundry-sync",
@@ -64,7 +84,7 @@ export async function GET() {
 
     if (error) {
       console.error(`${LOG_PREFIX} health check failed`, error);
-      return NextResponse.json(
+      return jsonWithCors(
         {
           ok: false,
           endpoint: "foundry-sync",
@@ -75,14 +95,14 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
+    return jsonWithCors({
       ok: true,
       endpoint: "foundry-sync",
       message: "Bereit. Sync per POST mit Header x-tableheroes-api-key.",
     });
   } catch (e: unknown) {
     console.error(`${LOG_PREFIX} health check exception`, e);
-    return NextResponse.json(
+    return jsonWithCors(
       {
         ok: false,
         endpoint: "foundry-sync",
@@ -96,7 +116,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const apiKey = getApiKey(request);
   if (!apiKey) {
-    return NextResponse.json(
+    return jsonWithCors(
       { error: "Missing API key header: x-tableheroes-api-key" },
       { status: 401 },
     );
@@ -106,12 +126,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ungültiger JSON-Body." }, { status: 400 });
+    return jsonWithCors({ error: "Ungültiger JSON-Body." }, { status: 400 });
   }
 
   const parsed = payloadSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonWithCors(
       {
         error: "Payload validation failed.",
         details: parsed.error.flatten(),
@@ -131,15 +151,12 @@ export async function POST(request: Request) {
 
   if (syncError) {
     console.error(`${LOG_PREFIX} key lookup failed`, syncError);
-    return NextResponse.json(
-      { error: "Foundry sync key lookup failed." },
-      { status: 500 },
-    );
+    return jsonWithCors({ error: "Foundry sync key lookup failed." }, { status: 500 });
   }
 
   const syncRow = syncRowRaw as FoundrySyncRow | null;
   if (!syncRow?.campaign_id) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return jsonWithCors({ error: "Unauthorized." }, { status: 401 });
   }
 
   const campaignId = String(syncRow.campaign_id);
@@ -157,10 +174,7 @@ export async function POST(request: Request) {
       campaignId,
       actorId,
     });
-    return NextResponse.json(
-      { error: "Foundry mapping lookup failed." },
-      { status: 500 },
-    );
+    return jsonWithCors({ error: "Foundry mapping lookup failed." }, { status: 500 });
   }
 
   const mapping = mappingRaw as FoundryCharacterMappingRow | null;
@@ -180,14 +194,14 @@ export async function POST(request: Request) {
           campaignId,
           actorId,
         });
-        return NextResponse.json(
+        return jsonWithCors(
           { error: "Unmapped character placeholder could not be created." },
           { status: 500 },
         );
       }
     }
 
-    return NextResponse.json(
+    return jsonWithCors(
       {
         status: "unmapped_character",
         message:
@@ -217,10 +231,7 @@ export async function POST(request: Request) {
       actorId,
       characterId: mapping.character_id,
     });
-    return NextResponse.json(
-      { error: "Character sync update failed." },
-      { status: 500 },
-    );
+    return jsonWithCors({ error: "Character sync update failed." }, { status: 500 });
   }
 
   console.info(`${LOG_PREFIX} synced`, {
@@ -232,7 +243,7 @@ export async function POST(request: Request) {
     experience_points: input.experience_points,
   });
 
-  return NextResponse.json({
+  return jsonWithCors({
     success: true,
     campaign_id: campaignId,
     character_id: mapping.character_id,
