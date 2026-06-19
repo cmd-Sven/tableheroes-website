@@ -94,6 +94,7 @@ import {
   ChronicleLiveMarkerBar,
 } from "@/src/components/session/ChronicleLiveMarkerBar";
 import { ChronicleRecordingNoticeModal } from "@/src/components/session/ChronicleRecordingNoticeModal";
+import { ChronicleRecordingReminderBanner } from "@/src/components/session/ChronicleRecordingReminderBanner";
 import { ChronicleMicMonitor } from "@/src/components/session/ChronicleMicMonitor";
 import { useSessionChronicleRecorder } from "@/src/hooks/useSessionChronicleRecorder";
 import { useSessionTranscriptionStatus } from "@/src/hooks/useSessionTranscriptionStatus";
@@ -1152,6 +1153,78 @@ export function LiveSessionBoard({
       ? topBarTranscriptionStatus
       : null;
 
+  const chronistRecordingActive =
+    chronicleRecorder.phase === "recording" ||
+    chronicleRecorder.phase === "paused" ||
+    chronicleRecorder.phase === "starting" ||
+    topBarTranscriptionStatus === "recording" ||
+    topBarTranscriptionStatus === "paused";
+
+  const [chronistReminderDismissed, setChronistReminderDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem(`th-chronist-reminder-dismiss-${sessionId}`) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const [jitsiChronistReminderDismissed, setJitsiChronistReminderDismissed] = useState(
+    () => {
+      if (typeof window === "undefined") return false;
+      try {
+        return (
+          sessionStorage.getItem(`th-chronist-jitsi-reminder-dismiss-${sessionId}`) ===
+          "1"
+        );
+      } catch {
+        return false;
+      }
+    },
+  );
+
+  useEffect(() => {
+    if (chronicleRecorder.phase === "recording") {
+      try {
+        sessionStorage.removeItem(`th-chronist-reminder-dismiss-${sessionId}`);
+      } catch {
+        /* ignore */
+      }
+      setChronistReminderDismissed(false);
+    }
+  }, [chronicleRecorder.phase, sessionId]);
+
+  function dismissChronistRecordingReminder() {
+    try {
+      sessionStorage.setItem(`th-chronist-reminder-dismiss-${sessionId}`, "1");
+    } catch {
+      /* ignore */
+    }
+    setChronistReminderDismissed(true);
+  }
+
+  function dismissJitsiChronistReminder() {
+    try {
+      sessionStorage.setItem(`th-chronist-jitsi-reminder-dismiss-${sessionId}`, "1");
+    } catch {
+      /* ignore */
+    }
+    setJitsiChronistReminderDismissed(true);
+  }
+
+  const showChronistNotRecordingReminder =
+    isGM &&
+    sessionStatus === "Live" &&
+    chronistTableMode &&
+    !chronistRecordingActive &&
+    !chronistReminderDismissed;
+
+  const showJitsiChronistReminder =
+    isGM &&
+    sessionStatus === "Live" &&
+    !chronistTableMode &&
+    !jitsiChronistReminderDismissed;
+
   useEffect(() => {
     if (
       isGM ||
@@ -2153,6 +2226,22 @@ export function LiveSessionBoard({
           </button>
         </div>
       </div>
+
+      {showChronistNotRecordingReminder ? (
+        <ChronicleRecordingReminderBanner
+          variant="not-recording"
+          onStartRecording={() => chronistStartFlowRef.current?.()}
+          onDismiss={dismissChronistRecordingReminder}
+          error={chronicleRecorder.error}
+        />
+      ) : null}
+
+      {showJitsiChronistReminder ? (
+        <ChronicleRecordingReminderBanner
+          variant="jitsi-mode"
+          onDismiss={dismissJitsiChronistReminder}
+        />
+      ) : null}
 
       {recordingNoticeStatus && recordingNoticeModalOpen ? (
         <ChronicleRecordingNoticeModal

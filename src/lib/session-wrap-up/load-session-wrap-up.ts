@@ -3,6 +3,7 @@ import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { isSessionStatusScheduled } from "@/src/lib/session-status";
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
+import { summarizeChronistChunkProcessing } from "@/src/lib/session-chronicle/chronist-processing-status";
 import {
   countPendingInboxItems,
   inboxItemTitle,
@@ -146,20 +147,13 @@ export async function loadSessionWrapUpPreview(
     (sum, c) => sum + Math.max(0, Number(c.duration_ms ?? 0)),
     0,
   );
-  const pendingWhisper = chunks.filter(
-    (c) => c.whisper_status === "pending" || c.whisper_status === "processing",
-  ).length;
-  const pendingSummarize = chunks.filter(
-    (c) =>
-      c.whisper_status === "done" &&
-      (c.summarize_status === "pending" || c.summarize_status === "processing"),
-  ).length;
-  const failedChunks = chunks.filter(
-    (c) => c.whisper_status === "failed" || c.summarize_status === "failed",
-  ).length;
-  const processedChunks = chunks.filter(
-    (c) => c.whisper_status === "done" && c.summarize_status === "done",
-  ).length;
+  const chronistProcessing = summarizeChronistChunkProcessing(chunks);
+  const {
+    pendingWhisper,
+    pendingSummarize,
+    failedChunks,
+    processedChunks,
+  } = chronistProcessing;
 
   const { data: stateRaw } = await (supabase as any)
     .from("session_chronicle_state")

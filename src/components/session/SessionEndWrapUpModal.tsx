@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Award,
+  CheckCircle2,
   Cloud,
   Coins,
   Info,
@@ -33,6 +34,7 @@ import {
   type SessionWrapUpPreview,
   type SessionWrapUpTask,
 } from "@/src/lib/session-wrap-up/types";
+import { SessionChronistProcessingWait } from "@/src/components/session/SessionChronistProcessingWait";
 
 type Props = {
   open: boolean;
@@ -76,6 +78,35 @@ function presenceLabel(presence: "online" | "physical" | "both" | null): string 
   return "Nicht erkannt";
 }
 
+function resolveRedirectPath(
+  data: SessionWrapUpPreview,
+  campaignId: string,
+): string {
+  const hasChronistFollowUp =
+    data.inbox.pendingCount > 0 ||
+    data.chronist.failedChunks > 0 ||
+    data.chronist.pendingWhisper + data.chronist.pendingSummarize > 0;
+  if (hasChronistFollowUp) {
+    return `/dashboard/campaigns/${campaignId}/chronist`;
+  }
+  return `/dashboard/campaigns/${campaignId}?tab=sessions`;
+}
+
+function shouldWaitForChronistProcessing(
+  preview: SessionWrapUpPreview,
+  wasRecordingActive: boolean,
+): boolean {
+  if (wasRecordingActive) return true;
+  if (preview.chronist.recordingActive) return true;
+  if (preview.chronist.chunkCount > 0) return true;
+  if (preview.chronist.pendingWhisper + preview.chronist.pendingSummarize > 0) {
+    return true;
+  }
+  return preview.chronist.used;
+}
+
+type WrapUpPhase = "preview" | "chronist-processing";
+
 export function SessionEndWrapUpModal({
   open,
   onClose,
@@ -98,9 +129,17 @@ export function SessionEndWrapUpModal({
     SessionParticipationAchievementInput[]
   >([{ userId: "", achievementId: "" }]);
   const [isPending, startTransition] = useTransition();
+  const [phase, setPhase] = useState<WrapUpPhase>("preview");
+  const [redirectAfterChronist, setRedirectAfterChronist] = useState<string | null>(
+    null,
+  );
+  const [chronistReady, setChronistReady] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setPhase("preview");
+    setRedirectAfterChronist(null);
+    setChronistReady(false);
     setLoadError(null);
     setPreview(null);
     setEnableExtraPoints(false);
@@ -135,16 +174,8 @@ export function SessionEndWrapUpModal({
 
   if (!open) return null;
 
-  function resolveRedirectPath(data: SessionWrapUpPreview): string {
-    const hasChronistFollowUp =
-      data.inbox.pendingCount > 0 ||
-      data.chronist.failedChunks > 0 ||
-      data.chronist.pendingWhisper + data.chronist.pendingSummarize > 0;
-    if (hasChronistFollowUp) {
-      return `/dashboard/campaigns/${campaignId}/chronist`;
-    }
-    return `/dashboard/campaigns/${campaignId}?tab=sessions`;
-  }
+  const chronistHref = `/dashboard/campaigns/${campaignId}/chronist`;
+  const sessionsHref = `/dashboard/campaigns/${campaignId}?tab=sessions`;
 
   function handleConfirmEnd() {
     if (!preview || isPending) return;
@@ -201,7 +232,13 @@ export function SessionEndWrapUpModal({
         }
 
         await endSession(sessionId);
-        onComplete(resolveRedirectPath(preview));
+        const redirectPath = resolveRedirectPath(preview, campaignId);
+        if (shouldWaitForChronistProcessing(preview, isRecordingActive)) {
+          setRedirectAfterChronist(redirectPath);
+          setPhase("chronist-processing");
+        } else {
+          onComplete(redirectPath);
+        }
         if (pointsSkippedDueToConfig) {
           window.alert(
             "Session wurde archiviert. Teilnahme-Punkte konnten wegen fehlender Server-Konfiguration (SUPABASE_SERVICE_ROLE_KEY) nicht vergeben werden — bitte in Vercel nachziehen.",
@@ -227,16 +264,20 @@ export function SessionEndWrapUpModal({
               id="session-wrap-up-title"
               className="font-barlow text-xl font-bold uppercase tracking-wide text-white"
             >
-              Session abschließen
+              {phase === "chronist-processing"
+                ? "Chronist-Verarbeitung"
+                : "Session abschließen"}
             </h2>
             <p className="mt-1 font-libre text-sm text-gray-400">
-              {preview?.sessionTitle?.trim() || "Live-Session"} — Übersicht vor dem Archivieren
+              {phase === "chronist-processing"
+                ? "Session archiviert — der Chronist arbeitet die Aufnahme auf"
+                : `${preview?.sessionTitle?.trim() || "Live-Session"} — Übersicht vor dem Archivieren`}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            disabled={isPending}
+            disabled={isPending || phase === "chronist-processing"}
             className="rounded border border-hero-border/50 p-2 text-gray-400 hover:text-white disabled:opacity-50"
             aria-label="Schließen"
           >
@@ -245,7 +286,14 @@ export function SessionEndWrapUpModal({
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
-          {loadError ? (
+          {phase === "chronist-processing" ? (
+            <SessionChronistProcessingWait
+              sessionId={sessionId}
+              onStatusChange={(_summary, waitPhase) => {
+                setChronistReady(waitPhase === "complete");
+              }}
+            />
+          ) : loadError ? (
             <p className="font-libre text-sm text-red-300">{loadError}</p>
           ) : !preview ? (
             <div className="flex items-center justify-center gap-2 py-12 text-gray-400">
@@ -286,12 +334,29 @@ export function SessionEndWrapUpModal({
                       <dd className="font-medium text-white">
                         {preview.chronist.recordingActive
                           ? "Noch aktiv"
-                          : preview.chronist.transcriptionStatus === "stopped"
-                            ? "Beendet"
-                            : (preview.chronist.transcriptionStatus ?? "—")}
+                          : preview.chronist.pendingWhisper +
+                                preview.chronist.pendingSummarize >
+                              0
+                            ? `${preview.chronist.pendingWhisper + preview.chronist.pendingSummarize} Chunk(s) in Arbeit`
+                            : preview.chronist.processedChunks > 0 &&
+                                preview.chronist.processedChunks ===
+                                  preview.chronist.chunkCount
+                              ? "Vollständig verarbeitet"
+                              : preview.chronist.transcriptionStatus === "stopped"
+                                ? "Beendet"
+                                : (preview.chronist.transcriptionStatus ?? "—")}
                       </dd>
                     </div>
                   </dl>
+                  {preview.chronist.pendingWhisper +
+                    preview.chronist.pendingSummarize >
+                  0 ? (
+                    <p className="mt-3 font-libre text-xs text-amber-200/90 leading-relaxed">
+                      Nach dem Archivieren wartet das Modal, bis alle Chunks
+                      durch sind — dann kannst du das Ergebnis direkt im Chronist
+                      öffnen.
+                    </p>
+                  ) : null}
                 </section>
               ) : (
                 <section className="rounded-lg border border-hero-border/30 bg-background-dark/50 p-4">
@@ -653,27 +718,64 @@ export function SessionEndWrapUpModal({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400 hover:text-white disabled:opacity-50"
-          >
-            Abbrechen
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirmEnd}
-            disabled={isPending || !preview}
-            className="inline-flex items-center gap-2 rounded border border-red-600 bg-red-900/70 px-4 py-2 font-barlow text-xs font-bold uppercase text-red-100 hover:bg-red-800/80 disabled:opacity-50"
-          >
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Power className="h-4 w-4" />
-            )}
-            Session archivieren & beenden
-          </button>
+          {phase === "chronist-processing" ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  onComplete(redirectAfterChronist ?? sessionsHref)
+                }
+                className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400 hover:text-white"
+              >
+                Später im Dashboard
+              </button>
+              <Link
+                href={chronistHref}
+                onClick={() => onComplete(chronistHref)}
+                className={`inline-flex items-center gap-2 rounded border px-4 py-2 font-barlow text-xs font-bold uppercase ${
+                  chronistReady
+                    ? "border-emerald-500 bg-emerald-900/60 text-emerald-100 hover:bg-emerald-800/70"
+                    : "border-hero-border text-gray-300 hover:text-white"
+                }`}
+              >
+                {chronistReady ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Ergebnis im Chronist öffnen
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chronist öffnen
+                  </>
+                )}
+              </Link>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isPending}
+                className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400 hover:text-white disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEnd}
+                disabled={isPending || !preview}
+                className="inline-flex items-center gap-2 rounded border border-red-600 bg-red-900/70 px-4 py-2 font-barlow text-xs font-bold uppercase text-red-100 hover:bg-red-800/80 disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Power className="h-4 w-4" />
+                )}
+                Session archivieren & beenden
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
