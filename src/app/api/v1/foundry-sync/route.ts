@@ -57,7 +57,8 @@ export async function GET() {
 
   try {
     const supabase = createAdminClient();
-    const { error } = await (supabase.from("foundry_sync") as any)
+    const { error } = await (supabase as any)
+      .from("foundry_sync")
       .select("id")
       .limit(1);
 
@@ -122,8 +123,8 @@ export async function POST(request: Request) {
   const input = parsed.data;
   const supabase = createAdminClient();
 
-  const { data: syncRowRaw, error: syncError } = await (supabase
-    .from("foundry_sync") as any)
+  const { data: syncRowRaw, error: syncError } = await (supabase as any)
+    .from("foundry_sync")
     .select("campaign_id")
     .eq("api_key", apiKey)
     .maybeSingle();
@@ -144,8 +145,8 @@ export async function POST(request: Request) {
   const campaignId = String(syncRow.campaign_id);
   const actorId = input.foundry_actor_id;
 
-  const { data: mappingRaw, error: mappingError } = await (supabase
-    .from("foundry_character_mapping") as any)
+  const { data: mappingRaw, error: mappingError } = await (supabase as any)
+    .from("foundry_character_mapping")
     .select("id, campaign_id, foundry_actor_id, character_id")
     .eq("campaign_id", campaignId)
     .eq("foundry_actor_id", actorId)
@@ -166,8 +167,8 @@ export async function POST(request: Request) {
 
   if (!mapping?.character_id) {
     if (!mapping) {
-      const { error: insertError } = await (supabase
-        .from("foundry_character_mapping") as any)
+      const { error: insertError } = await (supabase as any)
+        .from("foundry_character_mapping")
         .insert({
           campaign_id: campaignId,
           foundry_actor_id: actorId,
@@ -204,7 +205,8 @@ export async function POST(request: Request) {
     experience_points: input.experience_points,
   };
 
-  const { error: characterUpdateError } = await (supabase.from("characters") as any)
+  const { error: characterUpdateError } = await (supabase as any)
+    .from("characters")
     .update(updatePayload)
     .eq("id", mapping.character_id)
     .eq("campaign_id", campaignId);
