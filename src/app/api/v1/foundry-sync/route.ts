@@ -1,29 +1,18 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/src/lib/supabase/server";
+import {
+  foundryJson,
+  foundryOptions,
+  getFoundryApiKey,
+  resolveFoundryApiCampaign,
+} from "@/src/lib/foundry-sync/foundry-api";
 
 export const dynamic = "force-dynamic";
 
 const LOG_PREFIX = "[foundry-sync]";
 
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-tableheroes-api-key",
-};
-
-function jsonWithCors(
-  body: unknown,
-  init?: { status?: number },
-): NextResponse {
-  return NextResponse.json(body, {
-    status: init?.status,
-    headers: CORS_HEADERS,
-  });
-}
-
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return foundryOptions();
 }
 
 const payloadSchema = z
@@ -38,10 +27,6 @@ const payloadSchema = z
   })
   .strict();
 
-type FoundrySyncRow = {
-  campaign_id: string;
-};
-
 type FoundryCharacterMappingRow = {
   id: string;
   campaign_id: string;
@@ -50,9 +35,7 @@ type FoundryCharacterMappingRow = {
 };
 
 function getApiKey(request: Request): string | null {
-  const raw = request.headers.get("x-tableheroes-api-key");
-  const key = raw?.trim();
-  return key ? key : null;
+  return getFoundryApiKey(request);
 }
 
 /** GET = Erreichbarkeit prüfen (Browser, Monitoring). Sync selbst läuft per POST. */
@@ -61,7 +44,7 @@ export async function GET() {
   const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!hasUrl || !hasServiceKey) {
-    return jsonWithCors(
+    return foundryJson(
       {
         ok: false,
         endpoint: "foundry-sync",
@@ -84,7 +67,7 @@ export async function GET() {
 
     if (error) {
       console.error(`${LOG_PREFIX} health check failed`, error);
-      return jsonWithCors(
+      return foundryJson(
         {
           ok: false,
           endpoint: "foundry-sync",
@@ -95,14 +78,15 @@ export async function GET() {
       );
     }
 
-    return jsonWithCors({
+    return foundryJson({
       ok: true,
       endpoint: "foundry-sync",
-      message: "Bereit. Sync per POST mit Header x-tableheroes-api-key.",
+      message:
+        "Bereit. POST = XP-Sync, GET /api/v1/foundry-sync/profile = Punkte & Achievements.",
     });
   } catch (e: unknown) {
     console.error(`${LOG_PREFIX} health check exception`, e);
-    return jsonWithCors(
+    return foundryJson(
       {
         ok: false,
         endpoint: "foundry-sync",
@@ -116,7 +100,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const apiKey = getApiKey(request);
   if (!apiKey) {
-    return jsonWithCors(
+    return foundryJson(
       { error: "Missing API key header: x-tableheroes-api-key" },
       { status: 401 },
     );
@@ -126,12 +110,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return jsonWithCors({ error: "Ungültiger JSON-Body." }, { status: 400 });
+    return foundryJson({ error: "Ungültiger JSON-Body." }, { status: 400 });
   }
 
   const parsed = payloadSchema.safeParse(body);
   if (!parsed.success) {
-    return jsonWithCors(
+    return foundryJson(
       {
         error: "Payload validation failed.",
         details: parsed.error.flatten(),
@@ -142,24 +126,12 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const supabase = createAdminClient();
-
-  const { data: syncRowRaw, error: syncError } = await (supabase as any)
-    .from("foundry_sync")
-    .select("campaign_id")
-    .eq("api_key", apiKey)
-    .maybeSingle();
-
-  if (syncError) {
-    console.error(`${LOG_PREFIX} key lookup failed`, syncError);
-    return jsonWithCors({ error: "Foundry sync key lookup failed." }, { status: 500 });
+  const auth = await resolveFoundryApiCampaign(supabase, apiKey);
+  if (!auth.ok) {
+    return foundryJson({ error: auth.error }, { status: auth.status });
   }
 
-  const syncRow = syncRowRaw as FoundrySyncRow | null;
-  if (!syncRow?.campaign_id) {
-    return jsonWithCors({ error: "Unauthorized." }, { status: 401 });
-  }
-
-  const campaignId = String(syncRow.campaign_id);
+  const campaignId = auth.campaignId;
   const actorId = input.foundry_actor_id;
 
   const { data: mappingRaw, error: mappingError } = await (supabase as any)
@@ -174,7 +146,7 @@ export async function POST(request: Request) {
       campaignId,
       actorId,
     });
-    return jsonWithCors({ error: "Foundry mapping lookup failed." }, { status: 500 });
+    return foundryJson({ error: "Foundry mapping lookup failed." }, { status: 500 });
   }
 
   const mapping = mappingRaw as FoundryCharacterMappingRow | null;
@@ -194,14 +166,14 @@ export async function POST(request: Request) {
           campaignId,
           actorId,
         });
-        return jsonWithCors(
+        return foundryJson(
           { error: "Unmapped character placeholder could not be created." },
           { status: 500 },
         );
       }
     }
 
-    return jsonWithCors(
+    return foundryJson(
       {
         status: "unmapped_character",
         message:
@@ -231,7 +203,7 @@ export async function POST(request: Request) {
       actorId,
       characterId: mapping.character_id,
     });
-    return jsonWithCors({ error: "Character sync update failed." }, { status: 500 });
+    return foundryJson({ error: "Character sync update failed." }, { status: 500 });
   }
 
   console.info(`${LOG_PREFIX} synced`, {
@@ -243,7 +215,7 @@ export async function POST(request: Request) {
     experience_points: input.experience_points,
   });
 
-  return jsonWithCors({
+  return foundryJson({
     success: true,
     campaign_id: campaignId,
     character_id: mapping.character_id,

@@ -1,0 +1,36 @@
+{
+  "TABLEHEROES": {
+    "ModuleName": "Table Heroes",
+    "Settings": {
+      "ApiBaseUrl": {
+        "Name": "Table Heroes API-URL",
+        "Hint": "Basis-URL ohne Slash am Ende, z. B. https://table-heroes.de"
+      },
+      "ApiKey": {
+        "Name": "Kampagnen API-Key",
+        "Hint": "Aus den Table-Heroes-Kampagneneinstellungen (Foundry Sync)."
+      },
+      "RefreshMinutes": {
+        "Name": "Aktualisierung (Minuten)",
+        "Hint": "Wie oft Punkte im Hintergrund neu geladen werden."
+      }
+    },
+    "Tab": {
+      "Label": "Table Heroes",
+      "Title": "Table Heroes — Meta-Fortschritt",
+      "Unmapped": "Dieser Foundry-Actor ist noch keinem Table-Heroes-Charakter zugeordnet.",
+      "PointsTotal": "Guthaben",
+      "PointsLifetime": "Lebenszeit",
+      "Rank": "Rang",
+      "Level": "TH-Level",
+      "NextLevel": "Nächstes Level ab",
+      "Achievements": "Achievements",
+      "RecentPoints": "Letzte Buchungen",
+      "OpenDashboard": "Punkte-Katalog öffnen",
+      "Refresh": "Aktualisieren",
+      "Loading": "Lade Table-Heroes-Daten…",
+      "Error": "Daten konnten nicht geladen werden.",
+      "HeaderBadge": "TH {points} Pkt."
+    }
+  }
+}

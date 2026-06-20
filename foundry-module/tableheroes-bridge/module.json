@@ -1,0 +1,25 @@
+{
+  "id": "tableheroes-bridge",
+  "title": "Table Heroes Bridge",
+  "description": "Zeigt Table-Heroes-Punkte, Rang und Achievements am DnD5e-Charakterbogen.",
+  "version": "0.1.0",
+  "authors": [{ "name": "Table Heroes" }],
+  "url": "https://table-heroes.de",
+  "license": "MIT",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": { "minimum": "3.2.0" }
+      }
+    ]
+  },
+  "esmodules": ["scripts/main.js"],
+  "styles": ["styles/tableheroes-tab.css"],
+  "languages": [{ "lang": "de", "path": "lang/de.json", "name": "Deutsch" }]
+}
