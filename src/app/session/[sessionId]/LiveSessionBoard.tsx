@@ -3267,7 +3267,7 @@ export function LiveSessionBoard({
             </div>
           </div>
 
-          <div className="relative z-50 h-40 shrink-0 overflow-visible border-t border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/90 to-background-dark/95 px-4">
+          <div className="relative z-50 min-h-44 shrink-0 overflow-visible border-t border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/90 to-background-dark/95 px-4 pb-2">
             {displayPartyCharacters.length === 0 ? (
               <div className="space-y-1">
                 <p className="font-libre text-xs text-gray-400">
@@ -3281,7 +3281,7 @@ export function LiveSessionBoard({
                 </p>
               </div>
             ) : (
-              <div className="absolute inset-x-0 -top-[146px] z-[60] flex justify-center px-1 pb-8 pointer-events-none">
+              <div className="absolute inset-x-0 -top-[118px] z-[60] flex justify-center px-1 pb-2 pointer-events-none">
                 <div className="pointer-events-auto w-fit max-w-full overflow-x-auto overflow-y-visible">
                   <div className="flex justify-center gap-5">
                 {displayPartyCharacters.map((pc) => {
@@ -3305,7 +3305,7 @@ export function LiveSessionBoard({
                   return (
                     <motion.div
                       key={pc.id}
-                      className={`relative flex min-w-[248px] flex-col items-center pt-10 transition-[opacity,filter,transform] duration-200 ${
+                      className={`relative flex w-[272px] shrink-0 flex-col items-center pt-10 transition-[opacity,filter,transform] duration-200 ${
                         onDeck ? "" : "opacity-50 grayscale"
                       }`}
                       animate={
@@ -3326,19 +3326,19 @@ export function LiveSessionBoard({
                           : { duration: 0.2 }
                       }
                     >
-                      <div className="relative h-64 w-52 drop-shadow-2xl">
+                      <div className="relative h-64 w-56 drop-shadow-2xl">
                         <Image
                           src="/images/Session_ui/player-frame.png?v=20260429-freigestellt"
                           alt=""
                           fill
-                          sizes="248px"
+                          sizes="224px"
                           className="pointer-events-none object-contain object-bottom"
                           priority={false}
                           unoptimized
                         />
-                        <div className="absolute inset-x-5 bottom-10 top-10 z-10 flex flex-col items-center px-5 pt-0 text-center">
+                        <div className="absolute inset-x-3 bottom-12 top-8 z-10 flex flex-col items-center justify-end text-center">
                           <div
-                            className={`relative -mt-4 flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
+                            className={`relative flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
                               pc.isSessionDummy
                                 ? "border-dashed border-amber-600/90"
                                 : "border-amber-800/80"
@@ -3359,19 +3359,6 @@ export function LiveSessionBoard({
                               </span>
                             )}
                           </div>
-                          <p className="mt-3 max-w-36 truncate font-barlow text-base font-extrabold uppercase tracking-wide text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                            {pc.name}
-                          </p>
-                          <p className="mt-0.5 max-w-36 truncate font-libre text-xs text-gray-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                            {pc.isSessionDummy
-                              ? "Platzhalter · kein Account"
-                              : `Lvl ${pc.level || 1} · ${pc.class || "Unbekannt"}`}
-                          </p>
-                          {pid && !self && !onDeck ? (
-                            <p className="mt-1 font-libre text-[9px] text-amber-300/90">
-                              Nicht online
-                            </p>
-                          ) : null}
                         </div>
                         {isScribe && (
                           <span
@@ -3412,6 +3399,36 @@ export function LiveSessionBoard({
                               className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
                             />
                           </button>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 w-full rounded-md bg-black/50 px-2 py-1.5 text-center backdrop-blur-sm">
+                        <p
+                          className="font-barlow text-sm font-extrabold uppercase leading-snug tracking-wide text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
+                          title={pc.name}
+                        >
+                          {pc.name}
+                        </p>
+                        {pc.isSessionDummy ? (
+                          <p className="mt-1 font-libre text-xs leading-snug text-gray-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
+                            Platzhalter · kein Account
+                          </p>
+                        ) : (
+                          <div className="mt-1 space-y-0.5">
+                            <p className="font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
+                              Level {pc.level || 1}
+                            </p>
+                            <p
+                              className="font-libre text-xs leading-snug text-gray-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
+                              title={pc.class || "Unbekannt"}
+                            >
+                              {pc.class || "Unbekannt"}
+                            </p>
+                          </div>
+                        )}
+                        {pid && !self && !onDeck ? (
+                          <p className="mt-1 font-libre text-[10px] text-amber-300/90">
+                            Nicht online
+                          </p>
                         ) : null}
                       </div>
                     </motion.div>

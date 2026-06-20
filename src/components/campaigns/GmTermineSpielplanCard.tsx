@@ -26,6 +26,10 @@ import {
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
 import { setGmConfirmed } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import {
+  applyGmConfirmToTerminePlayer,
+  countTerminePendingPlayers,
+} from "@/src/lib/session-rsvp/gm-confirm-optimistic";
 import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
 import { APP_TIMEZONE } from "@/src/lib/datetime/berlin";
 
@@ -110,7 +114,20 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
   const router = useRouter();
   const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
+  const [playersLocal, setPlayersLocal] = useState(players);
+  const [nextSessionLocal, setNextSessionLocal] = useState(nextSession);
   const [dummyLocal, setDummyLocal] = useState(nextSession?.planningDummySlotCount ?? 0);
+
+  useEffect(() => {
+    if (confirmingUserId) return;
+    setPlayersLocal(players);
+  }, [players, confirmingUserId]);
+
+  useEffect(() => {
+    if (confirmingUserId) return;
+    setNextSessionLocal(nextSession);
+  }, [nextSession, confirmingUserId]);
 
   useEffect(() => {
     setDummyLocal(nextSession?.planningDummySlotCount ?? 0);
@@ -139,20 +156,51 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
   };
 
   const handleGmConfirmPlayer = (sessionId: string, playerUserId: string) => {
-    if (isPending) return;
-    startTransition(async () => {
-      const res = await setGmConfirmed(sessionId, playerUserId, true);
-      if (!res.success) {
-        alert(res.error ?? "Bestätigung fehlgeschlagen.");
-        return;
-      }
-      router.refresh();
+    if (confirmingUserId) return;
+
+    const rollbackPlayers = playersLocal;
+    const rollbackSession = nextSessionLocal;
+
+    setPlayersLocal((prev) => {
+      const nextPlayers = prev.map((p) =>
+        p.userId === playerUserId ? applyGmConfirmToTerminePlayer(p) : p,
+      );
+      const pending = countTerminePendingPlayers(nextPlayers);
+      setNextSessionLocal((current) =>
+        current
+          ? {
+              ...current,
+              pendingCount: pending,
+              canStart: pending === 0 && current.gmPrepComplete,
+            }
+          : current,
+      );
+      return nextPlayers;
     });
+
+    setConfirmingUserId(playerUserId);
+    void (async () => {
+      try {
+        const res = await setGmConfirmed(sessionId, playerUserId, true);
+        if (!res.success) {
+          throw new Error(res.error ?? "Bestätigung fehlgeschlagen.");
+        }
+        toast.success("Spieler als dabei markiert.");
+      } catch (err: unknown) {
+        setPlayersLocal(rollbackPlayers);
+        setNextSessionLocal(rollbackSession);
+        toast.error(
+          err instanceof Error ? err.message : "Bestätigung fehlgeschlagen.",
+        );
+      } finally {
+        setConfirmingUserId(null);
+      }
+    })();
   };
 
   const bumpDummy = (delta: number) => {
-    if (!nextSession?.id || isPending) return;
-    const sid = nextSession.id;
+    if (!nextSessionLocal?.id || isPending) return;
+    const sid = nextSessionLocal.id;
     const next = Math.min(3, Math.max(0, dummyLocal + delta));
     if (next === dummyLocal) return;
     startTransition(async () => {
@@ -168,7 +216,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
   };
 
   const handleCancelSession = () => {
-    if (!nextSession?.id || isPending) return;
+    if (!nextSessionLocal?.id || isPending) return;
     if (
       !window.confirm(
         "Termin absagen? Nur Spieler mit Zusage oder „Via Online“ erhalten eine Nachricht in ihrer Nachrichten-Karte.",
@@ -178,7 +226,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
     }
     startTransition(async () => {
       try {
-        await cancelSession(nextSession.id);
+        await cancelSession(nextSessionLocal.id);
         toast.success("Termin wurde abgesagt.");
         router.refresh();
       } catch (e) {
@@ -188,7 +236,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
   };
 
   const handleArchiveQuiet = () => {
-    if (!nextSession?.id || isPending) return;
+    if (!nextSessionLocal?.id || isPending) return;
     if (
       !window.confirm(
         "Diesen Termin ohne Benachrichtigung an Spieler archivieren? Er verschwindet aus der Übersicht (Status: abgeschlossen).",
@@ -198,7 +246,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
     }
     startTransition(async () => {
       try {
-        await archiveScheduledSessionQuietly(nextSession.id);
+        await archiveScheduledSessionQuietly(nextSessionLocal.id);
         toast.success("Termin wurde archiviert.");
         router.refresh();
       } catch (e) {
@@ -207,10 +255,10 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
     });
   };
 
-  const responded = players.filter((p) => p.status !== "offen").length;
-  const open = players.filter((p) => p.status === "offen").length;
-  const sched = nextSession ? isSessionStatusScheduled(nextSession.status) : false;
-  const liveNs = nextSession ? isSessionStatusLive(nextSession.status) : false;
+  const responded = playersLocal.filter((p) => p.status !== "offen").length;
+  const open = playersLocal.filter((p) => p.status === "offen").length;
+  const sched = nextSessionLocal ? isSessionStatusScheduled(nextSessionLocal.status) : false;
+  const liveNs = nextSessionLocal ? isSessionStatusLive(nextSessionLocal.status) : false;
 
   return (
     <div className={`${cardClass} lg:col-span-2 xl:col-span-3`}>
@@ -236,16 +284,16 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
           </div>
         </div>
         <div className="flex flex-col sm:items-end gap-2 shrink-0">
-          {sched && nextSession && (
+          {sched && nextSessionLocal && (
             <Link
-              href={`/session/${nextSession.id}`}
+              href={`/session/${nextSessionLocal.id}`}
               className="inline-flex items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold uppercase text-xs text-accent-gold hover:bg-accent-gold/20 transition-colors"
             >
               <Sparkles className="h-4 w-4" />
               Tisch vorbereiten &amp; testen
             </Link>
           )}
-          {!nextSession ? (
+          {!nextSessionLocal ? (
             <Link
               href={scheduleUrl}
               className="inline-flex items-center justify-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/15 px-5 py-2.5 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-vibrant/25 transition-colors"
@@ -255,16 +303,16 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
             </Link>
           ) : liveNs ? (
             <Link
-              href={`/session/${nextSession.id}`}
+              href={`/session/${nextSessionLocal!.id}`}
               className="inline-flex items-center justify-center gap-2 rounded border border-red-600/60 bg-red-900/30 px-5 py-2.5 font-barlow font-bold uppercase text-sm text-red-200 hover:bg-red-900/50 transition-colors"
             >
               <Monitor className="h-4 w-4" />
               Zur Live-Session
             </Link>
-          ) : sched && nextSession.canStart ? (
+          ) : sched && nextSessionLocal?.canStart ? (
             <button
               type="button"
-              onClick={() => handleStart(nextSession.id)}
+              onClick={() => handleStart(nextSessionLocal.id)}
               disabled={isPending}
               className="inline-flex items-center justify-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors disabled:opacity-50"
             >
@@ -276,15 +324,16 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
               Session starten
             </button>
           ) : sched &&
-            nextSession.pendingCount === 0 &&
-            !nextSession.gmPrepComplete ? (
+            nextSessionLocal &&
+            nextSessionLocal.pendingCount === 0 &&
+            !nextSessionLocal.gmPrepComplete ? (
             <div className="flex flex-col items-stretch sm:items-end gap-2">
               <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
                 Planung offen: Kartensatz, Szenen &amp; Co. vorbereiten, dann abschließen.
               </span>
               <button
                 type="button"
-                onClick={() => handlePrepComplete(nextSession.id)}
+                onClick={() => handlePrepComplete(nextSessionLocal.id)}
                 disabled={isPending}
                 className="inline-flex items-center justify-center gap-2 rounded border border-hero-border bg-hero-dark px-5 py-2.5 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:border-hero-vibrant hover:bg-background-dark transition-colors disabled:opacity-50"
               >
@@ -304,12 +353,12 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                 Session starten
               </button>
             </div>
-          ) : sched ? (
+          ) : sched && nextSessionLocal ? (
             <div className="flex flex-col items-stretch sm:items-end gap-2">
               <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
-                {nextSession.pendingCount === 1
+                {nextSessionLocal.pendingCount === 1
                   ? "Es fehlt noch 1 Spieler"
-                  : `Es fehlen noch ${nextSession.pendingCount} Spieler`}{" "}
+                  : `Es fehlen noch ${nextSessionLocal.pendingCount} Spieler`}{" "}
                 (Zusage oder deine Freigabe unten)
               </span>
               <button
@@ -340,7 +389,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
         </div>
       </div>
 
-      {!nextSession ? (
+      {!nextSessionLocal ? (
         <div className="rounded border border-hero-border/30 bg-background-dark p-4">
           <p className="font-libre text-sm text-gray-400">
             Es ist noch kein Termin geplant. Unter{" "}
@@ -353,23 +402,23 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
         <div className="space-y-4">
           <div className="rounded border border-hero-border/40 bg-background-dark p-4">
             <p className="font-barlow font-bold text-lg text-white">
-              {nextSession.title?.trim() || "Nächste Session"}
+              {nextSessionLocal.title?.trim() || "Nächste Session"}
             </p>
             <p className="font-libre text-sm text-gray-300 mt-1">
-              {formatSessionDate(nextSession.startTime)} Uhr
+              {formatSessionDate(nextSessionLocal.startTime)} Uhr
             </p>
             <p
               className={`font-libre text-xs mt-2 ${
-                nextSession.isLive ? "text-amber-200/90" : "text-gray-500"
+                nextSessionLocal.isLive ? "text-amber-200/90" : "text-gray-500"
               }`}
             >
-              {nextSession.isLive
+              {nextSessionLocal.isLive
                 ? "Modus: Tisch vor Ort – maximal ein Spieler kann „Via Online“ zuschalten."
                 : "Modus: Online-Sitzung (ohne begrenzten Hybrid-Platz)."}
             </p>
             {sched && (
               <p className="font-libre text-sm text-accent-gold/90 mt-3 border-t border-hero-border/30 pt-3">
-                {deadlineSummary(nextSession.startTime, nextSession.rsvpDeadlineDays)}
+                {deadlineSummary(nextSessionLocal.startTime, nextSessionLocal.rsvpDeadlineDays)}
               </p>
             )}
           </div>
@@ -379,15 +428,15 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
               Diese Sitzung läuft bereits. Rückmeldungen bezogen sich auf den Start des
               Termins; zur Nachbereitung nutze die Session-Ansicht.
             </p>
-          ) : players.length > 0 ? (
+          ) : playersLocal.length > 0 ? (
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <h3 className="font-barlow font-bold text-xs uppercase text-gray-500">
-                  Rückmeldungen ({responded} von {players.length} · {open} offen)
+                  Rückmeldungen ({responded} von {playersLocal.length} · {open} offen)
                 </h3>
               </div>
               <ul className="grid gap-2 sm:grid-cols-2">
-                {players.map((p) => (
+                {playersLocal.map((p) => (
                   <li
                     key={p.userId}
                     className="flex flex-wrap items-center gap-2 rounded border border-hero-border/25 bg-hero-dark/20 px-3 py-2"
@@ -403,14 +452,21 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                     >
                       {p.label}
                     </span>
-                    {p.canGmManuallyConfirm && sched && nextSession?.id ? (
+                    {p.canGmManuallyConfirm && sched && nextSessionLocal?.id ? (
                       <button
                         type="button"
-                        onClick={() => handleGmConfirmPlayer(nextSession.id, p.userId)}
-                        disabled={isPending}
-                        className="ml-auto shrink-0 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+                        onClick={() => handleGmConfirmPlayer(nextSessionLocal.id, p.userId)}
+                        disabled={confirmingUserId === p.userId}
+                        className="ml-auto inline-flex min-w-[7.5rem] items-center justify-center gap-1 shrink-0 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
                       >
-                        Als dabei markieren
+                        {confirmingUserId === p.userId ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                            Speichern…
+                          </>
+                        ) : (
+                          "Als dabei markieren"
+                        )}
                       </button>
                     ) : null}
                   </li>
@@ -419,14 +475,14 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
             </div>
           ) : null}
 
-          {players.length === 0 && sched && (
+          {playersLocal.length === 0 && sched && (
             <p className="font-libre text-sm text-gray-500 italic">
               Keine bestätigten Spieler in der Kampagne – Rückmeldungen erscheinen, sobald
               Teilnehmer akzeptiert sind.
             </p>
           )}
 
-          {nextSession && (sched || liveNs) ? (
+          {nextSessionLocal && (sched || liveNs) ? (
             <div className="space-y-3 rounded border border-hero-border/30 bg-background-dark/60 p-4">
               <div>
                 <h3 className="font-barlow font-bold text-xs uppercase text-gray-500">

@@ -1,7 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { notifyProfileMessageEmail } from "@/src/lib/email/dispatch";
 
 export type {
   GMNotification,
@@ -94,15 +97,20 @@ export async function sendMessage(
       };
     }
 
-    const { error } = await (supabase.from("messages") as any).insert({
-      sender_id: user.id,
-      recipient_id: null,
-      campaign_id: input.campaignId,
-      subject: input.subject.trim(),
-      content: input.content.trim(),
-      type: "broadcast",
-      priority,
-    });
+    const memberIds = ((members as any[]) || []).map((m: any) => m.user_id as string);
+
+    const { data: inserted, error } = await (supabase.from("messages") as any)
+      .insert({
+        sender_id: user.id,
+        recipient_id: null,
+        campaign_id: input.campaignId,
+        subject: input.subject.trim(),
+        content: input.content.trim(),
+        type: "broadcast",
+        priority,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("[sendMessage:broadcast]", error);
@@ -110,6 +118,23 @@ export async function sendMessage(
         success: false,
         error: error.message ?? "Nachricht konnte nicht gesendet werden.",
       };
+    }
+
+    const messageId = String((inserted as { id?: string } | null)?.id ?? "");
+    if (messageId) {
+      after(async () => {
+        const admin = createAdminClient();
+        await Promise.all(
+          memberIds.map((recipientUserId) =>
+            notifyProfileMessageEmail({
+              supabase: admin,
+              recipientUserId,
+              messageId,
+              subject: input.subject.trim(),
+            }),
+          ),
+        );
+      });
     }
 
     revalidatePath("/dashboard");
@@ -138,15 +163,18 @@ export async function sendMessage(
     };
   }
 
-  const { error } = await (supabase.from("messages") as any).insert({
-    sender_id: user.id,
-    recipient_id: input.recipientUserId,
-    campaign_id: input.campaignId ?? null,
-    subject: input.subject.trim(),
-    content: input.content.trim(),
-    type: "direct",
-    priority,
-  });
+  const { data: inserted, error } = await (supabase.from("messages") as any)
+    .insert({
+      sender_id: user.id,
+      recipient_id: input.recipientUserId,
+      campaign_id: input.campaignId ?? null,
+      subject: input.subject.trim(),
+      content: input.content.trim(),
+      type: "direct",
+      priority,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("[sendMessage:direct]", error);
@@ -154,6 +182,19 @@ export async function sendMessage(
       success: false,
       error: error.message ?? "Nachricht konnte nicht gesendet werden.",
     };
+  }
+
+  const messageId = String((inserted as { id?: string } | null)?.id ?? "");
+  if (messageId && input.recipientUserId) {
+    after(async () => {
+      const admin = createAdminClient();
+      await notifyProfileMessageEmail({
+        supabase: admin,
+        recipientUserId: input.recipientUserId!,
+        messageId,
+        subject: input.subject.trim(),
+      });
+    });
   }
 
   revalidatePath("/dashboard");

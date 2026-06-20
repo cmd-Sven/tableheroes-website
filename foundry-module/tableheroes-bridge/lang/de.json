@@ -28,9 +28,27 @@
       "RecentPoints": "Letzte Buchungen",
       "OpenDashboard": "Punkte-Katalog öffnen",
       "Refresh": "Aktualisieren",
+      "Refreshed": "Table-Heroes-Daten aktualisiert.",
       "Loading": "Lade Table-Heroes-Daten…",
       "Error": "Daten konnten nicht geladen werden.",
-      "HeaderBadge": "TH {points} Pkt."
+      "HeaderBadge": "TH {points} Pkt.",
+      "Portrait": "Portrait",
+      "Wealth": "Geldbörse",
+      "WealthTh": "Table Heroes",
+      "WealthFoundry": "Foundry",
+      "NoPortrait": "Kein Bild",
+      "SyncWealthToTh": "Geld → TH",
+      "SyncWealthToThHint": "Foundry-Geldbörse nach Table Heroes übertragen",
+      "SyncWealthToThDone": "Geldbörse nach Table Heroes synchronisiert.",
+      "SyncWealthToFoundry": "Geld → Foundry",
+      "SyncWealthToFoundryHint": "Table-Heroes-Geldbörse nach Foundry übertragen",
+      "SyncWealthToFoundryDone": "Geldbörse nach Foundry synchronisiert.",
+      "SyncPortraitToTh": "Portrait → TH",
+      "SyncPortraitToThDone": "Portrait nach Table Heroes synchronisiert.",
+      "SyncPortraitToFoundry": "Portrait → Foundry",
+      "SyncPortraitToFoundryDone": "Portrait nach Foundry synchronisiert.",
+      "SyncXp": "XP → TH",
+      "SyncXpDone": "XP nach Table Heroes synchronisiert."
     }
   }
 }

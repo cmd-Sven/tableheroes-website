@@ -1,4 +1,11 @@
-import { fetchActorProfile, settingsConfigured } from "./api.js";
+import {
+  fetchActorProfile,
+  readFoundryCurrency,
+  settingsConfigured,
+  syncActorPortrait,
+  syncActorWealth,
+  syncActorXp,
+} from "./api.js";
 
 const MODULE_ID = "tableheroes-bridge";
 const TAB_NAME = "tableheroes";
@@ -28,6 +35,97 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function renderWealthHtml(wealth, foundryCurrency) {
+  const L = game.i18n.localize;
+  const rows = [
+    { key: "pp", label: "PM" },
+    { key: "gp", label: "GM" },
+    { key: "ep", label: "EM" },
+    { key: "sp", label: "SM" },
+    { key: "cp", label: "KM" },
+  ];
+
+  const thCells = rows
+    .map(
+      (row) => `<div class="tableheroes-wealth-row">
+        <span class="coin">${row.label}</span>
+        <span class="amount">${formatNumber(wealth?.[row.key] ?? 0)}</span>
+      </div>`,
+    )
+    .join("");
+
+  const foundryCells = rows
+    .map(
+      (row) => `<div class="tableheroes-wealth-row">
+        <span class="coin">${row.label}</span>
+        <span class="amount">${formatNumber(foundryCurrency?.[row.key] ?? 0)}</span>
+      </div>`,
+    )
+    .join("");
+
+  const gmOnly = game.user.isGM
+    ? `<div class="tableheroes-sync-actions">
+        <button type="button" class="tableheroes-sync-wealth-to-th" title="${escapeHtml(
+          L("TABLEHEROES.Tab.SyncWealthToThHint"),
+        )}">
+          <i class="fas fa-arrow-left"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncWealthToTh"))}
+        </button>
+        <button type="button" class="tableheroes-sync-wealth-to-foundry" title="${escapeHtml(
+          L("TABLEHEROES.Tab.SyncWealthToFoundryHint"),
+        )}">
+          <i class="fas fa-arrow-right"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncWealthToFoundry"))}
+        </button>
+      </div>`
+    : "";
+
+  return `<div class="tableheroes-wealth-grid">
+    <div class="tableheroes-wealth-column">
+      <h5>${escapeHtml(L("TABLEHEROES.Tab.WealthTh"))}</h5>
+      ${thCells}
+    </div>
+    <div class="tableheroes-wealth-column">
+      <h5>${escapeHtml(L("TABLEHEROES.Tab.WealthFoundry"))}</h5>
+      ${foundryCells}
+    </div>
+  </div>${gmOnly}`;
+}
+
+function renderPortraitHtml(player, actor) {
+  const L = game.i18n.localize;
+  const thUrl = player?.portrait?.url ?? null;
+  const foundryUrl = actor?.img ?? null;
+
+  const thBlock = thUrl
+    ? `<img src="${escapeHtml(thUrl)}" alt="TH Portrait" class="tableheroes-portrait-img" />`
+    : `<div class="tableheroes-portrait-placeholder">${escapeHtml(L("TABLEHEROES.Tab.NoPortrait"))}</div>`;
+
+  const foundryBlock = foundryUrl
+    ? `<img src="${escapeHtml(foundryUrl)}" alt="Foundry Portrait" class="tableheroes-portrait-img" />`
+    : `<div class="tableheroes-portrait-placeholder">${escapeHtml(L("TABLEHEROES.Tab.NoPortrait"))}</div>`;
+
+  const gmOnly = game.user.isGM
+    ? `<div class="tableheroes-sync-actions">
+        <button type="button" class="tableheroes-sync-portrait-to-th">
+          <i class="fas fa-arrow-left"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncPortraitToTh"))}
+        </button>
+        <button type="button" class="tableheroes-sync-portrait-to-foundry">
+          <i class="fas fa-arrow-right"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncPortraitToFoundry"))}
+        </button>
+      </div>`
+    : "";
+
+  return `<div class="tableheroes-portrait-grid">
+    <div class="tableheroes-portrait-column">
+      <h5>Table Heroes</h5>
+      ${thBlock}
+    </div>
+    <div class="tableheroes-portrait-column">
+      <h5>Foundry</h5>
+      ${foundryBlock}
+    </div>
+  </div>${gmOnly}`;
+}
+
 /**
  * @param {Actor} actor
  * @param {object | null} payload
@@ -36,6 +134,7 @@ function renderTabHtml(actor, payload) {
   const L = game.i18n.localize;
   const player = payload?.player;
   const campaign = payload?.campaign;
+  const foundryCurrency = readFoundryCurrency(actor);
 
   if (!settingsConfigured()) {
     return `<div class="tableheroes-sheet-tab tableheroes-error">${escapeHtml(
@@ -59,6 +158,7 @@ function renderTabHtml(actor, payload) {
   const points = player.points;
   const achievements = Array.isArray(player.achievements) ? player.achievements : [];
   const recent = Array.isArray(player.recent_points) ? player.recent_points : [];
+  const wealth = player.wealth ?? { gp: 0, sp: 0, cp: 0, ep: 0, pp: 0 };
 
   const achievementsHtml = achievements.length
     ? `<ul class="tableheroes-achievement-list">${achievements
@@ -86,6 +186,14 @@ function renderTabHtml(actor, payload) {
         .join("")}</ul>`
     : `<p class="tableheroes-muted">—</p>`;
 
+  const gmSyncBlock = game.user.isGM
+    ? `<div class="tableheroes-sync-actions">
+        <button type="button" class="tableheroes-sync-xp">
+          <i class="fas fa-star"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncXp"))}
+        </button>
+      </div>`
+    : "";
+
   return `<div class="tableheroes-sheet-tab" data-actor-id="${escapeHtml(actor.id)}">
     <div class="tableheroes-points-grid">
       <div class="tableheroes-stat-card">
@@ -109,11 +217,19 @@ function renderTabHtml(actor, payload) {
       points.next_level_at ?? 0,
     )} Pkt.</p>
 
+    <h4 class="tableheroes-section-title">${escapeHtml(L("TABLEHEROES.Tab.Portrait"))}</h4>
+    ${renderPortraitHtml(player, actor)}
+
+    <h4 class="tableheroes-section-title">${escapeHtml(L("TABLEHEROES.Tab.Wealth"))}</h4>
+    ${renderWealthHtml(wealth, foundryCurrency)}
+
     <h4 class="tableheroes-section-title">${escapeHtml(L("TABLEHEROES.Tab.Achievements"))}</h4>
     ${achievementsHtml}
 
     <h4 class="tableheroes-section-title">${escapeHtml(L("TABLEHEROES.Tab.RecentPoints"))}</h4>
     ${logHtml}
+
+    ${gmSyncBlock}
 
     <div class="tableheroes-actions">
       <button type="button" class="tableheroes-refresh">
@@ -160,18 +276,83 @@ function updateHeaderBadge(sheet, payload) {
   title.appendChild(badge);
 }
 
+async function rerunTabRender(sheet, actor) {
+  const payload = await loadProfile(actor, { force: true });
+  const root = sheet.element?.[0] ?? sheet.element;
+  const panel = root?.querySelector(`[data-tab="${TAB_NAME}"]`);
+  if (panel) panel.innerHTML = renderTabHtml(actor, payload);
+  updateHeaderBadge(sheet, payload);
+  bindTabEvents(sheet, actor);
+  return payload;
+}
+
 function bindTabEvents(sheet, actor) {
   const root = sheet.element?.[0] ?? sheet.element;
   if (!root) return;
 
-  const refreshBtn = root.querySelector(".tableheroes-refresh");
-  refreshBtn?.addEventListener("click", async () => {
+  root.querySelector(".tableheroes-refresh")?.addEventListener("click", async () => {
     try {
-      const payload = await loadProfile(actor, { force: true });
-      const panel = root.querySelector(`[data-tab="${TAB_NAME}"]`);
-      if (panel) panel.innerHTML = renderTabHtml(actor, payload);
-      updateHeaderBadge(sheet, payload);
-      bindTabEvents(sheet, actor);
+      await rerunTabRender(sheet, actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.Refreshed"));
+    } catch (error) {
+      ui.notifications?.error(
+        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+      );
+    }
+  });
+
+  root.querySelector(".tableheroes-sync-xp")?.addEventListener("click", async () => {
+    try {
+      await syncActorXp(actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncXpDone"));
+    } catch (error) {
+      ui.notifications?.error(
+        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+      );
+    }
+  });
+
+  root.querySelector(".tableheroes-sync-wealth-to-th")?.addEventListener("click", async () => {
+    try {
+      await syncActorWealth(actor, "foundry_to_th");
+      await rerunTabRender(sheet, actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncWealthToThDone"));
+    } catch (error) {
+      ui.notifications?.error(
+        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+      );
+    }
+  });
+
+  root.querySelector(".tableheroes-sync-wealth-to-foundry")?.addEventListener("click", async () => {
+    try {
+      await syncActorWealth(actor, "th_to_foundry");
+      await rerunTabRender(sheet, actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncWealthToFoundryDone"));
+    } catch (error) {
+      ui.notifications?.error(
+        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+      );
+    }
+  });
+
+  root.querySelector(".tableheroes-sync-portrait-to-th")?.addEventListener("click", async () => {
+    try {
+      await syncActorPortrait(actor, "foundry_to_th");
+      await rerunTabRender(sheet, actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncPortraitToThDone"));
+    } catch (error) {
+      ui.notifications?.error(
+        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+      );
+    }
+  });
+
+  root.querySelector(".tableheroes-sync-portrait-to-foundry")?.addEventListener("click", async () => {
+    try {
+      await syncActorPortrait(actor, "th_to_foundry");
+      await rerunTabRender(sheet, actor);
+      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncPortraitToFoundryDone"));
     } catch (error) {
       ui.notifications?.error(
         error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),

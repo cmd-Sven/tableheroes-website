@@ -100,3 +100,76 @@
   color: #ffb4b4;
   font-size: 0.85rem;
 }
+
+.tableheroes-wealth-grid,
+.tableheroes-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.tableheroes-wealth-column,
+.tableheroes-portrait-column {
+  border: 1px solid rgba(139, 115, 85, 0.35);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.tableheroes-wealth-column h5,
+.tableheroes-portrait-column h5 {
+  margin: 0 0 0.35rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.tableheroes-wealth-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.1rem 0;
+}
+
+.tableheroes-wealth-row .coin {
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.tableheroes-wealth-row .amount {
+  color: #f0d58c;
+  font-weight: 700;
+}
+
+.tableheroes-portrait-img {
+  width: 100%;
+  max-width: 8rem;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 115, 85, 0.45);
+}
+
+.tableheroes-portrait-placeholder {
+  width: 100%;
+  max-width: 8rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px dashed rgba(139, 115, 85, 0.45);
+  opacity: 0.65;
+  font-size: 0.75rem;
+}
+
+.tableheroes-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.tableheroes-sync-actions button {
+  font-size: 0.72rem;
+}

@@ -82,7 +82,7 @@ export async function GET() {
       ok: true,
       endpoint: "foundry-sync",
       message:
-        "Bereit. POST = XP-Sync, GET /api/v1/foundry-sync/profile = Punkte & Achievements.",
+        "Bereit. POST = XP-Sync, GET /profile = Punkte & Achievements, POST /wealth = Geldbörse, POST /portrait = Portrait.",
     });
   } catch (e: unknown) {
     console.error(`${LOG_PREFIX} health check exception`, e);

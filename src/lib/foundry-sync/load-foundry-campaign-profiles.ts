@@ -5,6 +5,8 @@ import {
 } from "@/src/lib/utils/rank-utils";
 import type {
   FoundryPlayerProfile,
+  FoundryProfileCurrency,
+  FoundryProfilePortrait,
   FoundryProfileResponse,
 } from "./foundry-profile-types";
 
@@ -58,13 +60,20 @@ export async function loadFoundryCampaignProfiles(
 
   const characterById = new Map<
     string,
-    { id: string; name: string | null; user_id: string | null }
+    {
+      id: string;
+      name: string | null;
+      user_id: string | null;
+      avatar_url: string | null;
+      avatar_storage_path: string | null;
+      updated_at: string | null;
+    }
   >();
 
   if (characterIds.length > 0) {
     const { data: characterRows } = await (supabase as any)
       .from("characters")
-      .select("id, name, user_id")
+      .select("id, name, user_id, avatar_url, avatar_storage_path, updated_at")
       .eq("campaign_id", campaignId)
       .in("id", characterIds);
 
@@ -72,11 +81,43 @@ export async function loadFoundryCampaignProfiles(
       id: string;
       name: string | null;
       user_id: string | null;
+      avatar_url: string | null;
+      avatar_storage_path: string | null;
+      updated_at: string | null;
     }>) {
       characterById.set(String(row.id), {
         id: String(row.id),
         name: row.name != null ? String(row.name) : null,
         user_id: row.user_id != null ? String(row.user_id) : null,
+        avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
+        avatar_storage_path:
+          row.avatar_storage_path != null ? String(row.avatar_storage_path) : null,
+        updated_at: row.updated_at != null ? String(row.updated_at) : null,
+      });
+    }
+  }
+
+  const wealthByCharacterId = new Map<string, FoundryProfileCurrency>();
+  if (characterIds.length > 0) {
+    const { data: wealthRows } = await (supabase as any)
+      .from("character_wealth")
+      .select("character_id, gp, sp, cp, ep, pp")
+      .in("character_id", characterIds);
+
+    for (const row of (wealthRows ?? []) as Array<{
+      character_id: string;
+      gp: number | null;
+      sp: number | null;
+      cp: number | null;
+      ep: number | null;
+      pp: number | null;
+    }>) {
+      wealthByCharacterId.set(String(row.character_id), {
+        gp: Math.max(0, Math.round(Number(row.gp) || 0)),
+        sp: Math.max(0, Math.round(Number(row.sp) || 0)),
+        cp: Math.max(0, Math.round(Number(row.cp) || 0)),
+        ep: Math.max(0, Math.round(Number(row.ep) || 0)),
+        pp: Math.max(0, Math.round(Number(row.pp) || 0)),
       });
     }
   }
@@ -196,11 +237,23 @@ export async function loadFoundryCampaignProfiles(
         points: null,
         achievements: [],
         recent_points: [],
+        wealth: null,
+        portrait: null,
       };
     }
 
     const lifetime = user.lifetime_points;
     const level = calculateLevel(lifetime);
+
+    const wealth =
+      wealthByCharacterId.get(characterId) ??
+      ({ gp: 0, sp: 0, cp: 0, ep: 0, pp: 0 } satisfies FoundryProfileCurrency);
+
+    const portrait: FoundryProfilePortrait = {
+      url: character?.avatar_url ?? null,
+      storage_path: character?.avatar_storage_path ?? null,
+      updated_at: character?.updated_at ?? null,
+    };
 
     return {
       foundry_actor_id: actorId,
@@ -218,6 +271,8 @@ export async function loadFoundryCampaignProfiles(
       },
       achievements: achievementsByUser.get(userId) ?? [],
       recent_points: pointsLogByUser.get(userId) ?? [],
+      wealth,
+      portrait,
     };
   });
 

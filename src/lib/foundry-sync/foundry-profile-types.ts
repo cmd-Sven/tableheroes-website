@@ -12,6 +12,20 @@ export type FoundryProfilePointsLogEntry = {
   created_at: string;
 };
 
+export type FoundryProfileCurrency = {
+  gp: number;
+  sp: number;
+  cp: number;
+  ep: number;
+  pp: number;
+};
+
+export type FoundryProfilePortrait = {
+  url: string | null;
+  storage_path: string | null;
+  updated_at: string | null;
+};
+
 export type FoundryPlayerProfile = {
   foundry_actor_id: string;
   character_id: string | null;
@@ -28,6 +42,8 @@ export type FoundryPlayerProfile = {
   } | null;
   achievements: FoundryProfileAchievement[];
   recent_points: FoundryProfilePointsLogEntry[];
+  wealth: FoundryProfileCurrency | null;
+  portrait: FoundryProfilePortrait | null;
 };
 
 export type FoundryProfileResponse = {

@@ -55,3 +55,35 @@ export async function setPlayerDashboardTutorialDismissed(dismissed: boolean) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");
 }
+
+/** E-Mail-Benachrichtigungen in users.preferences.email_notifications. */
+export async function updateEmailNotificationPreferences(
+  patch: Partial<import("@/src/lib/email/notification-preferences").EmailNotificationPreferences>,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet");
+
+  const { data: row } = await (supabase.from("users") as any)
+    .select("preferences")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { mergeEmailNotificationPreferences } = await import(
+    "@/src/lib/email/notification-preferences"
+  );
+
+  const nextPreferences = mergeEmailNotificationPreferences(
+    (row as { preferences?: unknown } | null)?.preferences ?? null,
+    patch,
+  );
+
+  const { error } = await (supabase.from("users") as any)
+    .update({ preferences: nextPreferences })
+    .eq("id", user.id);
+
+  if (error) throw new Error(error.message || "E-Mail-Einstellungen konnten nicht gespeichert werden.");
+  revalidatePath("/dashboard/settings");
+}

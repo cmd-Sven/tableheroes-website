@@ -2,7 +2,9 @@
 
 import fs from "fs";
 import path from "path";
+import { after } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import {
   NEWS_CATEGORIES,
@@ -194,6 +196,16 @@ export async function createNewsPost(
         discordWarning = discord.error ?? "Discord-Versand fehlgeschlagen.";
       }
     }
+
+    after(async () => {
+      const admin = createAdminClient();
+      const { notifyNewsPublishedEmails } = await import("@/src/lib/email/dispatch");
+      await notifyNewsPublishedEmails({
+        supabase: admin,
+        newsPostId: postId,
+        title: input.title?.trim() ?? "Neue News",
+      });
+    });
   }
 
   revalidatePath("/dashboard");
@@ -261,6 +273,16 @@ export async function updateNewsPost(
     if (!discord.ok) {
       discordWarning = discord.error ?? "Discord-Versand fehlgeschlagen.";
     }
+
+    after(async () => {
+      const admin = createAdminClient();
+      const { notifyNewsPublishedEmails } = await import("@/src/lib/email/dispatch");
+      await notifyNewsPublishedEmails({
+        supabase: admin,
+        newsPostId: id,
+        title: post.title?.trim() ?? "Neue News",
+      });
+    });
   }
 
   revalidatePath("/dashboard");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import type {
 import { setSessionRsvp, setGmConfirmed, updateSessionRsvpSettings } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import { setCommunityEventRsvp } from "@/src/lib/actions/community-event-actions";
 import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
+import { applyGmConfirmToSessionRsvp } from "@/src/lib/session-rsvp/gm-confirm-optimistic";
 import { getSessionTypeLabel } from "@/src/lib/session-type";
 import { APP_TIMEZONE, formatSessionTimeDe } from "@/src/lib/datetime/berlin";
 
@@ -383,6 +384,14 @@ function SessionRowGM({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
+  const [rsvpsLocal, setRsvpsLocal] = useState(session.rsvps);
+
+  useEffect(() => {
+    if (confirmingUserId) return;
+    setRsvpsLocal(session.rsvps);
+  }, [session.id, session.rsvps, confirmingUserId]);
+
   const startDate = new Date(session.startTime);
   const isLive = session.status === "Live";
   const isScheduled = isSessionStatusScheduled(session.status);
@@ -391,8 +400,8 @@ function SessionRowGM({
   const formattedTime = formatSessionTimeDe(session.startTime);
 
   const allReadyForSessionStart =
-    session.rsvps.length > 0 &&
-    session.rsvps.every((r) =>
+    rsvpsLocal.length > 0 &&
+    rsvpsLocal.every((r) =>
       isPlayerReadyForSessionStart({
         rsvp_status: r.rsvpStatus,
         gm_confirmed: r.gmConfirmed,
@@ -400,14 +409,27 @@ function SessionRowGM({
     );
 
   const handleGmConfirm = (userId: string, confirmed: boolean) => {
-    startTransition(async () => {
-      const res = await setGmConfirmed(session.id, userId, confirmed);
-      if (!res.success) {
-        alert(res.error || "Speichern fehlgeschlagen.");
-        return;
+    if (confirmingUserId) return;
+
+    const rollback = rsvpsLocal;
+    setRsvpsLocal((prev) =>
+      prev.map((r) => (r.userId === userId ? applyGmConfirmToSessionRsvp(r) : r)),
+    );
+
+    setConfirmingUserId(userId);
+    void (async () => {
+      try {
+        const res = await setGmConfirmed(session.id, userId, confirmed);
+        if (!res.success) {
+          throw new Error(res.error || "Speichern fehlgeschlagen.");
+        }
+      } catch (err: unknown) {
+        setRsvpsLocal(rollback);
+        alert(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+      } finally {
+        setConfirmingUserId(null);
       }
-      router.refresh();
-    });
+    })();
   };
 
   const handleDeadlineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -475,20 +497,24 @@ function SessionRowGM({
 
             {/* RSVP-Liste */}
             <div className="border-t border-hero-border/20 pt-3 space-y-2">
-              {session.rsvps.map((r) => (
+              {rsvpsLocal.map((r) => (
                 <div key={r.userId} className="flex items-center justify-between gap-2">
                   <span className="font-libre text-sm text-gray-300 truncate">
                     {r.characterName || r.username}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={`font-barlow text-[10px] uppercase ${
-                      r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online"
+                      r.gmConfirmed
+                        ? "text-hero-vibrant"
+                        : r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online"
                         ? "text-hero-vibrant"
                         : r.rsvpStatus === "Absage"
                         ? "text-red-400"
                         : "text-gray-500"
                     }`}>
-                      {r.rsvpStatus ?? "—"}
+                      {r.gmConfirmed && r.rsvpStatus === "Absage"
+                        ? "GM-Freigabe"
+                        : (r.rsvpStatus ?? "—")}
                     </span>
                     {!isPlayerReadyForSessionStart({
                       rsvp_status: r.rsvpStatus,
@@ -497,10 +523,10 @@ function SessionRowGM({
                       <button
                         type="button"
                         onClick={() => handleGmConfirm(r.userId, true)}
-                        disabled={isPending}
-                        className="rounded bg-amber-900/40 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-amber-400 hover:bg-amber-800/50"
+                        disabled={confirmingUserId === r.userId}
+                        className="rounded bg-amber-900/40 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-amber-400 hover:bg-amber-800/50 disabled:opacity-50"
                       >
-                        Als dabei markieren
+                        {confirmingUserId === r.userId ? "…" : "Als dabei markieren"}
                       </button>
                     ) : (
                       <span className="rounded bg-hero-vibrant/20 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-hero-vibrant">

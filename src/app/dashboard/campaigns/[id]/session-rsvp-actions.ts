@@ -168,31 +168,34 @@ export async function setGmConfirmed(
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Nicht authentifiziert." };
 
-  const { data: session } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id")
+  const { data: session, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, campaigns!inner(gm_id)")
     .eq("id", sessionId)
     .single();
 
-  if (!session) return { success: false, error: "Session nicht gefunden." };
+  if (sessionError || !session) {
+    return { success: false, error: "Session nicht gefunden." };
+  }
 
-  const { data: campaign } = await (supabase.from("campaigns") as any)
-    .select("gm_id")
-    .eq("id", session.campaign_id)
-    .single();
-
-  if (!campaign || (campaign as any).gm_id !== user.id) {
+  const campaignGmId = String(
+    (session as { campaigns?: { gm_id?: string } }).campaigns?.gm_id ?? "",
+  );
+  if (campaignGmId !== user.id) {
     return { success: false, error: "Nur der GM kann bestätigen." };
   }
 
+  const campaignId = String((session as { campaign_id: string }).campaign_id);
+  const nowIso = new Date().toISOString();
+
   const { data: existing } = await (supabase.from("session_rsvps") as any)
-    .select("id")
+    .select("id, rsvp_status")
     .eq("session_id", sessionId)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (existing) {
     const { error } = await (supabase.from("session_rsvps") as any)
-      .update({ gm_confirmed: confirmed, updated_at: new Date().toISOString() })
+      .update({ gm_confirmed: confirmed, updated_at: nowIso })
       .eq("id", existing.id);
     if (error) return { success: false, error: error.message };
   } else {
@@ -201,12 +204,12 @@ export async function setGmConfirmed(
       user_id: userId,
       rsvp_status: "Zusage",
       gm_confirmed: confirmed,
+      updated_at: nowIso,
     });
     if (error) return { success: false, error: error.message };
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath(`/dashboard/campaigns/${session.campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}`, "page");
   return { success: true };
 }
 

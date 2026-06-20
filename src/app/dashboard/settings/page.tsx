@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SettingsClient } from "./SettingsClient";
 import type { ProfileDesignData } from "@/src/components/dashboard/settings/ProfileSettings";
 import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
+import { parseEmailNotificationPreferences } from "@/src/lib/email/notification-preferences";
 
 type UserProfile = {
   username?: string | null;
@@ -23,6 +24,7 @@ type UserProfile = {
   selected_achievement_id?: string | null;
   slogan?: string | null;
   show_slogan?: boolean | null;
+  preferences?: unknown;
 };
 
 export default async function DashboardSettingsPage() {
@@ -35,7 +37,7 @@ export default async function DashboardSettingsPage() {
 
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select(
-      "username, privacy_public_profile, player_dashboard_tutorial_dismissed, avatar_url, avatar_shape, profile_background_url, avatar_storage_path, profile_banner_storage_path, avatar_position_x, avatar_position_y, banner_position_x, banner_position_y, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
+      "username, privacy_public_profile, player_dashboard_tutorial_dismissed, preferences, avatar_url, avatar_shape, profile_background_url, avatar_storage_path, profile_banner_storage_path, avatar_position_x, avatar_position_y, banner_position_x, banner_position_y, show_rank, show_points, profile_achievement_mode, selected_achievement_id, slogan, show_slogan"
     )
     .eq("id", user.id)
     .single();
@@ -76,6 +78,10 @@ export default async function DashboardSettingsPage() {
     })
   );
 
+  const emailNotificationPreferences = parseEmailNotificationPreferences(
+    profile?.preferences ?? null,
+  );
+
   return (
     <div className="space-y-8">
       <div>
@@ -83,7 +89,7 @@ export default async function DashboardSettingsPage() {
           Einstellungen
         </h1>
         <p className="mt-2 font-libre text-gray-400">
-          Privatsphäre, Profil-Header und Account-Daten.
+          Privatsphäre, E-Mail-Benachrichtigungen, Profil-Header und Account-Daten.
         </p>
       </div>
       <SettingsClient
@@ -91,6 +97,7 @@ export default async function DashboardSettingsPage() {
         initialUsername={profile?.username ?? null}
         privacyPublicProfile={privacyPublicProfile}
         playerDashboardTutorialDismissed={playerDashboardTutorialDismissed}
+        emailNotificationPreferences={emailNotificationPreferences}
         profileDesign={profileDesign}
         achievements={achievements}
       />

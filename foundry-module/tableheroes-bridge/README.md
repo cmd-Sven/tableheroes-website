@@ -53,7 +53,26 @@ Später erweiterbar im gleichen Tab: Session-Recap-Link, Chronist-Status, Foundr
 
 Header: `x-tableheroes-api-key: <kampagnen-key>`
 
-Query (optional):
+Enthält zusätzlich pro Spieler: `wealth` (GP/SM/KM/EM/PM) und `portrait` (URL).
+
+**POST** `/api/v1/foundry-sync/wealth`
+
+```json
+{
+  "foundry_actor_id": "Actor.…",
+  "direction": "foundry_to_th",
+  "currency": { "gp": 120, "sp": 5, "cp": 0, "ep": 0, "pp": 2 }
+}
+```
+
+`th_to_foundry` liefert die TH-Geldbörse zurück (Modul schreibt sie in Foundry).
+
+**POST** `/api/v1/foundry-sync/portrait`
+
+- `th_to_foundry` (JSON): liefert `portrait.url` für Foundry
+- `foundry_to_th` (multipart): `foundry_actor_id` + `portrait`-Datei
+
+Query (optional) für Profile:
 
 | Parameter | Beschreibung |
 |---|---|
@@ -117,7 +136,9 @@ Query (optional):
 
 ## Roadmap
 
+- [x] Geldbörse sync (GM-Buttons im Modul)
+- [x] Portrait sync (GM-Buttons im Modul)
+- [x] XP-Sync-Button im Modul
 - [ ] Achievement-Bilder im Tab
-- [ ] XP-Sync-Button (POST `/api/v1/foundry-sync`) im Modul
 - [ ] Optional: Read-only API-Key getrennt vom Sync-Key
 - [ ] Spieler sehen nur eigene Daten (Actor-Besitz prüfen)

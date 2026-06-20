@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlayerDashboardSettings } from "@/src/components/dashboard/PlayerDashboardSettings";
+import { EmailNotificationSettings } from "@/src/components/dashboard/settings/EmailNotificationSettings";
 import { ProfileSettings } from "@/src/components/dashboard/settings/ProfileSettings";
+import type { EmailNotificationPreferences } from "@/src/lib/email/notification-preferences";
 import type {
   ProfileDesignData,
   AchievementOption,
@@ -16,6 +18,7 @@ type Props = {
   initialUsername: string | null;
   privacyPublicProfile: boolean;
   playerDashboardTutorialDismissed: boolean;
+  emailNotificationPreferences: EmailNotificationPreferences;
   profileDesign: ProfileDesignData;
   achievements: AchievementOption[];
 };
@@ -25,6 +28,7 @@ export function SettingsClient({
   initialUsername,
   privacyPublicProfile,
   playerDashboardTutorialDismissed,
+  emailNotificationPreferences,
   profileDesign,
   achievements,
 }: Props) {
@@ -60,6 +64,7 @@ export function SettingsClient({
         privacyPublicProfile={privacyPublicProfile}
         playerDashboardTutorialDismissed={playerDashboardTutorialDismissed}
       />
+      <EmailNotificationSettings initialPreferences={emailNotificationPreferences} />
       <ProfileSettings
         userId={userId}
         initial={profileDesign}
