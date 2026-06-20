@@ -3,6 +3,7 @@
 import {
   AUDIO_CHUNK_DURATION_MS,
   AUDIO_CHUNK_OVERLAP_MS,
+  AUDIO_FIRST_CHUNK_DURATION_MS,
 } from "../lib/session-chronicle/constants";
 
 type AudioPart = {
@@ -51,6 +52,10 @@ function resetState() {
   accumulatedMs = 0;
   chunkIndex = 0;
   overlapTail = [];
+}
+
+function targetChunkDurationMs(): number {
+  return chunkIndex === 0 ? AUDIO_FIRST_CHUNK_DURATION_MS : AUDIO_CHUNK_DURATION_MS;
 }
 
 function pickOverlapTail(source: AudioPart[]): AudioPart[] {
@@ -108,7 +113,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     parts.push(part);
     accumulatedMs += part.durationMs;
 
-    if (accumulatedMs >= AUDIO_CHUNK_DURATION_MS) {
+    if (accumulatedMs >= targetChunkDurationMs()) {
       void emitChunk(
         overlapTail,
         parts,

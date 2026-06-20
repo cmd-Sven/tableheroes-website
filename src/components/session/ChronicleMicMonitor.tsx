@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, Pause, Settings } from "lucide-react";
+import { CheckCircle2, Mic, Pause, Settings } from "lucide-react";
 import { MicLevelVisual, MicSignalBadge } from "@/src/components/session/MicLevelVisual";
 import type { UseSessionChronicleRecorderReturn } from "@/src/hooks/useSessionChronicleRecorder";
 
@@ -13,6 +13,8 @@ type Props = {
     | "peakLevel"
     | "deviceLabel"
     | "elapsedMs"
+    | "serverUploadedChunkCount"
+    | "captureHealth"
   >;
   onOpenSettings?: () => void;
 };
@@ -29,31 +31,49 @@ export function ChronicleMicMonitor({ recorder, onOpenSettings }: Props) {
   const isPaused = recorder.phase === "paused";
   if (!isRecording && !isPaused) return null;
 
+  const uploadOk = recorder.serverUploadedChunkCount > 0;
+  const uploadPending =
+    recorder.captureHealth === "waiting-first-upload" && !uploadOk;
+
   return (
     <div
       className="pointer-events-none fixed bottom-24 left-3 z-30 sm:bottom-28 sm:left-4"
       aria-live="polite"
     >
       <div
-        className={`pointer-events-auto w-[min(100vw-1.5rem,13rem)] rounded-xl border px-3 py-2.5 shadow-xl backdrop-blur-sm ${
+        className={`pointer-events-auto w-[min(100vw-1.5rem,14rem)] rounded-xl border px-3 py-2.5 shadow-xl backdrop-blur-sm ${
           isRecording
-            ? "border-red-500/50 bg-background-card/95 shadow-red-950/30"
+            ? uploadOk
+              ? "border-emerald-500/50 bg-background-card/95 shadow-emerald-950/25"
+              : "border-red-500/50 bg-background-card/95 shadow-red-950/30"
             : "border-amber-600/45 bg-background-card/95 shadow-amber-950/20"
         }`}
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             {isRecording ? (
-              <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse text-red-400" />
+              uploadOk ? (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              ) : (
+                <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse text-red-400" />
+              )
             ) : (
               <Pause className="h-3.5 w-3.5 shrink-0 text-amber-300" />
             )}
             <span
               className={`font-barlow text-[9px] font-bold uppercase tracking-wide ${
-                isRecording ? "text-red-300" : "text-amber-200"
+                isRecording
+                  ? uploadOk
+                    ? "text-emerald-300"
+                    : "text-red-300"
+                  : "text-amber-200"
               }`}
             >
-              {isRecording ? "Mikro aktiv" : "Pausiert"}
+              {isRecording
+                ? uploadOk
+                  ? `${recorder.serverUploadedChunkCount} Chunk${recorder.serverUploadedChunkCount === 1 ? "" : "s"} gespeichert`
+                  : "Mikro aktiv"
+                : "Pausiert"}
             </span>
           </div>
           <span className="shrink-0 font-mono text-[10px] text-gray-400">
@@ -68,6 +88,12 @@ export function ChronicleMicMonitor({ recorder, onOpenSettings }: Props) {
           peakLevel={recorder.peakLevel}
           className="w-full"
         />
+
+        {uploadPending ? (
+          <p className="mt-2 font-libre text-[10px] leading-snug text-gray-400">
+            Erster Upload nach ca. 2 Min.
+          </p>
+        ) : null}
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0 flex-1">

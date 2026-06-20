@@ -1,7 +1,8 @@
 "use client";
 
-import { Pause, Play, Square } from "lucide-react";
+import { CheckCircle2, Pause, Play, Square } from "lucide-react";
 import type { TranscriptionStatus } from "@/src/lib/session-chronicle/constants";
+import type { CaptureHealthStatus } from "@/src/lib/session-chronicle/capture-health";
 import { MicLevelVisual, MicSignalBadge } from "@/src/components/session/MicLevelVisual";
 
 type Props = {
@@ -16,6 +17,8 @@ type Props = {
   micActive?: boolean;
   deviceLabel?: string | null;
   compactWaveform?: boolean;
+  serverUploadedChunkCount?: number;
+  captureHealth?: CaptureHealthStatus;
   /** GM: Aufnahme-Dialog öffnen (wenn idle). */
   onStartRecording?: () => void;
   onStopRecording?: () => void;
@@ -47,6 +50,8 @@ export function ChronicleRecordingTopBar({
   micActive = false,
   deviceLabel = null,
   compactWaveform = true,
+  serverUploadedChunkCount = 0,
+  captureHealth = "idle",
   onStartRecording,
   onStopRecording,
   onTogglePause,
@@ -62,6 +67,14 @@ export function ChronicleRecordingTopBar({
     isRecording ||
     isPaused ||
     micActive;
+
+  const uploadHealthy =
+    captureHealth === "healthy" ||
+    (captureHealth === "waiting-first-upload" && serverUploadedChunkCount > 0);
+  const uploadWarning =
+    captureHealth === "upload-stalled" ||
+    captureHealth === "no-signal" ||
+    captureHealth === "reconnect-needed";
 
   if (!visible) return null;
 
@@ -118,6 +131,25 @@ export function ChronicleRecordingTopBar({
           ? "Mikro-Test"
           : statusLabel(status)}
       </span>
+
+      {!playerOnly && isActive && serverUploadedChunkCount > 0 ? (
+        <span className="inline-flex items-center gap-1 rounded border border-emerald-600/40 bg-emerald-950/40 px-1.5 py-0.5 font-barlow text-[8px] font-bold uppercase text-emerald-200">
+          <CheckCircle2 className="h-3 w-3" aria-hidden />
+          {serverUploadedChunkCount} Chunk{serverUploadedChunkCount === 1 ? "" : "s"}
+        </span>
+      ) : null}
+
+      {!playerOnly && isActive && uploadHealthy && serverUploadedChunkCount === 0 ? (
+        <span className="font-barlow text-[8px] font-bold uppercase text-emerald-300/90">
+          Erfasst…
+        </span>
+      ) : null}
+
+      {!playerOnly && isActive && uploadWarning ? (
+        <span className="font-barlow text-[8px] font-bold uppercase text-amber-300">
+          Prüfen
+        </span>
+      ) : null}
 
       {!playerOnly && isIdle && onStartRecording ? (
         <button

@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AUDIO_CHUNK_OVERLAP_MS,
   type LiveMarkerType,
   type TranscriptionMode,
   type TranscriptionStatus,
 } from "@/src/lib/session-chronicle/constants";
+import {
+  resolveCaptureHealth,
+  type CaptureHealthStatus,
+} from "@/src/lib/session-chronicle/capture-health";
 import type { LiveMarker } from "@/src/lib/session-chronicle/types";
 
 type RecorderPhase = "idle" | "starting" | "recording" | "paused" | "error";
@@ -25,9 +29,12 @@ export function useSessionChronicleRecorder({
   const [phase, setPhase] = useState<RecorderPhase>("idle");
   const [serverStatus, setServerStatus] = useState<TranscriptionStatus>("idle");
   const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+  const [serverUploadedChunkCount, setServerUploadedChunkCount] = useState(0);
   const [uploadQueueSize, setUploadQueueSize] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  const [localCaptureActive, setLocalCaptureActive] = useState(false);
+  const [audioSliceCount, setAudioSliceCount] = useState(0);
   const [tick, setTick] = useState(0);
   const [waveformLevels, setWaveformLevels] = useState<number[]>(() =>
     Array.from({ length: 24 }, () => 0),
@@ -44,6 +51,7 @@ export function useSessionChronicleRecorder({
   const rafRef = useRef<number | null>(null);
   const chunkMarkersRef = useRef<LiveMarker[]>([]);
   const uploadBusyRef = useRef(false);
+  const localCaptureRef = useRef(false);
   const uploadQueueRef = useRef<
     Array<{
       chunkIndex: number;
@@ -59,6 +67,10 @@ export function useSessionChronicleRecorder({
     phaseRef.current = phase;
   }, [phase]);
 
+  useEffect(() => {
+    localCaptureRef.current = localCaptureActive;
+  }, [localCaptureActive]);
+
   const refreshStatus = useCallback(async () => {
     if (!enabled) return;
     try {
@@ -67,35 +79,68 @@ export function useSessionChronicleRecorder({
         { credentials: "same-origin" },
       );
       const data = (await res.json().catch(() => ({}))) as {
-        transcriptionSession?: { status?: TranscriptionStatus };
+        transcriptionSession?: {
+          status?: TranscriptionStatus;
+          started_at?: string | null;
+        };
         chunks?: Array<{ chunk_index: number }>;
       };
       if (res.ok && data.transcriptionSession?.status) {
-        setServerStatus(data.transcriptionSession.status);
-        if (data.transcriptionSession.status === "paused") {
-          setPhase("paused");
-        } else if (data.transcriptionSession.status === "recording") {
-          setPhase((p) => (p === "idle" ? "recording" : p));
-        } else if (
-          data.transcriptionSession.status === "stopped" ||
-          data.transcriptionSession.status === "idle"
-        ) {
-          setPhase("idle");
-          setRecordingStartedAt(null);
-        }
+        const status = data.transcriptionSession.status;
+        setServerStatus(status);
+
+        const chunkCount = (data.chunks ?? []).length;
+        setServerUploadedChunkCount(chunkCount);
+
         const maxIdx = (data.chunks ?? []).reduce(
           (max, c) => Math.max(max, Number(c.chunk_index ?? 0)),
           -1,
         );
         if (maxIdx >= 0) setCurrentChunkIndex(maxIdx + 1);
+
+        if (status === "stopped" || status === "idle") {
+          setPhase("idle");
+          setRecordingStartedAt(null);
+          return;
+        }
+
+        if (!localCaptureRef.current) {
+          if (status === "paused") {
+            setPhase("idle");
+          } else if (status === "recording") {
+            setPhase("idle");
+          }
+          const startedAtRaw = data.transcriptionSession.started_at;
+          if (startedAtRaw && recordingStartedAt == null) {
+            const parsed = Date.parse(startedAtRaw);
+            if (Number.isFinite(parsed)) {
+              setRecordingStartedAt(parsed);
+            }
+          }
+          return;
+        }
+
+        if (status === "paused") {
+          setPhase("paused");
+        } else if (status === "recording") {
+          setPhase((p) => (p === "idle" || p === "error" ? "recording" : p));
+        }
       }
     } catch {
       /* ignore status poll errors */
     }
-  }, [enabled, sessionId]);
+  }, [enabled, recordingStartedAt, sessionId]);
 
   useEffect(() => {
     if (enabled) void refreshStatus();
+  }, [enabled, refreshStatus]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const id = window.setInterval(() => {
+      void refreshStatus();
+    }, 12_000);
+    return () => window.clearInterval(id);
   }, [enabled, refreshStatus]);
 
   useEffect(() => {
@@ -103,6 +148,16 @@ export function useSessionChronicleRecorder({
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
     return () => window.clearInterval(id);
   }, [phase]);
+
+  useEffect(() => {
+    if (!localCaptureActive) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [localCaptureActive]);
 
   const stopWaveformLoop = useCallback(() => {
     if (rafRef.current != null) {
@@ -113,7 +168,7 @@ export function useSessionChronicleRecorder({
 
   const startWaveformLoop = useCallback(() => {
     stopWaveformLoop();
-    const tick = () => {
+    const tickFrame = () => {
       const analyser = analyserRef.current;
       if (analyser) {
         const data = new Uint8Array(analyser.fftSize);
@@ -135,9 +190,9 @@ export function useSessionChronicleRecorder({
         setPeakLevel(max);
         setHasSignal(max >= 0.05);
       }
-      rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = requestAnimationFrame(tickFrame);
     };
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(tickFrame);
   }, [stopWaveformLoop]);
 
   const processUploadQueue = useCallback(async () => {
@@ -168,7 +223,12 @@ export function useSessionChronicleRecorder({
         }
         uploadQueueRef.current.shift();
         setCurrentChunkIndex(item.chunkIndex + 1);
+        setServerUploadedChunkCount((count) =>
+          Math.max(count, item.chunkIndex + 1),
+        );
         setUploadQueueSize(uploadQueueRef.current.length);
+        setError(null);
+        void refreshStatus();
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Upload fehlgeschlagen.");
         break;
@@ -176,7 +236,7 @@ export function useSessionChronicleRecorder({
     }
     uploadBusyRef.current = false;
     setUploadQueueSize(uploadQueueRef.current.length);
-  }, [sessionId]);
+  }, [refreshStatus, sessionId]);
 
   const enqueueUpload = useCallback(
     (payload: {
@@ -205,6 +265,8 @@ export function useSessionChronicleRecorder({
     setHasSignal(false);
     setPeakLevel(0);
     setDeviceLabel(null);
+    setLocalCaptureActive(false);
+    setAudioSliceCount(0);
     workerRef.current?.postMessage({ type: "reset" });
     workerRef.current?.terminate();
     workerRef.current = null;
@@ -219,9 +281,24 @@ export function useSessionChronicleRecorder({
   const setupWorker = useCallback(
     (mime: string) => {
       workerRef.current?.terminate();
-      const worker = new Worker(
-        new URL("../workers/session-audio-chunk.worker.ts", import.meta.url),
-      );
+      let worker: Worker;
+      try {
+        worker = new Worker(
+          new URL("../workers/session-audio-chunk.worker.ts", import.meta.url),
+        );
+      } catch (e: unknown) {
+        throw new Error(
+          e instanceof Error
+            ? e.message
+            : "Audio-Worker konnte nicht gestartet werden.",
+        );
+      }
+      worker.onerror = () => {
+        setError(
+          "Audio-Verarbeitung im Browser fehlgeschlagen. Seite neu laden und Mikrofon erneut verbinden.",
+        );
+        setPhase("error");
+      };
       worker.onmessage = (event: MessageEvent) => {
         const msg = event.data as
           | {
@@ -235,6 +312,10 @@ export function useSessionChronicleRecorder({
           | undefined;
         if (!msg || (msg.type !== "chunk-ready" && msg.type !== "flush-ready")) return;
         const blob = new Blob([msg.buffer], { type: msg.mimeType });
+        if (blob.size === 0) {
+          setError("Leerer Audio-Chunk — Mikrofon prüfen.");
+          return;
+        }
         enqueueUpload({
           chunkIndex: msg.chunkIndex,
           blob,
@@ -286,6 +367,7 @@ export function useSessionChronicleRecorder({
     recorder.ondataavailable = async (ev) => {
       if (!ev.data || ev.data.size === 0) return;
       if (phaseRef.current === "paused") return;
+      setAudioSliceCount((count) => count + 1);
       const buffer = await ev.data.arrayBuffer();
       workerRef.current?.postMessage(
         {
@@ -299,7 +381,34 @@ export function useSessionChronicleRecorder({
     };
 
     recorder.start(1000);
+    setLocalCaptureActive(true);
+    setAudioSliceCount(0);
   }, [setupWorker, startWaveformLoop]);
+
+  const reconnectLocalCapture = useCallback(async () => {
+    if (!enabled) return;
+    setError(null);
+    setPhase("starting");
+    try {
+      if (localCaptureRef.current) {
+        teardownCapture();
+      }
+      if (recordingStartedAt == null) {
+        setRecordingStartedAt(Date.now());
+      }
+      await startMicCapture();
+      setPhase(serverStatus === "paused" ? "paused" : "recording");
+      if (serverStatus === "paused") {
+        mediaRecorderRef.current?.pause();
+      }
+    } catch (e: unknown) {
+      teardownCapture();
+      setPhase("error");
+      setError(
+        e instanceof Error ? e.message : "Mikrofon konnte nicht verbunden werden.",
+      );
+    }
+  }, [enabled, recordingStartedAt, serverStatus, startMicCapture, teardownCapture]);
 
   const startRecording = useCallback(
     async (mode: TranscriptionMode, noticeAcknowledged: boolean) => {
@@ -325,6 +434,7 @@ export function useSessionChronicleRecorder({
         }
         setServerStatus("recording");
         setRecordingStartedAt(Date.now());
+        setServerUploadedChunkCount(0);
         chunkMarkersRef.current = [];
         setHasSignal(false);
         await startMicCapture();
@@ -453,16 +563,47 @@ export function useSessionChronicleRecorder({
       setServerStatus("stopped");
       setRecordingStartedAt(null);
       setWaveformLevels(Array.from({ length: 24 }, () => 0));
+      void refreshStatus();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Stop fehlgeschlagen.");
     }
-  }, [sessionId, teardownCapture, waitForUploadQueue]);
+  }, [refreshStatus, sessionId, teardownCapture, waitForUploadQueue]);
 
   const elapsedMs =
-    recordingStartedAt != null && (phase === "recording" || phase === "paused")
+    recordingStartedAt != null &&
+    (phase === "recording" ||
+      phase === "paused" ||
+      (!localCaptureActive &&
+        (serverStatus === "recording" || serverStatus === "paused")))
       ? Date.now() - recordingStartedAt
       : 0;
   void tick;
+
+  const captureHealth: CaptureHealthStatus = useMemo(
+    () =>
+      resolveCaptureHealth({
+        phase,
+        localCaptureActive,
+        serverStatus,
+        elapsedMs,
+        hasSignal,
+        audioSliceCount,
+        serverUploadedChunkCount,
+        uploadQueueSize,
+        error,
+      }),
+    [
+      audioSliceCount,
+      elapsedMs,
+      error,
+      hasSignal,
+      localCaptureActive,
+      phase,
+      serverStatus,
+      serverUploadedChunkCount,
+      uploadQueueSize,
+    ],
+  );
 
   return {
     plannedMode,
@@ -474,9 +615,14 @@ export function useSessionChronicleRecorder({
     peakLevel,
     deviceLabel,
     currentChunkIndex,
+    serverUploadedChunkCount,
     uploadQueueSize,
     elapsedMs,
+    localCaptureActive,
+    audioSliceCount,
+    captureHealth,
     startRecording,
+    reconnectLocalCapture,
     togglePause,
     stopRecording,
     addMarker,

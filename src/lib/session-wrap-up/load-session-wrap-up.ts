@@ -212,6 +212,27 @@ export async function loadSessionWrapUpPreview(
     });
   }
 
+  const recordingDurationMs =
+    ts?.started_at && ts?.stopped_at
+      ? new Date(ts.stopped_at).getTime() - new Date(ts.started_at).getTime()
+      : ts?.started_at && recordingActive
+        ? Date.now() - new Date(ts.started_at).getTime()
+        : 0;
+
+  if (
+    ts?.started_at &&
+    chunks.length === 0 &&
+    recordingDurationMs > 60_000
+  ) {
+    followUpTasks.unshift({
+      id: "no-audio-chunks",
+      kind: "warning",
+      title: "Chronist ohne gespeichertes Audio",
+      description:
+        "Die Aufnahme wurde gestartet, aber es kam kein Audio auf dem Server an. Eine automatische Zusammenfassung ist nicht möglich. Beim nächsten Mal auf die grüne Chunk-Bestätigung achten, den Tab geöffnet lassen und nach Reload „Mikrofon verbinden“ nutzen.",
+    });
+  }
+
   if (chunks.length > 0 && pendingWhisper + pendingSummarize > 0) {
     followUpTasks.push({
       id: "processing",

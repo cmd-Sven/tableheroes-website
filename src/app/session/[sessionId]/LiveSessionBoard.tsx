@@ -1132,8 +1132,7 @@ export function LiveSessionBoard({
   );
 
   const gmMicActive =
-    chronicleRecorder.phase === "recording" ||
-    chronicleRecorder.phase === "paused" ||
+    chronicleRecorder.localCaptureActive ||
     (isPrepMode && prepMicTest.isActive);
 
   const topBarTranscriptionStatus =
@@ -1152,13 +1151,6 @@ export function LiveSessionBoard({
       topBarTranscriptionStatus === "paused")
       ? topBarTranscriptionStatus
       : null;
-
-  const chronistRecordingActive =
-    chronicleRecorder.phase === "recording" ||
-    chronicleRecorder.phase === "paused" ||
-    chronicleRecorder.phase === "starting" ||
-    topBarTranscriptionStatus === "recording" ||
-    topBarTranscriptionStatus === "paused";
 
   const [chronistReminderDismissed, setChronistReminderDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -1183,8 +1175,27 @@ export function LiveSessionBoard({
     },
   );
 
+  const chronistRecordingActive =
+    chronicleRecorder.localCaptureActive ||
+    chronicleRecorder.phase === "starting";
+
+  const chronistHealthBannerVariant =
+    chronicleRecorder.captureHealth !== "idle" &&
+    chronicleRecorder.captureHealth !== "starting"
+      ? chronicleRecorder.captureHealth
+      : null;
+
+  const showChronistHealthBanner =
+    isGM &&
+    sessionStatus === "Live" &&
+    chronistTableMode &&
+    chronistHealthBannerVariant != null &&
+    (chronistHealthBannerVariant === "reconnect-needed" ||
+      chronistHealthBannerVariant === "no-signal" ||
+      chronistHealthBannerVariant === "upload-stalled");
+
   useEffect(() => {
-    if (chronicleRecorder.phase === "recording") {
+    if (chronicleRecorder.localCaptureActive) {
       try {
         sessionStorage.removeItem(`th-chronist-reminder-dismiss-${sessionId}`);
       } catch {
@@ -1192,7 +1203,7 @@ export function LiveSessionBoard({
       }
       setChronistReminderDismissed(false);
     }
-  }, [chronicleRecorder.phase, sessionId]);
+  }, [chronicleRecorder.localCaptureActive, sessionId]);
 
   function dismissChronistRecordingReminder() {
     try {
@@ -1217,7 +1228,9 @@ export function LiveSessionBoard({
     sessionStatus === "Live" &&
     chronistTableMode &&
     !chronistRecordingActive &&
-    !chronistReminderDismissed;
+    !liveTranscriptionStatus &&
+    !chronistReminderDismissed &&
+    !showChronistHealthBanner;
 
   const showJitsiChronistReminder =
     isGM &&
@@ -2106,29 +2119,27 @@ export function LiveSessionBoard({
               }
               micActive={gmMicActive}
               waveformLevels={
-                chronicleRecorder.phase === "recording" ||
-                chronicleRecorder.phase === "paused"
+                chronicleRecorder.localCaptureActive
                   ? chronicleRecorder.waveformLevels
                   : prepMicTest.waveformLevels
               }
               hasSignal={
-                chronicleRecorder.phase === "recording" ||
-                chronicleRecorder.phase === "paused"
+                chronicleRecorder.localCaptureActive
                   ? chronicleRecorder.hasSignal
                   : prepMicTest.hasSignal
               }
               peakLevel={
-                chronicleRecorder.phase === "recording" ||
-                chronicleRecorder.phase === "paused"
+                chronicleRecorder.localCaptureActive
                   ? chronicleRecorder.peakLevel
                   : prepMicTest.peakLevel
               }
               deviceLabel={
-                chronicleRecorder.phase === "recording" ||
-                chronicleRecorder.phase === "paused"
+                chronicleRecorder.localCaptureActive
                   ? chronicleRecorder.deviceLabel
                   : prepMicTest.deviceLabel
               }
+              serverUploadedChunkCount={chronicleRecorder.serverUploadedChunkCount}
+              captureHealth={chronicleRecorder.captureHealth}
             />
           ) : null}
           {isGM ? (
@@ -2226,6 +2237,15 @@ export function LiveSessionBoard({
           </button>
         </div>
       </div>
+
+      {showChronistHealthBanner && chronistHealthBannerVariant ? (
+        <ChronicleRecordingReminderBanner
+          variant={chronistHealthBannerVariant}
+          onReconnect={() => void chronicleRecorder.reconnectLocalCapture()}
+          error={chronicleRecorder.error}
+          uploadedChunkCount={chronicleRecorder.serverUploadedChunkCount}
+        />
+      ) : null}
 
       {showChronistNotRecordingReminder ? (
         <ChronicleRecordingReminderBanner

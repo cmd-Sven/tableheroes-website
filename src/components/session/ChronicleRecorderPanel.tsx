@@ -17,6 +17,10 @@ import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPa
 import { GmBoardSettingsModal } from "@/src/components/session/GmBoardSettingsModal";
 import { ChronicleChunkProcessingList } from "@/src/components/session/ChronicleChunkProcessingList";
 import { setLiveMarkerWithFeedback } from "@/src/components/session/live-marker-feedback";
+import {
+  captureHealthDescription,
+  captureHealthTitle,
+} from "@/src/lib/session-chronicle/capture-health";
 import { Loader2, Mic, MicOff, Pause, Play, Radio, Square } from "lucide-react";
 
 export type { UseSessionChronicleRecorderReturn };
@@ -179,6 +183,41 @@ export function ChronicleRecorderPanel({
         <p className="font-libre text-xs text-red-400">{recorder.error}</p>
       ) : null}
 
+      {isActive || recorder.captureHealth === "reconnect-needed" ? (
+        <div
+          className={`rounded border px-3 py-2 ${
+            recorder.captureHealth === "healthy"
+              ? "border-emerald-600/40 bg-emerald-950/30"
+              : recorder.captureHealth === "waiting-first-upload"
+                ? "border-emerald-700/30 bg-emerald-950/20"
+                : recorder.captureHealth === "reconnect-needed" ||
+                    recorder.captureHealth === "upload-stalled" ||
+                    recorder.captureHealth === "no-signal"
+                  ? "border-red-600/40 bg-red-950/30"
+                  : "border-hero-border/40 bg-background-dark/50"
+          }`}
+        >
+          <p className="font-barlow text-[10px] font-bold uppercase text-gray-200">
+            {captureHealthTitle(recorder.captureHealth)}
+          </p>
+          <p className="mt-1 font-libre text-xs text-gray-400 leading-relaxed">
+            {recorder.serverUploadedChunkCount > 0
+              ? `${recorder.serverUploadedChunkCount} Chunk${recorder.serverUploadedChunkCount === 1 ? "" : "s"} auf dem Server. `
+              : ""}
+            {captureHealthDescription(recorder.captureHealth)}
+          </p>
+          {recorder.captureHealth === "reconnect-needed" ? (
+            <button
+              type="button"
+              onClick={() => void recorder.reconnectLocalCapture()}
+              className="mt-2 inline-flex items-center gap-1.5 rounded border border-red-500/60 bg-red-900/40 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-red-200 hover:bg-red-800/50"
+            >
+              Mikrofon verbinden
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {recorder.uploadQueueSize > 0 ? (
         <p className="font-libre text-[10px] text-gray-500">
           Upload-Warteschlange: {recorder.uploadQueueSize} Chunk(s)
@@ -254,7 +293,8 @@ export function ChronicleRecorderPanel({
 
       {isActive ? (
         <p className="font-barlow text-[9px] uppercase text-gray-600">
-          Chunk #{recorder.currentChunkIndex + 1} · 10-Min-Segmente
+          Chunk #{recorder.currentChunkIndex + 1} · erster Upload nach ~2 Min., danach
+          alle 10 Min.
         </p>
       ) : null}
     </div>
