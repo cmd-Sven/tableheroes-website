@@ -1,8 +1,7 @@
 import { HeroSection } from "@/src/components/marketing/HeroSection";
 import { SubNavbar } from "@/src/components/marketing/SubNavbar";
 import { FeatureTabsSection } from "@/src/components/marketing/FeatureTabsSection";
-import { ActiveCampaignsSection } from "@/src/components/marketing/ActiveCampaignsSection";
-import { PublicCommunityEventsSection } from "@/src/components/marketing/PublicCommunityEventsSection";
+import { TermineUndRundenSection } from "@/src/components/marketing/TermineUndRundenSection";
 import { CommunitySection } from "@/src/components/marketing/CommunitySection";
 import { GamificationSection } from "@/src/components/marketing/GamificationSection";
 import { SystemsSection } from "@/src/components/marketing/SystemsSection";
@@ -20,9 +19,7 @@ export default async function MarketingLandingPage() {
 
       <SubNavbar />
 
-      <ActiveCampaignsSection />
-
-      <PublicCommunityEventsSection events={communityEvents} />
+      <TermineUndRundenSection events={communityEvents} />
 
       <NewsSection />
 

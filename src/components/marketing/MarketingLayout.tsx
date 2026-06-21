@@ -33,7 +33,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
   const items: NavItem[] = useMemo(
     () => [
       { id: "hero", label: "Start", Icon: Home },
-      { id: "campaigns", label: "Runden", Icon: Flag },
+      { id: "campaigns", label: "Termine", Icon: Flag },
       { id: "news", label: "News", Icon: Newspaper },
       { id: "community", label: "Community", Icon: Users },
       { id: "features", label: "Plattform", Icon: Sparkles },
