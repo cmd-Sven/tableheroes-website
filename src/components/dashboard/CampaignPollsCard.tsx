@@ -6,7 +6,7 @@ import { BarChart3, Clock, Coins, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { voteCampaignPoll } from "@/src/lib/actions/poll-actions";
 import type { CampaignPoll } from "@/src/lib/queries/poll-queries";
-import { POLL_VOTE_POINTS } from "@/src/lib/queries/poll-queries";
+import { POLL_VOTE_POINTS } from "@/src/lib/constants/poll";
 
 type Props = {
   polls: CampaignPoll[];

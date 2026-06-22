@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { POLL_VOTE_POINTS } from "@/src/lib/constants/poll";
 
-export const POLL_VOTE_POINTS = 10;
+export { POLL_VOTE_POINTS };
 
 export type PollStatus = "draft" | "published" | "closed";
 

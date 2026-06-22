@@ -19,7 +19,7 @@ import {
   type PollDurationPreset,
 } from "@/src/lib/actions/poll-actions";
 import type { CampaignPoll } from "@/src/lib/queries/poll-queries";
-import { POLL_VOTE_POINTS } from "@/src/lib/queries/poll-queries";
+import { POLL_VOTE_POINTS } from "@/src/lib/constants/poll";
 
 type Props = {
   campaignId: string;
