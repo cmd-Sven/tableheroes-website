@@ -42,6 +42,7 @@ export function useSessionChronicleRecorder({
   const [hasSignal, setHasSignal] = useState(false);
   const [peakLevel, setPeakLevel] = useState(0);
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
+  const [pageHidden, setPageHidden] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -62,6 +63,9 @@ export function useSessionChronicleRecorder({
     }>
   >([]);
   const phaseRef = useRef<RecorderPhase>("idle");
+  const lastSliceAtRef = useRef<number | null>(null);
+  const lastUploadAtRef = useRef<number | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -159,6 +163,51 @@ export function useSessionChronicleRecorder({
     return () => window.removeEventListener("beforeunload", handler);
   }, [localCaptureActive]);
 
+  useEffect(() => {
+    const syncVisibility = () => setPageHidden(document.hidden);
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      await wakeLockRef.current?.release();
+    } catch {
+      /* ignore */
+    }
+    wakeLockRef.current = null;
+  }, []);
+
+  const requestWakeLock = useCallback(async () => {
+    if (!("wakeLock" in navigator)) return;
+    try {
+      await releaseWakeLock();
+      wakeLockRef.current = await navigator.wakeLock.request("screen");
+      wakeLockRef.current.addEventListener("release", () => {
+        wakeLockRef.current = null;
+      });
+    } catch {
+      /* optional — z. B. ohne User-Geste */
+    }
+  }, [releaseWakeLock]);
+
+  useEffect(() => {
+    if (!localCaptureActive || phase === "idle" || phase === "error") {
+      void releaseWakeLock();
+      return;
+    }
+    void requestWakeLock();
+    const onVisible = () => {
+      if (!document.hidden) void requestWakeLock();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      void releaseWakeLock();
+    };
+  }, [localCaptureActive, phase, releaseWakeLock, requestWakeLock]);
+
   const stopWaveformLoop = useCallback(() => {
     if (rafRef.current != null) {
       cancelAnimationFrame(rafRef.current);
@@ -212,27 +261,39 @@ export function useSessionChronicleRecorder({
         formData.append("liveMarkers", JSON.stringify(chunkMarkersRef.current));
         chunkMarkersRef.current = [];
       }
-      try {
-        const res = await fetch(
-          `/api/sessions/${encodeURIComponent(sessionId)}/transcription/upload-chunk`,
-          { method: "POST", body: formData, credentials: "same-origin" },
-        );
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        if (!res.ok) {
-          throw new Error(data.error || "Chunk-Upload fehlgeschlagen.");
+
+      let uploaded = false;
+      for (let attempt = 0; attempt < 4 && !uploaded; attempt += 1) {
+        try {
+          const res = await fetch(
+            `/api/sessions/${encodeURIComponent(sessionId)}/transcription/upload-chunk`,
+            { method: "POST", body: formData, credentials: "same-origin" },
+          );
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          if (!res.ok) {
+            throw new Error(data.error || "Chunk-Upload fehlgeschlagen.");
+          }
+          uploaded = true;
+        } catch (e: unknown) {
+          if (attempt >= 3) {
+            setError(e instanceof Error ? e.message : "Upload fehlgeschlagen.");
+            uploadBusyRef.current = false;
+            setUploadQueueSize(uploadQueueRef.current.length);
+            return;
+          }
+          await new Promise((r) => window.setTimeout(r, 1000 * (attempt + 1)));
         }
-        uploadQueueRef.current.shift();
-        setCurrentChunkIndex(item.chunkIndex + 1);
-        setServerUploadedChunkCount((count) =>
-          Math.max(count, item.chunkIndex + 1),
-        );
-        setUploadQueueSize(uploadQueueRef.current.length);
-        setError(null);
-        void refreshStatus();
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Upload fehlgeschlagen.");
-        break;
       }
+
+      uploadQueueRef.current.shift();
+      setCurrentChunkIndex(item.chunkIndex + 1);
+      setServerUploadedChunkCount((count) =>
+        Math.max(count, item.chunkIndex + 1),
+      );
+      lastUploadAtRef.current = Date.now();
+      setUploadQueueSize(uploadQueueRef.current.length);
+      setError(null);
+      void refreshStatus();
     }
     uploadBusyRef.current = false;
     setUploadQueueSize(uploadQueueRef.current.length);
@@ -255,6 +316,7 @@ export function useSessionChronicleRecorder({
 
   const teardownCapture = useCallback(() => {
     stopWaveformLoop();
+    void releaseWakeLock();
     mediaRecorderRef.current?.stop();
     mediaRecorderRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -270,7 +332,7 @@ export function useSessionChronicleRecorder({
     workerRef.current?.postMessage({ type: "reset" });
     workerRef.current?.terminate();
     workerRef.current = null;
-  }, [stopWaveformLoop]);
+  }, [releaseWakeLock, stopWaveformLoop]);
 
   useEffect(() => {
     return () => {
@@ -279,7 +341,7 @@ export function useSessionChronicleRecorder({
   }, [teardownCapture]);
 
   const setupWorker = useCallback(
-    (mime: string) => {
+    (mime: string, initialChunkIndex = 0) => {
       workerRef.current?.terminate();
       let worker: Worker;
       try {
@@ -326,12 +388,15 @@ export function useSessionChronicleRecorder({
       };
       workerRef.current = worker;
       worker.postMessage({ type: "reset" });
+      if (initialChunkIndex > 0) {
+        worker.postMessage({ type: "set-chunk-index", chunkIndex: initialChunkIndex });
+      }
       return mime;
     },
     [enqueueUpload],
   );
 
-  const startMicCapture = useCallback(async () => {
+  const startMicCapture = useCallback(async (initialChunkIndex = 0) => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -359,7 +424,7 @@ export function useSessionChronicleRecorder({
     const mimeType =
       preferredTypes.find((t) => MediaRecorder.isTypeSupported(t)) ?? "audio/webm";
 
-    setupWorker(mimeType);
+    setupWorker(mimeType, initialChunkIndex);
 
     const recorder = new MediaRecorder(stream, { mimeType });
     mediaRecorderRef.current = recorder;
@@ -367,6 +432,7 @@ export function useSessionChronicleRecorder({
     recorder.ondataavailable = async (ev) => {
       if (!ev.data || ev.data.size === 0) return;
       if (phaseRef.current === "paused") return;
+      lastSliceAtRef.current = Date.now();
       setAudioSliceCount((count) => count + 1);
       const buffer = await ev.data.arrayBuffer();
       workerRef.current?.postMessage(
@@ -383,6 +449,7 @@ export function useSessionChronicleRecorder({
     recorder.start(1000);
     setLocalCaptureActive(true);
     setAudioSliceCount(0);
+    lastSliceAtRef.current = Date.now();
   }, [setupWorker, startWaveformLoop]);
 
   const reconnectLocalCapture = useCallback(async () => {
@@ -396,7 +463,7 @@ export function useSessionChronicleRecorder({
       if (recordingStartedAt == null) {
         setRecordingStartedAt(Date.now());
       }
-      await startMicCapture();
+      await startMicCapture(currentChunkIndex);
       setPhase(serverStatus === "paused" ? "paused" : "recording");
       if (serverStatus === "paused") {
         mediaRecorderRef.current?.pause();
@@ -408,7 +475,7 @@ export function useSessionChronicleRecorder({
         e instanceof Error ? e.message : "Mikrofon konnte nicht verbunden werden.",
       );
     }
-  }, [enabled, recordingStartedAt, serverStatus, startMicCapture, teardownCapture]);
+  }, [currentChunkIndex, enabled, recordingStartedAt, serverStatus, startMicCapture, teardownCapture]);
 
   const startRecording = useCallback(
     async (mode: TranscriptionMode, noticeAcknowledged: boolean) => {
@@ -437,7 +504,9 @@ export function useSessionChronicleRecorder({
         setServerUploadedChunkCount(0);
         chunkMarkersRef.current = [];
         setHasSignal(false);
-        await startMicCapture();
+        lastSliceAtRef.current = null;
+        lastUploadAtRef.current = null;
+        await startMicCapture(0);
         setPhase("recording");
       } catch (e: unknown) {
         teardownCapture();
@@ -591,6 +660,9 @@ export function useSessionChronicleRecorder({
         serverUploadedChunkCount,
         uploadQueueSize,
         error,
+        pageHidden,
+        lastSliceAtMs: lastSliceAtRef.current,
+        lastUploadAtMs: lastUploadAtRef.current,
       }),
     [
       audioSliceCount,
@@ -598,10 +670,12 @@ export function useSessionChronicleRecorder({
       error,
       hasSignal,
       localCaptureActive,
+      pageHidden,
       phase,
       serverStatus,
       serverUploadedChunkCount,
       uploadQueueSize,
+      tick,
     ],
   );
 
@@ -614,6 +688,7 @@ export function useSessionChronicleRecorder({
     hasSignal,
     peakLevel,
     deviceLabel,
+    pageHidden,
     currentChunkIndex,
     serverUploadedChunkCount,
     uploadQueueSize,

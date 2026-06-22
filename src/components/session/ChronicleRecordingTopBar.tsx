@@ -74,7 +74,9 @@ export function ChronicleRecordingTopBar({
   const uploadWarning =
     captureHealth === "upload-stalled" ||
     captureHealth === "no-signal" ||
-    captureHealth === "reconnect-needed";
+    captureHealth === "reconnect-needed" ||
+    captureHealth === "tab-background" ||
+    captureHealth === "capture-stalled";
 
   if (!visible) return null;
 

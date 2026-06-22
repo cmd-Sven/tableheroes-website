@@ -192,7 +192,9 @@ export function ChronicleRecorderPanel({
                 ? "border-emerald-700/30 bg-emerald-950/20"
                 : recorder.captureHealth === "reconnect-needed" ||
                     recorder.captureHealth === "upload-stalled" ||
-                    recorder.captureHealth === "no-signal"
+                    recorder.captureHealth === "no-signal" ||
+                    recorder.captureHealth === "tab-background" ||
+                    recorder.captureHealth === "capture-stalled"
                   ? "border-red-600/40 bg-red-950/30"
                   : "border-hero-border/40 bg-background-dark/50"
           }`}

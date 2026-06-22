@@ -30,6 +30,12 @@ export const AUDIO_CHUNK_OVERLAP_MS = 5_000;
 export const AUDIO_UPLOAD_STALL_WARN_MS =
   AUDIO_FIRST_CHUNK_DURATION_MS + 90_000;
 
+/** Keine MediaRecorder-Slices mehr — Aufnahme hängt vermutlich (Tab-Hintergrund). */
+export const AUDIO_SLICE_STALL_WARN_MS = 90_000;
+
+/** Puffer nach erwarteter Chunk-Zeit, bevor „Upload stockt“ gewarnt wird. */
+export const AUDIO_NEXT_CHUNK_GRACE_MS = 120_000;
+
 /** Warnung, wenn das Mikro längere Zeit kein Signal liefert. */
 export const AUDIO_NO_SIGNAL_WARN_MS = 15_000;
 

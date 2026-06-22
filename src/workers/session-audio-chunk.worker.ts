@@ -13,6 +13,7 @@ type AudioPart = {
 
 type WorkerInMessage =
   | { type: "reset" }
+  | { type: "set-chunk-index"; chunkIndex: number }
   | { type: "audio"; buffer: ArrayBuffer; durationMs?: number; mimeType?: string }
   | { type: "flush"; mimeType?: string };
 
@@ -101,6 +102,11 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
   const msg = event.data;
   if (msg.type === "reset") {
     resetState();
+    return;
+  }
+
+  if (msg.type === "set-chunk-index") {
+    chunkIndex = Math.max(0, Math.floor(msg.chunkIndex));
     return;
   }
 

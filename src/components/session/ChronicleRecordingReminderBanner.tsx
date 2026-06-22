@@ -28,6 +28,9 @@ function bannerStyles(variant: Variant): string {
   if (variant === "jitsi-mode") {
     return "border-amber-600/50 bg-amber-950/85";
   }
+  if (variant === "tab-background" || variant === "capture-stalled") {
+    return "border-red-500/50 bg-red-950/85";
+  }
   return "border-red-500/50 bg-red-950/85";
 }
 
