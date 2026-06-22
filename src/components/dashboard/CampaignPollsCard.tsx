@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
-import { BarChart3, Clock, Coins, Loader2, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
-import { voteCampaignPoll } from "@/src/lib/actions/poll-actions";
+import { BarChart3, Clock } from "lucide-react";
 import type { CampaignPoll } from "@/src/lib/queries/poll-queries";
-import { POLL_VOTE_POINTS } from "@/src/lib/constants/poll";
+import { CampaignPollVoteForm } from "@/src/components/campaigns/CampaignPollVoteForm";
 
 type Props = {
   polls: CampaignPoll[];
@@ -21,94 +18,9 @@ function formatRemaining(closesAt: string): string {
   return `noch ${days} Tag${days === 1 ? "" : "e"}`;
 }
 
-function PollVoteForm({ poll }: { poll: CampaignPoll }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [votedOptionId, setVotedOptionId] = useState<string | null>(
-    poll.userVoteOptionId ?? null
-  );
-  const [isPending, startTransition] = useTransition();
-
-  const hasVoted = !!votedOptionId;
-
-  function handleVote() {
-    if (!selected || hasVoted) return;
-    startTransition(async () => {
-      const result = await voteCampaignPoll(poll.id, selected);
-      if (result.success) {
-        setVotedOptionId(selected);
-        toast.success(
-          `Danke für deine Stimme! +${result.pointsAwarded ?? POLL_VOTE_POINTS} TableHeroes-Punkte`
-        );
-      } else {
-        toast.error(result.error ?? "Abstimmung fehlgeschlagen.");
-      }
-    });
-  }
-
-  if (hasVoted) {
-    const chosen = poll.options.find((o) => o.id === votedOptionId);
-    return (
-      <div className="rounded border border-green-800/40 bg-green-950/20 p-3 flex items-start gap-2">
-        <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-libre text-sm text-green-300">
-            Du hast abgestimmt:{" "}
-            <span className="font-semibold">{chosen?.label ?? "—"}</span>
-          </p>
-          <p className="font-libre text-xs text-gray-500 mt-1">
-            +{poll.pointsPerVote} Punkte auf dein Konto
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        {poll.options.map((opt) => (
-          <label
-            key={opt.id}
-            className={`flex items-center gap-3 rounded border px-3 py-2 cursor-pointer transition-colors ${
-              selected === opt.id
-                ? "border-hero-vibrant bg-hero-vibrant/10"
-                : "border-hero-border/40 bg-background-dark hover:border-hero-border"
-            }`}
-          >
-            <input
-              type="radio"
-              name={`poll-${poll.id}`}
-              value={opt.id}
-              checked={selected === opt.id}
-              onChange={() => setSelected(opt.id)}
-              className="accent-hero-vibrant"
-            />
-            <span className="font-libre text-sm text-gray-200">{opt.label}</span>
-          </label>
-        ))}
-      </div>
-      <button
-        type="button"
-        disabled={!selected || isPending}
-        onClick={handleVote}
-        className="w-full inline-flex items-center justify-center gap-2 rounded bg-hero-vibrant px-4 py-2 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-40 transition-colors"
-      >
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <>
-            <Coins className="h-4 w-4" />
-            Abstimmen (+{poll.pointsPerVote} Pkt.)
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
 export function CampaignPollsCard({ polls }: Props) {
   const openPolls = polls.filter((p) => p.isOpen);
-  const pendingVote = openPolls.filter((p) => !p.userVoteOptionId);
+  const pendingVote = openPolls.filter((p) => !p.hasParticipated);
 
   if (openPolls.length === 0) {
     return (
@@ -144,12 +56,16 @@ export function CampaignPollsCard({ polls }: Props) {
               <BarChart3 className="h-4 w-4 text-accent-gold shrink-0 mt-0.5" />
               {poll.question}
             </p>
-            <p className="font-libre text-xs text-gray-500 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatRemaining(poll.closesAt)}
+            <p className="font-libre text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatRemaining(poll.closesAt)}
+              </span>
+              {poll.allowMultiple && <span>· Mehrfachauswahl</span>}
+              {poll.allowFreeText && <span>· Freitext möglich</span>}
             </p>
           </div>
-          <PollVoteForm poll={poll} />
+          <CampaignPollVoteForm poll={poll} showOtherResponses />
         </div>
       ))}
     </div>

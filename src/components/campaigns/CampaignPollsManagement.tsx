@@ -10,16 +10,25 @@ import {
   XCircle,
   Clock,
   Coins,
+  Pencil,
+  Users,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createCampaignPoll,
+  updateCampaignPoll,
   publishCampaignPoll,
   closeCampaignPoll,
   type PollDurationPreset,
+  type PollOptionInput,
 } from "@/src/lib/actions/poll-actions";
 import type { CampaignPoll } from "@/src/lib/queries/poll-queries";
-import { POLL_VOTE_POINTS } from "@/src/lib/constants/poll";
+import {
+  MAX_POLL_OPTIONS,
+  POLL_VOTE_POINTS,
+} from "@/src/lib/constants/poll";
+import { PollTextResponsesList } from "@/src/components/campaigns/CampaignPollVoteForm";
 
 type Props = {
   campaignId: string;
@@ -33,6 +42,8 @@ const DURATION_OPTIONS: { value: PollDurationPreset; label: string }[] = [
   { value: "7d", label: "7 Tage" },
   { value: "14d", label: "14 Tage" },
 ];
+
+type OptionField = { id?: string; label: string };
 
 function formatClosesAt(iso: string): string {
   return new Date(iso).toLocaleString("de-DE", {
@@ -58,17 +69,38 @@ function statusClass(poll: CampaignPoll): string {
   return "bg-amber-900/40 text-amber-300";
 }
 
-export function CampaignPollsManagement({ campaignId, polls }: Props) {
-  const [showForm, setShowForm] = useState(false);
-  const [question, setQuestion] = useState("");
-  const [options, setOptions] = useState(["", ""]);
-  const [duration, setDuration] = useState<PollDurationPreset>("48h");
-  const [isPending, startTransition] = useTransition();
-  const [actionPollId, setActionPollId] = useState<string | null>(null);
+function pollToOptionFields(poll: CampaignPoll): OptionField[] {
+  return poll.options.map((o) => ({ id: o.id, label: o.label }));
+}
 
+function PollFormFields({
+  question,
+  setQuestion,
+  options,
+  setOptions,
+  duration,
+  setDuration,
+  allowMultiple,
+  setAllowMultiple,
+  allowFreeText,
+  setAllowFreeText,
+  showDuration = true,
+}: {
+  question: string;
+  setQuestion: (v: string) => void;
+  options: OptionField[];
+  setOptions: (v: OptionField[]) => void;
+  duration: PollDurationPreset;
+  setDuration: (v: PollDurationPreset) => void;
+  allowMultiple: boolean;
+  setAllowMultiple: (v: boolean) => void;
+  allowFreeText: boolean;
+  setAllowFreeText: (v: boolean) => void;
+  showDuration?: boolean;
+}) {
   function addOption() {
-    if (options.length >= 8) return;
-    setOptions([...options, ""]);
+    if (options.length >= MAX_POLL_OPTIONS) return;
+    setOptions([...options, { label: "" }]);
   }
 
   function removeOption(index: number) {
@@ -78,8 +110,145 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
 
   function updateOption(index: number, value: string) {
     const next = [...options];
-    next[index] = value;
+    next[index] = { ...next[index], label: value };
     setOptions(next);
+  }
+
+  return (
+    <>
+      <div>
+        <label className="block font-barlow text-xs uppercase text-gray-400 mb-1">
+          Frage
+        </label>
+        <input
+          type="text"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="z. B. Welcher Spieltag passt euch am besten?"
+          className="w-full rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white placeholder:text-gray-500 focus:border-hero-vibrant focus:outline-none"
+          maxLength={300}
+        />
+      </div>
+
+      <div>
+        <label className="block font-barlow text-xs uppercase text-gray-400 mb-2">
+          Antwortmöglichkeiten (max. {MAX_POLL_OPTIONS})
+        </label>
+        <div className="space-y-2">
+          {options.map((opt, i) => (
+            <div key={opt.id ?? `new-${i}`} className="flex gap-2">
+              <input
+                type="text"
+                value={opt.label}
+                onChange={(e) => updateOption(i, e.target.value)}
+                placeholder={`Option ${i + 1}`}
+                className="flex-1 rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white placeholder:text-gray-500 focus:border-hero-vibrant focus:outline-none"
+                maxLength={120}
+              />
+              {options.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => removeOption(i)}
+                  className="rounded border border-hero-border p-2 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
+                  aria-label="Option entfernen"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {options.length < MAX_POLL_OPTIONS && (
+          <button
+            type="button"
+            onClick={addOption}
+            className="mt-2 inline-flex items-center gap-1 font-libre text-sm text-hero-vibrant hover:text-white transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            Option hinzufügen
+          </button>
+        )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center gap-3 rounded border border-hero-border/50 bg-background-dark px-4 py-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowMultiple}
+            onChange={(e) => setAllowMultiple(e.target.checked)}
+            className="accent-hero-vibrant"
+          />
+          <span className="font-libre text-sm text-gray-200">
+            Mehrfachauswahl erlauben
+          </span>
+        </label>
+        <label className="flex items-center gap-3 rounded border border-hero-border/50 bg-background-dark px-4 py-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowFreeText}
+            onChange={(e) => setAllowFreeText(e.target.checked)}
+            className="accent-hero-vibrant"
+          />
+          <span className="font-libre text-sm text-gray-200">
+            Freitextfeld für eigene Antworten
+          </span>
+        </label>
+      </div>
+
+      {showDuration && (
+        <div>
+          <label className="block font-barlow text-xs uppercase text-gray-400 mb-1">
+            Laufzeit
+          </label>
+          <select
+            value={duration}
+            onChange={(e) => setDuration(e.target.value as PollDurationPreset)}
+            className="w-full rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white focus:border-hero-vibrant focus:outline-none"
+          >
+            {DURATION_OPTIONS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function CampaignPollsManagement({ campaignId, polls }: Props) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingPollId, setEditingPollId] = useState<string | null>(null);
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState<OptionField[]>([{ label: "" }, { label: "" }]);
+  const [duration, setDuration] = useState<PollDurationPreset>("48h");
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [allowFreeText, setAllowFreeText] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [actionPollId, setActionPollId] = useState<string | null>(null);
+
+  function resetForm() {
+    setQuestion("");
+    setOptions([{ label: "" }, { label: "" }]);
+    setDuration("48h");
+    setAllowMultiple(false);
+    setAllowFreeText(false);
+    setShowForm(false);
+    setEditingPollId(null);
+  }
+
+  function startEdit(poll: CampaignPoll) {
+    setEditingPollId(poll.id);
+    setQuestion(poll.question);
+    setOptions(pollToOptionFields(poll));
+    setAllowMultiple(poll.allowMultiple);
+    setAllowFreeText(poll.allowFreeText);
+    setShowForm(false);
+  }
+
+  function toOptionInputs(fields: OptionField[]): PollOptionInput[] {
+    return fields.map((f) => ({ id: f.id, label: f.label }));
   }
 
   function handleCreate(publishImmediately: boolean) {
@@ -87,23 +256,43 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
       const result = await createCampaignPoll(
         campaignId,
         question,
-        options,
+        options.map((o) => o.label),
         duration,
-        publishImmediately
+        publishImmediately,
+        allowMultiple,
+        allowFreeText,
       );
       if (result.success) {
         toast.success(
           publishImmediately
             ? "Umfrage veröffentlicht! Spieler sehen sie im Dashboard."
-            : "Umfrage als Entwurf gespeichert."
+            : "Umfrage als Entwurf gespeichert.",
         );
-        setQuestion("");
-        setOptions(["", ""]);
-        setDuration("48h");
-        setShowForm(false);
+        resetForm();
         window.location.reload();
       } else {
         toast.error(result.error ?? "Fehler beim Erstellen.");
+      }
+    });
+  }
+
+  function handleUpdate(pollId: string, extendDuration: boolean) {
+    startTransition(async () => {
+      const result = await updateCampaignPoll(
+        pollId,
+        campaignId,
+        question,
+        toOptionInputs(options),
+        allowMultiple,
+        allowFreeText,
+        extendDuration ? duration : undefined,
+      );
+      if (result.success) {
+        toast.success("Umfrage gespeichert.");
+        resetForm();
+        window.location.reload();
+      } else {
+        toast.error(result.error ?? "Speichern fehlgeschlagen.");
       }
     });
   }
@@ -136,6 +325,10 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
     });
   }
 
+  const editingPoll = editingPollId
+    ? polls.find((p) => p.id === editingPollId)
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -145,11 +338,12 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
             Kampagnen-Umfragen
           </h2>
           <p className="font-libre text-sm text-gray-400 mt-2">
-            Erstelle Umfragen für deine Spieler. Jede Abstimmung bringt{" "}
+            Erstelle Umfragen für deine Spieler. Jede Teilnahme bringt{" "}
             <span className="text-accent-gold font-semibold">{POLL_VOTE_POINTS} Punkte</span>.
+            Ergebnisse siehst du live während der Laufzeit.
           </p>
         </div>
-        {!showForm && (
+        {!showForm && !editingPollId && (
           <button
             type="button"
             onClick={() => setShowForm(true)}
@@ -167,76 +361,18 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
             Umfrage erstellen
           </h3>
 
-          <div>
-            <label className="block font-barlow text-xs uppercase text-gray-400 mb-1">
-              Frage
-            </label>
-            <input
-              type="text"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="z. B. Welcher Spieltag passt euch am besten?"
-              className="w-full rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white placeholder:text-gray-500 focus:border-hero-vibrant focus:outline-none"
-              maxLength={300}
-            />
-          </div>
-
-          <div>
-            <label className="block font-barlow text-xs uppercase text-gray-400 mb-2">
-              Antwortmöglichkeiten
-            </label>
-            <div className="space-y-2">
-              {options.map((opt, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={opt}
-                    onChange={(e) => updateOption(i, e.target.value)}
-                    placeholder={`Option ${i + 1}`}
-                    className="flex-1 rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white placeholder:text-gray-500 focus:border-hero-vibrant focus:outline-none"
-                    maxLength={120}
-                  />
-                  {options.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={() => removeOption(i)}
-                      className="rounded border border-hero-border p-2 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
-                      aria-label="Option entfernen"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {options.length < 8 && (
-              <button
-                type="button"
-                onClick={addOption}
-                className="mt-2 inline-flex items-center gap-1 font-libre text-sm text-hero-vibrant hover:text-white transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-                Option hinzufügen
-              </button>
-            )}
-          </div>
-
-          <div>
-            <label className="block font-barlow text-xs uppercase text-gray-400 mb-1">
-              Laufzeit
-            </label>
-            <select
-              value={duration}
-              onChange={(e) => setDuration(e.target.value as PollDurationPreset)}
-              className="w-full rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white focus:border-hero-vibrant focus:outline-none"
-            >
-              {DURATION_OPTIONS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <PollFormFields
+            question={question}
+            setQuestion={setQuestion}
+            options={options}
+            setOptions={setOptions}
+            duration={duration}
+            setDuration={setDuration}
+            allowMultiple={allowMultiple}
+            setAllowMultiple={setAllowMultiple}
+            allowFreeText={allowFreeText}
+            setAllowFreeText={setAllowFreeText}
+          />
 
           <div className="flex flex-wrap gap-3 pt-2">
             <button
@@ -262,7 +398,7 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               className="font-libre text-sm text-gray-400 hover:text-white transition-colors"
             >
               Abbrechen
@@ -271,7 +407,77 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
         </div>
       )}
 
-      {polls.length === 0 && !showForm && (
+      {editingPoll && (
+        <div className="rounded-lg border border-amber-500/40 bg-background-card p-6 space-y-5">
+          <h3 className="font-barlow font-bold text-lg text-amber-400 uppercase flex items-center gap-2">
+            <Pencil className="h-4 w-4" />
+            Umfrage bearbeiten
+          </h3>
+
+          <PollFormFields
+            question={question}
+            setQuestion={setQuestion}
+            options={options}
+            setOptions={setOptions}
+            duration={duration}
+            setDuration={setDuration}
+            allowMultiple={allowMultiple}
+            setAllowMultiple={setAllowMultiple}
+            allowFreeText={allowFreeText}
+            setAllowFreeText={setAllowFreeText}
+            showDuration={editingPoll.status === "draft"}
+          />
+
+          {editingPoll.status === "published" && editingPoll.isOpen && (
+            <div>
+              <label className="block font-barlow text-xs uppercase text-gray-400 mb-1">
+                Laufzeit verlängern (ab jetzt)
+              </label>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(e.target.value as PollDurationPreset)}
+                className="w-full rounded border border-hero-border bg-background-dark px-4 py-2 font-libre text-white focus:border-hero-vibrant focus:outline-none"
+              >
+                {DURATION_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() =>
+                handleUpdate(
+                  editingPoll.id,
+                  editingPoll.status === "published" && !!editingPoll.isOpen,
+                )
+              }
+              className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50 transition-colors"
+            >
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Pencil className="h-4 w-4" />
+              )}
+              Speichern
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="font-libre text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {polls.length === 0 && !showForm && !editingPollId && (
         <div className="rounded-lg border border-hero-dark bg-background-card p-8 text-center">
           <BarChart3 className="h-10 w-10 text-gray-600 mx-auto mb-3" />
           <p className="font-libre text-gray-400">
@@ -284,6 +490,7 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
         {polls.map((poll) => {
           const total = poll.totalVotes ?? 0;
           const busy = isPending && actionPollId === poll.id;
+          const canEdit = poll.status !== "closed" && editingPollId !== poll.id;
 
           return (
             <div
@@ -304,18 +511,48 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
                     </span>
                     <span className="flex items-center gap-1 text-xs text-accent-gold font-libre">
                       <Coins className="h-3 w-3" />
-                      {poll.pointsPerVote} Pkt./Stimme
+                      {poll.pointsPerVote} Pkt./Teilnahme
                     </span>
+                    {poll.allowMultiple && (
+                      <span className="text-xs text-gray-500 font-libre">
+                        Mehrfachauswahl
+                      </span>
+                    )}
+                    {poll.allowFreeText && (
+                      <span className="text-xs text-gray-500 font-libre flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        Freitext
+                      </span>
+                    )}
                   </div>
                   <p className="font-barlow font-bold text-lg text-white">
                     {poll.question}
                   </p>
-                  <p className="font-libre text-sm text-gray-500">
-                    {total} {total === 1 ? "Stimme" : "Stimmen"}
+                  <p className="font-libre text-sm text-gray-500 flex flex-wrap gap-3">
+                    <span>
+                      {total} {total === 1 ? "Stimme" : "Stimmen"}
+                    </span>
+                    {(poll.participantCount ?? 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {poll.participantCount} Teilnehmer
+                      </span>
+                    )}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 shrink-0">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      disabled={busy || !!editingPollId}
+                      onClick={() => startEdit(poll)}
+                      className="inline-flex items-center gap-1 rounded border border-hero-border px-3 py-1.5 font-barlow font-bold uppercase text-xs text-gray-200 hover:bg-hero-dark disabled:opacity-50"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Bearbeiten
+                    </button>
+                  )}
                   {poll.status === "draft" && (
                     <button
                       type="button"
@@ -372,6 +609,13 @@ export function CampaignPollsManagement({ campaignId, polls }: Props) {
                     );
                   })}
                 </div>
+              )}
+
+              {poll.allowFreeText && (poll.textResponses?.length ?? 0) > 0 && (
+                <PollTextResponsesList
+                  responses={poll.textResponses ?? []}
+                  title="Freitext-Antworten"
+                />
               )}
             </div>
           );
