@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Plus,
   User,
+  BarChart3,
   Link2,
 } from "lucide-react";
 import { togglePublishStatus } from "@/src/app/dashboard/campaigns/[id]/campaign-settings-actions";
@@ -109,6 +110,13 @@ export function GmCampaignDashboard({
             >
               <Award className="h-4 w-4 shrink-0 text-accent-gold" />
               Achievement vergeben
+            </Link>
+            <Link
+              href={`${base}?tab=polls`}
+              className="flex items-center gap-3 rounded border border-hero-border/40 bg-background-dark px-4 py-3 font-barlow font-bold uppercase text-xs text-gray-200 hover:border-hero-vibrant hover:text-white transition-colors"
+            >
+              <BarChart3 className="h-4 w-4 shrink-0 text-accent-gold" />
+              Umfrage starten
             </Link>
             <Link
               href={`${base}/schedule`}

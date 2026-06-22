@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getPointsLog } from "@/src/lib/queries/point-queries";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
 import {
@@ -326,6 +327,19 @@ export async function adjustMemberPoints(
 
   console.log("[adjustMemberPoints] ✓ Punkte atomar aktualisiert für User:", targetUserId, "Betrag:", amount, "Neuer Stand:", result.newTotal);
 
+  const pointsRef = `points:${campaignId}:${targetUserId}:${Date.now()}`;
+  after(async () => {
+    const { notifyPointsReceivedEmail } = await import("@/src/lib/email/dispatch");
+    await notifyPointsReceivedEmail({
+      supabase: admin,
+      userId: targetUserId,
+      campaignId,
+      amount,
+      reason: reason.trim(),
+      referenceKey: pointsRef,
+    });
+  });
+
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/dashboard");
   return { success: true, newTotal: result.newTotal ?? undefined };
@@ -411,6 +425,7 @@ export async function distributeGroupPoints(
 
   const users = (usersData as any[]) || [];
   const admin = createAdminClient();
+  const groupRef = `group-points:${campaignId}:${Date.now()}`;
 
   for (const userData of users) {
     const userId = userData.id;
@@ -429,6 +444,17 @@ export async function distributeGroupPoints(
     }
 
     successCount++;
+    after(async () => {
+      const { notifyPointsReceivedEmail } = await import("@/src/lib/email/dispatch");
+      await notifyPointsReceivedEmail({
+        supabase: admin,
+        userId,
+        campaignId,
+        amount,
+        reason: reason.trim(),
+        referenceKey: `${groupRef}:${userId}`,
+      });
+    });
   }
 
   console.log("[distributeGroupPoints] Abgeschlossen:", successCount, "erfolgreich,", failedUsers.length, "fehlgeschlagen");

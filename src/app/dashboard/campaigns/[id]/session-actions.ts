@@ -3,6 +3,7 @@
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { canEditSessionSchedule, isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
 import { isMissedScheduledSession } from "@/src/lib/session-focus";
@@ -226,7 +227,7 @@ export async function startSession(sessionId: string) {
 
   // 2. Load Session with Campaign
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, gm_prep_complete")
+    .select("id, campaign_id, status, gm_prep_complete, title")
     .eq("id", sessionId)
     .single();
 
@@ -236,6 +237,7 @@ export async function startSession(sessionId: string) {
     campaign_id: string;
     status: string;
     gm_prep_complete?: boolean | null;
+    title?: string | null;
   } | null;
 
   if (sessionError || !session) {
@@ -324,6 +326,17 @@ export async function startSession(sessionId: string) {
 
   // Kein revalidatePath hier: vermeidet RSC-/Digest-Fehler beim sofortigen
   // router.push auf /session/...; die Zielseite lädt frisch, die Kampagne beim nächsten Besuch.
+
+  after(async () => {
+    const admin = createAdminClient();
+    const { notifySessionLiveEmails } = await import("@/src/lib/email/dispatch");
+    await notifySessionLiveEmails({
+      supabase: admin,
+      sessionId,
+      campaignId: session.campaign_id,
+      sessionTitle: session.title?.trim() || "Live-Session",
+    });
+  });
 
   return { success: true };
 }

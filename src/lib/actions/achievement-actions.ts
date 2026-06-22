@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import {
   getAchievementImageForName,
   ACHIEVEMENT_IMAGE_FILENAMES,
@@ -149,6 +150,18 @@ export async function awardAchievement(
 
     console.log("[awardAchievement] ✓ Punkte atomar erhöht:", userId, "Betrag:", points, "Neuer Stand:", result.newTotal);
   }
+
+  after(async () => {
+    const admin = createAdminClient();
+    const { notifyAchievementEmail } = await import("@/src/lib/email/dispatch");
+    await notifyAchievementEmail({
+      supabase: admin,
+      userId,
+      achievementId: String(achievement.id),
+      achievementName: String(achievement.name),
+      pointsAwarded: skipPointsAndLog ? 0 : Number(achievement.points_awarded) || 0,
+    });
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/achievements");

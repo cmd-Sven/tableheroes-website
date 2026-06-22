@@ -41,6 +41,8 @@ import { MyCharacterSection } from "@/src/components/dashboard/player/MyCharacte
 import { CampaignSessionLandingVisibility } from "./CampaignSessionLandingVisibility";
 import type { CampaignDetailPageData } from "./campaign-detail-load";
 import { sessionRequiresCharacter } from "@/src/lib/session-type";
+import { CampaignPollsManagement } from "@/src/components/campaigns/CampaignPollsManagement";
+import { CampaignPollsCard } from "@/src/components/dashboard/CampaignPollsCard";
 
 export function CampaignDetailPageContent({
   campaignId,
@@ -104,6 +106,8 @@ export function CampaignDetailPageContent({
     lastPlayerAchievement,
     foundryProgressionLocked,
     foundryProgressionLockMessage,
+    gmCampaignPolls,
+    playerActivePolls,
   } = data;
 
   /** Nach serializeForClient kann `now` ISO-String statt Date sein */
@@ -528,6 +532,17 @@ export function CampaignDetailPageContent({
     </div>
   );
 
+  const PollsTab = isGM ? (
+    <CampaignPollsManagement campaignId={id} polls={gmCampaignPolls ?? []} />
+  ) : hasAccess ? (
+    <div className="rounded-lg border border-hero-dark bg-background-card p-6">
+      <h2 className="font-barlow font-bold text-xl text-white uppercase mb-4 border-b border-hero-dark pb-2">
+        Aktive Umfragen
+      </h2>
+      <CampaignPollsCard polls={playerActivePolls ?? []} />
+    </div>
+  ) : null;
+
   const GEOGRAPHIC_TYPES = [
     "Stadt",
     "Region",
@@ -941,6 +956,7 @@ export function CampaignDetailPageContent({
       )}
       {tab === "quests" && QuestTab}
       {tab === "members" && isGM && MembersTab}
+      {tab === "polls" && PollsTab}
       {tab === "character" && userHasCharacter && myCharacterForClient && (
         <MyCharacterSection
           campaignId={id}

@@ -13,6 +13,7 @@ import {
   Smile,
   Calendar,
   Heart,
+  BarChart3,
 } from "lucide-react";
 import { markWidgetAsRead } from "@/src/lib/actions/user-actions";
 import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
@@ -41,6 +42,8 @@ import type { PlayerMessage } from "@/src/lib/actions/message-actions";
 import type { DashboardLoreEntry, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
 import type { PointLogEntry } from "@/src/lib/types/point-log";
+import type { CampaignPoll } from "@/src/lib/queries/poll-queries";
+import { CampaignPollsCard } from "@/src/components/dashboard/CampaignPollsCard";
 
 export type ProfileHeaderData = {
   username: string | null;
@@ -134,6 +137,8 @@ type Props = {
   openCampaignsParticipantIds?: string[];
   /** true = Tutor-Hilfe ausgeblendet */
   playerDashboardTutorialDismissed?: boolean;
+  /** Aktive Kampagnen-Umfragen */
+  activePolls?: CampaignPoll[];
 };
 
 export function DashboardClient({
@@ -164,6 +169,7 @@ export function DashboardClient({
   pendingCharacterCampaigns = [],
   openCampaignsParticipantIds = [],
   playerDashboardTutorialDismissed = false,
+  activePolls = [],
 }: Props) {
   const router = useRouter();
   const [showAchievementModal, setShowAchievementModal] = useState(false);
@@ -295,6 +301,13 @@ export function DashboardClient({
       title: "Daily Fun",
       icon: <Smile className="h-5 w-5" />,
       content: <DailyComicCard src={dailyComic.src} />,
+      colSpan: 1 as const,
+    },
+    {
+      id: "campaign-polls",
+      title: "Umfragen",
+      icon: <BarChart3 className="h-5 w-5" />,
+      content: <CampaignPollsCard polls={activePolls} />,
       colSpan: 1 as const,
     },
     {

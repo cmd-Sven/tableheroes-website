@@ -30,6 +30,10 @@ import type {
   DiscoveryItem,
   PartyMember,
 } from "@/src/app/dashboard/campaigns/[id]/player-dashboard/page";
+import {
+  getCampaignPollsForGm,
+  getActivePollsForCampaignPlayer,
+} from "@/src/lib/queries/poll-queries";
 
 export type CampaignDetailPageData = Awaited<
   ReturnType<typeof loadCampaignDetailPageData>
@@ -1152,6 +1156,13 @@ export async function loadCampaignDetailPageData(
       gmTermineSpielplan.nextSession.planningDummySlotCount;
   }
 
+  const [gmCampaignPolls, playerActivePolls] = await Promise.all([
+    isGM ? getCampaignPollsForGm(id) : Promise.resolve([]),
+    !isGM && hasAccess
+      ? getActivePollsForCampaignPlayer(id, userId)
+      : Promise.resolve([]),
+  ]);
+
   const pageData = {
     campaign,
     world,
@@ -1203,6 +1214,8 @@ export async function loadCampaignDetailPageData(
     lastPlayerAchievement,
     foundryProgressionLocked,
     foundryProgressionLockMessage,
+    gmCampaignPolls,
+    playerActivePolls,
   };
 
   /** Ein Durchlauf: alle Supabase-/DB-Typen (BigInt, …) für RSC → Client-Komponenten sicher */

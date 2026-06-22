@@ -38,6 +38,7 @@ import {
   Hammer,
   Coins,
   Store,
+  BarChart3,
   PawPrint,
 } from "lucide-react";
 import Image from "next/image";
@@ -390,6 +391,12 @@ export function Sidebar({
           label: "Quests",
           icon: ScrollText,
           tab: "quests",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}?tab=polls`,
+          label: "Umfragen",
+          icon: BarChart3,
+          tab: "polls",
         },
         ...(role === "GameMaster" || role === "Admin"
           ? [

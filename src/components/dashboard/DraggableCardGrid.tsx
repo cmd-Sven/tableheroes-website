@@ -18,6 +18,7 @@ import {
 
 export const DEFAULT_CARD_ORDER = [
   "upcoming-sessions",
+  "campaign-polls",
   "points",
   "achievements",
   "my-campaigns",

@@ -7,6 +7,7 @@ import {
   notifyCampaignEntityRevealed,
 } from "@/src/lib/integrations/discord/notify";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { VisibilityEntityType } from "./campaign-visibility-queries";
 
 export type { VisibilityEntityType } from "./campaign-visibility-queries";
@@ -85,6 +86,18 @@ export async function setCampaignVisibility(
   if (isRevealed && !wasRevealed) {
     dispatchDiscordNotify(async () => {
       await notifyCampaignEntityRevealed(campaignId, entityType, entityId);
+    });
+    after(async () => {
+      const admin = createAdminClient();
+      const { notifyCampaignEntityRevealedEmails } = await import(
+        "@/src/lib/email/dispatch"
+      );
+      await notifyCampaignEntityRevealedEmails({
+        supabase: admin,
+        campaignId,
+        entityType,
+        entityId,
+      });
     });
   }
 

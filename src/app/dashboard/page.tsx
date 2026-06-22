@@ -6,6 +6,7 @@ import {
   getDailyComic,
   getPendingCharacterCampaignsForUser,
 } from "@/src/lib/queries/dashboard-widgets-queries";
+import { getActivePollsForPlayer } from "@/src/lib/queries/poll-queries";
 import { mergeUpcomingAppointments } from "@/src/lib/queries/community-events-queries";
 import { getNewsForDashboard } from "@/src/lib/queries/news-queries";
 import {
@@ -142,6 +143,7 @@ export default async function DashboardPage() {
           sessionRsvpHref={playerData.sessionRsvpHref}
           pendingCharacterCampaigns={playerData.pendingCharacterCampaigns}
           openCampaignsParticipantIds={playerData.openCampaignsParticipantIds}
+          activePolls={playerData.activePolls}
           playerDashboardTutorialDismissed={
             !!profile?.player_dashboard_tutorial_dismissed
           }
@@ -328,6 +330,7 @@ async function loadPlayerDashboardData(userId: string) {
     pointsHistory,
     unreadInboxMessages,
     pendingCharacterCampaigns,
+    activePolls,
   ] = await Promise.all([
     getRandomLoreEntry(userId),
     getDailyComic(),
@@ -337,6 +340,7 @@ async function loadPlayerDashboardData(userId: string) {
     getPointsLog(userId, 5),
     getUnreadInboxMessages(userId),
     getPendingCharacterCampaignsForUser(userId),
+    getActivePollsForPlayer(userId),
   ]);
 
   const noRsvpCampaignIds = new Set(
@@ -395,6 +399,7 @@ async function loadPlayerDashboardData(userId: string) {
     ),
     sessionRsvpHref,
     pendingCharacterCampaigns,
+    activePolls,
   };
 }
 
