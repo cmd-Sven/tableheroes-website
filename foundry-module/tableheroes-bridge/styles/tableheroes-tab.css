@@ -1,3 +1,11 @@
+.tab.tableheroes-tab:not(.active) {
+  display: none;
+}
+
+nav.tabs [data-tab="tableheroes"] label {
+  pointer-events: none;
+}
+
 .tableheroes-sheet-tab {
   display: flex;
   flex-direction: column;

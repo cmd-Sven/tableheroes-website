@@ -8,6 +8,7 @@ import {
   Settings,
   Store,
   User,
+  Link2,
 } from "lucide-react";
 import { GmCampaignDashboard } from "@/src/components/campaigns/GmCampaignDashboard";
 import {
@@ -28,6 +29,8 @@ import { CampaignDescriptionEditor } from "@/src/components/campaigns/CampaignDe
 import { CampaignScheduleForm } from "@/src/components/dashboard/campaigns/CampaignScheduleForm";
 import { CampaignDiscordSettings } from "@/src/components/dashboard/campaigns/CampaignDiscordSettings";
 import type { CampaignDiscordSettings as CampaignDiscordSettingsData } from "@/src/app/dashboard/campaigns/[id]/campaign-discord-actions";
+import type { CampaignFoundrySyncSettings as CampaignFoundrySyncSettingsData } from "@/src/app/dashboard/campaigns/[id]/foundry-sync-actions";
+import { CampaignFoundrySyncSettings } from "@/src/components/dashboard/campaigns/CampaignFoundrySyncSettings";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 import { OnboardingSettings } from "@/src/components/dashboard/campaigns/OnboardingSettings";
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
@@ -49,11 +52,13 @@ export function CampaignDetailPageContent({
   tab,
   data,
   discordSettings,
+  foundrySyncSettings,
 }: {
   campaignId: string;
   tab: string;
   data: CampaignDetailPageData;
   discordSettings: CampaignDiscordSettingsData | null;
+  foundrySyncSettings: CampaignFoundrySyncSettingsData | null;
 }) {
   const id = campaignId;
   const {
@@ -371,6 +376,13 @@ export function CampaignDetailPageContent({
             >
               <Settings className="inline h-4 w-4 mr-2" />
               Einstellungen
+            </Link>
+            <Link
+              href={`/dashboard/campaigns/${id}?tab=settings#foundry-sync`}
+              className="mt-2 flex w-full items-center rounded border border-hero-border/30 bg-background-dark px-4 py-2.5 font-barlow font-bold uppercase text-sm text-gray-300 hover:border-hero-vibrant hover:text-white transition-colors"
+            >
+              <Link2 className="inline h-4 w-4 mr-2" />
+              Foundry Sync
             </Link>
             <Link
               href={`/dashboard/campaigns/${id}/shops`}
@@ -710,6 +722,13 @@ export function CampaignDetailPageContent({
 
           {discordSettings ? (
             <CampaignDiscordSettings campaignId={id} initial={discordSettings} />
+          ) : null}
+
+          {foundrySyncSettings ? (
+            <CampaignFoundrySyncSettings
+              campaignId={id}
+              initial={foundrySyncSettings}
+            />
           ) : null}
         </div>
         <div className="space-y-6">

@@ -31,10 +31,25 @@ Hooks.once("init", () => {
   });
 });
 
-function onRenderActorSheet(sheet, _html, _data) {
+function onRenderActorSheet(sheet, html) {
   if (sheet.actor?.type !== "character") return;
-  void injectTableHeroesTab(sheet);
+  void injectTableHeroesTab(sheet, html);
 }
 
+function onRenderApplicationV2(app, element) {
+  if (app.actor?.type !== "character") return;
+  const name = app.constructor?.name ?? "";
+  if (!name.includes("Character")) return;
+  void injectTableHeroesTab(app, element);
+}
+
+// Legacy ApplicationV1 / ältere dnd5e-Blätter
 Hooks.on("renderActorSheet5e", onRenderActorSheet);
 Hooks.on("renderActorSheet", onRenderActorSheet);
+
+// dnd5e 3.x/4.x „Character Sheet 2“
+Hooks.on("renderActorSheet5eCharacter2", onRenderActorSheet);
+
+// dnd5e 5.0+ ApplicationV2 (Foundry v13)
+Hooks.on("renderActorSheet5eCharacter", onRenderActorSheet);
+Hooks.on("renderApplicationV2", onRenderApplicationV2);

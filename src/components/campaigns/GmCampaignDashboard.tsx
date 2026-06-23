@@ -119,6 +119,13 @@ export function GmCampaignDashboard({
               Umfrage starten
             </Link>
             <Link
+              href={`${base}?tab=settings#foundry-sync`}
+              className="flex items-center gap-3 rounded border border-hero-border/40 bg-background-dark px-4 py-3 font-barlow font-bold uppercase text-xs text-gray-200 hover:border-hero-vibrant hover:text-white transition-colors"
+            >
+              <Link2 className="h-4 w-4 shrink-0 text-accent-gold" />
+              Foundry Sync
+            </Link>
+            <Link
               href={`${base}/schedule`}
               className="flex items-center gap-3 rounded border border-hero-border/40 bg-background-dark px-4 py-3 font-barlow font-bold uppercase text-xs text-gray-200 hover:border-hero-vibrant hover:text-white transition-colors"
             >

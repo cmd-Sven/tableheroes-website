@@ -130,9 +130,14 @@ Query (optional) für Profile:
 
 ## Voraussetzungen
 
-- Foundry **v12+**, System **DnD5e 3.2+**
+- Foundry **v12+** (empfohlen **v13**), System **DnD5e 3.2+** (empfohlen **5.0+** mit neuem Charakterblatt)
 - Table-Heroes-Kampagne mit Foundry Sync API-Key
 - `foundry_character_mapping` (Actor-ID ↔ TH-Charakter), wie beim XP-Sync
+
+### Foundry v13 + D&D 5e 5.0 (neues Charakterblatt)
+
+Ab **dnd5e 5.0** nutzt das offizielle Charakterblatt **ApplicationV2** (vertikale Tabs, anderes HTML).
+Version **0.3.0+** des Moduls unterstützt beide Blatt-Typen (alt + neu).
 
 ## Roadmap
 

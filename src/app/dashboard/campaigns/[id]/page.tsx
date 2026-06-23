@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { getCampaignDiscordSettings } from "./campaign-discord-actions";
+import { getCampaignFoundrySyncSettings } from "./foundry-sync-actions";
 import { loadCampaignDetailPageData } from "./campaign-detail-load";
 import { CampaignDetailPageContent } from "./CampaignDetailPageContent";
 
@@ -43,12 +44,17 @@ export default async function CampaignDetailPage({
       }
     : null;
 
+  const foundrySyncSettings = data.isGM
+    ? await getCampaignFoundrySyncSettings(id)
+    : null;
+
   return (
     <CampaignDetailPageContent
       campaignId={id}
       tab={tab}
       data={data}
       discordSettings={discordSettings}
+      foundrySyncSettings={foundrySyncSettings}
     />
   );
 }
