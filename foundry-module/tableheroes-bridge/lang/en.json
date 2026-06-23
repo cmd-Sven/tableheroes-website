@@ -1,0 +1,54 @@
+{
+  "TABLEHEROES": {
+    "ModuleName": "Table Heroes",
+    "Settings": {
+      "ApiBaseUrl": {
+        "Name": "Table Heroes API URL",
+        "Hint": "Base URL without trailing slash, e.g. https://table-heroes.de"
+      },
+      "ApiKey": {
+        "Name": "Campaign API Key",
+        "Hint": "From Table Heroes campaign settings (Foundry Sync)."
+      },
+      "RefreshMinutes": {
+        "Name": "Refresh interval (minutes)",
+        "Hint": "How often to reload points in the background."
+      }
+    },
+    "Tab": {
+      "Label": "Table Heroes",
+      "Title": "Table Heroes — Meta Progress",
+      "Unmapped": "This Foundry actor is not linked to a Table Heroes character yet.",
+      "PointsTotal": "Balance",
+      "PointsLifetime": "Lifetime",
+      "Rank": "Rank",
+      "Level": "TH Level",
+      "NextLevel": "Next level at",
+      "Achievements": "Achievements",
+      "RecentPoints": "Recent entries",
+      "OpenDashboard": "Open points catalog",
+      "Refresh": "Refresh",
+      "Refreshed": "Table Heroes data updated.",
+      "Loading": "Loading Table Heroes data…",
+      "Error": "Could not load data.",
+      "HeaderBadge": "TH {points} pts",
+      "Portrait": "Portrait",
+      "Wealth": "Wealth",
+      "WealthTh": "Table Heroes",
+      "WealthFoundry": "Foundry",
+      "NoPortrait": "No image",
+      "SyncWealthToTh": "Gold → TH",
+      "SyncWealthToThHint": "Push Foundry wealth to Table Heroes",
+      "SyncWealthToThDone": "Wealth synced to Table Heroes.",
+      "SyncWealthToFoundry": "Gold → Foundry",
+      "SyncWealthToFoundryHint": "Push Table Heroes wealth to Foundry",
+      "SyncWealthToFoundryDone": "Wealth synced to Foundry.",
+      "SyncPortraitToTh": "Portrait → TH",
+      "SyncPortraitToThDone": "Portrait synced to Table Heroes.",
+      "SyncPortraitToFoundry": "Portrait → Foundry",
+      "SyncPortraitToFoundryDone": "Portrait synced to Foundry.",
+      "SyncXp": "XP → TH",
+      "SyncXpDone": "XP synced to Table Heroes."
+    }
+  }
+}

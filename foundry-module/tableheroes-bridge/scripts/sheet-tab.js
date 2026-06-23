@@ -6,6 +6,7 @@ import {
   syncActorWealth,
   syncActorXp,
 } from "./api.js";
+import { thFormat, thLocalize } from "./i18n.js";
 import {
   activateTab,
   getSheetRoot,
@@ -43,7 +44,7 @@ function escapeHtml(value) {
 }
 
 function renderWealthHtml(wealth, foundryCurrency) {
-  const L = game.i18n.localize;
+  const L = thLocalize;
   const rows = [
     { key: "pp", label: "PM" },
     { key: "gp", label: "GM" },
@@ -98,7 +99,7 @@ function renderWealthHtml(wealth, foundryCurrency) {
 }
 
 function renderPortraitHtml(player, actor) {
-  const L = game.i18n.localize;
+  const L = thLocalize;
   const thUrl = player?.portrait?.url ?? null;
   const foundryUrl = actor?.img ?? null;
 
@@ -134,7 +135,7 @@ function renderPortraitHtml(player, actor) {
 }
 
 function renderActionsHtml(campaign, { compact = false } = {}) {
-  const L = game.i18n.localize;
+  const L = thLocalize;
   return `<div class="tableheroes-actions">
       <button type="button" class="tableheroes-refresh">
         <i class="fas fa-sync"></i> ${escapeHtml(L("TABLEHEROES.Tab.Refresh"))}
@@ -154,7 +155,7 @@ function renderActionsHtml(campaign, { compact = false } = {}) {
  * @param {object | null} payload
  */
 function renderTabHtml(actor, payload) {
-  const L = game.i18n.localize;
+  const L = thLocalize;
   const player = payload?.player;
   const campaign = payload?.campaign;
   const foundryCurrency = readFoundryCurrency(actor);
@@ -286,7 +287,7 @@ function updateHeaderBadge(sheet, payload, root) {
 
   const badge = document.createElement("span");
   badge.className = "tableheroes-header-badge";
-  badge.textContent = game.i18n.format("TABLEHEROES.Tab.HeaderBadge", {
+  badge.textContent = thFormat("TABLEHEROES.Tab.HeaderBadge", {
     points: formatNumber(points),
   });
   title.appendChild(badge);
@@ -300,7 +301,7 @@ async function loadTabContent(sheet, actor, panel, root) {
     bindTabEvents(sheet, actor, root);
   } catch (error) {
     panel.innerHTML = `<div class="tableheroes-sheet-tab tableheroes-error">
-      <p>${escapeHtml(error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"))}</p>
+      <p>${escapeHtml(error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"))}</p>
       ${renderActionsHtml(null, { compact: true })}
     </div>`;
     bindTabEvents(sheet, actor, root);
@@ -314,19 +315,20 @@ async function loadTabContent(sheet, actor, panel, root) {
 export async function injectTableHeroesTab(sheet, html = null) {
   if (sheet.actor?.type !== "character") return;
 
-  const root = getSheetRoot(sheet, html);
-  if (!root) return;
+  try {
+    const root = getSheetRoot(sheet, html);
+    if (!root) return;
 
-  const { nav, body, tabGroup } = resolveTabContainers(root);
-  if (!nav || !body) {
-    console.warn("[tableheroes-bridge] Tab-Navigation nicht gefunden — neues D&D-Blatt?");
-    return;
-  }
-  if (nav.querySelector(`[data-tab="${TAB_NAME}"]`) || body.querySelector(`[data-tab="${TAB_NAME}"]`)) {
-    return;
-  }
+    const { nav, body, tabGroup } = resolveTabContainers(root);
+    if (!nav || !body) {
+      console.warn("[tableheroes-bridge] Tab-Navigation nicht gefunden — neues D&D-Blatt?");
+      return;
+    }
+    if (nav.querySelector(`[data-tab="${TAB_NAME}"]`) || body.querySelector(`[data-tab="${TAB_NAME}"]`)) {
+      return;
+    }
 
-  const label = game.i18n.localize("TABLEHEROES.Tab.Label");
+    const label = thLocalize("TABLEHEROES.Tab.Label");
   const tabButton = document.createElement("a");
   tabButton.className = isApplicationV2Sheet(sheet) ? "item control" : "item";
   tabButton.dataset.tab = TAB_NAME;
@@ -363,6 +365,9 @@ export async function injectTableHeroesTab(sheet, html = null) {
   });
 
   void refreshTab();
+  } catch (error) {
+    console.error("[tableheroes-bridge] Tab-Injection fehlgeschlagen:", error);
+  }
 }
 
 async function rerunTabRender(sheet, actor, root) {
@@ -382,10 +387,10 @@ function bindTabEvents(sheet, actor, root) {
   sheetRoot.querySelector(".tableheroes-refresh")?.addEventListener("click", async () => {
     try {
       await rerunTabRender(sheet, actor, sheetRoot);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.Refreshed"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.Refreshed"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });
@@ -393,10 +398,10 @@ function bindTabEvents(sheet, actor, root) {
   sheetRoot.querySelector(".tableheroes-sync-xp")?.addEventListener("click", async () => {
     try {
       await syncActorXp(actor);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncXpDone"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncXpDone"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });
@@ -405,10 +410,10 @@ function bindTabEvents(sheet, actor, root) {
     try {
       await syncActorWealth(actor, "foundry_to_th");
       await rerunTabRender(sheet, actor, sheetRoot);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncWealthToThDone"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncWealthToThDone"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });
@@ -417,10 +422,10 @@ function bindTabEvents(sheet, actor, root) {
     try {
       await syncActorWealth(actor, "th_to_foundry");
       await rerunTabRender(sheet, actor, sheetRoot);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncWealthToFoundryDone"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncWealthToFoundryDone"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });
@@ -429,10 +434,10 @@ function bindTabEvents(sheet, actor, root) {
     try {
       await syncActorPortrait(actor, "foundry_to_th");
       await rerunTabRender(sheet, actor, sheetRoot);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncPortraitToThDone"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncPortraitToThDone"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });
@@ -441,10 +446,10 @@ function bindTabEvents(sheet, actor, root) {
     try {
       await syncActorPortrait(actor, "th_to_foundry");
       await rerunTabRender(sheet, actor, sheetRoot);
-      ui.notifications?.info(game.i18n.localize("TABLEHEROES.Tab.SyncPortraitToFoundryDone"));
+      ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncPortraitToFoundryDone"));
     } catch (error) {
       ui.notifications?.error(
-        error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
+        error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
       );
     }
   });

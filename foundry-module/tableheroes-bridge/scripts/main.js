@@ -1,11 +1,12 @@
 import { injectTableHeroesTab } from "./sheet-tab.js";
+import { thLocalize } from "./i18n.js";
 
 const MODULE_ID = "tableheroes-bridge";
 
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "apiBaseUrl", {
-    name: game.i18n.localize("TABLEHEROES.Settings.ApiBaseUrl.Name"),
-    hint: game.i18n.localize("TABLEHEROES.Settings.ApiBaseUrl.Hint"),
+    name: thLocalize("TABLEHEROES.Settings.ApiBaseUrl.Name"),
+    hint: thLocalize("TABLEHEROES.Settings.ApiBaseUrl.Hint"),
     scope: "world",
     config: true,
     type: String,
@@ -13,8 +14,8 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, "apiKey", {
-    name: game.i18n.localize("TABLEHEROES.Settings.ApiKey.Name"),
-    hint: game.i18n.localize("TABLEHEROES.Settings.ApiKey.Hint"),
+    name: thLocalize("TABLEHEROES.Settings.ApiKey.Name"),
+    hint: thLocalize("TABLEHEROES.Settings.ApiKey.Hint"),
     scope: "world",
     config: true,
     type: String,
@@ -22,8 +23,8 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, "refreshMinutes", {
-    name: game.i18n.localize("TABLEHEROES.Settings.RefreshMinutes.Name"),
-    hint: game.i18n.localize("TABLEHEROES.Settings.RefreshMinutes.Hint"),
+    name: thLocalize("TABLEHEROES.Settings.RefreshMinutes.Name"),
+    hint: thLocalize("TABLEHEROES.Settings.RefreshMinutes.Hint"),
     scope: "world",
     config: true,
     type: Number,
