@@ -1,4 +1,4 @@
-/** Fallback strings when module translations are not loaded (e.g. Foundry UI language = en). */
+/** Fallback strings — always used if Foundry i18n is unavailable or broken. */
 const FALLBACKS = {
   "TABLEHEROES.Tab.Label": "Table Heroes",
   "TABLEHEROES.Tab.Unmapped":
@@ -44,24 +44,31 @@ const FALLBACKS = {
     "Wie oft Punkte im Hintergrund neu geladen werden.",
 };
 
+export const MODULE_VERSION = "0.3.3";
+
+/**
+ * Never trust game.i18n.has() — on some Foundry setups it returns true while localize() throws.
+ */
 export function thLocalize(key) {
+  const fallback = FALLBACKS[key] ?? key;
   try {
-    if (game?.i18n?.has?.(key)) return game.i18n.localize(key);
     const value = game?.i18n?.localize?.(key);
-    if (value && value !== key) return value;
+    if (typeof value === "string" && value.length > 0 && value !== key) return value;
   } catch (error) {
-    console.warn("[tableheroes-bridge] i18n lookup failed:", key, error);
+    console.warn("[tableheroes-bridge] i18n fallback for", key, error);
   }
-  return FALLBACKS[key] ?? key;
+  return fallback;
 }
 
 export function thFormat(key, data = {}) {
+  const fallback = FALLBACKS[key] ?? key;
   try {
-    if (game?.i18n?.format) return game.i18n.format(key, data);
+    const value = game?.i18n?.format?.(key, data);
+    if (typeof value === "string" && value.length > 0 && value !== key) return value;
   } catch {
     /* use fallback */
   }
-  let text = FALLBACKS[key] ?? key;
+  let text = fallback;
   for (const [name, value] of Object.entries(data)) {
     text = text.replaceAll(`{${name}}`, String(value));
   }

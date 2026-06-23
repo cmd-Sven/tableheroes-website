@@ -1,5 +1,5 @@
 import { injectTableHeroesTab } from "./sheet-tab.js";
-import { thLocalize } from "./i18n.js";
+import { MODULE_VERSION, thLocalize } from "./i18n.js";
 
 const MODULE_ID = "tableheroes-bridge";
 
