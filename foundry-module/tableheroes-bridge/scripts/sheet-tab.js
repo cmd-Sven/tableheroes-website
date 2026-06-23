@@ -9,6 +9,7 @@ import {
 import { thFormat, thLocalize } from "./i18n.js";
 import {
   activateTab,
+  findTabNavButton,
   findTabPanel,
   getSheetRoot,
   isApplicationV2Sheet,
@@ -339,54 +340,78 @@ export async function injectTableHeroesTab(sheet, html = null) {
 
     const { nav, body, tabGroup } = resolveTabContainers(root);
     if (!nav || !body) {
-      console.warn("[tableheroes-bridge] Tab-Navigation nicht gefunden — neues D&D-Blatt?");
       return;
     }
-    if (nav.querySelector(`[data-tab="${TAB_NAME}"]`) || findTabPanel(body, TAB_NAME)) {
+
+    const existingNav = findTabNavButton(nav, TAB_NAME);
+    const existingPanel = findTabPanel(body, TAB_NAME);
+
+    if (existingNav && existingPanel) {
+      sheet._tableheroesPanel = existingPanel;
+      void loadTabContent(sheet, sheet.actor, existingPanel, root);
       return;
     }
+
+    existingNav?.remove();
+    existingPanel?.remove();
 
     const label = thLocalize("TABLEHEROES.Tab.Label");
-  const tabButton = document.createElement("a");
-  tabButton.className = isApplicationV2Sheet(sheet) ? "item control" : "item";
-  tabButton.dataset.tab = TAB_NAME;
-  tabButton.dataset.group = tabGroup;
-  if (isApplicationV2Sheet(sheet)) {
-    tabButton.dataset.action = "tab";
-    tabButton.dataset.tooltip = label;
-    tabButton.setAttribute("aria-label", label);
-  }
-  if (isApplicationV2Sheet(sheet)) {
-    tabButton.innerHTML = `<i class="fas fa-crown"></i>`;
-  } else {
-    tabButton.innerHTML = `<i class="fas fa-crown"></i> ${escapeHtml(label)}`;
-  }
-  nav.appendChild(tabButton);
+    const tabButton = document.createElement("a");
+    tabButton.className = isApplicationV2Sheet(sheet) ? "item control" : "item";
+    tabButton.dataset.tab = TAB_NAME;
+    tabButton.dataset.group = tabGroup;
+    if (isApplicationV2Sheet(sheet)) {
+      tabButton.dataset.action = "tab";
+      tabButton.dataset.tooltip = label;
+      tabButton.setAttribute("aria-label", label);
+      tabButton.innerHTML = `<i class="fas fa-crown"></i>`;
+    } else {
+      tabButton.innerHTML = `<i class="fas fa-crown"></i> ${escapeHtml(label)}`;
+    }
+    nav.appendChild(tabButton);
 
-  const panel = document.createElement("div");
-  panel.className = "tab tableheroes-tab";
-  panel.dataset.tab = TAB_NAME;
-  panel.dataset.group = tabGroup;
-  panel.innerHTML = renderTabHtml(sheet.actor, null);
-  body.appendChild(panel);
-  sheet._tableheroesPanel = panel;
+    const panel = document.createElement("div");
+    panel.className = "tab tableheroes-tab";
+    panel.dataset.tab = TAB_NAME;
+    panel.dataset.group = tabGroup;
+    panel.innerHTML = renderTabHtml(sheet.actor, null);
+    body.appendChild(panel);
+    sheet._tableheroesPanel = panel;
 
-  const refreshTab = () => loadTabContent(sheet, sheet.actor, panel, root);
+    const refreshTab = () => loadTabContent(sheet, sheet.actor, panel, root);
 
-  patchSheetTabActivation(sheet, root, TAB_NAME, () => {
+    patchSheetTabActivation(sheet, root, TAB_NAME, () => {
+      void refreshTab();
+    });
+
+    tabButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      activateTab(sheet, root, tabGroup, TAB_NAME);
+      void refreshTab();
+    });
+
     void refreshTab();
-  });
-
-  tabButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    activateTab(sheet, root, tabGroup, TAB_NAME);
-    void refreshTab();
-  });
-
-  void refreshTab();
   } catch (error) {
     console.error("[tableheroes-bridge] Tab-Injection fehlgeschlagen:", error);
   }
+}
+
+/**
+ * Deferred inject — dnd5e 5.0 re-renders the sheet after data hooks; injecting too
+ * early loses the tab on mapped (data-heavy) characters.
+ */
+export function scheduleTableHeroesTabInject(sheet, html = null) {
+  if (sheet.actor?.type !== "character") return;
+
+  const actorId = sheet.actor.id;
+  if (sheet._tableheroesInjectTimer) {
+    window.clearTimeout(sheet._tableheroesInjectTimer);
+  }
+
+  sheet._tableheroesInjectTimer = window.setTimeout(() => {
+    sheet._tableheroesInjectTimer = null;
+    void injectTableHeroesTab(sheet, html);
+  }, 75);
 }
 
 async function rerunTabRender(sheet, actor, root, panel = null) {

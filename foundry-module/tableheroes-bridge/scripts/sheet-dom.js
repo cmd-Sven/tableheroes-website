@@ -15,14 +15,9 @@ export function resolveTabContainers(root) {
   const nav =
     root.querySelector("nav.tabs") ??
     root.querySelector(".sheet-tabs") ??
-    root.querySelector(".tabs");
+    root.querySelector("nav.sheet-tabs");
 
-  const body =
-    root.querySelector(".tab-body") ??
-    root.querySelector(".sheet-body") ??
-    root.querySelector("section.tab.active")?.parentElement ??
-    root.querySelector(".main-content")?.closest(".window-content") ??
-    root.querySelector(".window-content");
+  const body = root.querySelector(".tab-body");
 
   const existingTab = nav?.querySelector("[data-tab][data-group]");
   const tabGroup = existingTab?.dataset?.group ?? "primary";
@@ -34,9 +29,16 @@ export function isApplicationV2Sheet(sheet) {
   return typeof sheet?.changeTab === "function";
 }
 
+export function findTabNavButton(nav, tabName = TAB_NAME) {
+  if (!nav) return null;
+  return nav.querySelector(`[data-tab="${tabName}"]`);
+}
+
 export function findTabPanel(root, tabName = TAB_NAME) {
   if (!root) return null;
   return (
+    root.querySelector(`.tab-body .tab[data-tab="${tabName}"]`) ??
+    root.querySelector(`.tab-body .tableheroes-tab[data-tab="${tabName}"]`) ??
     root.querySelector(`.tab[data-tab="${tabName}"]`) ??
     root.querySelector(`.tableheroes-tab[data-tab="${tabName}"]`)
   );
@@ -62,16 +64,19 @@ export function activateTab(sheet, root, tabGroup, tabName) {
   });
 
   const panel = findTabPanel(body ?? root, tabName);
-  panel?.classList.toggle("active", true);
+  panel?.classList.add("active");
 }
 
 export function patchSheetTabActivation(sheet, root, tabName, onActivate) {
   const { nav } = resolveTabContainers(root);
-  nav?.addEventListener(
+  if (!nav || nav.dataset.thTabPatchBound === "1") return;
+  nav.dataset.thTabPatchBound = "1";
+
+  nav.addEventListener(
     "click",
     (event) => {
       const button = event.target.closest(`[data-tab="${tabName}"]`);
-      if (!button) return;
+      if (!button || !nav.contains(button)) return;
       onActivate();
     },
     true,

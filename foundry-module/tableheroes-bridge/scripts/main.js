@@ -1,4 +1,4 @@
-import { injectTableHeroesTab } from "./sheet-tab.js";
+import { scheduleTableHeroesTabInject } from "./sheet-tab.js";
 import { MODULE_VERSION, thLocalize } from "./i18n.js";
 
 const MODULE_ID = "tableheroes-bridge";
@@ -36,26 +36,22 @@ Hooks.once("ready", () => {
   console.log(`[tableheroes-bridge] Modul geladen v${MODULE_VERSION}`);
 });
 
-function onRenderActorSheet(sheet, html) {
+function onRenderCharacterSheet(sheet, html) {
   if (sheet.actor?.type !== "character") return;
-  void injectTableHeroesTab(sheet, html);
+  scheduleTableHeroesTabInject(sheet, html);
 }
 
-function onRenderApplicationV2(app, element) {
-  if (app.actor?.type !== "character") return;
-  const name = app.constructor?.name ?? "";
-  if (!name.includes("Character")) return;
-  void injectTableHeroesTab(app, element);
-}
+Hooks.on("closeActorSheet", (sheet) => {
+  if (sheet._tableheroesInjectTimer) {
+    window.clearTimeout(sheet._tableheroesInjectTimer);
+    sheet._tableheroesInjectTimer = null;
+  }
+  sheet._tableheroesPanel = null;
+});
 
-// Legacy ApplicationV1 / ältere dnd5e-Blätter
-Hooks.on("renderActorSheet5e", onRenderActorSheet);
-Hooks.on("renderActorSheet", onRenderActorSheet);
+// dnd5e 5.0 Character Sheet 2 (Foundry v13) — primary target
+Hooks.on("renderActorSheet5eCharacter2", onRenderCharacterSheet);
 
-// dnd5e 3.x/4.x „Character Sheet 2“
-Hooks.on("renderActorSheet5eCharacter2", onRenderActorSheet);
-
-// dnd5e 5.0+ ApplicationV2 (Foundry v13)
-Hooks.on("renderActorSheet5eCharacter", onRenderActorSheet);
-Hooks.on("renderApplicationV2", onRenderApplicationV2);
-Hooks.on("renderBaseActorSheet", onRenderActorSheet);
+// Legacy / other dnd5e character sheets
+Hooks.on("renderActorSheet5eCharacter", onRenderCharacterSheet);
+Hooks.on("renderActorSheet5e", onRenderCharacterSheet);
