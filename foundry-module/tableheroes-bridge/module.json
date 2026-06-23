@@ -2,7 +2,7 @@
   "id": "tableheroes-bridge",
   "title": "Table Heroes Bridge",
   "description": "Zeigt Table-Heroes-Punkte, Rang und Achievements am DnD5e-Charakterbogen.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "authors": [{ "name": "Table Heroes" }],
   "url": "https://table-heroes.de",
   "license": "MIT",

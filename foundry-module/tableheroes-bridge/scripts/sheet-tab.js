@@ -10,6 +10,7 @@ import {
   activateTab,
   getSheetRoot,
   isApplicationV2Sheet,
+  patchSheetTabActivation,
   resolveTabContainers,
   TAB_NAME,
 } from "./sheet-dom.js";
@@ -132,6 +133,22 @@ function renderPortraitHtml(player, actor) {
   </div>${gmOnly}`;
 }
 
+function renderActionsHtml(campaign, { compact = false } = {}) {
+  const L = game.i18n.localize;
+  return `<div class="tableheroes-actions">
+      <button type="button" class="tableheroes-refresh">
+        <i class="fas fa-sync"></i> ${escapeHtml(L("TABLEHEROES.Tab.Refresh"))}
+      </button>
+      ${
+        !compact && campaign?.points_catalog_url
+          ? `<a class="button" href="${escapeHtml(campaign.points_catalog_url)}" target="_blank" rel="noopener">
+              <i class="fas fa-external-link-alt"></i> ${escapeHtml(L("TABLEHEROES.Tab.OpenDashboard"))}
+            </a>`
+          : ""
+      }
+    </div>`;
+}
+
 /**
  * @param {Actor} actor
  * @param {object | null} payload
@@ -143,21 +160,25 @@ function renderTabHtml(actor, payload) {
   const foundryCurrency = readFoundryCurrency(actor);
 
   if (!settingsConfigured()) {
-    return `<div class="tableheroes-sheet-tab tableheroes-error">${escapeHtml(
-      "Bitte API-URL und API-Key in den Modul-Einstellungen hinterlegen.",
-    )}</div>`;
+    return `<div class="tableheroes-sheet-tab tableheroes-error">
+      <p>${escapeHtml("Bitte API-URL und API-Key in den Modul-Einstellungen hinterlegen.")}</p>
+      ${renderActionsHtml(null, { compact: true })}
+    </div>`;
   }
 
   if (!player) {
-    return `<div class="tableheroes-sheet-tab tableheroes-muted">${escapeHtml(
-      L("TABLEHEROES.Tab.Loading"),
-    )}</div>`;
+    return `<div class="tableheroes-sheet-tab">
+      <p class="tableheroes-muted">${escapeHtml(L("TABLEHEROES.Tab.Loading"))}</p>
+      ${renderActionsHtml(campaign, { compact: true })}
+    </div>`;
   }
 
   if (!player.mapped || !player.points) {
     return `<div class="tableheroes-sheet-tab">
       <p class="tableheroes-muted">${escapeHtml(L("TABLEHEROES.Tab.Unmapped"))}</p>
       <p class="tableheroes-muted"><strong>${escapeHtml(actor.name)}</strong></p>
+      <p class="tableheroes-muted"><code>${escapeHtml(actor.id)}</code></p>
+      ${renderActionsHtml(campaign, { compact: true })}
     </div>`;
   }
 
@@ -237,18 +258,7 @@ function renderTabHtml(actor, payload) {
 
     ${gmSyncBlock}
 
-    <div class="tableheroes-actions">
-      <button type="button" class="tableheroes-refresh">
-        <i class="fas fa-sync"></i> ${escapeHtml(L("TABLEHEROES.Tab.Refresh"))}
-      </button>
-      ${
-        campaign?.points_catalog_url
-          ? `<a class="button" href="${escapeHtml(campaign.points_catalog_url)}" target="_blank" rel="noopener">
-              <i class="fas fa-external-link-alt"></i> ${escapeHtml(L("TABLEHEROES.Tab.OpenDashboard"))}
-            </a>`
-          : ""
-      }
-    </div>
+    ${renderActionsHtml(campaign)}
   </div>`;
 }
 
@@ -289,9 +299,11 @@ async function loadTabContent(sheet, actor, panel, root) {
     updateHeaderBadge(sheet, payload, root);
     bindTabEvents(sheet, actor, root);
   } catch (error) {
-    panel.innerHTML = `<div class="tableheroes-sheet-tab tableheroes-error">${escapeHtml(
-      error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"),
-    )}</div>`;
+    panel.innerHTML = `<div class="tableheroes-sheet-tab tableheroes-error">
+      <p>${escapeHtml(error instanceof Error ? error.message : game.i18n.localize("TABLEHEROES.Tab.Error"))}</p>
+      ${renderActionsHtml(null, { compact: true })}
+    </div>`;
+    bindTabEvents(sheet, actor, root);
   }
 }
 
@@ -316,34 +328,41 @@ export async function injectTableHeroesTab(sheet, html = null) {
 
   const label = game.i18n.localize("TABLEHEROES.Tab.Label");
   const tabButton = document.createElement("a");
-  tabButton.className = isApplicationV2Sheet(sheet) ? "" : "item";
+  tabButton.className = isApplicationV2Sheet(sheet) ? "item control" : "item";
   tabButton.dataset.tab = TAB_NAME;
   tabButton.dataset.group = tabGroup;
   if (isApplicationV2Sheet(sheet)) {
     tabButton.dataset.action = "tab";
+    tabButton.dataset.tooltip = label;
+    tabButton.setAttribute("aria-label", label);
   }
-  tabButton.innerHTML = `<i class="fas fa-crown"></i> <label>${label}</label>`;
+  if (isApplicationV2Sheet(sheet)) {
+    tabButton.innerHTML = `<i class="fas fa-crown"></i>`;
+  } else {
+    tabButton.innerHTML = `<i class="fas fa-crown"></i> ${escapeHtml(label)}`;
+  }
   nav.appendChild(tabButton);
 
-  const panel = document.createElement("section");
+  const panel = document.createElement("div");
   panel.className = "tab tableheroes-tab";
   panel.dataset.tab = TAB_NAME;
   panel.dataset.group = tabGroup;
   panel.innerHTML = renderTabHtml(sheet.actor, null);
   body.appendChild(panel);
 
-  tabButton.addEventListener("click", async (event) => {
-    event.preventDefault();
-    activateTab(sheet, root, tabGroup, TAB_NAME);
-    await loadTabContent(sheet, sheet.actor, panel, root);
+  const refreshTab = () => loadTabContent(sheet, sheet.actor, panel, root);
+
+  patchSheetTabActivation(sheet, root, TAB_NAME, () => {
+    void refreshTab();
   });
 
-  try {
-    const payload = await loadProfile(sheet.actor, { force: false });
-    updateHeaderBadge(sheet, payload, root);
-  } catch {
-    /* Badge optional */
-  }
+  tabButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    activateTab(sheet, root, tabGroup, TAB_NAME);
+    void refreshTab();
+  });
+
+  void refreshTab();
 }
 
 async function rerunTabRender(sheet, actor, root) {

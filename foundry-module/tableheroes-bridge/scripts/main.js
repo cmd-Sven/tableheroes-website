@@ -53,3 +53,4 @@ Hooks.on("renderActorSheet5eCharacter2", onRenderActorSheet);
 // dnd5e 5.0+ ApplicationV2 (Foundry v13)
 Hooks.on("renderActorSheet5eCharacter", onRenderActorSheet);
 Hooks.on("renderApplicationV2", onRenderApplicationV2);
+Hooks.on("renderBaseActorSheet", onRenderActorSheet);

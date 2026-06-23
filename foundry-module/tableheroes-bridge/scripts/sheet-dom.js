@@ -38,19 +38,42 @@ export function activateTab(sheet, root, tabGroup, tabName) {
   const { nav, body } = resolveTabContainers(root);
 
   if (typeof sheet?.changeTab === "function") {
-    sheet.changeTab(tabName, tabGroup, { force: true });
-    return;
+    try {
+      sheet.changeTab(tabName, tabGroup, { force: true });
+    } catch {
+      /* Custom tabs may not be registered in the sheet tab config. */
+    }
   }
 
   nav?.querySelectorAll(".item, [data-tab]").forEach((el) => {
-    el.classList.remove("active");
-    if (el.dataset.tab === tabName) el.classList.add("active");
+    el.classList.toggle("active", el.dataset.tab === tabName);
   });
 
   body?.querySelectorAll(".tab").forEach((el) => {
-    el.classList.remove("active");
-    if (el.dataset.tab === tabName) el.classList.add("active");
+    el.classList.toggle("active", el.dataset.tab === tabName);
   });
+}
+
+export function patchSheetTabActivation(sheet, root, tabName, onActivate) {
+  const { nav } = resolveTabContainers(root);
+  nav?.addEventListener(
+    "click",
+    (event) => {
+      const button = event.target.closest(`[data-tab="${tabName}"]`);
+      if (!button) return;
+      onActivate();
+    },
+    true,
+  );
+
+  if (!sheet._tableheroesChangeTabPatched && typeof sheet.changeTab === "function") {
+    sheet._tableheroesChangeTabPatched = true;
+    const original = sheet.changeTab.bind(sheet);
+    sheet.changeTab = function patchedChangeTab(tab, group, options) {
+      original(tab, group, options);
+      if (tab === tabName) onActivate();
+    };
+  }
 }
 
 export { TAB_NAME };

@@ -137,7 +137,7 @@ Query (optional) für Profile:
 ### Foundry v13 + D&D 5e 5.0 (neues Charakterblatt)
 
 Ab **dnd5e 5.0** nutzt das offizielle Charakterblatt **ApplicationV2** (vertikale Tabs, anderes HTML).
-Version **0.3.0+** des Moduls unterstützt beide Blatt-Typen (alt + neu).
+Version **0.3.1+** des Moduls unterstützt beide Blatt-Typen (alt + neu) und lädt Tab-Inhalte automatisch.
 
 ## Roadmap
 

@@ -2,6 +2,14 @@
   display: none;
 }
 
+.tab.tableheroes-tab.active {
+  display: block;
+}
+
+.sheet.actor.character.vertical-tabs .tab-body .tab.tableheroes-tab.active {
+  display: block;
+}
+
 nav.tabs [data-tab="tableheroes"] label {
   pointer-events: none;
 }
