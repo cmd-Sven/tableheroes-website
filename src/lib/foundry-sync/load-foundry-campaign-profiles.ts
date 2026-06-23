@@ -73,7 +73,7 @@ export async function loadFoundryCampaignProfiles(
   if (characterIds.length > 0) {
     const { data: characterRows } = await (supabase as any)
       .from("characters")
-      .select("id, name, user_id, avatar_url, avatar_storage_path, updated_at")
+      .select("id, name, user_id, avatar_url, avatar_storage_path, created_at")
       .eq("campaign_id", campaignId)
       .in("id", characterIds);
 
@@ -83,7 +83,7 @@ export async function loadFoundryCampaignProfiles(
       user_id: string | null;
       avatar_url: string | null;
       avatar_storage_path: string | null;
-      updated_at: string | null;
+      created_at: string | null;
     }>) {
       characterById.set(String(row.id), {
         id: String(row.id),
@@ -92,7 +92,7 @@ export async function loadFoundryCampaignProfiles(
         avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
         avatar_storage_path:
           row.avatar_storage_path != null ? String(row.avatar_storage_path) : null,
-        updated_at: row.updated_at != null ? String(row.updated_at) : null,
+        updated_at: row.created_at != null ? String(row.created_at) : null,
       });
     }
   }
