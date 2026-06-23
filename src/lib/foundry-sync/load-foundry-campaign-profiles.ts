@@ -12,6 +12,14 @@ import type {
 
 const DEFAULT_SITE_URL = "https://table-heroes.de";
 
+function actorIdVariants(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  const withPrefix = trimmed.startsWith("Actor.") ? trimmed : `Actor.${trimmed}`;
+  const withoutPrefix = trimmed.startsWith("Actor.") ? trimmed.slice(6) : trimmed;
+  return [...new Set([trimmed, withPrefix, withoutPrefix])];
+}
+
 type LoadOpts = {
   foundryActorId?: string | null;
   achievementsLimit?: number;
@@ -39,7 +47,7 @@ export async function loadFoundryCampaignProfiles(
     .eq("campaign_id", campaignId);
 
   if (actorFilter) {
-    mappingQuery = mappingQuery.eq("foundry_actor_id", actorFilter);
+    mappingQuery = mappingQuery.in("foundry_actor_id", actorIdVariants(actorFilter));
   }
 
   const { data: mappingRows, error: mappingError } = await mappingQuery;
@@ -217,8 +225,6 @@ export async function loadFoundryCampaignProfiles(
     );
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, "");
-
   const players: FoundryPlayerProfile[] = mappings.map((mapping) => {
     const actorId = String(mapping.foundry_actor_id);
     const characterId = mapping.character_id ? String(mapping.character_id) : null;
@@ -276,6 +282,25 @@ export async function loadFoundryCampaignProfiles(
     };
   });
 
+  const resolvedPlayers =
+    actorFilter && players.length === 0
+      ? [
+          {
+            foundry_actor_id: actorIdVariants(actorFilter)[0] ?? actorFilter,
+            character_id: null,
+            character_name: null,
+            user_id: null,
+            username: null,
+            mapped: false,
+            points: null,
+            achievements: [],
+            recent_points: [],
+            wealth: null,
+            portrait: null,
+          } satisfies FoundryPlayerProfile,
+        ]
+      : players;
+
   return {
     ok: true,
     endpoint: "foundry-profile",
@@ -286,6 +311,6 @@ export async function loadFoundryCampaignProfiles(
         : null,
     dashboard_url: `${siteUrl}/dashboard/points`,
     points_catalog_url: `${siteUrl}/dashboard/points/catalog`,
-    players,
+    players: resolvedPlayers,
   };
 }

@@ -32,6 +32,10 @@ Hooks.once("init", () => {
   });
 });
 
+Hooks.once("ready", () => {
+  console.log(`[tableheroes-bridge] Modul geladen v${MODULE_VERSION}`);
+});
+
 function onRenderActorSheet(sheet, html) {
   if (sheet.actor?.type !== "character") return;
   void injectTableHeroesTab(sheet, html);

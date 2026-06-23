@@ -33,10 +33,16 @@ export async function fetchActorProfile(foundryActorId) {
     throw new Error("Table Heroes API ist nicht konfiguriert.");
   }
 
+  if (/tableheroes\.de/i.test(baseUrl) && !/table-heroes\.de/i.test(baseUrl)) {
+    throw new Error("API-URL muss https://table-heroes.de sein (mit Bindestrich).");
+  }
+
   const url = new URL(`${baseUrl}/api/v1/foundry-sync/profile`);
   url.searchParams.set("foundry_actor_id", foundryActorId);
   url.searchParams.set("achievements_limit", "8");
   url.searchParams.set("points_log_limit", "5");
+
+  console.log("[tableheroes-bridge] GET", url.toString());
 
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -48,7 +54,24 @@ export async function fetchActorProfile(foundryActorId) {
     throw new Error(data.error || `HTTP ${response.status}`);
   }
 
-  const player = Array.isArray(data.players) ? data.players[0] : null;
+  let player = Array.isArray(data.players) ? data.players[0] : null;
+  if (!player) {
+    console.warn("[tableheroes-bridge] leere players-Antwort für", foundryActorId, data);
+    player = {
+      foundry_actor_id: foundryActorId,
+      character_id: null,
+      character_name: null,
+      user_id: null,
+      username: null,
+      mapped: false,
+      points: null,
+      achievements: [],
+      recent_points: [],
+      wealth: null,
+      portrait: null,
+    };
+  }
+
   return {
     campaign: {
       id: data.campaign_id,

@@ -34,6 +34,14 @@ export function isApplicationV2Sheet(sheet) {
   return typeof sheet?.changeTab === "function";
 }
 
+export function findTabPanel(root, tabName = TAB_NAME) {
+  if (!root) return null;
+  return (
+    root.querySelector(`.tab[data-tab="${tabName}"]`) ??
+    root.querySelector(`.tableheroes-tab[data-tab="${tabName}"]`)
+  );
+}
+
 export function activateTab(sheet, root, tabGroup, tabName) {
   const { nav, body } = resolveTabContainers(root);
 
@@ -52,6 +60,9 @@ export function activateTab(sheet, root, tabGroup, tabName) {
   body?.querySelectorAll(".tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.tab === tabName);
   });
+
+  const panel = findTabPanel(body ?? root, tabName);
+  panel?.classList.toggle("active", true);
 }
 
 export function patchSheetTabActivation(sheet, root, tabName, onActivate) {
