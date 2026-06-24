@@ -12,15 +12,11 @@ import type {
 
 const DEFAULT_SITE_URL = "https://table-heroes.de";
 
-function actorIdVariants(raw: string): string[] {
-  const trimmed = raw.trim();
-  if (!trimmed) return [];
-  const withPrefix = trimmed.startsWith("Actor.") ? trimmed : `Actor.${trimmed}`;
-  const withoutPrefix = trimmed.startsWith("Actor.") ? trimmed.slice(6) : trimmed;
-  return [...new Set([trimmed, withPrefix, withoutPrefix])];
-}
-
-type LoadOpts = {
+import {
+  actorIdVariants,
+  dedupeFoundryMappings,
+  normalizeFoundryActorId,
+} from "./foundry-actor-id";
   foundryActorId?: string | null;
   achievementsLimit?: number;
   pointsLogLimit?: number;
@@ -55,10 +51,12 @@ export async function loadFoundryCampaignProfiles(
     throw new Error("Foundry mapping lookup failed.");
   }
 
-  const mappings = (mappingRows ?? []) as Array<{
-    foundry_actor_id: string;
-    character_id: string | null;
-  }>;
+  const mappings = dedupeFoundryMappings(
+    (mappingRows ?? []) as Array<{
+      foundry_actor_id: string;
+      character_id: string | null;
+    }>,
+  );
 
   const characterIds = [
     ...new Set(
@@ -286,7 +284,7 @@ export async function loadFoundryCampaignProfiles(
     actorFilter && players.length === 0
       ? [
           {
-            foundry_actor_id: actorIdVariants(actorFilter)[0] ?? actorFilter,
+            foundry_actor_id: normalizeFoundryActorId(actorFilter),
             character_id: null,
             character_name: null,
             user_id: null,

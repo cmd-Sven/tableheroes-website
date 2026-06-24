@@ -1,3 +1,9 @@
+import {
+  actorIdVariants,
+  normalizeFoundryActorId,
+  pickBestFoundryMapping,
+} from "./foundry-actor-id";
+
 export type FoundryCharacterMappingRow = {
   id: string;
   campaign_id: string;
@@ -13,12 +19,12 @@ export async function resolveFoundryCharacterMapping(
   | { ok: true; mapping: FoundryCharacterMappingRow; characterId: string }
   | { ok: false; status: number; body: Record<string, unknown> }
 > {
-  const { data: mappingRaw, error: mappingError } = await (supabase as any)
+  const variants = actorIdVariants(actorId);
+  const { data: mappingRowsRaw, error: mappingError } = await (supabase as any)
     .from("foundry_character_mapping")
     .select("id, campaign_id, foundry_actor_id, character_id")
     .eq("campaign_id", campaignId)
-    .eq("foundry_actor_id", actorId)
-    .maybeSingle();
+    .in("foundry_actor_id", variants);
 
   if (mappingError) {
     return {
@@ -28,15 +34,19 @@ export async function resolveFoundryCharacterMapping(
     };
   }
 
-  const mapping = mappingRaw as FoundryCharacterMappingRow | null;
+  const mapping = pickBestFoundryMapping(
+    (mappingRowsRaw ?? []) as FoundryCharacterMappingRow[],
+    actorId,
+  );
 
   if (!mapping?.character_id) {
     if (!mapping) {
+      const canonicalId = normalizeFoundryActorId(actorId);
       const { error: insertError } = await (supabase as any)
         .from("foundry_character_mapping")
         .insert({
           campaign_id: campaignId,
-          foundry_actor_id: actorId,
+          foundry_actor_id: canonicalId,
           character_id: null,
         });
 
@@ -56,7 +66,7 @@ export async function resolveFoundryCharacterMapping(
         status: "unmapped_character",
         message: "Foundry actor ist noch keinem Table-Heroes-Charakter zugeordnet.",
         campaign_id: campaignId,
-        foundry_actor_id: actorId,
+        foundry_actor_id: normalizeFoundryActorId(actorId),
       },
     };
   }

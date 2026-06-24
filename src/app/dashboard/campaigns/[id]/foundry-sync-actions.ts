@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { normalizeFoundryActorId } from "@/src/lib/foundry-sync/foundry-actor-id";
 
 const SITE_URL = () =>
   (process.env.NEXT_PUBLIC_SITE_URL ?? "https://table-heroes.de").replace(/\/$/, "");
@@ -30,13 +31,6 @@ export type CampaignFoundrySyncSettings = {
   configured: boolean;
 };
 
-function normalizeFoundryActorId(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("Actor.") ? trimmed : `Actor.${trimmed}`;
-}
-
-async function assertCampaignGm(
   supabase: Awaited<ReturnType<typeof createClient>>,
   campaignId: string,
 ): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {

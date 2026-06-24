@@ -6,6 +6,7 @@ import {
   getFoundryApiKey,
   resolveFoundryApiCampaign,
 } from "@/src/lib/foundry-sync/foundry-api";
+import { resolveFoundryCharacterMapping } from "@/src/lib/foundry-sync/resolve-foundry-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,6 @@ const payloadSchema = z
       .nonnegative("experience_points muss >= 0 sein."),
   })
   .strict();
-
-type FoundryCharacterMappingRow = {
-  id: string;
-  campaign_id: string;
-  foundry_actor_id: string;
-  character_id: string | null;
-};
 
 function getApiKey(request: Request): string | null {
   return getFoundryApiKey(request);
@@ -134,56 +128,12 @@ export async function POST(request: Request) {
   const campaignId = auth.campaignId;
   const actorId = input.foundry_actor_id;
 
-  const { data: mappingRaw, error: mappingError } = await (supabase as any)
-    .from("foundry_character_mapping")
-    .select("id, campaign_id, foundry_actor_id, character_id")
-    .eq("campaign_id", campaignId)
-    .eq("foundry_actor_id", actorId)
-    .maybeSingle();
-
-  if (mappingError) {
-    console.error(`${LOG_PREFIX} mapping lookup failed`, mappingError, {
-      campaignId,
-      actorId,
-    });
-    return foundryJson({ error: "Foundry mapping lookup failed." }, { status: 500 });
+  const resolved = await resolveFoundryCharacterMapping(supabase, campaignId, actorId);
+  if (!resolved.ok) {
+    return foundryJson(resolved.body, { status: resolved.status });
   }
 
-  const mapping = mappingRaw as FoundryCharacterMappingRow | null;
-
-  if (!mapping?.character_id) {
-    if (!mapping) {
-      const { error: insertError } = await (supabase as any)
-        .from("foundry_character_mapping")
-        .insert({
-          campaign_id: campaignId,
-          foundry_actor_id: actorId,
-          character_id: null,
-        });
-
-      if (insertError) {
-        console.error(`${LOG_PREFIX} unmapped insert failed`, insertError, {
-          campaignId,
-          actorId,
-        });
-        return foundryJson(
-          { error: "Unmapped character placeholder could not be created." },
-          { status: 500 },
-        );
-      }
-    }
-
-    return foundryJson(
-      {
-        status: "unmapped_character",
-        message:
-          "Foundry actor ist noch keinem Table-Heroes-Charakter zugeordnet.",
-        campaign_id: campaignId,
-        foundry_actor_id: actorId,
-      },
-      { status: 202 },
-    );
-  }
+  const mapping = resolved.mapping;
 
   const updatePayload = {
     level: input.level,

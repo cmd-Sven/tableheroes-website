@@ -54,7 +54,10 @@ export async function fetchActorProfile(foundryActorId) {
     throw new Error(data.error || `HTTP ${response.status}`);
   }
 
-  let player = Array.isArray(data.players) ? data.players[0] : null;
+  let player = null;
+  if (Array.isArray(data.players)) {
+    player = data.players.find((entry) => entry?.mapped && entry?.points) ?? data.players[0] ?? null;
+  }
   if (!player) {
     console.warn("[tableheroes-bridge] leere players-Antwort für", foundryActorId, data);
     player = {
