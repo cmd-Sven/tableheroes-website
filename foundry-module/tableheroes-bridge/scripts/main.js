@@ -41,17 +41,24 @@ function onRenderCharacterSheet(sheet, html) {
   scheduleTableHeroesTabInject(sheet, html);
 }
 
+function onRenderApplicationV2(app, element) {
+  if (app.actor?.type !== "character") return;
+  const name = app.constructor?.name ?? "";
+  if (!name.includes("Character") && !name.includes("ActorSheet5e")) return;
+  scheduleTableHeroesTabInject(app, element);
+}
+
 Hooks.on("closeActorSheet", (sheet) => {
   if (sheet._tableheroesInjectTimer) {
     window.clearTimeout(sheet._tableheroesInjectTimer);
     sheet._tableheroesInjectTimer = null;
   }
+  sheet._tableheroesInjectLoopActive = false;
   sheet._tableheroesPanel = null;
 });
 
-// dnd5e 5.0 Character Sheet 2 (Foundry v13) — primary target
 Hooks.on("renderActorSheet5eCharacter2", onRenderCharacterSheet);
-
-// Legacy / other dnd5e character sheets
 Hooks.on("renderActorSheet5eCharacter", onRenderCharacterSheet);
 Hooks.on("renderActorSheet5e", onRenderCharacterSheet);
+Hooks.on("renderBaseActorSheet", onRenderCharacterSheet);
+Hooks.on("renderApplicationV2", onRenderApplicationV2);

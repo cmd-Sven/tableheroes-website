@@ -1,11 +1,11 @@
 const TAB_NAME = "tableheroes";
 
 export function getSheetRoot(sheet, html) {
-  if (html instanceof HTMLElement) return html;
-  if (html?.[0] instanceof HTMLElement) return html[0];
   const element = sheet?.element;
   if (element instanceof HTMLElement) return element;
   if (element?.[0] instanceof HTMLElement) return element[0];
+  if (html instanceof HTMLElement) return html;
+  if (html?.[0] instanceof HTMLElement) return html[0];
   return null;
 }
 
@@ -14,10 +14,14 @@ export function resolveTabContainers(root) {
 
   const nav =
     root.querySelector("nav.tabs") ??
+    root.querySelector("nav.tabs-right") ??
     root.querySelector(".sheet-tabs") ??
     root.querySelector("nav.sheet-tabs");
 
-  const body = root.querySelector(".tab-body");
+  const body =
+    root.querySelector(".tab-body") ??
+    root.querySelector(".sheet-body .tab-body") ??
+    root.querySelector("section.tab-body");
 
   const existingTab = nav?.querySelector("[data-tab][data-group]");
   const tabGroup = existingTab?.dataset?.group ?? "primary";

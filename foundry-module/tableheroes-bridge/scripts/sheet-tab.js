@@ -327,20 +327,29 @@ async function loadTabContent(sheet, actor, panel, root) {
   }
 }
 
+function isTabComplete(sheet) {
+  const root = getSheetRoot(sheet);
+  if (!root) return false;
+  const { nav, body } = resolveTabContainers(root);
+  return Boolean(
+    findTabNavButton(nav, TAB_NAME) && findTabPanel(body ?? root, TAB_NAME),
+  );
+}
+
 /**
  * @param {ActorSheet} sheet
  * @param {HTMLElement | jQuery | null} html
  */
 export async function injectTableHeroesTab(sheet, html = null) {
-  if (sheet.actor?.type !== "character") return;
+  if (sheet.actor?.type !== "character") return false;
 
   try {
     const root = getSheetRoot(sheet, html);
-    if (!root) return;
+    if (!root) return false;
 
     const { nav, body, tabGroup } = resolveTabContainers(root);
     if (!nav || !body) {
-      return;
+      return false;
     }
 
     const existingNav = findTabNavButton(nav, TAB_NAME);
@@ -349,7 +358,7 @@ export async function injectTableHeroesTab(sheet, html = null) {
     if (existingNav && existingPanel) {
       sheet._tableheroesPanel = existingPanel;
       void loadTabContent(sheet, sheet.actor, existingPanel, root);
-      return;
+      return true;
     }
 
     existingNav?.remove();
@@ -391,27 +400,68 @@ export async function injectTableHeroesTab(sheet, html = null) {
     });
 
     void refreshTab();
+    console.log(
+      `[tableheroes-bridge] Tab eingefügt für ${sheet.actor?.name} (${sheet.actor?.id})`,
+    );
+    return true;
   } catch (error) {
     console.error("[tableheroes-bridge] Tab-Injection fehlgeschlagen:", error);
+    return false;
   }
 }
 
+const MAX_INJECT_ATTEMPTS = 50;
+const INJECT_INTERVAL_MS = 120;
+
 /**
- * Deferred inject — dnd5e 5.0 re-renders the sheet after data hooks; injecting too
- * early loses the tab on mapped (data-heavy) characters.
+ * Retry until tab exists — data-heavy sheets (mapped PCs) re-render repeatedly and
+ * cancel one-shot timeouts before inject runs.
  */
 export function scheduleTableHeroesTabInject(sheet, html = null) {
   if (sheet.actor?.type !== "character") return;
+  if (isTabComplete(sheet)) return;
 
-  const actorId = sheet.actor.id;
+  if (sheet._tableheroesInjectLoopActive) return;
+  sheet._tableheroesInjectLoopActive = true;
+
+  let attempt = 0;
+
+  const tick = async () => {
+    attempt += 1;
+    const root = getSheetRoot(sheet);
+    const { nav, body } = resolveTabContainers(root);
+
+    if (!isTabComplete(sheet)) {
+      if (nav && body) {
+        await injectTableHeroesTab(sheet);
+      }
+    }
+
+    if (isTabComplete(sheet)) {
+      sheet._tableheroesInjectLoopActive = false;
+      return;
+    }
+
+    if (attempt >= MAX_INJECT_ATTEMPTS) {
+      sheet._tableheroesInjectLoopActive = false;
+      console.warn(
+        `[tableheroes-bridge] Tab konnte nicht eingefügt werden: ${sheet.actor?.name} (${sheet.actor?.id})`,
+        { nav: !!nav, body: !!body, attempts: attempt },
+      );
+      return;
+    }
+
+    sheet._tableheroesInjectTimer = window.setTimeout(() => {
+      void tick();
+    }, INJECT_INTERVAL_MS);
+  };
+
   if (sheet._tableheroesInjectTimer) {
     window.clearTimeout(sheet._tableheroesInjectTimer);
   }
-
   sheet._tableheroesInjectTimer = window.setTimeout(() => {
-    sheet._tableheroesInjectTimer = null;
-    void injectTableHeroesTab(sheet, html);
-  }, 75);
+    void tick();
+  }, 80);
 }
 
 async function rerunTabRender(sheet, actor, root, panel = null) {
