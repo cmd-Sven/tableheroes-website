@@ -53,6 +53,7 @@ import { NarrativeHook } from "@/src/types/npc";
 import { NPCHookWizard } from "@/src/components/dashboard/campaigns/npcs/NPCHookWizard";
 import { NPCRelationsList } from "@/src/components/dashboard/campaigns/npcs/NPCRelationsList";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
+import { PublicSeoPanel } from "@/src/components/public/PublicSeoPanel";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { SmartText } from "@/src/components/ui/SmartText";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
@@ -769,6 +770,15 @@ export function NPCDetailPage({
           )}
         </div>
       </div>
+
+      {isGM ? (
+        <PublicSeoPanel
+          campaignId={campaignId}
+          entityType="npc"
+          entityId={npc.id}
+          entityName={npc.name}
+        />
+      ) : null}
 
       {/* NPC Header Card with Image */}
       <div className="rounded-lg border border-hero-border bg-background-card p-6">

@@ -31,6 +31,7 @@ import { CampaignDiscordSettings } from "@/src/components/dashboard/campaigns/Ca
 import type { CampaignDiscordSettings as CampaignDiscordSettingsData } from "@/src/app/dashboard/campaigns/[id]/campaign-discord-actions";
 import type { CampaignFoundrySyncSettings as CampaignFoundrySyncSettingsData } from "@/src/app/dashboard/campaigns/[id]/foundry-sync-actions";
 import { CampaignFoundrySyncSettings } from "@/src/components/dashboard/campaigns/CampaignFoundrySyncSettings";
+import { CampaignSeoHomepageSettings } from "@/src/components/dashboard/campaigns/CampaignSeoHomepageSettings";
 import { WorldRequiredBlocker } from "@/src/components/dashboard/campaigns/world/WorldRequiredBlocker";
 import { OnboardingSettings } from "@/src/components/dashboard/campaigns/OnboardingSettings";
 import { ApplyToCampaignBlock } from "./ApplyToCampaignBlock";
@@ -730,6 +731,11 @@ export function CampaignDetailPageContent({
               initial={foundrySyncSettings}
             />
           ) : null}
+
+          <CampaignSeoHomepageSettings
+            campaignId={id}
+            initialEnabled={(campaign as { seo_lore_homepage_enabled?: boolean }).seo_lore_homepage_enabled === true}
+          />
         </div>
         <div className="space-y-6">
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">

@@ -41,6 +41,7 @@ import {
 } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { upsertCampaignNote } from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
+import { PublicSeoPanel } from "@/src/components/public/PublicSeoPanel";
 import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
@@ -577,6 +578,15 @@ export function FactionDetailPage({
           </div>
         )}
       </div>
+
+      {isGM ? (
+        <PublicSeoPanel
+          campaignId={campaignId}
+          entityType="faction"
+          entityId={faction.id}
+          entityName={faction.name}
+        />
+      ) : null}
 
       {/* Faction Header Card with Image */}
       <div className="rounded-lg border border-hero-border bg-background-card p-6">

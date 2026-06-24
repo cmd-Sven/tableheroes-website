@@ -10,6 +10,7 @@ import { VALID_LORE_TYPES } from "@/src/lib/lore-types";
 import { LoreHeaderImageSlider } from "./LoreImageSlider";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
 import { ImageBorderContainer } from "./ImageBorderContainer";
+import { PublicSeoPanel } from "@/src/components/public/PublicSeoPanel";
 
 // Inline Edit Field Component
 type InlineEditFieldProps = {
@@ -628,6 +629,16 @@ export function LoreHeader({ lore: initialLore, campaignId, isGM, breadcrumb = [
         </ImageBorderContainer>
       );
       })()}
+      {isGM ? (
+        <div className="mt-6">
+          <PublicSeoPanel
+            campaignId={campaignId}
+            entityType="lore"
+            entityId={lore.id}
+            entityName={lore.name}
+          />
+        </div>
+      ) : null}
     </>
   );
 }
