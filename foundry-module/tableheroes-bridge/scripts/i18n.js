@@ -44,7 +44,7 @@ const FALLBACKS = {
     "Wie oft Punkte im Hintergrund neu geladen werden.",
 };
 
-export const MODULE_VERSION = "0.3.7";
+export const MODULE_VERSION = "0.3.8";
 
 /**
  * Never trust game.i18n.has() — on some Foundry setups it returns true while localize() throws.

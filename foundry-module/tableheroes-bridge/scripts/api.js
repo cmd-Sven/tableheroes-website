@@ -1,5 +1,11 @@
 const MODULE_ID = "tableheroes-bridge";
 
+function normalizeFoundryActorId(raw) {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return trimmed;
+  return trimmed.startsWith("Actor.") ? trimmed : `Actor.${trimmed}`;
+}
+
 export function getModuleSettings() {
   const baseUrl = String(game.settings.get(MODULE_ID, "apiBaseUrl") ?? "").replace(/\/$/, "");
   const apiKey = String(game.settings.get(MODULE_ID, "apiKey") ?? "").trim();
@@ -28,6 +34,7 @@ function apiHeaders(includeJson = true) {
  * @returns {Promise<object>}
  */
 export async function fetchActorProfile(foundryActorId) {
+  const actorId = normalizeFoundryActorId(foundryActorId);
   const { baseUrl, apiKey } = getModuleSettings();
   if (!baseUrl || !apiKey) {
     throw new Error("Table Heroes API ist nicht konfiguriert.");
@@ -38,7 +45,7 @@ export async function fetchActorProfile(foundryActorId) {
   }
 
   const url = new URL(`${baseUrl}/api/v1/foundry-sync/profile`);
-  url.searchParams.set("foundry_actor_id", foundryActorId);
+  url.searchParams.set("foundry_actor_id", actorId);
   url.searchParams.set("achievements_limit", "8");
   url.searchParams.set("points_log_limit", "5");
 
@@ -59,9 +66,9 @@ export async function fetchActorProfile(foundryActorId) {
     player = data.players.find((entry) => entry?.mapped && entry?.points) ?? data.players[0] ?? null;
   }
   if (!player) {
-    console.warn("[tableheroes-bridge] leere players-Antwort für", foundryActorId, data);
+    console.warn("[tableheroes-bridge] leere players-Antwort für", actorId, data);
     player = {
-      foundry_actor_id: foundryActorId,
+      foundry_actor_id: actorId,
       character_id: null,
       character_name: null,
       user_id: null,
@@ -95,10 +102,11 @@ export async function syncActorWealth(actor, direction) {
   if (!baseUrl) throw new Error("Table Heroes API ist nicht konfiguriert.");
 
   const currency = readFoundryCurrency(actor);
+  const actorId = normalizeFoundryActorId(actor.id);
   const body =
     direction === "foundry_to_th"
-      ? { foundry_actor_id: actor.id, direction, currency }
-      : { foundry_actor_id: actor.id, direction };
+      ? { foundry_actor_id: actorId, direction, currency }
+      : { foundry_actor_id: actorId, direction };
 
   const response = await fetch(`${baseUrl}/api/v1/foundry-sync/wealth`, {
     method: "POST",
@@ -130,7 +138,7 @@ export async function syncActorPortrait(actor, direction) {
     const response = await fetch(`${baseUrl}/api/v1/foundry-sync/portrait`, {
       method: "POST",
       headers: apiHeaders(),
-      body: JSON.stringify({ foundry_actor_id: actor.id, direction }),
+      body: JSON.stringify({ foundry_actor_id: normalizeFoundryActorId(actor.id), direction }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -152,7 +160,7 @@ export async function syncActorPortrait(actor, direction) {
 
   const blob = await imageResponse.blob();
   const form = new FormData();
-  form.append("foundry_actor_id", actor.id);
+  form.append("foundry_actor_id", normalizeFoundryActorId(actor.id));
   form.append("portrait", blob, "portrait.webp");
 
   const response = await fetch(`${baseUrl}/api/v1/foundry-sync/portrait`, {
@@ -187,7 +195,7 @@ export async function syncActorXp(actor) {
     method: "POST",
     headers: apiHeaders(),
     body: JSON.stringify({
-      foundry_actor_id: actor.id,
+      foundry_actor_id: normalizeFoundryActorId(actor.id),
       class: String(cls),
       level: Math.max(0, Math.floor(level)),
       experience_points: Math.max(0, Math.floor(xp)),

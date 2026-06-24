@@ -31,6 +31,7 @@ export type CampaignFoundrySyncSettings = {
   configured: boolean;
 };
 
+async function assertCampaignGm(
   supabase: Awaited<ReturnType<typeof createClient>>,
   campaignId: string,
 ): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {

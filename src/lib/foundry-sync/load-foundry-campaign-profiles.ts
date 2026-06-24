@@ -17,6 +17,8 @@ import {
   dedupeFoundryMappings,
   normalizeFoundryActorId,
 } from "./foundry-actor-id";
+
+type LoadOpts = {
   foundryActorId?: string | null;
   achievementsLimit?: number;
   pointsLogLimit?: number;
@@ -30,6 +32,7 @@ export async function loadFoundryCampaignProfiles(
   const achievementsLimit = Math.min(20, Math.max(0, opts.achievementsLimit ?? 8));
   const pointsLogLimit = Math.min(10, Math.max(0, opts.pointsLogLimit ?? 5));
   const actorFilter = opts.foundryActorId?.trim() || null;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, "");
 
   const { data: campaignRaw } = await (supabase as any)
     .from("campaigns")
