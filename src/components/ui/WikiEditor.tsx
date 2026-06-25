@@ -33,6 +33,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
+import { WIKI_HEADING_PROSE_CLASSES } from "@/src/lib/wiki-heading-styles";
 import type { EntityForMarkdownEditor } from "./MarkdownEditor";
 
 export type WikiMentionEntity = {
@@ -635,7 +636,7 @@ export function WikiEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: `${minHeight} w-full max-w-none px-4 py-3 font-libre text-sm leading-relaxed text-gray-200 outline-none prose prose-invert prose-headings:font-barlow prose-h1:text-hero-vibrant prose-h2:text-accent-blood prose-h3:text-accent-gold prose-a:text-hero-vibrant`,
+        class: `${minHeight} w-full max-w-none px-4 py-3 font-libre text-sm leading-relaxed text-gray-200 outline-none prose prose-invert ${WIKI_HEADING_PROSE_CLASSES} prose-a:text-hero-vibrant`,
         "data-placeholder": placeholder,
       },
     },

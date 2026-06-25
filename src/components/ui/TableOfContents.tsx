@@ -5,7 +5,7 @@ import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
 
 type TocHeading = {
   id: string;
-  level: 2 | 3;
+  level: 1 | 2 | 3;
   text: string;
 };
 
@@ -45,13 +45,13 @@ function extractMarkdownHeadings(content: string): TocHeading[] {
   return content
     .split(/\r?\n/)
     .map((line) => {
-      const match = /^(##|###)\s+(.+?)\s*#*$/.exec(line.trim());
+      const match = /^(#{1,3})\s+(.+?)\s*#*$/.exec(line.trim());
       if (!match) return null;
       const text = stripInlineMarkdown(match[2]);
       if (!text) return null;
       return {
         id: slugifyHeading(text),
-        level: match[1].length as 2 | 3,
+        level: match[1].length as 1 | 2 | 3,
         text,
       };
     })
@@ -62,11 +62,12 @@ function extractHtmlHeadings(content: string): TocHeading[] {
   if (typeof window === "undefined") return [];
 
   const doc = new DOMParser().parseFromString(content, "text/html");
-  return Array.from(doc.querySelectorAll("h2, h3"))
+  return Array.from(doc.querySelectorAll("h1, h2, h3"))
     .map((node) => {
       const text = node.textContent?.trim() ?? "";
       if (!text) return null;
-      const level = node.tagName.toLowerCase() === "h2" ? 2 : 3;
+      const tag = node.tagName.toLowerCase();
+      const level = tag === "h1" ? 1 : tag === "h2" ? 2 : 3;
       return {
         id: node.id || slugifyHeading(text),
         level,
@@ -79,7 +80,7 @@ function extractHtmlHeadings(content: string): TocHeading[] {
 function extractHeadings(content: string): TocHeading[] {
   const trimmed = content.trim();
   if (!trimmed) return [];
-  if (/<h[23][\s>]/i.test(trimmed)) return extractHtmlHeadings(trimmed);
+  if (/<h[123][\s>]/i.test(trimmed)) return extractHtmlHeadings(trimmed);
   return extractMarkdownHeadings(trimmed);
 }
 
@@ -110,7 +111,12 @@ export function TableOfContents({
       </h2>
       <ol className="space-y-1">
         {headings.map((heading, index) => (
-          <li key={`${heading.id}-${index}`} className={heading.level === 3 ? "pl-4" : ""}>
+          <li
+            key={`${heading.id}-${index}`}
+            className={
+              heading.level === 3 ? "pl-4" : heading.level === 2 ? "pl-2" : ""
+            }
+          >
             <a
               href={`#${heading.id}`}
               onClick={(event) => {

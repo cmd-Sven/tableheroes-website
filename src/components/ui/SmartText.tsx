@@ -5,6 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { normalizeEscapedMarkdown, normalizeMarkdownFlow } from "@/src/lib/markdown-normalize";
+import { WIKI_HEADING_CLASS } from "@/src/lib/wiki-heading-styles";
 import { slugifyHeading } from "./TableOfContents";
 
 export type EntityForSmartText = {
@@ -210,17 +211,24 @@ export function SmartText({
   const trimmed = normalizeMarkdownFlow(normalizeEscapedMarkdown(text || "")).trim();
 
   const components = useMemo(() => {
-    const createProcessor = (tag: string, withId = false, insideLink = false) => {
+    const createHeading = (tag: "h1" | "h2" | "h3") => {
+      return ({ children }: { children?: React.ReactNode }) => {
+        const processedChildren = entities.length
+          ? processChildren(children, entities, campaignId, worldId, false, openInNewTab)
+          : children;
+        return React.createElement(tag, {
+          id: slugifyHeading(childrenToText(children)),
+          className: WIKI_HEADING_CLASS[tag],
+        }, processedChildren);
+      };
+    };
+    const createProcessor = (tag: string, insideLink = false) => {
       const Comp = tag as keyof React.JSX.IntrinsicElements;
       return ({ children }: { children?: React.ReactNode }) => {
-        const props: { id?: string } = {};
-        if (withId) {
-          props.id = slugifyHeading(childrenToText(children));
-        }
         const processedChildren = entities.length
           ? processChildren(children, entities, campaignId, worldId, insideLink, openInNewTab)
           : children;
-        return React.createElement(Comp, props, processedChildren);
+        return React.createElement(Comp, {}, processedChildren);
       };
     };
     return {
@@ -228,9 +236,9 @@ export function SmartText({
       li: createProcessor("li"),
       td: createProcessor("td"),
       th: createProcessor("th"),
-      h1: createProcessor("h1", true),
-      h2: createProcessor("h2", true),
-      h3: createProcessor("h3", true),
+      h1: createHeading("h1"),
+      h2: createHeading("h2"),
+      h3: createHeading("h3"),
       blockquote: createProcessor("blockquote"),
       strong: createProcessor("strong"),
       em: createProcessor("em"),
@@ -279,10 +287,6 @@ export function SmartText({
     <div
       className={`w-full min-w-0 break-words font-libre text-[#e5e5e5] leading-relaxed prose prose-invert max-w-none
         prose-p:my-2 prose-p:leading-relaxed
-        prose-headings:font-barlow prose-headings:text-accent-blood prose-headings:border-b prose-headings:border-hero-border prose-headings:pb-2 prose-headings:mb-2 prose-headings:mt-4
-        prose-h1:text-2xl prose-h1:font-semibold
-        prose-h2:text-xl prose-h2:font-semibold
-        prose-h3:text-lg prose-h3:font-medium prose-h3:text-accent-gold
         prose-strong:text-white prose-strong:font-bold
         prose-em:text-gray-300 prose-em:italic
         prose-ul:my-3 prose-ul:list-disc prose-ul:pl-6 prose-ul:space-y-1
