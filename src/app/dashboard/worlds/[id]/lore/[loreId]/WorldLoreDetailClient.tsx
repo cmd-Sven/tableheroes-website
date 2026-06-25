@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Edit2, X, Plus, BookOpen, FolderTree, Loader2 } from "lucide-react";
 import { LoreHeaderImageSlider } from "@/src/components/dashboard/campaigns/lore/LoreImageSlider";
 import { SmartText } from "@/src/components/ui/SmartText";
-import { TableOfContents } from "@/src/components/ui/TableOfContents";
+import { TableOfContents, hasDocumentHeadings } from "@/src/components/ui/TableOfContents";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
@@ -118,6 +118,10 @@ export function WorldLoreDetailClient({
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [selectedOrphanId, setSelectedOrphanId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; description: string; index: number } | null>(null);
+  const descriptionHasToc = useMemo(
+    () => hasDocumentHeadings(lore.description),
+    [lore.description],
+  );
 
   const { entities } = useWorldEntities(worldId);
   const suggestedParents = SUGGESTED_PARENT_TYPES[lore.type] ?? [];
@@ -503,18 +507,29 @@ export function WorldLoreDetailClient({
           )}
 
           {lore.description ? (
-            <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-              <TableOfContents
-                content={lore.description}
-                className="self-start lg:sticky lg:top-24"
-              />
+            descriptionHasToc ? (
+              <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <TableOfContents
+                  content={lore.description}
+                  className="self-start lg:sticky lg:top-24"
+                />
+                <div className="min-w-0">
+                  <SmartText
+                    text={lore.description}
+                    entities={entities}
+                    worldId={worldId}
+                    emptyMessage="Keine Beschreibung."
+                  />
+                </div>
+              </div>
+            ) : (
               <SmartText
                 text={lore.description}
                 entities={entities}
                 worldId={worldId}
                 emptyMessage="Keine Beschreibung."
               />
-            </div>
+            )
           ) : (
             <p className="font-libre text-gray-500 italic">Keine Beschreibung.</p>
           )}

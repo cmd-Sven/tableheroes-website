@@ -83,6 +83,11 @@ function extractHeadings(content: string): TocHeading[] {
   return extractMarkdownHeadings(trimmed);
 }
 
+/** Prüft, ob für den Inhalt ein Inhaltsverzeichnis angezeigt werden kann. */
+export function hasDocumentHeadings(content: string | null | undefined): boolean {
+  return extractHeadings(normalizeEscapedMarkdown(content ?? "")).length > 0;
+}
+
 export function TableOfContents({
   content,
   title = "Inhalt",
