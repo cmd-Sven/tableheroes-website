@@ -4,8 +4,7 @@ import React, { useMemo, type ImgHTMLAttributes } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
-import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
+import { normalizeEscapedMarkdown, normalizeMarkdownFlow } from "@/src/lib/markdown-normalize";
 import { slugifyHeading } from "./TableOfContents";
 
 export type EntityForSmartText = {
@@ -208,7 +207,7 @@ export function SmartText({
   openInNewTab = false,
   largeImages = false,
 }: SmartTextProps) {
-  const trimmed = normalizeEscapedMarkdown(text || "").trim();
+  const trimmed = normalizeMarkdownFlow(normalizeEscapedMarkdown(text || "")).trim();
 
   const components = useMemo(() => {
     const createProcessor = (tag: string, withId = false, insideLink = false) => {
@@ -278,7 +277,7 @@ export function SmartText({
 
   return (
     <div
-      className={`font-libre text-[#e5e5e5] leading-relaxed prose prose-invert max-w-none
+      className={`w-full min-w-0 break-words font-libre text-[#e5e5e5] leading-relaxed prose prose-invert max-w-none
         prose-p:my-2 prose-p:leading-relaxed
         prose-headings:font-barlow prose-headings:text-accent-blood prose-headings:border-b prose-headings:border-hero-border prose-headings:pb-2 prose-headings:mb-2 prose-headings:mt-4
         prose-h1:text-2xl prose-h1:font-semibold
@@ -294,7 +293,7 @@ export function SmartText({
         prose-hr:border-hero-border/70 prose-hr:my-6
         ${className}`}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {trimmed}
       </ReactMarkdown>
     </div>

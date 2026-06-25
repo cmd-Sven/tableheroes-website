@@ -110,7 +110,7 @@ export function GothicSpotlightDescription({ children, className = "", backgroun
       />
 
       {/* Content */}
-      <div className="relative z-10 p-6">
+      <div className="relative z-10 w-full min-w-0 p-6">
         {children}
       </div>
     </div>

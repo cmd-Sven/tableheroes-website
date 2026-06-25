@@ -23,3 +23,31 @@ export function normalizeLooseMarkdownEmphasis(markdown: string): string {
 export function prepareNewsMarkdown(markdown: string): string {
   return normalizeLooseMarkdownEmphasis(normalizeEscapedMarkdown(markdown)).trim();
 }
+
+/**
+ * Joins accidental single line breaks inside prose blocks (paste from PDF/Word)
+ * while keeping paragraphs, lists, headings and code fences intact.
+ */
+export function normalizeMarkdownFlow(markdown: string): string {
+  const normalized = markdown.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return "";
+
+  return normalized
+    .split(/\n{2,}/)
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return "";
+
+      const isStructuredBlock =
+        /^(#{1,6}\s)/m.test(trimmed) ||
+        /^(\s*[-*+]\s)/m.test(trimmed) ||
+        /^(\s*\d+\.\s)/m.test(trimmed) ||
+        /^(\s*>)/m.test(trimmed) ||
+        /^```/m.test(trimmed);
+
+      if (isStructuredBlock) return trimmed;
+      return trimmed.replace(/\n+/g, " ").replace(/[ \t]{2,}/g, " ");
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
