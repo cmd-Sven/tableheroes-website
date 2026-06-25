@@ -32,7 +32,10 @@ export function normalizeMarkdownFlow(markdown: string): string {
   const normalized = markdown.replace(/\r\n/g, "\n").trim();
   if (!normalized) return "";
 
-  return normalized
+  // GFM hard breaks (two+ trailing spaces before newline) stack lines in a narrow column
+  const withoutHardBreaks = normalized.replace(/[ \t]{2,}\n/g, "\n");
+
+  return withoutHardBreaks
     .split(/\n{2,}/)
     .map((block) => {
       const trimmed = block.trim();

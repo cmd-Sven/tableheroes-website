@@ -3,6 +3,8 @@ export type NpcPortraitMetaInput = {
   portraitFile: File | null;
   portraitIsAiGenerated: boolean;
   uploadRightsConfirmed: boolean;
+  /** Externe Bild-URL ohne Upload — Nutzungsrechte bestätigt */
+  urlRightsConfirmed?: boolean;
 };
 
 export type NpcPortraitMeta = {
@@ -37,6 +39,13 @@ export function buildNpcPortraitMeta(input: NpcPortraitMetaInput): NpcPortraitMe
     return {
       image_is_ai_generated: true,
       image_upload_rights_confirmed: null,
+    };
+  }
+
+  if (input.urlRightsConfirmed) {
+    return {
+      image_is_ai_generated: false,
+      image_upload_rights_confirmed: true,
     };
   }
 

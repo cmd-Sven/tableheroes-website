@@ -14,6 +14,9 @@ import {
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
+import { uploadLoreImage } from "@/src/lib/profile-media";
+import { LoreMainImageField } from "./LoreMainImageField";
 import { getDeitiesByWorld, saveDeityFromLore, type DeityRelationshipInput } from "@/src/app/dashboard/worlds/deity-actions";
 import { saveReligionFromLore, type ReligionHolidayInput, type ReligionImportantFigureInput } from "@/src/app/dashboard/worlds/religion-actions";
 import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
@@ -34,6 +37,8 @@ type LoreEntry = {
   parent_id: string | null;
   image_url: string | null;
   image_display?: unknown;
+  image_is_ai_generated?: boolean | null;
+  image_upload_rights_confirmed?: boolean | null;
   additional_images?: AdditionalImage[] | null;
   description: string | null;
   gm_notes: string | null;
@@ -125,6 +130,10 @@ export function LoreForm({
   const [selectedRaceIds, setSelectedRaceIds] = useState<string[]>([]);
   const [selectedCultureId, setSelectedCultureId] = useState<string | null>(null);
   const [selectedDeityId, setSelectedDeityId] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
+  const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   
   const isEditMode = !!initialData;
   const isLocation = createMode === "location" || (initialData && isLocationType(initialData.type));
@@ -175,6 +184,10 @@ export function LoreForm({
       setSelectedLanguageIds(initialData.language_ids || []);
       setSelectedRaceIds(initialData.race_ids || []);
       setSelectedCultureId(initialData.culture_id || null);
+      setImageFile(null);
+      setUploadRightsConfirmed(false);
+      setUrlRightsConfirmed(initialData.image_upload_rights_confirmed === true);
+      setIsAiGenerated(initialData.image_is_ai_generated === true);
       // Falls wir eine bestehende Gottheit bearbeiten, Felder aus deities-Tabelle übernehmen
       if (initialData.type === "Gottheit" && initialDeityFields) {
         setDeityFields({
@@ -208,6 +221,10 @@ export function LoreForm({
       setSelectedRaceIds([]);
       setSelectedCultureId(null);
       setSelectedDeityId(null);
+      setImageFile(null);
+      setUploadRightsConfirmed(false);
+      setUrlRightsConfirmed(false);
+      setIsAiGenerated(false);
     }
   }, [initialData, defaultType, resolvedType, initialParentId, initialDeityFields]);
 
@@ -316,11 +333,58 @@ export function LoreForm({
         // If WORLD_ROOT_VALUE is selected, set parent_id to null (world root level)
         const parentId = formData.parent_id === WORLD_ROOT_VALUE ? null : (formData.parent_id || null);
 
+        const effectiveWorldId = worldId || world?.id;
+        let resolvedImageUrl = formData.image_url.trim() || null;
+
+        if (imageFile) {
+          if (!effectiveWorldId) {
+            throw new Error("Welt-Kontext fehlt für den Bild-Upload.");
+          }
+          const upload = await uploadLoreImage(imageFile, {
+            worldId: effectiveWorldId,
+            loreId: initialData?.id,
+          });
+          if ("error" in upload) throw new Error(upload.error);
+          resolvedImageUrl = upload.publicUrl;
+        }
+
+        const imageMetaFields: {
+          image_is_ai_generated?: boolean;
+          image_upload_rights_confirmed?: boolean | null;
+        } = {};
+
+        if (imageFile) {
+          const portraitMeta = buildNpcPortraitMeta({
+            imageUrl: resolvedImageUrl,
+            portraitFile: imageFile,
+            portraitIsAiGenerated: false,
+            uploadRightsConfirmed,
+          });
+          imageMetaFields.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+          imageMetaFields.image_upload_rights_confirmed =
+            portraitMeta.image_upload_rights_confirmed;
+        } else if (!resolvedImageUrl && initialData?.image_url) {
+          imageMetaFields.image_is_ai_generated = false;
+          imageMetaFields.image_upload_rights_confirmed = null;
+        } else if (resolvedImageUrl) {
+          const portraitMeta = buildNpcPortraitMeta({
+            imageUrl: resolvedImageUrl,
+            portraitFile: null,
+            portraitIsAiGenerated: isAiGenerated,
+            uploadRightsConfirmed: false,
+            urlRightsConfirmed,
+          });
+          imageMetaFields.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+          imageMetaFields.image_upload_rights_confirmed =
+            portraitMeta.image_upload_rights_confirmed;
+        }
+
         const payload: Record<string, unknown> = {
           name: formData.name,
           type: formData.type,
           parent_id: parentId,
-          image_url: formData.image_url || undefined,
+          image_url: resolvedImageUrl || undefined,
+          ...imageMetaFields,
           additional_images:
             formData.additional_images
               .filter((img) => img.url.trim() !== "")
@@ -329,7 +393,7 @@ export function LoreForm({
                 description: (img.description || "").trim(),
                 display: normalizeImageDisplay(img.display ?? DEFAULT_IMAGE_DISPLAY),
               })) || null,
-          image_display: formData.image_url.trim()
+          image_display: resolvedImageUrl
             ? normalizeImageDisplay(formData.image_display)
             : null,
           description: formData.description || undefined,
@@ -1468,32 +1532,34 @@ export function LoreForm({
           </div>
         )}
 
-        {/* Main Image URL - Required */}
+        {/* Main Image */}
         <div>
           <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-            Hauptbild URL *
+            Hauptbild (optional)
           </label>
-          <input
-            type="url"
-            required
-            value={formData.image_url}
-            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-            className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-            placeholder="https://example.com/image.jpg"
-          />
-          <p className="mt-1 text-xs text-gray-500 font-libre">
-            Querformat im Header. Unten: Ausschnitt (Cover), ganzes Bild (Contain) und ggf. Hintergrundfarbe.
+          <p className="mb-3 font-libre text-xs text-gray-500">
+            Querformat im Header. Per URL oder lokalem Upload — für öffentliche Lore-Seiten
+            Bildrechte bestätigen oder als KI-generiert kennzeichnen.
           </p>
-          {formData.image_url.trim() ? (
-            <div className="mt-4">
-              <ImageUrlDisplayEditor
-                value={formData.image_display}
-                onChange={(image_display) => setFormData((prev) => ({ ...prev, image_display }))}
-                previewUrl={formData.image_url}
-                previewAspectClassName="aspect-video"
-              />
-            </div>
-          ) : null}
+          <LoreMainImageField
+            imageUrl={formData.image_url}
+            onImageUrlChange={(url) => setFormData((prev) => ({ ...prev, image_url: url }))}
+            imageFile={imageFile}
+            onImageFileChange={(file) => {
+              setImageFile(file);
+              if (file) setUploadRightsConfirmed(false);
+            }}
+            imageDisplay={formData.image_display}
+            onImageDisplayChange={(image_display) =>
+              setFormData((prev) => ({ ...prev, image_display }))
+            }
+            isAiGenerated={isAiGenerated}
+            onIsAiGeneratedChange={setIsAiGenerated}
+            uploadRightsConfirmed={uploadRightsConfirmed}
+            onUploadRightsConfirmedChange={setUploadRightsConfirmed}
+            urlRightsConfirmed={urlRightsConfirmed}
+            onUrlRightsConfirmedChange={setUrlRightsConfirmed}
+          />
         </div>
 
         {/* Additional Images */}

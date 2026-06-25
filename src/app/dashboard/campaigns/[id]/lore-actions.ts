@@ -83,6 +83,8 @@ export async function createLoreEntry(formData: {
   race_traits?: string | null;
   /** URL-Bild: Cover/Contain, Fokus, Letterbox-Farbe */
   image_display?: unknown;
+  image_is_ai_generated?: boolean;
+  image_upload_rights_confirmed?: boolean | null;
 }) {
   const supabase = await createClient();
 
@@ -133,6 +135,8 @@ export async function createLoreEntry(formData: {
       formData.image_display != null
         ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
         : null,
+    image_is_ai_generated: formData.image_is_ai_generated ?? false,
+    image_upload_rights_confirmed: formData.image_upload_rights_confirmed ?? null,
     description: formData.description || null,
     gm_notes: formData.gm_notes || null,
     allow_pc_origin: formData.allow_pc_origin ?? false,
@@ -233,6 +237,8 @@ export async function updateLoreEntry(
     race_subtypes?: string | null;
     race_traits?: string | null;
     image_display?: unknown | null;
+    image_is_ai_generated?: boolean;
+    image_upload_rights_confirmed?: boolean | null;
   }
 ) {
   const supabase = await createClient();
