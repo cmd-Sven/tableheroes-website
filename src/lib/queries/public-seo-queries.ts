@@ -6,8 +6,7 @@ import type {
   PublicSeoEntityType,
 } from "@/src/lib/public-seo-types";
 
-const SITE_URL = () =>
-  (process.env.NEXT_PUBLIC_SITE_URL ?? "https://table-heroes.de").replace(/\/$/, "");
+import { getSiteUrl } from "@/src/lib/site-url";
 
 function excerpt(text: string | null | undefined, max = 160): string | null {
   if (!text?.trim()) return null;
@@ -271,7 +270,23 @@ export async function getHomepagePublicLoreGroups(
 }
 
 export function publicSeoAbsoluteUrl(slug: string): string {
-  return `${SITE_URL()}/${slug}`;
+  return `${getSiteUrl()}/${slug}`;
+}
+
+export async function getPublicSeoSlugsForSitemap(): Promise<
+  Array<{ slug: string; publishedAt: string | null }>
+> {
+  const supabase = createAdminClient();
+  const { data } = await (supabase as any)
+    .from("public_seo_entries")
+    .select("slug, published_at")
+    .eq("is_public", true)
+    .order("published_at", { ascending: false });
+
+  return ((data ?? []) as Array<{ slug: string; published_at: string | null }>).map((row) => ({
+    slug: String(row.slug),
+    publishedAt: row.published_at ? String(row.published_at) : null,
+  }));
 }
 
 export async function isPublicSeoSlugTaken(slug: string, exceptEntity?: {

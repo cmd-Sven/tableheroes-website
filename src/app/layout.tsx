@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Barlow_Condensed, Cinzel, Libre_Baskerville } from "next/font/google";
 import { Toaster } from "sonner";
+import { absoluteUrl, getSiteUrl } from "@/src/lib/site-url";
 import "./globals.css";
 
 // 1. Schriften konfigurieren
@@ -24,6 +25,7 @@ const libre = Libre_Baskerville({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title:
     "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
   description:
@@ -43,19 +45,22 @@ export const metadata: Metadata = {
     "Kampagnen Manager",
   ],
   authors: [{ name: "TableHeroes" }],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title:
       "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
     description:
       "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
-    url: "https://tableheroes.de",
-    siteName: "TableHeroes",
+    url: absoluteUrl("/"),
+    siteName: "Table Heroes",
     images: [
       {
         url: "/images/tableHeroes-logo.png",
         width: 520,
         height: 160,
-        alt: "TableHeroes Logo",
+        alt: "Table Heroes Logo",
       },
     ],
     locale: "de_DE",
@@ -93,13 +98,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // JSON-LD Strukturierte Daten für SEO
+  const siteUrl = getSiteUrl();
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "TableHeroes",
+    name: "Table Heroes",
     description:
       "Community-Plattform für TTRPG-Spieler in Osnabrück mit geschlossener Mitglieder-Area und proprietärem Spielleiter-Tool.",
-    url: "https://tableheroes.de",
+    url: siteUrl,
     areaServed: {
       "@type": "City",
       name: "Osnabrück",
@@ -108,7 +114,7 @@ export default function RootLayout({
         name: "Germany",
       },
     },
-    logo: "https://tableheroes.de/images/tableHeroes-logo.png",
+    logo: absoluteUrl("/images/tableHeroes-logo.png"),
     sameAs: [
       "https://discord.gg/JzfXw9b7v7",
       "https://instagram.com/tableheroes",
@@ -118,15 +124,15 @@ export default function RootLayout({
   const softwareApplicationSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "TableHeroes",
+    name: "Table Heroes",
     applicationCategory: "GameApplication",
     operatingSystem: "Web-based",
     description:
       "Die ultimative TTRPG-Plattform für Pen and Paper Abenteuer, Community-Management und Gamification.",
-    url: "https://tableheroes.de",
+    url: siteUrl,
     publisher: {
       "@type": "Organization",
-      name: "TableHeroes",
+      name: "Table Heroes",
     },
     areaServed: {
       "@type": "City",

@@ -322,13 +322,13 @@ export function HeroSection() {
               className="mt-3 font-barlow font-extrabold text-2xl md:text-3xl tracking-wide text-hero-vibrant"
               style={{ willChange: "transform, opacity" }}
             >
-              Pen &amp; Paper Community Osnabrück, zu Tisch oder Online.
+              TTRPG Community Osnabrück — Lore-Datenbank, NSCs &amp; Kampagnen-Tool
             </motion.h1>
 
             {/* Claim-Text direkt unter dem Untertitel, mittig und in Fließtext-Größe */}
             <p className="mt-4 font-libre text-gray-100 leading-relaxed text-sm md:text-base max-w-xl">
-              Wir bringen Spieler und Spielleiter zusammen. Digital organisiert, analog erlebt. Finde deine
-              Gruppe und werde Teil der TableHeroes-Gemeinschaft.
+              Wir bringen Spieler und Spielleiter zusammen — digital organisiert, analog erlebt.
+              Finde deine Gruppe, entdecke kuratierte Lore und werde Teil der Table-Heroes-Gemeinschaft.
             </p>
           </div>
 

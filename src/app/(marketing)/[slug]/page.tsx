@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicLoreDetailView } from "@/src/components/public/PublicLoreDetailView";
 import { getPublicSeoBySlug } from "@/src/lib/queries/public-seo-queries";
+import { absoluteUrl } from "@/src/lib/site-url";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -22,11 +23,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: {
+      canonical: `/${slug}`,
+    },
     openGraph: {
       title,
       description,
       type: "article",
-      url: `https://table-heroes.de/${slug}`,
+      url: absoluteUrl(slug),
       images: entry.imageUrl ? [{ url: entry.imageUrl, alt: entry.name }] : undefined,
     },
     twitter: {
