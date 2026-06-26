@@ -22,12 +22,13 @@ type LoreEntry = {
 
 type Props = {
   loreEntries: LoreEntry[];
+  overviewEntries: LoreEntry[];
   worldId: string;
 };
 
 type ViewMode = "overview" | "grid";
 
-export function WorldLoreListClient({ loreEntries, worldId }: Props) {
+export function WorldLoreListClient({ loreEntries, overviewEntries, worldId }: Props) {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
 
@@ -128,9 +129,10 @@ export function WorldLoreListClient({ loreEntries, worldId }: Props) {
         </div>
       ) : viewMode === "overview" ? (
         <LoreCategoryOverview
-          entries={loreEntries}
+          entries={overviewEntries}
           worldId={worldId}
           searchQuery={search}
+          scope="all"
         />
       ) : filteredEntries.length === 0 ? (
         <div className="text-center py-12">

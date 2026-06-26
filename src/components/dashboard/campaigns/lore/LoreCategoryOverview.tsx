@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { isLocationType } from "@/src/lib/lore-types";
 import {
   buildLoreOverviewSections,
   countLoreOverviewItems,
+  type BuildLoreOverviewOptions,
   type LoreOverviewItem,
+  type LoreOverviewLocationNode,
   type LoreOverviewSection,
   type LoreOverviewSourceEntry,
 } from "@/src/lib/lore-overview";
@@ -15,6 +18,7 @@ type Props = {
   entries: LoreOverviewSourceEntry[];
   worldId: string;
   searchQuery?: string;
+  scope?: BuildLoreOverviewOptions["scope"];
 };
 
 function matchesSearch(entry: LoreOverviewSourceEntry, query: string): boolean {
@@ -34,6 +38,7 @@ function filterEntriesForOverview(
   const q = searchQuery.trim().toLowerCase();
   if (!q) return entries;
 
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const directHits = new Set(
     entries.filter((entry) => matchesSearch(entry, q)).map((entry) => entry.id),
   );
@@ -50,34 +55,96 @@ function filterEntriesForOverview(
     }
   }
 
+  // Ort-Treffer → Elternkette und Unterorte einbeziehen
+  const locationEntries = entries.filter((entry) => isLocationType(entry.type));
+
+  for (const entry of locationEntries) {
+    if (!directHits.has(entry.id)) continue;
+    let parentId = entry.parent_id?.trim() || null;
+    while (parentId && byId.has(parentId)) {
+      directHits.add(parentId);
+      parentId = byId.get(parentId)?.parent_id?.trim() || null;
+    }
+  }
+
+  const addDescendants = (parentId: string) => {
+    for (const entry of locationEntries) {
+      if (entry.parent_id === parentId && !directHits.has(entry.id)) {
+        directHits.add(entry.id);
+        addDescendants(entry.id);
+      }
+    }
+  };
+
+  for (const id of [...directHits]) {
+    const entry = byId.get(id);
+    if (entry && isLocationType(entry.type)) {
+      addDescendants(id);
+    }
+  }
+
   return entries.filter((entry) => directHits.has(entry.id));
+}
+
+function resolveDetailHref(item: LoreOverviewItem, worldId: string): string {
+  if (isLocationType(item.type)) {
+    return `/dashboard/worlds/${worldId}/locations/${item.id}`;
+  }
+  return `/dashboard/worlds/${worldId}/lore/${item.id}`;
 }
 
 function EntryLink({
   item,
   worldId,
-  indent = false,
+  href,
   subtle = false,
 }: {
   item: LoreOverviewItem;
   worldId: string;
-  indent?: boolean;
+  href?: string;
   subtle?: boolean;
 }) {
   return (
-    <li className={indent ? "pl-4" : undefined}>
-      <Link
-        href={`/dashboard/worlds/${worldId}/lore/${item.id}`}
-        className={`group flex items-baseline justify-between gap-3 rounded px-2 py-1.5 transition-colors hover:bg-hero-dark/50 ${
-          subtle ? "text-gray-300" : "text-white"
-        }`}
-      >
-        <span className="font-libre group-hover:text-hero-vibrant">{item.name}</span>
-        <span className="shrink-0 font-barlow text-[10px] font-bold uppercase text-gray-500">
-          {item.type}
-        </span>
-      </Link>
-    </li>
+    <Link
+      href={href ?? resolveDetailHref(item, worldId)}
+      className={`group flex items-baseline justify-between gap-3 rounded px-2 py-1.5 transition-colors hover:bg-hero-dark/50 ${
+        subtle ? "text-gray-300" : "text-white"
+      }`}
+    >
+      <span className="font-libre group-hover:text-hero-vibrant">{item.name}</span>
+      <span className="shrink-0 font-barlow text-[10px] font-bold uppercase text-gray-500">
+        {item.type}
+      </span>
+    </Link>
+  );
+}
+
+function LocationTreeList({
+  nodes,
+  worldId,
+  depth = 0,
+}: {
+  nodes: LoreOverviewLocationNode[];
+  worldId: string;
+  depth?: number;
+}) {
+  return (
+    <ul
+      className={
+        depth > 0
+          ? "mt-1 space-y-0.5 border-l border-hero-border/40 ml-3 pl-2"
+          : "space-y-1"
+      }
+    >
+      {nodes.map((node) => (
+        <li key={node.item.id}>
+          <EntryLink item={node.item} worldId={worldId} subtle={depth > 0} />
+          {node.children.length > 0 ? (
+            <LocationTreeList nodes={node.children} worldId={worldId} depth={depth + 1} />
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -116,21 +183,21 @@ function OverviewSection({
 
       {isExpanded ? (
         <div className="border-t border-hero-dark/50 px-4 py-3">
+          {section.locationTree && section.locationTree.length > 0 ? (
+            <LocationTreeList nodes={section.locationTree} worldId={worldId} />
+          ) : null}
+
           {section.cultureGroups && section.cultureGroups.length > 0 ? (
             <ul className="space-y-3">
               {section.cultureGroups.map((group) => (
                 <li key={group.culture.id}>
                   <EntryLink item={group.culture} worldId={worldId} />
                   {group.races.length > 0 ? (
-                    <ul className="mt-1 space-y-0.5 border-l border-hero-border/40 ml-2">
+                    <ul className="mt-1 space-y-0.5 border-l border-hero-border/40 ml-3 pl-2">
                       {group.races.map((race) => (
-                        <EntryLink
-                          key={race.id}
-                          item={race}
-                          worldId={worldId}
-                          indent
-                          subtle
-                        />
+                        <li key={race.id}>
+                          <EntryLink item={race} worldId={worldId} subtle />
+                        </li>
                       ))}
                     </ul>
                   ) : null}
@@ -140,13 +207,19 @@ function OverviewSection({
           ) : null}
 
           {section.orphanRaces && section.orphanRaces.length > 0 ? (
-            <div className={section.cultureGroups?.length ? "mt-4 pt-3 border-t border-hero-dark/40" : undefined}>
+            <div
+              className={
+                section.cultureGroups?.length ? "mt-4 pt-3 border-t border-hero-dark/40" : undefined
+              }
+            >
               <p className="mb-2 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
                 Rassen ohne Kultur
               </p>
               <ul className="space-y-0.5">
                 {section.orphanRaces.map((race) => (
-                  <EntryLink key={race.id} item={race} worldId={worldId} subtle />
+                  <li key={race.id}>
+                    <EntryLink item={race} worldId={worldId} subtle />
+                  </li>
                 ))}
               </ul>
             </div>
@@ -155,7 +228,9 @@ function OverviewSection({
           {section.entries.length > 0 ? (
             <ul className="space-y-0.5">
               {section.entries.map((entry) => (
-                <EntryLink key={entry.id} item={entry} worldId={worldId} />
+                <li key={entry.id}>
+                  <EntryLink item={entry} worldId={worldId} />
+                </li>
               ))}
             </ul>
           ) : null}
@@ -165,11 +240,16 @@ function OverviewSection({
   );
 }
 
-export function LoreCategoryOverview({ entries, worldId, searchQuery = "" }: Props) {
+export function LoreCategoryOverview({
+  entries,
+  worldId,
+  searchQuery = "",
+  scope = "all",
+}: Props) {
   const sections = useMemo(() => {
     const filtered = filterEntriesForOverview(entries, searchQuery);
-    return buildLoreOverviewSections(filtered);
-  }, [entries, searchQuery]);
+    return buildLoreOverviewSections(filtered, { scope });
+  }, [entries, searchQuery, scope]);
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set());
 
@@ -197,7 +277,7 @@ export function LoreCategoryOverview({ entries, worldId, searchQuery = "" }: Pro
       <p className="rounded-lg border border-hero-dark/60 bg-hero-dark/20 px-4 py-6 text-center font-libre text-sm text-gray-400">
         {searchQuery.trim()
           ? "Keine Einträge für diese Suche in der Übersicht."
-          : "Noch keine Lore-Einträge vorhanden."}
+          : "Noch keine Einträge vorhanden."}
       </p>
     );
   }

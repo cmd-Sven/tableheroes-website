@@ -84,7 +84,11 @@ export default async function WorldLorePage({
         Zurück zu {(world as any).name}
       </Link>
 
-      <WorldLoreListClient loreEntries={loreEntries} worldId={worldId} />
+      <WorldLoreListClient
+        loreEntries={loreEntries}
+        overviewEntries={allEntries}
+        worldId={worldId}
+      />
     </div>
   );
 }
