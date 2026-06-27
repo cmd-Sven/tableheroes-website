@@ -10,7 +10,9 @@ import {
   MapPin,
   ScrollText,
   Users,
+  ImageIcon,
 } from "lucide-react";
+import type { SceneGalleryEntry } from "@/src/lib/scene-media-types";
 import { PlayerRecapEditor } from "@/src/components/chronicle/PlayerRecapEditor";
 import { PlayerRecapView } from "@/src/components/chronicle/PlayerRecapView";
 import { parsePlayerRecapRecord } from "@/src/lib/session-chronicle/parse-db";
@@ -39,6 +41,7 @@ export type SessionArchiveItem = {
   chronicle_snapshot: ChronicleEntry[] | null;
   encountered_npcs: ArchiveRef[] | null;
   visited_locations: ArchiveRef[] | null;
+  scene_gallery?: SceneGalleryEntry[] | null;
   player_recap?: unknown;
 };
 
@@ -353,6 +356,35 @@ export function PastSessionsGallery({
                       <p className="font-libre text-xs text-gray-500">Keine NSCs erfasst.</p>
                     )}
                   </div>
+                </div>
+
+                <div className="rounded border border-hero-border/30 bg-background-dark/70 p-4">
+                  <h4 className="mb-2 flex items-center gap-2 font-barlow text-xs font-bold uppercase text-accent-gold">
+                    <ImageIcon className="h-4 w-4" />
+                    Szenen-Galerie
+                  </h4>
+                  {(selectedArchive.scene_gallery ?? []).length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {(selectedArchive.scene_gallery ?? []).map((scene) => (
+                        <div
+                          key={`${scene.id}-${scene.shown_at}`}
+                          className="overflow-hidden rounded border border-hero-border/40 bg-black/30"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={scene.image_url}
+                            alt={scene.title}
+                            className="aspect-video w-full object-cover"
+                          />
+                          <p className="px-2 py-1 font-libre text-[11px] text-gray-300 line-clamp-2">
+                            {scene.title}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="font-libre text-xs text-gray-500">Keine Szenenbilder erfasst.</p>
+                  )}
                 </div>
               </aside>
             </article>

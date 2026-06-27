@@ -230,3 +230,45 @@ export async function uploadLoreImage(
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
 }
+
+/** Szenenbild Mediathek: `{userId}/scene-media/{campaignId}/{id|new-…}/image-{ts}.ext` */
+export async function uploadSceneMediaImage(
+  file: File,
+  options: { campaignId: string; sceneMediaId?: string | null },
+): Promise<{ path: string; publicUrl: string } | { error: string }> {
+  const err = validateProfileImageFile(file);
+  if (err) return { error: err };
+
+  const campaignId = options.campaignId?.trim();
+  if (!campaignId) return { error: "Kampagnen-ID fehlt für den Upload." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Nicht angemeldet." };
+
+  const ext = extensionFromMimeOrName(file);
+  const segment = options.sceneMediaId?.trim()
+    ? options.sceneMediaId.trim()
+    : `new-${crypto.randomUUID()}`;
+  const path = `${user.id}/scene-media/${campaignId}/${segment}/image-${Date.now()}.${ext}`;
+  const contentType = contentTypeForImageUpload(file);
+
+  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+    contentType,
+  });
+
+  if (error) {
+    const hint =
+      /mime|not supported|invalid/i.test(error.message)
+        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob Bild-MIME-Typen erlaubt sind."
+        : "";
+    return { error: `${error.message}${hint}` };
+  }
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}

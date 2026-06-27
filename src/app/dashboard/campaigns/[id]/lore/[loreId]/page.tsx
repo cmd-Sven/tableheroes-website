@@ -6,6 +6,7 @@ import { getLoreById, getChildLoreEntries, getLoreEntriesForParent, getLoreBread
 import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { getNPCsByLocation } from "../../location-actions";
 import { isLocationType } from "@/src/lib/lore-types";
+import { getLoreSceneAppearances } from "../../scene-media-actions";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;
@@ -404,12 +405,18 @@ export default async function LoreDetailPageRoute({ params }: Props) {
     type: b.type || "Eintrag"
   }));
 
+  let sceneAppearances: Awaited<ReturnType<typeof getLoreSceneAppearances>> = [];
+  if (isLocationType((lore as any).type)) {
+    sceneAppearances = await getLoreSceneAppearances(campaignId, loreId).catch(() => []);
+  }
+
   return (
     <LoreDetailPage
       lore={{ ...loreWithVisibility, parent } as any}
       campaignId={campaignId}
       isGM={isGM}
       locationNPCs={safeLocationNPCs}
+      sceneAppearances={sceneAppearances}
       childEntries={childEntries}
       breadcrumb={safeBreadcrumb as any}
       parentOptions={parentOptions}

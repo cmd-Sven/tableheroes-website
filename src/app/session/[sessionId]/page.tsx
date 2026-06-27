@@ -18,6 +18,7 @@ import {
   serializeGuestSessionPayload,
 } from "@/src/app/session/load-guest-session";
 import { absoluteUrl } from "@/src/lib/site-url";
+import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -103,7 +104,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode, guest_join_token")
+    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, transcription_mode, guest_join_token")
     .eq("id", sessionId)
     .single();
 
@@ -113,6 +114,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     status: string;
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
+    stage_deck_scene_media_ids?: string[] | null;
     transcription_mode?: string | null;
     guest_join_token?: string | null;
   } | null;
@@ -369,6 +371,23 @@ export default async function SessionPage({ params, searchParams }: Props) {
     session?.stage_deck_faction_ids != null && Array.isArray(session.stage_deck_faction_ids)
       ? session.stage_deck_faction_ids.map(String)
       : null;
+  const stageDeckSceneMediaIds =
+    session?.stage_deck_scene_media_ids != null &&
+    Array.isArray(session.stage_deck_scene_media_ids)
+      ? session.stage_deck_scene_media_ids.map(String)
+      : null;
+
+  const sceneMediaRows = await getCampaignSceneMedia((session as any).campaign_id).catch(
+    () => [],
+  );
+  const allSceneMedia = sceneMediaRows.map((s) => ({
+    id: String(s.id),
+    title: String(s.title),
+    image_url: String(s.image_url),
+    category: String(s.category),
+    player_notes: s.player_notes,
+    image_is_ai_generated: s.image_is_ai_generated === true,
+  }));
 
   const loreLocationOptions = viewAsGM
     ? (await getLoreEntries((session as any).campaign_id))
@@ -477,6 +496,12 @@ export default async function SessionPage({ params, searchParams }: Props) {
       stageDeckFactionIds={
         stageDeckFactionIds != null
           ? serializeForClient(stageDeckFactionIds)
+          : null
+      }
+      allSceneMedia={serializeForClient(allSceneMedia)}
+      stageDeckSceneMediaIds={
+        stageDeckSceneMediaIds != null
+          ? serializeForClient(stageDeckSceneMediaIds)
           : null
       }
       activeQuests={serializeForClient(normalizedQuests)}

@@ -408,8 +408,9 @@ export async function markSessionPlanningComplete(sessionId: string) {
 export async function updateSessionStageDeck(
   sessionId: string,
   deck: {
-    stage_deck_npc_ids: string[] | null;
-    stage_deck_faction_ids: string[] | null;
+    stage_deck_npc_ids?: string[] | null;
+    stage_deck_faction_ids?: string[] | null;
+    stage_deck_scene_media_ids?: string[] | null;
   },
 ) {
   const supabase = await createClient();
@@ -442,11 +443,19 @@ export async function updateSessionStageDeck(
     throw new Error("Nur der GM kann das Bühnendeck ändern.");
   }
 
+  const updatePayload: Record<string, unknown> = {};
+  if (deck.stage_deck_npc_ids !== undefined) {
+    updatePayload.stage_deck_npc_ids = deck.stage_deck_npc_ids;
+  }
+  if (deck.stage_deck_faction_ids !== undefined) {
+    updatePayload.stage_deck_faction_ids = deck.stage_deck_faction_ids;
+  }
+  if (deck.stage_deck_scene_media_ids !== undefined) {
+    updatePayload.stage_deck_scene_media_ids = deck.stage_deck_scene_media_ids;
+  }
+
   const { error: updateError } = await (supabase.from("sessions") as any)
-    .update({
-      stage_deck_npc_ids: deck.stage_deck_npc_ids,
-      stage_deck_faction_ids: deck.stage_deck_faction_ids,
-    })
+    .update(updatePayload)
     .eq("id", sessionId);
 
   if (updateError) {
@@ -981,6 +990,10 @@ export async function archiveSession(
     liveState.system_logs,
     liveState.journal_text,
   );
+  const { buildSceneGalleryForSession, linkSceneAppearancesToArchive } = await import(
+    "./scene-media-actions"
+  );
+  const sceneGallery = await buildSceneGalleryForSession(sessionId);
   const archivedAt = new Date().toISOString();
   const fallbackSessionName =
     session.title ||
@@ -1001,6 +1014,7 @@ export async function archiveSession(
         chronicle_snapshot: chronicleSnapshot,
         encountered_npcs: encounteredNpcs,
         visited_locations: visitedLocations,
+        scene_gallery: sceneGallery,
       },
       { onConflict: "session_id" },
     )
@@ -1012,6 +1026,8 @@ export async function archiveSession(
   }
 
   const archive = archiveRaw as { id: string };
+
+  await linkSceneAppearancesToArchive(sessionId, archive.id);
 
   try {
     const { seedPlayerRecapDraftForArchive } = await import("./player-recap-actions");

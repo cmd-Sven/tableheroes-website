@@ -124,6 +124,9 @@ type NPC = {
   }> | null;
 };
 
+import { NpcSceneAppearances } from "@/src/components/dashboard/campaigns/npcs/NpcSceneAppearances";
+import type { SceneMediaAppearance } from "@/src/lib/scene-media-types";
+
 type Props = {
   npc: NPC;
   campaignId: string;
@@ -142,6 +145,7 @@ type Props = {
     locationName: string | null;
     seenAt: string | null;
   } | null;
+  sceneAppearances?: SceneMediaAppearance[];
   /** Für Quest-Modal von NPC-Seite (nur GM) */
   npcsForQuest?: Array<{ id: string; name: string; title: string | null; role: string | null }>;
   membersForQuest?: Array<{ id: string; character_id: string | null; user?: { username: string } | null; character_data?: any; characters?: any }>;
@@ -256,6 +260,7 @@ export function NPCDetailPage({
   factions = [],
   locations = [],
   lastSeen = null,
+  sceneAppearances = [],
   npcsForQuest = [],
   membersForQuest = [],
 }: Props) {
@@ -1221,6 +1226,10 @@ export function NPCDetailPage({
                 </p>
               </div>
             )}
+
+            {sceneAppearances.length > 0 ? (
+              <NpcSceneAppearances campaignId={campaignId} appearances={sceneAppearances} />
+            ) : null}
           </div>
         </div>
       </div>

@@ -13,6 +13,8 @@ import { LoreDescription } from "./LoreDescription";
 import { LoreGallery } from "./LoreGallery";
 import { LoreGMNotes } from "./LoreGMNotes";
 import { isLocationType } from "@/src/lib/lore-types";
+import { NpcSceneAppearances } from "@/src/components/dashboard/campaigns/npcs/NpcSceneAppearances";
+import type { SceneMediaAppearance } from "@/src/lib/scene-media-types";
 
 type LoreEntry = {
   id: string;
@@ -89,6 +91,7 @@ type Props = {
   campaignId: string;
   isGM: boolean;
   locationNPCs?: LocationNPCs | null;
+  sceneAppearances?: SceneMediaAppearance[];
   childEntries?: Array<{ id: string; name: string; type: string; image_url: string | null; is_revealed: boolean; created_at?: string; is_favorite?: boolean; published_at?: string; latest_secret_discovered_at?: string | null; has_recent_secret?: boolean }>;
   breadcrumb?: Array<{ id: string; name: string; type: string }>;
   parentOptions?: Array<{ id: string; name: string; type: string }>;
@@ -104,6 +107,7 @@ export function LoreDetailPage({
   campaignId, 
   isGM, 
   locationNPCs = { residents: [], guests: [] },
+  sceneAppearances = [],
   childEntries = [],
   breadcrumb = [],
   parentOptions = [],
@@ -767,6 +771,16 @@ export function LoreDetailPage({
       )}
       {(locationNPCs?.guests?.length ?? 0) > 0 && (
         <NPCCarousel residents={locationNPCs?.guests || []} isGM={isGM} campaignId={campaignId} title="Aktuelle Gäste" />
+      )}
+
+      {isLocationType(lore.type) && sceneAppearances.length > 0 && (
+        <NpcSceneAppearances
+          campaignId={campaignId}
+          appearances={sceneAppearances}
+          title="Szenen an diesem Ort"
+          description="Diese Szenenbilder wurden gezeigt, während dieser Ort auf der Live-Bühne aktiv war."
+          showLocation={false}
+        />
       )}
 
       {/* Universal Secret AI Modal */}

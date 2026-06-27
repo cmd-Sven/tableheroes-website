@@ -6,6 +6,7 @@ import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/facti
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { StagePrepClient } from "./StagePrepClient";
+import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
 
 type Props = {
   params: Promise<{ id: string; sessionId: string }>;
@@ -33,7 +34,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
 
   const { data: sessionRaw, error: sessionErr } = await (supabase.from("sessions") as any)
     .select(
-      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode",
+      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, transcription_mode",
     )
     .eq("id", sessionId)
     .single();
@@ -45,6 +46,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     status: string;
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
+    stage_deck_scene_media_ids?: string[] | null;
     transcription_mode?: string | null;
   } | null;
 
@@ -116,6 +118,13 @@ export default async function SessionStagePrepPage({ params }: Props) {
     session.stage_deck_faction_ids != null && Array.isArray(session.stage_deck_faction_ids)
       ? session.stage_deck_faction_ids.map(String)
       : null;
+  const stageDeckSceneMediaIds =
+    session.stage_deck_scene_media_ids != null &&
+    Array.isArray(session.stage_deck_scene_media_ids)
+      ? session.stage_deck_scene_media_ids.map(String)
+      : null;
+
+  const sceneMediaItems = await getCampaignSceneMedia(campaignId).catch(() => []);
 
   return (
     <StagePrepClient
@@ -140,6 +149,12 @@ export default async function SessionStagePrepPage({ params }: Props) {
           : session.transcription_mode === "table"
             ? "table"
             : null
+      }
+      sceneMediaItems={serializeForClient(sceneMediaItems)}
+      stageDeckSceneMediaIds={
+        stageDeckSceneMediaIds != null
+          ? serializeForClient(stageDeckSceneMediaIds)
+          : null
       }
     />
   );

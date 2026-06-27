@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Flag } from "lucide-react";
+import { StageSceneDeckMiniCard, type StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 
 type HandNpc = {
   id: string;
@@ -19,15 +20,17 @@ type HandFaction = {
 
 type DeckEntry =
   | { kind: "npc"; item: HandNpc; stackIndex: number }
-  | { kind: "faction"; item: HandFaction; stackIndex: number };
+  | { kind: "faction"; item: HandFaction; stackIndex: number }
+  | { kind: "scene"; item: StageSceneMediaItem; stackIndex: number };
 
 type Props = {
   npcs: HandNpc[];
   factions: HandFaction[];
-  onPlace: (kind: "npc" | "faction", id: string) => void;
+  scenes?: StageSceneMediaItem[];
+  onPlace: (kind: "npc" | "faction" | "scene", id: string) => void;
 };
 
-export function StageDeckHand({ npcs, factions, onPlace }: Props) {
+export function StageDeckHand({ npcs, factions, scenes = [], onPlace }: Props) {
   const entries: DeckEntry[] = useMemo(() => {
     const n = npcs.map((item, stackIndex) => ({
       kind: "npc" as const,
@@ -40,21 +43,35 @@ export function StageDeckHand({ npcs, factions, onPlace }: Props) {
       item,
       stackIndex: base + i,
     }));
-    return [...n, ...f];
-  }, [npcs, factions]);
+    const base2 = base + f.length;
+    const s = scenes.map((item, i) => ({
+      kind: "scene" as const,
+      item,
+      stackIndex: base2 + i,
+    }));
+    return [...n, ...f, ...s];
+  }, [npcs, factions, scenes]);
 
   if (entries.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-hero-dark bg-background-card/90 px-3 py-3 shadow-lg">
       <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
-        Deck — nur Bild; Name erscheint beim Darüberfahren. Karten ziehen oder
-        doppelklicken.
+        Deck — NSC, Fraktionen & Szenen. Ziehen oder doppelklicken.
       </p>
       <div className="flex min-h-[120px] items-end overflow-x-auto overflow-y-visible pb-2 pl-3 pr-2 pt-5">
-        {entries.map((entry) => (
-          <DeckMiniCard key={`${entry.kind}-${entry.item.id}`} entry={entry} onPlace={onPlace} />
-        ))}
+        {entries.map((entry) =>
+          entry.kind === "scene" ? (
+            <StageSceneDeckMiniCard
+              key={`scene-${entry.item.id}`}
+              scene={entry.item}
+              stackIndex={entry.stackIndex}
+              onPlace={(id: string) => onPlace("scene", id)}
+            />
+          ) : (
+            <DeckMiniCard key={`${entry.kind}-${entry.item.id}`} entry={entry} onPlace={onPlace} />
+          ),
+        )}
       </div>
     </div>
   );
@@ -64,8 +81,8 @@ function DeckMiniCard({
   entry,
   onPlace,
 }: {
-  entry: DeckEntry;
-  onPlace: (kind: "npc" | "faction", id: string) => void;
+  entry: Extract<DeckEntry, { kind: "npc" | "faction" }>;
+  onPlace: (kind: "npc" | "faction" | "scene", id: string) => void;
 }) {
   const { kind, item, stackIndex } = entry;
   const isFaction = kind === "faction";

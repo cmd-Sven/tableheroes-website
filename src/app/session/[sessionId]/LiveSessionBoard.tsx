@@ -63,6 +63,8 @@ import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campai
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
 import { registerSessionOnlinePresence } from "@/src/lib/actions/session-presence-actions";
 import { StageDeckHand } from "./StageDeckHand";
+import { StageSceneCard, type StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
+import { logSceneMediaAppearance } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
 import {
   formatWeatherSummary,
   normalizeIntensity,
@@ -136,6 +138,7 @@ type LiveState = {
   system_logs?: SystemLogEntry[] | null;
   visible_npc_ids: string[] | null;
   visible_faction_ids?: string[] | null;
+  active_scene_media_id?: string | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
   is_combat_mode?: boolean | null;
@@ -179,6 +182,8 @@ function normalizeLiveRow(row: unknown): LiveState {
     ...(r as unknown as LiveState),
     visible_npc_ids: Array.isArray(npcRaw) ? npcRaw.map(String) : [],
     visible_faction_ids: Array.isArray(facRaw) ? facRaw.map(String) : [],
+    active_scene_media_id:
+      r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
           .filter((entry): entry is Record<string, unknown> =>
@@ -907,6 +912,10 @@ type Props = {
   stageDeckNpcIds: string[] | null;
   /** null = alle Fraktionen im Stage Manager */
   stageDeckFactionIds: string[] | null;
+  /** Kampagnen-Szenenbilder (Mediathek) */
+  allSceneMedia?: StageSceneMediaItem[];
+  /** null = alle Szenen im Deck */
+  stageDeckSceneMediaIds?: string[] | null;
   activeQuests: ActiveQuest[];
   /** Nur GM: Orte aus Lore (isLocationType) für Dropdown */
   loreLocationOptions?: LoreLocationOption[];
@@ -936,6 +945,8 @@ export function LiveSessionBoard({
   allCampaignFactions,
   stageDeckNpcIds,
   stageDeckFactionIds,
+  allSceneMedia = [],
+  stageDeckSceneMediaIds = null,
   activeQuests,
   loreLocationOptions = [],
   sessionLocationLoreReadable = false,
@@ -1696,6 +1707,28 @@ export function LiveSessionBoard({
     return allCampaignFactions.filter((f) => allowed.has(String(f.id)));
   }, [allCampaignFactions, stageDeckFactionIds]);
 
+  const sceneStagePool = useMemo(() => {
+    if (stageDeckSceneMediaIds == null) return allSceneMedia;
+    const deck = stageDeckSceneMediaIds.map((id) => String(id)).filter(Boolean);
+    if (deck.length === 0) return allSceneMedia;
+    const allowed = new Set(deck);
+    return allSceneMedia.filter((s) => allowed.has(String(s.id)));
+  }, [allSceneMedia, stageDeckSceneMediaIds]);
+
+  const activeSceneMedia = useMemo(() => {
+    const id = liveState?.active_scene_media_id;
+    if (!id) return null;
+    return allSceneMedia.find((s) => String(s.id) === String(id)) ?? null;
+  }, [liveState?.active_scene_media_id, allSceneMedia]);
+
+  const inHandScenes = useMemo(
+    () =>
+      sceneStagePool.filter(
+        (s) => String(s.id) !== String(liveState?.active_scene_media_id ?? ""),
+      ),
+    [sceneStagePool, liveState?.active_scene_media_id],
+  );
+
   const activeFactionIds = useMemo(() => {
     return new Set((liveState?.visible_faction_ids || []).map(String));
   }, [liveState?.visible_faction_ids]);
@@ -1815,7 +1848,7 @@ export function LiveSessionBoard({
     [allCampaignNpcs, campaignId, router],
   );
 
-  function placeOnStage(kind: "npc" | "faction", id: string) {
+  function placeOnStage(kind: "npc" | "faction" | "scene", id: string) {
     void (async () => {
       const base = await resolveLiveStateBase();
       if (!base) {
@@ -1827,6 +1860,40 @@ export function LiveSessionBoard({
         return;
       }
       const sid = String(id);
+      if (kind === "scene") {
+        if (!isGM) return;
+        const scene = allSceneMedia.find((entry) => String(entry.id) === sid);
+        if (!scene) return;
+        updateLiveState({ active_scene_media_id: sid }, base);
+        const npcIds = (base.visible_npc_ids || []).map(String);
+        const locationLoreId = base.current_location_lore_id
+          ? String(base.current_location_lore_id)
+          : null;
+        const locationName = base.current_location?.trim() || null;
+        const locationHint = locationName ? ` (Ort: ${locationName})` : "";
+        writeSystemLog(
+          "scene_show",
+          `Eine Szene wird auf der Bühne gezeigt: „${scene.title}“${locationHint}${npcIds.length > 0 ? ` (NSCs anwesend: ${npcIds.length})` : ""}.`,
+        );
+        try {
+          await logSceneMediaAppearance({
+            campaignId,
+            sessionId,
+            sceneMediaId: sid,
+            npcIds,
+            locationLoreId,
+            locationName,
+          });
+        } catch (err) {
+          console.error("[LiveSessionBoard] scene appearance log:", err);
+        }
+        setStagePortrait({
+          name: scene.title,
+          subtitle: scene.category,
+          imageUrl: scene.image_url,
+        });
+        return;
+      }
       if (kind === "npc") {
         const currentIds = new Set((base.visible_npc_ids || []).map(String));
         if (currentIds.has(sid)) return;
@@ -1854,11 +1921,22 @@ export function LiveSessionBoard({
     })();
   }
 
-  function removeFromStage(kind: "npc" | "faction", id: string) {
+  function removeFromStage(kind: "npc" | "faction" | "scene", id: string) {
     if (!isGM) return;
     const sid = String(id);
     const base = liveStateRef.current;
     if (!base) return;
+
+    if (kind === "scene") {
+      if (String(base.active_scene_media_id ?? "") !== sid) return;
+      updateLiveState({ active_scene_media_id: null });
+      const scene = allSceneMedia.find((entry) => String(entry.id) === sid);
+      writeSystemLog(
+        "scene_remove",
+        `Die Szene „${scene?.title ?? "Unbekannt"}“ verlässt die Bühne.`,
+      );
+      return;
+    }
 
     if (kind === "npc") {
       updateLiveState({
@@ -1998,9 +2076,50 @@ export function LiveSessionBoard({
     return option?.default_image_url || option?.image_url || null;
   }
 
+  function clearStageOnLocationChange(base: LiveState): Partial<LiveState> | null {
+    const hadNpcs = (base.visible_npc_ids || []).length > 0;
+    const hadFactions = (base.visible_faction_ids || []).length > 0;
+    const hadScene = !!base.active_scene_media_id;
+    if (!hadNpcs && !hadFactions && !hadScene) return null;
+
+    if (hadScene) {
+      const scene = allSceneMedia.find(
+        (entry) => String(entry.id) === String(base.active_scene_media_id),
+      );
+      writeSystemLog(
+        "scene_remove",
+        `Die Szene „${scene?.title ?? "Unbekannt"}“ verlässt die Bühne – der Ort wechselt.`,
+      );
+    }
+    if (hadNpcs || hadFactions) {
+      writeSystemLog(
+        "stage_clear",
+        "NSCs und Fraktionen verlassen die Bühne – ein neuer Ort beginnt.",
+      );
+    }
+
+    return {
+      visible_npc_ids: [],
+      visible_faction_ids: [],
+      active_scene_media_id: null,
+    };
+  }
+
   function changeSessionLocation(locationId: string) {
+    const base = liveStateRef.current;
+    if (!base) return;
+
+    const nextLocationId = locationId || null;
+    const currentLocationId = base.current_location_lore_id ?? null;
+    const locationChanged =
+      String(nextLocationId ?? "") !== String(currentLocationId ?? "");
+
     if (!locationId) {
-      updateLiveState({ current_location_lore_id: null });
+      const stagePatch = locationChanged ? clearStageOnLocationChange(base) : null;
+      updateLiveState({
+        current_location_lore_id: null,
+        ...(stagePatch ?? {}),
+      });
       return;
     }
 
@@ -2015,6 +2134,11 @@ export function LiveSessionBoard({
 
     if (!manualOverride && autoBackground) {
       patch.background_url = autoBackground;
+    }
+
+    if (locationChanged) {
+      const stagePatch = clearStageOnLocationChange(base);
+      if (stagePatch) Object.assign(patch, stagePatch);
     }
 
     updateLiveState(patch);
@@ -2957,6 +3081,7 @@ export function LiveSessionBoard({
                   const data = JSON.parse(raw) as { kind?: string; id?: string };
                   if (data.kind === "npc" && data.id) placeOnStage("npc", data.id);
                   if (data.kind === "faction" && data.id) placeOnStage("faction", data.id);
+                  if (data.kind === "scene" && data.id) placeOnStage("scene", data.id);
                 } catch {
                   /* ignore invalid payload */
                 }
@@ -3260,6 +3385,20 @@ export function LiveSessionBoard({
                     />
                   </div>
                 ) : null}
+                {activeSceneMedia ? (
+                  <div className="mb-6 flex justify-center px-2">
+                    <StageSceneCard
+                      scene={activeSceneMedia}
+                      isGM={isGM}
+                      onPortrait={setStagePortrait}
+                      onRemove={
+                        isGM
+                          ? () => removeFromStage("scene", String(activeSceneMedia.id))
+                          : undefined
+                      }
+                    />
+                  </div>
+                ) : null}
                 {sortedActiveNpcs.length > 0 && !liveState?.loot_hide_npcs ? (
                   <div
                     className={
@@ -3516,10 +3655,11 @@ export function LiveSessionBoard({
           </div>
         </div>
 
-        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0) && (
+        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0 || inHandScenes.length > 0) && (
           <StageDeckHand
             npcs={inHandNpcs}
             factions={inHandFactions}
+            scenes={inHandScenes}
             onPlace={placeOnStage}
           />
         )}

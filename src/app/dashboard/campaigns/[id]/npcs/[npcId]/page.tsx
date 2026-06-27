@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getNPCById } from "../../npc-actions";
 import { getNPCs } from "../../npc-queries";
 import { redirect, notFound } from "next/navigation";
+import { getNpcSceneAppearances } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
 import { NPCDetailPage } from "@/src/components/dashboard/campaigns/NPCDetailPage";
 import { getFactions } from "../../factions-actions";
 import { getLoreEntries } from "../../lore-queries";
@@ -183,6 +184,8 @@ export default async function NPCDetailPageRoute({ params }: Props) {
     }));
   }
 
+  const sceneAppearances = await getNpcSceneAppearances(campaignId, npcId).catch(() => []);
+
   return (
     <NPCDetailPage
       npc={npcWithVisibility}
@@ -195,6 +198,7 @@ export default async function NPCDetailPageRoute({ params }: Props) {
       factions={(factions || []).map((f: any) => ({ id: f.id, name: f.name }))}
       locations={locations}
       lastSeen={lastSeen}
+      sceneAppearances={sceneAppearances}
       npcsForQuest={npcsForQuest}
       membersForQuest={membersForQuest}
     />

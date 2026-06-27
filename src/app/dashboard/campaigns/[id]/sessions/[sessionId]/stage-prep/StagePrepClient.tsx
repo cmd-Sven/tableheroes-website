@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
 import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import { StagePrepSceneMedia } from "@/src/components/session/StagePrepSceneMedia";
+import type { CampaignSceneMedia } from "@/src/lib/scene-media-types";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 
 type CampaignNpc = {
@@ -32,6 +34,8 @@ type Props = {
   stageDeckFactionIds: string[] | null;
   initialBackgroundUrl: string | null;
   initialTranscriptionMode: TranscriptionMode | null;
+  sceneMediaItems: CampaignSceneMedia[];
+  stageDeckSceneMediaIds: string[] | null;
 };
 
 const marblePanelStyle: CSSProperties = {
@@ -62,6 +66,8 @@ export function StagePrepClient({
   stageDeckFactionIds,
   initialBackgroundUrl,
   initialTranscriptionMode,
+  sceneMediaItems,
+  stageDeckSceneMediaIds,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -412,6 +418,14 @@ export function StagePrepClient({
             />
           </section>
         </div>
+
+        <StagePrepSceneMedia
+          campaignId={campaignId}
+          sessionId={sessionId}
+          initialItems={sceneMediaItems}
+          stageDeckSceneMediaIds={stageDeckSceneMediaIds}
+          onRefresh={() => router.refresh()}
+        />
 
         <div className="rounded-lg border border-hero-dark bg-background-card/80 p-4 flex flex-wrap gap-4 items-center">
           <a
