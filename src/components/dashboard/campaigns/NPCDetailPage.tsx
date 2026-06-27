@@ -276,6 +276,8 @@ export function NPCDetailPage({
   const [imageDisplayEdit, setImageDisplayEdit] = useState<ImageDisplaySettings | null>(null);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
+  const [portraitIsAiGenerated, setPortraitIsAiGenerated] = useState(false);
+  const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(false);
   const npcWorldId = worldId ?? (npc as { world_id?: string }).world_id ?? null;
 
   const [isEditingGMNotes, setIsEditingGMNotes] = useState(false);
@@ -485,8 +487,20 @@ export function NPCDetailPage({
             const portraitMeta = buildNpcPortraitMeta({
               imageUrl: nextImageUrl,
               portraitFile,
-              portraitIsAiGenerated: false,
+              portraitIsAiGenerated: portraitFile ? false : portraitIsAiGenerated,
               uploadRightsConfirmed,
+              urlRightsConfirmed,
+            });
+            updates.image_is_ai_generated = portraitMeta.image_is_ai_generated;
+            updates.image_upload_rights_confirmed =
+              portraitMeta.image_upload_rights_confirmed;
+          } else if (nextImageUrl) {
+            const portraitMeta = buildNpcPortraitMeta({
+              imageUrl: nextImageUrl,
+              portraitFile: null,
+              portraitIsAiGenerated,
+              uploadRightsConfirmed: false,
+              urlRightsConfirmed,
             });
             updates.image_is_ai_generated = portraitMeta.image_is_ai_generated;
             updates.image_upload_rights_confirmed =
@@ -576,10 +590,14 @@ export function NPCDetailPage({
       setImageDisplayEdit(normalizeImageDisplay(npc.image_display));
       setPortraitFile(null);
       setUploadRightsConfirmed(false);
+      setPortraitIsAiGenerated(npc.image_is_ai_generated === true);
+      setUrlRightsConfirmed(npc.image_upload_rights_confirmed === true);
     } else {
       setImageDisplayEdit(null);
       setPortraitFile(null);
       setUploadRightsConfirmed(false);
+      setPortraitIsAiGenerated(false);
+      setUrlRightsConfirmed(false);
     }
   };
 
@@ -799,16 +817,25 @@ export function NPCDetailPage({
                     portraitFile={portraitFile}
                     onPortraitFileChange={(file) => {
                       setPortraitFile(file);
-                      if (file) setUploadRightsConfirmed(false);
+                      if (file) {
+                        setUploadRightsConfirmed(false);
+                        setPortraitIsAiGenerated(false);
+                        setUrlRightsConfirmed(false);
+                      }
                     }}
                     imageDisplay={imageDisplayEdit ?? normalizeImageDisplay(npc.image_display)}
                     onImageDisplayChange={setImageDisplayEdit}
-                    isAiGenerated={npc.image_is_ai_generated === true && !portraitFile}
+                    isAiGenerated={portraitIsAiGenerated}
+                    onIsAiGeneratedChange={setPortraitIsAiGenerated}
                     uploadRightsConfirmed={uploadRightsConfirmed}
                     onUploadRightsConfirmedChange={setUploadRightsConfirmed}
+                    urlRightsConfirmed={urlRightsConfirmed}
+                    onUrlRightsConfirmedChange={setUrlRightsConfirmed}
                     onClearImage={() => {
                       setPortraitFile(null);
                       setUploadRightsConfirmed(false);
+                      setPortraitIsAiGenerated(false);
+                      setUrlRightsConfirmed(false);
                       setEditValues({ image_url: "" });
                       setImageDisplayEdit(normalizeImageDisplay(null));
                     }}

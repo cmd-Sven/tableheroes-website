@@ -1,4 +1,5 @@
 import { Sparkles } from "lucide-react";
+import { AI_IMAGE_ATTRIBUTION_TEXT } from "@/src/lib/image-attribution";
 
 type Props = {
   isAiGenerated?: boolean | null;
@@ -11,10 +12,10 @@ export function NpcPortraitAttribution({ isAiGenerated, className = "" }: Props)
 
   return (
     <p
-      className={`flex items-center justify-center gap-1 font-libre text-[10px] text-gray-500 ${className}`}
+      className={`flex items-center justify-center gap-1 text-center font-libre text-[10px] text-gray-500 ${className}`}
     >
       <Sparkles className="h-3 w-3 shrink-0 text-accent-gold/80" aria-hidden />
-      KI-generiertes Bild
+      {AI_IMAGE_ATTRIBUTION_TEXT}
     </p>
   );
 }

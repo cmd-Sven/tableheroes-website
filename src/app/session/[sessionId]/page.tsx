@@ -12,6 +12,12 @@ import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
 import { getCampaignShops } from "@/src/app/dashboard/campaigns/[id]/shop-queries";
 import type { LiveCampaignShopOption } from "./StageNpcShopControls";
+import { readGuestSessionCookie } from "@/src/lib/session-guest-auth";
+import {
+  loadGuestSessionContext,
+  serializeGuestSessionPayload,
+} from "@/src/app/session/load-guest-session";
+import { absoluteUrl } from "@/src/lib/site-url";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -69,6 +75,23 @@ export default async function SessionPage({ params, searchParams }: Props) {
     notFound();
   }
 
+  const guestCookie = await readGuestSessionCookie();
+  if (guestCookie?.sessionId === sessionId) {
+    const guestCtx = await loadGuestSessionContext(sessionId, guestCookie);
+    if (!guestCtx) notFound();
+    const payload = serializeGuestSessionPayload(guestCtx);
+    return (
+      <LiveSessionBoard
+        {...(payload as any)}
+        isGM={false}
+        isGuest
+        forcePlayerView
+        loreLocationOptions={[]}
+        campaignShops={[]}
+      />
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -80,7 +103,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode")
+    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, transcription_mode, guest_join_token")
     .eq("id", sessionId)
     .single();
 
@@ -91,6 +114,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
     transcription_mode?: string | null;
+    guest_join_token?: string | null;
   } | null;
 
   if (sessionError || !session) {
@@ -422,6 +446,11 @@ export default async function SessionPage({ params, searchParams }: Props) {
     }));
   }
 
+  const guestJoinUrl =
+    viewAsGM && session.status === "Live" && session.guest_join_token
+      ? absoluteUrl(`/session/join/${session.guest_join_token}`)
+      : null;
+
   return (
     <LiveSessionBoard
       sessionId={sessionId}
@@ -461,6 +490,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
             ? "table"
             : null
       }
+      guestJoinUrl={guestJoinUrl}
     />
   );
 }

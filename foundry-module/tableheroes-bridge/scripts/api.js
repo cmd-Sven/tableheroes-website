@@ -240,3 +240,25 @@ export async function applyFoundryCurrency(actor, currency) {
   };
   await actor.update({ "system.currency": next });
 }
+
+/**
+ * Liefert den Gäste-Join-Link zur laufenden Live-Session der Kampagne (neuer Browser-Tab).
+ * @returns {Promise<{ live: boolean, join_url?: string, session_title?: string, message?: string }>}
+ */
+export async function fetchLiveSessionJoinUrl() {
+  const { baseUrl, apiKey } = getModuleSettings();
+  if (!baseUrl || !apiKey) {
+    throw new Error("Table Heroes API ist nicht konfiguriert.");
+  }
+
+  const response = await fetch(`${baseUrl}/api/v1/foundry-sync/live-session`, {
+    method: "GET",
+    headers: apiHeaders(false),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Live-Session API Fehler (${response.status})`);
+  }
+  return data;
+}

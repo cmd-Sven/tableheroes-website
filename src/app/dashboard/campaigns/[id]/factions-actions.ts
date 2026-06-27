@@ -21,6 +21,8 @@ export async function createFaction(formData: {
   current_status?: string;
   description?: string;
   image_url?: string;
+  image_is_ai_generated?: boolean;
+  image_upload_rights_confirmed?: boolean | null;
   location_id?: string;
   gm_notes?: string;
   is_revealed?: boolean;
@@ -79,6 +81,8 @@ export async function createFaction(formData: {
       current_status: formData.current_status || null,
       description: formData.description || null,
       image_url: formData.image_url || null,
+      image_is_ai_generated: formData.image_is_ai_generated ?? false,
+      image_upload_rights_confirmed: formData.image_upload_rights_confirmed ?? null,
       image_display:
         formData.image_display != null && (formData.image_url || "").trim() !== ""
           ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
@@ -311,6 +315,8 @@ export async function updateFaction(
     current_status?: string;
     description?: string;
     image_url?: string;
+    image_is_ai_generated?: boolean;
+    image_upload_rights_confirmed?: boolean | null;
     location_id?: string;
     gm_notes?: string;
     is_revealed?: boolean;

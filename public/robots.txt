@@ -1,9 +1,0 @@
-# robots.txt für TableHeroes
-User-agent: *
-Allow: /
-
-# Sitemap (wenn vorhanden)
-# Sitemap: https://tableheroes.de/sitemap.xml
-
-# Crawl-delay für freundliche Crawler
-Crawl-delay: 1

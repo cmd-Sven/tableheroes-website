@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Sparkles, BookOpen, Users, Shield } from "lucide-react";
 import { SmartText } from "@/src/components/ui/SmartText";
+import { AI_IMAGE_ATTRIBUTION_TEXT } from "@/src/lib/image-attribution";
 import type { PublicSeoDetail } from "@/src/lib/public-seo-types";
 
 const TYPE_LABELS = {
@@ -61,9 +62,9 @@ export function PublicLoreDetailView({ entry }: Props) {
             unoptimized
           />
           {entry.imageIsAiGenerated ? (
-            <p className="absolute bottom-3 right-3 flex items-center gap-1 rounded bg-black/75 px-2 py-1 text-[11px] text-gray-300">
-              <Sparkles className="h-3.5 w-3.5 text-accent-gold/80" />
-              KI-generiertes Bild
+            <p className="absolute bottom-3 right-3 max-w-[min(100%-1.5rem,20rem)] rounded bg-black/75 px-2 py-1 text-[11px] text-gray-300 text-right">
+              <Sparkles className="inline h-3.5 w-3.5 text-accent-gold/80 mr-1" />
+              {AI_IMAGE_ATTRIBUTION_TEXT}
             </p>
           ) : null}
         </div>

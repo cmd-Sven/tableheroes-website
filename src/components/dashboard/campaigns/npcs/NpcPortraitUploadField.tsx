@@ -16,6 +16,7 @@ import {
 } from "@/src/lib/profile-media";
 
 import { NpcPortraitAttribution } from "./NpcPortraitAttribution";
+import { EntityImageRightsFields } from "@/src/components/ui/EntityImageRightsFields";
 
 type Props = {
   imageUrl: string;
@@ -28,8 +29,11 @@ type Props = {
   compact?: boolean;
   /** True wenn das angezeigte Bild per KI erzeugt wurde (nicht Upload). */
   isAiGenerated?: boolean;
+  onIsAiGeneratedChange?: (value: boolean) => void;
   uploadRightsConfirmed?: boolean;
   onUploadRightsConfirmedChange?: (confirmed: boolean) => void;
+  urlRightsConfirmed?: boolean;
+  onUrlRightsConfirmedChange?: (confirmed: boolean) => void;
 };
 
 export function NpcPortraitUploadField({
@@ -42,8 +46,11 @@ export function NpcPortraitUploadField({
   previewAspectClassName = "aspect-[3/4] max-w-[220px]",
   compact = false,
   isAiGenerated = false,
+  onIsAiGeneratedChange,
   uploadRightsConfirmed = false,
   onUploadRightsConfirmedChange,
+  urlRightsConfirmed = false,
+  onUrlRightsConfirmedChange,
 }: Props) {
   const blobPreview = useMemo(
     () => (portraitFile ? URL.createObjectURL(portraitFile) : null),
@@ -104,21 +111,32 @@ export function NpcPortraitUploadField({
               }
               onPortraitFileChange(file);
               onUploadRightsConfirmedChange?.(false);
+              onIsAiGeneratedChange?.(false);
+              onUrlRightsConfirmedChange?.(false);
             }}
           />
           {portraitFile && onUploadRightsConfirmedChange ? (
-            <label className="flex cursor-pointer items-start gap-2 rounded border border-hero-border/40 bg-hero-dark/30 p-2.5">
-              <input
-                type="checkbox"
-                checked={uploadRightsConfirmed}
-                onChange={(e) => onUploadRightsConfirmedChange(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-hero-border accent-accent-gold"
-              />
-              <span className="font-libre text-xs leading-relaxed text-gray-300">
-                Ich bestätige, dass ich die Nutzungsrechte an diesem Bild besitze oder eine
-                entsprechende Lizenz habe.
-              </span>
-            </label>
+            <EntityImageRightsFields
+              mode="upload"
+              isAiGenerated={false}
+              onIsAiGeneratedChange={() => {}}
+              uploadRightsConfirmed={uploadRightsConfirmed}
+              onUploadRightsConfirmedChange={onUploadRightsConfirmedChange}
+              urlRightsConfirmed={false}
+              onUrlRightsConfirmedChange={() => {}}
+              showPublicHint={false}
+            />
+          ) : null}
+          {!portraitFile && hasImage && onIsAiGeneratedChange && onUrlRightsConfirmedChange ? (
+            <EntityImageRightsFields
+              mode="url"
+              isAiGenerated={isAiGenerated}
+              onIsAiGeneratedChange={onIsAiGeneratedChange}
+              uploadRightsConfirmed={false}
+              onUploadRightsConfirmedChange={() => {}}
+              urlRightsConfirmed={urlRightsConfirmed}
+              onUrlRightsConfirmedChange={onUrlRightsConfirmedChange}
+            />
           ) : null}
           <p className="font-libre text-xs text-gray-500">
             Portrait hochladen (max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB, JPEG/PNG/WebP).

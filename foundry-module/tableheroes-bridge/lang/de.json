@@ -49,6 +49,12 @@
       "SyncPortraitToFoundryDone": "Portrait nach Foundry synchronisiert.",
       "SyncXp": "XP → TH",
       "SyncXpDone": "XP nach Table Heroes synchronisiert."
+    },
+    "LiveSession": {
+      "Tooltip": "Table Heroes Live-Session im Browser öffnen (Gäste & Spieler)",
+      "NotConfigured": "Table Heroes API ist nicht konfiguriert.",
+      "NotLive": "Keine laufende Live-Session für diese Kampagne.",
+      "Opened": "Live-Session wird in einem neuen Browser-Tab geöffnet."
     }
   }
 }

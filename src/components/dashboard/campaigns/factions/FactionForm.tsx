@@ -16,6 +16,9 @@ import {
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
+import { EntityImageRightsFields } from "@/src/components/ui/EntityImageRightsFields";
+import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
+import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
 
 type Location = {
   id: string;
@@ -31,6 +34,8 @@ type FactionData = {
   description: string | null;
   image_url: string | null;
   image_display?: ImageDisplaySettings | null;
+  image_is_ai_generated?: boolean | null;
+  image_upload_rights_confirmed?: boolean | null;
   location_id: string | null;
   gm_notes: string | null;
   is_revealed: boolean;
@@ -88,6 +93,12 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
     philosophy: null,
     important_npcs_info: null,
   });
+  const [isAiGenerated, setIsAiGenerated] = useState(
+    initialData?.image_is_ai_generated === true,
+  );
+  const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(
+    initialData?.image_upload_rights_confirmed === true,
+  );
 
   // Lade Locations und Factions beim Mount (nur im Kampagnen-Kontext; bei worldId kommen sie von Server)
   useEffect(() => {
@@ -166,6 +177,8 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
         philosophy: initialData.philosophy || null,
         important_npcs_info: initialData.important_npcs_info || null,
       });
+      setIsAiGenerated(initialData.image_is_ai_generated === true);
+      setUrlRightsConfirmed(initialData.image_upload_rights_confirmed === true);
       const pm = (initialData as { planned_members?: Array<{ name: string; role: string; npc_id?: string | null }> }).planned_members;
       if (Array.isArray(pm) && pm.length > 0) {
         setPlannedMembers(pm.map((m) => ({ name: m.name || "", role: m.role || "Mitglied", npc_id: m.npc_id ?? null })));
@@ -256,12 +269,22 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
         // „Mitglieder“ und „Wichtige Persönlichkeiten“ sind dasselbe: eine Quelle (planned_members), important_npcs_info wird daraus abgeleitet
         const importantNpcsText = filteredPlanned.map((m) => `${m.name.trim()} - ${m.role || "Mitglied"}`).join("\n") || undefined;
 
+        const imageMeta = buildNpcPortraitMeta({
+          imageUrl: formData.image_url,
+          portraitFile: null,
+          portraitIsAiGenerated: isAiGenerated,
+          uploadRightsConfirmed: false,
+          urlRightsConfirmed,
+        });
+
         const payload = {
           name: formData.name.trim(),
           type: formData.type,
           current_status: formData.current_status || undefined,
           description: formData.description || undefined,
           image_url: formData.image_url || undefined,
+          image_is_ai_generated: imageMeta.image_is_ai_generated,
+          image_upload_rights_confirmed: imageMeta.image_upload_rights_confirmed,
           location_id: formData.location_id || undefined,
           gm_notes: formData.gm_notes || undefined,
           is_revealed: formData.is_revealed,
@@ -702,12 +725,29 @@ export function FactionForm({ campaignId, worldId, initialData, defaultName, def
             <input
               type="url"
               value={formData.image_url || ""}
-              onChange={(e) => setFormData({ ...formData, image_url: e.target.value || null })}
+              onChange={(e) => {
+                const nextUrl = e.target.value || null;
+                setFormData({ ...formData, image_url: nextUrl });
+                if (!nextUrl?.trim()) {
+                  setIsAiGenerated(false);
+                  setUrlRightsConfirmed(false);
+                }
+              }}
               className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold focus:ring-1 focus:ring-accent-gold"
               placeholder="https://..."
             />
             {formData.image_url?.trim() ? (
-              <div className="mt-4">
+              <div className="mt-4 space-y-3">
+                <NpcPortraitAttribution isAiGenerated={isAiGenerated} className="text-left justify-start" />
+                <EntityImageRightsFields
+                  mode="url"
+                  isAiGenerated={isAiGenerated}
+                  onIsAiGeneratedChange={setIsAiGenerated}
+                  uploadRightsConfirmed={false}
+                  onUploadRightsConfirmedChange={() => {}}
+                  urlRightsConfirmed={urlRightsConfirmed}
+                  onUrlRightsConfirmedChange={setUrlRightsConfirmed}
+                />
                 <ImageUrlDisplayEditor
                   value={formData.image_display ?? DEFAULT_IMAGE_DISPLAY}
                   onChange={(image_display) => setFormData((prev) => ({ ...prev, image_display }))}

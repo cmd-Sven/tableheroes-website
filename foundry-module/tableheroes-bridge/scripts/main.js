@@ -1,5 +1,6 @@
 import { scheduleTableHeroesTabInject } from "./sheet-tab.js";
 import { MODULE_VERSION, thLocalize } from "./i18n.js";
+import { fetchLiveSessionJoinUrl, settingsConfigured } from "./api.js";
 
 const MODULE_ID = "tableheroes-bridge";
 
@@ -34,6 +35,37 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   console.log(`[tableheroes-bridge] Modul geladen v${MODULE_VERSION}`);
+});
+
+Hooks.on("getSceneControlButtons", (controls) => {
+  if (!game.user) return;
+  const tokenControls = controls.find((c) => c.name === "token");
+  if (!tokenControls?.tools) return;
+
+  tokenControls.tools.push({
+    name: "tableheroes-live",
+    title: thLocalize("TABLEHEROES.LiveSession.Tooltip"),
+    icon: "fas fa-broadcast-tower",
+    visible: true,
+    onClick: async () => {
+      if (!settingsConfigured()) {
+        ui.notifications?.warn?.(thLocalize("TABLEHEROES.LiveSession.NotConfigured"));
+        return;
+      }
+      try {
+        const data = await fetchLiveSessionJoinUrl();
+        if (data?.live && data.join_url) {
+          window.open(data.join_url, "_blank", "noopener,noreferrer");
+          ui.notifications?.info?.(thLocalize("TABLEHEROES.LiveSession.Opened"));
+        } else {
+          ui.notifications?.warn?.(thLocalize("TABLEHEROES.LiveSession.NotLive"));
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ui.notifications?.error?.(message);
+      }
+    },
+  });
 });
 
 function onRenderCharacterSheet(sheet, html) {

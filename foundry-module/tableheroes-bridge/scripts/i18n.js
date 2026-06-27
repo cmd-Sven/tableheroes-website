@@ -42,9 +42,14 @@ const FALLBACKS = {
   "TABLEHEROES.Settings.RefreshMinutes.Name": "Aktualisierung (Minuten)",
   "TABLEHEROES.Settings.RefreshMinutes.Hint":
     "Wie oft Punkte im Hintergrund neu geladen werden.",
+  "TABLEHEROES.LiveSession.Tooltip":
+    "Table Heroes Live-Session im Browser öffnen (Gäste & Spieler)",
+  "TABLEHEROES.LiveSession.NotConfigured": "Table Heroes API ist nicht konfiguriert.",
+  "TABLEHEROES.LiveSession.NotLive": "Keine laufende Live-Session für diese Kampagne.",
+  "TABLEHEROES.LiveSession.Opened": "Live-Session wird in einem neuen Browser-Tab geöffnet.",
 };
 
-export const MODULE_VERSION = "0.3.8";
+export const MODULE_VERSION = "0.3.9";
 
 /**
  * Never trust game.i18n.has() — on some Foundry setups it returns true while localize() throws.

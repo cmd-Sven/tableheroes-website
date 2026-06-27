@@ -4,6 +4,9 @@ export type LoreOverviewItem = {
   id: string;
   name: string;
   type: string;
+  created_at?: string | null;
+  is_favorite?: boolean;
+  has_recent_secret?: boolean;
 };
 
 export type LoreOverviewCultureGroup = {
@@ -37,12 +40,27 @@ export type LoreOverviewSourceEntry = {
   culture_id?: string | null;
   race_ids?: string[] | null;
   description?: string | null;
+  created_at?: string | null;
+  is_favorite?: boolean;
+  has_recent_secret?: boolean;
+  /** Kampagnen-Sichtbarkeit (campaign_visibility.is_revealed) */
+  is_revealed?: boolean;
 };
 
 export type BuildLoreOverviewOptions = {
   /** all = Lore + Orte, lore = nur Lore-Kategorien, locations = nur Ortsbaum */
   scope?: "all" | "lore" | "locations";
+  /** Nur Einträge mit is_revealed === true (Kampagnen-Spieleransicht) */
+  onlyRevealed?: boolean;
 };
+
+function filterRevealedSourceEntries(
+  entries: LoreOverviewSourceEntry[],
+  onlyRevealed: boolean,
+): LoreOverviewSourceEntry[] {
+  if (!onlyRevealed) return entries;
+  return entries.filter((entry) => entry.is_revealed === true);
+}
 
 const LOCATION_TYPE_SORT: Record<string, number> = {
   Land: 0,
@@ -80,7 +98,33 @@ function sortLocations(entries: LoreOverviewSourceEntry[]): LoreOverviewSourceEn
 }
 
 function toItem(entry: LoreOverviewSourceEntry): LoreOverviewItem {
-  return { id: entry.id, name: entry.name, type: entry.type };
+  return {
+    id: entry.id,
+    name: entry.name,
+    type: entry.type,
+    created_at: entry.created_at ?? null,
+    is_favorite: entry.is_favorite === true,
+    has_recent_secret: entry.has_recent_secret === true,
+  };
+}
+
+export function isLoreOverviewItemNew(item: LoreOverviewItem): boolean {
+  if (!item.created_at) return false;
+  return (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60) < 48;
+}
+
+export function isLoreOverviewItemUpdate(item: LoreOverviewItem): boolean {
+  if (isLoreOverviewItemNew(item)) return false;
+  return item.has_recent_secret === true;
+}
+
+function sortOverviewItems(items: LoreOverviewItem[]): LoreOverviewItem[] {
+  return [...items].sort((a, b) => {
+    const aHighlight = isLoreOverviewItemNew(a) || isLoreOverviewItemUpdate(a);
+    const bHighlight = isLoreOverviewItemNew(b) || isLoreOverviewItemUpdate(b);
+    if (aHighlight !== bHighlight) return aHighlight ? -1 : 1;
+    return a.name.localeCompare(b.name, "de");
+  });
 }
 
 function sortByName<T extends { name: string }>(items: T[]): T[] {
@@ -109,7 +153,7 @@ function buildCultureSection(entries: LoreOverviewSourceEntry[]): Pick<
 
   const cultureGroups: LoreOverviewCultureGroup[] = cultures.map((culture) => ({
     culture: toItem(culture),
-    races: sortByName(
+    races: sortOverviewItems(
       races
         .filter((race) => raceToCulture.get(race.id) === culture.id)
         .map(toItem),
@@ -119,7 +163,7 @@ function buildCultureSection(entries: LoreOverviewSourceEntry[]): Pick<
   const assignedRaceIds = new Set(
     cultureGroups.flatMap((group) => group.races.map((race) => race.id)),
   );
-  const orphanRaces = sortByName(
+  const orphanRaces = sortOverviewItems(
     races.filter((race) => !assignedRaceIds.has(race.id)).map(toItem),
   );
 
@@ -149,6 +193,17 @@ function buildLocationTree(
   return sortLocations(childrenByParent.get("") ?? []).map(buildNode);
 }
 
+function sortLocationNodes(nodes: LoreOverviewLocationNode[]): LoreOverviewLocationNode[] {
+  const sortedItems = sortOverviewItems(nodes.map((node) => node.item));
+  return sortedItems.map((item) => {
+    const node = nodes.find((entry) => entry.item.id === item.id)!;
+    return {
+      item,
+      children: sortLocationNodes(node.children),
+    };
+  });
+}
+
 function buildLocationSection(
   entries: LoreOverviewSourceEntry[],
 ): Pick<LoreOverviewSection, "locationTree" | "entries"> | null {
@@ -157,7 +212,7 @@ function buildLocationSection(
 
   return {
     entries: [],
-    locationTree: buildLocationTree(locations),
+    locationTree: sortLocationNodes(buildLocationTree(locations)),
   };
 }
 
@@ -167,10 +222,12 @@ export function buildLoreOverviewSections(
   options: BuildLoreOverviewOptions = {},
 ): LoreOverviewSection[] {
   const scope = options.scope ?? "all";
+  const onlyRevealed = options.onlyRevealed === true;
+  const visibleEntries = filterRevealedSourceEntries(entries, onlyRevealed);
   const sections: LoreOverviewSection[] = [];
 
   if (scope !== "lore") {
-    const locationPart = buildLocationSection(entries);
+    const locationPart = buildLocationSection(visibleEntries);
     if (locationPart) {
       sections.push({
         id: "locations",
@@ -184,7 +241,7 @@ export function buildLoreOverviewSections(
     return sections;
   }
 
-  const culturePart = buildCultureSection(entries);
+  const culturePart = buildCultureSection(visibleEntries);
   if (culturePart) {
     sections.push({
       id: "culture",
@@ -193,7 +250,9 @@ export function buildLoreOverviewSections(
     });
   }
 
-  const languages = sortByName(entries.filter((e) => e.type === "Sprache").map(toItem));
+  const languages = sortOverviewItems(
+    visibleEntries.filter((e) => e.type === "Sprache").map(toItem),
+  );
   if (languages.length > 0) {
     sections.push({
       id: "languages",
@@ -202,8 +261,8 @@ export function buildLoreOverviewSections(
     });
   }
 
-  const deities = sortByName(entries.filter((e) => e.type === "Gottheit").map(toItem));
-  const religions = sortByName(entries.filter((e) => e.type === "Religion").map(toItem));
+  const deities = sortOverviewItems(visibleEntries.filter((e) => e.type === "Gottheit").map(toItem));
+  const religions = sortOverviewItems(visibleEntries.filter((e) => e.type === "Religion").map(toItem));
   if (deities.length > 0 || religions.length > 0) {
     sections.push({
       id: "religion",
@@ -212,8 +271,8 @@ export function buildLoreOverviewSections(
     });
   }
 
-  const history = sortByName(
-    entries
+  const history = sortOverviewItems(
+    visibleEntries
       .filter((e) =>
         ["Geschichten & Legenden", "Ereignis", "Mythos"].includes(e.type),
       )
@@ -227,8 +286,8 @@ export function buildLoreOverviewSections(
     });
   }
 
-  const magic = sortByName(
-    entries.filter((e) => ["Magie", "Artefakt"].includes(e.type)).map(toItem),
+  const magic = sortOverviewItems(
+    visibleEntries.filter((e) => ["Magie", "Artefakt"].includes(e.type)).map(toItem),
   );
   if (magic.length > 0) {
     sections.push({
@@ -238,8 +297,8 @@ export function buildLoreOverviewSections(
     });
   }
 
-  const organizations = sortByName(
-    entries.filter((e) => e.type === "Regierung").map(toItem),
+  const organizations = sortOverviewItems(
+    visibleEntries.filter((e) => e.type === "Regierung").map(toItem),
   );
   if (organizations.length > 0) {
     sections.push({
@@ -263,8 +322,8 @@ export function buildLoreOverviewSections(
     "Artefakt",
     "Regierung",
   ]);
-  const other = sortByName(
-    entries.filter((e) => !knownTypes.has(e.type)).map(toItem),
+  const other = sortOverviewItems(
+    visibleEntries.filter((e) => !knownTypes.has(e.type)).map(toItem),
   );
   if (other.length > 0) {
     sections.push({
@@ -275,6 +334,35 @@ export function buildLoreOverviewSections(
   }
 
   return sections;
+}
+
+export function countLoreOverviewNewItems(section: LoreOverviewSection): number {
+  const countItems = (items: LoreOverviewItem[]) =>
+    items.filter((item) => isLoreOverviewItemNew(item) || isLoreOverviewItemUpdate(item)).length;
+
+  const cultureCount =
+    (section.cultureGroups?.reduce(
+      (sum, group) =>
+        sum +
+        countItems([group.culture]) +
+        countItems(group.races),
+      0,
+    ) ?? 0) + countItems(section.orphanRaces ?? []);
+
+  const locationCount = (nodes: LoreOverviewLocationNode[]): number =>
+    nodes.reduce(
+      (sum, node) =>
+        sum +
+        countItems([node.item]) +
+        locationCount(node.children),
+      0,
+    );
+
+  return (
+    countItems(section.entries) +
+    cultureCount +
+    (section.locationTree ? locationCount(section.locationTree) : 0)
+  );
 }
 
 export function countLoreOverviewItems(section: LoreOverviewSection): number {

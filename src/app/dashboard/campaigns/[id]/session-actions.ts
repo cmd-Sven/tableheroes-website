@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { revalidatePath } from "next/cache";
@@ -271,9 +272,10 @@ export async function startSession(sessionId: string) {
     );
   }
 
-  // 4. Update Session Status to Live
+  // 4. Update Session Status to Live + Gäste-Join-Token
+  const guestJoinToken = randomBytes(24).toString("hex");
   const { error: updateError } = await (supabase.from("sessions") as any)
-    .update({ status: "Live" })
+    .update({ status: "Live", guest_join_token: guestJoinToken })
     .eq("id", sessionId);
 
   if (updateError) {

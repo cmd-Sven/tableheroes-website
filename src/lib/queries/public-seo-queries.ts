@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/src/lib/supabase/server";
+import { tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { canShowPublicImage } from "@/src/lib/public-image-policy";
 import type {
   PublicSeoCard,
@@ -51,7 +51,7 @@ type FactionRow = {
 };
 
 async function loadEntityPayload(
-  supabase: ReturnType<typeof createAdminClient>,
+  supabase: NonNullable<ReturnType<typeof tryCreateAdminClient>>,
   entityType: PublicSeoEntityType,
   entityId: string,
 ): Promise<{
@@ -165,7 +165,8 @@ async function loadEntityPayload(
 }
 
 export async function getPublicSeoBySlug(slug: string): Promise<PublicSeoDetail | null> {
-  const supabase = createAdminClient();
+  const supabase = tryCreateAdminClient();
+  if (!supabase) return null;
   const { data: seoRow } = await (supabase as any)
     .from("public_seo_entries")
     .select("campaign_id, entity_type, entity_id, slug, published_at")
@@ -214,7 +215,8 @@ export type HomepageLoreGroup = {
 export async function getHomepagePublicLoreGroups(
   limitPerCampaign = 6,
 ): Promise<HomepageLoreGroup[]> {
-  const supabase = createAdminClient();
+  const supabase = tryCreateAdminClient();
+  if (!supabase) return [];
 
   const { data: campaigns } = await (supabase as any)
     .from("campaigns")
@@ -276,7 +278,8 @@ export function publicSeoAbsoluteUrl(slug: string): string {
 export async function getPublicSeoSlugsForSitemap(): Promise<
   Array<{ slug: string; publishedAt: string | null }>
 > {
-  const supabase = createAdminClient();
+  const supabase = tryCreateAdminClient();
+  if (!supabase) return [];
   const { data } = await (supabase as any)
     .from("public_seo_entries")
     .select("slug, published_at")
@@ -293,7 +296,8 @@ export async function isPublicSeoSlugTaken(slug: string, exceptEntity?: {
   entityType: PublicSeoEntityType;
   entityId: string;
 }): Promise<boolean> {
-  const supabase = createAdminClient();
+  const supabase = tryCreateAdminClient();
+  if (!supabase) return false;
   const { data } = await (supabase as any)
     .from("public_seo_entries")
     .select("entity_type, entity_id")

@@ -15,6 +15,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
+import { normalizeGuestSlots } from "@/src/lib/session-guest-auth";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient as createBrowserSupabase } from "@/src/lib/supabase/client";
 import {
@@ -149,6 +150,8 @@ type LiveState = {
   destroyed_fate_coins?: number | null;
   /** GM: 0–3 reine UI-Platzhalter „Spieler 1–3“ (kein Account / kein Log). */
   dummy_player_count?: number | null;
+  /** Gast-Namen pro Dummy-Slot (Live-Sync). */
+  guest_slots?: unknown;
   downtime_active?: boolean | null;
   downtime_type?: string | null;
   downtime_current_day?: number | null;
@@ -394,6 +397,8 @@ type PartyCharacter = {
   starvation_days: number;
   /** Nur Client: GM-Platzhalter ohne echten Charakter */
   isSessionDummy?: boolean;
+  /** Gast-Teilnehmer (ohne TH-Account) */
+  guestId?: string | null;
 };
 
 type CampaignNpc = {
@@ -889,6 +894,9 @@ type Props = {
   worldId: string | null;
   sessionStatus: string;
   isGM: boolean;
+  isGuest?: boolean;
+  guestDisplayName?: string;
+  guestSlotIndex?: number;
   forcePlayerView?: boolean;
   userId: string;
   initialLiveState: LiveState | null;
@@ -907,6 +915,8 @@ type Props = {
   /** Nur GM: Shop-Templates für schnelle Händler-Zuweisung auf der Bühne */
   campaignShops?: LiveCampaignShopOption[];
   transcriptionMode?: "table" | "jitsi" | null;
+  /** Nur GM: Gäste-Join-Link für Foundry / Spieler ohne Account */
+  guestJoinUrl?: string | null;
 };
 
 export function LiveSessionBoard({
@@ -915,6 +925,9 @@ export function LiveSessionBoard({
   worldId,
   sessionStatus,
   isGM: actualUserIsGM,
+  isGuest = false,
+  guestDisplayName,
+  guestSlotIndex,
   forcePlayerView = false,
   userId,
   initialLiveState,
@@ -928,6 +941,7 @@ export function LiveSessionBoard({
   sessionLocationLoreReadable = false,
   campaignShops = [],
   transcriptionMode = null,
+  guestJoinUrl = null,
 }: Props) {
   const router = useRouter();
   /** Cookie-Session (RLS): nicht supabaseClient.ts (nur Anon ohne Auth). */
@@ -1323,12 +1337,14 @@ export function LiveSessionBoard({
     Math.max(0, Math.round(Number(liveState?.dummy_player_count ?? 0)) || 0),
   );
   const displayPartyCharacters = useMemo((): PartyCharacter[] => {
+    const guestSlots = normalizeGuestSlots(liveState?.guest_slots);
     const dummies: PartyCharacter[] = [];
     for (let i = 1; i <= dummyPlayerCountLive; i += 1) {
+      const guestSlot = guestSlots.find((slot) => slot.slot === i);
       dummies.push({
         id: `session-dummy-${i}`,
-        name: `Spieler ${i}`,
-        class: "Platzhalter",
+        name: guestSlot?.name ?? `Spieler ${i}`,
+        class: "Gast",
         race: null,
         level: null,
         avatar_url: "/images/icon-empty.svg",
@@ -1336,10 +1352,11 @@ export function LiveSessionBoard({
         rations_count: 0,
         starvation_days: 0,
         isSessionDummy: true,
+        guestId: guestSlot?.guest_id ?? null,
       });
     }
     return [...partyCharacters, ...dummies];
-  }, [partyCharacters, dummyPlayerCountLive]);
+  }, [partyCharacters, dummyPlayerCountLive, liveState?.guest_slots]);
   const temperatureValue = isGM
     ? temperatureDraft
     : normalizeTemperatureValue(liveState?.temperature_value);
@@ -1376,9 +1393,41 @@ export function LiveSessionBoard({
   }
 
   // ---------------------------------------------------------------------------
+  // Gast: Live-State per API (kein Supabase-Login)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isGuest) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/session/guest/live-state?sessionId=${encodeURIComponent(sessionId)}`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { ok?: boolean; live_state?: unknown };
+        if (data.ok && data.live_state) {
+          const next = normalizeLiveRow(data.live_state);
+          liveStateRef.current = next;
+          setLiveState(next);
+          setBackgroundUrl(next.background_url || null);
+        }
+      } catch {
+        /* Polling-Fehler ignorieren */
+      }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isGuest, sessionId]);
+
+  // ---------------------------------------------------------------------------
   // Realtime Subscription
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (isGuest) return;
     const channel = supabase
       .channel(`session_live_${sessionId}`, {
         config: { presence: { key: userId } },
@@ -1462,9 +1511,10 @@ export function LiveSessionBoard({
       }
       supabase.removeChannel(channel);
     };
-  }, [sessionId, showNpcReaction, supabase, userId]);
+  }, [sessionId, showNpcReaction, supabase, userId, isGM, isGuest]);
 
   useEffect(() => {
+    if (isGuest) return;
     let cancelled = false;
 
     async function loadCombatParticipants() {
@@ -2077,12 +2127,20 @@ export function LiveSessionBoard({
       <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/85 to-background-dark/95 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
         <div className="flex flex-col gap-1">
           <div className="font-barlow text-sm uppercase text-gray-400">
-            {forcePlayerView
-              ? "Spieler-Monitor"
-              : isPrepMode
-                ? "Session – Vorbereitung"
-                : "Live Session Dashboard"}
+            {isGuest
+              ? `Gast · ${guestDisplayName ?? "Zuschauer"}`
+              : forcePlayerView
+                ? "Spieler-Monitor"
+                : isPrepMode
+                  ? "Session – Vorbereitung"
+                  : "Live Session Dashboard"}
           </div>
+          {isGuest ? (
+            <p className="font-libre text-xs text-gray-400 max-w-xl">
+              Du nimmst als Gast teil (Platzhalter-Slot {guestSlotIndex ?? "—"}) — nur Anschauen, kein
+              Inventar und kein Handel.
+            </p>
+          ) : null}
           {isPrepMode && (
             <p className="font-libre text-xs text-accent-gold/90 max-w-xl">
               Du gestaltest und testest den Tisch vor dem Start. Spieler sehen diese Ansicht erst,
@@ -2167,6 +2225,20 @@ export function LiveSessionBoard({
             >
               <Swords className="h-5 w-5 shrink-0" />
               {liveState?.is_combat_mode ? "Combat beenden" : "Combat starten"}
+            </button>
+          ) : null}
+          {actualUserIsGM && !forcePlayerView && guestJoinUrl ? (
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(guestJoinUrl);
+                window.open(guestJoinUrl, "_blank", "noopener,noreferrer");
+              }}
+              className="inline-flex items-center gap-1 rounded border border-hero-border/60 bg-hero-vibrant/20 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:bg-hero-vibrant/30 transition-colors"
+              title="Gäste-Link kopieren und in neuem Tab öffnen (Foundry-Spieler ohne TH-Account)"
+            >
+              <Monitor className="h-4 w-4" />
+              Gäste-Link
             </button>
           ) : null}
           {actualUserIsGM && !forcePlayerView && (
@@ -3151,7 +3223,7 @@ export function LiveSessionBoard({
                   liveState?.is_combat_mode ? "pt-56" : "pt-[60px]"
                 }`}
               >
-                {liveState?.active_shop_id ? (
+                {!isGuest && liveState?.active_shop_id ? (
                   <LiveStageShopOverlay
                     campaignId={campaignId}
                     shopId={liveState.active_shop_id}
@@ -3286,7 +3358,9 @@ export function LiveSessionBoard({
                   <div className="flex justify-center gap-5">
                 {displayPartyCharacters.map((pc) => {
                   const pid = pc.playerUserId ? String(pc.playerUserId) : "";
-                  const self = pid === userId;
+                  const isGuestSelf =
+                    isGuest && pc.isSessionDummy && pc.guestId === userId;
+                  const self = pid === userId || isGuestSelf;
                   const onDeck =
                     Boolean(pc.isSessionDummy) ||
                     !pid ||
@@ -3295,6 +3369,7 @@ export function LiveSessionBoard({
                     physicallyPresentIdSet.has(pid);
                   const isScribe = !!pid && liveState?.scribe_id === pid;
                   const canOpenInventory =
+                    !isGuest &&
                     ((actualUserIsGM && !forcePlayerView) || pid === userId) &&
                     !pc.isSessionDummy;
                   const isActiveTurn =
