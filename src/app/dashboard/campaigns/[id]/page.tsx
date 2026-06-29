@@ -36,17 +36,19 @@ export default async function CampaignDetailPage({
 
   const data = await loadCampaignDetailPageData(id, user.id);
 
-  const discordSettings = data.isGM
-    ? (await getCampaignDiscordSettings(id)) ?? {
-        webhookUrl: "",
-        notificationsEnabled: true,
-        configured: false,
-      }
-    : null;
-
-  const foundrySyncSettings = data.isGM
-    ? await getCampaignFoundrySyncSettings(id)
-    : null;
+  const [discordSettings, foundrySyncSettings] = data.isGM
+    ? await Promise.all([
+        getCampaignDiscordSettings(id).then(
+          (settings) =>
+            settings ?? {
+              webhookUrl: "",
+              notificationsEnabled: true,
+              configured: false,
+            },
+        ),
+        getCampaignFoundrySyncSettings(id),
+      ])
+    : [null, null];
 
   return (
     <CampaignDetailPageContent

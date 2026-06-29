@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 
@@ -14,7 +15,7 @@ export type VisibilityEntityType = "lore" | "npc" | "faction" | "bestarium";
  * Lädt die Sichtbarkeits-Map für eine Kampagne und einen Entity-Typ.
  * Rückgabe: Record<entity_id, is_revealed>.
  */
-export async function getVisibilityForCampaign(
+async function getVisibilityForCampaignUncached(
   campaignId: string,
   entityType: VisibilityEntityType,
 ): Promise<Record<string, boolean>> {
@@ -55,3 +56,6 @@ export async function getVisibilityForCampaign(
   });
   return map;
 }
+
+/** Pro Request dedupliziert (mehrere Tabs/Queries teilen sich einen Roundtrip). */
+export const getVisibilityForCampaign = cache(getVisibilityForCampaignUncached);

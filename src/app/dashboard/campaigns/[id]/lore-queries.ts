@@ -1,5 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { isLocationType } from "@/src/lib/lore-types";
 
 /**
  * Reine Datenqueries (kein "use server") – für Server Components.
@@ -128,4 +129,53 @@ export async function getRecentLoreForGmDashboard(
     type: r.type != null ? String(r.type) : null,
     created_at: r.created_at != null ? String(r.created_at) : null,
   }));
+}
+
+/** Leichte Ortsliste für Dropdowns (ohne Beschreibungen/JSON-Felder). */
+export async function getLoreLocationOptions(campaignId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("id, gm_id, world_id")
+    .eq("id", campaignId)
+    .single();
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
+  if (!campaign?.world_id) return [];
+
+  const isGM = campaign.gm_id === user.id;
+  if (!isGM) {
+    const { data: member } = await (supabase.from("campaign_members") as any)
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", user.id)
+      .in("status", ["Approved", "Active", "Drafting", "In_Review", "Changes_Proposed"])
+      .maybeSingle();
+    if (!member) return [];
+  }
+
+  const { data: lore, error } = await (supabase.from("world_lore") as any)
+    .select("id, name, type")
+    .eq("world_id", campaign.world_id)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("[getLoreLocationOptions]", error);
+    return [];
+  }
+
+  const visibility = await getVisibilityForCampaign(campaignId, "lore");
+
+  return ((lore as { id: string; name: string; type: string }[]) || [])
+    .filter((entry) => isLocationType(entry.type))
+    .filter((entry) => isGM || visibility[entry.id] === true)
+    .map((entry) => ({
+      id: String(entry.id),
+      name: String(entry.name),
+      type: String(entry.type),
+    }));
 }

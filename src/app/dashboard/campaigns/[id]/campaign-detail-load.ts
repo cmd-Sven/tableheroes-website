@@ -1,5 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type {
   GmTermineNextSession,
   GmTerminePlayerRsvp,
@@ -203,17 +204,19 @@ export async function loadCampaignDetailPageData(
   }[] = [];
 
   if (isGM) {
-    try {
-      const { expirePastScheduledSessionsForCampaign } = await import(
-        "./session-actions",
-      );
-      await expirePastScheduledSessionsForCampaign(id);
-    } catch (e) {
-      console.warn(
-        "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
-        e,
-      );
-    }
+    after(async () => {
+      try {
+        const { expirePastScheduledSessionsForCampaign } = await import(
+          "./session-actions",
+        );
+        await expirePastScheduledSessionsForCampaign(id);
+      } catch (e) {
+        console.warn(
+          "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
+          e,
+        );
+      }
+    });
   }
 
   // Fetch Sessions (alle Status — Aufteilung Fokus / aktiv / Archiv)
@@ -318,61 +321,23 @@ export async function loadCampaignDetailPageData(
   );
 
   if (hasAccess) {
-    // Unified data loading: Use getNPCs for both GM and Player
-    // This ensures has_active_quest is calculated for all users
-    console.log("🔍 [DashboardPage] Loading data (isGM:", isGM, ")");
-    npcs = await getNPCs(id, userId, isGM);
+    const [npcsResult, factionsResult, loreResult, questsResult] = await Promise.all([
+      getNPCs(id, userId, isGM),
+      getFactionsWithMembers(id),
+      getLoreEntries(id),
+      getQuests(id, isGM),
+    ]);
 
-    console.log("✅ [DashboardPage] NPCs loaded:", npcs.length, "NPCs");
-    if (npcs.length > 0) {
-      console.log("🔍 [DashboardPage] Sample NPC:", {
-        id: npcs[0].id,
-        name: npcs[0].name,
-        is_revealed: npcs[0].is_revealed,
-        has_active_quest: npcs[0].has_active_quest,
-        user_id: npcs[0].user_id,
-      });
-    }
+    npcs = npcsResult;
+    loreEntries = loreResult;
+    quests = questsResult;
 
     if (isGM) {
-      // GM: Load everything (no filters)
-      factions = await getFactionsWithMembers(id);
-      loreEntries = await getLoreEntries(id);
-      quests = await getQuests(id, true);
-
-      console.log("🔍 [DashboardPage] GM Data loaded:", {
-        npcs: npcs.length,
-        factions: factions.length,
-        loreEntries: loreEntries.length,
-        quests: quests.length,
-      });
+      factions = factionsResult;
     } else {
-      // Player: Load with filters
-
-      // Factions: alle laden, Sichtbarkeit aus campaign_visibility; für Anzeige: is_revealed ODER allow_pc_join_on_creation
-      console.log("🔍 [DashboardPage] Fetching Factions for campaign:", id);
-      factions = await getFactionsWithMembers(id);
-      factions = factions.filter(
-        (f: any) => f.is_revealed === true || f.allow_pc_join_on_creation === true
+      factions = factionsResult.filter(
+        (f: any) => f.is_revealed === true || f.allow_pc_join_on_creation === true,
       );
-      console.log("✅ [DashboardPage] Factions loaded:", factions.length, "factions");
-
-      // Lore: über getLoreEntries (filtert nach campaign_visibility.is_revealed)
-      console.log("🔍 [DashboardPage] Fetching Lore for campaign:", id);
-      loreEntries = await getLoreEntries(id);
-      console.log("✅ [DashboardPage] Lore loaded:", loreEntries.length, "entries");
-
-      // Quests: nur freigegebene (is_revealed)
-      console.log("🔍 [DashboardPage] Fetching Quests for campaign:", id);
-      quests = await getQuests(id, false);
-      console.log("✅ [DashboardPage] Quests loaded:", quests.length, "quests");
-
-      console.log("🔍 [DashboardPage] Player Data Summary:", {
-        npcs: npcs.length,
-        factions: factions.length,
-        loreEntries: loreEntries.length,
-        quests: quests.length,
-      });
     }
   } else {
     console.log("⚠️ [DashboardPage] User has NO ACCESS. Skipping data fetch.");

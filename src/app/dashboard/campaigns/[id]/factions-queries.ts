@@ -50,18 +50,21 @@ export async function getFactionsWithMembers(campaignId: string) {
 
   const visibility = await getVisibilityForCampaign(campaignId, "faction");
 
-  const factionsWithCounts = await Promise.all(
-    factions.map(async (faction: any) => {
-      const { count } = await (supabase.from("npcs") as any)
-        .select("id", { count: "exact", head: true })
-        .eq("faction_id", faction.id);
-      return {
-        ...faction,
-        is_revealed: visibility[faction.id] ?? false,
-        member_count: count || 0,
-      };
-    }),
-  );
+  const { data: npcFactionRows } = await (supabase.from("npcs") as any)
+    .select("faction_id")
+    .eq("world_id", campaign.world_id)
+    .not("faction_id", "is", null);
 
-  return factionsWithCounts;
+  const memberCountByFaction = new Map<string, number>();
+  for (const row of (npcFactionRows as { faction_id?: string | null }[]) || []) {
+    const factionId = row.faction_id ? String(row.faction_id) : "";
+    if (!factionId) continue;
+    memberCountByFaction.set(factionId, (memberCountByFaction.get(factionId) ?? 0) + 1);
+  }
+
+  return factions.map((faction: any) => ({
+    ...faction,
+    is_revealed: visibility[faction.id] ?? false,
+    member_count: memberCountByFaction.get(String(faction.id)) ?? 0,
+  }));
 }
