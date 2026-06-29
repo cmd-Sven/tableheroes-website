@@ -264,7 +264,9 @@ export function NarrativeNPCWizard({
         const portraitMeta = buildNpcPortraitMeta({
           imageUrl,
           portraitFile,
-          portraitIsAiGenerated,
+          portraitIsAiGenerated:
+            portraitIsAiGenerated ||
+            (!!imageUrl && !portraitFile && imageUrl.includes("/profile-media/")),
           uploadRightsConfirmed,
         });
 

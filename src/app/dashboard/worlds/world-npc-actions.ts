@@ -13,6 +13,107 @@ const PROFILE_MEDIA_BUCKET = "profile-media";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const NPC_ALIGNMENT_VALUES = [
+  "Lawful Good",
+  "Neutral Good",
+  "Chaotic Good",
+  "Lawful Neutral",
+  "True Neutral",
+  "Chaotic Neutral",
+  "Lawful Evil",
+  "Neutral Evil",
+  "Chaotic Evil",
+] as const;
+
+const NPC_STATUS_VALUES = ["Alive", "Deceased", "Missing", "Unknown"] as const;
+
+function normalizeNpcAlignment(value: unknown): (typeof NPC_ALIGNMENT_VALUES)[number] {
+  const raw = String(value ?? "").trim();
+  if ((NPC_ALIGNMENT_VALUES as readonly string[]).includes(raw)) {
+    return raw as (typeof NPC_ALIGNMENT_VALUES)[number];
+  }
+  const lower = raw.toLowerCase();
+  const map: Record<string, (typeof NPC_ALIGNMENT_VALUES)[number]> = {
+    "lawful good": "Lawful Good",
+    "neutral good": "Neutral Good",
+    "chaotic good": "Chaotic Good",
+    "lawful neutral": "Lawful Neutral",
+    "true neutral": "True Neutral",
+    "neutral": "True Neutral",
+    "chaotic neutral": "Chaotic Neutral",
+    "lawful evil": "Lawful Evil",
+    "neutral evil": "Neutral Evil",
+    "chaotic evil": "Chaotic Evil",
+    "rechtschaffen gut": "Lawful Good",
+    "neutral gut": "Neutral Good",
+    "chaotisch gut": "Chaotic Good",
+    "rechtschaffen neutral": "Lawful Neutral",
+    "wahrhaft neutral": "True Neutral",
+    "chaotisch neutral": "Chaotic Neutral",
+    "rechtschaffen böse": "Lawful Evil",
+    "neutral böse": "Neutral Evil",
+    "chaotisch böse": "Chaotic Evil",
+  };
+  return map[lower] ?? "True Neutral";
+}
+
+function normalizeNpcStatus(value: unknown): (typeof NPC_STATUS_VALUES)[number] {
+  const raw = String(value ?? "").trim();
+  if ((NPC_STATUS_VALUES as readonly string[]).includes(raw)) {
+    return raw as (typeof NPC_STATUS_VALUES)[number];
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes("dead") || lower.includes("tot")) return "Deceased";
+  if (lower.includes("missing") || lower.includes("vermisst")) return "Missing";
+  if (lower.includes("unknown") || lower.includes("unbekannt")) return "Unknown";
+  return "Alive";
+}
+
+function normalizeNpcCheckResults(value: unknown) {
+  const rows = Array.isArray(value) ? value : [];
+  const normalized = rows
+    .filter((row): row is Record<string, unknown> => row != null && typeof row === "object")
+    .map((row) => ({
+      type: String(row.type ?? "Wahrnehmung"),
+      dc: Number.isFinite(Number(row.dc)) ? Number(row.dc) : 15,
+      result: String(row.result ?? "").trim(),
+      is_critical: row.is_critical === true,
+    }))
+    .filter((row) => row.result.length > 0);
+
+  const defaults = [
+    {
+      type: "Wahrnehmung",
+      dc: 15,
+      result: "Auf den ersten Blick wirkt der NSC unauffällig, aber etwas an seiner Haltung fällt auf.",
+      is_critical: false,
+    },
+    {
+      type: "Motiv erkennen",
+      dc: 18,
+      result: "Hinter der höflichen Fassade zeigt sich ein berechnender, wachsamer Blick.",
+      is_critical: false,
+    },
+  ];
+
+  while (normalized.length < 2) {
+    normalized.push(defaults[normalized.length]);
+  }
+
+  return normalized;
+}
+
+function normalizeNpcAiPayload(raw: Record<string, unknown>) {
+  return {
+    ...raw,
+    name: String(raw.name ?? "Unbenannter NSC").trim() || "Unbenannter NSC",
+    description: String(raw.description ?? "").trim() || "Ein NSC aus dieser Welt.",
+    alignment: normalizeNpcAlignment(raw.alignment),
+    status: normalizeNpcStatus(raw.status),
+    check_results: normalizeNpcCheckResults(raw.check_results),
+  };
+}
+
 export async function buildBlueprintContext(worldName: string, blueprint: WorldBlueprint | null): Promise<string> {
   if (!blueprint) return `Welt: ${worldName}. Kein Blueprint hinterlegt – nutze konsistentes Fantasy-Setting.`;
   const bp = blueprint;
@@ -59,27 +160,20 @@ export type GeneratedNPCResult = {
 export async function loadWorldAndAuth(worldId: string) {
   const supabase = await createClient();
 
-  // Deep Logging: empfangene worldId (UUID-ähnlich behandeln)
   const worldIdNorm = typeof worldId === "string" ? worldId.trim() : String(worldId);
-  console.log("[loadWorldAndAuth] Empfangene worldId:", worldIdNorm, "Länge:", worldIdNorm.length);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
-  console.log("[loadWorldAndAuth] user.id (Server-Client):", user.id);
-
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select("primary_role")
     .eq("id", user.id)
     .single();
   const profile = profileRaw as { primary_role?: string } | null;
-  if (profile?.primary_role !== "GameMaster" && profile?.primary_role !== "Admin") {
-    throw new Error("Nur Spielleiter können NPCs per KI generieren.");
-  }
+  const isAdmin = profile?.primary_role === "Admin";
 
-  // Abfrage: Filter auf Spalte id (Primary Key). Tabelle worlds nutzt gm_id für GM-Zuordnung.
   const { data: worldRaw, error: worldError } = await (supabase.from("worlds") as any)
     .select("id, name, gm_id, blueprint")
     .eq("id", worldIdNorm)
@@ -89,40 +183,7 @@ export async function loadWorldAndAuth(worldId: string) {
     console.error("[loadWorldAndAuth] Welt-Abfrage fehlgeschlagen:", {
       worldId: worldIdNorm,
       error: worldError,
-      errorMessage: worldError?.message,
-      errorCode: worldError?.code,
-      errorDetails: worldError?.details,
-      dataReturned: worldRaw ?? null,
     });
-    // RLS-Bypass (testweise): Mit Service-Role-Client erneut versuchen, falls konfiguriert
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (serviceRoleKey) {
-      console.log("[loadWorldAndAuth] RLS-Bypass: Versuche Abfrage mit Service-Role-Client.");
-      const { createAdminClient } = await import("@/src/lib/supabase/server");
-      const adminSupabase = createAdminClient();
-      const { data: worldRawAdmin, error: worldErrorAdmin } = await (adminSupabase.from("worlds") as any)
-        .select("id, name, gm_id, blueprint")
-        .eq("id", worldIdNorm)
-        .single();
-      console.log("[loadWorldAndAuth] RLS-Bypass Ergebnis:", {
-        found: !!worldRawAdmin,
-        error: worldErrorAdmin,
-        errorMessage: worldErrorAdmin?.message,
-      });
-      if (!worldErrorAdmin && worldRawAdmin) {
-        const world = worldRawAdmin as {
-          id: string;
-          name: string;
-          gm_id?: string;
-          blueprint?: WorldBlueprint | null;
-        };
-        const isOwner = world.gm_id === user.id;
-        if (!isOwner) throw new Error("Keine Berechtigung für diese Welt.");
-        return { world, blueprint: (world.blueprint as WorldBlueprint) ?? null };
-      }
-    } else {
-      console.log("[loadWorldAndAuth] SUPABASE_SERVICE_ROLE_KEY nicht gesetzt – kein RLS-Bypass möglich.");
-    }
     throw new Error("Welt nicht gefunden.");
   }
 
@@ -132,8 +193,10 @@ export async function loadWorldAndAuth(worldId: string) {
     gm_id?: string;
     blueprint?: WorldBlueprint | null;
   };
-  const isOwner = world.gm_id === user.id;
-  if (!isOwner) throw new Error("Keine Berechtigung für diese Welt.");
+  const isWorldGm = world.gm_id != null && String(world.gm_id) === String(user.id);
+  if (!isWorldGm && !isAdmin) {
+    throw new Error("Keine Berechtigung für diese Welt.");
+  }
 
   return { world, blueprint: (world.blueprint as WorldBlueprint) ?? null };
 }
@@ -204,9 +267,9 @@ Zusätzlich MUSS das Objekt das Feld "suggested_secret" enthalten: ein Geheimnis
     raw.appearance = null;
   }
 
-  const parsed = NPCSchema.safeParse(raw);
+  const parsed = NPCSchema.safeParse(normalizeNpcAiPayload(raw as Record<string, unknown>));
   if (!parsed.success) {
-    console.error("NPCSchema validation:", parsed.error.format());
+    console.error("NPCSchema validation:", parsed.error.format(), raw);
     throw new Error("Die KI hat ein ungültiges NPC-Format geliefert.");
   }
 

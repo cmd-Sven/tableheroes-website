@@ -3,6 +3,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 
 /**
  * Server Actions für NPCs
@@ -79,11 +80,16 @@ export async function createNPC(formData: {
     worldId = formData.world_id;
   } else if (formData.campaign_id) {
     const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-      .select("id, gm_id, world_id")
+      .select("id, gm_id, owner_id, world_id")
       .eq("id", formData.campaign_id)
       .single();
-    const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
-    if (!campaign || campaign.gm_id !== user.id) {
+    const campaign = campaignRaw as {
+      id: string;
+      gm_id: string;
+      owner_id?: string | null;
+      world_id: string | null;
+    } | null;
+    if (!campaign || !isCampaignGm(campaign, user.id)) {
       throw new Error("Nur der GM kann NPCs erstellen.");
     }
     if (!campaign.world_id) {
@@ -169,6 +175,15 @@ export async function createNPC(formData: {
       .single();
 
     if (createError || !createdLocation) {
+      if (createError?.code === "23505") {
+        const { data: existingLocation } = await (supabase.from("locations") as any)
+          .select("id, world_id")
+          .eq("id", lore.id)
+          .maybeSingle();
+        if (existingLocation && existingLocation.world_id === worldIdParam) {
+          return existingLocation as { id: string; world_id: string };
+        }
+      }
       if (createError?.code === "23503" || createError?.message?.includes("foreign key")) {
         throw new Error(
           `Der Ort "${lore.name}" oder sein übergeordneter Ort ist ungültig. Bitte prüfe die Orts-Hierarchie.`
@@ -216,6 +231,7 @@ export async function createNPC(formData: {
     portraitFile: null,
     portraitIsAiGenerated: formData.image_is_ai_generated === true,
     uploadRightsConfirmed: formData.image_upload_rights_confirmed === true,
+    urlRightsConfirmed: formData.image_upload_rights_confirmed === true,
   });
 
   if (
