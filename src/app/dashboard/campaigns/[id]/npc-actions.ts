@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 
 /**
  * Server Actions für NPCs
@@ -21,7 +22,6 @@ import { isCampaignGm } from "@/src/lib/campaign-gm";
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
-import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 
 export async function createNPC(formData: {
   campaign_id?: string;
@@ -226,12 +226,10 @@ export async function createNPC(formData: {
   const validatedHomeLocationId = await validateLocation(normalizedHomeLocationId, "home_location_id");
 
   const imageUrl = (formData.image_url || "").trim();
-  const portraitMeta = buildNpcPortraitMeta({
+  const portraitMeta = resolveNpcPortraitMetaForServer(user.id, {
     imageUrl,
-    portraitFile: null,
-    portraitIsAiGenerated: formData.image_is_ai_generated === true,
-    uploadRightsConfirmed: formData.image_upload_rights_confirmed === true,
-    urlRightsConfirmed: formData.image_upload_rights_confirmed === true,
+    portraitIsAiGenerated: formData.image_is_ai_generated,
+    uploadRightsConfirmed: formData.image_upload_rights_confirmed,
   });
 
   if (
@@ -581,16 +579,25 @@ export async function updateNPC(
         ? (updates.image_url || "").trim() || null
         : undefined;
     if (nextUrl !== undefined) {
-      const portraitMeta = buildNpcPortraitMeta({
+      const portraitMeta = resolveNpcPortraitMetaForServer(user.id, {
         imageUrl: nextUrl,
-        portraitFile: null,
-        portraitIsAiGenerated: updates.image_is_ai_generated === true,
-        uploadRightsConfirmed: updates.image_upload_rights_confirmed === true,
+        portraitIsAiGenerated: updates.image_is_ai_generated,
+        uploadRightsConfirmed: updates.image_upload_rights_confirmed,
       });
       normalizedUpdates.image_url = nextUrl;
       normalizedUpdates.image_is_ai_generated = portraitMeta.image_is_ai_generated;
       normalizedUpdates.image_upload_rights_confirmed =
         portraitMeta.image_upload_rights_confirmed;
+
+      if (
+        nextUrl &&
+        !portraitMeta.image_is_ai_generated &&
+        portraitMeta.image_upload_rights_confirmed !== true
+      ) {
+        throw new Error(
+          "Bitte bestätige die Nutzungsrechte am hochgeladenen Bild oder kennzeichne es als KI-generiert.",
+        );
+      }
     }
   }
 

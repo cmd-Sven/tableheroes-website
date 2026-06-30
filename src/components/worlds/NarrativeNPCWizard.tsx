@@ -255,20 +255,36 @@ export function NarrativeNPCWizard({
     startTransition(async () => {
       try {
         let imageUrl = portraitUrl;
+        let imageIsAiGenerated = portraitIsAiGenerated;
+        let imageUploadRightsConfirmed: boolean | null = null;
+
         if (portraitFile) {
+          if (!uploadRightsConfirmed) {
+            throw new Error(
+              "Bitte bestätige die Nutzungsrechte am hochgeladenen Bild (Schritt 4).",
+            );
+          }
           const upload = await uploadNpcPortrait(portraitFile, { worldId });
           if ("error" in upload) throw new Error(upload.error);
           imageUrl = upload.publicUrl;
+          imageIsAiGenerated = false;
+          imageUploadRightsConfirmed = true;
+        } else if (imageUrl) {
+          if (portraitIsAiGenerated) {
+            imageIsAiGenerated = true;
+            imageUploadRightsConfirmed = null;
+          } else {
+            const portraitMeta = buildNpcPortraitMeta({
+              imageUrl,
+              portraitFile: null,
+              portraitIsAiGenerated: false,
+              uploadRightsConfirmed: false,
+              urlRightsConfirmed: uploadRightsConfirmed,
+            });
+            imageIsAiGenerated = portraitMeta.image_is_ai_generated;
+            imageUploadRightsConfirmed = portraitMeta.image_upload_rights_confirmed;
+          }
         }
-
-        const portraitMeta = buildNpcPortraitMeta({
-          imageUrl,
-          portraitFile,
-          portraitIsAiGenerated:
-            portraitIsAiGenerated ||
-            (!!imageUrl && !portraitFile && imageUrl.includes("/profile-media/")),
-          uploadRightsConfirmed,
-        });
 
         const npc = await createNPC({
           world_id: worldId,
@@ -287,8 +303,8 @@ export function NarrativeNPCWizard({
           gm_notes: persona.gm_notes ?? undefined,
           image_url: imageUrl ?? undefined,
           image_display: imageUrl ? normalizeImageDisplay(portraitDisplay) : undefined,
-          image_is_ai_generated: portraitMeta.image_is_ai_generated,
-          image_upload_rights_confirmed: portraitMeta.image_upload_rights_confirmed,
+          image_is_ai_generated: imageIsAiGenerated,
+          image_upload_rights_confirmed: imageUploadRightsConfirmed ?? undefined,
           narrative_hooks: (persona.narrative_hooks ?? undefined)?.map((h) => ({ ...h, name: h.name ?? undefined })) ?? undefined,
           check_results: (persona.check_results ?? undefined) as any,
           faction_id: selectedFactionId ?? undefined,
@@ -347,7 +363,10 @@ export function NarrativeNPCWizard({
   const canGoStep3 = !!persona;
   const canGoStep4 = !!persona && appearanceConfirmed;
   const canGoStep5 =
-    !!persona && appearanceConfirmed && (!!portraitUrl || !!portraitFile || portraitSkipped);
+    !!persona &&
+    appearanceConfirmed &&
+    (!!portraitUrl || !!portraitFile || portraitSkipped) &&
+    (!portraitFile || uploadRightsConfirmed);
   const canGoStep6 = !!persona;
   const displayName = step1Name.trim() || persona?.name || "NPC";
 

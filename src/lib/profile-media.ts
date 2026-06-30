@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/client";
+import { compressImageFileForUpload } from "@/src/lib/image-compress-client";
 
 export const PROFILE_MEDIA_BUCKET = "profile-media";
 export const PROFILE_MEDIA_MAX_BYTES = 5 * 1024 * 1024;
@@ -50,6 +51,33 @@ export function validateProfileImageFile(file: File): string | null {
   return "Nur JPEG-, PNG- oder WebP-Bilder sind erlaubt.";
 }
 
+async function prepareImageForProfileUpload(
+  file: File,
+): Promise<{ file: File } | { error: string }> {
+  return compressImageFileForUpload(file);
+}
+
+async function uploadPreparedImage(
+  path: string,
+  file: File,
+): Promise<{ error: string } | null> {
+  const supabase = createClient();
+  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+    contentType: "image/webp",
+  });
+
+  if (error) {
+    const hint =
+      /mime|not supported|invalid/i.test(error.message)
+        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/webp“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
+        : "";
+    return { error: `${error.message}${hint}` };
+  }
+  return null;
+}
+
 function extensionFromMimeOrName(file: File): string {
   const fromName = file.name.split(".").pop()?.toLowerCase();
   if (fromName && ["jpg", "jpeg", "png", "webp"].includes(fromName)) {
@@ -67,30 +95,15 @@ export async function uploadProfileMediaAsset(
   kind: "avatar" | "banner",
   file: File,
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
-  const err = validateProfileImageFile(file);
-  if (err) return { error: err };
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
 
-  const ext = extensionFromMimeOrName(file);
-  const path = `${userId}/${kind}-${Date.now()}.${ext}`;
+  const uploadFile = prepared.file;
+  const path = `${userId}/${kind}-${Date.now()}.webp`;
+  const uploadError = await uploadPreparedImage(path, uploadFile);
+  if (uploadError) return uploadError;
+
   const supabase = createClient();
-  const contentType = contentTypeForImageUpload(file);
-
-  const { error } = await supabase.storage
-    .from(PROFILE_MEDIA_BUCKET)
-    .upload(path, file, {
-      cacheControl: "31536000",
-      upsert: false,
-      contentType,
-    });
-
-  if (error) {
-    const hint =
-      /mime|not supported|invalid/i.test(error.message)
-        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/jpeg“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
-        : "";
-    return { error: `${error.message}${hint}` };
-  }
-
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
 }
@@ -108,8 +121,8 @@ export async function uploadCharacterPortrait(
   file: File,
   options: { characterId?: string | null },
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
-  const err = validateProfileImageFile(file);
-  if (err) return { error: err };
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
 
   const supabase = createClient();
   const {
@@ -117,29 +130,13 @@ export async function uploadCharacterPortrait(
   } = await supabase.auth.getUser();
   if (!user?.id) return { error: "Nicht angemeldet." };
 
-  const ext = extensionFromMimeOrName(file);
   const uid = user.id;
   const path = options.characterId?.trim()
-    ? `${uid}/characters/${options.characterId}/portrait-${Date.now()}.${ext}`
-    : `${uid}/characters/new-${crypto.randomUUID()}-${Date.now()}.${ext}`;
+    ? `${uid}/characters/${options.characterId}/portrait-${Date.now()}.webp`
+    : `${uid}/characters/new-${crypto.randomUUID()}-${Date.now()}.webp`;
 
-  const contentType = contentTypeForImageUpload(file);
-
-  const { error } = await supabase.storage
-    .from(PROFILE_MEDIA_BUCKET)
-    .upload(path, file, {
-      cacheControl: "31536000",
-      upsert: false,
-      contentType,
-    });
-
-  if (error) {
-    const hint =
-      /mime|not supported|invalid/i.test(error.message)
-        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/jpeg“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
-        : "";
-    return { error: `${error.message}${hint}` };
-  }
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
 
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
@@ -150,8 +147,8 @@ export async function uploadNpcPortrait(
   file: File,
   options: { worldId: string; npcId?: string | null },
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
-  const err = validateProfileImageFile(file);
-  if (err) return { error: err };
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
 
   const worldId = options.worldId?.trim();
   if (!worldId) return { error: "Welt-ID fehlt für den Portrait-Upload." };
@@ -162,27 +159,14 @@ export async function uploadNpcPortrait(
   } = await supabase.auth.getUser();
   if (!user?.id) return { error: "Nicht angemeldet." };
 
-  const ext = extensionFromMimeOrName(file);
   const uid = user.id;
   const npcSegment = options.npcId?.trim()
     ? options.npcId.trim()
     : `new-${crypto.randomUUID()}`;
-  const path = `${uid}/npcs/${worldId}/${npcSegment}/portrait-${Date.now()}.${ext}`;
-  const contentType = contentTypeForImageUpload(file);
+  const path = `${uid}/npcs/${worldId}/${npcSegment}/portrait-${Date.now()}.webp`;
 
-  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
-    cacheControl: "31536000",
-    upsert: false,
-    contentType,
-  });
-
-  if (error) {
-    const hint =
-      /mime|not supported|invalid/i.test(error.message)
-        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/jpeg“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
-        : "";
-    return { error: `${error.message}${hint}` };
-  }
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
 
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
@@ -193,8 +177,8 @@ export async function uploadLoreImage(
   file: File,
   options: { worldId: string; loreId?: string | null },
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
-  const err = validateProfileImageFile(file);
-  if (err) return { error: err };
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
 
   const worldId = options.worldId?.trim();
   if (!worldId) return { error: "Welt-ID fehlt für den Bild-Upload." };
@@ -205,27 +189,14 @@ export async function uploadLoreImage(
   } = await supabase.auth.getUser();
   if (!user?.id) return { error: "Nicht angemeldet." };
 
-  const ext = extensionFromMimeOrName(file);
   const uid = user.id;
   const loreSegment = options.loreId?.trim()
     ? options.loreId.trim()
     : `new-${crypto.randomUUID()}`;
-  const path = `${uid}/lore/${worldId}/${loreSegment}/image-${Date.now()}.${ext}`;
-  const contentType = contentTypeForImageUpload(file);
+  const path = `${uid}/lore/${worldId}/${loreSegment}/image-${Date.now()}.webp`;
 
-  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
-    cacheControl: "31536000",
-    upsert: false,
-    contentType,
-  });
-
-  if (error) {
-    const hint =
-      /mime|not supported|invalid/i.test(error.message)
-        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob „image/jpeg“ unter den erlaubten MIME-Typen steht (oder die Liste leeren)."
-        : "";
-    return { error: `${error.message}${hint}` };
-  }
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
 
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
@@ -236,8 +207,8 @@ export async function uploadSceneMediaImage(
   file: File,
   options: { campaignId: string; sceneMediaId?: string | null },
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
-  const err = validateProfileImageFile(file);
-  if (err) return { error: err };
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
 
   const campaignId = options.campaignId?.trim();
   if (!campaignId) return { error: "Kampagnen-ID fehlt für den Upload." };
@@ -248,26 +219,13 @@ export async function uploadSceneMediaImage(
   } = await supabase.auth.getUser();
   if (!user?.id) return { error: "Nicht angemeldet." };
 
-  const ext = extensionFromMimeOrName(file);
   const segment = options.sceneMediaId?.trim()
     ? options.sceneMediaId.trim()
     : `new-${crypto.randomUUID()}`;
-  const path = `${user.id}/scene-media/${campaignId}/${segment}/image-${Date.now()}.${ext}`;
-  const contentType = contentTypeForImageUpload(file);
+  const path = `${user.id}/scene-media/${campaignId}/${segment}/image-${Date.now()}.webp`;
 
-  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
-    cacheControl: "31536000",
-    upsert: false,
-    contentType,
-  });
-
-  if (error) {
-    const hint =
-      /mime|not supported|invalid/i.test(error.message)
-        ? " Prüfe im Supabase-Dashboard beim Bucket „profile-media“, ob Bild-MIME-Typen erlaubt sind."
-        : "";
-    return { error: `${error.message}${hint}` };
-  }
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
 
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };

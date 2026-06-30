@@ -8,6 +8,7 @@ import {
   buildPortraitArtStyle,
   buildPortraitImagePrompt,
 } from "@/src/lib/npc-portrait-style";
+import { compressImageBufferToWebp } from "@/src/lib/image-compress-server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
 
@@ -688,13 +689,14 @@ export async function generateNPCPortrait(
     throw new Error("Die Bild-KI hat kein Bild zurückgegeben.");
   }
 
-  const buffer = Buffer.from(b64, "base64");
-  const path = `${user.id}/npcs/${worldId}/portrait-${Date.now()}.png`;
+  const rawBuffer = Buffer.from(b64, "base64");
+  const compressed = await compressImageBufferToWebp(rawBuffer);
+  const path = `${user.id}/npcs/${worldId}/portrait-${Date.now()}.webp`;
 
   const { error: uploadError } = await supabase.storage
     .from(PROFILE_MEDIA_BUCKET)
-    .upload(path, buffer, {
-      contentType: "image/png",
+    .upload(path, compressed.buffer, {
+      contentType: compressed.contentType,
       cacheControl: "31536000",
       upsert: false,
     });

@@ -139,7 +139,8 @@ export function NpcPortraitUploadField({
             />
           ) : null}
           <p className="font-libre text-xs text-gray-500">
-            Portrait hochladen (max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB, JPEG/PNG/WebP).
+            Portrait hochladen (JPEG/PNG/WebP, wird automatisch als WebP komprimiert, max.{" "}
+            {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB).
             Wird in TableHeroes gespeichert — kein externer Bild-Link nötig.
           </p>
           {hasImage && onClearImage ? (

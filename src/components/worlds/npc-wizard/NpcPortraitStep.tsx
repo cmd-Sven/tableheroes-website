@@ -146,6 +146,11 @@ export function NpcPortraitStep({
           previewAspectClassName="aspect-square max-w-sm"
           compact
         />
+        {portraitFile && !uploadRightsConfirmed ? (
+          <p className="mt-2 font-libre text-xs text-amber-200/90">
+            Bitte bestätige die Nutzungsrechte am hochgeladenen Bild, um fortzufahren.
+          </p>
+        ) : null}
       </div>
     </div>
   );
