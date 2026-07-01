@@ -88,6 +88,15 @@ import { CharacterAvatarImage } from "@/src/components/dashboard/player/Characte
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
+import { GmBeastSearchModal } from "@/src/components/session/GmBeastSearchModal";
+import { StageBeastCard } from "@/src/components/session/StageBeastCard";
+import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootModal";
+import {
+  setCreatureDefeated,
+  setCreatureDiscovery,
+  type CampaignCreatureStateRow,
+} from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
+import type { BeastDiscoveryKey } from "@/src/lib/beast-check-results";
 import { ChronicleRecorderPanel } from "@/src/components/session/ChronicleRecorderPanel";
 import { ChronicleInboxFeed } from "@/src/components/chronicle/ChronicleInboxFeed";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
@@ -138,6 +147,7 @@ type LiveState = {
   system_logs?: SystemLogEntry[] | null;
   visible_npc_ids: string[] | null;
   visible_faction_ids?: string[] | null;
+  visible_creature_ids?: string[] | null;
   active_scene_media_id?: string | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
@@ -164,7 +174,7 @@ type LiveState = {
 
 type StageVisibilityPatch = Pick<
   LiveState,
-  "visible_npc_ids" | "visible_faction_ids"
+  "visible_npc_ids" | "visible_faction_ids" | "visible_creature_ids"
 >;
 
 function normalizePhysicallyPresentUserIds(value: unknown): string[] {
@@ -176,12 +186,14 @@ function normalizeLiveRow(row: unknown): LiveState {
   const r = row as Record<string, unknown>;
   const npcRaw = r.visible_npc_ids;
   const facRaw = r.visible_faction_ids;
+  const creatureRaw = r.visible_creature_ids;
   const logsRaw = r.system_logs;
   const fateCoinsRaw = r.fate_coins;
   return {
     ...(r as unknown as LiveState),
     visible_npc_ids: Array.isArray(npcRaw) ? npcRaw.map(String) : [],
     visible_faction_ids: Array.isArray(facRaw) ? facRaw.map(String) : [],
+    visible_creature_ids: Array.isArray(creatureRaw) ? creatureRaw.map(String) : [],
     active_scene_media_id:
       r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
     system_logs: Array.isArray(logsRaw)
@@ -248,6 +260,12 @@ function normalizeStageVisibilityPatch(value: unknown): Partial<StageVisibilityP
   if (Object.prototype.hasOwnProperty.call(payload, "visible_faction_ids")) {
     patch.visible_faction_ids = Array.isArray(payload.visible_faction_ids)
       ? payload.visible_faction_ids.map(String)
+      : [];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "visible_creature_ids")) {
+    patch.visible_creature_ids = Array.isArray(payload.visible_creature_ids)
+      ? payload.visible_creature_ids.map(String)
       : [];
   }
 
@@ -418,6 +436,17 @@ type CampaignNpc = {
   /** world_lore.id – gleiche Semantik wie Session-Ort */
   current_location_id?: string | null;
   home_location_id?: string | null;
+};
+
+type CampaignCreature = {
+  id: string;
+  name: string;
+  creature_type: string | null;
+  image_url: string | null;
+  physical_description: string | null;
+  challenge_rating: number | null;
+  known_loot: string | null;
+  is_revealed?: boolean | null;
 };
 
 type CampaignFaction = {
@@ -907,15 +936,20 @@ type Props = {
   initialLiveState: LiveState | null;
   partyCharacters: PartyCharacter[];
   allCampaignNpcs: CampaignNpc[];
+  allCampaignCreatures?: CampaignCreature[];
   allCampaignFactions: CampaignFaction[];
   /** null = alle NPCs im Stage Manager */
   stageDeckNpcIds: string[] | null;
+  /** null = alle Kreaturen im Stage Manager */
+  stageDeckCreatureIds?: string[] | null;
   /** null = alle Fraktionen im Stage Manager */
   stageDeckFactionIds: string[] | null;
   /** Kampagnen-Szenenbilder (Mediathek) */
   allSceneMedia?: StageSceneMediaItem[];
   /** null = alle Szenen im Deck */
   stageDeckSceneMediaIds?: string[] | null;
+  /** Kampagnenweite Kreaturen-Entdeckungen & Besiegt */
+  initialCreatureStates?: Record<string, CampaignCreatureStateRow>;
   activeQuests: ActiveQuest[];
   /** Nur GM: Orte aus Lore (isLocationType) für Dropdown */
   loreLocationOptions?: LoreLocationOption[];
@@ -942,11 +976,14 @@ export function LiveSessionBoard({
   initialLiveState,
   partyCharacters,
   allCampaignNpcs,
+  allCampaignCreatures = [],
   allCampaignFactions,
   stageDeckNpcIds,
+  stageDeckCreatureIds = null,
   stageDeckFactionIds,
   allSceneMedia = [],
   stageDeckSceneMediaIds = null,
+  initialCreatureStates = {},
   activeQuests,
   loreLocationOptions = [],
   sessionLocationLoreReadable = false,
@@ -1007,6 +1044,8 @@ export function LiveSessionBoard({
       }),
     [allCampaignNpcs, npcMerchantOverrides],
   );
+
+  const campaignCreatures = useMemo(() => allCampaignCreatures, [allCampaignCreatures]);
 
   useEffect(() => {
     setActiveTranscriptionMode(transcriptionMode);
@@ -1114,6 +1153,10 @@ export function LiveSessionBoard({
   const [recordingNoticeModalOpen, setRecordingNoticeModalOpen] = useState(false);
   const [stageFactionSearch, setStageFactionSearch] = useState("");
   const [npcSearchModalOpen, setNpcSearchModalOpen] = useState(false);
+  const [beastSearchModalOpen, setBeastSearchModalOpen] = useState(false);
+  const [creatureStates, setCreatureStates] =
+    useState<Record<string, CampaignCreatureStateRow>>(initialCreatureStates);
+  const [beastLootCreatureId, setBeastLootCreatureId] = useState<string | null>(null);
   const [stageDropHighlight, setStageDropHighlight] = useState(false);
   const [stagePortrait, setStagePortrait] = useState<StagePortraitModal | null>(
     null,
@@ -1641,6 +1684,34 @@ export function LiveSessionBoard({
     [activeNpcs, liveState?.current_location_lore_id],
   );
 
+  const activeCreatureIds = useMemo(() => {
+    return new Set((liveState?.visible_creature_ids || []).map(String));
+  }, [liveState?.visible_creature_ids]);
+
+  const activeCreatures = useMemo(
+    () => campaignCreatures.filter((c) => activeCreatureIds.has(String(c.id))),
+    [campaignCreatures, activeCreatureIds],
+  );
+
+  const creatureStagePool = useMemo(() => {
+    if (stageDeckCreatureIds == null) return campaignCreatures;
+    const deck = new Set(stageDeckCreatureIds.map(String));
+    if (deck.size === 0) return campaignCreatures;
+    return campaignCreatures.filter((c) => deck.has(String(c.id)));
+  }, [campaignCreatures, stageDeckCreatureIds]);
+
+  const gmBeastSearchRows = useMemo(
+    () =>
+      creatureStagePool.map((c) => ({
+        id: String(c.id),
+        name: c.name,
+        creature_type: c.creature_type,
+        image_url: c.image_url,
+        is_revealed: c.is_revealed,
+      })),
+    [creatureStagePool],
+  );
+
   const gmNpcSearchRows = useMemo(
     () =>
       campaignNpcs.map((n) => ({
@@ -1848,7 +1919,21 @@ export function LiveSessionBoard({
     [allCampaignNpcs, campaignId, router],
   );
 
-  function placeOnStage(kind: "npc" | "faction" | "scene", id: string) {
+  const revealCreatureOnCampaignIfNeeded = useCallback(
+    async (creatureId: string) => {
+      const creature = allCampaignCreatures.find((entry) => String(entry.id) === creatureId);
+      if (!creature || creature.is_revealed === true) return;
+      try {
+        await setCampaignVisibility(campaignId, "bestarium", creatureId, true);
+        router.refresh();
+      } catch (err) {
+        console.error("[LiveSessionBoard] reveal creature on stage:", err);
+      }
+    },
+    [allCampaignCreatures, campaignId, router],
+  );
+
+  function placeOnStage(kind: "npc" | "faction" | "scene" | "creature", id: string) {
     void (async () => {
       const base = await resolveLiveStateBase();
       if (!base) {
@@ -1905,6 +1990,21 @@ export function LiveSessionBoard({
           `Eine neue Präsenz betritt das Geschehen: ${npc?.name ?? "Unbekannt"}.`,
         );
         await revealNpcOnCampaignIfNeeded(sid);
+      } else if (kind === "creature") {
+        const currentIds = new Set((base.visible_creature_ids || []).map(String));
+        if (currentIds.has(sid)) return;
+        currentIds.add(sid);
+        updateLiveState({ visible_creature_ids: Array.from(currentIds) }, base);
+        const creature = allCampaignCreatures.find((entry) => String(entry.id) === sid);
+        const descHint = creature?.physical_description?.trim().slice(0, 220);
+        const descLong = (creature?.physical_description?.trim().length ?? 0) > 220;
+        writeSystemLog(
+          "stage_card",
+          descHint
+            ? `Eine Kreatur betritt die Bühne: ${creature?.name ?? "Unbekannt"}. ${descHint}${descLong ? "…" : ""}`
+            : `Eine Kreatur betritt die Bühne: ${creature?.name ?? "Unbekannt"}.`,
+        );
+        await revealCreatureOnCampaignIfNeeded(sid);
       } else {
         const currentIds = new Set(
           (base.visible_faction_ids || []).map(String),
@@ -1921,7 +2021,7 @@ export function LiveSessionBoard({
     })();
   }
 
-  function removeFromStage(kind: "npc" | "faction" | "scene", id: string) {
+  function removeFromStage(kind: "npc" | "faction" | "scene" | "creature", id: string) {
     if (!isGM) return;
     const sid = String(id);
     const base = liveStateRef.current;
@@ -1948,6 +2048,17 @@ export function LiveSessionBoard({
       writeSystemLog(
         "stage_remove",
         `${npc?.name ?? "Ein NSC"} verlässt die Bühne.`,
+      );
+    } else if (kind === "creature") {
+      updateLiveState({
+        visible_creature_ids: (base.visible_creature_ids || [])
+          .map(String)
+          .filter((creatureId) => creatureId !== sid),
+      });
+      const creature = allCampaignCreatures.find((entry) => String(entry.id) === sid);
+      writeSystemLog(
+        "stage_remove",
+        `${creature?.name ?? "Eine Kreatur"} verlässt die Bühne.`,
       );
     } else {
       updateLiveState({
@@ -2672,6 +2783,15 @@ export function LiveSessionBoard({
                     >
                       <Search className="h-3.5 w-3.5" />
                       NPCs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBeastSearchModalOpen(true)}
+                      className="inline-flex items-center gap-1 rounded border border-emerald-900/50 bg-background-dark px-3 py-2 font-barlow font-bold uppercase text-[10px] text-emerald-300 hover:border-emerald-500 transition-colors"
+                      title="Kreaturen aus dem Bestarium auf die Bühne legen"
+                    >
+                      <Swords className="h-3.5 w-3.5" />
+                      Biester
                     </button>
                   </>
                 )}
@@ -3442,6 +3562,100 @@ export function LiveSessionBoard({
                   </div>
                 ) : null}
 
+                {activeCreatures.length > 0 ? (
+                  <div
+                    className={
+                      activeCreatures.length === 1
+                        ? "flex justify-center mb-6"
+                        : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 mb-6"
+                    }
+                  >
+                    <AnimatePresence mode="popLayout">
+                      {activeCreatures.map((creature) => {
+                        const state = creatureStates[String(creature.id)];
+                        const discoveries = state?.discoveries ?? {};
+                        return (
+                          <StageBeastCard
+                            key={creature.id}
+                            creature={creature}
+                            isSingle={activeCreatures.length === 1}
+                            isGM={isGM}
+                            isUpdating={isUpdating}
+                            discoveries={isGM ? discoveries : discoveries}
+                            creatureState={state}
+                            onPortrait={setStagePortrait}
+                            onRemove={(creatureId) => removeFromStage("creature", creatureId)}
+                            onToggleDiscovery={
+                              isGM
+                                ? (key: BeastDiscoveryKey, value: boolean) => {
+                                    void (async () => {
+                                      try {
+                                        await setCreatureDiscovery(
+                                          campaignId,
+                                          String(creature.id),
+                                          key,
+                                          value,
+                                        );
+                                        setCreatureStates((prev) => ({
+                                          ...prev,
+                                          [String(creature.id)]: {
+                                            creature_id: String(creature.id),
+                                            discoveries: {
+                                              ...(prev[String(creature.id)]?.discoveries ?? {}),
+                                              [key]: value,
+                                            },
+                                            is_defeated:
+                                              prev[String(creature.id)]?.is_defeated ?? false,
+                                            defeated_at:
+                                              prev[String(creature.id)]?.defeated_at ?? null,
+                                          },
+                                        }));
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    })();
+                                  }
+                                : undefined
+                            }
+                            onMarkDefeated={
+                              isGM
+                                ? () => {
+                                    void (async () => {
+                                      try {
+                                        await setCreatureDefeated(
+                                          campaignId,
+                                          String(creature.id),
+                                          sessionId,
+                                          true,
+                                        );
+                                        setCreatureStates((prev) => ({
+                                          ...prev,
+                                          [String(creature.id)]: {
+                                            creature_id: String(creature.id),
+                                            discoveries: prev[String(creature.id)]?.discoveries ?? {},
+                                            is_defeated: true,
+                                            defeated_at: new Date().toISOString(),
+                                          },
+                                        }));
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    })();
+                                  }
+                                : undefined
+                            }
+                            onSuggestLoot={
+                              isGM && state?.is_defeated
+                                ? () => setBeastLootCreatureId(String(creature.id))
+                                : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ) : null}
+
                 {activeFactions.length > 0 && (
                   <div className="rounded-xl border border-amber-900/40 bg-black/35 p-4 backdrop-blur-sm">
                     <h3 className="font-barlow font-bold text-xs uppercase text-gray-300 mb-3 flex items-center gap-2">
@@ -3711,6 +3925,38 @@ export function LiveSessionBoard({
           activeNpcIds={activeNpcIds}
           onPlaceOnStage={(id) => {
             placeOnStage("npc", id);
+          }}
+        />
+      ) : null}
+
+      {isGM ? (
+        <GmBeastSearchModal
+          open={beastSearchModalOpen}
+          onClose={() => setBeastSearchModalOpen(false)}
+          creatures={gmBeastSearchRows}
+          stageDeckCreatureIds={stageDeckCreatureIds}
+          activeCreatureIds={activeCreatureIds}
+          onPlaceOnStage={(id) => {
+            placeOnStage("creature", id);
+            setBeastSearchModalOpen(false);
+          }}
+        />
+      ) : null}
+
+      {isGM && beastLootCreatureId ? (
+        <BeastDefeatLootModal
+          open
+          creatureName={
+            allCampaignCreatures.find((c) => String(c.id) === beastLootCreatureId)?.name ??
+            "Kreatur"
+          }
+          onClose={() => setBeastLootCreatureId(null)}
+          onAccept={(suggestion) => {
+            writeSystemLog(
+              "loot_suggestion",
+              `Loot-Vorschlag für besiegte Kreatur: ${suggestion.name} (${suggestion.items.length} Gegenstände).`,
+            );
+            setBeastLootCreatureId(null);
           }}
         />
       ) : null}

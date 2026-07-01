@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
  * Ein Nutzer sieht/speichert nur seine eigene Notiz pro Entity pro Kampagne; keine Notizen aus anderen Kampagnen.
  */
 
-export type CampaignNoteEntityType = "npc" | "faction" | "lore" | "location";
+export type CampaignNoteEntityType = "npc" | "faction" | "lore" | "location" | "bestarium";
 
 async function ensureCampaignAccess(
   supabase: Awaited<ReturnType<typeof createClient>>,

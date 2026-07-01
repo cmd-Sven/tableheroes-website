@@ -411,6 +411,7 @@ export async function updateSessionStageDeck(
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
     stage_deck_scene_media_ids?: string[] | null;
+    stage_deck_creature_ids?: string[] | null;
   },
 ) {
   const supabase = await createClient();
@@ -452,6 +453,9 @@ export async function updateSessionStageDeck(
   }
   if (deck.stage_deck_scene_media_ids !== undefined) {
     updatePayload.stage_deck_scene_media_ids = deck.stage_deck_scene_media_ids;
+  }
+  if (deck.stage_deck_creature_ids !== undefined) {
+    updatePayload.stage_deck_creature_ids = deck.stage_deck_creature_ids;
   }
 
   const { error: updateError } = await (supabase.from("sessions") as any)

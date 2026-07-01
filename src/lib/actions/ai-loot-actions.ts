@@ -231,3 +231,66 @@ Vorgaben des Spielleiters (strikt einhalten):
     items,
   };
 }
+
+export type BeastLootRollQuality = "poor" | "fair" | "good" | "excellent" | "critical";
+
+/** Qualität aus Würfelergebnis (Gesamtwurf vs. SG) für Kreaturen-Loot. */
+export function beastLootQualityFromRoll(
+  rollTotal: number,
+  dc: number,
+): BeastLootRollQuality {
+  const margin = rollTotal - dc;
+  if (margin >= 10) return "critical";
+  if (margin >= 5) return "excellent";
+  if (margin >= 0) return "good";
+  if (margin >= -5) return "fair";
+  return "poor";
+}
+
+const BEAST_LOOT_QUALITY_HINT: Record<BeastLootRollQuality, string> = {
+  poor: "Kaum brauchbare Fundstücke — eher Abfall und Kleinkram.",
+  fair: "Einige nützliche profane Teile, wenig Wertvolles.",
+  good: "Solide Beute mit handwerklich oder alchemistisch interessanten Teilen.",
+  excellent: "Beachtliche Beute, eventuell ein seltener Fund.",
+  critical: "Außergewöhnliche Beute — mindestens ein bemerkenswerter oder magischer Gegenstand.",
+};
+
+/**
+ * KI-Loot nach besiegter Kreatur — Qualität hängt von der besten Analyse-Probe ab.
+ */
+export async function requestBeastDefeatLootSuggestion(input: {
+  creatureName: string;
+  creatureType: string | null;
+  challengeRating: number | null;
+  knownLoot: string | null;
+  physicalDescription: string | null;
+  rollSkill: string;
+  rollTotal: number;
+  dc: number;
+}): Promise<LootSuggestion> {
+  const quality = beastLootQualityFromRoll(input.rollTotal, input.dc);
+  const isCritical = quality === "critical" || quality === "excellent";
+
+  const quantities: LootAiQuantityParams = {
+    magicalCount: quality === "critical" ? 2 : quality === "excellent" ? 1 : quality === "good" ? 1 : 0,
+    mundaneCount: quality === "poor" ? 1 : quality === "fair" ? 2 : 3,
+    goldGp: quality === "critical" ? 80 : quality === "excellent" ? 45 : quality === "good" ? 25 : 8,
+    silverSp: quality === "poor" ? 5 : 15,
+  };
+
+  const context = [
+    `Besiegte Kreatur: ${input.creatureName}`,
+    input.creatureType ? `Typ: ${input.creatureType}` : null,
+    input.challengeRating != null ? `CR: ${input.challengeRating}` : null,
+    input.knownLoot ? `Bekannter Loot (GM): ${input.knownLoot}` : null,
+    input.physicalDescription
+      ? `Erscheinung: ${input.physicalDescription.slice(0, 400)}`
+      : null,
+    `Spieler-Probe (${input.rollSkill}): Wurf ${input.rollTotal} vs. SG ${input.dc}`,
+    `Loot-Qualität: ${BEAST_LOOT_QUALITY_HINT[quality]}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return requestLootSuggestion(context, isCritical, quantities);
+}

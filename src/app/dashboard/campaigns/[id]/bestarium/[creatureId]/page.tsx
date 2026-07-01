@@ -6,6 +6,13 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getBestariumPlayerDetail } from "../../bestarium-queries";
 import { getBestariumCreatureById } from "@/src/app/dashboard/worlds/world-bestarium-actions";
 import { resolveBestariumImageUrl } from "@/src/lib/bestarium-image";
+import { getCampaignNote } from "../../campaign-notes-actions";
+import { getCampaignCreatureStates } from "../../creature-state-actions";
+import { BestariumPlayerNotes } from "@/src/components/dashboard/campaigns/BestariumPlayerNotes";
+import {
+  BEAST_DISCOVERY_LABELS,
+  type BeastDiscoveryKey,
+} from "@/src/lib/beast-check-results";
 
 type Props = { params: Promise<{ id: string; creatureId: string }> };
 
@@ -49,6 +56,15 @@ export default async function CampaignBestariumCreaturePage({ params }: Props) {
 
   const safe = await getBestariumPlayerDetail(campaignId, creatureId);
   if (!safe) notFound();
+
+  const [campaignNote, creatureStates] = await Promise.all([
+    getCampaignNote(campaignId, "bestarium", creatureId),
+    getCampaignCreatureStates(campaignId),
+  ]);
+  const discoveries = creatureStates[creatureId]?.discoveries ?? {};
+  const discoveredKeys = (Object.keys(BEAST_DISCOVERY_LABELS) as BeastDiscoveryKey[]).filter(
+    (k) => discoveries[k] === true,
+  );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -107,6 +123,28 @@ export default async function CampaignBestariumCreaturePage({ params }: Props) {
             Für diesen Eintrag hat die Spielleitung noch keinen Text für Spieler:innen hinterlegt.
           </p>
         )}
+
+        {discoveredKeys.length > 0 && (
+          <section>
+            <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-3">
+              Eure Analysen
+            </h2>
+            <ul className="space-y-1 font-libre text-sm text-gray-300">
+              {discoveredKeys.map((key) => (
+                <li key={key} className="flex items-center gap-2">
+                  <span className="text-hero-vibrant">✓</span>
+                  {BEAST_DISCOVERY_LABELS[key]}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <BestariumPlayerNotes
+          campaignId={campaignId}
+          creatureId={creatureId}
+          initialContent={campaignNote?.content ?? ""}
+        />
       </article>
     </div>
   );

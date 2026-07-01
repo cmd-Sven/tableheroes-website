@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/src/lib/supabase/server";
 import { buildBlueprintContext, loadWorldAndAuth } from "@/src/app/dashboard/worlds/world-npc-actions";
 import type { WorldBlueprint } from "@/src/types/world";
+import {
+  normalizeBeastCheckResults,
+  type BeastCheckResult,
+} from "@/src/lib/beast-check-results";
+import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -51,6 +56,11 @@ export type GeneratedBeastResult = {
   /** Nur für Spieler:innen (bei Freigabe), ohne Statblock – Gerüchte, Volksmund, allgemeines Wissen. */
   player_knowledge: string | null;
   lore_notes: string | null;
+  check_results?: BeastCheckResult[] | null;
+  known_loot?: string | null;
+  lifestyle_habitat?: string | null;
+  image_is_ai_generated?: boolean | null;
+  image_upload_rights_confirmed?: boolean | null;
 };
 
 export type BestariumCreatureRow = GeneratedBeastResult & {
@@ -183,6 +193,9 @@ function normalizeGeneratedBeast(raw: Record<string, unknown>): GeneratedBeastRe
     physical_description: strOrNull(raw.physical_description),
     player_knowledge: strOrNull(raw.player_knowledge),
     lore_notes: strOrNull(raw.lore_notes),
+    check_results: normalizeBeastCheckResults(raw.check_results),
+    known_loot: strOrNull(raw.known_loot),
+    lifestyle_habitat: strOrNull(raw.lifestyle_habitat),
   };
 }
 
@@ -217,10 +230,30 @@ export type SaveBestariumInput = GeneratedBeastResult & {
   location_id?: string | null;
   lore_id?: string | null;
   image_url?: string | null;
+  image_display?: unknown;
+  image_is_ai_generated?: boolean | null;
+  image_upload_rights_confirmed?: boolean | null;
   sort_order?: number;
 };
 
-function toRowPayload(input: SaveBestariumInput) {
+function toRowPayload(input: SaveBestariumInput, userId: string) {
+  const imageUrl = (input.image_url || "").trim();
+  const portraitMeta = resolveNpcPortraitMetaForServer(userId, {
+    imageUrl,
+    portraitIsAiGenerated: input.image_is_ai_generated === true,
+    uploadRightsConfirmed: input.image_upload_rights_confirmed,
+  });
+
+  if (
+    imageUrl &&
+    !portraitMeta.image_is_ai_generated &&
+    portraitMeta.image_upload_rights_confirmed !== true
+  ) {
+    throw new Error(
+      "Bitte bestätige die Nutzungsrechte am Bild oder kennzeichne es als KI-generiert.",
+    );
+  }
+
   return {
     world_id: input.world_id,
     game_system: input.game_system || "dnd5e",
@@ -257,7 +290,14 @@ function toRowPayload(input: SaveBestariumInput) {
     lore_notes: input.lore_notes,
     location_id: input.location_id ?? null,
     lore_id: input.lore_id ?? null,
-    image_url: input.image_url ?? null,
+    image_url: imageUrl || null,
+    image_display: input.image_display ?? null,
+    image_is_ai_generated: portraitMeta.image_is_ai_generated,
+    image_upload_rights_confirmed: portraitMeta.image_upload_rights_confirmed,
+    check_results:
+      input.check_results && input.check_results.length > 0 ? input.check_results : null,
+    known_loot: input.known_loot ?? null,
+    lifestyle_habitat: input.lifestyle_habitat ?? null,
     sort_order: input.sort_order ?? 0,
   };
 }
@@ -308,7 +348,7 @@ export async function createBestariumCreature(input: SaveBestariumInput): Promis
   await assertGmWorld(supabase, input.world_id, user.id);
   await validateLocationAndLore(supabase, input.world_id, input.location_id, input.lore_id);
 
-  const payload = toRowPayload(input);
+  const payload = toRowPayload(input, user.id);
   const { data, error } = await (supabase.from("bestarium_creatures") as any)
     .insert(payload)
     .select("id")
@@ -341,7 +381,7 @@ export async function updateBestariumCreature(
     throw new Error("Kreatur nicht gefunden.");
   }
 
-  const payload = toRowPayload({ ...input, world_id: input.world_id });
+  const payload = toRowPayload({ ...input, world_id: input.world_id }, user.id);
 
   const { error } = await (supabase.from("bestarium_creatures") as any)
     .update({ ...payload, updated_at: new Date().toISOString() })
@@ -445,7 +485,10 @@ export async function generateBeastForWorld(worldId: string, options: GenerateBe
   const descriptionRules = `BESCHREIBUNG (Deutsch):
 - physical_description: Mindestens 4–6 Sätze flüssiges Deutsch für die Spielrunde – Aussehen, Bewegung, Licht, Geräusche, Geruch, wie sich die Kreatur im genannten VORKOMMEN ausnimmt (Bezug zum Ort). Keine Spielwerte nennen.
 - player_knowledge: 2–5 Sätze Deutsch – was Charaktere in der Welt üblicherweise über diese Kreatur wissen oder erzählen (Gerüchte, Volksmund, Reisenden‑Weisheiten). Keine RK/TP/CR/Attribute; nichts, was nur der GM wissen soll.
-- lore_notes: 3–5 Sätze nur für den GM: Rolle am Ort, Verhalten, mögliche Hooks, wie sie zur Welt passt (Blueprint + Vorkommen).`;
+- lore_notes: 3–5 Sätze nur für den GM: Rolle am Ort, Verhalten, mögliche Hooks, wie sie zur Welt passt (Blueprint + Vorkommen).
+- known_loot: 1–3 Sätze – was Jäger, Alchemisten oder Handwerker an der Kreatur interessant finden (ohne exakte Spielwerte).
+- lifestyle_habitat: 2–4 Sätze – Lebensweise, Jagdverhalten, Tagesrhythmus, typischer Lebensraum (Deutsch).
+- check_results: Array für Spieler-Proben. Pro Eintrag: type (genau einer von: "Monsterkategorie", "Schwächen", "Immunität", "Besondere Fähigkeit", "Loot", "Lebensweise"), skill (deutsche D&D-Fertigkeit, z. B. Naturkunde, Arkane Kunde, Wahrnehmung, Überleben), dc (10–22), result (was der Spieler bei Erfolg erfährt – KEINE RK/TP/CR; Schwächen/Immunitäten in Fließtext ohne Mechanik-Werte), is_critical (optional). Mindestens je einen Eintrag für Monsterkategorie, Schwächen, Immunität, Besondere Fähigkeit, Loot, Lebensweise.`;
 
   const systemPrompt = `Du bist ein erfahrener D&D 5e Game Designer. Erstelle eine MONSTER- oder BEAST-Statblock-Datenstruktur für die Fantasy-Welt "${world.name}".
 Genre: ${genre}. Magie-Level: ${magic}.
@@ -480,7 +523,9 @@ attacks (Array),
 special_abilities, legendary_actions, lair_actions (String, leer wenn nicht zutreffend),
 challenge_rating, xp_awarded,
 senses, languages, passive_traits,
-physical_description, player_knowledge, lore_notes`;
+physical_description, player_knowledge, lore_notes,
+known_loot, lifestyle_habitat,
+check_results (Array wie oben beschrieben)`;
 
   const userMessage =
     briefing.length > 0

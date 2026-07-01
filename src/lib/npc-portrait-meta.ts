@@ -1,4 +1,4 @@
-import { classifyProfileMediaNpcPortrait } from "@/src/lib/profile-media-url";
+import { classifyProfileMediaNpcPortrait, classifyProfileMediaBestariumPortrait } from "@/src/lib/profile-media-url";
 
 export type NpcPortraitMetaInput = {
   imageUrl?: string | null;
@@ -77,7 +77,9 @@ export function resolveNpcPortraitMetaForServer(
     };
   }
 
-  const storageKind = classifyProfileMediaNpcPortrait(imageUrl, userId);
+  const storageKind =
+    classifyProfileMediaNpcPortrait(imageUrl, userId) ??
+    classifyProfileMediaBestariumPortrait(imageUrl, userId);
   if (storageKind === "ai-generated") {
     return {
       image_is_ai_generated: true,

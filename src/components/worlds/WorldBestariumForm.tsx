@@ -10,6 +10,15 @@ import {
   type BestariumAttack,
   type BestariumCreatureRow,
 } from "@/src/app/dashboard/worlds/world-bestarium-actions";
+import { BeastCheckResultsEditor } from "@/src/components/worlds/BeastCheckResultsEditor";
+import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
+import { normalizeBeastCheckResults, type BeastCheckResult } from "@/src/lib/beast-check-results";
+import { uploadBestariumPortrait } from "@/src/lib/profile-media";
+import {
+  normalizeImageDisplay,
+  imageDisplayToJson,
+  type ImageDisplaySettings,
+} from "@/src/lib/image-display";
 
 type LoreOpt = { id: string; name: string; type: string | null };
 
@@ -82,10 +91,28 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
   const [physicalDesc, setPhysicalDesc] = useState(creature?.physical_description ?? "");
   const [playerKnowledge, setPlayerKnowledge] = useState(creature?.player_knowledge ?? "");
   const [loreNotes, setLoreNotes] = useState(creature?.lore_notes ?? "");
+  const [knownLoot, setKnownLoot] = useState(creature?.known_loot ?? "");
+  const [lifestyleHabitat, setLifestyleHabitat] = useState(creature?.lifestyle_habitat ?? "");
+  const [checkResults, setCheckResults] = useState<BeastCheckResult[]>(() =>
+    normalizeBeastCheckResults(creature?.check_results),
+  );
 
   const [locationId, setLocationId] = useState(creature?.location_id ?? "");
   const [loreId, setLoreId] = useState(creature?.lore_id ?? "");
   const [imageUrl, setImageUrl] = useState(creature?.image_url ?? "");
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [imageDisplay, setImageDisplay] = useState<ImageDisplaySettings>(() =>
+    normalizeImageDisplay(creature?.image_display),
+  );
+  const [imageIsAiGenerated, setImageIsAiGenerated] = useState(
+    creature?.image_is_ai_generated === true,
+  );
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(
+    creature?.image_upload_rights_confirmed === true,
+  );
+  const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(
+    creature?.image_upload_rights_confirmed === true,
+  );
   const [sortOrder, setSortOrder] = useState(creature?.sort_order != null ? String(creature.sort_order) : "0");
 
   const parseOptInt = (s: string): number | null => {
@@ -152,10 +179,21 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
       physical_description: physicalDesc.trim() || null,
       player_knowledge: playerKnowledge.trim() || null,
       lore_notes: loreNotes.trim() || null,
+      known_loot: knownLoot.trim() || null,
+      lifestyle_habitat: lifestyleHabitat.trim() || null,
+      check_results: checkResults,
       world_id: worldId,
       location_id: locationId || null,
       lore_id: loreId || null,
       image_url: imageUrl.trim() || null,
+      image_display:
+        imageUrl.trim() !== "" ? imageDisplayToJson(normalizeImageDisplay(imageDisplay)) : null,
+      image_is_ai_generated: imageIsAiGenerated,
+      image_upload_rights_confirmed: portraitFile
+        ? uploadRightsConfirmed
+        : imageUrl.trim()
+          ? urlRightsConfirmed || uploadRightsConfirmed
+          : null,
       sort_order: parseOptInt(sortOrder) ?? 0,
     };
   };
@@ -166,9 +204,29 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
       alert("Bitte einen Namen angeben.");
       return;
     }
+    if (portraitFile && !uploadRightsConfirmed) {
+      alert("Bitte bestätige die Nutzungsrechte am hochgeladenen Bild.");
+      return;
+    }
     startTransition(async () => {
       try {
-        const payload = buildPayload();
+        let resolvedImageUrl = imageUrl.trim();
+        if (portraitFile) {
+          const upload = await uploadBestariumPortrait(portraitFile, {
+            worldId,
+            creatureId: creature?.id,
+          });
+          if ("error" in upload) {
+            alert(upload.error);
+            return;
+          }
+          resolvedImageUrl = upload.publicUrl;
+        }
+
+        const payload = {
+          ...buildPayload(),
+          image_url: resolvedImageUrl || null,
+        };
         if (isEdit && creature) {
           await updateBestariumCreature(creature.id, payload);
           router.push(`/dashboard/worlds/${worldId}/bestarium/${creature.id}`);
@@ -507,9 +565,74 @@ export function WorldBestariumForm({ worldId, locations, loreEntries, creature }
             <textarea className={`mt-1 ${inputClass}`} rows={3} value={loreNotes} onChange={(e) => setLoreNotes(e.target.value)} />
           </label>
           <label>
-            <span className={labelClass}>Bild-URL</span>
-            <input className={`mt-1 ${inputClass}`} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+            <span className={labelClass}>Bekannter Loot (GM)</span>
+            <p className="mt-1 font-libre text-xs text-gray-500">
+              Typische Beute oder wertvolle Teile — Basis für KI-Loot-Vorschläge nach dem Sieg.
+            </p>
+            <textarea
+              className={`mt-1 ${inputClass}`}
+              rows={2}
+              value={knownLoot}
+              onChange={(e) => setKnownLoot(e.target.value)}
+            />
           </label>
+          <label>
+            <span className={labelClass}>Lebensweise &amp; Lebensraum</span>
+            <textarea
+              className={`mt-1 ${inputClass}`}
+              rows={2}
+              value={lifestyleHabitat}
+              onChange={(e) => setLifestyleHabitat(e.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="font-barlow font-bold uppercase text-sm text-accent-gold border-b border-hero-border pb-2">
+          Spieler-Analyse (Würfelproben)
+        </h3>
+        <BeastCheckResultsEditor value={checkResults} onChange={setCheckResults} />
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="font-barlow font-bold uppercase text-sm text-accent-gold border-b border-hero-border pb-2">
+          Kreaturenbild
+        </h3>
+        <NpcPortraitUploadField
+          imageUrl={imageUrl}
+          portraitFile={portraitFile}
+          onPortraitFileChange={setPortraitFile}
+          imageDisplay={imageDisplay}
+          onImageDisplayChange={setImageDisplay}
+          onClearImage={() => {
+            setImageUrl("");
+            setPortraitFile(null);
+          }}
+          isAiGenerated={imageIsAiGenerated}
+          onIsAiGeneratedChange={setImageIsAiGenerated}
+          uploadRightsConfirmed={uploadRightsConfirmed}
+          onUploadRightsConfirmedChange={setUploadRightsConfirmed}
+          urlRightsConfirmed={urlRightsConfirmed}
+          onUrlRightsConfirmedChange={setUrlRightsConfirmed}
+          previewAspectClassName="aspect-[3/4] max-w-[240px]"
+        />
+        <label>
+          <span className={labelClass}>Bild-URL (alternativ)</span>
+          <input
+            className={`mt-1 ${inputClass}`}
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://… oder Upload oben"
+          />
+        </label>
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="font-barlow font-bold uppercase text-sm text-accent-gold border-b border-hero-border pb-2">
+          Zuordnung
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className={labelClass}>Sortierung</span>
             <input className={`mt-1 ${inputClass}`} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />

@@ -19,6 +19,9 @@ import {
 } from "@/src/app/session/load-guest-session";
 import { absoluteUrl } from "@/src/lib/site-url";
 import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
+import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
+import { getCampaignCreatureStates } from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
+import { resolveBestariumImageUrl } from "@/src/lib/bestarium-image";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -104,7 +107,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, transcription_mode, guest_join_token")
+    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, guest_join_token")
     .eq("id", sessionId)
     .single();
 
@@ -115,6 +118,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
     stage_deck_scene_media_ids?: string[] | null;
+    stage_deck_creature_ids?: string[] | null;
     transcription_mode?: string | null;
     guest_join_token?: string | null;
   } | null;
@@ -360,7 +364,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     is_revealed: f.is_revealed ?? false,
   }));
   if (!viewAsGM) {
-    allCampaignFactions = allCampaignFactions.filter((f) => f.is_revealed);
+    allCampaignFactions = allCampaignFactions.filter((f: { is_revealed: boolean }) => f.is_revealed);
   }
 
   const stageDeckNpcIds =
@@ -376,6 +380,32 @@ export default async function SessionPage({ params, searchParams }: Props) {
     Array.isArray(session.stage_deck_scene_media_ids)
       ? session.stage_deck_scene_media_ids.map(String)
       : null;
+  const stageDeckCreatureIds =
+    session?.stage_deck_creature_ids != null &&
+    Array.isArray(session.stage_deck_creature_ids)
+      ? session.stage_deck_creature_ids.map(String)
+      : null;
+
+  const bestariumPayload = viewAsGM
+    ? await getBestariumCreaturesForCampaign((session as any).campaign_id, true)
+    : { gm: [], player: [] };
+  const creatureStates = await getCampaignCreatureStates((session as any).campaign_id);
+
+  let allCampaignCreatures = (bestariumPayload.gm || []).map((c: any) => ({
+    id: String(c.id),
+    name: String(c.name ?? ""),
+    creature_type: c.creature_type != null ? String(c.creature_type) : null,
+    image_url: c.image_url != null ? resolveBestariumImageUrl(String(c.image_url)) : null,
+    physical_description:
+      c.physical_description != null ? String(c.physical_description) : null,
+    challenge_rating:
+      typeof c.challenge_rating === "number" ? c.challenge_rating : null,
+    known_loot: c.known_loot != null ? String(c.known_loot) : null,
+    is_revealed: !!c.is_revealed,
+  }));
+  if (!viewAsGM) {
+    allCampaignCreatures = allCampaignCreatures.filter((c) => c.is_revealed);
+  }
 
   const sceneMediaRows = await getCampaignSceneMedia((session as any).campaign_id).catch(
     () => [],
@@ -489,6 +519,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
       }
       partyCharacters={serializeForClient(partyCharacters)}
       allCampaignNpcs={serializeForClient(allCampaignNpcs || [])}
+      allCampaignCreatures={serializeForClient(allCampaignCreatures)}
       allCampaignFactions={serializeForClient(allCampaignFactions)}
       stageDeckNpcIds={
         stageDeckNpcIds != null ? serializeForClient(stageDeckNpcIds) : null
@@ -504,6 +535,10 @@ export default async function SessionPage({ params, searchParams }: Props) {
           ? serializeForClient(stageDeckSceneMediaIds)
           : null
       }
+      stageDeckCreatureIds={
+        stageDeckCreatureIds != null ? serializeForClient(stageDeckCreatureIds) : null
+      }
+      initialCreatureStates={serializeForClient(creatureStates)}
       activeQuests={serializeForClient(normalizedQuests)}
       loreLocationOptions={serializeForClient(loreLocationOptions)}
       sessionLocationLoreReadable={sessionLocationLoreReadable}
