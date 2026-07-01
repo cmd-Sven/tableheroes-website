@@ -14,6 +14,7 @@ import {
   Rocket,
   ClipboardList,
   Sparkles,
+  LayoutGrid,
   UserCheck,
   UserMinus,
   Archive,
@@ -285,13 +286,25 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
         </div>
         <div className="flex flex-col sm:items-end gap-2 shrink-0">
           {sched && nextSessionLocal && (
-            <Link
-              href={`/session/${nextSessionLocal.id}`}
-              className="inline-flex items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold uppercase text-xs text-accent-gold hover:bg-accent-gold/20 transition-colors"
-            >
-              <Sparkles className="h-4 w-4" />
-              Tisch vorbereiten &amp; testen
-            </Link>
+            <>
+              <Link
+                href={`/session/${nextSessionLocal.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded border border-accent-gold/50 bg-accent-gold/10 px-4 py-2 font-barlow font-bold uppercase text-xs text-accent-gold hover:bg-accent-gold/20 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+                Tisch vorbereiten &amp; testen
+              </Link>
+              {nextSessionLocal.isLive && (
+                <Link
+                  href={`/dashboard/campaigns/${campaignId}/sessions/${nextSessionLocal.id}/stage-prep#szenen-mediathek`}
+                  className="inline-flex items-center justify-center gap-2 rounded border border-hero-border/50 bg-background-dark px-4 py-2 font-barlow font-bold uppercase text-xs text-gray-200 hover:border-accent-gold hover:text-white transition-colors"
+                  title="Szenen-Bilder hochladen und ins Bühnendeck legen"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Szenen-Mediathek
+                </Link>
+              )}
+            </>
           )}
           {!nextSessionLocal ? (
             <Link

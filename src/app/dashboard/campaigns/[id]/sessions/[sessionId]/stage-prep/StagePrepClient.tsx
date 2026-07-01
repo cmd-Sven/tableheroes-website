@@ -204,9 +204,13 @@ export function StagePrepClient({
       <main className="mx-auto max-w-6xl px-4 py-8 md:px-8 space-y-8">
         <p className="font-libre text-sm text-gray-300 leading-relaxed max-w-3xl">
           Hier stellst du das <strong className="text-gray-200">Bühnendeck</strong> ein (welche
-          NPCs und Fraktionen im Stage Manager erscheinen) und den{" "}
-          <strong className="text-gray-200">Session-Hintergrund</strong>. In der laufenden Session
-          nutzt du den Stage Manager nur noch für schnelle Zu- und Abschaltungen auf der Bühne.
+          NPCs und Fraktionen im Stage Manager erscheinen), den{" "}
+          <strong className="text-gray-200">Session-Hintergrund</strong> und unten die{" "}
+          <a href="#szenen-mediathek" className="text-hero-vibrant hover:underline">
+            Szenen-Mediathek
+          </a>{" "}
+          (Karten, Orte, Kampfszenen). In der laufenden Session legst du Szenen aus dem Deck auf
+          die Bühne; der Stage Manager dient dort für schnelle Zu- und Abschaltungen.
         </p>
 
         <div className="grid gap-8 lg:grid-cols-2">
@@ -419,13 +423,15 @@ export function StagePrepClient({
           </section>
         </div>
 
-        <StagePrepSceneMedia
-          campaignId={campaignId}
-          sessionId={sessionId}
-          initialItems={sceneMediaItems}
-          stageDeckSceneMediaIds={stageDeckSceneMediaIds}
-          onRefresh={() => router.refresh()}
-        />
+        <div id="szenen-mediathek" className="scroll-mt-24">
+          <StagePrepSceneMedia
+            campaignId={campaignId}
+            sessionId={sessionId}
+            initialItems={sceneMediaItems}
+            stageDeckSceneMediaIds={stageDeckSceneMediaIds}
+            onRefresh={() => router.refresh()}
+          />
+        </div>
 
         <div className="rounded-lg border border-hero-dark bg-background-card/80 p-4 flex flex-wrap gap-4 items-center">
           <a

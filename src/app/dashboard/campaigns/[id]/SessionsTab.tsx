@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Square,
   Sparkles,
+  LayoutGrid,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -440,6 +441,14 @@ export function SessionsTab({
         >
           <Sparkles className="h-3.5 w-3.5" />
           Vorbereiten
+        </Link>
+        <Link
+          href={`/dashboard/campaigns/${campaignId}/sessions/${session.id}/stage-prep#szenen-mediathek`}
+          className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-accent-gold hover:text-white transition-colors"
+          title="Szenen-Bilder hochladen und ins Bühnendeck legen"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+          Szenen-Mediathek
         </Link>
         {session.canStart ? (
           <div className="flex flex-col items-end gap-1">
