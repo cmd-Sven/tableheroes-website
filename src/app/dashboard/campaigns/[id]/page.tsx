@@ -30,25 +30,24 @@ export default async function CampaignDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("🔍 [DashboardPage] Current User:", user?.id, user?.email);
-
   if (!user) return null;
 
-  const data = await loadCampaignDetailPageData(id, user.id);
+  const data = await loadCampaignDetailPageData(id, user.id, { tab });
 
-  const [discordSettings, foundrySyncSettings] = data.isGM
-    ? await Promise.all([
-        getCampaignDiscordSettings(id).then(
-          (settings) =>
-            settings ?? {
-              webhookUrl: "",
-              notificationsEnabled: true,
-              configured: false,
-            },
-        ),
-        getCampaignFoundrySyncSettings(id),
-      ])
-    : [null, null];
+  const [discordSettings, foundrySyncSettings] =
+    data.isGM && tab === "settings"
+      ? await Promise.all([
+          getCampaignDiscordSettings(id).then(
+            (settings) =>
+              settings ?? {
+                webhookUrl: "",
+                notificationsEnabled: true,
+                configured: false,
+              },
+          ),
+          getCampaignFoundrySyncSettings(id),
+        ])
+      : [null, null];
 
   return (
     <CampaignDetailPageContent

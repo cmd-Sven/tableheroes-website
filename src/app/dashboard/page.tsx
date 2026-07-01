@@ -173,20 +173,39 @@ export default async function DashboardPage() {
 
 async function loadPlayerDashboardData(userId: string) {
   const supabase = await createClient();
+
+  const [
+    pointsResult,
+    earnedAchievementsResult,
+    membershipsResult,
+  ] = await Promise.all([
+    (supabase.from("users") as any)
+      .select("total_points, lifetime_points")
+      .eq("id", userId)
+      .single(),
+    getUserAchievements(userId),
+    (supabase.from("campaign_members") as any)
+      .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
+      .eq("user_id", userId)
+      .in("status", [
+        "Drafting",
+        "In_Review",
+        "Changes_Proposed",
+        "Approved",
+        "Active",
+      ]),
+  ]);
+
   let totalPoints = 0;
   let lifetimePoints = 0;
   try {
-    const { data } = await (supabase.from("users") as any)
-      .select("total_points, lifetime_points")
-      .eq("id", userId)
-      .single();
-    totalPoints = Number((data as any)?.total_points) || 0;
-    lifetimePoints = Number((data as any)?.lifetime_points) || 0;
+    totalPoints = Number((pointsResult.data as any)?.total_points) || 0;
+    lifetimePoints = Number((pointsResult.data as any)?.lifetime_points) || 0;
   } catch {
     totalPoints = 0;
     lifetimePoints = 0;
   }
-  const earnedAchievementsResult = await getUserAchievements(userId);
+
   const achievements = earnedAchievementsResult.achievements.map((a) => ({
     id: a.id,
     name: a.name,
@@ -197,21 +216,7 @@ async function loadPlayerDashboardData(userId: string) {
   }));
   const hasNewAchievements = earnedAchievementsResult.hasNewContent;
 
-  console.log("[Dashboard] Achievements geladen für User:", userId, "Anzahl:", achievements.length);
-
-  const { data: membershipsRaw } = await (
-    supabase.from("campaign_members") as any
-  )
-    .select("campaign_id, status, character_id, campaigns ( id, name, system, banner_url, gm_id )")
-    .eq("user_id", userId)
-    .in("status", [
-      "Drafting",
-      "In_Review",
-      "Changes_Proposed",
-      "Approved",
-      "Active",
-    ]);
-
+  const membershipsRaw = membershipsResult.data;
   const memberships = (membershipsRaw as any[]) || [];
   let characterIds = [...new Set(memberships.map((m: any) => m.character_id).filter(Boolean))];
 
@@ -307,20 +312,20 @@ async function loadPlayerDashboardData(userId: string) {
       status: m.characters.status ?? undefined,
     }));
 
-  const { data: newAcceptancesRaw } = await (
-    supabase.from("campaign_members") as any
-  )
-    .select("id, campaign_id, campaigns!inner(id, name)")
-    .eq("user_id", userId)
-    .eq("status", "Approved")
-    .eq("has_seen_acceptance", false);
-  const newAcceptances = ((newAcceptancesRaw as any[]) || []).map((a: any) => ({
+  const [newAcceptancesRaw, discoverableCampaigns] = await Promise.all([
+    (supabase.from("campaign_members") as any)
+      .select("id, campaign_id, campaigns!inner(id, name)")
+      .eq("user_id", userId)
+      .eq("status", "Approved")
+      .eq("has_seen_acceptance", false),
+    getDiscoverableCampaigns(),
+  ]);
+  const newAcceptances = ((newAcceptancesRaw.data as any[]) || []).map((a: any) => ({
     id: a.id,
     campaignId: a.campaigns.id,
     campaignName: a.campaigns.name,
   }));
 
-  const discoverableCampaigns = await getDiscoverableCampaigns();
   const [
     loreResult,
     dailyComic,

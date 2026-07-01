@@ -37,6 +37,28 @@ export async function getPendingApplications(
 }
 
 export async function getPendingApplicationsCount(userId: string): Promise<number> {
-  const list = await getPendingApplications(userId);
-  return list.length;
+  const supabase = await createClient();
+
+  const { data: campaigns, error: campaignError } = await (supabase.from("campaigns") as any)
+    .select("id")
+    .eq("gm_id", userId);
+
+  if (campaignError) {
+    console.error("[getPendingApplicationsCount] campaigns:", campaignError);
+    return 0;
+  }
+
+  const campaignIds = ((campaigns as { id: string }[]) || []).map((row) => row.id);
+  if (campaignIds.length === 0) return 0;
+
+  const { count, error } = await (supabase.from("campaign_members") as any)
+    .select("id", { count: "exact", head: true })
+    .in("campaign_id", campaignIds)
+    .eq("status", "Applied");
+
+  if (error) {
+    console.error("[getPendingApplicationsCount]", error);
+    return 0;
+  }
+  return count ?? 0;
 }

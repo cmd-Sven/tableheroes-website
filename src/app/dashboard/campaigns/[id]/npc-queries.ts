@@ -65,3 +65,40 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
 
   return enrichedNPCs;
 }
+
+/** Leichte NSC-Liste für Sessions-Tab (ohne Quest-Enrichment). */
+export async function getNpcSessionOptions(
+  campaignId: string,
+  userId: string,
+  isGM: boolean,
+  worldId?: string | null,
+) {
+  const supabase = await createClient();
+
+  let resolvedWorldId = worldId ?? null;
+  if (!resolvedWorldId) {
+    const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+      .select("world_id")
+      .eq("id", campaignId)
+      .single();
+    resolvedWorldId = (campaignRaw as { world_id?: string | null } | null)?.world_id ?? null;
+  }
+  if (!resolvedWorldId) return [];
+
+  const { data: npcsRaw, error } = await (supabase.from("npcs") as any)
+    .select("id, name, title, user_id")
+    .eq("world_id", resolvedWorldId)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Fetch NPC session options error:", error);
+    return [];
+  }
+
+  if (isGM) return (npcsRaw as any[]) || [];
+
+  const visibility = await getVisibilityForCampaign(campaignId, "npc");
+  return ((npcsRaw as any[]) || []).filter(
+    (npc) => visibility[npc.id] === true || npc.user_id === userId,
+  );
+}

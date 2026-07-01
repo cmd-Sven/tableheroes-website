@@ -5,9 +5,13 @@ import type {
   GmTermineNextSession,
   GmTerminePlayerRsvp,
 } from "@/src/components/campaigns/GmTermineSpielplanCard";
-import { getNPCs } from "./npc-queries";
+import {
+  buildCampaignDetailLoadPlan,
+  normalizeCampaignDetailTab,
+} from "./campaign-detail-tab-plan";
+import { getNPCs, getNpcSessionOptions } from "./npc-queries";
 import { getFactionsWithMembers } from "./factions-queries";
-import { getLoreEntries } from "./lore-queries";
+import { getLoreEntries, getLoreLocationOptions } from "./lore-queries";
 import { isLocationType, TYPE_MAPPING } from "@/src/lib/lore-types";
 import { getQuests } from "./quest-queries";
 import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
@@ -43,8 +47,10 @@ export type CampaignDetailPageData = Awaited<
 export async function loadCampaignDetailPageData(
   campaignId: string,
   userId: string,
+  options?: { tab?: string },
 ) {
   const id = campaignId;
+  const tab = normalizeCampaignDetailTab(options?.tab);
   const supabase = await createClient();
 
   // Fetch Campaign
@@ -80,29 +86,36 @@ export async function loadCampaignDetailPageData(
     (campaignGmId !== null && campaignGmId === currentUserId) ||
     (campaignOwnerId !== null && campaignOwnerId === currentUserId);
 
-  console.log("🔍 [CampaignPage] GM check:", {
-    campaignId: id,
-    userId: currentUserId,
-    campaignGmId,
-    campaignOwnerId,
-    isGM,
-  });
+  const campaignWorldId = (campaign as any).world_id as string | null | undefined;
 
-  // Welt über campaign.world_id (welt-zentrisch)
+  const SESSION_LIST_COLUMNS =
+    "id, title, start_time, type, status, rsvp_deadline_days, is_live, gm_prep_complete, planning_dummy_player_count, transcription_mode";
+
+  const [worldResult, membershipResult, sessionsResult] = await Promise.all([
+    campaignWorldId
+      ? (supabase.from("worlds") as any)
+          .select("id, name, description, gm_id, blueprint, banner_url, image_url")
+          .eq("id", campaignWorldId)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    !isGM
+      ? (supabase.from("campaign_members") as any)
+          .select("status, character_id")
+          .eq("campaign_id", id)
+          .eq("user_id", userId)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    (supabase.from("sessions") as any)
+      .select(SESSION_LIST_COLUMNS)
+      .eq("campaign_id", id)
+      .order("start_time", { ascending: true }),
+  ]);
+
   let world: any = null;
-  const campaignWorldId = (campaign as any).world_id;
-  if (campaignWorldId) {
-    const { data: worldRaw, error: worldError } = await (
-      supabase.from("worlds") as any
-    )
-      .select("*")
-      .eq("id", campaignWorldId)
-      .single();
-    if (worldError && worldError.code !== "PGRST116") {
-      console.error("Error fetching world:", worldError);
-    } else {
-      world = worldRaw;
-    }
+  if (worldResult.error && worldResult.error.code !== "PGRST116") {
+    console.error("Error fetching world:", worldResult.error);
+  } else {
+    world = worldResult.data;
   }
 
   // Welten des GMs für Welt-Zuweisung (wenn Kampagne noch keine world_id hat)
@@ -128,19 +141,11 @@ export async function loadCampaignDetailPageData(
   let membership: any = null;
 
   if (!isGM) {
-    console.log("🔍 [DashboardPage] Checking Membership for Campaign:", id);
-    console.log("🔍 [DashboardPage] User ID:", userId);
-
-    const { data: membershipData, error: membershipError } = await (
-      supabase.from("campaign_members") as any
-    )
-      .select("status, character_id")
-      .eq("campaign_id", id)
-      .eq("user_id", userId)
-      .single();
+    const membershipData = membershipResult.data;
+    const membershipError = membershipResult.error;
 
     if (membershipError) {
-      console.error("🔍 [DashboardPage] Membership query error:", membershipError);
+      console.error("[CampaignPage] Membership query error:", membershipError);
     }
 
     if (membershipData) {
@@ -148,7 +153,6 @@ export async function loadCampaignDetailPageData(
       userMembershipStatus = membership.status as any;
       userHasCharacter = !!membership.character_id;
 
-      // Charakter-Status separat laden (kein Join – FK kann fehlen)
       let characterStatus: string | null = null;
       if (membership.character_id) {
         const { data: charRow } = await (supabase.from("characters") as any)
@@ -160,7 +164,6 @@ export async function loadCampaignDetailPageData(
       isDeadOrArchived =
         characterStatus === "Dead" || characterStatus === "Archived";
 
-      // User has access if accepted / am Charakter arbeiten / Review
       const validMemberStatuses = [
         "Approved",
         "Active",
@@ -169,31 +172,11 @@ export async function loadCampaignDetailPageData(
         "Changes_Proposed",
       ];
       isAcceptedMember = validMemberStatuses.includes(membership.status);
-
-      console.log(
-        "🔍 [DashboardPage] Membership Status:",
-        userMembershipStatus,
-      );
-      console.log("🔍 [DashboardPage] User Has Character:", userHasCharacter);
-      console.log(
-        "🔍 [DashboardPage] Derived isAcceptedMember:",
-        isAcceptedMember,
-        "(valid statuses: Approved, Active, Drafting, In_Review, Changes_Proposed)",
-      );
-    } else {
-      console.log("🔍 [DashboardPage] No membership found for user");
     }
-  } else {
-    console.log("🔍 [DashboardPage] User is GM, skipping membership check");
   }
 
-  // Check if user has access (GM or Accepted Member)
   const hasAccess = isGM || isAcceptedMember;
-  console.log(
-    "🔍 [DashboardPage] Has Access (isGM || isAcceptedMember):",
-    hasAccess,
-    { isGM, isAcceptedMember },
-  );
+  const loadPlan = buildCampaignDetailLoadPlan(tab, isGM, hasAccess);
 
   /** RSVP-Zeilen für GM-Termin-Card (nur geplante Sessions mit IDs) */
   let gmSessionRsvpRows: {
@@ -219,14 +202,9 @@ export async function loadCampaignDetailPageData(
     });
   }
 
-  // Fetch Sessions (alle Status — Aufteilung Fokus / aktiv / Archiv)
-  const { data: sessionsRaw } = await (supabase.from("sessions") as any)
-    .select("*")
-    .eq("campaign_id", id)
-    .order("start_time", { ascending: true });
-
+  // Sessions (parallel mit Welt/Membership geladen)
   const sessions =
-    (sessionsRaw as Array<{
+    (sessionsResult.data as Array<{
       id: string;
       title: string | null;
       start_time: string;
@@ -313,34 +291,34 @@ export async function loadCampaignDetailPageData(
   let loreEntries: any[] = [];
   let quests: any[] = [];
 
-  console.log(
-    "🔍 [DashboardPage] Starting data fetch. hasAccess:",
-    hasAccess,
-    "isGM:",
-    isGM,
-  );
-
   if (hasAccess) {
-    const [npcsResult, factionsResult, loreResult, questsResult] = await Promise.all([
-      getNPCs(id, userId, isGM),
-      getFactionsWithMembers(id),
-      getLoreEntries(id),
-      getQuests(id, isGM),
-    ]);
+    if (loadPlan.needsFullWorldBundle) {
+      const [npcsResult, factionsResult, loreResult, questsResult] = await Promise.all([
+        getNPCs(id, userId, isGM),
+        getFactionsWithMembers(id),
+        getLoreEntries(id),
+        getQuests(id, isGM),
+      ]);
 
-    npcs = npcsResult;
-    loreEntries = loreResult;
-    quests = questsResult;
+      npcs = npcsResult;
+      loreEntries = loreResult;
+      quests = questsResult;
 
-    if (isGM) {
-      factions = factionsResult;
-    } else {
-      factions = factionsResult.filter(
-        (f: any) => f.is_revealed === true || f.allow_pc_join_on_creation === true,
-      );
+      if (isGM) {
+        factions = factionsResult;
+      } else {
+        factions = factionsResult.filter(
+          (f: any) => f.is_revealed === true || f.allow_pc_join_on_creation === true,
+        );
+      }
+    } else if (loadPlan.needsSessionsLightData) {
+      const [npcsResult, loreResult] = await Promise.all([
+        getNpcSessionOptions(id, userId, isGM, campaignWorldId ?? null),
+        getLoreLocationOptions(id),
+      ]);
+      npcs = npcsResult;
+      loreEntries = loreResult;
     }
-  } else {
-    console.log("⚠️ [DashboardPage] User has NO ACCESS. Skipping data fetch.");
   }
 
   // Fetch Campaign Members (GM Only)
@@ -349,9 +327,8 @@ export async function loadCampaignDetailPageData(
   let inReviewMembers: any[] = [];
   let acceptedMembers: any[] = [];
 
-  if (isGM) {
+  if (isGM && loadPlan.needsGmPending) {
     // Offene Bewerbungen: Primär aus `characters` (Status Pending_Approval).
-    // Nicht nur campaign_members – Spieler-Charaktere hängen in characters.
     // Ohne users-Join (characters.user_id → auth.users), stattdessen profiles separat laden
     const { data: pendingChars, error: pendingCharsError } = await (
       supabase.from("characters") as any
@@ -451,7 +428,7 @@ export async function loadCampaignDetailPageData(
     pendingApplications = [...pendingFromCharacters, ...fromMembers];
   }
 
-  if (isGM) {
+  if (isGM && loadPlan.needsGmMembers) {
     try {
       const { getGmCampaignMembersWithCharacters } = await import("./members-actions");
       const { drafting, inReview, accepted } = await getGmCampaignMembersWithCharacters(id);
@@ -474,7 +451,15 @@ export async function loadCampaignDetailPageData(
   // Count accepted members (for all users, not just GM)
   let acceptedMembersCount = 0;
   if (isGM) {
-    acceptedMembersCount = acceptedMembers.length;
+    if (loadPlan.needsGmMembers && acceptedMembers.length > 0) {
+      acceptedMembersCount = acceptedMembers.length;
+    } else {
+      const { count } = await (supabase.from("campaign_members") as any)
+        .select("id", { count: "exact", head: true })
+        .eq("campaign_id", id)
+        .in("status", ["Approved", "Active"]);
+      acceptedMembersCount = count || 0;
+    }
   } else {
     // For non-GM users, count accepted members
     const { count } = await (supabase.from("campaign_members") as any)
@@ -488,7 +473,7 @@ export async function loadCampaignDetailPageData(
     [];
   let gmRecentLore: import("./lore-queries").RecentLoreSnippet[] = [];
   let gmBroadcastRecipientCount = 0;
-  if (isGM) {
+  if (isGM && loadPlan.tab === "overview") {
     const { getRecentLoreForGmDashboard } = await import("./lore-queries");
     gmRecentLore = await getRecentLoreForGmDashboard(id, 3);
     const cardMembers = acceptedMembers.filter(
@@ -538,7 +523,7 @@ export async function loadCampaignDetailPageData(
     nextSession: null,
     players: [],
   };
-  if (isGM) {
+  if (isGM && loadPlan.tab === "overview") {
     const list = (upcomingSessionsWithRsvp as any[]) || [];
     const notMissed = (s: { id?: unknown; status?: unknown; start_time?: unknown }) =>
       !isMissedScheduledSession(
@@ -679,7 +664,7 @@ export async function loadCampaignDetailPageData(
   // LOAD CHARACTER DATA (if user has character) – inkl. Kultur, Sprachen, Fraktion, Ort
   // ============================================================================
   let myCharacter: any = null;
-  if (!isGM) {
+  if (!isGM && loadPlan.needsPlayerCharacter) {
     try {
       const characterId = membership?.character_id ?? null;
       let characterData: any = null;
@@ -780,7 +765,7 @@ export async function loadCampaignDetailPageData(
   let party: PartyMember[] = [];
   const myCharacterId = myCharacter?.id ?? membership?.character_id ?? null;
 
-  if (!isGM && hasAccess) {
+  if (loadPlan.needsPlayerOverviewExtras) {
     const loreItems: DiscoveryItem[] = (loreEntries || []).slice(0, 8).map((e: any) => ({
       id: String(e.id),
       name: String(e.name ?? ""),
@@ -897,7 +882,7 @@ export async function loadCampaignDetailPageData(
     rsvpDeadlineEndIso: string | null;
   } | null = null;
 
-  if (!isGM && hasAccess) {
+  if (!isGM && hasAccess && (loadPlan.needsPlayerOverviewExtras || loadPlan.tab === "sessions")) {
     const notMissed = (s: { id?: unknown; status?: unknown; start_time?: unknown }) =>
       !isMissedScheduledSession(
         {
@@ -966,7 +951,9 @@ export async function loadCampaignDetailPageData(
   // ============================================================================
   // FETCH GALLERY IMAGES (Public images only)
   // ============================================================================
-  const galleryImages = await getCampaignGalleryImages(id);
+  const galleryImages = loadPlan.needsGallery
+    ? await getCampaignGalleryImages(id)
+    : [];
 
   // Charakter-Wizard (Spieler): world_lore + allow_pc_origin + campaign_visibility dieser Kampagne; Fraktionen analog
   // Typen wie in DB: Stadt, Region, Ort, Akademie (case-insensitive)
@@ -986,10 +973,11 @@ export async function loadCampaignDetailPageData(
   let wizardFactions: any[] = [];
   let wizardLocations: any[] = [];
 
-  if (isGM) {
-    wizardFactions = factions;
-    wizardLocations = (loreEntries || []).filter((e: any) => typeMatchesGeographic(e.type));
-  } else if (campaignWorldId) {
+  if (loadPlan.needsWizardData) {
+    if (isGM) {
+      wizardFactions = factions;
+      wizardLocations = (loreEntries || []).filter((e: any) => typeMatchesGeographic(e.type));
+    } else if (campaignWorldId) {
     // Fraktionen: select("*") um PostgREST Schema-Cache-Probleme zu vermeiden,
     // dann im Code nach allow_pc_join_on_creation filtern.
     const { data: allWorldFactions, error: pcFErr } = await (supabase.from("factions") as any)
@@ -1018,16 +1006,7 @@ export async function loadCampaignDetailPageData(
     ]);
     wizardLocations = wizardLocations.filter((e: any) => loreVisWizard[e.id] === true);
     wizardFactions = wizardFactions.filter((f: any) => facVisWizard[f.id] === true);
-    console.log("✅ wizardLocations:", wizardLocations.length, wizardLocations.map((l: any) => l.name));
-  } else {
-    console.log("⚠️ wizardFactions/wizardLocations: kein campaignWorldId, isGM=", isGM);
-  }
-
-  if (!isGM) {
-    console.log("SPIELER_DATEN_CHECK:", {
-      locations: wizardLocations,
-      factions: wizardFactions,
-    });
+    }
   }
 
   // Kulturen, Sprachen & Ruf für Charakter-Bearbeitung (Spieler mit Charakter)
@@ -1041,7 +1020,7 @@ export async function loadCampaignDetailPageData(
     rank: string | null;
     updated_at: string;
   }[] = [];
-  if (!isGM && myCharacter) {
+  if (loadPlan.needsWizardData && !isGM && myCharacter) {
     const [loreData, repData] = await Promise.all([
       getCharacterWizardLoreData(id),
       getCharacterFactionReputations(myCharacter.id, id),
@@ -1063,7 +1042,7 @@ export async function loadCampaignDetailPageData(
     icon: string | null;
     awarded_at: string;
   } | null = null;
-  if (!isGM) {
+  if (loadPlan.needsPlayerOverviewExtras) {
     const { data: uaRow } = await (supabase.from("user_achievements") as any)
       .select("awarded_at, achievements(name, icon)")
       .eq("user_id", userId)
@@ -1083,7 +1062,7 @@ export async function loadCampaignDetailPageData(
 
   let foundryProgressionLocked = false;
   let foundryProgressionLockMessage = "";
-  if (myCharacter?.id) {
+  if (loadPlan.needsWizardData && myCharacter?.id) {
     const progressionLock = await resolveFoundryProgressionLock(
       supabase,
       id,
@@ -1093,21 +1072,29 @@ export async function loadCampaignDetailPageData(
     foundryProgressionLockMessage = progressionLock.message;
   }
 
-  const { data: sessionArchivesRaw } = await (supabase.from(
-    "session_archives",
-  ) as any)
-    .select("*")
-    .eq("campaign_id", id)
-    .order("archived_at", { ascending: false });
-  const sessionArchives = (sessionArchivesRaw as any[]) || [];
-  const latestPublishedPlayerRecap = findLatestPublishedPlayerRecap(
-    sessionArchives.map((row) => ({
-      id: String(row.id),
-      session_name: row.session_name,
-      archived_at: String(row.archived_at ?? ""),
-      player_recap: row.player_recap,
-    })),
-  );
+  let sessionArchives: any[] = [];
+  let latestPublishedPlayerRecap: ReturnType<typeof findLatestPublishedPlayerRecap> = null;
+  if (loadPlan.needsSessionArchives) {
+    const archiveColumns = loadPlan.needsSessionArchivesFull
+      ? "*"
+      : "id, session_name, archived_at, player_recap";
+    const archiveQuery = (supabase.from("session_archives") as any)
+      .select(archiveColumns)
+      .eq("campaign_id", id)
+      .order("archived_at", { ascending: false });
+    const { data: sessionArchivesRaw } = loadPlan.needsSessionArchivesFull
+      ? await archiveQuery
+      : await archiveQuery.limit(30);
+    sessionArchives = (sessionArchivesRaw as any[]) || [];
+    latestPublishedPlayerRecap = findLatestPublishedPlayerRecap(
+      sessionArchives.map((row) => ({
+        id: String(row.id),
+        session_name: row.session_name,
+        archived_at: String(row.archived_at ?? ""),
+        player_recap: row.player_recap,
+      })),
+    );
+  }
 
   const focusSessionForTab = focus
     ? ((upcomingSessionsWithRsvp as any[]).find((x) => x.id === focus.id) ?? null)
@@ -1121,12 +1108,14 @@ export async function loadCampaignDetailPageData(
       gmTermineSpielplan.nextSession.planningDummySlotCount;
   }
 
-  const [gmCampaignPolls, playerActivePolls] = await Promise.all([
-    isGM ? getCampaignPollsForGm(id) : Promise.resolve([]),
-    !isGM && hasAccess
-      ? getActivePollsForCampaignPlayer(id, userId)
-      : Promise.resolve([]),
-  ]);
+  const [gmCampaignPolls, playerActivePolls] = loadPlan.needsPolls
+    ? await Promise.all([
+        isGM ? getCampaignPollsForGm(id) : Promise.resolve([]),
+        !isGM && hasAccess
+          ? getActivePollsForCampaignPlayer(id, userId)
+          : Promise.resolve([]),
+      ])
+    : [[], []];
 
   const pageData = {
     campaign,
