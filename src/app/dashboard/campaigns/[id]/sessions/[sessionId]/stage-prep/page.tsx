@@ -7,6 +7,7 @@ import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/s
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { StagePrepClient } from "./StagePrepClient";
 import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
+import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
 
 type Props = {
   params: Promise<{ id: string; sessionId: string }>;
@@ -34,7 +35,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
 
   const { data: sessionRaw, error: sessionErr } = await (supabase.from("sessions") as any)
     .select(
-      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, transcription_mode",
+      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode",
     )
     .eq("id", sessionId)
     .single();
@@ -47,6 +48,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     stage_deck_npc_ids?: string[] | null;
     stage_deck_faction_ids?: string[] | null;
     stage_deck_scene_media_ids?: string[] | null;
+    stage_deck_creature_ids?: string[] | null;
     transcription_mode?: string | null;
   } | null;
 
@@ -110,6 +112,14 @@ export default async function SessionStagePrepPage({ params }: Props) {
     type: f.type != null ? String(f.type) : null,
   }));
 
+  const bestariumPayload = await getBestariumCreaturesForCampaign(campaignId, true);
+  const allCampaignCreatures = (bestariumPayload.gm || []).map((c: any) => ({
+    id: String(c.id),
+    name: String(c.name ?? "Kreatur"),
+    creature_type: c.creature_type != null ? String(c.creature_type) : null,
+    is_revealed: !!c.is_revealed,
+  }));
+
   const stageDeckNpcIds =
     session.stage_deck_npc_ids != null && Array.isArray(session.stage_deck_npc_ids)
       ? session.stage_deck_npc_ids.map(String)
@@ -123,6 +133,11 @@ export default async function SessionStagePrepPage({ params }: Props) {
     Array.isArray(session.stage_deck_scene_media_ids)
       ? session.stage_deck_scene_media_ids.map(String)
       : null;
+  const stageDeckCreatureIds =
+    session.stage_deck_creature_ids != null &&
+    Array.isArray(session.stage_deck_creature_ids)
+      ? session.stage_deck_creature_ids.map(String)
+      : null;
 
   const sceneMediaItems = await getCampaignSceneMedia(campaignId).catch(() => []);
 
@@ -134,6 +149,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       sessionStatus={String(session.status ?? "")}
       allCampaignNpcs={serializeForClient(allCampaignNpcs)}
       allCampaignFactions={serializeForClient(allCampaignFactions)}
+      allCampaignCreatures={serializeForClient(allCampaignCreatures)}
       stageDeckNpcIds={
         stageDeckNpcIds != null ? serializeForClient(stageDeckNpcIds) : null
       }
@@ -155,6 +171,9 @@ export default async function SessionStagePrepPage({ params }: Props) {
         stageDeckSceneMediaIds != null
           ? serializeForClient(stageDeckSceneMediaIds)
           : null
+      }
+      stageDeckCreatureIds={
+        stageDeckCreatureIds != null ? serializeForClient(stageDeckCreatureIds) : null
       }
     />
   );

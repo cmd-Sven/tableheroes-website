@@ -23,6 +23,13 @@ type CampaignFaction = {
   type: string | null;
 };
 
+type CampaignCreature = {
+  id: string;
+  name: string;
+  creature_type: string | null;
+  is_revealed: boolean;
+};
+
 type Props = {
   sessionId: string;
   campaignId: string;
@@ -30,8 +37,10 @@ type Props = {
   sessionStatus: string;
   allCampaignNpcs: CampaignNpc[];
   allCampaignFactions: CampaignFaction[];
+  allCampaignCreatures: CampaignCreature[];
   stageDeckNpcIds: string[] | null;
   stageDeckFactionIds: string[] | null;
+  stageDeckCreatureIds: string[] | null;
   initialBackgroundUrl: string | null;
   initialTranscriptionMode: TranscriptionMode | null;
   sceneMediaItems: CampaignSceneMedia[];
@@ -62,8 +71,10 @@ export function StagePrepClient({
   sessionStatus,
   allCampaignNpcs,
   allCampaignFactions,
+  allCampaignCreatures,
   stageDeckNpcIds,
   stageDeckFactionIds,
+  stageDeckCreatureIds,
   initialBackgroundUrl,
   initialTranscriptionMode,
   sceneMediaItems,
@@ -73,6 +84,7 @@ export function StagePrepClient({
   const [isPending, startTransition] = useTransition();
   const [npcDeckAll, setNpcDeckAll] = useState(stageDeckNpcIds == null);
   const [factionDeckAll, setFactionDeckAll] = useState(stageDeckFactionIds == null);
+  const [creatureDeckAll, setCreatureDeckAll] = useState(stageDeckCreatureIds == null);
   const [npcDeckPick, setNpcDeckPick] = useState<Set<string>>(() => {
     if (stageDeckNpcIds?.length) return new Set(stageDeckNpcIds);
     return new Set(allCampaignNpcs.map((n) => n.id));
@@ -81,9 +93,14 @@ export function StagePrepClient({
     if (stageDeckFactionIds?.length) return new Set(stageDeckFactionIds);
     return new Set(allCampaignFactions.map((f) => f.id));
   });
+  const [creatureDeckPick, setCreatureDeckPick] = useState<Set<string>>(() => {
+    if (stageDeckCreatureIds?.length) return new Set(stageDeckCreatureIds);
+    return new Set(allCampaignCreatures.map((c) => c.id));
+  });
   const [bgUrl, setBgUrl] = useState(initialBackgroundUrl || "");
   const [npcSearch, setNpcSearch] = useState("");
   const [facSearch, setFacSearch] = useState("");
+  const [creatureSearch, setCreatureSearch] = useState("");
 
   useEffect(() => {
     setBgUrl(initialBackgroundUrl || "");
@@ -92,6 +109,7 @@ export function StagePrepClient({
   useEffect(() => {
     setNpcDeckAll(stageDeckNpcIds == null);
     setFactionDeckAll(stageDeckFactionIds == null);
+    setCreatureDeckAll(stageDeckCreatureIds == null);
     setNpcDeckPick(
       new Set(
         stageDeckNpcIds?.length ? stageDeckNpcIds : allCampaignNpcs.map((n) => n.id),
@@ -104,7 +122,21 @@ export function StagePrepClient({
           : allCampaignFactions.map((f) => f.id),
       ),
     );
-  }, [stageDeckNpcIds, stageDeckFactionIds, allCampaignNpcs, allCampaignFactions]);
+    setCreatureDeckPick(
+      new Set(
+        stageDeckCreatureIds?.length
+          ? stageDeckCreatureIds
+          : allCampaignCreatures.map((c) => c.id),
+      ),
+    );
+  }, [
+    stageDeckNpcIds,
+    stageDeckFactionIds,
+    stageDeckCreatureIds,
+    allCampaignNpcs,
+    allCampaignFactions,
+    allCampaignCreatures,
+  ]);
 
   function saveDeck() {
     if (!npcDeckAll && npcDeckPick.size === 0) {
@@ -117,11 +149,18 @@ export function StagePrepClient({
       alert('Bitte mindestens eine Fraktion auswählen oder „Alle Fraktionen“ aktivieren.');
       return;
     }
+    if (!creatureDeckAll && creatureDeckPick.size === 0) {
+      alert(
+        "Bitte mindestens eine Kreatur auswählen oder „Alle Bestarium-Kreaturen“ aktivieren.",
+      );
+      return;
+    }
     startTransition(async () => {
       try {
         await updateSessionStageDeck(sessionId, {
           stage_deck_npc_ids: npcDeckAll ? null : Array.from(npcDeckPick),
           stage_deck_faction_ids: factionDeckAll ? null : Array.from(factionDeckPick),
+          stage_deck_creature_ids: creatureDeckAll ? null : Array.from(creatureDeckPick),
         });
         router.refresh();
       } catch (err: unknown) {
@@ -162,6 +201,11 @@ export function StagePrepClient({
   );
   const facFiltered = allCampaignFactions.filter((f) =>
     `${f.name} ${f.type || ""}`.toLowerCase().includes(facSearch.trim().toLowerCase()),
+  );
+  const creatureFiltered = allCampaignCreatures.filter((c) =>
+    `${c.name} ${c.creature_type || ""}`
+      .toLowerCase()
+      .includes(creatureSearch.trim().toLowerCase()),
   );
 
   const sessionPath = `/session/${sessionId}`;
@@ -204,7 +248,8 @@ export function StagePrepClient({
       <main className="mx-auto max-w-6xl px-4 py-8 md:px-8 space-y-8">
         <p className="font-libre text-sm text-gray-300 leading-relaxed max-w-3xl">
           Hier stellst du das <strong className="text-gray-200">Bühnendeck</strong> ein (welche
-          NPCs und Fraktionen im Stage Manager erscheinen), den{" "}
+          NPCs, Fraktionen und <strong className="text-gray-200">Bestarium-Kreaturen</strong> im
+          Stage Manager erscheinen), den{" "}
           <strong className="text-gray-200">Session-Hintergrund</strong> und unten die{" "}
           <a href="#szenen-mediathek" className="text-hero-vibrant hover:underline">
             Szenen-Mediathek
@@ -358,6 +403,97 @@ export function StagePrepClient({
                 )}
               </div>
 
+              <div id="kreaturen-deck">
+                <p className="font-barlow font-bold uppercase text-[10px] text-gray-500 mb-2">
+                  Kreaturen im Stage Manager (Bestarium)
+                </p>
+                {allCampaignCreatures.length === 0 ? (
+                  <p className="font-libre text-xs text-gray-500 mb-2">
+                    Noch keine Kreaturen in dieser Welt. Lege sie im{" "}
+                    <a
+                      href={`${campaignPath}/bestarium`}
+                      className="text-hero-vibrant hover:underline"
+                    >
+                      Kampagnen-Bestarium
+                    </a>{" "}
+                    bzw. in der Welt an.
+                  </p>
+                ) : (
+                  <>
+                    <label className="flex items-center gap-2 cursor-pointer mb-1">
+                      <input
+                        type="radio"
+                        name="creature-deck-full"
+                        checked={creatureDeckAll}
+                        onChange={() => setCreatureDeckAll(true)}
+                        className="border-hero-border text-hero-vibrant"
+                      />
+                      Alle Bestarium-Kreaturen
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="creature-deck-full"
+                        checked={!creatureDeckAll}
+                        onChange={() => {
+                          setCreatureDeckAll(false);
+                          setCreatureDeckPick(new Set(allCampaignCreatures.map((c) => c.id)));
+                        }}
+                        className="border-hero-border text-hero-vibrant"
+                      />
+                      Nur ausgewählte
+                    </label>
+                    {!creatureDeckAll && (
+                      <>
+                        <input
+                          type="search"
+                          value={creatureSearch}
+                          onChange={(e) => setCreatureSearch(e.target.value)}
+                          placeholder="Kreaturen filtern…"
+                          className="mt-3 w-full rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white focus:border-hero-vibrant outline-none"
+                        />
+                        <div className="mt-2 max-h-[min(40vh,22rem)] overflow-y-auto rounded border border-emerald-900/30 bg-background-dark/90 p-3 space-y-2">
+                          {creatureFiltered.map((creature) => (
+                            <label
+                              key={creature.id}
+                              className="flex items-center gap-2 cursor-pointer text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={creatureDeckPick.has(creature.id)}
+                                onChange={(e) => {
+                                  setCreatureDeckPick((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(creature.id);
+                                    else next.delete(creature.id);
+                                    return next;
+                                  });
+                                }}
+                                className="rounded border-hero-border"
+                              />
+                              <span>
+                                {creature.name}
+                                {creature.creature_type ? (
+                                  <span className="text-gray-500 text-xs capitalize">
+                                    {" "}
+                                    · {creature.creature_type}
+                                  </span>
+                                ) : null}
+                                {!creature.is_revealed ? (
+                                  <span className="text-amber-500/90 text-[10px] uppercase ml-1">
+                                    · verborgen
+                                  </span>
+                                ) : null}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={saveDeck}
@@ -450,6 +586,14 @@ export function StagePrepClient({
             className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-xs text-hero-vibrant hover:text-white"
           >
             Neuen NPC anlegen (neuer Tab)
+          </a>
+          <a
+            href={`${campaignPath}/bestarium`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 font-barlow font-bold uppercase text-xs text-emerald-400 hover:text-white"
+          >
+            Bestarium öffnen (neuer Tab)
           </a>
         </div>
       </main>

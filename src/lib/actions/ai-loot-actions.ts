@@ -235,7 +235,7 @@ Vorgaben des Spielleiters (strikt einhalten):
 export type BeastLootRollQuality = "poor" | "fair" | "good" | "excellent" | "critical";
 
 /** Qualität aus Würfelergebnis (Gesamtwurf vs. SG) für Kreaturen-Loot. */
-export function beastLootQualityFromRoll(
+function beastLootQualityFromRoll(
   rollTotal: number,
   dc: number,
 ): BeastLootRollQuality {

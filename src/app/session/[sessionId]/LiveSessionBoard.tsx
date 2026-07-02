@@ -15,7 +15,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
-import { normalizeGuestSlots } from "@/src/lib/session-guest-auth";
+import { normalizeGuestSlots } from "@/src/lib/session-guest-slots";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient as createBrowserSupabase } from "@/src/lib/supabase/client";
 import {
