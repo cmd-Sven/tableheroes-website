@@ -1,6 +1,6 @@
 import {
   PROFILE_MEDIA_MAX_BYTES,
-  validateProfileImageFile,
+  PROFILE_MEDIA_ACCEPT_MIME,
 } from "@/src/lib/profile-media";
 
 export const IMAGE_COMPRESS_MAX_EDGE = 1024;
@@ -13,7 +13,12 @@ function validateInputFile(file: File): string | null {
   if (file.size > PROFILE_MEDIA_MAX_INPUT_BYTES) {
     return `Die Datei ist zu groß (max. ${Math.round(PROFILE_MEDIA_MAX_INPUT_BYTES / 1024 / 1024)} MB vor Komprimierung).`;
   }
-  return validateProfileImageFile(file);
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  const extLooksValid = ext === "jpg" || ext === "jpeg" || ext === "png" || ext === "webp";
+  if (extLooksValid) return null;
+  const mime = (file.type || "").toLowerCase().trim();
+  if ((PROFILE_MEDIA_ACCEPT_MIME as readonly string[]).includes(mime)) return null;
+  return "Nur JPEG-, PNG- oder WebP-Bilder sind erlaubt.";
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {

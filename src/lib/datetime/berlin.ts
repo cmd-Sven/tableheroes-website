@@ -130,7 +130,7 @@ export function getBerlinWeekday(year: number, month: number, day: number): numb
   return map[name] ?? 0;
 }
 
-/** Nächstes Vorkommen eines Wochentags (0=So … 6=Sa) ab „jetzt“ in Berlin. */
+/** Nächstes Vorkommen eines Wochentags (0=So … 6=Sa) ab „jetzt“ in Berlin — inkl. heute, wenn die Uhrzeit noch nicht vorbei ist. */
 export function nextBerlinScheduleOccurrence(
   scheduleDay: number,
   hour: number,
@@ -145,7 +145,7 @@ export function nextBerlinScheduleOccurrence(
   for (let i = 0; i < 370; i++) {
     if (getBerlinWeekday(y, m, d) === scheduleDay) {
       const start = berlinLocalToUtc(y, m, d, hour, minute);
-      if (start.getTime() > from.getTime()) {
+      if (start.getTime() >= from.getTime()) {
         return start;
       }
     }

@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Sparkles,
   LayoutGrid,
+  Wand2,
   UserCheck,
   UserMinus,
   Archive,
@@ -434,6 +435,15 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                 {deadlineSummary(nextSessionLocal.startTime, nextSessionLocal.rsvpDeadlineDays)}
               </p>
             )}
+            {sched && !nextSessionLocal.gmPrepComplete ? (
+              <Link
+                href={scheduleUrl}
+                className="mt-3 inline-flex items-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-3 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20 transition-colors"
+              >
+                <Wand2 className="h-4 w-4" />
+                Session mit KI ausarbeiten
+              </Link>
+            ) : null}
           </div>
 
           {liveNs ? (

@@ -1,6 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { after } from "next/server";
 import type {
   GmTermineNextSession,
   GmTerminePlayerRsvp,
@@ -187,23 +186,19 @@ export async function loadCampaignDetailPageData(
   }[] = [];
 
   if (isGM) {
-    after(async () => {
-      try {
-        const { expirePastScheduledSessionsForCampaign } = await import(
-          "./session-actions",
-        );
-        await expirePastScheduledSessionsForCampaign(id);
-      } catch (e) {
-        console.warn(
-          "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
-          e,
-        );
-      }
-    });
+    try {
+      const { expirePastScheduledSessionsForCampaign } = await import("./session-actions");
+      await expirePastScheduledSessionsForCampaign(id);
+    } catch (e) {
+      console.warn(
+        "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
+        e,
+      );
+    }
   }
 
-  // Sessions (parallel mit Welt/Membership geladen)
-  const sessions =
+  // Sessions (parallel mit Welt/Membership geladen) — nach Hygiene ggf. neu lesen
+  let sessions =
     (sessionsResult.data as Array<{
       id: string;
       title: string | null;
@@ -211,6 +206,21 @@ export async function loadCampaignDetailPageData(
       type: string;
       status: string;
     }> | null) ?? null;
+
+  if (isGM) {
+    const { data: sessionsRefreshed } = await (supabase.from("sessions") as any)
+      .select(SESSION_LIST_COLUMNS)
+      .eq("campaign_id", id)
+      .order("start_time", { ascending: true });
+    sessions =
+      (sessionsRefreshed as Array<{
+        id: string;
+        title: string | null;
+        start_time: string;
+        type: string;
+        status: string;
+      }> | null) ?? sessions;
+  }
 
   const now = new Date();
   const { focus, otherActive, pastArchiveRows } = partitionCampaignSessionsForTab(

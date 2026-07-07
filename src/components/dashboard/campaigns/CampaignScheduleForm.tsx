@@ -241,9 +241,9 @@ export function CampaignScheduleForm({
         {hasSchedule && (
           <div className="border-t border-hero-dark pt-4 mt-4">
             <p className="font-libre text-sm text-gray-300 mb-3">
-              Erstelle automatisch Termine für die nächsten 8 Wochen basierend
-              auf dem eingestellten Spielplan. Bereits vorhandene Termine werden
-              nicht doppelt erstellt.
+              Erstelle automatisch Termine für die nächsten 8 Wochen basierend auf dem
+              eingestellten Spielplan. Jeder Termin erhält ein Datums-Label — Titel und Szenen
+              legst du danach pro Termin mit „Mit KI planen“ fest.
             </p>
             <button
               type="button"
