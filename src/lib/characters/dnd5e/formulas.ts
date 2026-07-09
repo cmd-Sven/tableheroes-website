@@ -17,6 +17,7 @@ export function skillProficiencyBonus(
 ): number {
   if (proficiency === "expertise") return pb * 2;
   if (proficiency === "proficient") return pb;
+  if (proficiency === "half") return Math.floor(pb / 2);
   return 0;
 }
 

@@ -34,7 +34,7 @@ export type Dnd5eSkillKey =
   | "ste"
   | "surv";
 
-export type SkillProficiency = "none" | "proficient" | "expertise";
+export type SkillProficiency = "none" | "half" | "proficient" | "expertise";
 
 export type Dnd5eSkillEntry = {
   proficient: SkillProficiency;

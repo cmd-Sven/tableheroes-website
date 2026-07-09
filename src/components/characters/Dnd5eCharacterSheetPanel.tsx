@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { Loader2, Save, ScrollText, Shield, Swords, Backpack } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { Loader2, Save, ScrollText, Shield, Backpack } from "lucide-react";
 import { toast } from "sonner";
 import {
   loadDnd5eCharacterSheet,
@@ -18,12 +18,13 @@ import type {
 } from "@/src/lib/characters/dnd5e/types";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
+import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { Dnd5eEquipmentTab } from "@/src/components/characters/Dnd5eEquipmentTab";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
 
-type SheetTab = "sheet" | "equipment";
+type SheetTab = "attributes" | "equipment";
 
 function ToggleSwitch({
   checked,
@@ -113,7 +114,6 @@ function TextInput({
 type Props = {
   campaignId: string;
   characterId: string;
-  /** In Modal: kompakter Header */
   compact?: boolean;
   onClose?: () => void;
 };
@@ -136,7 +136,7 @@ export function Dnd5eCharacterSheetPanel({
     experiencePoints: 0,
   });
   const [editMode, setEditMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<SheetTab>("sheet");
+  const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -172,9 +172,14 @@ export function Dnd5eCharacterSheetPanel({
     void reload();
   }, [reload]);
 
-  const derived = payload?.derived ?? null;
+  const derived = useMemo(() => {
+    if (!sheet) return null;
+    return computeDerivedDnd5eSheet(sheet, meta.level);
+  }, [sheet, meta.level]);
+
   const canEdit = payload?.canEdit ?? false;
   const readOnly = !editMode || !canEdit;
+  const passivePerception = derived ? 10 + derived.skills.prc.total : 10;
 
   function updateAbility(key: AbilityKey, score: number) {
     if (!sheet) return;
@@ -221,7 +226,7 @@ export function Dnd5eCharacterSheetPanel({
       ...sheet,
       features: [
         ...sheet.features,
-        { id: crypto.randomUUID(), name: "Neue Fähigkeit", description: null, source: "manual" },
+        { id: crypto.randomUUID(), name: "Neues Feat", description: null, source: "manual" },
       ],
     });
   }
@@ -284,6 +289,10 @@ export function Dnd5eCharacterSheetPanel({
     );
   }
 
+  const classLevelLabel = [meta.className, meta.subclass ? `(${meta.subclass})` : null]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="space-y-6">
       <div
@@ -317,15 +326,15 @@ export function Dnd5eCharacterSheetPanel({
       <div className="flex gap-1 border-b border-hero-dark">
         <button
           type="button"
-          onClick={() => setActiveTab("sheet")}
+          onClick={() => setActiveTab("attributes")}
           className={`inline-flex items-center gap-2 px-4 py-2 font-barlow text-xs font-bold uppercase border-b-2 transition-colors ${
-            activeTab === "sheet"
+            activeTab === "attributes"
               ? "border-hero-vibrant text-hero-vibrant"
               : "border-transparent text-gray-500 hover:text-gray-300"
           }`}
         >
           <ScrollText className="h-3.5 w-3.5" />
-          Blatt
+          Attribute
         </button>
         <button
           type="button"
@@ -352,314 +361,508 @@ export function Dnd5eCharacterSheetPanel({
         />
       ) : null}
 
-      {activeTab === "sheet" ? (
-      <>
-
-      {payload.progressionLocked ? (
-        <FoundryProgressionLockNotice message={payload.progressionLockMessage} />
-      ) : null}
-
-      {/* Stammdaten */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
-          Stammdaten
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Name</span>
-            <TextInput value={meta.name} disabled={readOnly} onChange={(v) => setMeta({ ...meta, name: v })} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Klasse</span>
-            <TextInput
-              value={meta.className}
-              disabled={readOnly || payload.progressionLocked}
-              onChange={(v) => setMeta({ ...meta, className: v })}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Unterklasse</span>
-            <TextInput value={meta.subclass} disabled={readOnly} onChange={(v) => setMeta({ ...meta, subclass: v })} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Volk</span>
-            <TextInput value={meta.race} disabled={readOnly} onChange={(v) => setMeta({ ...meta, race: v })} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Hintergrund</span>
-            <TextInput value={meta.background} disabled={readOnly} onChange={(v) => setMeta({ ...meta, background: v })} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Gesinnung</span>
-            <TextInput value={meta.alignment} disabled={readOnly} onChange={(v) => setMeta({ ...meta, alignment: v })} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Level</span>
-            <NumberInput
-              value={meta.level}
-              min={1}
-              disabled={readOnly || payload.progressionLocked}
-              onChange={(v) => setMeta({ ...meta, level: Math.max(1, v) })}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">XP</span>
-            <NumberInput
-              value={meta.experiencePoints}
-              min={0}
-              disabled={readOnly || payload.progressionLocked}
-              onChange={(v) => setMeta({ ...meta, experiencePoints: Math.max(0, v) })}
-            />
-          </label>
-          <div className="flex items-end">
-            <p className="font-libre text-sm text-gray-400">
-              Übungsbonus: <strong className="text-accent-gold">{formatSigned(derived.proficiencyBonus)}</strong>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Attribute + Rettungswürfe */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-3">
-            Attribute
-          </h3>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {ABILITY_KEYS.map((key) => (
-              <div key={key} className="rounded border border-hero-border/50 bg-hero-dark/30 p-2 text-center">
-                <p className="font-barlow text-[10px] uppercase text-gray-500">{ABILITY_LABELS_DE[key]}</p>
-                {readOnly ? (
-                  <p className="font-barlow text-2xl font-bold text-white">{sheet.abilities[key].score}</p>
-                ) : (
-                  <NumberInput
-                    value={sheet.abilities[key].score}
-                    min={1}
-                    max={30}
-                    onChange={(v) => updateAbility(key, v)}
-                  />
-                )}
-                <p className="font-barlow text-sm text-accent-gold">{formatSigned(derived.abilities[key].modifier)}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-3 flex items-center gap-2">
-            <Shield className="h-4 w-4" /> Rettungswürfe
-          </h3>
-          <div className="space-y-2">
-            {ABILITY_KEYS.map((key) => (
-              <div key={key} className="flex items-center justify-between gap-2 rounded bg-hero-dark/20 px-3 py-1.5">
-                <span className="font-libre text-sm text-gray-300">{ABILITY_LABELS_DE[key]}</span>
-                <div className="flex items-center gap-3">
-                  {readOnly ? (
-                    <span className="font-barlow text-sm text-accent-gold">
-                      {formatSigned(derived.savingThrows[key].total)}
-                    </span>
-                  ) : (
-                    <label className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={sheet.savingThrows[key].proficient}
-                        onChange={(e) => updateSave(key, e.target.checked)}
-                      />
-                      Prof.
-                    </label>
-                  )}
-                  {!readOnly ? (
-                    <span className="font-barlow text-sm text-accent-gold w-8 text-right">
-                      {formatSigned(derived.savingThrows[key].total)}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* Kampf */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-3 flex items-center gap-2">
-          <Swords className="h-4 w-4" /> Kampf
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">TP aktuell</span>
-            <NumberInput value={sheet.combat.hpCurrent} min={0} disabled={readOnly} onChange={(v) => updateCombat("hpCurrent", v)} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">TP max</span>
-            <NumberInput value={sheet.combat.hpMax} min={0} disabled={readOnly} onChange={(v) => updateCombat("hpMax", v)} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">TP temp</span>
-            <NumberInput value={sheet.combat.hpTemp} min={0} disabled={readOnly} onChange={(v) => updateCombat("hpTemp", v)} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Rüstungsklasse</span>
-            {readOnly ? (
-              <p className="font-barlow text-2xl font-bold text-white py-1">{derived.ac}</p>
-            ) : (
-              <NumberInput value={sheet.combat.ac} min={0} onChange={(v) => updateCombat("ac", v)} />
-            )}
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Initiative</span>
-            {readOnly ? (
-              <p className="font-barlow text-2xl font-bold text-white py-1">{formatSigned(derived.initiative)}</p>
-            ) : (
-              <NumberInput
-                value={sheet.combat.initiativeBonus}
-                onChange={(v) => updateCombat("initiativeBonus", v)}
-              />
-            )}
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Bewegung (ft)</span>
-            <NumberInput value={sheet.combat.speed} min={0} disabled={readOnly} onChange={(v) => updateCombat("speed", v)} />
-          </label>
-          <label className="space-y-1">
-            <span className="font-barlow text-xs uppercase text-gray-500">Trefferwürfel</span>
-            <TextInput value={sheet.combat.hitDice} disabled={readOnly} onChange={(v) => updateCombat("hitDice", v)} />
-          </label>
-        </div>
-      </section>
-
-      {/* Fertigkeiten */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-3">
-          Fertigkeiten
-        </h3>
-        <div className="grid gap-1 sm:grid-cols-2">
-          {DND5E_SKILLS.map((def) => {
-            const skillDerived = derived.skills[def.key];
-            const entry = sheet.skills[def.key];
-            return (
-              <div
-                key={def.key}
-                className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-hero-dark/20"
-              >
-                <span className="font-libre text-sm text-gray-300">
-                  {def.labelDe}
-                  <span className="ml-1 text-[10px] uppercase text-gray-600">({def.ability})</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  {!readOnly ? (
-                    <select
-                      value={entry.proficient}
-                      onChange={(e) => updateSkill(def.key, e.target.value as SkillProficiency)}
-                      className="rounded border border-hero-border bg-hero-dark px-1 py-0.5 text-xs text-white"
-                    >
-                      <option value="none">—</option>
-                      <option value="proficient">Prof.</option>
-                      <option value="expertise">Expertise</option>
-                    </select>
-                  ) : null}
-                  <span className="font-barlow text-sm text-accent-gold w-8 text-right">
-                    {formatSigned(skillDerived.total)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-hero-dark pb-2">
-          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">Merkmale &amp; Fähigkeiten</h3>
-          {!readOnly ? (
-            <button
-              type="button"
-              onClick={addFeature}
-              className="font-barlow text-xs font-bold uppercase text-hero-vibrant hover:text-white"
-            >
-              + Hinzufügen
-            </button>
+      {activeTab === "attributes" ? (
+        <>
+          {payload.progressionLocked ? (
+            <FoundryProgressionLockNotice message={payload.progressionLockMessage} />
           ) : null}
-        </div>
-        {sheet.features.length === 0 ? (
-          <p className="font-libre text-sm text-gray-500">Noch keine Einträge.</p>
-        ) : (
-          <div className="space-y-3">
-            {sheet.features.map((feat, index) => (
-              <div key={feat.id} className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
-                {readOnly ? (
-                  <>
-                    <p className="font-barlow font-bold text-white">{feat.name}</p>
-                    {feat.description ? (
-                      <p className="mt-1 font-libre text-sm text-gray-400 whitespace-pre-wrap">{feat.description}</p>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <TextInput
-                        value={feat.name}
-                        onChange={(v) => updateFeature(index, { name: v })}
-                        className="flex-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFeature(index)}
-                        className="text-xs text-red-400 hover:text-red-300 px-2"
-                      >
-                        Entfernen
-                      </button>
+
+          {/* Kopfzeile wie PHB-Bogen */}
+          <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+            <div className="grid gap-3 lg:grid-cols-12">
+              <label className="lg:col-span-4 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Charaktername
+                </span>
+                <TextInput
+                  value={meta.name}
+                  disabled={readOnly}
+                  onChange={(v) => setMeta({ ...meta, name: v })}
+                  className="text-lg font-bold"
+                />
+              </label>
+              <label className="lg:col-span-3 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Klasse &amp; Stufe
+                </span>
+                <div className="flex gap-2">
+                  <TextInput
+                    value={classLevelLabel}
+                    disabled={readOnly || payload.progressionLocked}
+                    placeholder="Klasse"
+                    onChange={(v) => setMeta({ ...meta, className: v })}
+                    className="flex-1"
+                  />
+                  <NumberInput
+                    value={meta.level}
+                    min={1}
+                    disabled={readOnly || payload.progressionLocked}
+                    onChange={(v) => setMeta({ ...meta, level: Math.max(1, v) })}
+                    className="!w-16"
+                  />
+                </div>
+              </label>
+              <label className="lg:col-span-2 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Hintergrund
+                </span>
+                <TextInput
+                  value={meta.background}
+                  disabled={readOnly}
+                  onChange={(v) => setMeta({ ...meta, background: v })}
+                />
+              </label>
+              <label className="lg:col-span-3 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Volk
+                </span>
+                <TextInput
+                  value={meta.race}
+                  disabled={readOnly}
+                  onChange={(v) => setMeta({ ...meta, race: v })}
+                />
+              </label>
+              <label className="lg:col-span-3 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Gesinnung
+                </span>
+                <TextInput
+                  value={meta.alignment}
+                  disabled={readOnly}
+                  onChange={(v) => setMeta({ ...meta, alignment: v })}
+                />
+              </label>
+              <label className="lg:col-span-2 space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Erfahrungspunkte
+                </span>
+                <NumberInput
+                  value={meta.experiencePoints}
+                  min={0}
+                  disabled={readOnly || payload.progressionLocked}
+                  onChange={(v) => setMeta({ ...meta, experiencePoints: Math.max(0, v) })}
+                />
+              </label>
+              <div className="lg:col-span-2 flex items-end">
+                <div className="w-full rounded border border-hero-border/60 bg-hero-dark/40 px-3 py-2 text-center">
+                  <p className="font-barlow text-[10px] uppercase text-gray-500">Übungsbonus</p>
+                  <p className="font-barlow text-2xl font-bold text-accent-gold">
+                    {formatSigned(derived.proficiencyBonus)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-12">
+            {/* Linke Spalte: Attribute, Rettungswürfe, Fertigkeiten */}
+            <div className="xl:col-span-4 space-y-4">
+              <section className="rounded-lg border border-hero-dark bg-background-card p-3">
+                <div className="space-y-2">
+                  {ABILITY_KEYS.map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-3 rounded border border-hero-border/40 bg-hero-dark/30 px-2 py-1.5"
+                    >
+                      <div className="w-10 text-center">
+                        <p className="font-barlow text-xl font-bold text-accent-gold leading-none">
+                          {formatSigned(derived.abilities[key].modifier)}
+                        </p>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-barlow text-[10px] font-bold uppercase text-gray-400 truncate">
+                          {ABILITY_LABELS_DE[key]}
+                        </p>
+                        {readOnly ? (
+                          <p className="font-barlow text-xs text-gray-500">{sheet.abilities[key].score}</p>
+                        ) : (
+                          <NumberInput
+                            value={sheet.abilities[key].score}
+                            min={1}
+                            max={30}
+                            className="!py-0.5 !text-xs"
+                            onChange={(v) => updateAbility(key, v)}
+                          />
+                        )}
+                      </div>
                     </div>
-                    <textarea
-                      value={feat.description ?? ""}
-                      onChange={(e) => updateFeature(index, { description: e.target.value })}
-                      rows={3}
-                      className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-                      placeholder="Beschreibung…"
-                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-3">
+                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2 flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" /> Rettungswürfe
+                </h3>
+                <div className="space-y-1">
+                  {ABILITY_KEYS.map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-hero-dark/20"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {!readOnly ? (
+                          <input
+                            type="checkbox"
+                            className="shrink-0"
+                            checked={sheet.savingThrows[key].proficient}
+                            onChange={(e) => updateSave(key, e.target.checked)}
+                          />
+                        ) : (
+                          <span
+                            className={`inline-block h-2.5 w-2.5 rounded-full border ${
+                              sheet.savingThrows[key].proficient
+                                ? "border-accent-gold bg-accent-gold"
+                                : "border-gray-600"
+                            }`}
+                          />
+                        )}
+                        <span className="font-libre text-xs text-gray-300 truncate">
+                          {ABILITY_LABELS_DE[key]}
+                        </span>
+                      </div>
+                      <span className="font-barlow text-sm text-accent-gold shrink-0">
+                        {formatSigned(derived.savingThrows[key].total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-3">
+                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2">
+                  Fertigkeiten
+                </h3>
+                <div className="space-y-0.5 max-h-[28rem] overflow-y-auto pr-1">
+                  {DND5E_SKILLS.map((def) => {
+                    const skillDerived = derived.skills[def.key];
+                    const entry = sheet.skills[def.key];
+                    return (
+                      <div
+                        key={def.key}
+                        className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-hero-dark/20"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {!readOnly ? (
+                            <select
+                              value={entry.proficient}
+                              onChange={(e) =>
+                                updateSkill(def.key, e.target.value as SkillProficiency)
+                              }
+                              className="w-14 shrink-0 rounded border border-hero-border bg-hero-dark px-0.5 py-0.5 text-[10px] text-white"
+                            >
+                              <option value="none">—</option>
+                              <option value="half">½</option>
+                              <option value="proficient">P</option>
+                              <option value="expertise">E</option>
+                            </select>
+                          ) : (
+                            <span className="w-4 text-center font-barlow text-[10px] text-gray-500 shrink-0">
+                              {entry.proficient === "expertise"
+                                ? "E"
+                                : entry.proficient === "proficient"
+                                  ? "P"
+                                  : entry.proficient === "half"
+                                    ? "½"
+                                    : ""}
+                            </span>
+                          )}
+                          <span className="font-libre text-xs text-gray-300 truncate">
+                            {def.labelDe}
+                            <span className="ml-1 text-[9px] uppercase text-gray-600">
+                              ({def.ability})
+                            </span>
+                          </span>
+                        </div>
+                        <span className="font-barlow text-sm text-accent-gold shrink-0 w-8 text-right">
+                          {formatSigned(skillDerived.total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 rounded border border-hero-border/50 bg-hero-dark/30 px-3 py-2 flex items-center justify-between">
+                  <span className="font-barlow text-[10px] uppercase text-gray-500">
+                    Passive Wahrnehmung
+                  </span>
+                  <span className="font-barlow text-lg font-bold text-white">{passivePerception}</span>
+                </div>
+              </section>
+            </div>
+
+            {/* Mittlere Spalte: Kampf */}
+            <div className="xl:col-span-4 space-y-4">
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">RK</p>
+                    {readOnly ? (
+                      <p className="font-barlow text-4xl font-bold text-white mt-1">{derived.ac}</p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.ac}
+                        min={0}
+                        className="mt-1 !text-2xl !font-bold"
+                        onChange={(v) => updateCombat("ac", v)}
+                      />
+                    )}
+                  </div>
+                  <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">Initiative</p>
+                    {readOnly ? (
+                      <p className="font-barlow text-4xl font-bold text-white mt-1">
+                        {formatSigned(derived.initiative)}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.initiativeBonus}
+                        className="mt-1 !text-2xl !font-bold"
+                        onChange={(v) => updateCombat("initiativeBonus", v)}
+                      />
+                    )}
+                  </div>
+                  <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                      Bewegung
+                    </p>
+                    {readOnly ? (
+                      <p className="font-barlow text-4xl font-bold text-white mt-1">
+                        {sheet.combat.speed}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.speed}
+                        min={0}
+                        className="mt-1 !text-2xl !font-bold"
+                        onChange={(v) => updateCombat("speed", v)}
+                      />
+                    )}
+                    <p className="font-barlow text-[9px] text-gray-500 mt-0.5">ft</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
+                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
+                  Trefferpunkte
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="space-y-1">
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">Maximum</span>
+                    {readOnly ? (
+                      <p className="font-barlow text-2xl font-bold text-white text-center">
+                        {sheet.combat.hpMax}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.hpMax}
+                        min={0}
+                        onChange={(v) => updateCombat("hpMax", v)}
+                      />
+                    )}
+                  </label>
+                  <label className="space-y-1">
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">Aktuell</span>
+                    {readOnly ? (
+                      <p className="font-barlow text-2xl font-bold text-white text-center">
+                        {sheet.combat.hpCurrent}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.hpCurrent}
+                        min={0}
+                        onChange={(v) => updateCombat("hpCurrent", v)}
+                      />
+                    )}
+                  </label>
+                  <label className="space-y-1">
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">Temp</span>
+                    {readOnly ? (
+                      <p className="font-barlow text-2xl font-bold text-white text-center">
+                        {sheet.combat.hpTemp}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.hpTemp}
+                        min={0}
+                        onChange={(v) => updateCombat("hpTemp", v)}
+                      />
+                    )}
+                  </label>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4 grid grid-cols-2 gap-4">
+                <label className="space-y-1">
+                  <span className="font-barlow text-[10px] uppercase text-gray-500">Trefferwürfel</span>
+                  <TextInput
+                    value={sheet.combat.hitDice}
+                    disabled={readOnly}
+                    onChange={(v) => updateCombat("hitDice", v)}
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="font-barlow text-[10px] uppercase text-gray-500">Todesrettungen</span>
+                  <div className="flex gap-4 text-xs">
+                    <div>
+                      <p className="text-gray-500 mb-1">Erfolge</p>
+                      {readOnly ? (
+                        <p className="text-white">{sheet.combat.deathSaveSuccesses ?? 0}</p>
+                      ) : (
+                        <NumberInput
+                          value={sheet.combat.deathSaveSuccesses ?? 0}
+                          min={0}
+                          max={3}
+                          onChange={(v) => updateCombat("deathSaveSuccesses", v)}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-gray-500 mb-1">Fehlschläge</p>
+                      {readOnly ? (
+                        <p className="text-white">{sheet.combat.deathSaveFailures ?? 0}</p>
+                      ) : (
+                        <NumberInput
+                          value={sheet.combat.deathSaveFailures ?? 0}
+                          min={0}
+                          max={3}
+                          onChange={(v) => updateCombat("deathSaveFailures", v)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Rechte Spalte: Feats & Proficiencies */}
+            <div className="xl:col-span-4 space-y-4">
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4 min-h-[20rem] flex flex-col">
+                <div className="flex items-center justify-between border-b border-hero-dark pb-2 mb-3">
+                  <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
+                    Merkmale &amp; Feats
+                  </h3>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={addFeature}
+                      className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
+                    >
+                      + Feat
+                    </button>
+                  ) : null}
+                </div>
+                {sheet.features.length === 0 ? (
+                  <p className="font-libre text-sm text-gray-500 flex-1">Keine Feats vorhanden.</p>
+                ) : (
+                  <div className="space-y-2 flex-1 overflow-y-auto max-h-[24rem] pr-1">
+                    {sheet.features.map((feat, index) => (
+                      <div
+                        key={feat.id}
+                        className="rounded border border-hero-border/40 bg-hero-dark/20 p-2.5"
+                      >
+                        {readOnly ? (
+                          <>
+                            <p className="font-barlow text-sm font-bold text-white">{feat.name}</p>
+                            {feat.description ? (
+                              <p className="mt-1 font-libre text-xs text-gray-400 whitespace-pre-wrap line-clamp-4">
+                                {feat.description}
+                              </p>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <TextInput
+                                value={feat.name}
+                                onChange={(v) => updateFeature(index, { name: v })}
+                                className="flex-1 !text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeFeature(index)}
+                                className="text-[10px] text-red-400 hover:text-red-300 px-1"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <textarea
+                              value={feat.description ?? ""}
+                              onChange={(e) => updateFeature(index, { description: e.target.value })}
+                              rows={2}
+                              className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white"
+                              placeholder="Beschreibung…"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
-            ))}
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
+                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
+                  Übungen &amp; Sprachen
+                </h3>
+                {(
+                  [
+                    ["Rüstung", sheet.proficiencies.armor],
+                    ["Waffen", sheet.proficiencies.weapons],
+                    ["Werkzeuge", sheet.proficiencies.tools],
+                    ["Sprachen", sheet.proficiencies.languages],
+                  ] as const
+                ).map(([label, items]) =>
+                  items.length > 0 ? (
+                    <div key={label}>
+                      <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">{label}</p>
+                      <p className="font-libre text-xs text-gray-300">{items.join(", ")}</p>
+                    </div>
+                  ) : null,
+                )}
+                {sheet.proficiencies.armor.length === 0 &&
+                sheet.proficiencies.weapons.length === 0 &&
+                sheet.proficiencies.tools.length === 0 &&
+                sheet.proficiencies.languages.length === 0 ? (
+                  <p className="font-libre text-sm text-gray-500">—</p>
+                ) : null}
+              </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-2">
+                  Notizen
+                </h3>
+                {readOnly ? (
+                  <p className="font-libre text-sm text-gray-300 whitespace-pre-wrap min-h-[4rem]">
+                    {sheet.notes?.trim() || "—"}
+                  </p>
+                ) : (
+                  <textarea
+                    value={sheet.notes ?? ""}
+                    onChange={(e) => setSheet({ ...sheet, notes: e.target.value })}
+                    rows={4}
+                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
+                    placeholder="Spieler-Notizen…"
+                  />
+                )}
+              </section>
+            </div>
           </div>
-        )}
-      </section>
 
-      {/* Notizen */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-3">
-          Notizen
-        </h3>
-        {readOnly ? (
-          <p className="font-libre text-sm text-gray-300 whitespace-pre-wrap">
-            {sheet.notes?.trim() || "—"}
-          </p>
-        ) : (
-          <textarea
-            value={sheet.notes ?? ""}
-            onChange={(e) => setSheet({ ...sheet, notes: e.target.value })}
-            rows={4}
-            className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-            placeholder="Hausregeln, Spieler-Notizen…"
-          />
-        )}
-      </section>
-
-      {editMode && canEdit ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleSave}
-            className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
-          >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Speichern
-          </button>
-        </div>
-      ) : null}
-      </>
+          {editMode && canEdit ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSave}
+                className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Speichern
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {activeTab === "equipment" && editMode && canEdit ? (

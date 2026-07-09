@@ -213,6 +213,46 @@ export async function syncActorXp(actor) {
 }
 
 /**
+ * Serialisiert actor.system inkl. berechneter Kampfwerte (AC, TP, Initiative).
+ * @param {Actor} actor
+ */
+function buildActorSystemPayload(actor) {
+  const sys = actor.system ?? {};
+  let base = {};
+  try {
+    base = typeof sys.toObject === "function" ? foundry.utils.duplicate(sys.toObject()) : foundry.utils.duplicate(sys);
+  } catch {
+    base = { ...sys };
+  }
+
+  base.attributes = base.attributes ?? {};
+  base.attributes.ac = { ...(base.attributes.ac ?? {}) };
+  base.attributes.hp = { ...(base.attributes.hp ?? {}) };
+  base.attributes.init = { ...(base.attributes.init ?? {}) };
+
+  const acValue = Number(sys?.attributes?.ac?.value);
+  if (Number.isFinite(acValue) && acValue > 0) {
+    base.attributes.ac.value = acValue;
+  }
+
+  const hpMax = Number(sys?.attributes?.hp?.max);
+  const hpValue = Number(sys?.attributes?.hp?.value);
+  if (Number.isFinite(hpMax) && hpMax > 0) {
+    base.attributes.hp.max = hpMax;
+  }
+  if (Number.isFinite(hpValue)) {
+    base.attributes.hp.value = hpValue;
+  }
+
+  const initBonus = sys?.attributes?.init?.bonus;
+  const initTotal = sys?.attributes?.init?.total;
+  if (initBonus != null) base.attributes.init.bonus = initBonus;
+  if (initTotal != null) base.attributes.init.total = initTotal;
+
+  return base;
+}
+
+/**
  * Vollständiges DnD5e-Charakterblatt Foundry → Table Heroes (nur diese Richtung).
  * @param {Actor} actor
  */
@@ -235,7 +275,7 @@ export async function syncActorSheet(actor) {
     body: JSON.stringify({
       foundry_actor_id: normalizeFoundryActorId(actor.id),
       actor_name: String(actor.name ?? ""),
-      actor_system: actor.system ?? {},
+      actor_system: buildActorSystemPayload(actor),
       actor_items: items,
     }),
   });
