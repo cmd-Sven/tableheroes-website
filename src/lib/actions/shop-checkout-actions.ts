@@ -52,8 +52,11 @@ function itemTypeToInventoryCategory(itemType: string | null | undefined) {
   }
 }
 
+import { catalogTagForResolvedShopItem } from "@/src/lib/characters/dnd5e/item-resolve";
 function buildInventoryDescription(item: ResolvedShopItem, unitPriceCp: number) {
+  const catalogTag = catalogTagForResolvedShopItem(item);
   const tags = [
+    catalogTag,
     item.is_magical ? "magisch" : null,
     item.is_legal === false ? "illegal" : null,
     item.rarity ? `Seltenheit: ${item.rarity}` : null,

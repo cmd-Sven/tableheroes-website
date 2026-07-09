@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Shield, Search, Info } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Shield, Search, Info, Eye } from "lucide-react";
 import {
   updateCharacterByGM,
   deleteCharacterByGM,
@@ -253,7 +253,7 @@ export function GMCharacterEditorPage({
     }
     if (
       !confirm(
-        `Charakter „${character?.name ?? "Unbekannt"}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
+        `Charakter „${character?.name ?? "Unbekannt"}" aus der Kampagne entfernen? Der Charakter bleibt im Spieler-Profil und kann dort später gelöscht werden.`,
       )
     )
       return;
@@ -421,12 +421,25 @@ export function GMCharacterEditorPage({
       ) : null}
       {/* Header */}
       <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-        <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant">
-          Charakter verwalten
-        </h1>
-        <p className="font-libre text-lg text-gray-300 mt-2">
-          {character?.name ?? ""} — {character?.class ?? ""}, {character?.race ?? ""}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant">
+              Charakter verwalten
+            </h1>
+            <p className="font-libre text-lg text-gray-300 mt-2">
+              {character?.name ?? ""} — {character?.class ?? ""}, {character?.race ?? ""}
+            </p>
+          </div>
+          {characterId ? (
+            <Link
+              href={`/dashboard/campaigns/${campaignId}/characters/${characterId}/player-view`}
+              className="inline-flex items-center gap-2 rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-dark/50 transition-colors"
+            >
+              <Eye className="h-4 w-4" />
+              Spieler-Ansicht
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* Stammdaten: alle Felder wie im Wizard / Spieler-Editor */}

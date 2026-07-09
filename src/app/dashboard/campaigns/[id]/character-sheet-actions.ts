@@ -1,0 +1,253 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import {
+  createEmptyDnd5eSheet,
+  mergeSheetWithDefaults,
+  parseSheetData,
+} from "@/src/lib/characters/dnd5e/defaults";
+import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
+import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
+import type {
+  CharacterSheetPayload,
+  Dnd5eSheetData,
+  Dnd5eSheetOverrides,
+  Dnd5eSheetSource,
+} from "@/src/lib/characters/dnd5e/types";
+import {
+  resolveFoundryProgressionLock,
+  stripFoundryLockedCharacterFields,
+} from "@/src/lib/foundry-sync/progression-lock-server";
+import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
+
+const SHEET_SELECT =
+  "id, campaign_id, user_id, name, class, subclass, race, background, alignment, level, experience_points, sheet_data, sheet_overrides, sheet_source, sheet_synced_at";
+
+type CharacterRow = {
+  id: string;
+  campaign_id: string;
+  user_id: string | null;
+  name: string;
+  class: string | null;
+  subclass: string | null;
+  race: string | null;
+  background: string | null;
+  alignment: string | null;
+  level: number;
+  experience_points: number;
+  sheet_data: unknown;
+  sheet_overrides: unknown;
+  sheet_source: string | null;
+  sheet_synced_at: string | null;
+};
+
+async function loadCharacterAccess(
+  campaignId: string,
+  characterId: string,
+): Promise<{
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  character: CharacterRow;
+  isGm: boolean;
+  campaignSystem: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id, system")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const campaign = campaignRaw as {
+    gm_id?: string | null;
+    owner_id?: string | null;
+    system?: string | null;
+  } | null;
+  if (!campaign) throw new Error("Kampagne nicht gefunden.");
+
+  const isGm = isCampaignGm(campaign, user.id);
+
+  const { data: charRaw, error } = await (supabase.from("characters") as any)
+    .select(SHEET_SELECT)
+    .eq("id", characterId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  if (error || !charRaw) throw new Error("Charakter nicht gefunden.");
+
+  const character = charRaw as CharacterRow;
+  const isOwner = character.user_id === user.id;
+  if (!isGm && !isOwner) {
+    throw new Error("Keine Berechtigung für dieses Charakterblatt.");
+  }
+
+  return {
+    supabase,
+    userId: user.id,
+    character,
+    isGm,
+    campaignSystem: String(campaign.system ?? ""),
+  };
+}
+
+function buildSheetPayload(
+  character: CharacterRow,
+  campaignSystem: string,
+  canEdit: boolean,
+  progressionLocked: boolean,
+  progressionLockMessage: string,
+): CharacterSheetPayload {
+  const level = Math.max(1, Math.floor(Number(character.level) || 1));
+  const parsed = parseSheetData(character.sheet_data);
+  const sheet = parsed ?? createEmptyDnd5eSheet(level);
+  const overrides = (character.sheet_overrides ?? {}) as Dnd5eSheetOverrides;
+
+  return {
+    characterId: character.id,
+    campaignId: character.campaign_id,
+    campaignSystem,
+    name: character.name,
+    class: character.class,
+    subclass: character.subclass,
+    race: character.race,
+    background: character.background,
+    alignment: character.alignment,
+    level,
+    experiencePoints: Math.max(0, Math.floor(Number(character.experience_points) || 0)),
+    sheet,
+    overrides,
+    derived: computeDerivedDnd5eSheet(sheet, level),
+    sheetSource: (character.sheet_source as Dnd5eSheetSource | null) ?? null,
+    sheetSyncedAt: character.sheet_synced_at,
+    canEdit,
+    progressionLocked,
+    progressionLockMessage,
+  };
+}
+
+export async function loadDnd5eCharacterSheet(
+  campaignId: string,
+  characterId: string,
+): Promise<CharacterSheetPayload | null> {
+  const { supabase, character, campaignSystem } = await loadCharacterAccess(
+    campaignId,
+    characterId,
+  );
+
+  if (!isDnd5eCampaignSystem(campaignSystem)) {
+    return null;
+  }
+
+  const lock = await resolveFoundryProgressionLock(supabase, campaignId, characterId);
+
+  return buildSheetPayload(
+    character,
+    campaignSystem,
+    true,
+    lock.locked,
+    lock.message,
+  );
+}
+
+export type SaveDnd5eCharacterSheetInput = {
+  campaignId: string;
+  characterId: string;
+  sheet: Dnd5eSheetData;
+  overrides?: Dnd5eSheetOverrides;
+  meta?: {
+    subclass?: string | null;
+    background?: string | null;
+    alignment?: string | null;
+    name?: string;
+    race?: string;
+    class?: string;
+    level?: number;
+    experiencePoints?: number;
+  };
+};
+
+export async function saveDnd5eCharacterSheet(
+  input: SaveDnd5eCharacterSheetInput,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase, userId, character, isGm, campaignSystem } = await loadCharacterAccess(
+      input.campaignId,
+      input.characterId,
+    );
+
+    if (!isDnd5eCampaignSystem(campaignSystem)) {
+      return { success: false, error: "Diese Kampagne nutzt kein D&D-5e-System." };
+    }
+
+    const mergedSheet = mergeSheetWithDefaults(input.sheet);
+    const overrides = input.overrides ?? {};
+
+    let updates: Record<string, unknown> = {
+      sheet_data: mergedSheet,
+      sheet_overrides: overrides,
+      sheet_source: "manual",
+    };
+
+    if (input.meta) {
+      if (input.meta.subclass !== undefined) {
+        updates.subclass = input.meta.subclass?.trim() || null;
+      }
+      if (input.meta.background !== undefined) {
+        updates.background = input.meta.background?.trim() || null;
+      }
+      if (input.meta.alignment !== undefined) {
+        updates.alignment = input.meta.alignment?.trim() || null;
+      }
+      if (input.meta.name?.trim()) updates.name = input.meta.name.trim();
+      if (input.meta.race?.trim()) updates.race = input.meta.race.trim();
+      if (input.meta.class?.trim()) updates.class = input.meta.class.trim();
+      if (input.meta.level != null) {
+        updates.level = Math.max(1, Math.floor(input.meta.level));
+      }
+      if (input.meta.experiencePoints != null) {
+        updates.experience_points = Math.max(0, Math.floor(input.meta.experiencePoints));
+      }
+    }
+
+    updates = await stripFoundryLockedCharacterFields(
+      supabase,
+      input.campaignId,
+      input.characterId,
+      updates,
+    );
+
+    const { error } = await (supabase.from("characters") as any)
+      .update(updates)
+      .eq("id", character.id)
+      .eq("campaign_id", input.campaignId);
+
+    if (error) {
+      return { success: false, error: error.message || "Speichern fehlgeschlagen." };
+    }
+
+    if (!isGm) {
+      await recordPlayerCharacterEditAdmin({
+        characterId: input.characterId,
+        campaignId: input.campaignId,
+        playerUserId: userId,
+        editSource: "sheet",
+        editSummary: "D&D-5e-Charakterblatt bearbeitet",
+      });
+    }
+
+    revalidatePath(`/dashboard/campaigns/${input.campaignId}`);
+    revalidatePath(`/dashboard/campaigns/${input.campaignId}?tab=character`);
+    revalidatePath("/dashboard/characters");
+    revalidatePath(`/dashboard/characters/${input.characterId}`);
+    return { success: true };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Speichern fehlgeschlagen.",
+    };
+  }
+}

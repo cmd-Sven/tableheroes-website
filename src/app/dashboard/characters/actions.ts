@@ -2,6 +2,10 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import {
+  evaluateCharacterDeletionState,
+  type CharacterDeletionState,
+} from "@/src/lib/characters/character-deletion";
 
 /**
  * @deprecated Diese Funktion ist veraltet. Charaktere können nur noch innerhalb einer Kampagne erstellt werden.
@@ -17,7 +21,6 @@ export async function createCharacter(formData: FormData) {
 
   if (!user) throw new Error("Not authenticated");
 
-  // Extract form data
   const name = formData.get("name") as string;
   const class_name = formData.get("class") as string;
   const race = formData.get("race") as string;
@@ -32,19 +35,16 @@ export async function createCharacter(formData: FormData) {
   const profession = formData.get("profession") as string;
   const campaign_id = formData.get("campaign_id") as string | null;
 
-  // Validation
   if (!name || !class_name || !race) {
     throw new Error("Name, Klasse und Rasse sind Pflichtfelder.");
   }
 
-  // HARTE VALIDIERUNG: Charaktere können nur innerhalb einer Kampagne erstellt werden
   if (!campaign_id) {
     throw new Error(
       "Charaktere können nur innerhalb einer Kampagne erstellt werden. Bitte bewerbe dich zuerst bei einer Kampagne.",
     );
   }
 
-  // Insert character
   const { error } = await (supabase.from("characters") as any).insert({
     user_id: user.id,
     name: name,
@@ -52,7 +52,7 @@ export async function createCharacter(formData: FormData) {
     race: race,
     level: level,
     avatar_url: avatar_url || null,
-    campaign_id: campaign_id, // Muss vorhanden sein
+    campaign_id: campaign_id,
     backstory_summary: backstory_summary || null,
     goals: goals || null,
     fears: fears || null,
@@ -70,25 +70,94 @@ export async function createCharacter(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function getCharacterDeletionState(
+  characterId: string,
+): Promise<CharacterDeletionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      canDelete: false,
+      isCampaignLinked: false,
+      reason: "Nicht authentifiziert.",
+    };
+  }
+
+  const { data: characterRaw } = await (supabase.from("characters") as any)
+    .select("id, user_id, campaign_id, status")
+    .eq("id", characterId)
+    .maybeSingle();
+
+  const character = characterRaw as {
+    id: string;
+    user_id: string;
+    campaign_id: string;
+    status: string | null;
+  } | null;
+
+  if (!character || character.user_id !== user.id) {
+    return {
+      canDelete: false,
+      isCampaignLinked: false,
+      reason: "Keine Berechtigung.",
+    };
+  }
+
+  const { data: memberRaw } = await (supabase.from("campaign_members") as any)
+    .select("character_id, status")
+    .eq("campaign_id", character.campaign_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return evaluateCharacterDeletionState(
+    character,
+    memberRaw as { character_id?: string | null; status?: string | null } | null,
+  );
+}
+
 export async function deleteCharacter(characterId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Not authenticated");
+  if (!user) throw new Error("Nicht authentifiziert.");
 
-  // Verify ownership
   const { data: characterRaw } = await (supabase.from("characters") as any)
-    .select("user_id")
+    .select("id, user_id, campaign_id, status")
     .eq("id", characterId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const character = characterRaw as { user_id: string } | null;
+  const character = characterRaw as {
+    id: string;
+    user_id: string;
+    campaign_id: string;
+    status: string | null;
+  } | null;
 
   if (!character || character.user_id !== user.id) {
     throw new Error("Keine Berechtigung: Dieser Charakter gehört dir nicht.");
+  }
+
+  const { data: memberRaw } = await (supabase.from("campaign_members") as any)
+    .select("character_id, status")
+    .eq("campaign_id", character.campaign_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const deletionState = evaluateCharacterDeletionState(
+    character,
+    memberRaw as { character_id?: string | null; status?: string | null } | null,
+  );
+
+  if (!deletionState.canDelete) {
+    throw new Error(
+      deletionState.reason ??
+        "Dieser Charakter ist mit einer Kampagne verknüpft und kann nicht gelöscht werden.",
+    );
   }
 
   const { error } = await (supabase.from("characters") as any)
@@ -101,4 +170,5 @@ export async function deleteCharacter(characterId: string) {
   }
 
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/characters");
 }

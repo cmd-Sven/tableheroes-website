@@ -5,6 +5,7 @@ import {
   CharacterCard,
   type CharacterCardData,
 } from "@/src/app/dashboard/characters/CharacterCard";
+import { evaluateCharacterDeletionState } from "@/src/lib/characters/character-deletion";
 
 export default async function MyCharactersPage() {
   const supabase = await createClient();
@@ -22,7 +23,7 @@ export default async function MyCharactersPage() {
   }
 
   const { data: charactersRaw, error } = await (supabase.from("characters") as any)
-    .select("id, name, status, level, class, race, biography, campaign_id")
+    .select("id, name, status, level, class, race, biography, campaign_id, sheet_data")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -38,20 +39,54 @@ export default async function MyCharactersPage() {
       .select("id, name, system")
       .in("id", campaignIds);
     campaignMap = new Map(
-      ((campRows as any[]) || []).map((c: any) => [c.id, { id: c.id, name: c.name ?? "", system: c.system ?? null }])
+      ((campRows as any[]) || []).map((c: any) => [
+        c.id,
+        { id: c.id, name: c.name ?? "", system: c.system ?? null },
+      ]),
     );
   }
 
-  const characterList = chars.map((char: any) => ({
-    id: char.id,
-    name: char.name,
-    status: char.status,
-    level: char.level ?? 1,
-    class: char.class ?? "",
-    race: char.race ?? "",
-    biography: char.biography ?? null,
-    campaigns: char.campaign_id ? campaignMap.get(char.campaign_id) ?? null : null,
-  }));
+  const { data: memberRows } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id, character_id, status")
+    .eq("user_id", user.id);
+
+  const memberByCampaign = new Map<string, { character_id?: string | null; status?: string | null }>();
+  for (const row of (memberRows as any[]) ?? []) {
+    memberByCampaign.set(String(row.campaign_id), row);
+  }
+
+  const characterList = chars
+    .map((char: any) => {
+      const member = char.campaign_id
+        ? memberByCampaign.get(String(char.campaign_id)) ?? null
+        : null;
+      const deletion = evaluateCharacterDeletionState(
+        { id: String(char.id), status: char.status, campaign_id: char.campaign_id },
+        member,
+      );
+      return {
+        id: char.id,
+        name: char.name,
+        status: char.status,
+        level: char.level ?? 1,
+        class: char.class ?? "",
+        race: char.race ?? "",
+        biography: char.biography ?? null,
+        isCampaignLinked: deletion.isCampaignLinked,
+        canDelete: deletion.canDelete,
+        deleteBlockedReason: deletion.reason,
+        hasSheet: char.sheet_data != null,
+        campaigns: char.campaign_id ? campaignMap.get(char.campaign_id) ?? null : null,
+      };
+    })
+    .sort((a, b) => {
+      if (a.isCampaignLinked !== b.isCampaignLinked) {
+        return a.isCampaignLinked ? -1 : 1;
+      }
+      return String(a.name).localeCompare(String(b.name), "de");
+    });
+
+  const activeCount = characterList.filter((c) => c.isCampaignLinked).length;
 
   return (
     <div className="space-y-8">
@@ -61,6 +96,13 @@ export default async function MyCharactersPage() {
         </h1>
         <p className="font-libre text-gray-400">
           Übersicht aller deiner Charaktere über alle Kampagnen hinweg.
+          {activeCount > 0 ? (
+            <span className="text-hero-vibrant">
+              {" "}
+              {activeCount} aktive{activeCount === 1 ? "r" : ""} Held
+              {activeCount === 1 ? "" : "en"} in Kampagnen.
+            </span>
+          ) : null}
         </p>
       </div>
 
@@ -93,6 +135,10 @@ export default async function MyCharactersPage() {
               class: char.class ?? "",
               race: char.race ?? "",
               biography: char.biography ?? null,
+              isCampaignLinked: char.isCampaignLinked,
+              canDelete: char.canDelete,
+              deleteBlockedReason: char.deleteBlockedReason,
+              hasSheet: char.hasSheet,
               campaign: char.campaigns
                 ? {
                     id: char.campaigns.id,
@@ -105,7 +151,7 @@ export default async function MyCharactersPage() {
               <CharacterCard
                 key={char.id}
                 character={cardData}
-                allowDelete={true}
+                allowDelete={char.canDelete}
               />
             );
           })}

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Inbox, Users, UserPlus, ShieldCheck, ArrowRight } from "lucide-react";
 import { getPendingApplications } from "@/src/lib/queries/application-queries";
 import { getPendingApprovalCharactersWithRequests } from "@/src/app/dashboard/campaigns/[id]/player-npc-requests-queries";
+import { getOpenCharacterPlayerEditAlertsForGm } from "@/src/lib/characters/player-character-edit-alerts";
+import { CharacterPlayerEditAlertsPanel } from "@/src/components/dashboard/characters/CharacterPlayerEditAlertsPanel";
 
 export const revalidate = 0;
 
@@ -106,6 +108,8 @@ export default async function GMInboxPage() {
 
   const hasCampaignApplications = campaignApplicationGroups.length > 0;
   const hasCharacterApprovals = characterGroups.length > 0;
+  const playerEditAlerts = await getOpenCharacterPlayerEditAlertsForGm(userId);
+  const hasPlayerEdits = playerEditAlerts.length > 0;
 
   return (
     <div className="space-y-8">
@@ -115,11 +119,14 @@ export default async function GMInboxPage() {
           GM Inbox
         </h1>
         <p className="font-libre text-gray-400 mt-2">
-          Kampagnen-Bewerbungen und Charakter-Freigaben an einem Ort.
+          Kampagnen-Bewerbungen, Charakter-Freigaben und Spieler-Änderungen an einem Ort.
         </p>
       </div>
 
       <div className="space-y-10">
+        {hasPlayerEdits ? (
+          <CharacterPlayerEditAlertsPanel alerts={playerEditAlerts} />
+        ) : null}
         {/* A. Kampagnen-Bewerbungen – immer rendern, eigene Leer-Anzeige */}
         <section>
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">

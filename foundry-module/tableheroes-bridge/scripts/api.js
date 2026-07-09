@@ -213,6 +213,44 @@ export async function syncActorXp(actor) {
 }
 
 /**
+ * Vollständiges DnD5e-Charakterblatt Foundry → Table Heroes (nur diese Richtung).
+ * @param {Actor} actor
+ */
+export async function syncActorSheet(actor) {
+  const { baseUrl } = getModuleSettings();
+  if (!baseUrl) throw new Error("Table Heroes API ist nicht konfiguriert.");
+
+  const items =
+    actor.items?.map?.((item) => {
+      try {
+        return typeof item.toObject === "function" ? item.toObject() : item;
+      } catch {
+        return { name: item.name, type: item.type };
+      }
+    }) ?? [];
+
+  const response = await fetch(`${baseUrl}/api/v1/foundry-sync/sheet`, {
+    method: "POST",
+    headers: apiHeaders(),
+    body: JSON.stringify({
+      foundry_actor_id: normalizeFoundryActorId(actor.id),
+      actor_name: String(actor.name ?? ""),
+      actor_system: actor.system ?? {},
+      actor_items: items,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok && response.status !== 202) {
+    throw new Error(data.error || data.message || `HTTP ${response.status}`);
+  }
+  if (response.status === 202) {
+    throw new Error(data.message || "Actor ist noch nicht zugeordnet.");
+  }
+  return data;
+}
+
+/**
  * @param {Actor} actor
  */
 export function readFoundryCurrency(actor) {

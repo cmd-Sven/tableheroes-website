@@ -997,6 +997,7 @@ export function CampaignDetailPageContent({
           factionReputations={characterReputations}
           progressionLocked={foundryProgressionLocked}
           progressionLockMessage={foundryProgressionLockMessage}
+          campaignSystem={campaign.system}
         />
       )}
       {tab === "settings" && isGM && SettingsTabContent}

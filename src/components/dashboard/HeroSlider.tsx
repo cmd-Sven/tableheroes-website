@@ -20,6 +20,8 @@ export type HeroSliderCharacter = {
   campaignName: string;
   /** Charakter-Status (z. B. Active, Pending_Approval, Dead). Für Lösch-Warnung bei Active. */
   status?: string;
+  /** Nur true, wenn nicht mit Kampagne verknüpft */
+  canDelete?: boolean;
 };
 
 /** Zeigt characters.status an; nach GM-Freigabe: Active → Lebend/Aktiv. */
@@ -134,7 +136,7 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
                   </span>
                 </div>
               </Link>
-              {allowDelete && (
+              {allowDelete && c.canDelete !== false && (
                 <>
                   <button
                     type="button"

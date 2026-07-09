@@ -73,6 +73,8 @@ import {
   type WeatherPresetId,
 } from "@/src/lib/session-weather";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
+import { Dnd5eCharacterSheetModal } from "@/src/components/characters/Dnd5eCharacterSheetModal";
+import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
   StageNpcShopControls,
@@ -960,6 +962,7 @@ type Props = {
   transcriptionMode?: "table" | "jitsi" | null;
   /** Nur GM: Gäste-Join-Link für Foundry / Spieler ohne Account */
   guestJoinUrl?: string | null;
+  campaignSystem?: string | null;
 };
 
 export function LiveSessionBoard({
@@ -990,6 +993,7 @@ export function LiveSessionBoard({
   campaignShops = [],
   transcriptionMode = null,
   guestJoinUrl = null,
+  campaignSystem = null,
 }: Props) {
   const router = useRouter();
   /** Cookie-Session (RLS): nicht supabaseClient.ts (nur Anon ohne Auth). */
@@ -1015,6 +1019,8 @@ export function LiveSessionBoard({
   );
   const [inventoryCharacter, setInventoryCharacter] =
     useState<PartyCharacter | null>(null);
+  const [sheetCharacter, setSheetCharacter] = useState<PartyCharacter | null>(null);
+  const showDnd5eSheet = isDnd5eCampaignSystem(campaignSystem);
   const [fateGmSettingsOpen, setFateGmSettingsOpen] = useState(false);
   const [weatherGmSettingsOpen, setWeatherGmSettingsOpen] = useState(false);
   const [tempGmSettingsOpen, setTempGmSettingsOpen] = useState(false);
@@ -3725,6 +3731,7 @@ export function LiveSessionBoard({
                     !isGuest &&
                     ((actualUserIsGM && !forcePlayerView) || pid === userId) &&
                     !pc.isSessionDummy;
+                  const canOpenSheet = canOpenInventory && showDnd5eSheet;
                   const isActiveTurn =
                     liveState?.is_combat_mode &&
                     activeCombatParticipant?.type === "player" &&
@@ -3826,6 +3833,17 @@ export function LiveSessionBoard({
                               height={88}
                               className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
                             />
+                          </button>
+                        ) : null}
+                        {canOpenSheet ? (
+                          <button
+                            type="button"
+                            onClick={() => setSheetCharacter(pc)}
+                            className="absolute -right-8 top-[70px] z-50 flex h-[72px] w-[72px] cursor-pointer items-center justify-center rounded-full border-2 border-amber-700/80 bg-background-dark/90 text-accent-gold shadow-lg transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
+                            title={`Charakterblatt von ${pc.name} öffnen`}
+                            aria-label={`Charakterblatt von ${pc.name} öffnen`}
+                          >
+                            <ScrollText className="h-9 w-9" aria-hidden />
                           </button>
                         ) : null}
                       </div>
@@ -3988,6 +4006,19 @@ export function LiveSessionBoard({
                 }
               : undefined
           }
+        />
+      ) : null}
+
+      {sheetCharacter && showDnd5eSheet ? (
+        <Dnd5eCharacterSheetModal
+          campaignId={campaignId}
+          character={{
+            id: sheetCharacter.id,
+            name: sheetCharacter.name,
+            class: sheetCharacter.class,
+            level: sheetCharacter.level,
+          }}
+          onClose={() => setSheetCharacter(null)}
         />
       ) : null}
 

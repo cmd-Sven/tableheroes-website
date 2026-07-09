@@ -106,6 +106,24 @@ export async function getGMNotifications(
     });
   }
 
+  const { getOpenCharacterPlayerEditAlertsForGm } = await import(
+    "@/src/lib/characters/player-character-edit-alerts"
+  );
+  const playerEditAlerts = await getOpenCharacterPlayerEditAlertsForGm(userId);
+  for (const alert of playerEditAlerts) {
+    notifications.push({
+      id: `edit-${alert.id}`,
+      type: "character_update",
+      message: `${alert.playerUsername ?? "Spieler"} hat „${alert.characterName}" bearbeitet`,
+      href: `/dashboard/campaigns/${alert.campaignId}/characters/${alert.characterId}`,
+      campaignId: alert.campaignId,
+      campaignName: alert.campaignName,
+      actorName: alert.playerUsername,
+      actorAvatarUrl: null,
+      createdAt: alert.editedAt,
+    });
+  }
+
   const { data: chronicleStatesRaw } = await (supabase as any)
     .from("session_chronicle_state")
     .select("*")

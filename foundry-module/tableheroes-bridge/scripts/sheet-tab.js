@@ -3,6 +3,7 @@ import {
   readFoundryCurrency,
   settingsConfigured,
   syncActorPortrait,
+  syncActorSheet,
   syncActorWealth,
   syncActorXp,
 } from "./api.js";
@@ -236,6 +237,9 @@ function renderTabHtml(actor, payload) {
     ? `<div class="tableheroes-sync-actions">
         <button type="button" class="tableheroes-sync-xp">
           <i class="fas fa-star"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncXp"))}
+        </button>
+        <button type="button" class="tableheroes-sync-sheet">
+          <i class="fas fa-scroll"></i> ${escapeHtml(L("TABLEHEROES.Tab.SyncSheet"))}
         </button>
       </div>`
     : "";
@@ -512,6 +516,18 @@ function bindTabEvents(sheet, actor, root, panel = null) {
       try {
         await syncActorXp(actor);
         ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncXpDone"));
+      } catch (error) {
+        ui.notifications?.error(
+          error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),
+        );
+      }
+      return;
+    }
+
+    if (target.classList.contains("tableheroes-sync-sheet")) {
+      try {
+        await syncActorSheet(actor);
+        ui.notifications?.info(thLocalize("TABLEHEROES.Tab.SyncSheetDone"));
       } catch (error) {
         ui.notifications?.error(
           error instanceof Error ? error.message : thLocalize("TABLEHEROES.Tab.Error"),

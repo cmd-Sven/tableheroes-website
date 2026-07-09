@@ -310,6 +310,7 @@ async function loadPlayerDashboardData(userId: string) {
       campaignId: m.campaigns.id,
       campaignName: m.campaigns.name ?? "Kampagne",
       status: m.characters.status ?? undefined,
+      canDelete: false,
     }));
 
   const [newAcceptancesRaw, discoverableCampaigns] = await Promise.all([

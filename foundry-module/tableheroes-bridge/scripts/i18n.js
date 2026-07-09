@@ -33,6 +33,8 @@ const FALLBACKS = {
   "TABLEHEROES.Tab.SyncPortraitToFoundryDone": "Portrait nach Foundry synchronisiert.",
   "TABLEHEROES.Tab.SyncXp": "XP → TH",
   "TABLEHEROES.Tab.SyncXpDone": "XP nach Table Heroes synchronisiert.",
+  "TABLEHEROES.Tab.SyncSheet": "Blatt → TH",
+  "TABLEHEROES.Tab.SyncSheetDone": "Charakterblatt nach Table Heroes synchronisiert.",
   "TABLEHEROES.Settings.ApiBaseUrl.Name": "Table Heroes API-URL",
   "TABLEHEROES.Settings.ApiBaseUrl.Hint":
     "Basis-URL ohne Slash am Ende, z. B. https://table-heroes.de",
@@ -49,7 +51,7 @@ const FALLBACKS = {
   "TABLEHEROES.LiveSession.Opened": "Live-Session wird in einem neuen Browser-Tab geöffnet.",
 };
 
-export const MODULE_VERSION = "0.3.9";
+export const MODULE_VERSION = "0.4.0";
 
 /**
  * Never trust game.i18n.has() — on some Foundry setups it returns true while localize() throws.

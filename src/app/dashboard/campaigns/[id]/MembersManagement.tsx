@@ -654,6 +654,13 @@ export function MembersManagement({
                         >
                           <Settings className="h-5 w-5" />
                         </Link>
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/characters/${member.character?.id ?? member.character_id}/player-view`}
+                          className="rounded-md p-2 text-gray-500 hover:bg-hero-dark hover:text-hero-vibrant transition-colors"
+                          title="Spieler-Ansicht (Profil & Datenblatt)"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </Link>
                         <button
                           type="button"
                           onClick={async () => {
@@ -663,14 +670,14 @@ export function MembersManagement({
                             const name = member.character?.name || "diesen Charakter";
                             if (
                               !confirm(
-                                `Charakter „${name}" wirklich entfernen? Der Spieler kann danach einen neuen Charakter anlegen.`,
+                                `Charakter „${name}" aus der Kampagne entfernen? Der Charakter bleibt im Profil des Spielers und kann dort später gelöscht werden.`,
                               )
                             )
                               return;
                             setIsProcessing(true);
                             try {
                               await deleteCharacterByGM(charId, campaignId);
-                              toast.success("Charakter wurde entfernt.");
+                              toast.success("Charakter wurde aus der Kampagne entfernt.");
                               window.location.reload();
                             } catch (err) {
                               toast.error(

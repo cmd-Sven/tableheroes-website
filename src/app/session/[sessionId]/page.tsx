@@ -129,7 +129,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
 
   // 2. Load Campaign to determine GM
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id, world_id")
+    .select("gm_id, owner_id, world_id, system")
     .eq("id", (session as any).campaign_id)
     .single();
 
@@ -137,6 +137,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     gm_id?: string | null;
     owner_id?: string | null;
     world_id?: string | null;
+    system?: string | null;
   } | null;
 
   if (!campaign) {
@@ -551,6 +552,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
             : null
       }
       guestJoinUrl={guestJoinUrl}
+      campaignSystem={campaign.system ?? null}
     />
   );
 }

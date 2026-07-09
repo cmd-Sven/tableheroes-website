@@ -17,6 +17,8 @@ import type { ImageDisplaySettings } from "@/src/lib/image-display";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
 import Link from "next/link";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
+import { Dnd5eCharacterSheetPanel } from "@/src/components/characters/Dnd5eCharacterSheetPanel";
+import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 
@@ -75,6 +77,10 @@ type Props = {
   factionReputations?: Array<{ id: string; faction_id: string; faction_name: string; reputation: number; rank?: string | null }>;
   progressionLocked?: boolean;
   progressionLockMessage?: string;
+  campaignSystem?: string | null;
+  /** GM testet die Spieler-Ansicht: Profil nur lesen, D&D-Blatt bearbeitbar */
+  gmPreviewMode?: boolean;
+  gmEditorHref?: string;
 };
 
 export function MyCharacterSection({
@@ -87,6 +93,9 @@ export function MyCharacterSection({
   factionReputations = [],
   progressionLocked = false,
   progressionLockMessage = "",
+  campaignSystem = null,
+  gmPreviewMode = false,
+  gmEditorHref,
 }: Props) {
   const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
@@ -250,8 +259,9 @@ export function MyCharacterSection({
 
   const relationships = character?.character_relationships ?? [];
   const isPendingApproval = character?.status === "Pending_Approval";
+  const profileReadOnly = gmPreviewMode;
 
-  const saveButton = (
+  const saveButton = profileReadOnly ? null : (
     <button
       type="button"
       onClick={handleSave}
@@ -268,10 +278,26 @@ export function MyCharacterSection({
       <div className="mb-4 flex items-center justify-between border-b border-hero-border pb-2">
         <h2 className="font-barlow font-semibold text-2xl text-accent-blood flex items-center gap-2">
           <User className="h-6 w-6 text-accent-gold" />
-          Mein Charakter
+          {gmPreviewMode ? "Spieler-Profil (Vorschau)" : "Mein Charakter"}
         </h2>
         {saveButton}
       </div>
+
+      {gmPreviewMode && (
+        <div className="mb-4 rounded border border-hero-border/60 bg-hero-dark/30 p-3">
+          <p className="font-libre text-sm text-gray-400">
+            Stammdaten sind hier nur zur Ansicht. Änderungen am Profil nimmst du in der{" "}
+            {gmEditorHref ? (
+              <Link href={gmEditorHref} className="text-hero-vibrant hover:underline">
+                GM-Bearbeitung
+              </Link>
+            ) : (
+              "GM-Bearbeitung"
+            )}{" "}
+            vor. Das D&amp;D-5e-Datenblatt kannst du unten bearbeiten.
+          </p>
+        </div>
+      )}
 
       {isPendingApproval && (
         <div className="mb-4 rounded border border-accent-gold/50 bg-accent-gold/10 p-3">
@@ -313,8 +339,9 @@ export function MyCharacterSection({
             <input
               type="text"
               value={form.name}
+              readOnly={profileReadOnly}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly ? "cursor-default opacity-80" : ""}`}
             />
           </div>
           <div>
@@ -322,9 +349,9 @@ export function MyCharacterSection({
             <input
               type="text"
               value={form.class}
-              readOnly={progressionLocked}
+              readOnly={profileReadOnly || progressionLocked}
               onChange={(e) => setForm((p) => ({ ...p, class: e.target.value }))}
-              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly || progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div>
@@ -332,8 +359,9 @@ export function MyCharacterSection({
             <input
               type="text"
               value={form.race}
+              readOnly={profileReadOnly}
               onChange={(e) => setForm((p) => ({ ...p, race: e.target.value }))}
-              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly ? "cursor-default opacity-80" : ""}`}
             />
           </div>
           <div>
@@ -342,9 +370,9 @@ export function MyCharacterSection({
               type="number"
               min={1}
               value={form.level}
-              readOnly={progressionLocked}
+              readOnly={profileReadOnly || progressionLocked}
               onChange={(e) => setForm((p) => ({ ...p, level: parseInt(e.target.value) || 1 }))}
-              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly || progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div id="character-erfahrung" className="scroll-mt-24">
@@ -355,14 +383,14 @@ export function MyCharacterSection({
               type="number"
               min={0}
               value={form.experience_points}
-              readOnly={progressionLocked}
+              readOnly={profileReadOnly || progressionLocked}
               onChange={(e) =>
                 setForm((p) => ({
                   ...p,
                   experience_points: Math.max(0, parseInt(e.target.value, 10) || 0),
                 }))
               }
-              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+              className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly || progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
             />
           </div>
           <div id="character-gold" className="scroll-mt-24 sm:col-span-2">
@@ -376,6 +404,12 @@ export function MyCharacterSection({
               }}
             />
           </div>
+          {isDnd5eCampaignSystem(campaignSystem) && characterId ? (
+            <div id="character-dnd5e-sheet" className="scroll-mt-24 sm:col-span-2 lg:col-span-3">
+              <Dnd5eCharacterSheetPanel campaignId={campaignId} characterId={characterId} />
+            </div>
+          ) : null}
+          {!profileReadOnly ? (
           <div className="sm:col-span-2 lg:col-span-3 space-y-3">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
               Charakterbild
@@ -456,14 +490,31 @@ export function MyCharacterSection({
               />
             ) : null}
           </div>
+          ) : (
+            <div className="sm:col-span-2 lg:col-span-3">
+              {form.avatar_url.trim() || avatarBlobUrl ? (
+                <CharacterAvatarImage
+                  src={avatarBlobUrl || form.avatar_url.trim()}
+                  avatarDisplay={avatarDisplay}
+                  className="h-28 w-28 shrink-0 rounded-lg border-2 border-hero-border bg-hero-dark"
+                  alt=""
+                />
+              ) : (
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-hero-border/60 bg-hero-dark/40 px-2 text-center font-libre text-[10px] text-gray-500">
+                  Kein Bild
+                </div>
+              )}
+            </div>
+          )}
           {cultureOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Kultur</label>
               <div className="flex items-center gap-2">
                 <select
                   value={form.culture_lore_id}
+                  disabled={profileReadOnly}
                   onChange={(e) => setForm((p) => ({ ...p, culture_lore_id: e.target.value }))}
-                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
                 >
                   <option value="">-- Keine --</option>
                   {cultureOptions.map((c) => (
@@ -500,6 +551,7 @@ export function MyCharacterSection({
                     <input
                       type="checkbox"
                       checked={form.languages.includes(lang.id)}
+                      disabled={profileReadOnly}
                       onChange={() => toggleLanguage(lang.id)}
                       className="rounded border-hero-dark"
                     />
@@ -515,8 +567,9 @@ export function MyCharacterSection({
               <div className="flex items-center gap-2">
                 <select
                   value={form.faction_membership}
+                  disabled={profileReadOnly}
                   onChange={(e) => setForm((p) => ({ ...p, faction_membership: e.target.value }))}
-                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
                 >
                   <option value="">-- Keine --</option>
                   {factionOptions.map((f) => (
@@ -543,8 +596,9 @@ export function MyCharacterSection({
               <div className="flex items-center gap-2">
                 <select
                   value={form.current_location_id}
+                  disabled={profileReadOnly}
                   onChange={(e) => setForm((p) => ({ ...p, current_location_id: e.target.value }))}
-                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+                  className="flex-1 rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
                 >
                   <option value="">-- Keiner --</option>
                   {locationOptions.map((loc) => (
@@ -575,9 +629,10 @@ export function MyCharacterSection({
           <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Biografie</label>
           <textarea
             value={form.biography}
+            readOnly={profileReadOnly}
             onChange={(e) => setForm((p) => ({ ...p, biography: e.target.value }))}
             rows={6}
-            className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none"
+            className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly ? "cursor-default opacity-80" : ""}`}
             placeholder="Hintergrundgeschichte deines Charakters..."
           />
         </div>
@@ -703,19 +758,25 @@ export function MyCharacterSection({
         )}
 
         <Link
-          href={`/dashboard/campaigns/${campaignId}?tab=overview`}
+          href={
+            gmPreviewMode && gmEditorHref
+              ? gmEditorHref
+              : `/dashboard/campaigns/${campaignId}?tab=overview`
+          }
           className="inline-flex items-center gap-2 rounded border border-hero-border px-4 py-2 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-dark/50 transition-colors"
         >
           <User className="h-4 w-4" />
-          Zurück zur Übersicht
+          {gmPreviewMode ? "Zur GM-Bearbeitung" : "Zurück zur Übersicht"}
         </Link>
 
+        {!profileReadOnly ? (
         <div className="mt-10 flex flex-col gap-3 border-t border-hero-border pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-libre text-sm text-gray-400">
             Alle Änderungen (Name, Punkte, Gold, Bild, …) werden mit „Speichern“ übernommen.
           </p>
           {saveButton}
         </div>
+        ) : null}
       </div>
       </ClientMountGate>
     </section>

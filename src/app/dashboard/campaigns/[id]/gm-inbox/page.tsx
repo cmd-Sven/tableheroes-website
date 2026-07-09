@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPendingApprovalCharactersWithRequests } from "../player-npc-requests-queries";
 import { GMInboxClient } from "@/src/components/dashboard/campaigns/GMInboxClient";
+import { getOpenCharacterPlayerEditAlertsForGm } from "@/src/lib/characters/player-character-edit-alerts";
+import { CharacterPlayerEditAlertsPanel } from "@/src/components/dashboard/characters/CharacterPlayerEditAlertsPanel";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -57,6 +59,11 @@ export default async function GMInboxPage({ params }: Props) {
     campaignId,
   );
 
+  const playerEditAlerts = await getOpenCharacterPlayerEditAlertsForGm(
+    user.id,
+    campaignId,
+  );
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -75,6 +82,15 @@ export default async function GMInboxPage({ params }: Props) {
           ← Zurück zur Kampagne
         </Link>
       </div>
+
+      {playerEditAlerts.length > 0 ? (
+        <div className="mb-8">
+          <CharacterPlayerEditAlertsPanel
+            alerts={playerEditAlerts}
+            campaignId={campaignId}
+          />
+        </div>
+      ) : null}
 
       <GMInboxClient
         campaignId={campaignId}

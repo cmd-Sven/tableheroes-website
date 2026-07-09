@@ -11,6 +11,7 @@ import {
   stripFoundryLockedCharacterFields,
 } from "@/src/lib/foundry-sync/progression-lock-server";
 import { setCharacterGoldGp } from "@/src/lib/character-gold";
+import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
 
 /**
  * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
@@ -601,8 +602,19 @@ export async function updateCharacterPlayer(data: {
     const goldResult = await setCharacterGoldGp(supabase, data.character_id, pocketGoldToSet);
     if (goldResult.error) throw new Error(goldResult.error);
   }
+
+  await recordPlayerCharacterEditAdmin({
+    characterId: data.character_id,
+    campaignId: data.campaign_id,
+    playerUserId: user.id,
+    editSource: "profile",
+    editSummary: "Charakterprofil bearbeitet",
+  });
+
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);
   revalidatePath(`/dashboard/campaigns/${data.campaign_id}/characters/${data.character_id}`);
+  revalidatePath("/dashboard/characters");
+  revalidatePath(`/dashboard/characters/${data.character_id}`);
   return { success: true };
 }
 
@@ -974,7 +986,8 @@ export async function rejectCharacter(characterId: string, campaignId: string) {
 }
 
 /**
- * GM: Spieler-Charakter aus der Kampagne entfernen (Datensatz löschen, Verknüpfung in campaign_members lösen).
+ * GM: Spieler-Charakter aus der Kampagne entfernen (Verknüpfung lösen, archivieren).
+ * Der Charakter bleibt im Spieler-Profil und kann dort ggf. gelöscht werden.
  */
 export async function deleteCharacterByGM(characterId: string, campaignId: string) {
   const supabase = await createClient();
@@ -1006,7 +1019,7 @@ export async function deleteCharacterByGM(characterId: string, campaignId: strin
     throw new Error("Charakter nicht gefunden oder gehört nicht zu dieser Kampagne.");
   }
 
-  const detachAndDelete = async (client: any) => {
+  const detachFromCampaign = async (client: any) => {
     const c = client;
     const { error: cmErr } = await c
       .from("campaign_members")
@@ -1015,18 +1028,48 @@ export async function deleteCharacterByGM(characterId: string, campaignId: strin
       .eq("character_id", characterId);
     if (cmErr) {
       console.error("[deleteCharacterByGM] campaign_members:", cmErr);
+      throw cmErr;
     }
-    const { error: delErr } = await c.from("characters").delete().eq("id", characterId);
-    if (delErr) throw delErr;
+
+    const { error: archiveErr } = await c
+      .from("characters")
+      .update({ status: "Archived" })
+      .eq("id", characterId)
+      .eq("campaign_id", campaignId);
+    if (archiveErr) {
+      console.error("[deleteCharacterByGM] characters archive:", archiveErr);
+      throw archiveErr;
+    }
+
+    const { error: mappingErr } = await c
+      .from("foundry_character_mapping")
+      .delete()
+      .eq("campaign_id", campaignId)
+      .eq("character_id", characterId);
+    if (mappingErr) {
+      console.warn("[deleteCharacterByGM] foundry mapping:", mappingErr);
+    }
+
+    try {
+      await c
+        .from("character_player_edit_alerts")
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq("character_id", characterId)
+        .eq("campaign_id", campaignId)
+        .is("dismissed_at", null)
+        .is("reviewed_at", null);
+    } catch {
+      /* Tabelle ggf. noch nicht migriert */
+    }
   };
 
   try {
-    await detachAndDelete(supabase);
+    await detachFromCampaign(supabase);
   } catch (firstErr) {
-    console.warn("[deleteCharacterByGM] Anon-Delete fehlgeschlagen, versuche Service-Role:", firstErr);
+    console.warn("[deleteCharacterByGM] Anon-Detach fehlgeschlagen, versuche Service-Role:", firstErr);
     try {
       const admin = createAdminClient();
-      await detachAndDelete(admin);
+      await detachFromCampaign(admin);
     } catch (secondErr) {
       console.error("[deleteCharacterByGM]", secondErr);
       const msg =
@@ -1036,13 +1079,14 @@ export async function deleteCharacterByGM(characterId: string, campaignId: strin
           : (secondErr as Error)?.message;
       throw new Error(
         msg ||
-          "Charakter konnte nicht gelöscht werden (Berechtigung oder Datenbank).",
+          "Charakter konnte nicht aus der Kampagne entfernt werden (Berechtigung oder Datenbank).",
       );
     }
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath(`/dashboard/campaigns/${campaignId}/gm-inbox`);
+  revalidatePath("/dashboard/characters");
   revalidatePath("/dashboard", "layout");
   revalidatePath("/dashboard");
   return { success: true };
