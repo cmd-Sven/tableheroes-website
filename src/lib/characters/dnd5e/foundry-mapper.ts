@@ -55,6 +55,11 @@ type FoundryActorSystem = {
     xp?: { value?: number } | number;
     class?: string | { name?: string; value?: string };
     originalClass?: string;
+    /** Vom Foundry-Modul angereichert */
+    raceResolved?: string;
+    backgroundResolved?: string;
+    classResolved?: string;
+    totalLevels?: number;
   };
   skills?: Partial<Record<Dnd5eSkillKey, FoundrySkillBlock>>;
   traits?: {
@@ -81,6 +86,38 @@ function readStringField(value: unknown): string | null {
     if (typeof obj.value === "string" && obj.value.trim()) return obj.value.trim();
   }
   return null;
+}
+
+/** Foundry-Item-IDs (z. B. HWIVzf23B9WnGqbA) — keine Anzeigenamen. */
+function isProbablyFoundryId(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes(" ")) return false;
+  return /^[A-Za-z0-9]{12,24}$/.test(trimmed);
+}
+
+function sanitizeDisplayLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || isProbablyFoundryId(trimmed)) return null;
+  return trimmed;
+}
+
+function findFirstItemByType(items: unknown[], type: string): FoundryItemRow | null {
+  if (!Array.isArray(items)) return null;
+  const wanted = type.toLowerCase();
+  return (
+    (items as FoundryItemRow[]).find(
+      (row) => String(row.type ?? "").toLowerCase() === wanted,
+    ) ?? null
+  );
+}
+
+function findAllItemsByType(items: unknown[], type: string): FoundryItemRow[] {
+  if (!Array.isArray(items)) return [];
+  const wanted = type.toLowerCase();
+  return (items as FoundryItemRow[]).filter(
+    (row) => String(row.type ?? "").toLowerCase() === wanted,
+  );
 }
 
 function readNumber(value: unknown, fallback = 0): number {
@@ -127,10 +164,30 @@ function resolveItemLabel(
 
   const byId = itemsById(items);
   const item = byId.get(direct);
-  if (item?.name) return String(item.name).trim();
+  if (item?.name) return sanitizeDisplayLabel(String(item.name).trim());
 
-  if (direct.includes(" ") || direct.length < 16) return direct;
-  return null;
+  return sanitizeDisplayLabel(direct);
+}
+
+function resolveRaceName(items: unknown[], details: FoundryActorSystem["details"]): string | null {
+  const raceItem = findFirstItemByType(items, "race");
+  return (
+    sanitizeDisplayLabel(details?.raceResolved) ??
+    sanitizeDisplayLabel(raceItem?.name ? String(raceItem.name) : null) ??
+    resolveItemLabel(items, details?.race)
+  );
+}
+
+function resolveBackgroundName(
+  items: unknown[],
+  details: FoundryActorSystem["details"],
+): string | null {
+  const backgroundItem = findFirstItemByType(items, "background");
+  return (
+    sanitizeDisplayLabel(details?.backgroundResolved) ??
+    sanitizeDisplayLabel(backgroundItem?.name ? String(backgroundItem.name) : null) ??
+    resolveItemLabel(items, details?.background)
+  );
 }
 
 function resolveClassInfo(items: unknown[], originalClassId: string | null) {
@@ -161,8 +218,8 @@ function resolveClassInfo(items: unknown[], originalClassId: string | null) {
     subclasses.length > 0 ? String(subclasses[0].name ?? "").trim() || null : null;
 
   return {
-    className: primary?.name ? String(primary.name).trim() : null,
-    subclass,
+    className: primary?.name ? sanitizeDisplayLabel(String(primary.name).trim()) : null,
+    subclass: subclass ? sanitizeDisplayLabel(subclass) : null,
     level,
     hitDie,
   };
@@ -336,22 +393,22 @@ export function mapFoundryActorToDnd5eSheet(input: {
     typeof details.level === "object" ? (details.level as { value?: number }).value : details.level,
     0,
   );
+  const enrichedLevel = readNumber(details.totalLevels, 0);
   const level = Math.max(
     classInfo.level,
+    enrichedLevel > 0 ? Math.floor(enrichedLevel) : 0,
     detailsLevel > 0 ? Math.floor(detailsLevel) : 0,
     1,
   );
 
   const className =
+    sanitizeDisplayLabel(details.classResolved) ??
     classInfo.className ??
     resolveItemLabel(items, details.class) ??
-    resolveItemLabel(items, details.originalClass) ??
-    readStringField(details.class);
+    resolveItemLabel(items, details.originalClass);
 
-  const race =
-    resolveItemLabel(items, details.race) ?? readStringField(details.race);
-  const background =
-    resolveItemLabel(items, details.background) ?? readStringField(details.background);
+  const race = resolveRaceName(items, details);
+  const background = resolveBackgroundName(items, details);
 
   const hpMax = resolveHpMax(attrs, level, conMod, classInfo.hitDie);
   const hpCurrentRaw = readNumber(attrs.hp?.value, 0);

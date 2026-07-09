@@ -249,7 +249,55 @@ function buildActorSystemPayload(actor) {
   if (initBonus != null) base.attributes.init.bonus = initBonus;
   if (initTotal != null) base.attributes.init.total = initTotal;
 
+  base.details = { ...(base.details ?? {}) };
+  let totalLevels = 0;
+  for (const item of actor.items ?? []) {
+    const type = String(item.type ?? "").toLowerCase();
+    const name = String(item.name ?? "").trim();
+    if (!name) continue;
+    if (type === "race") base.details.raceResolved = name;
+    if (type === "background") base.details.backgroundResolved = name;
+    if (type === "class") {
+      if (!base.details.classResolved) base.details.classResolved = name;
+      totalLevels += Math.max(0, Math.floor(Number(item.system?.levels) || 0));
+    }
+  }
+  if (totalLevels > 0) base.details.totalLevels = totalLevels;
+
   return base;
+}
+
+/**
+ * Stammdaten-Items (Klasse, Volk, Hintergrund, Feats) müssen immer mitgesendet werden.
+ * @param {Actor} actor
+ */
+function serializeActorItems(actor) {
+  const identityTypes = new Set(["class", "subclass", "race", "background", "feat"]);
+  const serialized = [];
+  const seen = new Set();
+
+  const pushItem = (item) => {
+    if (!item) return;
+    try {
+      const row = typeof item.toObject === "function" ? item.toObject() : item;
+      const id = String(row._id ?? row.id ?? "");
+      if (id && seen.has(id)) return;
+      if (id) seen.add(id);
+      serialized.push(row);
+    } catch {
+      serialized.push({ name: item.name, type: item.type, _id: item.id });
+    }
+  };
+
+  for (const item of actor.items ?? []) {
+    const type = String(item.type ?? "").toLowerCase();
+    if (identityTypes.has(type)) pushItem(item);
+  }
+  for (const item of actor.items ?? []) {
+    pushItem(item);
+  }
+
+  return serialized;
 }
 
 /**
@@ -260,14 +308,7 @@ export async function syncActorSheet(actor) {
   const { baseUrl } = getModuleSettings();
   if (!baseUrl) throw new Error("Table Heroes API ist nicht konfiguriert.");
 
-  const items =
-    actor.items?.map?.((item) => {
-      try {
-        return typeof item.toObject === "function" ? item.toObject() : item;
-      } catch {
-        return { name: item.name, type: item.type };
-      }
-    }) ?? [];
+  const items = serializeActorItems(actor);
 
   const response = await fetch(`${baseUrl}/api/v1/foundry-sync/sheet`, {
     method: "POST",

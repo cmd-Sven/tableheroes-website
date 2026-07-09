@@ -107,14 +107,17 @@ export async function POST(request: Request) {
     sheet_overrides: {},
     sheet_source: "foundry_import",
     sheet_synced_at: now,
+    class: meta.className,
     subclass: meta.subclass,
+    race: meta.race,
     background: meta.background,
     alignment: meta.alignment,
     level: meta.level,
     experience_points: meta.experiencePoints,
   };
-  if (meta.className) updatePayload.class = meta.className;
-  if (meta.race) updatePayload.race = meta.race;
+  if (input.actor_name?.trim()) {
+    updatePayload.name = input.actor_name.trim();
+  }
 
   const { error: characterUpdateError } = await (supabase as any)
     .from("characters")
