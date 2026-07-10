@@ -5,8 +5,13 @@ import {
 } from "@/src/lib/session-status";
 
 const STALE_LIVE_MS = 48 * 60 * 60 * 1000;
-/** Nach Ablauf dieses Fensters ab geplantem Start gilt ein „Scheduled“-Termin als verpasst (nicht mehr „kommend“). */
-export const SCHEDULED_STALE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** Stunden nach geplantem Start, in denen eine nicht gestartete Session noch aktiv bleibt. */
+export const SCHEDULED_NOT_STARTED_GRACE_HOURS = 4;
+
+/** Nach Ablauf dieses Fensters ab geplantem Start gilt ein „Scheduled“-Termin als verpasst (Archiv-Bereich). */
+export const SCHEDULED_STALE_GRACE_MS =
+  SCHEDULED_NOT_STARTED_GRACE_HOURS * 60 * 60 * 1000;
 
 /** @deprecated Alias — gleiche Bedeutung wie SCHEDULED_STALE_GRACE_MS */
 const SCHEDULED_GRACE_MS = SCHEDULED_STALE_GRACE_MS;
@@ -27,7 +32,7 @@ export type SessionFocusRow = {
   [key: string]: unknown;
 };
 
-/** Geplanter Termin, dessen Start länger als die Toleranz zurückliegt (nie gestartet / hängengeblieben). */
+/** Geplanter Termin, dessen Start länger als die Toleranz zurückliegt (nie gestartet). */
 export function isMissedScheduledSession<T extends SessionFocusRow>(
   session: T,
   now: Date = new Date(),
@@ -39,7 +44,10 @@ export function isMissedScheduledSession<T extends SessionFocusRow>(
   return startMs < now.getTime() - SCHEDULED_STALE_GRACE_MS;
 }
 
-/** Geplant, Start liegt in der Vergangenheit, aber noch innerhalb des Toleranzfensters (nicht „verpasst“). */
+/**
+ * Geplant, Start liegt in der Vergangenheit, aber noch innerhalb des Toleranzfensters —
+ * Session wurde noch nicht gestartet, bleibt planbar und startbar.
+ */
 export function isScheduledInGraceOverdue<T extends SessionFocusRow>(
   session: T,
   now: Date = new Date(),
@@ -51,9 +59,17 @@ export function isScheduledInGraceOverdue<T extends SessionFocusRow>(
   return startMs >= now.getTime() - SCHEDULED_STALE_GRACE_MS;
 }
 
+/** Alias für UI: Termin vorbei, aber noch nicht gestartet (innerhalb der Toleranz). */
+export function isNotStartedScheduledSession<T extends SessionFocusRow>(
+  session: T,
+  now: Date = new Date(),
+): boolean {
+  return isScheduledInGraceOverdue(session, now);
+}
+
 /**
- * Fokus-Termin: zuerst nicht-verwaiste Live-Session, sonst zeitlich nächste **noch gültige**
- * geplante Session (innerhalb der Toleranz nach Start; verpasste Termine nie als Fokus).
+ * Fokus-Termin: zuerst nicht-verwaiste Live-Session, dann nicht gestartete Termine
+ * im Toleranzfenster, sonst zeitlich nächste gültige geplante Session.
  */
 export function pickCampaignFocusSession<T extends SessionFocusRow>(
   sessions: T[],
@@ -75,6 +91,14 @@ export function pickCampaignFocusSession<T extends SessionFocusRow>(
 
   const sched = active.filter((s) => isSessionStatusScheduled(s.status));
   if (sched.length === 0) return null;
+
+  const notStarted = sched.filter((s) => isNotStartedScheduledSession(s, now));
+  if (notStarted.length > 0) {
+    return [...notStarted].sort(
+      (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime(),
+    )[0]!;
+  }
+
   const sorted = [...sched].sort(
     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
   );

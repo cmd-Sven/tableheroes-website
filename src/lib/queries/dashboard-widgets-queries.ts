@@ -15,7 +15,7 @@ import {
   isSessionStatusScheduled,
   isSessionStatusTerminal,
 } from "@/src/lib/session-status";
-import { isStaleLiveSession, sortSessionsForDashboardFocus } from "@/src/lib/session-focus";
+import { isMissedScheduledSession, isStaleLiveSession, sortSessionsForDashboardFocus } from "@/src/lib/session-focus";
 import { sessionRequiresCharacter, parseSessionType } from "@/src/lib/session-type";
 
 const MEMBER_CAMPAIGN_STATUSES = [
@@ -590,8 +590,14 @@ export async function getPastSessionsForUser(
       if (isSessionStatusLive(s.status) && isStaleLiveSession(s, now)) return true;
       if (
         isSessionStatusScheduled(s.status) &&
-        s.start_time &&
-        new Date(s.start_time).getTime() <= now.getTime()
+        isMissedScheduledSession(
+          {
+            id: String(s.id),
+            status: String(s.status ?? ""),
+            start_time: String(s.start_time ?? ""),
+          },
+          now,
+        )
       ) {
         return true;
       }

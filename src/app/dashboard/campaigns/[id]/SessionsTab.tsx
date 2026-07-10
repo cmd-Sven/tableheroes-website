@@ -44,7 +44,9 @@ import type { LatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/lat
 import { isSessionStatusLive, isSessionStatusScheduled, canEditSessionSchedule } from "@/src/lib/session-status";
 import {
   isMissedScheduledSession,
+  isNotStartedScheduledSession,
   isScheduledInGraceOverdue,
+  SCHEDULED_NOT_STARTED_GRACE_HOURS,
 } from "@/src/lib/session-focus";
 import { getSessionTypeLabel, sessionSupportsLiveBoard } from "@/src/lib/session-type";
 
@@ -80,7 +82,7 @@ function formatSessionDateTime(startTime: string) {
 
 function pastSessionStatusLabel(session: SessionItem): string {
   if (isMissedScheduledSession(session)) {
-    return "Nicht gestartet (Termin vorbei)";
+    return "Nicht gestartet (Toleranz abgelaufen)";
   }
   const st = String(session.status ?? "").toLowerCase();
   if (st === "cancelled") return "Abgesagt";
@@ -598,8 +600,8 @@ export function SessionsTab({
             <p className="mb-3 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
               {isSessionStatusLive(focusSession.status)
                 ? "Aktuell"
-                : isScheduledInGraceOverdue(focusSession)
-                  ? "Nächster Termin (Start liegt zurück — noch im Toleranzfenster)"
+                : isNotStartedScheduledSession(focusSession)
+                  ? "Session noch nicht gestartet"
                   : "Nächster Termin"}
             </p>
             {(() => {
@@ -622,7 +624,7 @@ export function SessionsTab({
                       ) : null}
                       {scheduled && graceOverdue ? (
                         <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-600/70 bg-amber-950/40 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-widest text-amber-100">
-                          Überfällig (noch startbar, 24h-Toleranz)
+                          Session noch nicht gestartet ({SCHEDULED_NOT_STARTED_GRACE_HOURS}h Toleranz)
                         </span>
                       ) : null}
                       <h3 className="font-cinzel text-2xl font-bold text-white md:text-3xl">
@@ -785,7 +787,7 @@ export function SessionsTab({
                     <div>
                       {graceOverdue && scheduled ? (
                         <p className="mb-1 font-barlow text-[9px] font-bold uppercase text-amber-400">
-                          Überfällig (Toleranzfenster)
+                          Session noch nicht gestartet
                         </p>
                       ) : null}
                       <p className="font-barlow font-bold text-sm text-white">
@@ -862,14 +864,27 @@ export function SessionsTab({
                             </p>
                           </div>
                           {isGM && isSessionStatusScheduled(session.status) ? (
-                            <SessionActionsDropdown
-                              isStarting={isStarting}
-                              onEditSchedule={() => setEditingSession(session)}
-                              canEditSchedule
-                              onDelete={() => handleDelete(session.id)}
-                              hasAcceptedRsvps={session.hasAcceptedRsvps}
-                              isScheduled
-                            />
+                            <div className="flex flex-wrap items-center gap-2">
+                              {sessionSupportsLiveBoard(session.type) ? (
+                                <button
+                                  type="button"
+                                  disabled={isStarting}
+                                  onClick={() => handleStartSession(session.id)}
+                                  className="rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20 disabled:opacity-50"
+                                >
+                                  Session starten
+                                </button>
+                              ) : null}
+                              <SessionActionsDropdown
+                                isStarting={isStarting}
+                                onEditSchedule={() => setEditingSession(session)}
+                                canEditSchedule
+                                onDelete={() => handleDelete(session.id)}
+                                onArchiveQuiet={() => handleArchiveQuiet(session.id)}
+                                hasAcceptedRsvps={session.hasAcceptedRsvps}
+                                isScheduled
+                              />
+                            </div>
                           ) : null}
                         </li>
                       );

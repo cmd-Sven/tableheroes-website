@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { canEditSessionSchedule, isSessionStatusLive, isSessionStatusScheduled, isSessionStatusTerminal } from "@/src/lib/session-status";
-import { isMissedScheduledSession, isStaleLiveSession } from "@/src/lib/session-focus";
+import { isStaleLiveSession } from "@/src/lib/session-focus";
 import { findLatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
 import { sendMessage } from "@/src/lib/actions/message-actions";
 import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
@@ -1399,9 +1399,9 @@ export async function endSession(sessionId: string, skipRevalidate = false) {
 }
 
 /**
- * GM: Geplante Termine, deren Startzeit mehr als 24h zurückliegt und die nie live gingen,
- * werden wie „Session beenden“ abgewickelt (Archiv-Eintrag, Status Completed).
- * Keine Absage-DMs an Spieler (im Gegensatz zu „Absagen“).
+ * GM: Verwaiste Live-Sessions (48h+) werden still beendet.
+ * Geplante, nie gestartete Termine werden NICHT automatisch archiviert —
+ * sie bleiben bis zu {@link SCHEDULED_NOT_STARTED_GRACE_HOURS}h startbar, danach im Archiv-Bereich der UI.
  */
 export async function expirePastScheduledSessionsForCampaign(
   campaignId: string,
@@ -1432,17 +1432,6 @@ export async function expirePastScheduledSessionsForCampaign(
   const now = new Date();
   const allRows = (rows as { id: string; status: string; start_time: string }[]) || [];
 
-  const missedScheduled = allRows.filter((r) =>
-    isMissedScheduledSession(
-      {
-        id: String(r.id),
-        status: String(r.status ?? ""),
-        start_time: String(r.start_time ?? ""),
-      },
-      now,
-    ),
-  );
-
   const staleLive = allRows.filter((r) =>
     isSessionStatusLive(r.status) &&
     isStaleLiveSession(
@@ -1455,14 +1444,6 @@ export async function expirePastScheduledSessionsForCampaign(
   );
 
   let closedCount = 0;
-  for (const r of missedScheduled) {
-    try {
-      await endSession(String(r.id), true);
-      closedCount += 1;
-    } catch (e) {
-      console.warn("[expirePastScheduledSessionsForCampaign] endSession (missed):", r.id, e);
-    }
-  }
 
   let staleLiveCount = 0;
   for (const r of staleLive) {
