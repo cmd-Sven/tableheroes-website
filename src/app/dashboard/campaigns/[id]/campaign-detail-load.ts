@@ -88,7 +88,7 @@ export async function loadCampaignDetailPageData(
   const campaignWorldId = (campaign as any).world_id as string | null | undefined;
 
   const SESSION_LIST_COLUMNS =
-    "id, title, start_time, type, status, rsvp_deadline_days, is_live, gm_prep_complete, planning_dummy_player_count, transcription_mode";
+    "id, title, start_time, end_time, type, status, rsvp_deadline_days, is_live, gm_prep_complete, transcription_mode";
 
   const [worldResult, membershipResult, sessionsResult] = await Promise.all([
     campaignWorldId
@@ -185,10 +185,14 @@ export async function loadCampaignDetailPageData(
     gm_confirmed: boolean;
   }[] = [];
 
+  if (sessionsResult.error) {
+    console.error("[CampaignPage] Sessions query error:", sessionsResult.error);
+  }
+
   if (isGM) {
     try {
       const { expirePastScheduledSessionsForCampaign } = await import("./session-actions");
-      await expirePastScheduledSessionsForCampaign(id);
+      await expirePastScheduledSessionsForCampaign(campaignId);
     } catch (e) {
       console.warn(
         "[loadCampaignDetailPageData] expirePastScheduledSessionsForCampaign:",
@@ -208,10 +212,13 @@ export async function loadCampaignDetailPageData(
     }> | null) ?? null;
 
   if (isGM) {
-    const { data: sessionsRefreshed } = await (supabase.from("sessions") as any)
+    const { data: sessionsRefreshed, error: sessionsRefreshError } = await (supabase.from("sessions") as any)
       .select(SESSION_LIST_COLUMNS)
       .eq("campaign_id", id)
       .order("start_time", { ascending: true });
+    if (sessionsRefreshError) {
+      console.error("[CampaignPage] Sessions refresh error:", sessionsRefreshError);
+    }
     sessions =
       (sessionsRefreshed as Array<{
         id: string;
