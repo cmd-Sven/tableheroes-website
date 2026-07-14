@@ -119,7 +119,7 @@ export const characterSheetMessagesEn = {
   "equipment.combatValues": "Combat stats (equipped)",
   "equipment.acPreview": "Armor Class (preview)",
   "equipment.storedAc": "Stored sheet value:",
-  "equipment.noWeapons": "No weapon equipped in main/off hand.",
+  "equipment.noWeapons": "No weapon equipped in left/right hand.",
   "equipment.attack": "Attack",
   "equipment.damage": "Damage",
   "equipment.step4Title": "4. Pack gear",
@@ -132,6 +132,14 @@ export const characterSheetMessagesEn = {
   "equipment.noMagicItems": "No magical items in inventory.",
   "equipment.needBackpackFirst":
     "Set a backpack first to manage belt, worn gear, and packed items.",
+  "equipment.uiHead": "Head",
+  "equipment.uiNeck": "Neck",
+  "equipment.uiTorso": "Torso",
+  "equipment.uiHandLeft": "Left hand",
+  "equipment.uiHandRight": "Right hand",
+  "equipment.uiRingLeft": "Ring left",
+  "equipment.uiRingRight": "Ring right",
+  "equipment.uiFeet": "Feet",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":

@@ -119,7 +119,7 @@ export const characterSheetMessagesDe = {
   "equipment.combatValues": "Kampfwerte (ausgerüstet)",
   "equipment.acPreview": "Rüstungsklasse (Vorschau)",
   "equipment.storedAc": "Gespeicherter Blattwert:",
-  "equipment.noWeapons": "Keine Waffe in Haupthand/Nebenhand ausgerüstet.",
+  "equipment.noWeapons": "Keine Waffe in Hand links/rechts ausgerüstet.",
   "equipment.attack": "Angriff",
   "equipment.damage": "Schaden",
   "equipment.step4Title": "4. Gepäck verteilen",
@@ -132,6 +132,14 @@ export const characterSheetMessagesDe = {
   "equipment.noMagicItems": "Keine magischen Gegenstände im Inventar.",
   "equipment.needBackpackFirst":
     "Lege zuerst einen Rucksack fest, um Gürtel, Ausrüstung und Gepäck zu verwalten.",
+  "equipment.uiHead": "Kopf",
+  "equipment.uiNeck": "Hals",
+  "equipment.uiTorso": "Torso",
+  "equipment.uiHandLeft": "Hand links",
+  "equipment.uiHandRight": "Hand rechts",
+  "equipment.uiRingLeft": "Ring links",
+  "equipment.uiRingRight": "Ring rechts",
+  "equipment.uiFeet": "Füße",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":
