@@ -654,6 +654,127 @@ export type Database = {
           },
         ]
       }
+      campaign_flaws: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          description: string
+          effects: string
+          flaw_key: string
+          id: string
+          is_custom: boolean
+          is_enabled: boolean
+          main_disadvantage: string
+          name: string
+          nr: number
+          roleplay: string
+          small_advantage: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          description?: string
+          effects?: string
+          flaw_key: string
+          id?: string
+          is_custom?: boolean
+          is_enabled?: boolean
+          main_disadvantage?: string
+          name: string
+          nr?: number
+          roleplay?: string
+          small_advantage?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          description?: string
+          effects?: string
+          flaw_key?: string
+          id?: string
+          is_custom?: boolean
+          is_enabled?: boolean
+          main_disadvantage?: string
+          name?: string
+          nr?: number
+          roleplay?: string
+          small_advantage?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_flaws_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_rules_presets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          snapshot: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          snapshot: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          snapshot?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      campaign_rules_settings: {
+        Row: {
+          campaign_id: string
+          fate_points_gm_notes: string
+          fate_points_intro: string
+          fate_points_w10_rules: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          fate_points_gm_notes?: string
+          fate_points_intro?: string
+          fate_points_w10_rules?: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          fate_points_gm_notes?: string
+          fate_points_intro?: string
+          fate_points_w10_rules?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_rules_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_visibility: {
         Row: {
           campaign_id: string | null
@@ -859,6 +980,9 @@ export type Database = {
           token_url: string | null
           token_storage_path: string | null
           condition_tokens: Json
+          mood_state: string | null
+          mood_tokens: Json
+          active_conditions: Json
           alignment: string | null
           bio_family: string | null
           bio_occupation: string | null
@@ -898,6 +1022,9 @@ export type Database = {
           token_url?: string | null
           token_storage_path?: string | null
           condition_tokens?: Json
+          mood_state?: string | null
+          mood_tokens?: Json
+          active_conditions?: Json
           alignment?: string | null
           bio_family?: string | null
           bio_occupation?: string | null
@@ -937,6 +1064,9 @@ export type Database = {
           token_url?: string | null
           token_storage_path?: string | null
           condition_tokens?: Json
+          mood_state?: string | null
+          mood_tokens?: Json
+          active_conditions?: Json
           alignment?: string | null
           bio_family?: string | null
           bio_occupation?: string | null

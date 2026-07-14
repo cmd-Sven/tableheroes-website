@@ -16,6 +16,8 @@ import type {
   Dnd5eSheetOverrides,
   Dnd5eSheetSource,
 } from "@/src/lib/characters/dnd5e/types";
+import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
+import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import {
   resolveFoundryProgressionLock,
   stripFoundryLockedCharacterFields,
@@ -24,7 +26,7 @@ import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-
 import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
 
 const SHEET_SELECT =
-  "id, campaign_id, user_id, name, class, subclass, race, background, alignment, level, experience_points, sheet_data, sheet_overrides, sheet_source, sheet_synced_at";
+  "id, campaign_id, user_id, name, class, subclass, race, background, alignment, level, experience_points, sheet_data, sheet_overrides, sheet_source, sheet_synced_at, sheet_locale";
 
 type CharacterRow = {
   id: string;
@@ -42,6 +44,7 @@ type CharacterRow = {
   sheet_overrides: unknown;
   sheet_source: string | null;
   sheet_synced_at: string | null;
+  sheet_locale?: string | null;
 };
 
 async function loadCharacterAccess(
@@ -127,6 +130,7 @@ function buildSheetPayload(
     canEdit,
     progressionLocked,
     progressionLockMessage,
+    sheetLocale: normalizeCharacterSheetLocale(character.sheet_locale),
   };
 }
 
@@ -152,6 +156,33 @@ export async function loadDnd5eCharacterSheet(
     lock.locked,
     lock.message,
   );
+}
+
+export async function saveCharacterSheetLocale(
+  campaignId: string,
+  characterId: string,
+  locale: CharacterSheetLocale,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase, character } = await loadCharacterAccess(campaignId, characterId);
+    const normalized = normalizeCharacterSheetLocale(locale);
+
+    const { error } = await (supabase.from("characters") as any)
+      .update({ sheet_locale: normalized })
+      .eq("id", character.id)
+      .eq("campaign_id", campaignId);
+
+    if (error) {
+      return { success: false, error: error.message || "Sprache konnte nicht gespeichert werden." };
+    }
+
+    return { success: true };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Sprache konnte nicht gespeichert werden.",
+    };
+  }
 }
 
 export type SaveDnd5eCharacterSheetInput = {

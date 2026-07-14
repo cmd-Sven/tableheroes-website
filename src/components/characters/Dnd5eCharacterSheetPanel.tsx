@@ -7,7 +7,7 @@ import {
   loadDnd5eCharacterSheet,
   saveDnd5eCharacterSheet,
 } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
-import { ABILITY_KEYS, ABILITY_LABELS_DE } from "@/src/lib/characters/dnd5e/types";
+import { ABILITY_KEYS } from "@/src/lib/characters/dnd5e/types";
 import type {
   AbilityKey,
   CharacterSheetPayload,
@@ -31,6 +31,11 @@ import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers
 import type { CharacterFlawEntry } from "@/src/lib/characters/character-flaws";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import { CharacterSheetLanguageToggle } from "@/src/components/characters/CharacterSheetLanguageToggle";
+import {
+  CharacterSheetLocaleProvider,
+  useCharacterSheetLocale,
+} from "@/src/lib/i18n/character-sheet/context";
 
 type SheetTab = "attributes" | "equipment" | "biography";
 
@@ -128,12 +133,27 @@ type Props = {
   biographyCulture?: CharacterSheetBiographyCultureTabProps;
 };
 
+export function Dnd5eCharacterSheetPanelWithLocale(props: Props) {
+  const { campaignId, characterId } = props;
+
+  return (
+    <CharacterSheetLocaleProvider
+      campaignId={campaignId}
+      characterId={characterId}
+      initialLocale="de"
+    >
+      <Dnd5eCharacterSheetPanel {...props} />
+    </CharacterSheetLocaleProvider>
+  );
+}
+
 export function Dnd5eCharacterSheetPanel({
   campaignId,
   characterId,
   compact = false,
   biographyCulture,
 }: Props) {
+  const { t, abilityLabel, skillLabel, formatDateTime, hydrateLocale } = useCharacterSheetLocale();
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
   const [sheet, setSheet] = useState<Dnd5eSheetData | null>(null);
   const [meta, setMeta] = useState({
@@ -172,12 +192,13 @@ export function Dnd5eCharacterSheetPanel({
         level: data.level,
         experiencePoints: data.experiencePoints,
       });
+      hydrateLocale(data.sheetLocale);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Charakterblatt konnte nicht geladen werden.");
+      toast.error(e instanceof Error ? e.message : t("sheet.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [campaignId, characterId]);
+  }, [campaignId, characterId, hydrateLocale, t]);
 
   useEffect(() => {
     void reload();
@@ -249,7 +270,7 @@ export function Dnd5eCharacterSheetPanel({
       ...sheet,
       features: [
         ...sheet.features,
-        { id: crypto.randomUUID(), name: "Neues Feat", description: null, source: "manual" },
+        { id: crypto.randomUUID(), name: t("field.newFeat"), description: null, source: "manual" },
       ],
     });
   }
@@ -284,10 +305,10 @@ export function Dnd5eCharacterSheetPanel({
         },
       });
       if (!result.success) {
-        toast.error(result.error ?? "Speichern fehlgeschlagen.");
+        toast.error(result.error ?? t("sheet.saveError"));
         return;
       }
-      toast.success("Charakterblatt gespeichert.");
+      toast.success(t("sheet.saved"));
       setEditMode(false);
       await reload();
     });
@@ -297,7 +318,7 @@ export function Dnd5eCharacterSheetPanel({
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="font-libre text-sm">Charakterblatt wird geladen…</span>
+        <span className="font-libre text-sm">{t("sheet.loading")}</span>
       </div>
     );
   }
@@ -306,7 +327,7 @@ export function Dnd5eCharacterSheetPanel({
     return (
       <div className="rounded-lg border border-hero-dark bg-background-card p-6 text-center">
         <p className="font-libre text-gray-400">
-          Kein D&amp;D-5e-Charakterblatt für diese Kampagne verfügbar.
+          {t("sheet.unavailable")}
         </p>
       </div>
     );
@@ -329,26 +350,29 @@ export function Dnd5eCharacterSheetPanel({
         <div>
           <h2 className="font-barlow text-xl font-bold uppercase text-white flex items-center gap-2">
             <ScrollText className="h-5 w-5 text-accent-gold" />
-            D&amp;D 5e Charakterblatt
+            {t("sheet.title")}
           </h2>
           {payload.sheetSyncedAt ? (
             <p className="mt-1 font-libre text-xs text-gray-500">
-              Zuletzt aus Foundry importiert:{" "}
-              {new Date(payload.sheetSyncedAt).toLocaleString("de-DE")}
+              {t("sheet.foundrySynced")}{" "}
+              {formatDateTime(payload.sheetSyncedAt)}
             </p>
           ) : null}
         </div>
-        <label className="flex items-center gap-3 cursor-pointer">
+        <div className="flex flex-wrap items-center gap-4">
+          {!compact ? <CharacterSheetLanguageToggle /> : null}
+          <label className="flex items-center gap-3 cursor-pointer">
           <span className="font-barlow text-xs font-bold uppercase tracking-wide text-gray-400">
-            {editMode ? "Bearbeiten" : "Ansicht"}
+            {editMode ? t("sheet.editMode") : t("sheet.viewMode")}
           </span>
           <ToggleSwitch
             checked={editMode}
             disabled={!canEdit}
             onToggle={() => setEditMode((v) => !v)}
-            label={editMode ? "Bearbeitungsmodus" : "Ansichtsmodus"}
+            label={editMode ? t("sheet.editModeAria") : t("sheet.viewModeAria")}
           />
         </label>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b border-hero-dark">
@@ -362,7 +386,7 @@ export function Dnd5eCharacterSheetPanel({
           }`}
         >
           <ScrollText className="h-3.5 w-3.5" />
-          Attribute
+          {t("tab.attributes")}
         </button>
         <button
           type="button"
@@ -374,7 +398,7 @@ export function Dnd5eCharacterSheetPanel({
           }`}
         >
           <Backpack className="h-3.5 w-3.5" />
-          Ausrüstung
+          {t("tab.equipment")}
         </button>
         <button
           type="button"
@@ -386,7 +410,7 @@ export function Dnd5eCharacterSheetPanel({
           }`}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Biografie &amp; Kultur
+          {t("tab.biography")}
         </button>
       </div>
 
@@ -412,7 +436,7 @@ export function Dnd5eCharacterSheetPanel({
             <div className="grid gap-3 lg:grid-cols-12">
               <label className="lg:col-span-4 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Charaktername
+                  {t("field.characterName")}
                 </span>
                 <TextInput
                   value={meta.name}
@@ -423,13 +447,13 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <label className="lg:col-span-3 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Klasse &amp; Stufe
+                  {t("field.classLevel")}
                 </span>
                 <div className="flex gap-2">
                   <TextInput
                     value={classLevelLabel}
                     disabled={readOnly || payload.progressionLocked}
-                    placeholder="Klasse"
+                    placeholder={t("field.classPlaceholder")}
                     onChange={(v) => setMeta({ ...meta, className: v })}
                     className="flex-1"
                   />
@@ -444,7 +468,7 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <label className="lg:col-span-2 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Hintergrund
+                  {t("field.background")}
                 </span>
                 <TextInput
                   value={meta.background}
@@ -454,7 +478,7 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <label className="lg:col-span-3 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Volk
+                  {t("field.race")}
                 </span>
                 <TextInput
                   value={meta.race}
@@ -464,7 +488,7 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <label className="lg:col-span-3 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Gesinnung
+                  {t("field.alignment")}
                 </span>
                 <TextInput
                   value={meta.alignment}
@@ -474,7 +498,7 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <label className="lg:col-span-2 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Erfahrungspunkte
+                  {t("field.experiencePoints")}
                 </span>
                 <NumberInput
                   value={meta.experiencePoints}
@@ -485,7 +509,7 @@ export function Dnd5eCharacterSheetPanel({
               </label>
               <div className="lg:col-span-2 flex items-end">
                 <div className="w-full rounded border border-hero-border/60 bg-hero-dark/40 px-3 py-2 text-center">
-                  <p className="font-barlow text-[10px] uppercase text-gray-500">Übungsbonus</p>
+                  <p className="font-barlow text-[10px] uppercase text-gray-500">{t("field.proficiencyBonus")}</p>
                   <p className="font-barlow text-2xl font-bold text-accent-gold">
                     {formatSigned(derived.proficiencyBonus)}
                   </p>
@@ -503,10 +527,10 @@ export function Dnd5eCharacterSheetPanel({
                     src={portraitSrc}
                     avatarDisplay={biographyCulture?.avatarDisplay}
                     className="h-44 w-44 shrink-0 rounded-lg border-2 border-hero-border bg-hero-dark shadow-lg"
-                    alt={meta.name || "Charakterportrait"}
+                    alt={meta.name || t("field.portraitAlt")}
                   />
                   <p className="mt-2 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                    Charakterportrait
+                    {t("field.portrait")}
                   </p>
                 </section>
               ) : null}
@@ -524,7 +548,7 @@ export function Dnd5eCharacterSheetPanel({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-barlow text-[10px] font-bold uppercase text-gray-400 truncate">
-                          {ABILITY_LABELS_DE[key]}
+                                                    {abilityLabel(key)}
                         </p>
                         {readOnly ? (
                           <p className="font-barlow text-xs text-gray-500">{sheet.abilities[key].score}</p>
@@ -545,7 +569,7 @@ export function Dnd5eCharacterSheetPanel({
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-3">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2 flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5" /> Rettungswürfe
+                  <Shield className="h-3.5 w-3.5" /> {t("combat.savingThrows")}
                 </h3>
                 <div className="space-y-1">
                   {ABILITY_KEYS.map((key) => (
@@ -571,7 +595,7 @@ export function Dnd5eCharacterSheetPanel({
                           />
                         )}
                         <span className="font-libre text-xs text-gray-300 truncate">
-                          {ABILITY_LABELS_DE[key]}
+                                                    {abilityLabel(key)}
                         </span>
                       </div>
                       <span className="font-barlow text-sm text-accent-gold shrink-0">
@@ -584,7 +608,7 @@ export function Dnd5eCharacterSheetPanel({
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-3">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2">
-                  Fertigkeiten
+                  {t("combat.skills")}
                 </h3>
                 <div className="space-y-0.5 max-h-[28rem] overflow-y-auto pr-1">
                   {DND5E_SKILLS.map((def) => {
@@ -621,7 +645,7 @@ export function Dnd5eCharacterSheetPanel({
                             </span>
                           )}
                           <span className="font-libre text-xs text-gray-300 truncate">
-                            {def.labelDe}
+                            {skillLabel(def.key)}
                             <span className="ml-1 text-[9px] uppercase text-gray-600">
                               ({def.ability})
                             </span>
@@ -636,7 +660,7 @@ export function Dnd5eCharacterSheetPanel({
                 </div>
                 <div className="mt-3 rounded border border-hero-border/50 bg-hero-dark/30 px-3 py-2 flex items-center justify-between">
                   <span className="font-barlow text-[10px] uppercase text-gray-500">
-                    Passive Wahrnehmung
+                    {t("combat.passivePerception")}
                   </span>
                   <span className="font-barlow text-lg font-bold text-white">{passivePerception}</span>
                 </div>
@@ -648,7 +672,7 @@ export function Dnd5eCharacterSheetPanel({
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
-                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">RK</p>
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.ac")}</p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">{derived.ac}</p>
                     ) : (
@@ -661,7 +685,7 @@ export function Dnd5eCharacterSheetPanel({
                     )}
                   </div>
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
-                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">Initiative</p>
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.initiative")}</p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">
                         {formatSigned(displayDerived.initiative)}
@@ -676,7 +700,7 @@ export function Dnd5eCharacterSheetPanel({
                   </div>
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
-                      Bewegung
+                      {t("combat.speed")}
                     </p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">
@@ -690,18 +714,18 @@ export function Dnd5eCharacterSheetPanel({
                         onChange={(v) => updateCombat("speed", v)}
                       />
                     )}
-                    <p className="font-barlow text-[9px] text-gray-500 mt-0.5">ft</p>
+                    <p className="font-barlow text-[9px] text-gray-500 mt-0.5">{t("combat.speedUnit")}</p>
                   </div>
                 </div>
               </section>
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
-                  Trefferpunkte
+                  {t("combat.hitPoints")}
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   <label className="space-y-1">
-                    <span className="font-barlow text-[10px] uppercase text-gray-500">Maximum</span>
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hpMax")}</span>
                     {readOnly ? (
                       <p className="font-barlow text-2xl font-bold text-white text-center">
                         {sheet.combat.hpMax}
@@ -715,7 +739,7 @@ export function Dnd5eCharacterSheetPanel({
                     )}
                   </label>
                   <label className="space-y-1">
-                    <span className="font-barlow text-[10px] uppercase text-gray-500">Aktuell</span>
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hpCurrent")}</span>
                     {readOnly ? (
                       <p className="font-barlow text-2xl font-bold text-white text-center">
                         {sheet.combat.hpCurrent}
@@ -729,7 +753,7 @@ export function Dnd5eCharacterSheetPanel({
                     )}
                   </label>
                   <label className="space-y-1">
-                    <span className="font-barlow text-[10px] uppercase text-gray-500">Temp</span>
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hpTemp")}</span>
                     {readOnly ? (
                       <p className="font-barlow text-2xl font-bold text-white text-center">
                         {sheet.combat.hpTemp}
@@ -747,7 +771,7 @@ export function Dnd5eCharacterSheetPanel({
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 grid grid-cols-2 gap-4">
                 <label className="space-y-1">
-                  <span className="font-barlow text-[10px] uppercase text-gray-500">Trefferwürfel</span>
+                  <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hitDice")}</span>
                   <TextInput
                     value={sheet.combat.hitDice}
                     disabled={readOnly}
@@ -755,10 +779,10 @@ export function Dnd5eCharacterSheetPanel({
                   />
                 </label>
                 <div className="space-y-2">
-                  <span className="font-barlow text-[10px] uppercase text-gray-500">Todesrettungen</span>
+                  <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.deathSaves")}</span>
                   <div className="flex gap-4 text-xs">
                     <div>
-                      <p className="text-gray-500 mb-1">Erfolge</p>
+                      <p className="text-gray-500 mb-1">{t("combat.deathSaveSuccesses")}</p>
                       {readOnly ? (
                         <p className="text-white">{sheet.combat.deathSaveSuccesses ?? 0}</p>
                       ) : (
@@ -771,7 +795,7 @@ export function Dnd5eCharacterSheetPanel({
                       )}
                     </div>
                     <div>
-                      <p className="text-gray-500 mb-1">Fehlschläge</p>
+                      <p className="text-gray-500 mb-1">{t("combat.deathSaveFailures")}</p>
                       {readOnly ? (
                         <p className="text-white">{sheet.combat.deathSaveFailures ?? 0}</p>
                       ) : (
@@ -793,7 +817,7 @@ export function Dnd5eCharacterSheetPanel({
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 min-h-[20rem] flex flex-col">
                 <div className="flex items-center justify-between border-b border-hero-dark pb-2 mb-3">
                   <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
-                    Merkmale &amp; Feats
+                    {t("features.title")}
                   </h3>
                   {!readOnly ? (
                     <button
@@ -801,12 +825,12 @@ export function Dnd5eCharacterSheetPanel({
                       onClick={addFeature}
                       className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
                     >
-                      + Feat
+                      {t("features.add")}
                     </button>
                   ) : null}
                 </div>
                 {sheet.features.length === 0 ? (
-                  <p className="font-libre text-sm text-gray-500 flex-1">Keine Feats vorhanden.</p>
+                  <p className="font-libre text-sm text-gray-500 flex-1">{t("features.empty")}</p>
                 ) : (
                   <div className="space-y-2 flex-1 overflow-y-auto max-h-[24rem] pr-1">
                     {sheet.features.map((feat, index) => (
@@ -844,7 +868,7 @@ export function Dnd5eCharacterSheetPanel({
                               onChange={(e) => updateFeature(index, { description: e.target.value })}
                               rows={2}
                               className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white"
-                              placeholder="Beschreibung…"
+                              placeholder={t("field.descriptionPlaceholder")}
                             />
                           </div>
                         )}
@@ -856,19 +880,19 @@ export function Dnd5eCharacterSheetPanel({
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
-                  Übungen &amp; Sprachen
+                  {t("proficiencies.title")}
                 </h3>
                 {(
                   [
-                    ["Rüstung", sheet.proficiencies.armor],
-                    ["Waffen", sheet.proficiencies.weapons],
-                    ["Werkzeuge", sheet.proficiencies.tools],
-                    ["Sprachen", sheet.proficiencies.languages],
+                    ["proficiencies.armor", sheet.proficiencies.armor],
+                    ["proficiencies.weapons", sheet.proficiencies.weapons],
+                    ["proficiencies.tools", sheet.proficiencies.tools],
+                    ["proficiencies.languages", sheet.proficiencies.languages],
                   ] as const
-                ).map(([label, items]) =>
+                ).map(([labelKey, items]) =>
                   items.length > 0 ? (
-                    <div key={label}>
-                      <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">{label}</p>
+                    <div key={labelKey}>
+                      <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">{t(labelKey)}</p>
                       <p className="font-libre text-xs text-gray-300">{items.join(", ")}</p>
                     </div>
                   ) : null,
@@ -877,17 +901,17 @@ export function Dnd5eCharacterSheetPanel({
                 sheet.proficiencies.weapons.length === 0 &&
                 sheet.proficiencies.tools.length === 0 &&
                 sheet.proficiencies.languages.length === 0 ? (
-                  <p className="font-libre text-sm text-gray-500">—</p>
+                  <p className="font-libre text-sm text-gray-500">{t("proficiencies.empty")}</p>
                 ) : null}
               </section>
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-2">
-                  Notizen
+                  {t("field.notes")}
                 </h3>
                 {readOnly ? (
                   <p className="font-libre text-sm text-gray-300 whitespace-pre-wrap min-h-[4rem]">
-                    {sheet.notes?.trim() || "—"}
+                    {sheet.notes?.trim() || t("proficiencies.empty")}
                   </p>
                 ) : (
                   <textarea
@@ -895,7 +919,7 @@ export function Dnd5eCharacterSheetPanel({
                     onChange={(e) => setSheet({ ...sheet, notes: e.target.value })}
                     rows={4}
                     className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-                    placeholder="Spieler-Notizen…"
+                    placeholder={t("field.notesPlaceholder")}
                   />
                 )}
               </section>
@@ -912,12 +936,11 @@ export function Dnd5eCharacterSheetPanel({
               {hasFlawAdjustments || flawNotes.length > 0 ? (
                 <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
                   <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
-                    Makel-Effekte (Anzeige)
+                    {t("flaws.effectsTitle")}
                   </h3>
                   {hasFlawAdjustments ? (
                     <p className="font-libre text-xs text-gray-400">
-                      Numerische Anpassungen sind in Attribute, Fertigkeiten und Kampfwerten
-                      berücksichtigt. Attributswerte im Blatt bleiben unverändert gespeichert.
+                      {t("flaws.effectsHint")}
                     </p>
                   ) : null}
                   {flawNotes.length > 0 ? (
@@ -944,7 +967,7 @@ export function Dnd5eCharacterSheetPanel({
                 className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Speichern
+                {t("sheet.save")}
               </button>
             </div>
           ) : null}
@@ -964,7 +987,7 @@ export function Dnd5eCharacterSheetPanel({
             className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Ausrüstung speichern
+            {t("sheet.saveEquipment")}
           </button>
         </div>
       ) : null}

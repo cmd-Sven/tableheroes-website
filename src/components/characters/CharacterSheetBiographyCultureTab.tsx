@@ -18,17 +18,24 @@ import {
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
 import {
+  type CharacterConditionKey,
   type ConditionTokensMap,
 } from "@/src/lib/characters/condition-tokens";
+import {
+  type MoodStateKey,
+  type MoodTokensMap,
+} from "@/src/lib/characters/mood-states";
 import {
   type CharacterFlawEntry,
 } from "@/src/lib/characters/character-flaws";
 import { CharacterFlawSummary } from "@/src/components/characters/CharacterFlawPicker";
 import { CharacterConditionTokensPanel } from "@/src/components/characters/CharacterConditionTokensPanel";
+import { CharacterStatesPanel } from "@/src/components/characters/CharacterStatesPanel";
 import {
   DND5E_ALIGNMENTS,
   findAlignmentOption,
 } from "@/src/lib/characters/dnd5e-alignments";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type LanguageOption = { id: string; name: string };
 type LocationOption = { id: string; name: string; type?: string };
@@ -78,6 +85,14 @@ export type CharacterSheetBiographyCultureTabProps = {
   onConditionTokensChange: (next: ConditionTokensMap) => void;
   canManageConditionTokens?: boolean;
   isGmViewer?: boolean;
+  moodState: MoodStateKey | null;
+  moodTokens: MoodTokensMap;
+  activeConditions: CharacterConditionKey[];
+  onMoodStateChange: (next: MoodStateKey | null) => void;
+  onMoodTokensChange: (next: MoodTokensMap) => void;
+  onActiveConditionsChange: (next: CharacterConditionKey[]) => void;
+  canManageMood?: boolean;
+  canManageActiveConditions?: boolean;
 };
 
 function TokenPreview({
@@ -141,7 +156,16 @@ export function CharacterSheetBiographyCultureTab({
   onConditionTokensChange,
   canManageConditionTokens = true,
   isGmViewer = false,
+  moodState,
+  moodTokens,
+  activeConditions,
+  onMoodStateChange,
+  onMoodTokensChange,
+  onActiveConditionsChange,
+  canManageMood = true,
+  canManageActiveConditions = false,
 }: CharacterSheetBiographyCultureTabProps) {
+  const { t, alignmentLabel, alignmentShort } = useCharacterSheetLocale();
   const portraitPreview = avatarBlobUrl || avatarUrl.trim();
   const tokenPreview = tokenBlobUrl || tokenUrl.trim() || portraitPreview;
   const selectedAlignment = findAlignmentOption(alignment);
@@ -156,11 +180,10 @@ export function CharacterSheetBiographyCultureTab({
         <div className="border-b border-hero-dark pb-2">
           <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
             <User className="h-4 w-4" />
-            Portrait &amp; Karten-Token
+            {t("biography.portraitToken")}
           </h3>
           <p className="mt-1 font-libre text-xs text-gray-500">
-            Das Portrait erscheint im Profil. Der Token wird auf der Karte genutzt — ohne eigenes Token
-            wird das Portrait übernommen.
+            {t("biography.portraitTokenHint")}
           </p>
         </div>
 
@@ -168,7 +191,7 @@ export function CharacterSheetBiographyCultureTab({
           {/* Portrait */}
           <div className="space-y-3">
             <label className="block text-xs font-barlow font-bold uppercase text-gray-500">
-              Charakterportrait
+              {t("field.portrait")}
             </label>
             <div className="flex flex-wrap items-start gap-3">
               {portraitPreview ? (
@@ -180,7 +203,7 @@ export function CharacterSheetBiographyCultureTab({
                 />
               ) : (
                 <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-hero-border/60 bg-hero-dark/40 px-2 text-center font-libre text-[10px] text-gray-500">
-                  Kein Portrait
+                  {t("biography.noPortrait")}
                 </div>
               )}
               {!readOnly ? (
@@ -206,7 +229,7 @@ export function CharacterSheetBiographyCultureTab({
                       onClick={onClearAvatar}
                       className="text-sm font-libre text-red-400 hover:underline"
                     >
-                      Portrait entfernen
+                      {t("biography.removePortrait")}
                     </button>
                   ) : null}
                 </div>
@@ -218,7 +241,7 @@ export function CharacterSheetBiographyCultureTab({
                   type="url"
                   value={avatarUrl}
                   onChange={(e) => onAvatarUrlChange(e.target.value)}
-                  placeholder="Portrait-URL (optional)"
+                  placeholder={t("biography.portraitUrl")}
                   className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none"
                 />
                 {portraitPreview ? (
@@ -237,14 +260,14 @@ export function CharacterSheetBiographyCultureTab({
           <div className="space-y-3">
             <label className="block text-xs font-barlow font-bold uppercase text-gray-500 flex items-center gap-2">
               <Coins className="h-3.5 w-3.5" />
-              Karten-Token
+              {t("biography.mapToken")}
             </label>
             <div className="flex flex-wrap items-start gap-3">
               {tokenPreview ? (
                 <TokenPreview src={tokenPreview} label="Token" className="h-32 w-32 rounded-full" />
               ) : (
                 <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-hero-border/60 bg-hero-dark/40 px-2 text-center font-libre text-[10px] text-gray-500">
-                  Kein Token
+                  {t("biography.noToken")}
                 </div>
               )}
               {!readOnly ? (
@@ -270,7 +293,7 @@ export function CharacterSheetBiographyCultureTab({
                       onClick={onCopyTokenFromPortrait}
                       className="block text-sm font-libre text-hero-vibrant hover:underline"
                     >
-                      Vom Portrait übernehmen
+                      {t("biography.copyFromPortrait")}
                     </button>
                   ) : null}
                   {(tokenPreview && (tokenUrl.trim() || tokenBlobUrl)) ? (
@@ -279,11 +302,13 @@ export function CharacterSheetBiographyCultureTab({
                       onClick={onClearToken}
                       className="block text-sm font-libre text-red-400 hover:underline"
                     >
-                      Eigenes Token entfernen
+                      {t("biography.removeToken")}
                     </button>
                   ) : null}
                   <p className="font-libre text-[10px] text-gray-500">
-                    Max. {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB. Quadratisch empfohlen.
+                    {t("biography.tokenSizeHint", {
+                      mb: Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024),
+                    })}
                   </p>
                 </div>
               ) : null}
@@ -293,13 +318,13 @@ export function CharacterSheetBiographyCultureTab({
                 type="url"
                 value={tokenUrl}
                 onChange={(e) => onTokenUrlChange(e.target.value)}
-                placeholder="Token-URL (optional)"
+                placeholder={t("biography.tokenUrl")}
                 className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none"
               />
             ) : null}
             {!tokenUrl.trim() && !tokenBlobUrl && portraitPreview ? (
               <p className="font-libre text-xs text-gray-500 italic">
-                Aktuell wird das Portrait als Token verwendet.
+                {t("biography.usingPortraitAsToken")}
               </p>
             ) : null}
           </div>
@@ -309,46 +334,46 @@ export function CharacterSheetBiographyCultureTab({
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2 border-b border-hero-dark pb-2">
           <BookOpen className="h-4 w-4" />
-          Biografie
+          {t("biography.title")}
         </h3>
 
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Familie
+              {t("biography.family")}
             </label>
             <textarea
               value={bioFamily}
               readOnly={readOnly}
               onChange={(e) => onBioFamilyChange(e.target.value)}
               rows={3}
-              placeholder="Eltern, Geschwister, Herkunft, familiäre Bindungen…"
+              placeholder={t("biography.familyPlaceholder")}
               className={textareaClass}
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Bisherige Tätigkeiten / Beruf / Ausbildung
+              {t("biography.occupation")}
             </label>
             <textarea
               value={bioOccupation}
               readOnly={readOnly}
               onChange={(e) => onBioOccupationChange(e.target.value)}
               rows={3}
-              placeholder="Was hast du vor dem Abenteurerleben gemacht?"
+              placeholder={t("biography.occupationPlaceholder")}
               className={textareaClass}
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Aussehen &amp; besondere Merkmale (körperlich)
+              {t("biography.appearance")}
             </label>
             <textarea
               value={bioAppearance}
               readOnly={readOnly}
               onChange={(e) => onBioAppearanceChange(e.target.value)}
               rows={4}
-              placeholder="Größe, Haare, Narben, Kleidungsstil — nicht Persönlichkeit oder Charakterzüge."
+              placeholder={t("biography.appearancePlaceholder")}
               className={textareaClass}
             />
           </div>
@@ -357,11 +382,11 @@ export function CharacterSheetBiographyCultureTab({
 
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
-          Gesinnung
+          {t("biography.alignmentTitle")}
         </h3>
         {alignmentImportedFromFoundry && alignment.trim() ? (
           <p className="font-libre text-xs text-gray-500">
-            Aus Foundry übernommen — du kannst sie hier anpassen, wenn sie nicht passt.
+            {t("biography.alignmentFoundryHint")}
           </p>
         ) : null}
         <select
@@ -370,20 +395,20 @@ export function CharacterSheetBiographyCultureTab({
           onChange={(e) => onAlignmentChange(e.target.value)}
           className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
         >
-          <option value="">— Gesinnung wählen —</option>
+          <option value="">{t("biography.alignmentSelect")}</option>
           {DND5E_ALIGNMENTS.map((a) => (
             <option key={a.value} value={a.value}>
-              {a.labelDe}
+              {alignmentLabel(a.value)}
             </option>
           ))}
         </select>
         {selectedAlignment ? (
           <p className="font-libre text-sm text-gray-300 leading-relaxed rounded border border-hero-border/40 bg-hero-dark/30 p-3">
-            {selectedAlignment.shortDe}
+            {alignmentShort(alignment)}
           </p>
         ) : (
           <p className="font-libre text-xs text-gray-500 italic">
-            Wähle eine der neun D&amp;D-5e-Gesinnungen — Kurzbeschreibung erscheint hier.
+            {t("biography.alignmentHint")}
           </p>
         )}
       </section>
@@ -393,13 +418,13 @@ export function CharacterSheetBiographyCultureTab({
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-5">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2 border-b border-hero-dark pb-2">
           <Globe className="h-4 w-4" />
-          Kultur &amp; Herkunft
+          {t("biography.cultureTitle")}
         </h3>
 
         {cultureOptions.length > 0 ? (
           <div>
             <label className="mb-2 block text-xs font-barlow font-bold uppercase text-gray-500">
-              Kultur
+              {t("biography.culture")}
             </label>
             <div className="flex items-center gap-2">
               <select
@@ -408,7 +433,7 @@ export function CharacterSheetBiographyCultureTab({
                 onChange={(e) => onCultureChange(e.target.value)}
                 className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
               >
-                <option value="">— Keine —</option>
+                <option value="">{t("biography.cultureNone")}</option>
                 {cultureOptions.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -421,7 +446,7 @@ export function CharacterSheetBiographyCultureTab({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0 rounded border border-hero-border bg-hero-dark/60 p-2 text-gray-500 hover:text-accent-gold"
-                  title="Kultur in der Lore anzeigen"
+                  title={t("biography.cultureLoreLink")}
                 >
                   <Info className="h-4 w-4" />
                 </Link>
@@ -432,11 +457,11 @@ export function CharacterSheetBiographyCultureTab({
 
         <div id="character-sprachen" className="scroll-mt-24">
           <label className="mb-2 flex items-center gap-2 text-xs font-barlow font-bold uppercase text-gray-500">
-            Sprachen (Welt-Lore)
+            {t("biography.languages")}
           </label>
           {languageOptions.length === 0 ? (
             <p className="font-libre text-sm text-gray-500 italic">
-              Für diese Kampagne sind keine freigegebenen Sprachen hinterlegt.
+              {t("biography.languagesEmpty")}
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -465,7 +490,7 @@ export function CharacterSheetBiographyCultureTab({
           <div>
             <label className="mb-2 flex items-center gap-2 text-xs font-barlow font-bold uppercase text-gray-500">
               <MapPin className="h-3.5 w-3.5" />
-              Heimatort
+              {t("biography.homeLocation")}
             </label>
             <div className="flex items-center gap-2">
               <select
@@ -474,7 +499,7 @@ export function CharacterSheetBiographyCultureTab({
                 onChange={(e) => onCurrentLocationChange(e.target.value)}
                 className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
               >
-                <option value="">— Noch nicht gewählt —</option>
+                <option value="">{t("biography.homeLocationNone")}</option>
                 {locationOptions.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name}
@@ -488,7 +513,7 @@ export function CharacterSheetBiographyCultureTab({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0 rounded border border-hero-border bg-hero-dark/60 p-2 text-gray-500 hover:text-accent-gold"
-                  title="Ort in der Lore anzeigen"
+                  title={t("biography.locationLoreLink")}
                 >
                   <Info className="h-4 w-4" />
                 </Link>
@@ -497,6 +522,22 @@ export function CharacterSheetBiographyCultureTab({
           </div>
         ) : null}
       </section>
+
+      <CharacterStatesPanel
+        campaignId={campaignId}
+        characterId={characterId}
+        moodState={moodState}
+        moodTokens={moodTokens}
+        activeConditions={activeConditions}
+        conditionTokens={conditionTokens}
+        onMoodStateChange={onMoodStateChange}
+        onMoodTokensChange={onMoodTokensChange}
+        onActiveConditionsChange={onActiveConditionsChange}
+        baseTokenUrl={tokenPreview}
+        hasSourceImage={Boolean(portraitPreview || tokenUrl.trim())}
+        canManageMood={canManageMood && !readOnly}
+        canManageActiveConditions={canManageActiveConditions || isGmViewer}
+      />
 
       <CharacterConditionTokensPanel
         campaignId={campaignId}

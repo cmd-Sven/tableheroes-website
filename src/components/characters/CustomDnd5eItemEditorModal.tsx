@@ -19,6 +19,7 @@ import {
   stripMachineTags,
   type Dnd5eItemMeta,
 } from "@/src/lib/characters/dnd5e/item-meta";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
   characterId: string;
@@ -57,6 +58,7 @@ export function CustomDnd5eItemEditorModal({
   onClose,
   onSaved,
 }: Props) {
+  const { t } = useCharacterSheetLocale();
   const [name, setName] = useState("");
   const [userText, setUserText] = useState("");
   const [meta, setMeta] = useState<Dnd5eItemMeta>(createEmptyCustomItemMeta());
@@ -87,7 +89,7 @@ export function CustomDnd5eItemEditorModal({
   function save() {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Name fehlt.");
+      setError(t("itemEditor.nameMissing"));
       return;
     }
     setError(null);
@@ -116,7 +118,7 @@ export function CustomDnd5eItemEditorModal({
             });
         onSaved(saved);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Item konnte nicht gespeichert werden.");
+        setError(err instanceof Error ? err.message : t("itemEditor.saveError"));
       }
     });
   }
@@ -130,7 +132,7 @@ export function CustomDnd5eItemEditorModal({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hero-border bg-background-card px-5 py-4">
           <div>
             <h2 className="font-barlow text-lg font-extrabold uppercase tracking-wide text-accent-gold">
-              {item ? "D&D-5e-Item bearbeiten" : "Eigenes D&D-5e-Item"}
+              {item ? t("itemEditor.titleEdit") : t("itemEditor.titleNew")}
             </h2>
             <p className="font-libre text-xs text-gray-400">
               Nach PHB-Regeln: Gewicht, Schaden, RK, Einstimmung usw.
@@ -140,7 +142,7 @@ export function CustomDnd5eItemEditorModal({
             type="button"
             onClick={onClose}
             className="rounded p-1 text-gray-400 hover:bg-hero-dark hover:text-white"
-            aria-label="Schließen"
+            aria-label={t("condition.close")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -197,7 +199,7 @@ export function CustomDnd5eItemEditorModal({
                 value={meta.rarity ?? ""}
                 onChange={(e) => patchMeta({ rarity: e.target.value })}
                 className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-                placeholder="Gewöhnlich"
+                placeholder={t("itemEditor.rarityPlaceholder")}
               />
             </label>
           </div>
@@ -329,7 +331,7 @@ export function CustomDnd5eItemEditorModal({
               onChange={(e) => setUserText(e.target.value)}
               rows={4}
               className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-              placeholder="Was macht der Gegenstand? (freier Text)"
+              placeholder={t("itemEditor.descriptionPlaceholder")}
             />
           </label>
 

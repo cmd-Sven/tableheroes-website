@@ -1,4 +1,5 @@
 import type { Dnd5eEquipmentState } from "./equipment-types";
+import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
@@ -10,6 +11,15 @@ export const ABILITY_LABELS_DE: Record<AbilityKey, string> = {
   con: "Konstitution",
   int: "Intelligenz",
   wis: "Weisheit",
+  cha: "Charisma",
+};
+
+export const ABILITY_LABELS_EN: Record<AbilityKey, string> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
   cha: "Charisma",
 };
 
@@ -137,4 +147,5 @@ export type CharacterSheetPayload = {
   canEdit: boolean;
   progressionLocked: boolean;
   progressionLockMessage: string;
+  sheetLocale: CharacterSheetLocale;
 };

@@ -5,6 +5,7 @@ import {
   Ban,
   EyeOff,
   EarOff,
+  Flame,
   FlaskConical,
   Ghost,
   Grip,
@@ -16,6 +17,7 @@ import {
   Mountain,
   Skull,
   Sparkles,
+  Thermometer,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -42,6 +44,8 @@ export const COMBAT_CONDITION_ICONS: Record<CombatConditionId, LucideIcon> = {
   charmed: Heart,
   incapacitated: Ban,
   petrified: Mountain,
+  sick: Thermometer,
+  cursed: Flame,
 };
 
 export function getCombatConditionIcon(id: CombatConditionId): LucideIcon {

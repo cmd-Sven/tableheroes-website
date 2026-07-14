@@ -18,12 +18,18 @@ import type { ImageDisplaySettings } from "@/src/lib/image-display";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
 import Link from "next/link";
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
-import { Dnd5eCharacterSheetPanel } from "@/src/components/characters/Dnd5eCharacterSheetPanel";
+import { Dnd5eCharacterSheetPanelWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetPanel";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { formatCharacterDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
-import { parseConditionTokensMap, type ConditionTokensMap } from "@/src/lib/characters/condition-tokens";
+import { parseConditionTokensMap, parseActiveConditions, type CharacterConditionKey, type ConditionTokensMap } from "@/src/lib/characters/condition-tokens";
+import {
+  normalizeMoodState,
+  parseMoodTokensMap,
+  type MoodStateKey,
+  type MoodTokensMap,
+} from "@/src/lib/characters/mood-states";
 import {
   parseCharacterFlaws,
   type CharacterFlawEntry,
@@ -75,6 +81,9 @@ type Props = {
     token_url?: string | null;
     token_storage_path?: string | null;
     condition_tokens?: unknown;
+    mood_state?: string | null;
+    mood_tokens?: unknown;
+    active_conditions?: unknown;
     alignment?: string | null;
     sheet_synced_at?: string | null;
     bio_family?: string | null;
@@ -153,6 +162,15 @@ export function MyCharacterSection({
   const [conditionTokens, setConditionTokens] = useState<ConditionTokensMap>(() =>
     parseConditionTokensMap(character?.condition_tokens),
   );
+  const [moodState, setMoodState] = useState<MoodStateKey | null>(() =>
+    normalizeMoodState(character?.mood_state),
+  );
+  const [moodTokens, setMoodTokens] = useState<MoodTokensMap>(() =>
+    parseMoodTokensMap(character?.mood_tokens),
+  );
+  const [activeConditions, setActiveConditions] = useState<CharacterConditionKey[]>(() =>
+    parseActiveConditions(character?.active_conditions),
+  );
   const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
     normalizeImageDisplay(character?.avatar_display),
   );
@@ -181,11 +199,19 @@ export function MyCharacterSection({
       const serverCount = Object.keys(fromServer).length;
       if (serverCount > 0) return fromServer;
       const prevHasUrl = Object.values(prev).some((entry) => Boolean(entry?.url?.trim()));
-      // Nach KI-Generierung liefert router.refresh() manchmal noch gecachte Props ohne Tokens.
       if (prevHasUrl && serverCount === 0) return prev;
       return fromServer;
     });
-  }, [character?.condition_tokens, character?.id]);
+    setMoodState(normalizeMoodState(character?.mood_state));
+    setMoodTokens(parseMoodTokensMap(character?.mood_tokens));
+    setActiveConditions(parseActiveConditions(character?.active_conditions));
+  }, [
+    character?.condition_tokens,
+    character?.mood_state,
+    character?.mood_tokens,
+    character?.active_conditions,
+    character?.id,
+  ]);
 
   useEffect(() => {
     if (!tokenFile) {
@@ -496,7 +522,7 @@ export function MyCharacterSection({
           </div>
           {showDnd5eSheet ? (
             <div id="character-dnd5e-sheet" className="scroll-mt-24 sm:col-span-2 lg:col-span-3">
-              <Dnd5eCharacterSheetPanel
+              <Dnd5eCharacterSheetPanelWithLocale
                 campaignId={campaignId}
                 characterId={characterId}
                 biographyCulture={{
@@ -567,6 +593,14 @@ export function MyCharacterSection({
                   onConditionTokensChange: setConditionTokens,
                   canManageConditionTokens: !profileReadOnly || gmPreviewMode,
                   isGmViewer: gmPreviewMode,
+                  moodState,
+                  moodTokens,
+                  activeConditions,
+                  onMoodStateChange: setMoodState,
+                  onMoodTokensChange: setMoodTokens,
+                  onActiveConditionsChange: setActiveConditions,
+                  canManageMood: !profileReadOnly,
+                  canManageActiveConditions: gmPreviewMode,
                 }}
               />
             </div>

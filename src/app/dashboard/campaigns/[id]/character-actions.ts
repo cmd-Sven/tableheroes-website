@@ -60,7 +60,7 @@ export async function getCharacterForMemberByUserId(
 }
 
 const GM_CHARACTER_BASE_SELECT =
-  "id, name, class, race, level, status, biography, avatar_url, avatar_storage_path, avatar_display, token_url, token_storage_path, condition_tokens, modification_log, culture_lore_id, languages, faction_membership, current_location_id";
+  "id, name, class, race, level, status, biography, avatar_url, avatar_storage_path, avatar_display, token_url, token_storage_path, condition_tokens, mood_state, mood_tokens, active_conditions, modification_log, culture_lore_id, languages, faction_membership, current_location_id";
 
 /**
  * Lädt eine Charakterzeile für die GM-Ansicht.

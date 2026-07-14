@@ -82,7 +82,7 @@ import {
   type WeatherPresetId,
 } from "@/src/lib/session-weather";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
-import { Dnd5eCharacterSheetModal } from "@/src/components/characters/Dnd5eCharacterSheetModal";
+import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -4205,7 +4205,7 @@ export function LiveSessionBoard({
       ) : null}
 
       {sheetCharacter && showDnd5eSheet ? (
-        <Dnd5eCharacterSheetModal
+        <Dnd5eCharacterSheetModalWithLocale
           campaignId={campaignId}
           character={{
             id: sheetCharacter.id,

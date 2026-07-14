@@ -1,4 +1,4 @@
-/** Foundry / D&D-5e-Zustände für Karten-Token-Varianten. */
+import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 export const CHARACTER_CONDITION_KEYS = [
   "charmed",
   "unconscious",
@@ -12,6 +12,10 @@ export const CHARACTER_CONDITION_KEYS = [
   "deafened",
   "invisible",
   "poisoned",
+  "frightened",
+  "silenced",
+  "sick",
+  "cursed",
 ] as const;
 
 export type CharacterConditionKey = (typeof CHARACTER_CONDITION_KEYS)[number];
@@ -118,6 +122,34 @@ export const CHARACTER_CONDITION_DEFINITIONS: CharacterConditionDefinition[] = [
     aiVisualHint:
       "Green veins visible on face and neck, sickly greenish skin tint, nauseated pained expression.",
   },
+  {
+    key: "frightened",
+    labelDe: "Angst",
+    labelEn: "Fear",
+    aiVisualHint:
+      "Wide terrified eyes, pale face, trembling lips, fearful cowering expression.",
+  },
+  {
+    key: "silenced",
+    labelDe: "Verstummt",
+    labelEn: "Silenced",
+    aiVisualHint:
+      "Hand over mouth or magical silence glyph, strained expression unable to speak.",
+  },
+  {
+    key: "sick",
+    labelDe: "Krank",
+    labelEn: "Sick",
+    aiVisualHint:
+      "Pale clammy skin, feverish sweat, runny nose or cough, visibly ill and weak expression.",
+  },
+  {
+    key: "cursed",
+    labelDe: "Verflucht",
+    labelEn: "Cursed",
+    aiVisualHint:
+      "Dark purple curse marks on skin, eerie shadow aura, haunted tormented expression.",
+  },
 ];
 
 const CONDITION_BY_KEY = Object.fromEntries(
@@ -126,6 +158,34 @@ const CONDITION_BY_KEY = Object.fromEntries(
 
 export function getConditionDefinition(key: string): CharacterConditionDefinition | null {
   return CONDITION_BY_KEY[key as CharacterConditionKey] ?? null;
+}
+
+export function getConditionLabel(
+  locale: CharacterSheetLocale,
+  key: CharacterConditionKey,
+): string {
+  const def = CONDITION_BY_KEY[key];
+  return locale === "en" ? def.labelEn : def.labelDe;
+}
+
+export function parseActiveConditions(raw: unknown): CharacterConditionKey[] {
+  let data = raw;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(data)) return [];
+  const out: CharacterConditionKey[] = [];
+  for (const item of data) {
+    const key = String(item ?? "").trim();
+    if (getConditionDefinition(key)) {
+      out.push(key as CharacterConditionKey);
+    }
+  }
+  return out;
 }
 
 export function parseConditionTokensMap(raw: unknown): ConditionTokensMap {

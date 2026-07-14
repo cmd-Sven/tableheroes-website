@@ -13,6 +13,7 @@ import {
   loadCharacterConditionTokens,
   removeCharacterConditionToken,
 } from "@/src/app/dashboard/campaigns/[id]/character-token-actions";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 export type CharacterConditionTokensPanelProps = {
   campaignId: string;
@@ -43,6 +44,7 @@ export function CharacterConditionTokensPanel({
   canManage = true,
   isGm = false,
 }: CharacterConditionTokensPanelProps) {
+  const { t, conditionLabel } = useCharacterSheetLocale();
   const [tokens, setTokens] = useState<ConditionTokensMap>(() => conditionTokens);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
@@ -86,7 +88,7 @@ export function CharacterConditionTokensPanel({
     try {
       const result = await loadCharacterConditionTokens({ campaignId, characterId });
       if (!result.success) {
-        setFetchError(result.error ?? "Zustands-Token konnten nicht geladen werden.");
+        setFetchError(result.error ?? t("condition.fetchError"));
         return;
       }
       applyTokens(result.tokens);
@@ -94,7 +96,7 @@ export function CharacterConditionTokensPanel({
       setFetchError(
         error instanceof Error
           ? error.message
-          : "Zustands-Token konnten nicht geladen werden.",
+          : t("condition.fetchError"),
       );
     } finally {
       setIsFetching(false);
@@ -119,7 +121,7 @@ export function CharacterConditionTokensPanel({
 
   const ensureSourceImage = () => {
     if (hasSourceImage) return true;
-    alert("Bitte lade zuerst ein Portrait oder Basis-Token hoch.");
+    alert(t("condition.needPortrait"));
     return false;
   };
 
@@ -136,7 +138,7 @@ export function CharacterConditionTokensPanel({
         conditionKey: key,
       });
       if (!result.success || !result.entry) {
-        alert(result.error ?? "KI-Generierung fehlgeschlagen.");
+        alert(result.error ?? t("condition.generateError"));
         return;
       }
       applyTokens({ ...tokens, [key]: result.entry });
@@ -145,7 +147,7 @@ export function CharacterConditionTokensPanel({
       alert(
         error instanceof Error
           ? error.message
-          : "Unerwarteter Fehler bei der KI-Generierung (Timeout oder Netzwerk).",
+          : t("condition.generateNetworkError"),
       );
     } finally {
       setIsLoading(false);
@@ -159,11 +161,11 @@ export function CharacterConditionTokensPanel({
 
     if (regenerateExisting) {
       const ok = confirm(
-        "Alle 12 Zustands-Token neu generieren? Bestehende Bilder werden ersetzt. Das kann einige Minuten dauern.",
+        t("condition.regenerateAllConfirm"),
       );
       if (!ok) return;
     } else if (missingCount === 0) {
-      alert("Alle Zustands-Token sind bereits vorhanden. Nutze „Neu generieren“ pro Zustand oder „Alle neu generieren“.");
+      alert(t("condition.allPresent"));
       return;
     }
 
@@ -190,7 +192,7 @@ export function CharacterConditionTokensPanel({
             : `KI-Generierung fehlgeschlagen:\n${failed}`,
         );
       } else if (result.generatedCount === 0) {
-        alert(result.error ?? "Keine Token erzeugt.");
+        alert(result.error ?? t("condition.noneGenerated"));
       }
 
       await refreshTokensFromServer();
@@ -198,7 +200,7 @@ export function CharacterConditionTokensPanel({
       alert(
         error instanceof Error
           ? error.message
-          : "Unerwarteter Fehler bei der KI-Generierung (Timeout oder Netzwerk).",
+          : t("condition.generateNetworkError"),
       );
     } finally {
       setIsLoading(false);
@@ -208,7 +210,7 @@ export function CharacterConditionTokensPanel({
 
   const handleRemove = async (key: CharacterConditionKey) => {
     if (!canManage || isLoading) return;
-    if (!confirm("Zustands-Token wirklich entfernen?")) return;
+    if (!confirm(t("condition.deleteConfirm"))) return;
 
     setIsLoading(true);
     try {
@@ -218,7 +220,7 @@ export function CharacterConditionTokensPanel({
         conditionKey: key,
       });
       if (!result.success) {
-        alert(result.error ?? "Löschen fehlgeschlagen.");
+        alert(result.error ?? t("condition.deleteError"));
         return;
       }
       const next = { ...tokens };
@@ -229,7 +231,7 @@ export function CharacterConditionTokensPanel({
       alert(
         error instanceof Error
           ? error.message
-          : "Unerwarteter Fehler beim Löschen (Timeout oder Netzwerk).",
+          : t("condition.deleteNetworkError"),
       );
     } finally {
       setIsLoading(false);
@@ -243,20 +245,23 @@ export function CharacterConditionTokensPanel({
       <div className="border-b border-hero-dark pb-3 space-y-2">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
-          Zustands-Token (KI)
+          {t("condition.title")}
         </h3>
         <p className="font-libre text-xs text-gray-500">
-          Erstelle aus deinem Basis-Token Varianten für typische Foundry-Zustände. Die KI passt nur
-          das Avatarbild an — Identität und Stil bleiben erhalten. Später wechselt der Token auf der
-          Karte automatisch je nach Zustand.
+          {t("condition.hint")}
         </p>
         {isGm ? (
           <p className="font-libre text-xs text-amber-200/90">
-            Als Spielleiter kannst du die KI-Generierung für diesen Charakter starten.
+            {t("condition.gmHint")}
           </p>
         ) : null}
         <p className="font-libre text-xs text-gray-500">
-          {isFetching ? "Lade Zustands-Token…" : `${generatedCount} von ${CHARACTER_CONDITION_DEFINITIONS.length} Zuständen mit Token.`}
+          {isFetching
+            ? t("condition.loading")
+            : t("condition.progress", {
+                generated: generatedCount,
+                total: CHARACTER_CONDITION_DEFINITIONS.length,
+              })}
         </p>
         {fetchError ? (
           <p className="rounded border border-red-900/50 bg-red-950/20 px-3 py-2 font-libre text-xs text-red-300">
@@ -279,8 +284,8 @@ export function CharacterConditionTokensPanel({
               <Sparkles className="h-4 w-4" />
             )}
             {missingCount > 0
-              ? `KI starten: ${missingCount} fehlende generieren`
-              : "Alle Zustände generieren"}
+              ? t("condition.generateMissing", { count: missingCount })
+              : t("condition.generateAll")}
           </button>
           {generatedCount > 0 ? (
             <button
@@ -294,7 +299,7 @@ export function CharacterConditionTokensPanel({
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Alle neu generieren
+              {t("condition.regenerateAll")}
             </button>
           ) : null}
         </div>
@@ -326,9 +331,8 @@ export function CharacterConditionTokensPanel({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-barlow text-sm font-bold uppercase text-white truncate">
-                    {def.labelDe}
+                    {conditionLabel(def.key)}
                   </p>
-                  <p className="font-libre text-xs text-gray-500">{def.labelEn}</p>
                 </div>
               </div>
 
@@ -337,13 +341,13 @@ export function CharacterConditionTokensPanel({
                   type="button"
                   onClick={() => setPreviewKey(def.key)}
                   className="group relative mx-auto h-36 w-36 overflow-hidden rounded-full border-2 border-hero-border bg-hero-dark transition-colors hover:border-hero-vibrant focus:outline-none focus-visible:ring-2 focus-visible:ring-hero-vibrant focus-visible:ring-offset-2 focus-visible:ring-offset-background-card cursor-zoom-in"
-                  title={`${def.labelDe} vergrößern`}
-                  aria-label={`${def.labelDe} vergrößern`}
+                  title={conditionLabel(def.key)}
+                  aria-label={conditionLabel(def.key)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL */}
                   <img
                     src={tokenImageSrc(entry!.url, entry!.generated_at)}
-                    alt={def.labelDe}
+                    alt={conditionLabel(def.key)}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                     onError={() =>
                       setBrokenImages((prev) => ({ ...prev, [def.key]: true }))
@@ -372,7 +376,7 @@ export function CharacterConditionTokensPanel({
                     </div>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center font-libre text-[10px] text-gray-600 text-center px-2">
-                      {isFetching ? "…" : "Noch kein Token"}
+                      {isFetching ? "…" : t("condition.noTokenYet")}
                     </div>
                   )}
                 </div>
@@ -397,7 +401,7 @@ export function CharacterConditionTokensPanel({
                     ) : (
                       <Sparkles className="h-3 w-3" />
                     )}
-                    {entry ? "Neu generieren" : "KI starten"}
+                    {entry ? t("condition.regenerate") : t("condition.startAi")}
                   </button>
                   {entry ? (
                     <button
@@ -427,7 +431,7 @@ export function CharacterConditionTokensPanel({
           <button
             type="button"
             className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-            aria-label="Vorschau schließen"
+            aria-label={t("condition.previewClose")}
             onClick={() => setPreviewKey(null)}
           />
           <div className="relative z-10 w-full max-w-md rounded-xl border border-hero-border bg-background-card p-6 shadow-2xl">
@@ -437,15 +441,14 @@ export function CharacterConditionTokensPanel({
                   id="condition-token-preview-title"
                   className="font-barlow text-xl font-bold uppercase text-hero-vibrant"
                 >
-                  {previewDef.labelDe}
+                  {conditionLabel(previewDef.key)}
                 </h4>
-                <p className="font-libre text-sm text-gray-400">{previewDef.labelEn}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewKey(null)}
                 className="rounded border border-hero-border p-2 text-gray-400 hover:text-white hover:border-hero-vibrant"
-                aria-label="Schließen"
+                aria-label={t("condition.close")}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -455,7 +458,7 @@ export function CharacterConditionTokensPanel({
               {/* eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL */}
               <img
                 src={tokenImageSrc(previewEntry.url, previewEntry.generated_at)}
-                alt={previewDef.labelDe}
+                alt={conditionLabel(previewDef.key)}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -464,7 +467,7 @@ export function CharacterConditionTokensPanel({
               {previewEntry.is_ai_generated ? (
                 <span className="inline-flex items-center gap-1.5 font-barlow text-xs font-bold uppercase text-accent-gold">
                   <Sparkles className="h-3.5 w-3.5" />
-                  KI-generiert
+                  {t("condition.aiGenerated")}
                 </span>
               ) : null}
               <a

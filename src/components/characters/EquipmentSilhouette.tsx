@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dnd5eEquipmentSlot } from "@/src/lib/characters/dnd5e/equipment-types";
-import { EQUIPMENT_SLOT_LABELS_DE } from "@/src/lib/characters/dnd5e/equipment-types";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type SlotLayout = {
   key: Dnd5eEquipmentSlot;
@@ -40,12 +40,13 @@ export function EquipmentSilhouette({
   readOnly,
   onSelectSlot,
 }: Props) {
+  const { t, equipmentSlotLabel } = useCharacterSheetLocale();
   return (
     <div className="relative mx-auto w-full max-w-[220px]">
       <svg
         viewBox="0 0 200 360"
         className="w-full h-auto text-hero-border"
-        aria-label="Ausrüstungs-Silhouette"
+        aria-label={t("silhouette.aria")}
       >
         {/* Silhouette */}
         <ellipse cx="100" cy="38" rx="28" ry="32" fill="currentColor" className="text-hero-dark/80" />
@@ -72,7 +73,7 @@ export function EquipmentSilhouette({
           const itemId = slots[key];
           const filled = Boolean(itemId);
           const isActive = activeSlot === key;
-          const label = EQUIPMENT_SLOT_LABELS_DE[key];
+          const label = equipmentSlotLabel(key);
           const itemLabel = itemId ? itemNames[itemId] : null;
 
           return (
@@ -111,7 +112,7 @@ export function EquipmentSilhouette({
       <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] font-barlow uppercase text-gray-500">
         {SLOT_LAYOUT.filter((s) => slots[s.key]).map(({ key }) => (
           <div key={key} className="truncate">
-            <span className="text-gray-600">{EQUIPMENT_SLOT_LABELS_DE[key]}:</span>{" "}
+            <span className="text-gray-600">{equipmentSlotLabel(key)}:</span>{" "}
             <span className="text-gray-300">{itemNames[slots[key]!] ?? "—"}</span>
           </div>
         ))}

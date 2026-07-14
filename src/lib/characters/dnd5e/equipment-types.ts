@@ -43,12 +43,33 @@ export const EQUIPMENT_SLOT_LABELS_DE: Record<Dnd5eEquipmentSlot, string> = {
   back: "Rücken",
 };
 
+export const EQUIPMENT_SLOT_LABELS_EN: Record<Dnd5eEquipmentSlot, string> = {
+  head: "Head",
+  eyes: "Eyes",
+  neck: "Neck",
+  shoulders: "Shoulders",
+  chest: "Chest",
+  hands: "Hands",
+  waist: "Waist",
+  legs: "Legs",
+  feet: "Feet",
+  mainHand: "Main Hand",
+  offHand: "Off Hand",
+  back: "Back",
+};
+
 export type Dnd5eContainerKind = "backpack" | "bag_of_holding" | "pouch";
 
 export const CONTAINER_KIND_LABELS_DE: Record<Dnd5eContainerKind, string> = {
   backpack: "Rucksack",
   bag_of_holding: "Tasche der haltenden Magie",
   pouch: "Beutel",
+};
+
+export const CONTAINER_KIND_LABELS_EN: Record<Dnd5eContainerKind, string> = {
+  backpack: "Backpack",
+  bag_of_holding: "Bag of Holding",
+  pouch: "Pouch",
 };
 
 /** Standard-Gewichtslimit in Pfund (D&D 5e) */

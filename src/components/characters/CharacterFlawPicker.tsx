@@ -4,10 +4,9 @@ import {
   CHARACTER_FLAWS,
   MAX_CHARACTER_FLAWS,
   getFlawById,
-  flawUnlockHint,
-  flawEmptyHint,
   type CharacterFlawEntry,
 } from "@/src/lib/characters/character-flaws";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 export type CharacterFlawPickerProps = {
   characterFlaws: CharacterFlawEntry[];
@@ -23,6 +22,7 @@ export function CharacterFlawPicker({
   readOnly = false,
   compact = false,
 }: CharacterFlawPickerProps) {
+  const { t } = useCharacterSheetLocale();
   const usedFlawIds = new Set(characterFlaws.map((f) => f.flawId).filter(Boolean));
   const hasSelectedFlaws = usedFlawIds.size > 0;
 
@@ -49,9 +49,9 @@ export function CharacterFlawPicker({
   return (
     <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
       <div className="border-b border-hero-dark pb-2">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">Makel</h3>
+        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">{t("flaws.title")}</h3>
         <p className="mt-1 font-libre text-xs text-gray-500">
-          {hasSelectedFlaws ? flawUnlockHint() : flawEmptyHint()}
+          {hasSelectedFlaws ? t("flaws.unlockHint") : t("flaws.emptyHint")}
         </p>
       </div>
 
@@ -67,9 +67,9 @@ export function CharacterFlawPicker({
             }`}
           >
             <p className="font-barlow text-xs font-bold uppercase text-gray-400">
-              Makel {slotIndex + 1}
+              {t("flaws.slot", { n: slotIndex + 1 })}
               {slotIndex === 0 ? (
-                <span className="ml-2 text-[10px] font-normal text-gray-500">(optional)</span>
+                <span className="ml-2 text-[10px] font-normal text-gray-500">{t("flaws.slotOptional")}</span>
               ) : null}
             </p>
 
@@ -89,7 +89,7 @@ export function CharacterFlawPicker({
               }}
               className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
             >
-              <option value="">— Makel auswählen —</option>
+              <option value="">{t("flaws.selectPlaceholder")}</option>
               {CHARACTER_FLAWS.map((f) => (
                 <option
                   key={f.id}
@@ -111,17 +111,17 @@ export function CharacterFlawPicker({
                   <p className="font-libre text-gray-300">{flawDef.description}</p>
                 ) : null}
                 <p>
-                  <span className="font-barlow font-bold uppercase text-accent-blood">Nachteil:</span>{" "}
+                  <span className="font-barlow font-bold uppercase text-accent-blood">{t("flaws.disadvantage")}</span>{" "}
                   <span className="font-libre text-gray-300">{flawDef.mainDisadvantage}</span>
                 </p>
                 <p>
-                  <span className="font-barlow font-bold uppercase text-hero-vibrant">Vorteil:</span>{" "}
+                  <span className="font-barlow font-bold uppercase text-hero-vibrant">{t("flaws.advantage")}</span>{" "}
                   <span className="font-libre text-gray-300">{flawDef.smallAdvantage}</span>
                 </p>
                 {!compact ? (
                   <details className="font-libre text-gray-400">
                     <summary className="cursor-pointer text-hero-vibrant hover:underline">
-                      Details &amp; Rollenspiel
+                      {t("flaws.details")}
                     </summary>
                     <p className="mt-2 whitespace-pre-wrap">{flawDef.effects}</p>
                     <p className="mt-2 italic">{flawDef.roleplay}</p>
@@ -133,14 +133,14 @@ export function CharacterFlawPicker({
             {flawDef ? (
               <div>
                 <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
-                  Wie ist es dazu gekommen?
+                  {t("flaws.storyLabel")}
                 </label>
                 <textarea
                   value={entry?.story ?? ""}
                   readOnly={readOnly}
                   onChange={(e) => setFlawAt(slotIndex, { story: e.target.value })}
                   rows={compact ? 2 : 3}
-                  placeholder="Beschreibe die Hintergrundgeschichte zu diesem Makel…"
+                  placeholder={t("flaws.storyPlaceholder")}
                   className={textareaClass}
                 />
               </div>
@@ -158,15 +158,16 @@ export function CharacterFlawSummary({
 }: {
   characterFlaws: CharacterFlawEntry[];
 }) {
+  const { t } = useCharacterSheetLocale();
   const selected = characterFlaws.filter((f) => f.flawId.trim());
 
   if (selected.length === 0) {
     return (
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-2">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
-          Makel
+          {t("flaws.title")}
         </h3>
-        <p className="font-libre text-xs text-gray-500">{flawEmptyHint()}</p>
+        <p className="font-libre text-xs text-gray-500">{t("flaws.emptyHint")}</p>
       </section>
     );
   }
@@ -174,9 +175,9 @@ export function CharacterFlawSummary({
   return (
     <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
       <div className="border-b border-hero-dark pb-2">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">Makel</h3>
+        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">{t("flaws.title")}</h3>
         <p className="mt-1 font-libre text-xs text-gray-500">
-          Ausgewählte Makel — bearbeiten im Tab „Attribute“.
+          {t("flaws.summaryHint")}
         </p>
       </div>
       <ul className="space-y-2">

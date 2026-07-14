@@ -1,5 +1,6 @@
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
-import { parseConditionTokensMap } from "@/src/lib/characters/condition-tokens";
+import { parseConditionTokensMap, parseActiveConditions } from "@/src/lib/characters/condition-tokens";
+import { parseMoodTokensMap, normalizeMoodState } from "@/src/lib/characters/mood-states";
 
 const DROP_KEYS = new Set([
   "modification_log",
@@ -22,6 +23,9 @@ const ALLOWED_EDITOR_KEYS = new Set([
   "token_url",
   "token_storage_path",
   "condition_tokens",
+  "mood_state",
+  "mood_tokens",
+  "active_conditions",
   "alignment",
   "sheet_synced_at",
   "bio_family",
@@ -152,6 +156,24 @@ export function serializeCharacterForEditorClient(
     }
   }
   out.condition_tokens = parseConditionTokensMap(out.condition_tokens);
+
+  if (out.mood_tokens != null && typeof out.mood_tokens === "string") {
+    try {
+      out.mood_tokens = JSON.parse(out.mood_tokens) as unknown;
+    } catch {
+      out.mood_tokens = {};
+    }
+  }
+  out.mood_tokens = parseMoodTokensMap(out.mood_tokens);
+  out.mood_state = normalizeMoodState(out.mood_state);
+  if (out.active_conditions != null && typeof out.active_conditions === "string") {
+    try {
+      out.active_conditions = JSON.parse(out.active_conditions) as unknown;
+    } catch {
+      out.active_conditions = [];
+    }
+  }
+  out.active_conditions = parseActiveConditions(out.active_conditions);
 
   for (const k of Object.keys(out)) {
     if (!ALLOWED_EDITOR_KEYS.has(k)) delete out[k];

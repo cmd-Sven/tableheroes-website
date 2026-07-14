@@ -19,7 +19,9 @@ export type CombatConditionId =
   | "invisible"
   | "charmed"
   | "incapacitated"
-  | "petrified";
+  | "petrified"
+  | "sick"
+  | "cursed";
 
 export type CombatConditionDef = {
   id: CombatConditionId;
@@ -38,10 +40,12 @@ export const DND5E_COMBAT_CONDITIONS: CombatConditionDef[] = [
   { id: "concentration", short: "K", label: "Konzentration", isStandard5e: false },
   { id: "blinded", short: "Bl", label: "Blind", isStandard5e: true },
   { id: "deafened", short: "T", label: "Taub", isStandard5e: true },
-  { id: "silenced", short: "St", label: "Stumm", isStandard5e: false },
+  { id: "silenced", short: "St", label: "Verstummt", isStandard5e: false },
   { id: "stunned", short: "Bt", label: "Betäubt", isStandard5e: true },
   { id: "prone", short: "Lg", label: "Liegend", isStandard5e: true },
-  { id: "frightened", short: "Va", label: "Verängstigt", isStandard5e: true },
+  { id: "frightened", short: "An", label: "Angst", isStandard5e: true },
+  { id: "sick", short: "Kr", label: "Krank", isStandard5e: false },
+  { id: "cursed", short: "Vf", label: "Verflucht", isStandard5e: false },
   { id: "poisoned", short: "Vg", label: "Vergiftet", isStandard5e: true },
   { id: "grappled", short: "Gr", label: "Gegriffen", isStandard5e: true },
   { id: "restrained", short: "Gh", label: "Gehemmt", isStandard5e: true },

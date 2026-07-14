@@ -40,6 +40,7 @@ import {
   Store,
   BarChart3,
   PawPrint,
+  Scale,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -397,6 +398,12 @@ export function Sidebar({
           label: "Umfragen",
           icon: BarChart3,
           tab: "polls",
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}/regelsystem`,
+          label: "Regelsystem",
+          icon: Scale,
+          tab: undefined,
         },
         ...(role === "GameMaster" || role === "Admin"
           ? [
@@ -778,7 +785,8 @@ export function Sidebar({
                       pathname === item.href ||
                       (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox")) ||
                       (item.href?.includes("/chronist") && pathname.includes("/chronist")) ||
-                      (!!pathname && item.href.endsWith("/bestarium") && pathname.startsWith(item.href))
+                      (!!pathname && item.href.endsWith("/bestarium") && pathname.startsWith(item.href)) ||
+                      (!!pathname && item.href.endsWith("/regelsystem") && pathname.startsWith(item.href))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
                     disabled={

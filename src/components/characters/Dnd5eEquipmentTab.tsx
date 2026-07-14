@@ -24,8 +24,6 @@ import {
   type Dnd5eEquipmentSlot,
   type Dnd5eEquipmentState,
   CONTAINER_CAPACITY_LB,
-  CONTAINER_KIND_LABELS_DE,
-  EQUIPMENT_SLOT_LABELS_DE,
   MAX_ATTUNEMENT,
   MAX_BELT_SLOTS,
 } from "@/src/lib/characters/dnd5e/equipment-types";
@@ -54,6 +52,7 @@ import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhouette";
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
 import { parseFoundryItemTag } from "@/src/lib/characters/dnd5e/item-meta";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
   characterId: string;
@@ -102,6 +101,7 @@ export function Dnd5eEquipmentTab({
   readOnly,
   onEquipmentChange,
 }: Props) {
+  const { t, equipmentSlotLabel, containerKindLabel } = useCharacterSheetLocale();
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSlot, setActiveSlot] = useState<Dnd5eEquipmentSlot | null>(null);
@@ -174,7 +174,7 @@ export function Dnd5eEquipmentTab({
     const container: Dnd5eEquipmentContainer = {
       id: crypto.randomUUID(),
       kind: "backpack",
-      label: "Rucksack",
+      label: t("equipment.defaultBackpack"),
       linkedItemId: null,
       itemIds: [],
     };
@@ -192,7 +192,7 @@ export function Dnd5eEquipmentTab({
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-gray-400">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="font-libre text-sm">Inventar wird geladen…</span>
+        <span className="font-libre text-sm">{t("equipment.loading")}</span>
       </div>
     );
   }
@@ -204,14 +204,14 @@ export function Dnd5eEquipmentTab({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
             <Scale className="h-4 w-4" />
-            Traglast
+            {t("equipment.carryingCapacity")}
           </h3>
           <div className="text-right">
             <p className="font-barlow text-2xl font-bold text-white">
               {totalWeight} <span className="text-sm text-gray-500">/ {capacity} lb</span>
             </p>
             <p className="font-libre text-xs text-gray-500">
-              STR {strScore} × 15 = {capacity} lb Kapazität
+              {t("equipment.capacityFormula", { str: strScore, cap: capacity })}
             </p>
           </div>
         </div>
@@ -227,7 +227,7 @@ export function Dnd5eEquipmentTab({
 
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">Inventar</h3>
+          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">{t("equipment.inventory")}</h3>
           {!readOnly ? (
             <button
               type="button"
@@ -235,16 +235,15 @@ export function Dnd5eEquipmentTab({
               className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-3 py-1.5 font-barlow text-xs font-bold uppercase text-black hover:bg-yellow-500"
             >
               <Plus className="h-3.5 w-3.5" />
-              Eigenes Item (D&D 5e)
+              {t("equipment.customItem")}
             </button>
           ) : null}
         </div>
         <p className="font-libre text-xs text-gray-500">
-          Shop-Käufe, Foundry-Import und selbst erstellte Gegenstände. Foundry-Items werden beim
-          Blatt-Sync aktualisiert; eigene Items bearbeitest du hier.
+          {t("equipment.inventoryHint")}
         </p>
         {items.length === 0 ? (
-          <p className="font-libre text-sm text-gray-500 italic">Noch keine Gegenstände im Inventar.</p>
+          <p className="font-libre text-sm text-gray-500 italic">{t("equipment.inventoryEmpty")}</p>
         ) : (
           <ul className="space-y-2 max-h-48 overflow-y-auto">
             {items.map((item) => {
@@ -259,7 +258,7 @@ export function Dnd5eEquipmentTab({
                     <p className="font-libre text-sm text-white truncate">{item.name}</p>
                     <p className="font-libre text-[10px] text-gray-500">
                       {item.category} · {stats.weightLb} lb
-                      {isFoundry ? " · Foundry" : " · Eigen/Shop"}
+                      {isFoundry ? ` · ${t("equipment.foundryTag")}` : ` · ${t("equipment.customTag")}`}
                     </p>
                   </div>
                   {!readOnly && !isFoundry ? (
@@ -268,20 +267,20 @@ export function Dnd5eEquipmentTab({
                         type="button"
                         onClick={() => setItemEditor(item)}
                         className="rounded p-1.5 text-gray-500 hover:text-hero-vibrant"
-                        title="Bearbeiten"
+                        title={t("equipment.edit")}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!confirm(`„${item.name}" wirklich löschen?`)) return;
+                          if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
                           await deleteCharacterItem(item.id);
                           update(removeItemFromEquipment(equipment, item.id));
                           await reloadInventory();
                         }}
                         className="rounded p-1.5 text-gray-500 hover:text-red-400"
-                        title="Löschen"
+                        title={t("equipment.delete")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -298,22 +297,21 @@ export function Dnd5eEquipmentTab({
       <section className="rounded-lg border border-amber-700/40 bg-amber-950/20 p-4 space-y-3">
         <h3 className="font-barlow text-sm font-bold uppercase text-amber-200 flex items-center gap-2">
           <Backpack className="h-4 w-4" />
-          1. Gepäck — Rucksack festlegen
+          {t("equipment.step1Title")}
         </h3>
         <p className="font-libre text-sm text-gray-400">
-          Bevor du Ausrüstung verteilst, lege mindestens einen Rucksack oder eine Tasche der
-          haltenden Magie fest. Gegenstände aus Shops und Loot landen in deinem Inventar.
+          {t("equipment.step1Hint")}
         </p>
 
         {equipment.containers.length === 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {backpackCandidates.length > 0 ? (
               <div className="space-y-2">
-                <p className="font-barlow text-xs uppercase text-gray-500">Aus Inventar wählen</p>
+                <p className="font-barlow text-xs uppercase text-gray-500">{t("equipment.chooseFromInventory")}</p>
                 <ItemSelect
                   value=""
                   items={backpackCandidates}
-                  placeholder="Rucksack wählen…"
+                  placeholder={t("equipment.chooseBackpack")}
                   disabled={readOnly}
                   onChange={(id) => addBackpackFromItem(id)}
                 />
@@ -326,7 +324,7 @@ export function Dnd5eEquipmentTab({
                   onClick={addDefaultBackpack}
                   className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-dark/50"
                 >
-                  Standard-Rucksack hinzufügen
+                  {t("equipment.addDefaultBackpack")}
                 </button>
               </div>
             ) : null}
@@ -344,8 +342,8 @@ export function Dnd5eEquipmentTab({
                   <div>
                     <p className="font-barlow text-sm font-bold text-white">{container.label}</p>
                     <p className="font-libre text-xs text-gray-500">
-                      {CONTAINER_KIND_LABELS_DE[container.kind]}
-                      {cap != null ? ` · max. ${cap} lb` : ""} · {w} lb
+                      {containerKindLabel(container.kind)}
+                      {cap != null ? ` · ${t("equipment.maxLb", { cap })}` : ""} · {w} lb
                     </p>
                   </div>
                   {!readOnly ? (
@@ -354,7 +352,7 @@ export function Dnd5eEquipmentTab({
                       onClick={() => removeContainer(container.id)}
                       className="text-xs text-red-400 hover:text-red-300"
                     >
-                      Entfernen
+                      {t("equipment.remove")}
                     </button>
                   ) : null}
                 </div>
@@ -362,7 +360,7 @@ export function Dnd5eEquipmentTab({
             })}
             {!readOnly && !hasBackpack ? (
               <p className="font-libre text-xs text-amber-400">
-                Hinweis: Mindestens ein Rucksack-Typ wird empfohlen.
+                {t("equipment.backpackHint")}
               </p>
             ) : null}
           </div>
@@ -374,16 +372,16 @@ export function Dnd5eEquipmentTab({
           {/* Gürtel */}
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
             <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">
-              2. Gürtel — Schnellzugriff (max. {MAX_BELT_SLOTS})
+              {t("equipment.step2Title", { max: MAX_BELT_SLOTS })}
             </h3>
             <p className="font-libre text-xs text-gray-500">
-              Tränke, Dolche, Zauberstäbe oder andere schnell erreichbare Gegenstände.
+              {t("equipment.step2Hint")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {equipment.belt.map((itemId, index) => (
                 <div key={index} className="space-y-1">
                   <span className="font-barlow text-[10px] uppercase text-gray-600">
-                    Gürtel {index + 1}
+                    {t("equipment.beltSlot", { n: index + 1 })}
                   </span>
                   {readOnly ? (
                     <p className="font-libre text-sm text-gray-300">
@@ -393,7 +391,7 @@ export function Dnd5eEquipmentTab({
                     <ItemSelect
                       value={itemId ?? ""}
                       items={[...unassigned, ...(itemId ? items.filter((i) => i.id === itemId) : [])]}
-                      placeholder="Leer"
+                      placeholder={t("equipment.empty")}
                       onChange={(id) =>
                         update(placeItemOnBelt(equipment, index, id || null))
                       }
@@ -408,7 +406,7 @@ export function Dnd5eEquipmentTab({
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-lg border border-hero-dark bg-background-card p-4">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
-                3. Ausrüstung am Körper
+                {t("equipment.step3Title")}
               </h3>
               <EquipmentSilhouette
                 slots={equipment.slots}
@@ -420,7 +418,7 @@ export function Dnd5eEquipmentTab({
               {activeSlot && !readOnly ? (
                 <div className="mt-4 space-y-2 border-t border-hero-dark pt-4">
                   <p className="font-barlow text-xs uppercase text-gray-500">
-                    {EQUIPMENT_SLOT_LABELS_DE[activeSlot]} belegen
+                    {t("equipment.equipSlot", { slot: equipmentSlotLabel(activeSlot) })}
                   </p>
                   <ItemSelect
                     value={equipment.slots[activeSlot] ?? ""}
@@ -430,7 +428,7 @@ export function Dnd5eEquipmentTab({
                         ? items.filter((i) => i.id === equipment.slots[activeSlot])
                         : []),
                     ]}
-                    placeholder="Nichts ausgerüstet"
+                    placeholder={t("equipment.nothingEquipped")}
                     onChange={(id) =>
                       update(placeItemInSlot(equipment, activeSlot, id || null))
                     }
@@ -442,23 +440,23 @@ export function Dnd5eEquipmentTab({
             <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
                 <Swords className="h-4 w-4" />
-                Kampfwerte (ausgerüstet)
+                {t("equipment.combatValues")}
               </h3>
 
               <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
                 <p className="font-barlow text-xs uppercase text-gray-500 flex items-center gap-1">
-                  <Shield className="h-3.5 w-3.5" /> Rüstungsklasse (Vorschau)
+                  <Shield className="h-3.5 w-3.5" /> {t("equipment.acPreview")}
                 </p>
                 <p className="font-barlow text-3xl font-bold text-white mt-1">{acPreview.ac}</p>
                 <p className="font-libre text-xs text-gray-500 mt-1">{acPreview.breakdown}</p>
                 <p className="font-libre text-[10px] text-gray-600 mt-1">
-                  Gespeicherter Blattwert: {derived.ac}
+                  {t("equipment.storedAc")} {derived.ac}
                 </p>
               </div>
 
               {weaponAttacks.length === 0 ? (
                 <p className="font-libre text-sm text-gray-500">
-                  Keine Waffe in Haupthand/Nebenhand ausgerüstet.
+                  {t("equipment.noWeapons")}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -469,7 +467,7 @@ export function Dnd5eEquipmentTab({
                     >
                       <p className="font-barlow font-bold text-white">{atk.name}</p>
                       <p className="font-libre text-sm text-accent-gold mt-1">
-                        Angriff {formatSigned(atk.attackBonus)} · Schaden {atk.damage}
+                        {t("equipment.attack")} {formatSigned(atk.attackBonus)} · {t("equipment.damage")} {atk.damage}
                       </p>
                       {atk.notes ? (
                         <p className="font-libre text-xs text-gray-500 mt-1">{atk.notes}</p>
@@ -485,13 +483,13 @@ export function Dnd5eEquipmentTab({
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
             <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
               <Package className="h-4 w-4" />
-              4. Gepäck verteilen
+              {t("equipment.step4Title")}
             </h3>
             {equipment.containers.map((container) => (
               <div key={container.id} className="rounded border border-hero-border/40 p-3 space-y-2">
                 <p className="font-barlow text-sm font-bold text-white">{container.label}</p>
                 {container.itemIds.length === 0 ? (
-                  <p className="font-libre text-xs text-gray-500 italic">Noch leer</p>
+                  <p className="font-libre text-xs text-gray-500 italic">{t("equipment.containerEmpty")}</p>
                 ) : (
                   <ul className="space-y-1">
                     {container.itemIds.map((id) => (
@@ -516,7 +514,7 @@ export function Dnd5eEquipmentTab({
                             }}
                             className="text-xs text-red-400"
                           >
-                            Entfernen
+                            {t("equipment.remove")}
                           </button>
                         ) : null}
                       </li>
@@ -527,7 +525,7 @@ export function Dnd5eEquipmentTab({
                   <ItemSelect
                     value=""
                     items={unassigned}
-                    placeholder="Gegenstand einpacken…"
+                    placeholder={t("equipment.packItem")}
                     onChange={(id) => update(placeItemInContainer(equipment, container.id, id))}
                   />
                 ) : null}
@@ -537,7 +535,7 @@ export function Dnd5eEquipmentTab({
             {unassigned.length > 0 ? (
               <div className="border-t border-hero-dark pt-3">
                 <p className="font-barlow text-xs uppercase text-gray-500 mb-2">
-                  Noch nicht verteilt ({unassigned.length})
+                  {t("equipment.unassigned", { count: unassigned.length })}
                 </p>
                 <ul className="flex flex-wrap gap-2">
                   {unassigned.map((item) => (
@@ -557,10 +555,13 @@ export function Dnd5eEquipmentTab({
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
             <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
-              Magische Einstimmung (max. {MAX_ATTUNEMENT})
+              {t("equipment.attunementTitle", { max: MAX_ATTUNEMENT })}
             </h3>
             <p className="font-libre text-xs text-gray-500">
-              Eingestimmte Gegenstände: {equipment.attunedItemIds.length} / {MAX_ATTUNEMENT}
+              {t("equipment.attunementCount", {
+                count: equipment.attunedItemIds.length,
+                max: MAX_ATTUNEMENT,
+              })}
             </p>
             <div className="space-y-2">
               {items
@@ -588,7 +589,7 @@ export function Dnd5eEquipmentTab({
                       <span className="font-libre text-sm text-gray-300">{item.name}</span>
                       {resolveCharacterItemStats(item).attunement ? (
                         <span className="ml-auto font-barlow text-[10px] uppercase text-accent-gold">
-                          Einstimmung
+                          {t("equipment.attunement")}
                         </span>
                       ) : null}
                     </label>
@@ -596,7 +597,7 @@ export function Dnd5eEquipmentTab({
                 })}
               {items.filter((i) => resolveCharacterItemStats(i).isMagical).length === 0 ? (
                 <p className="font-libre text-sm text-gray-500 italic">
-                  Keine magischen Gegenstände im Inventar.
+                  {t("equipment.noMagicItems")}
                 </p>
               ) : null}
             </div>
@@ -604,7 +605,7 @@ export function Dnd5eEquipmentTab({
         </>
       ) : (
         <p className="font-libre text-sm text-gray-500 text-center py-6">
-          Lege zuerst einen Rucksack fest, um Gürtel, Ausrüstung und Gepäck zu verwalten.
+          {t("equipment.needBackpackFirst")}
         </p>
       )}
       {itemEditor !== null ? (
