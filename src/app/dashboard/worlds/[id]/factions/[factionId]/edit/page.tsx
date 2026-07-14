@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { getFactionById } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 import { getAllLocationsByWorld } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { getFactionsByWorld } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
-import { FactionForm } from "@/src/components/dashboard/campaigns/factions/FactionForm";
+import { FactionCreationWizard } from "@/src/components/dashboard/campaigns/factions/FactionCreationWizard";
 
 type Props = {
   params: Promise<{ id: string; factionId: string }>;
@@ -57,7 +57,7 @@ export default async function WorldEditFactionPage({ params }: Props) {
         Zurück zu Fraktionen
       </Link>
 
-      <FactionForm
+      <FactionCreationWizard
         worldId={worldId}
         initialData={faction as any}
         locations={typedLocations}

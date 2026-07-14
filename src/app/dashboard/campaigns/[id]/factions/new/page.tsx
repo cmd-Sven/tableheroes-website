@@ -1,6 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { FactionForm } from "@/src/components/dashboard/campaigns/factions/FactionForm";
+import { FactionCreationWizard } from "@/src/components/dashboard/campaigns/factions/FactionCreationWizard";
 import { getAllLocations } from "../../location-actions";
 import { getFactions } from "../../factions-actions";
 
@@ -49,7 +49,7 @@ export default async function CreateFactionPage({ params }: Props) {
 
   return (
     <div className="container mx-auto p-6">
-      <FactionForm
+      <FactionCreationWizard
         campaignId={campaignId}
         initialData={null}
         locations={typedLocations}

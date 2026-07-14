@@ -185,7 +185,7 @@ components/
 │   │   ├── NPCDetailPage.tsx      # NPC-Detailseite
 │   │   │
 │   │   ├── factions/
-│   │   │   └── FactionForm.tsx    # Fraktions-Formular
+│   │   │   └── FactionCreationWizard.tsx    # Fraktions-Wizard (Erstellen/Bearbeiten)
 │   │   │
 │   │   ├── lore/                  # Lore-Komponenten
 │   │   │   ├── LoreDetailPage.tsx
@@ -228,7 +228,7 @@ components/
 │   │
 │   ├── [Modal-Komponenten]
 │   │   ├── CreateNPCModal.tsx
-│   │   ├── CreateFactionModal.tsx
+│   │   ├── FactionCreationWizard.tsx
 │   │   ├── CreateLoreModal.tsx
 │   │   ├── CreateQuestModal.tsx
 │   │   ├── AddPersonModal.tsx
@@ -413,7 +413,7 @@ Alle Server-Actions befinden sich in `app/dashboard/campaigns/[id]/`:
 ### **Formulare**
 - `NPCForm.tsx` - NPC-Erstellung/Bearbeitung
 - `LoreForm.tsx` - Lore-Erstellung/Bearbeitung
-- `FactionForm.tsx` - Fraktions-Erstellung/Bearbeitung
+- `FactionCreationWizard.tsx` - Fraktions-Erstellung/Bearbeitung (Schritt-für-Schritt)
 - `QuestForm.tsx` - Quest-Erstellung/Bearbeitung
 - `WorldSetupForm.tsx` - World-Setup
 

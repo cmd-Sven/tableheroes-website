@@ -24,6 +24,7 @@ export async function createFaction(formData: {
   image_is_ai_generated?: boolean;
   image_upload_rights_confirmed?: boolean | null;
   location_id?: string;
+  hq_location_id?: string;
   gm_notes?: string;
   is_revealed?: boolean;
   appearance?: string;
@@ -88,6 +89,7 @@ export async function createFaction(formData: {
           ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
           : null,
       location_id: formData.location_id || null,
+      hq_location_id: formData.hq_location_id || null,
       gm_notes: formData.gm_notes || null,
       is_revealed: formData.is_revealed ?? false,
       // neue in der DB gespeicherte Felder
@@ -109,6 +111,21 @@ export async function createFaction(formData: {
 
   revalidatePath(`/dashboard/worlds/${worldId}`);
   if (formData.campaign_id) revalidatePath(`/dashboard/campaigns/${formData.campaign_id}`);
+
+  const factionId = (faction as { id: string }).id;
+  if (formData.campaign_id && Array.isArray(formData.faction_relations) && factionId) {
+    for (const rel of formData.faction_relations) {
+      if (!rel.target_faction_id || rel.target_faction_id === factionId) continue;
+      await createFactionRelation(
+        formData.campaign_id,
+        factionId,
+        rel.target_faction_id,
+        rel.relation_type,
+        rel.description ?? null,
+      );
+    }
+  }
+
   return faction;
 }
 
@@ -318,6 +335,7 @@ export async function updateFaction(
     image_is_ai_generated?: boolean;
     image_upload_rights_confirmed?: boolean | null;
     location_id?: string;
+    hq_location_id?: string;
     gm_notes?: string;
     is_revealed?: boolean;
     appearance?: string;
@@ -331,6 +349,8 @@ export async function updateFaction(
       description?: string | null;
     }>;
     image_display?: unknown | null;
+    /** Erforderlich zum Sync von faction_relations (kampagnen-spezifisch). */
+    campaign_id?: string;
   }
 ) {
   const supabase = await createClient();
@@ -353,7 +373,13 @@ export async function updateFaction(
     throw new Error("Nur der GM dieser Welt kann Fraktionen bearbeiten.");
   }
 
-  const { planned_members: pm, faction_relations: _fr, image_display: imageDisplayRaw, ...restUpdates } = updates;
+  const {
+    planned_members: pm,
+    faction_relations: factionRelations,
+    image_display: imageDisplayRaw,
+    campaign_id: campaignIdForRelations,
+    ...restUpdates
+  } = updates;
   const updatePayload: Record<string, unknown> = { ...restUpdates };
   if (imageDisplayRaw !== undefined) {
     updatePayload.image_display =
@@ -374,6 +400,32 @@ export async function updateFaction(
   if (error) {
     console.error("Update Faction Error:", error);
     throw new Error(error.message);
+  }
+
+  if (campaignIdForRelations && factionRelations !== undefined) {
+    const existing = await getFactionRelations(campaignIdForRelations, factionId);
+    const desired = (factionRelations || []).filter(
+      (rel) => rel.target_faction_id && rel.target_faction_id !== factionId,
+    );
+    const desiredPartnerIds = new Set(desired.map((rel) => rel.target_faction_id));
+
+    for (const rel of existing) {
+      if (!desiredPartnerIds.has(rel.partnerFactionId)) {
+        await deleteFactionRelation(rel.id, campaignIdForRelations);
+      }
+    }
+
+    for (const rel of desired) {
+      await createFactionRelation(
+        campaignIdForRelations,
+        factionId,
+        rel.target_faction_id,
+        rel.relation_type,
+        rel.description ?? null,
+      );
+    }
+
+    revalidatePath(`/dashboard/campaigns/${campaignIdForRelations}`);
   }
 
   revalidatePath(`/dashboard/worlds/${faction.world_id}`);

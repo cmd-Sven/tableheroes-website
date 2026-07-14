@@ -106,7 +106,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
 
   const visibility = await getRevealedIdsForCampaign(session.campaign_id, "npc");
   const { data: npcRows } = await (admin.from("npcs") as any)
-    .select("id, name, title, description, image_url, is_merchant, shop_id, current_location_id, home_location_id")
+    .select("id, name, title, description, image_url, is_merchant, shop_id, faction_id, current_location_id, home_location_id")
     .eq("campaign_id", session.campaign_id);
 
   const allCampaignNpcs = ((npcRows as any[]) || [])
@@ -120,6 +120,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
       is_revealed: true,
       is_merchant: !!npc.is_merchant,
       shop_id: npc.shop_id != null ? String(npc.shop_id) : null,
+      faction_id: npc.faction_id != null ? String(npc.faction_id) : null,
       current_location_id:
         npc.current_location_id != null ? String(npc.current_location_id) : null,
       home_location_id: npc.home_location_id != null ? String(npc.home_location_id) : null,
@@ -127,7 +128,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
 
   const factionVis = await getRevealedIdsForCampaign(session.campaign_id, "faction");
   const { data: factionRows } = await (admin.from("factions") as any)
-    .select("id, name, image_url, type, description")
+    .select("id, name, image_url, type, description, current_status")
     .eq("campaign_id", session.campaign_id);
 
   const allCampaignFactions = ((factionRows as any[]) || [])
@@ -138,6 +139,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
       image_url: f.image_url ?? null,
       type: f.type != null ? String(f.type) : null,
       description: f.description != null ? String(f.description) : null,
+      current_status: f.current_status != null ? String(f.current_status) : null,
       is_revealed: true,
     }));
 

@@ -28,7 +28,7 @@ Das **Factions & Relations System** wurde erfolgreich implementiert! Dieses Feat
 
 #### **Faction Components:**
 - ✅ **FactionCard.tsx**: Zeigt Fraktion mit Type, Status, Member Count, GM Actions
-- ✅ **CreateFactionModal.tsx**: Formular zum Erstellen/Bearbeiten von Fraktionen
+- ✅ **FactionCreationWizard.tsx**: Schritt-für-Schritt-Wizard zum Erstellen/Bearbeiten von Fraktionen
 - ✅ **FactionsManagement.tsx**: Tab-Container mit Grid und Modal-Logik
 
 #### **NPC Components:**
@@ -410,7 +410,7 @@ tableheroes/
 │   └── components/
 │       └── dashboard/
 │           ├── FactionCard.tsx         ← Faction Display
-│           ├── CreateFactionModal.tsx  ← Faction Form
+│           ├── FactionCreationWizard.tsx  ← Faction Wizard
 │           ├── NPCCard.tsx             ← NPC Display (with Faction Badge!)
 │           └── CreateNPCModal.tsx      ← NPC Form (with Faction Dropdown!)
 └── sql/

@@ -349,6 +349,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     is_revealed: !!npc.is_revealed,
     is_merchant: !!npc.is_merchant,
     shop_id: npc.shop_id != null ? String(npc.shop_id) : null,
+    faction_id: npc.faction_id != null ? String(npc.faction_id) : null,
     current_location_id:
       npc.current_location_id != null ? String(npc.current_location_id) : null,
     home_location_id:
@@ -362,6 +363,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     image_url: f.image_url ?? null,
     type: f.type != null ? String(f.type) : null,
     description: f.description != null ? String(f.description) : null,
+    current_status: f.current_status != null ? String(f.current_status) : null,
     is_revealed: f.is_revealed ?? false,
   }));
   if (!viewAsGM) {

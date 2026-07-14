@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { FactionForm } from "@/src/components/dashboard/campaigns/factions/FactionForm";
+import { FactionCreationWizard } from "@/src/components/dashboard/campaigns/factions/FactionCreationWizard";
 import { getAllLocationsByWorld } from "@/src/app/dashboard/campaigns/[id]/location-actions";
 import { getFactionsByWorld } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 
@@ -55,7 +55,7 @@ export default async function WorldNewFactionPage({ params, searchParams }: Prop
         Zurück zu Fraktionen
       </Link>
 
-      <FactionForm
+      <FactionCreationWizard
         worldId={worldId}
         initialData={null}
         defaultName={defaultName}

@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getFactionById, getFactions } from "../../../factions-actions";
 import { getAllLocations } from "../../../location-actions";
 import { redirect } from "next/navigation";
-import { FactionForm } from "@/src/components/dashboard/campaigns/factions/FactionForm";
+import { FactionCreationWizard } from "@/src/components/dashboard/campaigns/factions/FactionCreationWizard";
 
 type Props = {
   params: Promise<{ id: string; factionId: string }>;
@@ -76,7 +76,7 @@ export default async function FactionEditPage({ params }: Props) {
 
   return (
     <div className="container mx-auto p-6">
-      <FactionForm
+      <FactionCreationWizard
         campaignId={campaignId}
         initialData={faction as any}
         locations={typedLocations}

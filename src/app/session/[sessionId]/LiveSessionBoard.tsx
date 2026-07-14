@@ -45,6 +45,11 @@ import {
   Gift,
   Armchair,
   UserRound,
+  Shield,
+  Skull,
+  Handshake,
+  Minus,
+  StickyNote,
 } from "lucide-react";
 import {
   ensureSessionPrepLiveState,
@@ -59,6 +64,10 @@ import {
 import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
+import {
+  getCampaignNote,
+  upsertCampaignNote,
+} from "@/src/app/dashboard/campaigns/[id]/campaign-notes-actions";
 import { setCampaignVisibility } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-actions";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
 import { registerSessionOnlinePresence } from "@/src/lib/actions/session-presence-actions";
@@ -435,6 +444,7 @@ type CampaignNpc = {
   is_revealed?: boolean | null;
   is_merchant?: boolean | null;
   shop_id?: string | null;
+  faction_id?: string | null;
   /** world_lore.id – gleiche Semantik wie Session-Ort */
   current_location_id?: string | null;
   home_location_id?: string | null;
@@ -457,6 +467,7 @@ type CampaignFaction = {
   image_url: string | null;
   type: string | null;
   description: string | null;
+  current_status?: string | null;
   is_revealed?: boolean;
 };
 
@@ -553,6 +564,117 @@ function useTemporaryStageGlow() {
   return showGlow;
 }
 
+function getFactionStatusVisual(status: string | null | undefined) {
+  switch (status) {
+    case "Feindlich":
+      return { Icon: Skull, color: "text-red-400", label: "Feindlich" };
+    case "Im Krieg":
+      return { Icon: Swords, color: "text-red-500", label: "Im Krieg" };
+    case "Verbündet":
+      return { Icon: Shield, color: "text-hero-vibrant", label: "Verbündet" };
+    case "Freundlich":
+      return { Icon: Handshake, color: "text-emerald-400", label: "Freundlich" };
+    case "Neutral":
+      return { Icon: Minus, color: "text-gray-400", label: "Neutral" };
+    default:
+      return null;
+  }
+}
+
+function StageFactionPlayerNotesButton({
+  campaignId,
+  factionId,
+  factionName,
+}: {
+  campaignId: string;
+  factionId: string;
+  factionName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState("");
+  const [saved, setSaved] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const openModal = () => {
+    setOpen(true);
+    if (loaded) return;
+    startTransition(async () => {
+      try {
+        const note = await getCampaignNote(campaignId, "faction", factionId);
+        const text = note?.content ?? "";
+        setContent(text);
+        setSaved(text);
+        setLoaded(true);
+      } catch {
+        setLoaded(true);
+      }
+    });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`Meine Notizen zu ${factionName}`}
+        title="Meine Notizen"
+        onClick={(e) => {
+          e.stopPropagation();
+          openModal();
+        }}
+        className="absolute left-2 top-2 z-30 grid h-8 w-8 place-items-center rounded-full border border-hero-vibrant/50 bg-black/75 text-hero-vibrant shadow-lg backdrop-blur transition-colors hover:bg-hero-vibrant/20"
+      >
+        <StickyNote className="h-4 w-4" />
+      </button>
+      {open ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[200] bg-black/50"
+            aria-label="Notizen schließen"
+            onClick={() => setOpen(false)}
+          />
+          <div className="fixed left-1/2 top-1/2 z-[201] w-[min(92vw,24rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-hero-border bg-background-card p-4 shadow-2xl">
+            <h4 className="font-barlow font-bold text-sm uppercase text-accent-gold mb-2">
+              Meine Notizen — {factionName}
+            </h4>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={5}
+              placeholder="Beobachtungen zu dieser Fraktion…"
+              className="w-full rounded border border-hero-dark bg-slate-900 p-3 font-libre text-sm text-gray-200 resize-y"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded border border-hero-border px-3 py-1.5 font-barlow text-xs font-bold uppercase text-gray-400"
+              >
+                Schließen
+              </button>
+              <button
+                type="button"
+                disabled={isPending || content === saved}
+                onClick={() => {
+                  startTransition(async () => {
+                    await upsertCampaignNote(campaignId, "faction", factionId, content);
+                    setSaved(content);
+                    setOpen(false);
+                  });
+                }}
+                className="rounded border border-hero-vibrant/50 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-hero-vibrant disabled:opacity-40"
+              >
+                {isPending ? "Speichern…" : "Speichern"}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function StageNpcCard({
   npc,
   isSingle,
@@ -571,6 +693,7 @@ function StageNpcCard({
   campaignShops,
   isShopOpen,
   isShopBusy,
+  linkedToStageFaction = false,
 }: {
   npc: CampaignNpc;
   isSingle: boolean;
@@ -589,10 +712,13 @@ function StageNpcCard({
   campaignShops: LiveCampaignShopOption[];
   isShopOpen: boolean;
   isShopBusy: boolean;
+  linkedToStageFaction?: boolean;
 }) {
   const showGlow = useTemporaryStageGlow();
   const cardTitle = [npc.name, npc.title].filter(Boolean).join(" — ");
-  const glowColor = getStageCardGlowColor("npc");
+  const glowColor = linkedToStageFaction
+    ? getStageCardGlowColor("faction")
+    : getStageCardGlowColor("npc");
   const canDragToInitiative = isGM && isCombatMode && !isInInitiative;
 
   return (
@@ -606,7 +732,9 @@ function StageNpcCard({
         isSingle ? "max-w-xs" : ""
       } ${npc.image_url ? "cursor-zoom-in" : "cursor-default"} ${
         canDragToInitiative ? "cursor-grab active:cursor-grabbing" : ""
-      } ${isInInitiative ? "ring-2 ring-accent-gold/50" : ""}`}
+      } ${isInInitiative ? "ring-2 ring-accent-gold/50" : ""} ${
+        linkedToStageFaction ? "ring-2 ring-accent-gold/70" : ""
+      }`}
       initial={{ opacity: 0, scale: 1.5, y: 200, rotateZ: -15 }}
       animate={
         isCombatMode
@@ -762,6 +890,7 @@ function StageFactionCard({
   isSingle,
   isGM,
   isCombatMode,
+  campaignId,
   onPortrait,
   onRemove,
 }: {
@@ -769,12 +898,14 @@ function StageFactionCard({
   isSingle: boolean;
   isGM: boolean;
   isCombatMode: boolean;
+  campaignId: string;
   onPortrait: (portrait: StagePortraitModal) => void;
   onRemove: (factionId: string) => void;
 }) {
   const showGlow = useTemporaryStageGlow();
   const cardTitle = [faction.name, faction.type].filter(Boolean).join(" — ");
   const glowColor = getStageCardGlowColor("faction");
+  const statusVisual = getFactionStatusVisual(faction.current_status);
 
   return (
     <motion.div
@@ -832,6 +963,22 @@ function StageFactionCard({
           </div>
         )}
       </button>
+      {statusVisual ? (
+        <span
+          className={`pointer-events-none absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-black/40 bg-black/70 px-2 py-1 backdrop-blur ${statusVisual.color}`}
+          title={statusVisual.label}
+        >
+          <statusVisual.Icon className="h-3.5 w-3.5" />
+          <span className="font-barlow text-[9px] font-bold uppercase">{statusVisual.label}</span>
+        </span>
+      ) : null}
+      {!isGM ? (
+        <StageFactionPlayerNotesButton
+          campaignId={campaignId}
+          factionId={String(faction.id)}
+          factionName={faction.name}
+        />
+      ) : null}
       {isGM ? (
         <button
           type="button"
@@ -3561,6 +3708,9 @@ export function LiveSessionBoard({
                               liveState?.active_merchant_npc_id === String(npc.id)
                             }
                             isShopBusy={isShopBusy}
+                            linkedToStageFaction={
+                              Boolean(npc.faction_id) && activeFactionIds.has(String(npc.faction_id))
+                            }
                           />
                         );
                       })}
@@ -3684,6 +3834,7 @@ export function LiveSessionBoard({
                               isSingle={activeFactions.length === 1}
                               isGM={isGM}
                               isCombatMode={!!liveState?.is_combat_mode}
+                              campaignId={campaignId}
                               onPortrait={setStagePortrait}
                               onRemove={(factionId) => removeFromStage("faction", factionId)}
                             />
