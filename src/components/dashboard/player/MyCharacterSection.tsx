@@ -599,7 +599,7 @@ export function MyCharacterSection({
                   onMoodStateChange: setMoodState,
                   onMoodTokensChange: setMoodTokens,
                   onActiveConditionsChange: setActiveConditions,
-                  canManageMood: !profileReadOnly,
+                  canManageMood: !profileReadOnly || gmPreviewMode,
                   canManageActiveConditions: gmPreviewMode,
                 }}
               />

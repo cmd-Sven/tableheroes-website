@@ -235,7 +235,7 @@ export async function setCharacterMoodState(input: {
     const { supabase, character, isOwner, isGm, actorUserId, storageOwnerId } =
       await assertCharacterStateAccess(input.campaignId, input.characterId);
     if (!isOwner && !isGm) {
-      throw new Error("Nur der Spieler kann den Gemütszustand setzen.");
+      throw new Error("Nur Spieler oder Spielleiter können den Gemütszustand setzen.");
     }
 
     const nextMood =
