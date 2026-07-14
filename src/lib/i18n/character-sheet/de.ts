@@ -140,6 +140,16 @@ export const characterSheetMessagesDe = {
   "equipment.uiRingLeft": "Ring links",
   "equipment.uiRingRight": "Ring rechts",
   "equipment.uiFeet": "Füße",
+  "equipment.uiBack1": "Umhang",
+  "equipment.uiBack2": "Rucksack (am Rücken)",
+  "equipment.uiWaist": "Gürtel",
+  "equipment.beltQuickAccess": "Gürtel — Schnellzugriff (max. {max})",
+  "equipment.beltPrepared": "Vorbereitet",
+  "equipment.beltPreparedHint":
+    "Gegenstände am Gürtel gelten als vorbereitet und sind im Kampf schnell erreichbar.",
+  "equipment.containerItemCount": "{count} Gegenstände",
+  "equipment.containerWeight": "{weight} lb",
+  "equipment.containerMaxCapacity": "max. {cap} lb",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":

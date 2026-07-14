@@ -223,6 +223,14 @@ function inferSlotForFoundryItem(
 
   if (type === "weapon") return "mainHand";
   if (meta.isShield || equipType.includes("shield") || name.includes("schild")) return "offHand";
+  if (
+    type === "container" ||
+    equipType.includes("backpack") ||
+    name.includes("rucksack") ||
+    name.includes("backpack")
+  ) {
+    return "back";
+  }
   if (type === "equipment" || type === "loot") {
     if (equipType.includes("ring") || name.includes("ring")) return "ring1";
     if (equipType.includes("cloak") || name.includes("umhang")) return "shoulders";
@@ -232,7 +240,9 @@ function inferSlotForFoundryItem(
     if (equipType.includes("amulet") || name.includes("amulett")) return "neck";
   }
   if (meta.kind === "armor" && meta.acFormula) return "chest";
-  if (type === "container" || name.includes("rucksack") || name.includes("backpack")) return "back";
+  if (equipType.includes("belt") || equipType.includes("gürtel") || name.includes("gürtel") || name.includes("belt")) {
+    return "waist";
+  }
   return null;
 }
 
@@ -327,6 +337,9 @@ export function mapFoundryItemsToEquipment(
       linkedItemId: fid,
       itemIds: [],
     });
+    if (isEquipped(containerItem.system ?? {}) && !equipment.slots.back) {
+      equipment.slots.back = fid;
+    }
   }
 
   if (equipment.containers.length === 0 && stowedItems.length > 0) {

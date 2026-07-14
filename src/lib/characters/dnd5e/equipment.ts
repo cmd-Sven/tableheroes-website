@@ -1,6 +1,7 @@
 import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eDerivedSheet, Dnd5eSheetData } from "./types";
 import {
+  type Dnd5eContainerKind,
   type Dnd5eEquipmentContainer,
   type Dnd5eEquipmentSlot,
   type Dnd5eEquipmentState,
@@ -16,6 +17,10 @@ import { resolveCharacterItemStats } from "./item-resolve";
 
 export { createEmptyEquipmentState } from "./equipment-types";
 
+export function getContainerMaxCapacityLb(kind: Dnd5eContainerKind): number {
+  return CONTAINER_CAPACITY_LB[kind];
+}
+
 export function normalizeEquipmentState(
   raw: Partial<Dnd5eEquipmentState> | null | undefined,
 ): Dnd5eEquipmentState {
@@ -26,6 +31,15 @@ export function normalizeEquipmentState(
   while (belt.length < MAX_BELT_SLOTS) belt.push(null);
   belt.length = MAX_BELT_SLOTS;
 
+  const slots: Partial<Record<Dnd5eEquipmentSlot, string | null>> = {
+    ...(raw.slots ?? {}),
+  };
+  const legacy = raw.slots as Record<string, string | null | undefined> | undefined;
+  if (legacy?.back1 && !slots.shoulders) slots.shoulders = legacy.back1;
+  if (legacy?.back2 && !slots.back) slots.back = legacy.back2;
+  delete (slots as Record<string, unknown>).back1;
+  delete (slots as Record<string, unknown>).back2;
+
   return {
     containers: (raw.containers ?? []).map((c) => ({
       id: String(c.id),
@@ -35,7 +49,7 @@ export function normalizeEquipmentState(
       itemIds: [...(c.itemIds ?? [])],
     })),
     belt,
-    slots: { ...(raw.slots ?? {}) },
+    slots,
     attunedItemIds: [...(raw.attunedItemIds ?? [])].slice(0, MAX_ATTUNEMENT),
   };
 }

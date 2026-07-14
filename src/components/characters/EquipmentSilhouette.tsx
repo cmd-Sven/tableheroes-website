@@ -5,17 +5,20 @@ import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eEquipmentSlot } from "@/src/lib/characters/dnd5e/equipment-types";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
-/** Nur die 8 D&D-relevanten Ausrüstungs-Slots (interne Keys → Position auf dem Hintergrundbild). */
+/** 11 D&D-relevante Ausrüstungs-Slots (interne Keys → Position auf dem Hintergrundbild). */
 const EQUIPMENT_UI_SLOTS: {
   key: Dnd5eEquipmentSlot;
   labelKey:
     | "equipment.uiHead"
     | "equipment.uiNeck"
+    | "equipment.uiBack1"
     | "equipment.uiTorso"
+    | "equipment.uiBack2"
     | "equipment.uiHandLeft"
     | "equipment.uiRingLeft"
     | "equipment.uiHandRight"
     | "equipment.uiRingRight"
+    | "equipment.uiWaist"
     | "equipment.uiFeet";
   top: string;
   left: string;
@@ -23,11 +26,14 @@ const EQUIPMENT_UI_SLOTS: {
 }[] = [
   { key: "head", labelKey: "equipment.uiHead", top: "4%", left: "50%", width: "42%" },
   { key: "neck", labelKey: "equipment.uiNeck", top: "14%", left: "50%", width: "42%" },
-  { key: "chest", labelKey: "equipment.uiTorso", top: "26%", left: "50%", width: "44%" },
-  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "38%", left: "8%", width: "38%" },
-  { key: "ring2", labelKey: "equipment.uiRingRight", top: "48%", left: "8%", width: "38%" },
-  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "38%", left: "92%", width: "38%" },
-  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "48%", left: "92%", width: "38%" },
+  { key: "shoulders", labelKey: "equipment.uiBack1", top: "20%", left: "50%", width: "42%" },
+  { key: "chest", labelKey: "equipment.uiTorso", top: "28%", left: "50%", width: "44%" },
+  { key: "back", labelKey: "equipment.uiBack2", top: "34%", left: "14%", width: "34%" },
+  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "40%", left: "8%", width: "38%" },
+  { key: "ring2", labelKey: "equipment.uiRingRight", top: "50%", left: "8%", width: "38%" },
+  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "40%", left: "92%", width: "38%" },
+  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "50%", left: "92%", width: "38%" },
+  { key: "waist", labelKey: "equipment.uiWaist", top: "62%", left: "50%", width: "44%" },
   { key: "feet", labelKey: "equipment.uiFeet", top: "78%", left: "50%", width: "44%" },
 ];
 

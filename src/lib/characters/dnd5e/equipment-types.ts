@@ -85,8 +85,8 @@ export const CONTAINER_KIND_LABELS_EN: Record<Dnd5eContainerKind, string> = {
 };
 
 /** Standard-Gewichtslimit in Pfund (D&D 5e) */
-export const CONTAINER_CAPACITY_LB: Record<Dnd5eContainerKind, number | null> = {
-  backpack: null,
+export const CONTAINER_CAPACITY_LB: Record<Dnd5eContainerKind, number> = {
+  backpack: 30,
   bag_of_holding: 500,
   pouch: 6,
 };

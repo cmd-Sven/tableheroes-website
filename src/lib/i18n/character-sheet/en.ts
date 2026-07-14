@@ -140,6 +140,16 @@ export const characterSheetMessagesEn = {
   "equipment.uiRingLeft": "Ring left",
   "equipment.uiRingRight": "Ring right",
   "equipment.uiFeet": "Feet",
+  "equipment.uiBack1": "Cloak",
+  "equipment.uiBack2": "Backpack (worn)",
+  "equipment.uiWaist": "Belt",
+  "equipment.beltQuickAccess": "Belt — Quick access (max. {max})",
+  "equipment.beltPrepared": "Prepared",
+  "equipment.beltPreparedHint":
+    "Items on the belt count as prepared and are quickly reachable in combat.",
+  "equipment.containerItemCount": "{count} items",
+  "equipment.containerWeight": "{weight} lb",
+  "equipment.containerMaxCapacity": "max. {cap} lb",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":
