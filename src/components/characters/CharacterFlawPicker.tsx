@@ -5,6 +5,7 @@ import {
   MAX_CHARACTER_FLAWS,
   getFlawById,
   flawUnlockHint,
+  flawEmptyHint,
   type CharacterFlawEntry,
 } from "@/src/lib/characters/character-flaws";
 
@@ -23,6 +24,7 @@ export function CharacterFlawPicker({
   compact = false,
 }: CharacterFlawPickerProps) {
   const usedFlawIds = new Set(characterFlaws.map((f) => f.flawId).filter(Boolean));
+  const hasSelectedFlaws = usedFlawIds.size > 0;
 
   const textareaClass = `w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none ${
     readOnly ? "cursor-default opacity-80" : ""
@@ -48,7 +50,9 @@ export function CharacterFlawPicker({
     <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
       <div className="border-b border-hero-dark pb-2">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">Makel</h3>
-        <p className="mt-1 font-libre text-xs text-gray-500">{flawUnlockHint()}</p>
+        <p className="mt-1 font-libre text-xs text-gray-500">
+          {hasSelectedFlaws ? flawUnlockHint() : flawEmptyHint()}
+        </p>
       </div>
 
       {Array.from({ length: MAX_CHARACTER_FLAWS }, (_, slotIndex) => {
@@ -162,10 +166,7 @@ export function CharacterFlawSummary({
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
           Makel
         </h3>
-        <p className="font-libre text-xs text-gray-500">
-          Keine Makel gewählt. Makel kannst du im Tab „Attribute“ wählen — bis zu 3, keiner ist
-          verpflichtend.
-        </p>
+        <p className="font-libre text-xs text-gray-500">{flawEmptyHint()}</p>
       </section>
     );
   }

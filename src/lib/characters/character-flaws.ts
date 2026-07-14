@@ -270,3 +270,10 @@ export function flawUnlockHint(): string {
     "Wenn du einen Makel außerhalb des Kampfs gut ausspielst, wandelt der GM einen schwarzen Schicksalspunkt in einen weißen um."
   );
 }
+
+export function flawEmptyHint(): string {
+  return (
+    "Noch keinen Makel ausgewählt. Es steht dir ab Level 1 ein Makel zu, " +
+    "weitere Makel in Absprache mit deinem SL möglich."
+  );
+}
