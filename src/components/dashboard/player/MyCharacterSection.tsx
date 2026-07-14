@@ -557,6 +557,8 @@ export function MyCharacterSection({
                   locationOptions,
                   conditionTokens,
                   onConditionTokensChange: setConditionTokens,
+                  canManageConditionTokens: !profileReadOnly || gmPreviewMode,
+                  isGmViewer: gmPreviewMode,
                 }}
               />
             </div>

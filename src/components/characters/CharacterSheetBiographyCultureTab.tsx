@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   BookOpen,
   Globe,
   Info,
-  Loader2,
   MapPin,
-  Plus,
-  Sparkles,
-  Trash2,
   User,
   Coins,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import type { ImageDisplaySettings } from "@/src/lib/image-display";
@@ -25,22 +18,17 @@ import {
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
 import {
-  CHARACTER_CONDITION_DEFINITIONS,
-  type CharacterConditionKey,
   type ConditionTokensMap,
 } from "@/src/lib/characters/condition-tokens";
 import {
   type CharacterFlawEntry,
 } from "@/src/lib/characters/character-flaws";
 import { CharacterFlawSummary } from "@/src/components/characters/CharacterFlawPicker";
+import { CharacterConditionTokensPanel } from "@/src/components/characters/CharacterConditionTokensPanel";
 import {
   DND5E_ALIGNMENTS,
   findAlignmentOption,
 } from "@/src/lib/characters/dnd5e-alignments";
-import {
-  generateCharacterConditionToken,
-  removeCharacterConditionToken,
-} from "@/src/app/dashboard/campaigns/[id]/character-token-actions";
 
 type LanguageOption = { id: string; name: string };
 type LocationOption = { id: string; name: string; type?: string };
@@ -88,6 +76,8 @@ export type CharacterSheetBiographyCultureTabProps = {
   locationOptions: LocationOption[];
   conditionTokens: ConditionTokensMap;
   onConditionTokensChange: (next: ConditionTokensMap) => void;
+  canManageConditionTokens?: boolean;
+  isGmViewer?: boolean;
 };
 
 function TokenPreview({
@@ -149,11 +139,9 @@ export function CharacterSheetBiographyCultureTab({
   locationOptions,
   conditionTokens,
   onConditionTokensChange,
+  canManageConditionTokens = true,
+  isGmViewer = false,
 }: CharacterSheetBiographyCultureTabProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [generatingKey, setGeneratingKey] = useState<CharacterConditionKey | null>(null);
-
   const portraitPreview = avatarBlobUrl || avatarUrl.trim();
   const tokenPreview = tokenBlobUrl || tokenUrl.trim() || portraitPreview;
   const selectedAlignment = findAlignmentOption(alignment);
@@ -161,49 +149,6 @@ export function CharacterSheetBiographyCultureTab({
   const textareaClass = `w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none ${
     readOnly ? "cursor-default opacity-80" : ""
   }`;
-
-  const handleGenerateCondition = (key: CharacterConditionKey) => {
-    if (readOnly) return;
-    if (!portraitPreview && !tokenUrl.trim()) {
-      alert("Bitte lade zuerst ein Portrait oder Basis-Token hoch.");
-      return;
-    }
-    setGeneratingKey(key);
-    startTransition(async () => {
-      const result = await generateCharacterConditionToken({
-        campaignId,
-        characterId,
-        conditionKey: key,
-      });
-      setGeneratingKey(null);
-      if (!result.success || !result.entry) {
-        alert(result.error ?? "KI-Generierung fehlgeschlagen.");
-        return;
-      }
-      onConditionTokensChange({ ...conditionTokens, [key]: result.entry });
-      router.refresh();
-    });
-  };
-
-  const handleRemoveCondition = (key: CharacterConditionKey) => {
-    if (readOnly) return;
-    if (!confirm("Zustands-Token wirklich entfernen?")) return;
-    startTransition(async () => {
-      const result = await removeCharacterConditionToken({
-        campaignId,
-        characterId,
-        conditionKey: key,
-      });
-      if (!result.success) {
-        alert(result.error ?? "Löschen fehlgeschlagen.");
-        return;
-      }
-      const next = { ...conditionTokens };
-      delete next[key];
-      onConditionTokensChange(next);
-      router.refresh();
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -553,95 +498,15 @@ export function CharacterSheetBiographyCultureTab({
         ) : null}
       </section>
 
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
-        <div className="border-b border-hero-dark pb-2">
-          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Zustands-Token (KI)
-          </h3>
-          <p className="mt-1 font-libre text-xs text-gray-500">
-            Erstelle aus deinem Basis-Token Varianten für typische Foundry-Zustände. Die KI passt nur
-            das Avatarbild an — Identität und Stil bleiben erhalten. Später wechselt der Token auf der
-            Karte automatisch je nach Zustand.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
-            const entry = conditionTokens[def.key];
-            const isGenerating = generatingKey === def.key && isPending;
-
-            return (
-              <div
-                key={def.key}
-                className="rounded-lg border border-hero-border/50 bg-hero-dark/30 p-3 flex flex-col gap-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-barlow text-xs font-bold uppercase text-white truncate">
-                      {def.labelDe}
-                    </p>
-                    <p className="font-libre text-[10px] text-gray-500">{def.labelEn}</p>
-                  </div>
-                  {!readOnly ? (
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        title={`KI-Token für ${def.labelDe} erstellen`}
-                        disabled={isPending}
-                        onClick={() => handleGenerateCondition(def.key)}
-                        className="rounded border border-accent-gold/50 bg-accent-gold/10 p-1.5 text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
-                      >
-                        {isGenerating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </button>
-                      {entry ? (
-                        <button
-                          type="button"
-                          title="Token entfernen"
-                          disabled={isPending}
-                          onClick={() => handleRemoveCondition(def.key)}
-                          className="rounded border border-red-900/50 p-1.5 text-red-400 hover:bg-red-900/20 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="relative mx-auto h-20 w-20 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                  {entry?.url ? (
-                    <Image
-                      src={entry.url}
-                      alt={def.labelDe}
-                      fill
-                      className="object-cover"
-                      sizes="80px"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-gray-600 text-center px-1">
-                      Noch kein Token
-                    </div>
-                  )}
-                  {entry?.is_ai_generated ? (
-                    <span
-                      className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 py-0.5"
-                      title="KI-generiert"
-                    >
-                      <Sparkles className="h-2.5 w-2.5 text-accent-gold" />
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <CharacterConditionTokensPanel
+        campaignId={campaignId}
+        characterId={characterId}
+        conditionTokens={conditionTokens}
+        onConditionTokensChange={onConditionTokensChange}
+        hasSourceImage={Boolean(portraitPreview || tokenUrl.trim())}
+        canManage={canManageConditionTokens}
+        isGm={isGmViewer}
+      />
     </div>
   );
 }
