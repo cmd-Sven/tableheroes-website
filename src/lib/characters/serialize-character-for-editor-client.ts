@@ -1,4 +1,5 @@
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { parseConditionTokensMap } from "@/src/lib/characters/condition-tokens";
 
 const DROP_KEYS = new Set([
   "modification_log",
@@ -150,6 +151,7 @@ export function serializeCharacterForEditorClient(
       out.condition_tokens = {};
     }
   }
+  out.condition_tokens = parseConditionTokensMap(out.condition_tokens);
 
   for (const k of Object.keys(out)) {
     if (!ALLOWED_EDITOR_KEYS.has(k)) delete out[k];

@@ -252,7 +252,10 @@ async function persistConditionToken(
 
 function revalidateCharacterPaths(campaignId: string, characterId: string) {
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}`, "layout");
   revalidatePath(`/dashboard/characters/${characterId}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/characters/${characterId}/player-view`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}/characters/${characterId}`);
 }
 
 export async function generateCharacterConditionToken(input: {

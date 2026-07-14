@@ -176,8 +176,16 @@ export function MyCharacterSection({
   }, [character?.character_flaws]);
 
   useEffect(() => {
-    setConditionTokens(parseConditionTokensMap(character?.condition_tokens));
-  }, [character?.condition_tokens]);
+    const fromServer = parseConditionTokensMap(character?.condition_tokens);
+    setConditionTokens((prev) => {
+      const serverCount = Object.keys(fromServer).length;
+      if (serverCount > 0) return fromServer;
+      const prevHasUrl = Object.values(prev).some((entry) => Boolean(entry?.url?.trim()));
+      // Nach KI-Generierung liefert router.refresh() manchmal noch gecachte Props ohne Tokens.
+      if (prevHasUrl && serverCount === 0) return prev;
+      return fromServer;
+    });
+  }, [character?.condition_tokens, character?.id]);
 
   useEffect(() => {
     if (!tokenFile) {

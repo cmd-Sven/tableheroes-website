@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
-import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { useRouter } from "next/navigation";
 import {
   CHARACTER_CONDITION_DEFINITIONS,
@@ -256,11 +255,12 @@ export function CharacterConditionTokensPanel({
 
               <div className="relative mx-auto h-20 w-20 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
                 {entry?.url ? (
-                  <CharacterAvatarImage
+                  // eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL
+                  <img
                     src={entry.url}
                     alt={def.labelDe}
-                    className="h-full w-full"
-                    sizes="80px"
+                    className="h-full w-full object-cover"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-gray-600 text-center px-1">
