@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2, Save, ScrollText, Shield, Backpack } from "lucide-react";
+import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
   loadDnd5eCharacterSheet,
@@ -20,15 +20,19 @@ import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
+import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { Dnd5eEquipmentTab } from "@/src/components/characters/Dnd5eEquipmentTab";
 import {
-  CharacterSheetLoreProfileFields,
-  type CharacterSheetLoreProfileFieldsProps,
-} from "@/src/components/characters/CharacterSheetLoreProfileFields";
+  CharacterSheetBiographyCultureTab,
+  type CharacterSheetBiographyCultureTabProps,
+} from "@/src/components/characters/CharacterSheetBiographyCultureTab";
+import { CharacterFlawPicker } from "@/src/components/characters/CharacterFlawPicker";
+import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
+import type { CharacterFlawEntry } from "@/src/lib/characters/character-flaws";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
 
-type SheetTab = "attributes" | "equipment";
+type SheetTab = "attributes" | "equipment" | "biography";
 
 function ToggleSwitch({
   checked,
@@ -120,15 +124,15 @@ type Props = {
   characterId: string;
   compact?: boolean;
   onClose?: () => void;
-  /** Portrait, Lore-Sprachen und Heimatort (TableHeroes-Welt, nicht Foundry) */
-  loreProfile?: CharacterSheetLoreProfileFieldsProps;
+  /** Biografie, Kultur, Portrait, Token & Zustands-Token */
+  biographyCulture?: CharacterSheetBiographyCultureTabProps;
 };
 
 export function Dnd5eCharacterSheetPanel({
   campaignId,
   characterId,
   compact = false,
-  loreProfile,
+  biographyCulture,
 }: Props) {
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
   const [sheet, setSheet] = useState<Dnd5eSheetData | null>(null);
@@ -184,9 +188,21 @@ export function Dnd5eCharacterSheetPanel({
     return computeDerivedDnd5eSheet(sheet, meta.level);
   }, [sheet, meta.level]);
 
+  const characterFlaws: CharacterFlawEntry[] = biographyCulture?.characterFlaws ?? [];
+
+  const flawAdjusted = useMemo(() => {
+    if (!derived || !sheet) return null;
+    return applyFlawModifiersToDerived(derived, sheet.combat.speed, characterFlaws);
+  }, [derived, sheet, characterFlaws]);
+
+  const displayDerived = flawAdjusted?.derived ?? derived;
+
   const canEdit = payload?.canEdit ?? false;
   const readOnly = !editMode || !canEdit;
-  const passivePerception = derived ? 10 + derived.skills.prc.total : 10;
+  const passivePerception = flawAdjusted?.passivePerception ?? (derived ? 10 + derived.skills.prc.total : 10);
+  const displaySpeed = flawAdjusted?.displaySpeed ?? sheet?.combat.speed ?? 0;
+  const flawNotes = flawAdjusted?.flawNotes ?? [];
+  const hasFlawAdjustments = flawAdjusted?.hasFlawAdjustments ?? false;
 
   function updateAbility(key: AbilityKey, score: number) {
     if (!sheet) return;
@@ -286,7 +302,7 @@ export function Dnd5eCharacterSheetPanel({
     );
   }
 
-  if (!payload || !sheet || !derived) {
+  if (!payload || !sheet || !derived || !displayDerived) {
     return (
       <div className="rounded-lg border border-hero-dark bg-background-card p-6 text-center">
         <p className="font-libre text-gray-400">
@@ -299,6 +315,11 @@ export function Dnd5eCharacterSheetPanel({
   const classLevelLabel = [meta.className, meta.subclass ? `(${meta.subclass})` : null]
     .filter(Boolean)
     .join(" ");
+
+  const portraitSrc =
+    biographyCulture?.avatarBlobUrl ||
+    biographyCulture?.avatarUrl?.trim() ||
+    null;
 
   return (
     <div className="space-y-6">
@@ -354,6 +375,18 @@ export function Dnd5eCharacterSheetPanel({
         >
           <Backpack className="h-3.5 w-3.5" />
           Ausrüstung
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("biography")}
+          className={`inline-flex items-center gap-2 px-4 py-2 font-barlow text-xs font-bold uppercase border-b-2 transition-colors ${
+            activeTab === "biography"
+              ? "border-hero-vibrant text-hero-vibrant"
+              : "border-transparent text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Biografie &amp; Kultur
         </button>
       </div>
 
@@ -462,8 +495,21 @@ export function Dnd5eCharacterSheetPanel({
           </section>
 
           <div className="grid gap-4 xl:grid-cols-12">
-            {/* Linke Spalte: Attribute, Rettungswürfe, Fertigkeiten */}
+            {/* Linke Spalte: Portrait, Attribute, Rettungswürfe, Fertigkeiten */}
             <div className="xl:col-span-4 space-y-4">
+              {portraitSrc ? (
+                <section className="rounded-lg border border-hero-dark bg-background-card p-4 flex flex-col items-center">
+                  <CharacterAvatarImage
+                    src={portraitSrc}
+                    avatarDisplay={biographyCulture?.avatarDisplay}
+                    className="h-44 w-44 shrink-0 rounded-lg border-2 border-hero-border bg-hero-dark shadow-lg"
+                    alt={meta.name || "Charakterportrait"}
+                  />
+                  <p className="mt-2 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                    Charakterportrait
+                  </p>
+                </section>
+              ) : null}
               <section className="rounded-lg border border-hero-dark bg-background-card p-3">
                 <div className="space-y-2">
                   {ABILITY_KEYS.map((key) => (
@@ -473,7 +519,7 @@ export function Dnd5eCharacterSheetPanel({
                     >
                       <div className="w-10 text-center">
                         <p className="font-barlow text-xl font-bold text-accent-gold leading-none">
-                          {formatSigned(derived.abilities[key].modifier)}
+                          {formatSigned(displayDerived.abilities[key].modifier)}
                         </p>
                       </div>
                       <div className="min-w-0 flex-1">
@@ -529,7 +575,7 @@ export function Dnd5eCharacterSheetPanel({
                         </span>
                       </div>
                       <span className="font-barlow text-sm text-accent-gold shrink-0">
-                        {formatSigned(derived.savingThrows[key].total)}
+                        {formatSigned(displayDerived.savingThrows[key].total)}
                       </span>
                     </div>
                   ))}
@@ -542,7 +588,7 @@ export function Dnd5eCharacterSheetPanel({
                 </h3>
                 <div className="space-y-0.5 max-h-[28rem] overflow-y-auto pr-1">
                   {DND5E_SKILLS.map((def) => {
-                    const skillDerived = derived.skills[def.key];
+                    const skillDerived = displayDerived.skills[def.key];
                     const entry = sheet.skills[def.key];
                     return (
                       <div
@@ -618,7 +664,7 @@ export function Dnd5eCharacterSheetPanel({
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">Initiative</p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">
-                        {formatSigned(derived.initiative)}
+                        {formatSigned(displayDerived.initiative)}
                       </p>
                     ) : (
                       <NumberInput
@@ -634,7 +680,7 @@ export function Dnd5eCharacterSheetPanel({
                     </p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">
-                        {sheet.combat.speed}
+                        {displaySpeed}
                       </p>
                     ) : (
                       <NumberInput
@@ -853,10 +899,41 @@ export function Dnd5eCharacterSheetPanel({
                   />
                 )}
               </section>
+
+              {biographyCulture ? (
+                <CharacterFlawPicker
+                  characterFlaws={characterFlaws}
+                  onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
+                  readOnly={biographyCulture.readOnly}
+                  compact
+                />
+              ) : null}
+
+              {hasFlawAdjustments || flawNotes.length > 0 ? (
+                <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
+                  <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
+                    Makel-Effekte (Anzeige)
+                  </h3>
+                  {hasFlawAdjustments ? (
+                    <p className="font-libre text-xs text-gray-400">
+                      Numerische Anpassungen sind in Attribute, Fertigkeiten und Kampfwerten
+                      berücksichtigt. Attributswerte im Blatt bleiben unverändert gespeichert.
+                    </p>
+                  ) : null}
+                  {flawNotes.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {flawNotes.map((note) => (
+                        <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
+                          <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
+                          {note.text}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
           </div>
-
-          {loreProfile ? <CharacterSheetLoreProfileFields {...loreProfile} /> : null}
 
           {editMode && canEdit ? (
             <div className="flex justify-end">
@@ -872,6 +949,10 @@ export function Dnd5eCharacterSheetPanel({
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {activeTab === "biography" && biographyCulture ? (
+        <CharacterSheetBiographyCultureTab {...biographyCulture} />
       ) : null}
 
       {activeTab === "equipment" && editMode && canEdit ? (

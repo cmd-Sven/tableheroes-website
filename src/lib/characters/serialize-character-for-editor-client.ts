@@ -18,6 +18,15 @@ const ALLOWED_EDITOR_KEYS = new Set([
   "avatar_url",
   "avatar_storage_path",
   "avatar_display",
+  "token_url",
+  "token_storage_path",
+  "condition_tokens",
+  "alignment",
+  "sheet_synced_at",
+  "bio_family",
+  "bio_occupation",
+  "bio_appearance",
+  "character_flaws",
   "culture_lore_id",
   "languages",
   "faction_membership",
@@ -107,6 +116,10 @@ export function serializeCharacterForEditorClient(
   if (out.avatar_url != null) out.avatar_url = String(out.avatar_url);
   if (out.avatar_storage_path != null) {
     out.avatar_storage_path = String(out.avatar_storage_path);
+  }
+  if (out.token_url != null) out.token_url = String(out.token_url);
+  if (out.token_storage_path != null) {
+    out.token_storage_path = String(out.token_storage_path);
   }
   if (out.status != null) out.status = String(out.status);
   if (out.culture_lore_id != null) out.culture_lore_id = String(out.culture_lore_id);

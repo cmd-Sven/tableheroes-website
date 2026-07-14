@@ -507,6 +507,13 @@ export async function updateCharacterPlayer(data: {
   avatar_storage_path?: string | null;
   /** Zuschnitt Porträt (JSON wie npcs.image_display) */
   avatar_display?: unknown | null;
+  token_url?: string | null;
+  token_storage_path?: string | null;
+  alignment?: string | null;
+  bio_family?: string | null;
+  bio_occupation?: string | null;
+  bio_appearance?: string | null;
+  character_flaws?: Array<{ flawId: string; story: string; grantedNote?: string }>;
   experience_points?: number;
   pocket_gold?: number;
 }) {
@@ -573,6 +580,29 @@ export async function updateCharacterPlayer(data: {
         normalizeImageDisplay(data.avatar_display),
       );
     }
+  }
+  if (data.token_url !== undefined) {
+    updates.token_url = data.token_url?.trim() ? data.token_url.trim() : null;
+  }
+  if (data.token_storage_path !== undefined) {
+    updates.token_storage_path = data.token_storage_path?.trim()
+      ? data.token_storage_path.trim()
+      : null;
+  }
+  if (data.alignment !== undefined) {
+    updates.alignment = data.alignment?.trim() ? data.alignment.trim() : null;
+  }
+  if (data.bio_family !== undefined) {
+    updates.bio_family = data.bio_family?.trim() ? data.bio_family.trim() : null;
+  }
+  if (data.bio_occupation !== undefined) {
+    updates.bio_occupation = data.bio_occupation?.trim() ? data.bio_occupation.trim() : null;
+  }
+  if (data.bio_appearance !== undefined) {
+    updates.bio_appearance = data.bio_appearance?.trim() ? data.bio_appearance.trim() : null;
+  }
+  if (data.character_flaws !== undefined) {
+    updates.character_flaws = Array.isArray(data.character_flaws) ? data.character_flaws : [];
   }
   if (data.experience_points !== undefined) {
     const n = Math.max(0, Math.floor(Number(data.experience_points) || 0));

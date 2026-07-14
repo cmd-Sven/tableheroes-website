@@ -9,6 +9,7 @@ import {
   PROFILE_MEDIA_MAX_BYTES,
   removeProfileMediaAsset,
   uploadCharacterPortrait,
+  uploadCharacterToken,
   validateProfileImageFile,
 } from "@/src/lib/profile-media";
 import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
@@ -22,6 +23,12 @@ import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { formatCharacterDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
+import { parseConditionTokensMap, type ConditionTokensMap } from "@/src/lib/characters/condition-tokens";
+import {
+  parseCharacterFlaws,
+  type CharacterFlawEntry,
+} from "@/src/lib/characters/character-flaws";
+import { normalizeAlignmentValue } from "@/src/lib/characters/dnd5e-alignments";
 
 type Culture = { id: string; name: string };
 type Language = { id: string; name: string };
@@ -63,8 +70,17 @@ type Props = {
     faction_name?: string | null;
     current_location_id: string | null;
     location_name?: string | null;
-    avatar_url?: string | null;
-    avatar_storage_path?: string | null;
+  avatar_url?: string | null;
+  avatar_storage_path?: string | null;
+    token_url?: string | null;
+    token_storage_path?: string | null;
+    condition_tokens?: unknown;
+    alignment?: string | null;
+    sheet_synced_at?: string | null;
+    bio_family?: string | null;
+    bio_occupation?: string | null;
+    bio_appearance?: string | null;
+    character_flaws?: unknown;
     /** Zuschnitt / Fokus (wie NPC-Bilddarstellung) */
     avatar_display?: unknown;
     status?: string;
@@ -115,12 +131,28 @@ export function MyCharacterSection({
     faction_membership: character?.faction_membership ?? "",
     current_location_id: character?.current_location_id ?? "",
     avatar_url: character?.avatar_url ?? "",
+    token_url: character?.token_url ?? "",
+    alignment: normalizeAlignmentValue(character?.alignment ?? ""),
+    bio_family: character?.bio_family ?? "",
+    bio_occupation: character?.bio_occupation ?? "",
+    bio_appearance: character?.bio_appearance ?? "",
   });
+  const [characterFlaws, setCharacterFlaws] = useState<CharacterFlawEntry[]>(() =>
+    parseCharacterFlaws(character?.character_flaws),
+  );
   const [avatarStoragePath, setAvatarStoragePath] = useState(
     character?.avatar_storage_path ?? null,
   );
+  const [tokenStoragePath, setTokenStoragePath] = useState(
+    character?.token_storage_path ?? null,
+  );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [tokenFile, setTokenFile] = useState<File | null>(null);
   const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+  const [tokenBlobUrl, setTokenBlobUrl] = useState<string | null>(null);
+  const [conditionTokens, setConditionTokens] = useState<ConditionTokensMap>(() =>
+    parseConditionTokensMap(character?.condition_tokens),
+  );
   const [avatarDisplay, setAvatarDisplay] = useState<ImageDisplaySettings>(() =>
     normalizeImageDisplay(character?.avatar_display),
   );
@@ -138,6 +170,24 @@ export function MyCharacterSection({
     setAvatarBlobUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [avatarFile]);
+
+  useEffect(() => {
+    setCharacterFlaws(parseCharacterFlaws(character?.character_flaws));
+  }, [character?.character_flaws]);
+
+  useEffect(() => {
+    setConditionTokens(parseConditionTokensMap(character?.condition_tokens));
+  }, [character?.condition_tokens]);
+
+  useEffect(() => {
+    if (!tokenFile) {
+      setTokenBlobUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(tokenFile);
+    setTokenBlobUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [tokenFile]);
 
   const cultureOptions = useMemo(() => {
     const cid = form.culture_lore_id || character?.culture_lore_id || "";
@@ -205,6 +255,8 @@ export function MyCharacterSection({
       try {
         let nextAvatarUrl = form.avatar_url.trim() || null;
         let nextAvatarPath = avatarStoragePath;
+        let nextTokenUrl = form.token_url.trim() || null;
+        let nextTokenPath = tokenStoragePath;
 
         if (avatarFile) {
           const r = await uploadCharacterPortrait(avatarFile, {
@@ -218,7 +270,18 @@ export function MyCharacterSection({
           nextAvatarPath = r.path;
         }
 
+        if (tokenFile) {
+          const r = await uploadCharacterToken(tokenFile, { characterId });
+          if ("error" in r) {
+            alert(r.error);
+            return;
+          }
+          nextTokenUrl = r.publicUrl;
+          nextTokenPath = r.path;
+        }
+
         if (!nextAvatarUrl) nextAvatarPath = null;
+        if (!nextTokenUrl) nextTokenPath = null;
 
         await updateCharacterPlayer({
           character_id: characterId,
@@ -235,15 +298,27 @@ export function MyCharacterSection({
           avatar_url: nextAvatarUrl,
           avatar_storage_path: nextAvatarPath,
           avatar_display: nextAvatarUrl ? normalizeImageDisplay(avatarDisplay) : null,
+          token_url: nextTokenUrl,
+          token_storage_path: nextTokenPath,
+          alignment: form.alignment.trim() || null,
+          bio_family: form.bio_family.trim() || null,
+          bio_occupation: form.bio_occupation.trim() || null,
+          bio_appearance: form.bio_appearance.trim() || null,
+          character_flaws: characterFlaws,
           experience_points: form.experience_points,
         });
 
-        const prevPath = character?.avatar_storage_path ?? null;
-        if (prevPath && prevPath !== nextAvatarPath) {
-          await removeProfileMediaAsset(prevPath);
+        const prevAvatarPath = character?.avatar_storage_path ?? null;
+        if (prevAvatarPath && prevAvatarPath !== nextAvatarPath) {
+          await removeProfileMediaAsset(prevAvatarPath);
+        }
+        const prevTokenPath = character?.token_storage_path ?? null;
+        if (prevTokenPath && prevTokenPath !== nextTokenPath) {
+          await removeProfileMediaAsset(prevTokenPath);
         }
 
         setAvatarFile(null);
+        setTokenFile(null);
         router.refresh();
       } catch (e: unknown) {
         alert((e as Error).message || "Fehler beim Speichern.");
@@ -416,8 +491,9 @@ export function MyCharacterSection({
               <Dnd5eCharacterSheetPanel
                 campaignId={campaignId}
                 characterId={characterId}
-                loreProfile={{
+                biographyCulture={{
                   campaignId,
+                  characterId,
                   readOnly: profileReadOnly,
                   avatarUrl: form.avatar_url,
                   onAvatarUrlChange: (url) => {
@@ -435,6 +511,43 @@ export function MyCharacterSection({
                     setAvatarStoragePath(null);
                     setAvatarDisplay(normalizeImageDisplay(null));
                   },
+                  tokenUrl: form.token_url,
+                  onTokenUrlChange: (url) => {
+                    setForm((p) => ({ ...p, token_url: url }));
+                    if (url.trim()) setTokenStoragePath(null);
+                  },
+                  tokenFile,
+                  onTokenFileChange: setTokenFile,
+                  tokenBlobUrl,
+                  onClearToken: () => {
+                    setTokenFile(null);
+                    setForm((p) => ({ ...p, token_url: "" }));
+                    setTokenStoragePath(null);
+                  },
+                  onCopyTokenFromPortrait: () => {
+                    const src = avatarBlobUrl || form.avatar_url.trim();
+                    if (!src) return;
+                    setTokenFile(null);
+                    setForm((p) => ({ ...p, token_url: form.avatar_url }));
+                    setTokenStoragePath(avatarStoragePath);
+                  },
+                  level: form.level,
+                  alignment: form.alignment,
+                  onAlignmentChange: (v) => setForm((p) => ({ ...p, alignment: v })),
+                  alignmentImportedFromFoundry: Boolean(
+                    character?.sheet_synced_at && character?.alignment,
+                  ),
+                  bioFamily: form.bio_family,
+                  onBioFamilyChange: (v) => setForm((p) => ({ ...p, bio_family: v })),
+                  bioOccupation: form.bio_occupation,
+                  onBioOccupationChange: (v) => setForm((p) => ({ ...p, bio_occupation: v })),
+                  bioAppearance: form.bio_appearance,
+                  onBioAppearanceChange: (v) => setForm((p) => ({ ...p, bio_appearance: v })),
+                  characterFlaws,
+                  onCharacterFlawsChange: setCharacterFlaws,
+                  cultureLoreId: form.culture_lore_id,
+                  onCultureChange: (id) => setForm((p) => ({ ...p, culture_lore_id: id })),
+                  cultureOptions,
                   languages: form.languages,
                   onToggleLanguage: toggleLanguage,
                   languageOptions,
@@ -442,6 +555,8 @@ export function MyCharacterSection({
                   onCurrentLocationChange: (id) =>
                     setForm((p) => ({ ...p, current_location_id: id })),
                   locationOptions,
+                  conditionTokens,
+                  onConditionTokensChange: setConditionTokens,
                 }}
               />
             </div>
@@ -543,7 +658,7 @@ export function MyCharacterSection({
               )}
             </div>
           ) : null}
-          {cultureOptions.length > 0 && (
+          {cultureOptions.length > 0 && !showDnd5eSheet && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Kultur</label>
               <div className="flex items-center gap-2">
@@ -664,6 +779,7 @@ export function MyCharacterSection({
         </div>
 
         {/* Biografie */}
+        {!showDnd5eSheet ? (
         <div id="character-biografie" className="scroll-mt-24">
           <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Biografie</label>
           <textarea
@@ -675,6 +791,7 @@ export function MyCharacterSection({
             placeholder="Hintergrundgeschichte deines Charakters..."
           />
         </div>
+        ) : null}
 
         {/* Beziehungen zu NPCs & Ruf bei Fraktionen – Card Design */}
         {(relationships.length > 0 || factionReputations.length > 0) && (

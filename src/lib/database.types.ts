@@ -856,6 +856,14 @@ export type Database = {
           avatar_display: Json | null
           avatar_storage_path: string | null
           avatar_url: string | null
+          token_url: string | null
+          token_storage_path: string | null
+          condition_tokens: Json
+          alignment: string | null
+          bio_family: string | null
+          bio_occupation: string | null
+          bio_appearance: string | null
+          character_flaws: Json
           backstory_summary: string | null
           biography: string | null
           campaign_id: string
@@ -887,6 +895,14 @@ export type Database = {
           avatar_display?: Json | null
           avatar_storage_path?: string | null
           avatar_url?: string | null
+          token_url?: string | null
+          token_storage_path?: string | null
+          condition_tokens?: Json
+          alignment?: string | null
+          bio_family?: string | null
+          bio_occupation?: string | null
+          bio_appearance?: string | null
+          character_flaws?: Json
           backstory_summary?: string | null
           biography?: string | null
           campaign_id: string
@@ -918,6 +934,14 @@ export type Database = {
           avatar_display?: Json | null
           avatar_storage_path?: string | null
           avatar_url?: string | null
+          token_url?: string | null
+          token_storage_path?: string | null
+          condition_tokens?: Json
+          alignment?: string | null
+          bio_family?: string | null
+          bio_occupation?: string | null
+          bio_appearance?: string | null
+          character_flaws?: Json
           backstory_summary?: string | null
           biography?: string | null
           campaign_id?: string
