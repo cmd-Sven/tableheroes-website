@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -37,7 +37,7 @@ export function CharacterConditionTokensPanel({
   isGm = false,
 }: CharacterConditionTokensPanelProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
   const [generatingKey, setGeneratingKey] = useState<CharacterConditionKey | "all" | null>(null);
 
   const generatedCount = useMemo(
@@ -52,29 +52,38 @@ export function CharacterConditionTokensPanel({
     return false;
   };
 
-  const handleGenerateOne = (key: CharacterConditionKey) => {
-    if (!canManage) return;
+  const handleGenerateOne = async (key: CharacterConditionKey) => {
+    if (!canManage || isLoading) return;
     if (!ensureSourceImage()) return;
 
     setGeneratingKey(key);
-    startTransition(async () => {
+    setIsLoading(true);
+    try {
       const result = await generateCharacterConditionToken({
         campaignId,
         characterId,
         conditionKey: key,
       });
-      setGeneratingKey(null);
       if (!result.success || !result.entry) {
         alert(result.error ?? "KI-Generierung fehlgeschlagen.");
         return;
       }
       onConditionTokensChange({ ...conditionTokens, [key]: result.entry });
       router.refresh();
-    });
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unerwarteter Fehler bei der KI-Generierung (Timeout oder Netzwerk).",
+      );
+    } finally {
+      setIsLoading(false);
+      setGeneratingKey(null);
+    }
   };
 
-  const handleGenerateAll = (regenerateExisting: boolean) => {
-    if (!canManage) return;
+  const handleGenerateAll = async (regenerateExisting: boolean) => {
+    if (!canManage || isLoading) return;
     if (!ensureSourceImage()) return;
 
     if (regenerateExisting) {
@@ -88,13 +97,13 @@ export function CharacterConditionTokensPanel({
     }
 
     setGeneratingKey("all");
-    startTransition(async () => {
+    setIsLoading(true);
+    try {
       const result = await generateAllCharacterConditionTokens({
         campaignId,
         characterId,
         onlyMissing: !regenerateExisting,
       });
-      setGeneratingKey(null);
 
       if (result.entries && Object.keys(result.entries).length > 0) {
         onConditionTokensChange({ ...conditionTokens, ...result.entries });
@@ -114,14 +123,24 @@ export function CharacterConditionTokensPanel({
       }
 
       router.refresh();
-    });
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unerwarteter Fehler bei der KI-Generierung (Timeout oder Netzwerk).",
+      );
+    } finally {
+      setIsLoading(false);
+      setGeneratingKey(null);
+    }
   };
 
-  const handleRemove = (key: CharacterConditionKey) => {
-    if (!canManage) return;
+  const handleRemove = async (key: CharacterConditionKey) => {
+    if (!canManage || isLoading) return;
     if (!confirm("Zustands-Token wirklich entfernen?")) return;
 
-    startTransition(async () => {
+    setIsLoading(true);
+    try {
       const result = await removeCharacterConditionToken({
         campaignId,
         characterId,
@@ -135,10 +154,18 @@ export function CharacterConditionTokensPanel({
       delete next[key];
       onConditionTokensChange(next);
       router.refresh();
-    });
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unerwarteter Fehler beim Löschen (Timeout oder Netzwerk).",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const isBulkGenerating = generatingKey === "all" && isPending;
+  const isBulkGenerating = generatingKey === "all" && isLoading;
 
   return (
     <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
@@ -166,7 +193,7 @@ export function CharacterConditionTokensPanel({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={isPending || !hasSourceImage}
+            disabled={isLoading || !hasSourceImage}
             onClick={() => handleGenerateAll(false)}
             className="inline-flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/15 px-3 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/25 disabled:opacity-50"
           >
@@ -182,7 +209,7 @@ export function CharacterConditionTokensPanel({
           {generatedCount > 0 ? (
             <button
               type="button"
-              disabled={isPending || !hasSourceImage}
+              disabled={isLoading || !hasSourceImage}
               onClick={() => handleGenerateAll(true)}
               className="inline-flex items-center gap-2 rounded border border-hero-border px-3 py-2 font-barlow text-xs font-bold uppercase text-gray-300 hover:text-white hover:border-hero-vibrant disabled:opacity-50"
             >
@@ -211,7 +238,7 @@ export function CharacterConditionTokensPanel({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
           const entry = conditionTokens[def.key];
-          const isGenerating = generatingKey === def.key && isPending;
+          const isGenerating = generatingKey === def.key && isLoading;
 
           return (
             <div
@@ -256,7 +283,7 @@ export function CharacterConditionTokensPanel({
                 <div className="flex flex-wrap gap-1 justify-center">
                   <button
                     type="button"
-                    disabled={isPending || !hasSourceImage}
+                    disabled={isLoading || !hasSourceImage}
                     onClick={() => handleGenerateOne(def.key)}
                     className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
                   >
@@ -270,7 +297,7 @@ export function CharacterConditionTokensPanel({
                   {entry ? (
                     <button
                       type="button"
-                      disabled={isPending}
+                      disabled={isLoading}
                       onClick={() => handleRemove(def.key)}
                       className="inline-flex items-center gap-1 rounded border border-red-900/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-red-400 hover:bg-red-900/20 disabled:opacity-50"
                     >

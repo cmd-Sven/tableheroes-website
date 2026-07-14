@@ -1,8 +1,8 @@
 "use server";
 
-import OpenAI from "openai";
+import OpenAI, { APIError } from "openai";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/src/lib/supabase/server";
+import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { compressImageBufferToWebp } from "@/src/lib/image-compress-server";
 import {
@@ -91,6 +91,47 @@ async function bufferToPng(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer).rotate().resize(1024, 1024, { fit: "cover" }).png().toBuffer();
 }
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+const GM_ADMIN_REQUIRED_MSG =
+  "Als Spielleiter für fremde Charaktere ist SUPABASE_SERVICE_ROLE_KEY serverseitig erforderlich (Speicher-Upload / Charakter-Update).";
+
+function resolveConditionTokenWriteClient(
+  supabase: SupabaseServerClient,
+  isGm: boolean,
+  actorUserId: string,
+  storageOwnerId: string,
+): SupabaseServerClient {
+  if (!isGm || storageOwnerId === actorUserId) {
+    return supabase;
+  }
+  const admin = tryCreateAdminClient();
+  if (!admin) {
+    throw new Error(GM_ADMIN_REQUIRED_MSG);
+  }
+  return admin as unknown as SupabaseServerClient;
+}
+
+function formatOpenAiError(error: unknown): string {
+  if (error instanceof APIError) {
+    const msg = error.message?.trim();
+    if (error.status === 401) {
+      return "OpenAI API-Key ungültig oder nicht autorisiert.";
+    }
+    if (error.status === 429) {
+      return msg ? `OpenAI Rate-Limit: ${msg}` : "OpenAI Rate-Limit erreicht — bitte später erneut versuchen.";
+    }
+    if (error.status === 400) {
+      return msg ? `OpenAI-Anfrage abgelehnt: ${msg}` : "OpenAI-Anfrage abgelehnt (ungültiges Bild oder Prompt).";
+    }
+    return msg ? `OpenAI-Fehler (${error.status}): ${msg}` : `OpenAI-Fehler (${error.status}).`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "KI-Token-Generierung fehlgeschlagen.";
+}
+
 async function generateConditionTokenEntry(
   character: CharacterTokenRow,
   storageOwnerId: string,
@@ -117,13 +158,18 @@ async function generateConditionTokenEntry(
   const prompt = buildConditionTokenEditPrompt(def, character.name || "Charakter");
   const imageFile = new File([new Uint8Array(pngBuffer)], "source.png", { type: "image/png" });
 
-  const response = await openai.images.edit({
-    model: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
-    image: imageFile,
-    prompt,
-    n: 1,
-    size: "1024x1024",
-  });
+  let response;
+  try {
+    response = await openai.images.edit({
+      model: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
+      image: imageFile,
+      prompt,
+      n: 1,
+      size: "1024x1024",
+    });
+  } catch (error) {
+    throw new Error(formatOpenAiError(error));
+  }
 
   const first = response.data?.[0];
   let outputBuffer: Buffer | null = null;
@@ -147,12 +193,20 @@ async function generateConditionTokenEntry(
 }
 
 async function persistConditionToken(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseServerClient,
   character: CharacterTokenRow,
   conditionKey: CharacterConditionKey,
   pending: { storage_path: string; buffer: Buffer; contentType: string },
+  opts: { isGm: boolean; actorUserId: string; storageOwnerId: string },
 ): Promise<NonNullable<ConditionTokensMap[CharacterConditionKey]>> {
-  const { error: uploadError } = await supabase.storage
+  const writeClient = resolveConditionTokenWriteClient(
+    supabase,
+    opts.isGm,
+    opts.actorUserId,
+    opts.storageOwnerId,
+  );
+
+  const { error: uploadError } = await writeClient.storage
     .from(PROFILE_MEDIA_BUCKET)
     .upload(pending.storage_path, pending.buffer, {
       contentType: pending.contentType,
@@ -164,14 +218,14 @@ async function persistConditionToken(
     throw new Error(`Bild-Upload fehlgeschlagen: ${uploadError.message}`);
   }
 
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = writeClient.storage
     .from(PROFILE_MEDIA_BUCKET)
     .getPublicUrl(pending.storage_path);
 
   const existing = parseConditionTokensMap(character.condition_tokens);
   const prev = existing[conditionKey];
   if (prev?.storage_path) {
-    await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
+    await writeClient.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
   }
 
   const storedEntry = {
@@ -183,7 +237,7 @@ async function persistConditionToken(
 
   const nextMap = { ...existing, [conditionKey]: storedEntry };
 
-  const { error: updateError } = await (supabase.from("characters") as any)
+  const { error: updateError } = await (writeClient.from("characters") as any)
     .update({ condition_tokens: nextMap })
     .eq("id", character.id);
 
@@ -207,17 +261,19 @@ export async function generateCharacterConditionToken(input: {
   conditionKey: CharacterConditionKey;
 }): Promise<{ success: boolean; entry?: ConditionTokensMap[CharacterConditionKey]; error?: string }> {
   try {
-    const { supabase, storageOwnerId, character } = await assertConditionTokenAccess(
-      input.campaignId,
-      input.characterId,
-    );
+    const { supabase, storageOwnerId, character, isGm, actorUserId } =
+      await assertConditionTokenAccess(input.campaignId, input.characterId);
 
     const rawEntry = await generateConditionTokenEntry(
       character,
       storageOwnerId,
       input.conditionKey,
     );
-    const entry = await persistConditionToken(supabase, character, input.conditionKey, rawEntry);
+    const entry = await persistConditionToken(supabase, character, input.conditionKey, rawEntry, {
+      isGm,
+      actorUserId,
+      storageOwnerId,
+    });
 
     revalidateCharacterPaths(input.campaignId, input.characterId);
     return { success: true, entry };
@@ -240,10 +296,8 @@ export async function generateAllCharacterConditionTokens(input: {
   error?: string;
 }> {
   try {
-    const { supabase, storageOwnerId, character } = await assertConditionTokenAccess(
-      input.campaignId,
-      input.characterId,
-    );
+    const { supabase, storageOwnerId, character, isGm, actorUserId } =
+      await assertConditionTokenAccess(input.campaignId, input.characterId);
 
     const existing = parseConditionTokensMap(character.condition_tokens);
     const keys = CHARACTER_CONDITION_DEFINITIONS.map((d) => d.key).filter((key) =>
@@ -265,7 +319,11 @@ export async function generateAllCharacterConditionTokens(input: {
     for (const key of keys) {
       try {
         const rawEntry = await generateConditionTokenEntry(character, storageOwnerId, key);
-        const entry = await persistConditionToken(supabase, character, key, rawEntry);
+        const entry = await persistConditionToken(supabase, character, key, rawEntry, {
+          isGm,
+          actorUserId,
+          storageOwnerId,
+        });
         entries[key] = entry;
       } catch (e: unknown) {
         errors[key] = e instanceof Error ? e.message : "Generierung fehlgeschlagen.";
@@ -292,9 +350,14 @@ export async function removeCharacterConditionToken(input: {
   conditionKey: CharacterConditionKey;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase, character } = await assertConditionTokenAccess(
-      input.campaignId,
-      input.characterId,
+    const { supabase, character, isGm, actorUserId, storageOwnerId } =
+      await assertConditionTokenAccess(input.campaignId, input.characterId);
+
+    const writeClient = resolveConditionTokenWriteClient(
+      supabase,
+      isGm,
+      actorUserId,
+      storageOwnerId,
     );
 
     const existing = parseConditionTokensMap(character.condition_tokens);
@@ -302,13 +365,13 @@ export async function removeCharacterConditionToken(input: {
     if (!prev) return { success: true };
 
     if (prev.storage_path) {
-      await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
+      await writeClient.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
     }
 
     const nextMap = { ...existing };
     delete nextMap[input.conditionKey];
 
-    const { error } = await (supabase.from("characters") as any)
+    const { error } = await (writeClient.from("characters") as any)
       .update({ condition_tokens: nextMap })
       .eq("id", input.characterId);
 
