@@ -37,7 +37,7 @@ import {
 } from "@/src/lib/image-display";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
-import { uploadFactionEmblem } from "@/src/lib/profile-media";
+import { uploadFactionBanner, uploadFactionEmblem } from "@/src/lib/profile-media";
 
 type Location = {
   id: string;
@@ -55,6 +55,10 @@ type FactionData = {
   image_display?: ImageDisplaySettings | null;
   image_is_ai_generated?: boolean | null;
   image_upload_rights_confirmed?: boolean | null;
+  banner_url: string | null;
+  banner_display?: ImageDisplaySettings | null;
+  banner_is_ai_generated?: boolean | null;
+  banner_upload_rights_confirmed?: boolean | null;
   location_id: string | null;
   hq_location_id: string | null;
   gm_notes: string | null;
@@ -157,6 +161,8 @@ export function FactionCreationWizard({
     description: null,
     image_url: null,
     image_display: { ...DEFAULT_IMAGE_DISPLAY },
+    banner_url: null,
+    banner_display: { ...DEFAULT_IMAGE_DISPLAY },
     location_id: null,
     hq_location_id: defaultHqLocationId ?? null,
     gm_notes: null,
@@ -172,6 +178,14 @@ export function FactionCreationWizard({
   );
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
+  const [bannerIsAiGenerated, setBannerIsAiGenerated] = useState(
+    initialData?.banner_is_ai_generated === true,
+  );
+  const [bannerUrlRightsConfirmed, setBannerUrlRightsConfirmed] = useState(
+    initialData?.banner_upload_rights_confirmed === true,
+  );
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerUploadRightsConfirmed, setBannerUploadRightsConfirmed] = useState(false);
 
   const effectiveWorldId = worldId ?? null;
 
@@ -236,6 +250,8 @@ export function FactionCreationWizard({
       description: initialData.description || null,
       image_url: initialData.image_url || null,
       image_display: normalizeImageDisplay(initialData.image_display ?? null),
+      banner_url: initialData.banner_url || null,
+      banner_display: normalizeImageDisplay(initialData.banner_display ?? null),
       location_id: initialData.location_id || null,
       hq_location_id: initialData.hq_location_id ?? initialData.location_id ?? null,
       gm_notes: initialData.gm_notes || null,
@@ -247,6 +263,8 @@ export function FactionCreationWizard({
     });
     setIsAiGenerated(initialData.image_is_ai_generated === true);
     setUrlRightsConfirmed(initialData.image_upload_rights_confirmed === true);
+    setBannerIsAiGenerated(initialData.banner_is_ai_generated === true);
+    setBannerUrlRightsConfirmed(initialData.banner_upload_rights_confirmed === true);
     const pm = (initialData as { planned_members?: PlannedMember[] }).planned_members;
     if (Array.isArray(pm) && pm.length > 0) {
       setPlannedMembers(
@@ -260,8 +278,8 @@ export function FactionCreationWizard({
   const stepLabels = useMemo(
     () =>
       hasDiplomacy
-        ? ["Identität", "Erscheinung", "Logistik", "Mitglieder", "Diplomatie", "Bild & Öffentlich"]
-        : ["Identität", "Erscheinung", "Logistik", "Mitglieder", "Bild & Öffentlich"],
+        ? ["Identität", "Erscheinung", "Logistik", "Mitglieder", "Diplomatie", "Bilder & Öffentlich"]
+        : ["Identität", "Erscheinung", "Logistik", "Mitglieder", "Bilder & Öffentlich"],
     [hasDiplomacy],
   );
 
@@ -380,12 +398,33 @@ export function FactionCreationWizard({
           resolvedImageUrl = upload.publicUrl;
         }
 
+        let resolvedBannerUrl = formData.banner_url?.trim() || null;
+        if (bannerFile) {
+          if (!effectiveWorldId) {
+            throw new Error("Welt-Kontext fehlt für den Banner-Upload.");
+          }
+          const upload = await uploadFactionBanner(bannerFile, {
+            worldId: effectiveWorldId,
+            factionId: initialData?.id,
+          });
+          if ("error" in upload) throw new Error(upload.error);
+          resolvedBannerUrl = upload.publicUrl;
+        }
+
         const imageMeta = buildNpcPortraitMeta({
           imageUrl: resolvedImageUrl,
           portraitFile,
           portraitIsAiGenerated: isAiGenerated,
           uploadRightsConfirmed,
           urlRightsConfirmed,
+        });
+
+        const bannerMeta = buildNpcPortraitMeta({
+          imageUrl: resolvedBannerUrl,
+          portraitFile: bannerFile,
+          portraitIsAiGenerated: bannerIsAiGenerated,
+          uploadRightsConfirmed: bannerUploadRightsConfirmed,
+          urlRightsConfirmed: bannerUrlRightsConfirmed,
         });
 
         const payload = {
@@ -399,6 +438,12 @@ export function FactionCreationWizard({
             : undefined,
           image_is_ai_generated: imageMeta.image_is_ai_generated,
           image_upload_rights_confirmed: imageMeta.image_upload_rights_confirmed,
+          banner_url: resolvedBannerUrl || undefined,
+          banner_display: resolvedBannerUrl
+            ? normalizeImageDisplay(formData.banner_display ?? null)
+            : undefined,
+          banner_is_ai_generated: bannerMeta.image_is_ai_generated,
+          banner_upload_rights_confirmed: bannerMeta.image_upload_rights_confirmed,
           location_id: formData.location_id || undefined,
           hq_location_id: formData.hq_location_id || undefined,
           gm_notes: formData.gm_notes || undefined,
@@ -871,11 +916,83 @@ export function FactionCreationWizard({
               >
                 <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 flex items-center gap-2">
                   <ImageIcon className="h-5 w-5" />
-                  Schritt {totalSteps}: Wappen & Öffentlich
+                  Schritt {totalSteps}: Bilder & Öffentlich
                 </h2>
-                <div className="space-y-4">
+
+                <div className="space-y-4 rounded border border-hero-border/40 bg-slate-900/30 p-4">
+                  <h3 className="font-cinzel font-bold text-lg text-accent-gold">Fraktionsbild (Banner)</h3>
                   <p className="font-libre text-sm text-gray-400">
-                    Das Wappen erscheint auf der Fraktions-Detailseite und auf der Session-Bühne.
+                    Großes Bild oben auf der Detailseite, Hintergrund der Fraktionskarte und Hauptmotiv auf der
+                    Session-Bühne.
+                  </p>
+                  <NpcPortraitUploadField
+                    imageUrl={formData.banner_url || ""}
+                    portraitFile={bannerFile}
+                    onPortraitFileChange={(file) => {
+                      setBannerFile(file);
+                      if (file) {
+                        setFormData((prev) => ({ ...prev, banner_url: "" }));
+                        setBannerIsAiGenerated(false);
+                        setBannerUrlRightsConfirmed(false);
+                      }
+                    }}
+                    imageDisplay={formData.banner_display ?? DEFAULT_IMAGE_DISPLAY}
+                    onImageDisplayChange={(banner_display) =>
+                      setFormData((prev) => ({ ...prev, banner_display }))
+                    }
+                    onClearImage={() => {
+                      setBannerFile(null);
+                      setFormData((prev) => ({
+                        ...prev,
+                        banner_url: null,
+                        banner_display: { ...DEFAULT_IMAGE_DISPLAY },
+                      }));
+                      setBannerIsAiGenerated(false);
+                      setBannerUrlRightsConfirmed(false);
+                      setBannerUploadRightsConfirmed(false);
+                    }}
+                    previewAspectClassName="aspect-video max-w-[360px]"
+                    previewAlt="Fraktionsbanner Vorschau"
+                    emptyIcon="flag"
+                    uploadHint="Fraktionsbild hochladen (JPEG/PNG/WebP, max. 5 MB). Wird als Header, Kartenhintergrund und Bühnenbild verwendet."
+                    isAiGenerated={bannerIsAiGenerated}
+                    onIsAiGeneratedChange={setBannerIsAiGenerated}
+                    uploadRightsConfirmed={bannerUploadRightsConfirmed}
+                    onUploadRightsConfirmedChange={setBannerUploadRightsConfirmed}
+                    urlRightsConfirmed={bannerUrlRightsConfirmed}
+                    onUrlRightsConfirmedChange={setBannerUrlRightsConfirmed}
+                  />
+                  {!bannerFile ? (
+                    <div className="rounded border border-hero-border/40 bg-slate-900/40 p-4 space-y-2">
+                      <label className="block font-barlow font-bold text-xs uppercase text-gray-400">
+                        Alternativ: Banner-URL
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.banner_url || ""}
+                        onChange={(e) => {
+                          const nextUrl = e.target.value || null;
+                          setFormData({ ...formData, banner_url: nextUrl });
+                          if (!nextUrl?.trim()) {
+                            setBannerIsAiGenerated(false);
+                            setBannerUrlRightsConfirmed(false);
+                          }
+                        }}
+                        className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none focus:border-accent-gold"
+                        placeholder="https://…"
+                      />
+                      <p className="font-libre text-xs text-gray-500">
+                        Externe URL — bitte KI-Kennzeichnung oder Nutzungsrechte bestätigen.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-4 rounded border border-hero-border/40 bg-slate-900/30 p-4">
+                  <h3 className="font-cinzel font-bold text-lg text-accent-gold">Wappen</h3>
+                  <p className="font-libre text-sm text-gray-400">
+                    Kleines Symbol oben links auf der Karte, im Textbereich der Detailseite und als Overlay auf der
+                    Session-Bühne.
                   </p>
                   <NpcPortraitUploadField
                     imageUrl={formData.image_url || ""}
@@ -906,7 +1023,7 @@ export function FactionCreationWizard({
                     previewAspectClassName="aspect-square max-w-[220px]"
                     previewAlt="Fraktions-Wappen Vorschau"
                     emptyIcon="flag"
-                    uploadHint="Wappen oder Symbol hochladen (JPEG/PNG/WebP, max. 5 MB). Wird in TableHeroes gespeichert und auf Detail- & Bühnenkarten angezeigt."
+                    uploadHint="Wappen oder Symbol hochladen (JPEG/PNG/WebP, max. 5 MB). Erscheint als kleines Icon auf Karten und in Detailtexten."
                     isAiGenerated={isAiGenerated}
                     onIsAiGeneratedChange={setIsAiGenerated}
                     uploadRightsConfirmed={uploadRightsConfirmed}
@@ -917,7 +1034,7 @@ export function FactionCreationWizard({
                   {!portraitFile ? (
                     <div className="rounded border border-hero-border/40 bg-slate-900/40 p-4 space-y-2">
                       <label className="block font-barlow font-bold text-xs uppercase text-gray-400">
-                        Alternativ: Bild-URL
+                        Alternativ: Wappen-URL
                       </label>
                       <input
                         type="url"
@@ -934,8 +1051,7 @@ export function FactionCreationWizard({
                         placeholder="https://…"
                       />
                       <p className="font-libre text-xs text-gray-500">
-                        Externe URL — bitte KI-Kennzeichnung oder Nutzungsrechte bestätigen (erscheint oben
-                        nach Eingabe).
+                        Externe URL — bitte KI-Kennzeichnung oder Nutzungsrechte bestätigen.
                       </p>
                     </div>
                   ) : null}

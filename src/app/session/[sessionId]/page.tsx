@@ -362,6 +362,8 @@ export default async function SessionPage({ params, searchParams }: Props) {
     name: String(f.name ?? "Fraktion"),
     image_url: f.image_url ?? null,
     image_display: f.image_display ?? null,
+    banner_url: f.banner_url ?? null,
+    banner_display: f.banner_display ?? null,
     type: f.type != null ? String(f.type) : null,
     description: f.description != null ? String(f.description) : null,
     current_status: f.current_status != null ? String(f.current_status) : null,

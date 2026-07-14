@@ -3,6 +3,12 @@
 import { Info, Shield, Trash2, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
+import {
+  imageDisplayBackdropStyle,
+  imageDisplayObjectStyle,
+  normalizeImageDisplay,
+} from "@/src/lib/image-display";
 
 type Faction = {
   id: string;
@@ -10,6 +16,10 @@ type Faction = {
   type: string;
   current_status: string | null;
   description: string | null;
+  image_url?: string | null;
+  image_display?: unknown;
+  banner_url?: string | null;
+  banner_display?: unknown;
   member_count?: number;
   is_revealed?: boolean;
 };
@@ -48,6 +58,8 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
       : "#";
 
   const reputationBorderClass = playerReputation != null ? getReputationBorderColor(playerReputation) : "";
+  const bannerDisplay = normalizeImageDisplay(faction.banner_display ?? null);
+  const emblemDisplay = normalizeImageDisplay(faction.image_display ?? null);
 
   const handleCardClick = () => {
     if (onInfoClick) {
@@ -71,49 +83,86 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
       transition={{ duration: 0.3 }}
       onClick={handleCardClick}
       className={`group relative h-full flex flex-col rounded-lg border-2 border-transparent overflow-hidden transition-all duration-300 ease-in-out hover:scale-[1.02] hover:border-[#C5A572] hover:shadow-xl cursor-pointer ${reputationBorderClass}`}
-      style={{
-        backgroundImage: "url('/images/grunge-paper-background.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
     >
-      {(onDelete || (isGM && campaignId && onToggleVisibility)) && (
-        <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
-          {isGM && campaignId && onToggleVisibility && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleVisibility(faction);
-              }}
-              className="p-1.5 rounded bg-white/90 backdrop-blur-sm text-zinc-700 hover:text-emerald-700 hover:bg-emerald-900/10 transition-colors shadow-md"
-              title={faction.is_revealed ? "Für Spieler verbergen" : "Für Spieler sichtbar"}
-            >
-              {faction.is_revealed ? (
-                <Eye className="h-4 w-4 text-emerald-600" />
-              ) : (
-                <EyeOff className="h-4 w-4 text-gray-500" />
-              )}
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="p-1.5 rounded bg-white/90 backdrop-blur-sm text-zinc-700 hover:text-red-700 hover:bg-red-900/10 transition-colors shadow-md"
-              title="Löschen"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      )}
+      <div
+        className="relative h-36 shrink-0 border-b border-gray-400/30"
+        style={
+          faction.banner_url
+            ? imageDisplayBackdropStyle(bannerDisplay)
+            : {
+                backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+        }
+      >
+        {faction.banner_url ? (
+          <Image
+            src={faction.banner_url}
+            alt=""
+            fill
+            className="select-none"
+            style={imageDisplayObjectStyle(bannerDisplay)}
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
 
-      <div className="flex-none p-4 border-b border-gray-400/30 relative z-10">
+        {faction.image_url ? (
+          <div
+            className="absolute top-2 left-2 z-20 h-11 w-11 overflow-hidden rounded-md border-2 border-white/80 bg-black/40 shadow-lg"
+            style={imageDisplayBackdropStyle(emblemDisplay)}
+          >
+            <Image
+              src={faction.image_url}
+              alt=""
+              fill
+              className="select-none"
+              style={imageDisplayObjectStyle(emblemDisplay)}
+            />
+          </div>
+        ) : (
+          <div className="absolute top-2 left-2 z-20 flex h-11 w-11 items-center justify-center rounded-md border-2 border-white/60 bg-black/40 shadow-lg">
+            <Shield className="h-5 w-5 text-accent-gold" />
+          </div>
+        )}
+
+        {(onDelete || (isGM && campaignId && onToggleVisibility)) && (
+          <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
+            {isGM && campaignId && onToggleVisibility && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleVisibility(faction);
+                }}
+                className="p-1.5 rounded bg-white/90 backdrop-blur-sm text-zinc-700 hover:text-emerald-700 hover:bg-emerald-900/10 transition-colors shadow-md"
+                title={faction.is_revealed ? "Für Spieler verbergen" : "Für Spieler sichtbar"}
+              >
+                {faction.is_revealed ? (
+                  <Eye className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <EyeOff className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="p-1.5 rounded bg-white/90 backdrop-blur-sm text-zinc-700 hover:text-red-700 hover:bg-red-900/10 transition-colors shadow-md"
+                title="Löschen"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex-none p-4 relative z-10 bg-[#f4efe6]/95">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Shield className="h-5 w-5 text-gray-700 shrink-0" />
             <h3 className="font-cinzel font-bold text-lg text-gray-900 line-clamp-2">
               {faction.name}
             </h3>
@@ -134,7 +183,7 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
         )}
       </div>
 
-      <div className="flex-1 flex flex-col p-4 relative z-10">
+      <div className="flex-1 flex flex-col p-4 relative z-10 bg-[#f4efe6]/95">
         {faction.description ? (
           <p className="font-libre text-sm text-gray-700 leading-relaxed line-clamp-3 mb-3">
             {faction.description}

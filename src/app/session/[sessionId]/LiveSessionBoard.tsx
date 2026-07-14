@@ -471,6 +471,8 @@ type CampaignFaction = {
   name: string;
   image_url: string | null;
   image_display?: unknown | null;
+  banner_url?: string | null;
+  banner_display?: unknown | null;
   type: string | null;
   description: string | null;
   current_status?: string | null;
@@ -912,13 +914,15 @@ function StageFactionCard({
   const cardTitle = [faction.name, faction.type].filter(Boolean).join(" — ");
   const glowColor = getStageCardGlowColor("faction");
   const statusVisual = getFactionStatusVisual(faction.current_status);
-  const imageDisplay = normalizeImageDisplay(faction.image_display ?? null);
+  const bannerDisplay = normalizeImageDisplay(faction.banner_display ?? null);
+  const emblemDisplay = normalizeImageDisplay(faction.image_display ?? null);
+  const stageImageUrl = faction.banner_url || faction.image_url;
 
   return (
     <motion.div
       className={`group relative isolate aspect-3/4 w-full max-h-[min(42vh,320px)] overflow-visible rounded-lg transition-transform duration-200 hover:z-10 hover:scale-[1.02] ${
         isSingle ? "max-w-xs" : ""
-      } ${faction.image_url ? "cursor-zoom-in" : "cursor-default"}`}
+      } ${stageImageUrl ? "cursor-zoom-in" : "cursor-default"}`}
       initial={{ opacity: 0, scale: 1.5, y: 200, rotateZ: -15 }}
       animate={
         isCombatMode
@@ -947,27 +951,40 @@ function StageFactionCard({
         title={cardTitle}
         aria-label={`Fraktion: ${faction.name}`}
         onClick={() => {
-          if (faction.image_url) {
+          if (faction.banner_url) {
             onPortrait({
               name: faction.name,
               subtitle: faction.type,
-              imageUrl: faction.image_url,
+              imageUrl: faction.banner_url,
             });
           }
         }}
         className="relative h-full w-full overflow-hidden rounded-lg border-2 border-amber-800/70 bg-amber-950/40 shadow-lg hover:border-amber-500/80"
       >
-        {faction.image_url ? (
+        {faction.banner_url ? (
           <div
             className="pointer-events-none h-full w-full"
-            style={imageDisplayBackdropStyle(imageDisplay)}
+            style={imageDisplayBackdropStyle(bannerDisplay)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte */}
+            <img
+              src={faction.banner_url}
+              alt=""
+              className="h-full w-full"
+              style={imageDisplayObjectStyle(bannerDisplay)}
+            />
+          </div>
+        ) : faction.image_url ? (
+          <div
+            className="pointer-events-none h-full w-full"
+            style={imageDisplayBackdropStyle(emblemDisplay)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte Fallback */}
             <img
               src={faction.image_url}
               alt=""
               className="h-full w-full"
-              style={imageDisplayObjectStyle(imageDisplay)}
+              style={imageDisplayObjectStyle(emblemDisplay)}
             />
           </div>
         ) : (
@@ -975,6 +992,20 @@ function StageFactionCard({
             <Flag className="h-14 w-14 text-accent-gold/90" />
           </div>
         )}
+        {faction.image_url && faction.banner_url ? (
+          <div
+            className="pointer-events-none absolute left-2 top-2 z-10 h-10 w-10 overflow-hidden rounded border border-amber-200/70 bg-black/50 shadow-md"
+            style={imageDisplayBackdropStyle(emblemDisplay)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- Wappen-Overlay */}
+            <img
+              src={faction.image_url}
+              alt=""
+              className="h-full w-full"
+              style={imageDisplayObjectStyle(emblemDisplay)}
+            />
+          </div>
+        ) : null}
       </button>
       {statusVisual ? (
         <span

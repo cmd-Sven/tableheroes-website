@@ -715,6 +715,9 @@ export type Database = {
         }
         Insert: {
           banner_url?: string | null
+          banner_display?: Json | null
+          banner_is_ai_generated?: boolean
+          banner_upload_rights_confirmed?: boolean | null
           created_at?: string | null
           description?: string | null
           frequency?: string | null
@@ -738,6 +741,9 @@ export type Database = {
         }
         Update: {
           banner_url?: string | null
+          banner_display?: Json | null
+          banner_is_ai_generated?: boolean
+          banner_upload_rights_confirmed?: boolean | null
           created_at?: string | null
           description?: string | null
           frequency?: string | null
@@ -1181,6 +1187,9 @@ export type Database = {
           allow_pc_join_on_creation: boolean | null
           appearance: string | null
           banner_url: string | null
+          banner_display: Json | null
+          banner_is_ai_generated: boolean
+          banner_upload_rights_confirmed: boolean | null
           created_at: string | null
           current_status: string | null
           description: string | null
@@ -1206,6 +1215,9 @@ export type Database = {
           allow_pc_join_on_creation?: boolean | null
           appearance?: string | null
           banner_url?: string | null
+          banner_display?: Json | null
+          banner_is_ai_generated?: boolean
+          banner_upload_rights_confirmed?: boolean | null
           created_at?: string | null
           current_status?: string | null
           description?: string | null
@@ -1231,6 +1243,9 @@ export type Database = {
           allow_pc_join_on_creation?: boolean | null
           appearance?: string | null
           banner_url?: string | null
+          banner_display?: Json | null
+          banner_is_ai_generated?: boolean
+          banner_upload_rights_confirmed?: boolean | null
           created_at?: string | null
           current_status?: string | null
           description?: string | null

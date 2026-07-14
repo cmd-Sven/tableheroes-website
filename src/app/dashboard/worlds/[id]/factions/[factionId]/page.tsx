@@ -1,7 +1,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
+import {
+  imageDisplayBackdropStyle,
+  imageDisplayObjectStyle,
+  normalizeImageDisplay,
+} from "@/src/lib/image-display";
 import {
   ArrowLeft,
   Shield,
@@ -12,6 +15,8 @@ import {
   UserPlus,
   CheckCircle2,
 } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 import { getFactionById } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
 
 type Props = {
@@ -125,29 +130,28 @@ export default async function WorldFactionDetailPage({ params }: Props) {
         </Link>
       </div>
 
-      {/* Header-Karte: Typ, Name, Status, Bild */}
+      {/* Header-Karte: Banner, Typ, Name, Status */}
       <div
-        className="rounded-lg border-2 border-hero-dark bg-background-card p-6 shadow-xl"
-        style={{
-          borderColor: "rgba(35, 199, 99, 0.5)",
-          backgroundImage: f.image_url ? "none" : "url('/images/grunge-paper-background.jpg')",
-          backgroundSize: "cover",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center",
-        }}
+        className="rounded-lg border-2 border-hero-dark bg-background-card shadow-xl overflow-hidden"
+        style={{ borderColor: "rgba(35, 199, 99, 0.5)" }}
       >
+        {f.banner_url ? (
+          <div
+            className="relative w-full h-44 sm:h-52 border-b border-hero-border"
+            style={imageDisplayBackdropStyle(normalizeImageDisplay(f.banner_display))}
+          >
+            <Image
+              src={f.banner_url}
+              alt={`${f.name} Banner`}
+              fill
+              className="select-none"
+              style={imageDisplayObjectStyle(normalizeImageDisplay(f.banner_display))}
+              unoptimized
+            />
+          </div>
+        ) : null}
+        <div className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-          {f.image_url && (
-            <div className="relative w-32 h-32 rounded-lg overflow-hidden shrink-0 border border-hero-border">
-              <Image
-                src={f.image_url}
-                alt={f.name}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-          )}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <Shield className="h-6 w-6 text-accent-gold shrink-0" />
@@ -194,6 +198,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
             )}
           </div>
         </div>
+        </div>
       </div>
 
       {/* Beschreibung */}
@@ -212,6 +217,21 @@ export default async function WorldFactionDetailPage({ params }: Props) {
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
             Beschreibung
           </h2>
+          {f.image_url ? (
+            <div
+              className="relative float-left mr-4 mb-3 w-16 h-16 rounded-lg overflow-hidden border border-hero-border shadow-md"
+              style={imageDisplayBackdropStyle(normalizeImageDisplay(f.image_display))}
+            >
+              <Image
+                src={f.image_url}
+                alt={`${f.name} Wappen`}
+                fill
+                className="select-none"
+                style={imageDisplayObjectStyle(normalizeImageDisplay(f.image_display))}
+                unoptimized
+              />
+            </div>
+          ) : null}
           {f.description ? (
             <div className="font-libre text-gray-200 leading-relaxed whitespace-pre-wrap">
               {f.description}

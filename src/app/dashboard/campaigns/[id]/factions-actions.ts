@@ -23,6 +23,9 @@ export async function createFaction(formData: {
   image_url?: string;
   image_is_ai_generated?: boolean;
   image_upload_rights_confirmed?: boolean | null;
+  banner_url?: string;
+  banner_is_ai_generated?: boolean;
+  banner_upload_rights_confirmed?: boolean | null;
   location_id?: string;
   hq_location_id?: string;
   gm_notes?: string;
@@ -38,6 +41,7 @@ export async function createFaction(formData: {
     description?: string | null;
   }>;
   image_display?: unknown;
+  banner_display?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -87,6 +91,13 @@ export async function createFaction(formData: {
       image_display:
         formData.image_display != null && (formData.image_url || "").trim() !== ""
           ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
+          : null,
+      banner_url: formData.banner_url || null,
+      banner_is_ai_generated: formData.banner_is_ai_generated ?? false,
+      banner_upload_rights_confirmed: formData.banner_upload_rights_confirmed ?? null,
+      banner_display:
+        formData.banner_display != null && (formData.banner_url || "").trim() !== ""
+          ? imageDisplayToJson(normalizeImageDisplay(formData.banner_display))
           : null,
       location_id: formData.location_id || null,
       hq_location_id: formData.hq_location_id || null,
@@ -334,6 +345,9 @@ export async function updateFaction(
     image_url?: string;
     image_is_ai_generated?: boolean;
     image_upload_rights_confirmed?: boolean | null;
+    banner_url?: string;
+    banner_is_ai_generated?: boolean;
+    banner_upload_rights_confirmed?: boolean | null;
     location_id?: string;
     hq_location_id?: string;
     gm_notes?: string;
@@ -349,6 +363,7 @@ export async function updateFaction(
       description?: string | null;
     }>;
     image_display?: unknown | null;
+    banner_display?: unknown | null;
     /** Erforderlich zum Sync von faction_relations (kampagnen-spezifisch). */
     campaign_id?: string;
   }
@@ -377,6 +392,7 @@ export async function updateFaction(
     planned_members: pm,
     faction_relations: factionRelations,
     image_display: imageDisplayRaw,
+    banner_display: bannerDisplayRaw,
     campaign_id: campaignIdForRelations,
     ...restUpdates
   } = updates;
@@ -386,6 +402,12 @@ export async function updateFaction(
       imageDisplayRaw == null
         ? null
         : imageDisplayToJson(normalizeImageDisplay(imageDisplayRaw));
+  }
+  if (bannerDisplayRaw !== undefined) {
+    updatePayload.banner_display =
+      bannerDisplayRaw == null
+        ? null
+        : imageDisplayToJson(normalizeImageDisplay(bannerDisplayRaw));
   }
   if (pm !== undefined) {
     updatePayload.planned_members = Array.isArray(pm)

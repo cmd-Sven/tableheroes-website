@@ -83,6 +83,8 @@ type Faction = {
   description: string | null;
   image_url: string | null;
   image_display?: unknown;
+  banner_url?: string | null;
+  banner_display?: unknown;
   location_id: string | null;
   lore_id: string | null;
   gm_notes: string | null;
@@ -588,34 +590,27 @@ export function FactionDetailPage({
         />
       ) : null}
 
-      {/* Faction Header Card with Image */}
-      <div className="rounded-lg border border-hero-border bg-background-card p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Image - Portrait Format */}
-          <div className="shrink-0">
-            {faction.image_url ? (
-              <div
-                className="relative w-48 h-64 lg:w-56 lg:h-72 rounded-xl overflow-hidden border-2 border-hero-border shadow-lg"
-                style={imageDisplayBackdropStyle(normalizeImageDisplay(faction.image_display))}
-              >
-                <Image
-                  src={faction.image_url}
-                  alt={faction.name}
-                  fill
-                  className="select-none"
-                  style={imageDisplayObjectStyle(normalizeImageDisplay(faction.image_display))}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="w-48 h-64 lg:w-56 lg:h-72 rounded-xl border-2 border-hero-border bg-hero-dark/50 flex items-center justify-center shadow-lg">
-                <Shield className="h-24 w-24 text-gray-500" />
-              </div>
-            )}
+      {/* Faction Header Card with Banner */}
+      <div className="rounded-lg border border-hero-border bg-background-card overflow-hidden">
+        {faction.banner_url ? (
+          <div
+            className="relative w-full h-48 sm:h-56 lg:h-64 border-b border-hero-border"
+            style={imageDisplayBackdropStyle(normalizeImageDisplay(faction.banner_display))}
+          >
+            <Image
+              src={faction.banner_url}
+              alt={`${faction.name} Banner`}
+              fill
+              className="select-none"
+              style={imageDisplayObjectStyle(normalizeImageDisplay(faction.banner_display))}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
           </div>
-
+        ) : null}
+        <div className="p-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Info */}
           <div className="flex-1 space-y-4">
             {/* Name */}
@@ -803,6 +798,7 @@ export function FactionDetailPage({
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -822,8 +818,22 @@ export function FactionDetailPage({
             {/* Dark Overlay for readability */}
             <div className="absolute inset-0 bg-black/40 pointer-events-none" />
             <div className="relative z-10">
+              {faction.image_url ? (
+                <div
+                  className="relative float-left mr-4 mb-3 w-16 h-16 rounded-lg overflow-hidden border border-hero-border shadow-md"
+                  style={imageDisplayBackdropStyle(normalizeImageDisplay(faction.image_display))}
+                >
+                  <Image
+                    src={faction.image_url}
+                    alt={`${faction.name} Wappen`}
+                    fill
+                    className="select-none"
+                    style={imageDisplayObjectStyle(normalizeImageDisplay(faction.image_display))}
+                  />
+                </div>
+              ) : null}
               <GothicSpotlightDescription
-                backgroundImageUrl={faction.image_url || undefined}
+                backgroundImageUrl={faction.banner_url || faction.image_url || undefined}
               >
                 <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
                   Beschreibung
@@ -1085,7 +1095,7 @@ export function FactionDetailPage({
             <div className="absolute inset-0 bg-black/40 pointer-events-none" />
             <div className="relative z-10">
               <GothicSpotlightDescription
-                backgroundImageUrl={faction.image_url || undefined}
+                backgroundImageUrl={faction.banner_url || faction.image_url || undefined}
               >
                 {isGM && (
                   <div className="mb-4 flex justify-end">
