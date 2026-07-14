@@ -258,6 +258,50 @@ function revalidateCharacterPaths(campaignId: string, characterId: string) {
   revalidatePath(`/dashboard/campaigns/${campaignId}/characters/${characterId}`);
 }
 
+/** Lädt Zustands-Token direkt aus der DB (umgeht fehlende/gestreifte RSC-Props). */
+export async function loadCharacterConditionTokens(input: {
+  campaignId: string;
+  characterId: string;
+}): Promise<{ success: boolean; tokens: ConditionTokensMap; error?: string }> {
+  try {
+    const { supabase, character, isGm, actorUserId, storageOwnerId } =
+      await assertConditionTokenAccess(input.campaignId, input.characterId);
+
+    let rawTokens: unknown = character.condition_tokens;
+
+    if (isGm && storageOwnerId !== actorUserId) {
+      const admin = tryCreateAdminClient();
+      if (admin) {
+        const { data } = await (admin.from("characters") as any)
+          .select("condition_tokens")
+          .eq("id", input.characterId)
+          .eq("campaign_id", input.campaignId)
+          .maybeSingle();
+        if (data?.condition_tokens != null) {
+          rawTokens = data.condition_tokens;
+        }
+      }
+    } else {
+      const { data } = await (supabase.from("characters") as any)
+        .select("condition_tokens")
+        .eq("id", input.characterId)
+        .eq("campaign_id", input.campaignId)
+        .maybeSingle();
+      if (data?.condition_tokens != null) {
+        rawTokens = data.condition_tokens;
+      }
+    }
+
+    return { success: true, tokens: parseConditionTokensMap(rawTokens) };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      tokens: {},
+      error: e instanceof Error ? e.message : "Zustands-Token konnten nicht geladen werden.",
+    };
+  }
+}
+
 export async function generateCharacterConditionToken(input: {
   campaignId: string;
   characterId: string;

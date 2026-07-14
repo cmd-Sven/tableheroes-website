@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import {
   CHARACTER_CONDITION_DEFINITIONS,
   type CharacterConditionKey,
@@ -11,6 +10,7 @@ import {
 import {
   generateAllCharacterConditionTokens,
   generateCharacterConditionToken,
+  loadCharacterConditionTokens,
   removeCharacterConditionToken,
 } from "@/src/app/dashboard/campaigns/[id]/character-token-actions";
 
@@ -26,6 +26,14 @@ export type CharacterConditionTokensPanelProps = {
   isGm?: boolean;
 };
 
+function tokenImageSrc(url: string, generatedAt?: string): string {
+  const base = url.trim();
+  if (!base) return base;
+  if (!generatedAt) return base;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}v=${encodeURIComponent(generatedAt)}`;
+}
+
 export function CharacterConditionTokensPanel({
   campaignId,
   characterId,
@@ -35,13 +43,58 @@ export function CharacterConditionTokensPanel({
   canManage = true,
   isGm = false,
 }: CharacterConditionTokensPanelProps) {
-  const router = useRouter();
+  const [tokens, setTokens] = useState<ConditionTokensMap>(() => conditionTokens);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [generatingKey, setGeneratingKey] = useState<CharacterConditionKey | "all" | null>(null);
+  const [brokenImages, setBrokenImages] = useState<Partial<Record<CharacterConditionKey, boolean>>>(
+    {},
+  );
+
+  const applyTokens = useCallback(
+    (next: ConditionTokensMap) => {
+      setTokens(next);
+      onConditionTokensChange(next);
+      setBrokenImages({});
+    },
+    [onConditionTokensChange],
+  );
+
+  const refreshTokensFromServer = useCallback(async () => {
+    setIsFetching(true);
+    setFetchError(null);
+    try {
+      const result = await loadCharacterConditionTokens({ campaignId, characterId });
+      if (!result.success) {
+        setFetchError(result.error ?? "Zustands-Token konnten nicht geladen werden.");
+        return;
+      }
+      applyTokens(result.tokens);
+    } catch (error) {
+      setFetchError(
+        error instanceof Error
+          ? error.message
+          : "Zustands-Token konnten nicht geladen werden.",
+      );
+    } finally {
+      setIsFetching(false);
+    }
+  }, [applyTokens, campaignId, characterId]);
+
+  useEffect(() => {
+    void refreshTokensFromServer();
+  }, [refreshTokensFromServer]);
+
+  useEffect(() => {
+    if (Object.keys(conditionTokens).length > 0) {
+      setTokens(conditionTokens);
+    }
+  }, [conditionTokens]);
 
   const generatedCount = useMemo(
-    () => CHARACTER_CONDITION_DEFINITIONS.filter((d) => conditionTokens[d.key]?.url).length,
-    [conditionTokens],
+    () => CHARACTER_CONDITION_DEFINITIONS.filter((d) => tokens[d.key]?.url).length,
+    [tokens],
   );
   const missingCount = CHARACTER_CONDITION_DEFINITIONS.length - generatedCount;
 
@@ -67,8 +120,8 @@ export function CharacterConditionTokensPanel({
         alert(result.error ?? "KI-Generierung fehlgeschlagen.");
         return;
       }
-      onConditionTokensChange({ ...conditionTokens, [key]: result.entry });
-      router.refresh();
+      applyTokens({ ...tokens, [key]: result.entry });
+      await refreshTokensFromServer();
     } catch (error) {
       alert(
         error instanceof Error
@@ -105,7 +158,7 @@ export function CharacterConditionTokensPanel({
       });
 
       if (result.entries && Object.keys(result.entries).length > 0) {
-        onConditionTokensChange({ ...conditionTokens, ...result.entries });
+        applyTokens({ ...tokens, ...result.entries });
       }
 
       if (result.errors && Object.keys(result.errors).length > 0) {
@@ -121,7 +174,7 @@ export function CharacterConditionTokensPanel({
         alert(result.error ?? "Keine Token erzeugt.");
       }
 
-      router.refresh();
+      await refreshTokensFromServer();
     } catch (error) {
       alert(
         error instanceof Error
@@ -149,10 +202,10 @@ export function CharacterConditionTokensPanel({
         alert(result.error ?? "Löschen fehlgeschlagen.");
         return;
       }
-      const next = { ...conditionTokens };
+      const next = { ...tokens };
       delete next[key];
-      onConditionTokensChange(next);
-      router.refresh();
+      applyTokens(next);
+      await refreshTokensFromServer();
     } catch (error) {
       alert(
         error instanceof Error
@@ -184,8 +237,13 @@ export function CharacterConditionTokensPanel({
           </p>
         ) : null}
         <p className="font-libre text-xs text-gray-500">
-          {generatedCount} von {CHARACTER_CONDITION_DEFINITIONS.length} Zuständen mit Token.
+          {isFetching ? "Lade Zustands-Token…" : `${generatedCount} von ${CHARACTER_CONDITION_DEFINITIONS.length} Zuständen mit Token.`}
         </p>
+        {fetchError ? (
+          <p className="rounded border border-red-900/50 bg-red-950/20 px-3 py-2 font-libre text-xs text-red-300">
+            {fetchError}
+          </p>
+        ) : null}
       </div>
 
       {canManage ? (
@@ -236,8 +294,9 @@ export function CharacterConditionTokensPanel({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
-          const entry = conditionTokens[def.key];
+          const entry = tokens[def.key];
           const isGenerating = generatingKey === def.key && isLoading;
+          const imageBroken = Boolean(entry?.url && brokenImages[def.key]);
 
           return (
             <div
@@ -254,17 +313,23 @@ export function CharacterConditionTokensPanel({
               </div>
 
               <div className="relative mx-auto h-20 w-20 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                {entry?.url ? (
+                {entry?.url && !imageBroken ? (
                   // eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL
                   <img
-                    src={entry.url}
+                    src={tokenImageSrc(entry.url, entry.generated_at)}
                     alt={def.labelDe}
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    onError={() =>
+                      setBrokenImages((prev) => ({ ...prev, [def.key]: true }))
+                    }
                   />
+                ) : entry?.url && imageBroken ? (
+                  <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-red-400 text-center px-1">
+                    Bild nicht ladbar
+                  </div>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-gray-600 text-center px-1">
-                    Noch kein Token
+                    {isFetching ? "…" : "Noch kein Token"}
                   </div>
                 )}
                 {entry?.is_ai_generated ? (
