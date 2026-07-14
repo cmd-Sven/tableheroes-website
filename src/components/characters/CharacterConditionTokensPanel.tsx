@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles, Trash2, X, ZoomIn } from "lucide-react";
 import {
   CHARACTER_CONDITION_DEFINITIONS,
   type CharacterConditionKey,
@@ -51,6 +51,25 @@ export function CharacterConditionTokensPanel({
   const [brokenImages, setBrokenImages] = useState<Partial<Record<CharacterConditionKey, boolean>>>(
     {},
   );
+  const [previewKey, setPreviewKey] = useState<CharacterConditionKey | null>(null);
+
+  const previewDef = useMemo(
+    () =>
+      previewKey
+        ? CHARACTER_CONDITION_DEFINITIONS.find((d) => d.key === previewKey) ?? null
+        : null,
+    [previewKey],
+  );
+  const previewEntry = previewKey ? tokens[previewKey] : undefined;
+
+  useEffect(() => {
+    if (!previewKey) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewKey(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewKey]);
 
   const applyTokens = useCallback(
     (next: ConditionTokensMap) => {
@@ -292,58 +311,78 @@ export function CharacterConditionTokensPanel({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
           const entry = tokens[def.key];
           const isGenerating = generatingKey === def.key && isLoading;
           const imageBroken = Boolean(entry?.url && brokenImages[def.key]);
+          const canPreview = Boolean(entry?.url && !imageBroken);
 
           return (
             <div
               key={def.key}
-              className="rounded-lg border border-hero-border/50 bg-hero-dark/30 p-3 flex flex-col gap-2"
+              className="rounded-lg border border-hero-border/50 bg-hero-dark/30 p-4 flex flex-col gap-3"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-barlow text-xs font-bold uppercase text-white truncate">
+                  <p className="font-barlow text-sm font-bold uppercase text-white truncate">
                     {def.labelDe}
                   </p>
-                  <p className="font-libre text-[10px] text-gray-500">{def.labelEn}</p>
+                  <p className="font-libre text-xs text-gray-500">{def.labelEn}</p>
                 </div>
               </div>
 
-              <div className="relative mx-auto h-20 w-20 overflow-hidden rounded-full border border-hero-border bg-hero-dark">
-                {entry?.url && !imageBroken ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL
+              {canPreview ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewKey(def.key)}
+                  className="group relative mx-auto h-36 w-36 overflow-hidden rounded-full border-2 border-hero-border bg-hero-dark transition-colors hover:border-hero-vibrant focus:outline-none focus-visible:ring-2 focus-visible:ring-hero-vibrant focus-visible:ring-offset-2 focus-visible:ring-offset-background-card cursor-zoom-in"
+                  title={`${def.labelDe} vergrößern`}
+                  aria-label={`${def.labelDe} vergrößern`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL */}
                   <img
-                    src={tokenImageSrc(entry.url, entry.generated_at)}
+                    src={tokenImageSrc(entry!.url, entry!.generated_at)}
                     alt={def.labelDe}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                     onError={() =>
                       setBrokenImages((prev) => ({ ...prev, [def.key]: true }))
                     }
                   />
-                ) : entry?.url && imageBroken ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center font-libre text-[9px] text-red-400 text-center px-1 gap-1">
-                    <span>Bild beschädigt</span>
-                    {canManage ? (
-                      <span className="text-[8px] text-gray-500">Neu generieren</span>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-gray-600 text-center px-1">
-                    {isFetching ? "…" : "Noch kein Token"}
-                  </div>
-                )}
-                {entry?.is_ai_generated ? (
-                  <span
-                    className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 py-0.5"
-                    title="KI-generiert"
-                  >
-                    <Sparkles className="h-2.5 w-2.5 text-accent-gold" />
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
+                    <ZoomIn className="h-8 w-8 text-white opacity-0 transition-opacity group-hover:opacity-100 drop-shadow-lg" />
                   </span>
-                ) : null}
-              </div>
+                  {entry?.is_ai_generated ? (
+                    <span
+                      className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1.5 py-0.5"
+                      title="KI-generiert"
+                    >
+                      <Sparkles className="h-3 w-3 text-accent-gold" />
+                    </span>
+                  ) : null}
+                </button>
+              ) : (
+                <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-2 border-hero-border bg-hero-dark">
+                  {entry?.url && imageBroken ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center font-libre text-[10px] text-red-400 text-center px-2 gap-1">
+                      <span>Bild beschädigt</span>
+                      {canManage ? (
+                        <span className="text-[9px] text-gray-500">Neu generieren</span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center font-libre text-[10px] text-gray-600 text-center px-2">
+                      {isFetching ? "…" : "Noch kein Token"}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {canPreview ? (
+                <p className="text-center font-libre text-[10px] text-gray-500">
+                  Klicken zum Vergrößern
+                </p>
+              ) : null}
 
               {canManage ? (
                 <div className="flex flex-wrap gap-1 justify-center">
@@ -377,6 +416,69 @@ export function CharacterConditionTokensPanel({
           );
         })}
       </div>
+
+      {previewDef && previewEntry?.url && !brokenImages[previewDef.key] ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="condition-token-preview-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            aria-label="Vorschau schließen"
+            onClick={() => setPreviewKey(null)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-xl border border-hero-border bg-background-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h4
+                  id="condition-token-preview-title"
+                  className="font-barlow text-xl font-bold uppercase text-hero-vibrant"
+                >
+                  {previewDef.labelDe}
+                </h4>
+                <p className="font-libre text-sm text-gray-400">{previewDef.labelEn}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewKey(null)}
+                className="rounded border border-hero-border p-2 text-gray-400 hover:text-white hover:border-hero-vibrant"
+                aria-label="Schließen"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mx-auto aspect-square w-full max-w-[min(80vw,20rem)] overflow-hidden rounded-full border-4 border-hero-border bg-hero-dark shadow-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Supabase-Storage-URL */}
+              <img
+                src={tokenImageSrc(previewEntry.url, previewEntry.generated_at)}
+                alt={previewDef.labelDe}
+                className="h-full w-full object-cover"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              {previewEntry.is_ai_generated ? (
+                <span className="inline-flex items-center gap-1.5 font-barlow text-xs font-bold uppercase text-accent-gold">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  KI-generiert
+                </span>
+              ) : null}
+              <a
+                href={tokenImageSrc(previewEntry.url, previewEntry.generated_at)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-barlow text-xs font-bold uppercase text-gray-400 hover:text-hero-vibrant"
+              >
+                Original öffnen
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
