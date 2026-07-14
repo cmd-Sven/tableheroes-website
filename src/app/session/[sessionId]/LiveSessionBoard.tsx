@@ -138,6 +138,11 @@ import {
   npcReputationSmileyFromScore,
 } from "@/src/lib/npc-reputation-smiley";
 import { sortNpcsByLocationPriority } from "@/src/lib/npc-stage-display";
+import {
+  imageDisplayBackdropStyle,
+  imageDisplayObjectStyle,
+  normalizeImageDisplay,
+} from "@/src/lib/image-display";
 
 type LiveState = {
   id: string;
@@ -465,6 +470,7 @@ type CampaignFaction = {
   id: string;
   name: string;
   image_url: string | null;
+  image_display?: unknown | null;
   type: string | null;
   description: string | null;
   current_status?: string | null;
@@ -906,6 +912,7 @@ function StageFactionCard({
   const cardTitle = [faction.name, faction.type].filter(Boolean).join(" — ");
   const glowColor = getStageCardGlowColor("faction");
   const statusVisual = getFactionStatusVisual(faction.current_status);
+  const imageDisplay = normalizeImageDisplay(faction.image_display ?? null);
 
   return (
     <motion.div
@@ -951,12 +958,18 @@ function StageFactionCard({
         className="relative h-full w-full overflow-hidden rounded-lg border-2 border-amber-800/70 bg-amber-950/40 shadow-lg hover:border-amber-500/80"
       >
         {faction.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte
-          <img
-            src={faction.image_url}
-            alt=""
-            className="pointer-events-none h-full w-full object-cover"
-          />
+          <div
+            className="pointer-events-none h-full w-full"
+            style={imageDisplayBackdropStyle(imageDisplay)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- Session-Bühnen-Karte */}
+            <img
+              src={faction.image_url}
+              alt=""
+              className="h-full w-full"
+              style={imageDisplayObjectStyle(imageDisplay)}
+            />
+          </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-amber-950/50">
             <Flag className="h-14 w-14 text-accent-gold/90" />

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import Image from "next/image";
-import { User } from "lucide-react";
+import { Flag, User } from "lucide-react";
 import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import {
   imageDisplayBackdropStyle,
@@ -34,6 +34,11 @@ type Props = {
   onUploadRightsConfirmedChange?: (confirmed: boolean) => void;
   urlRightsConfirmed?: boolean;
   onUrlRightsConfirmedChange?: (confirmed: boolean) => void;
+  /** Vorschau-Alt-Text und Upload-Hinweis (z. B. Fraktions-Wappen). */
+  previewAlt?: string;
+  uploadHint?: string;
+  /** Leerer Platzhalter: NPC-Portrait oder Fraktions-Wappen. */
+  emptyIcon?: "user" | "flag";
 };
 
 export function NpcPortraitUploadField({
@@ -51,7 +56,11 @@ export function NpcPortraitUploadField({
   onUploadRightsConfirmedChange,
   urlRightsConfirmed = false,
   onUrlRightsConfirmedChange,
+  previewAlt = "NPC-Portrait Vorschau",
+  uploadHint,
+  emptyIcon = "user",
 }: Props) {
+  const EmptyIcon = emptyIcon === "flag" ? Flag : User;
   const blobPreview = useMemo(
     () => (portraitFile ? URL.createObjectURL(portraitFile) : null),
     [portraitFile],
@@ -78,7 +87,7 @@ export function NpcPortraitUploadField({
             >
               <Image
                 src={previewUrl}
-                alt="NPC-Portrait Vorschau"
+                alt={previewAlt}
                 fill
                 unoptimized={!!blobPreview}
                 className="select-none"
@@ -89,7 +98,7 @@ export function NpcPortraitUploadField({
             <div
               className={`flex items-center justify-center rounded-xl border-2 border-dashed border-hero-border bg-hero-dark/40 ${previewAspectClassName}`}
             >
-              <User className="h-16 w-16 text-gray-600" />
+              <EmptyIcon className="h-16 w-16 text-gray-600" />
             </div>
           )}
           {showAiAttribution ? <NpcPortraitAttribution isAiGenerated className="max-w-[220px]" /> : null}
@@ -139,9 +148,10 @@ export function NpcPortraitUploadField({
             />
           ) : null}
           <p className="font-libre text-xs text-gray-500">
-            Portrait hochladen (JPEG/PNG/WebP, wird automatisch als WebP komprimiert, max.{" "}
-            {Math.round(PROFILE_MEDIA_MAX_BYTES / 1024 / 1024)} MB).
-            Wird in TableHeroes gespeichert — kein externer Bild-Link nötig.
+            {uploadHint ??
+              `Portrait hochladen (JPEG/PNG/WebP, wird automatisch als WebP komprimiert, max. ${Math.round(
+                PROFILE_MEDIA_MAX_BYTES / 1024 / 1024,
+              )} MB). Wird in TableHeroes gespeichert — kein externer Bild-Link nötig.`}
           </p>
           {hasImage && onClearImage ? (
             <button

@@ -30,15 +30,14 @@ import { VALID_FACTION_TYPES, VALID_RELATIONSHIPS, FACTION_MEMBER_ROLES } from "
 import { SmartLocationCombobox } from "@/src/components/dashboard/campaigns/npcs/SmartLocationCombobox";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { getAllLocations } from "@/src/app/dashboard/campaigns/[id]/location-actions";
-import { ImageUrlDisplayEditor } from "@/src/components/ui/ImageUrlDisplayEditor";
 import {
   DEFAULT_IMAGE_DISPLAY,
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
-import { EntityImageRightsFields } from "@/src/components/ui/EntityImageRightsFields";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
-import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
+import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
+import { uploadFactionEmblem } from "@/src/lib/profile-media";
 
 type Location = {
   id: string;
@@ -171,6 +170,10 @@ export function FactionCreationWizard({
   const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(
     initialData?.image_upload_rights_confirmed === true,
   );
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
+
+  const effectiveWorldId = worldId ?? null;
 
   const backHref = worldId
     ? `/dashboard/worlds/${worldId}/factions`
@@ -364,11 +367,24 @@ export function FactionCreationWizard({
         const importantNpcsText =
           filteredPlanned.map((m) => `${m.name.trim()} - ${m.role || "Mitglied"}`).join("\n") || undefined;
 
+        let resolvedImageUrl = formData.image_url?.trim() || null;
+        if (portraitFile) {
+          if (!effectiveWorldId) {
+            throw new Error("Welt-Kontext fehlt für den Wappen-Upload.");
+          }
+          const upload = await uploadFactionEmblem(portraitFile, {
+            worldId: effectiveWorldId,
+            factionId: initialData?.id,
+          });
+          if ("error" in upload) throw new Error(upload.error);
+          resolvedImageUrl = upload.publicUrl;
+        }
+
         const imageMeta = buildNpcPortraitMeta({
-          imageUrl: formData.image_url,
-          portraitFile: null,
+          imageUrl: resolvedImageUrl,
+          portraitFile,
           portraitIsAiGenerated: isAiGenerated,
-          uploadRightsConfirmed: false,
+          uploadRightsConfirmed,
           urlRightsConfirmed,
         });
 
@@ -377,8 +393,10 @@ export function FactionCreationWizard({
           type: formData.type,
           current_status: formData.current_status || undefined,
           description: formData.description || undefined,
-          image_url: formData.image_url || undefined,
-          image_display: formData.image_url?.trim() ? formData.image_display : undefined,
+          image_url: resolvedImageUrl || undefined,
+          image_display: resolvedImageUrl
+            ? normalizeImageDisplay(formData.image_display ?? null)
+            : undefined,
           image_is_ai_generated: imageMeta.image_is_ai_generated,
           image_upload_rights_confirmed: imageMeta.image_upload_rights_confirmed,
           location_id: formData.location_id || undefined,
@@ -853,42 +871,72 @@ export function FactionCreationWizard({
               >
                 <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 flex items-center gap-2">
                   <ImageIcon className="h-5 w-5" />
-                  Schritt {totalSteps}: Bild & Öffentlich
+                  Schritt {totalSteps}: Wappen & Öffentlich
                 </h2>
-                <div>
-                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">Bild-URL</label>
-                  <input
-                    type="url"
-                    value={formData.image_url || ""}
-                    onChange={(e) => {
-                      const nextUrl = e.target.value || null;
-                      setFormData({ ...formData, image_url: nextUrl });
-                      if (!nextUrl?.trim()) {
+                <div className="space-y-4">
+                  <p className="font-libre text-sm text-gray-400">
+                    Das Wappen erscheint auf der Fraktions-Detailseite und auf der Session-Bühne.
+                  </p>
+                  <NpcPortraitUploadField
+                    imageUrl={formData.image_url || ""}
+                    portraitFile={portraitFile}
+                    onPortraitFileChange={(file) => {
+                      setPortraitFile(file);
+                      if (file) {
+                        setFormData((prev) => ({ ...prev, image_url: "" }));
                         setIsAiGenerated(false);
                         setUrlRightsConfirmed(false);
                       }
                     }}
-                    className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none focus:border-accent-gold"
-                    placeholder="https://…"
+                    imageDisplay={formData.image_display ?? DEFAULT_IMAGE_DISPLAY}
+                    onImageDisplayChange={(image_display) =>
+                      setFormData((prev) => ({ ...prev, image_display }))
+                    }
+                    onClearImage={() => {
+                      setPortraitFile(null);
+                      setFormData((prev) => ({
+                        ...prev,
+                        image_url: null,
+                        image_display: { ...DEFAULT_IMAGE_DISPLAY },
+                      }));
+                      setIsAiGenerated(false);
+                      setUrlRightsConfirmed(false);
+                      setUploadRightsConfirmed(false);
+                    }}
+                    previewAspectClassName="aspect-square max-w-[220px]"
+                    previewAlt="Fraktions-Wappen Vorschau"
+                    emptyIcon="flag"
+                    uploadHint="Wappen oder Symbol hochladen (JPEG/PNG/WebP, max. 5 MB). Wird in TableHeroes gespeichert und auf Detail- & Bühnenkarten angezeigt."
+                    isAiGenerated={isAiGenerated}
+                    onIsAiGeneratedChange={setIsAiGenerated}
+                    uploadRightsConfirmed={uploadRightsConfirmed}
+                    onUploadRightsConfirmedChange={setUploadRightsConfirmed}
+                    urlRightsConfirmed={urlRightsConfirmed}
+                    onUrlRightsConfirmedChange={setUrlRightsConfirmed}
                   />
-                  {formData.image_url?.trim() ? (
-                    <div className="mt-4 space-y-3">
-                      <NpcPortraitAttribution isAiGenerated={isAiGenerated} className="text-left justify-start" />
-                      <EntityImageRightsFields
-                        mode="url"
-                        isAiGenerated={isAiGenerated}
-                        onIsAiGeneratedChange={setIsAiGenerated}
-                        uploadRightsConfirmed={false}
-                        onUploadRightsConfirmedChange={() => {}}
-                        urlRightsConfirmed={urlRightsConfirmed}
-                        onUrlRightsConfirmedChange={setUrlRightsConfirmed}
+                  {!portraitFile ? (
+                    <div className="rounded border border-hero-border/40 bg-slate-900/40 p-4 space-y-2">
+                      <label className="block font-barlow font-bold text-xs uppercase text-gray-400">
+                        Alternativ: Bild-URL
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.image_url || ""}
+                        onChange={(e) => {
+                          const nextUrl = e.target.value || null;
+                          setFormData({ ...formData, image_url: nextUrl });
+                          if (!nextUrl?.trim()) {
+                            setIsAiGenerated(false);
+                            setUrlRightsConfirmed(false);
+                          }
+                        }}
+                        className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none focus:border-accent-gold"
+                        placeholder="https://…"
                       />
-                      <ImageUrlDisplayEditor
-                        value={formData.image_display ?? DEFAULT_IMAGE_DISPLAY}
-                        onChange={(image_display) => setFormData((prev) => ({ ...prev, image_display }))}
-                        previewUrl={formData.image_url}
-                        previewAspectClassName="aspect-video max-w-md"
-                      />
+                      <p className="font-libre text-xs text-gray-500">
+                        Externe URL — bitte KI-Kennzeichnung oder Nutzungsrechte bestätigen (erscheint oben
+                        nach Eingabe).
+                      </p>
                     </div>
                   ) : null}
                 </div>

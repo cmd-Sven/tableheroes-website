@@ -202,6 +202,36 @@ export async function uploadBestariumPortrait(
   return { path, publicUrl: data.publicUrl };
 }
 
+/** Fraktions-Wappen: `{userId}/factions/{worldId}/{factionId|new-…}/emblem-{ts}.ext` */
+export async function uploadFactionEmblem(
+  file: File,
+  options: { worldId: string; factionId?: string | null },
+): Promise<{ path: string; publicUrl: string } | { error: string }> {
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
+
+  const worldId = options.worldId?.trim();
+  if (!worldId) return { error: "Welt-ID fehlt für den Wappen-Upload." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Nicht angemeldet." };
+
+  const uid = user.id;
+  const factionSegment = options.factionId?.trim()
+    ? options.factionId.trim()
+    : `new-${crypto.randomUUID()}`;
+  const path = `${uid}/factions/${worldId}/${factionSegment}/emblem-${Date.now()}.webp`;
+
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}
+
 /** Lore-Hauptbild: `{userId}/lore/{worldId}/{loreId|new-…}/image-{ts}.ext` */
 export async function uploadLoreImage(
   file: File,

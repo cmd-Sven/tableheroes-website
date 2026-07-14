@@ -128,7 +128,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
 
   const factionVis = await getRevealedIdsForCampaign(session.campaign_id, "faction");
   const { data: factionRows } = await (admin.from("factions") as any)
-    .select("id, name, image_url, type, description, current_status")
+    .select("id, name, image_url, image_display, type, description, current_status")
     .eq("campaign_id", session.campaign_id);
 
   const allCampaignFactions = ((factionRows as any[]) || [])
@@ -137,6 +137,7 @@ export async function loadGuestSessionContext(sessionId: string, guest: GuestSes
       id: String(f.id),
       name: String(f.name ?? "Fraktion"),
       image_url: f.image_url ?? null,
+      image_display: f.image_display ?? null,
       type: f.type != null ? String(f.type) : null,
       description: f.description != null ? String(f.description) : null,
       current_status: f.current_status != null ? String(f.current_status) : null,

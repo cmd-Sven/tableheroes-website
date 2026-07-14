@@ -20,12 +20,11 @@ export default async function CreateFactionPage({ params }: Props) {
 
   // 2. Check if user is GM
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
+    .select("id, gm_id, world_id")
     .eq("id", campaignId)
     .single();
 
-  // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
 
   if (!campaign) redirect("/dashboard");
   if (campaign.gm_id !== user.id) redirect(`/dashboard/campaigns/${campaignId}`);
@@ -51,6 +50,7 @@ export default async function CreateFactionPage({ params }: Props) {
     <div className="container mx-auto p-6">
       <FactionCreationWizard
         campaignId={campaignId}
+        worldId={campaign.world_id ?? undefined}
         initialData={null}
         locations={typedLocations}
         factions={typedFactions}

@@ -78,6 +78,7 @@ export default async function FactionEditPage({ params }: Props) {
     <div className="container mx-auto p-6">
       <FactionCreationWizard
         campaignId={campaignId}
+        worldId={campaign.world_id ?? undefined}
         initialData={faction as any}
         locations={typedLocations}
         factions={typedFactions}
