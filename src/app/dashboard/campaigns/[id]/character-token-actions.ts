@@ -4,7 +4,7 @@ import OpenAI, { APIError } from "openai";
 import { revalidatePath } from "next/cache";
 import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
-import { compressImageBufferToWebp } from "@/src/lib/image-compress-server";
+import { compressImageBufferToWebp, toStorageUploadBody } from "@/src/lib/image-compress-server";
 import {
   CHARACTER_CONDITION_DEFINITIONS,
   buildConditionTokenEditPrompt,
@@ -84,6 +84,26 @@ async function fetchImageBuffer(url: string): Promise<Buffer> {
   }
   const ab = await res.arrayBuffer();
   return Buffer.from(ab);
+}
+
+function decodeOpenAiImageBuffer(first: {
+  b64_json?: string | null;
+  url?: string | null;
+}): Buffer {
+  if (first.b64_json?.trim()) {
+    let b64 = first.b64_json.trim();
+    const dataPrefix = b64.indexOf("base64,");
+    if (dataPrefix !== -1) {
+      b64 = b64.slice(dataPrefix + "base64,".length);
+    }
+    b64 = b64.replace(/\s/g, "");
+    const decoded = Buffer.from(b64, "base64");
+    if (decoded.length === 0) {
+      throw new Error("OpenAI lieferte leere Bilddaten.");
+    }
+    return decoded;
+  }
+  throw new Error("OpenAI lieferte kein Bild (b64_json fehlt).");
 }
 
 async function bufferToPng(buffer: Buffer): Promise<Buffer> {
@@ -166,6 +186,7 @@ async function generateConditionTokenEntry(
       prompt,
       n: 1,
       size: "1024x1024",
+      output_format: "png",
     });
   } catch (error) {
     throw new Error(formatOpenAiError(error));
@@ -173,10 +194,12 @@ async function generateConditionTokenEntry(
 
   const first = response.data?.[0];
   let outputBuffer: Buffer | null = null;
-  if (first?.b64_json) {
-    outputBuffer = Buffer.from(first.b64_json, "base64");
-  } else if (first?.url) {
-    outputBuffer = await fetchImageBuffer(first.url);
+  try {
+    outputBuffer = decodeOpenAiImageBuffer(first ?? {});
+  } catch {
+    if (first?.url) {
+      outputBuffer = await fetchImageBuffer(first.url);
+    }
   }
   if (!outputBuffer) {
     throw new Error("Die Bild-KI hat kein Bild zurückgegeben.");
@@ -208,11 +231,15 @@ async function persistConditionToken(
 
   const { error: uploadError } = await writeClient.storage
     .from(PROFILE_MEDIA_BUCKET)
-    .upload(pending.storage_path, pending.buffer, {
-      contentType: pending.contentType,
-      cacheControl: "31536000",
-      upsert: false,
-    });
+    .upload(
+      pending.storage_path,
+      toStorageUploadBody(pending.buffer, pending.contentType),
+      {
+        contentType: pending.contentType,
+        cacheControl: "31536000",
+        upsert: false,
+      },
+    );
 
   if (uploadError) {
     throw new Error(`Bild-Upload fehlgeschlagen: ${uploadError.message}`);

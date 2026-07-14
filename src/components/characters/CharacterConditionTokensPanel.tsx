@@ -324,8 +324,11 @@ export function CharacterConditionTokensPanel({
                     }
                   />
                 ) : entry?.url && imageBroken ? (
-                  <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-red-400 text-center px-1">
-                    Bild nicht ladbar
+                  <div className="flex h-full w-full flex-col items-center justify-center font-libre text-[9px] text-red-400 text-center px-1 gap-1">
+                    <span>Bild beschädigt</span>
+                    {canManage ? (
+                      <span className="text-[8px] text-gray-500">Neu generieren</span>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center font-libre text-[9px] text-gray-600 text-center px-1">
