@@ -151,6 +151,8 @@ export function Dnd5eEquipmentTab({
     }
     return list;
   }, [unassigned, items, equipment.slots]);
+
+  const backpackCandidates = items.filter(
     (i) => isBackpackItem(i) || inferContainerKind(i) != null,
   );
 
