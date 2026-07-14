@@ -231,6 +231,9 @@ function mapFoundrySkillProficiency(raw: FoundrySkillBlock | undefined): Dnd5eSk
 
   const explicit = raw.proficient;
   if (explicit != null) {
+    if (typeof explicit === "boolean") {
+      return { proficient: explicit ? "proficient" : "none" };
+    }
     const n = Number(explicit);
     if (Number.isFinite(n)) {
       if (n >= 2) return { proficient: "expertise" };
@@ -240,19 +243,18 @@ function mapFoundrySkillProficiency(raw: FoundrySkillBlock | undefined): Dnd5eSk
     }
   }
 
+  // In Foundry dnd5e 5.x ist `value` oft der Attributsmodifikator (+2 bei CHA 15),
+  // nicht der Übungsgrad — nur exakte Stufen 0 / 0.5 / 1 / 2 auswerten.
   const value = raw.value;
   if (value != null && Number.isFinite(Number(value))) {
     const n = Number(value);
+    if (n === 2) return { proficient: "expertise" };
+    if (n === 1) return { proficient: "proficient" };
+    if (n === 0.5) return { proficient: "half" };
+    if (n === 0) return { proficient: "none" };
     if (n > 2) {
       return { proficient: "none", bonusOverride: Math.round(n) };
     }
-    if (n >= 2) return { proficient: "expertise" };
-    if (n >= 1) return { proficient: "proficient" };
-    if (n >= 0.5) return { proficient: "half" };
-  }
-
-  if (raw.total != null && Number.isFinite(Number(raw.total))) {
-    return { proficient: "none", bonusOverride: Math.round(Number(raw.total)) };
   }
 
   return { proficient: "none" };

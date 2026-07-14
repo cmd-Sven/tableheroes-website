@@ -194,6 +194,8 @@ export function MyCharacterSection({
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [languages, form.languages, character?.language_names, savedLangIds]);
 
+  const showDnd5eSheet = isDnd5eCampaignSystem(campaignSystem) && Boolean(characterId);
+
   const handleSave = () => {
     if (!characterId) {
       alert("Charakter-ID fehlt.");
@@ -409,12 +411,42 @@ export function MyCharacterSection({
               }}
             />
           </div>
-          {isDnd5eCampaignSystem(campaignSystem) && characterId ? (
+          {showDnd5eSheet ? (
             <div id="character-dnd5e-sheet" className="scroll-mt-24 sm:col-span-2 lg:col-span-3">
-              <Dnd5eCharacterSheetPanel campaignId={campaignId} characterId={characterId} />
+              <Dnd5eCharacterSheetPanel
+                campaignId={campaignId}
+                characterId={characterId}
+                loreProfile={{
+                  campaignId,
+                  readOnly: profileReadOnly,
+                  avatarUrl: form.avatar_url,
+                  onAvatarUrlChange: (url) => {
+                    setForm((p) => ({ ...p, avatar_url: url }));
+                    if (url.trim()) setAvatarStoragePath(null);
+                  },
+                  avatarFile,
+                  onAvatarFileChange: setAvatarFile,
+                  avatarBlobUrl,
+                  avatarDisplay,
+                  onAvatarDisplayChange: setAvatarDisplay,
+                  onClearAvatar: () => {
+                    setAvatarFile(null);
+                    setForm((p) => ({ ...p, avatar_url: "" }));
+                    setAvatarStoragePath(null);
+                    setAvatarDisplay(normalizeImageDisplay(null));
+                  },
+                  languages: form.languages,
+                  onToggleLanguage: toggleLanguage,
+                  languageOptions,
+                  currentLocationId: form.current_location_id,
+                  onCurrentLocationChange: (id) =>
+                    setForm((p) => ({ ...p, current_location_id: id })),
+                  locationOptions,
+                }}
+              />
             </div>
           ) : null}
-          {!profileReadOnly ? (
+          {!showDnd5eSheet && !profileReadOnly ? (
           <div className="sm:col-span-2 lg:col-span-3 space-y-3">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">
               Charakterbild
@@ -495,7 +527,7 @@ export function MyCharacterSection({
               />
             ) : null}
           </div>
-          ) : (
+          ) : !showDnd5eSheet && profileReadOnly ? (
             <div className="sm:col-span-2 lg:col-span-3">
               {form.avatar_url.trim() || avatarBlobUrl ? (
                 <CharacterAvatarImage
@@ -510,7 +542,7 @@ export function MyCharacterSection({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
           {cultureOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Kultur</label>
@@ -540,6 +572,7 @@ export function MyCharacterSection({
               </div>
             </div>
           )}
+          {!showDnd5eSheet ? (
           <div id="character-sprachen" className="sm:col-span-2 lg:col-span-3 scroll-mt-24">
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Sprachen</label>
             {languageOptions.length === 0 ? (
@@ -566,6 +599,7 @@ export function MyCharacterSection({
               </div>
             )}
           </div>
+          ) : null}
           {factionOptions.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Fraktion</label>
@@ -595,7 +629,7 @@ export function MyCharacterSection({
               </div>
             </div>
           )}
-          {locationOptions.length > 0 && (
+          {locationOptions.length > 0 && !showDnd5eSheet && (
             <div>
               <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Heimatort</label>
               <div className="flex items-center gap-2">

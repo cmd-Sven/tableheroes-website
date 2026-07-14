@@ -21,6 +21,10 @@ import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { Dnd5eEquipmentTab } from "@/src/components/characters/Dnd5eEquipmentTab";
+import {
+  CharacterSheetLoreProfileFields,
+  type CharacterSheetLoreProfileFieldsProps,
+} from "@/src/components/characters/CharacterSheetLoreProfileFields";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
 
@@ -116,12 +120,15 @@ type Props = {
   characterId: string;
   compact?: boolean;
   onClose?: () => void;
+  /** Portrait, Lore-Sprachen und Heimatort (TableHeroes-Welt, nicht Foundry) */
+  loreProfile?: CharacterSheetLoreProfileFieldsProps;
 };
 
 export function Dnd5eCharacterSheetPanel({
   campaignId,
   characterId,
   compact = false,
+  loreProfile,
 }: Props) {
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
   const [sheet, setSheet] = useState<Dnd5eSheetData | null>(null);
@@ -848,6 +855,8 @@ export function Dnd5eCharacterSheetPanel({
               </section>
             </div>
           </div>
+
+          {loreProfile ? <CharacterSheetLoreProfileFields {...loreProfile} /> : null}
 
           {editMode && canEdit ? (
             <div className="flex justify-end">
