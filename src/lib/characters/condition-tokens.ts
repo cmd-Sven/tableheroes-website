@@ -129,10 +129,18 @@ export function getConditionDefinition(key: string): CharacterConditionDefinitio
 }
 
 export function parseConditionTokensMap(raw: unknown): ConditionTokensMap {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  let data = raw;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data) as unknown;
+    } catch {
+      return {};
+    }
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
   const out: ConditionTokensMap = {};
   for (const def of CHARACTER_CONDITION_DEFINITIONS) {
-    const entry = (raw as Record<string, unknown>)[def.key];
+    const entry = (data as Record<string, unknown>)[def.key];
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const row = entry as Record<string, unknown>;
     const url = String(row.url ?? "").trim();

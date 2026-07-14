@@ -162,7 +162,7 @@ export async function getGmCampaignMembersWithCharacters(
     const fallbackUserIds = membersWithoutChar.map((m) => m.user_id);
     let { data: fallbackChars } = await supabase
       .from("characters")
-      .select("id, name, class, race, level, status, biography, avatar_url, user_id, campaign_id, culture_lore_id, languages, faction_membership, current_location_id")
+      .select("id, name, class, race, level, status, biography, avatar_url, token_url, token_storage_path, condition_tokens, user_id, campaign_id, culture_lore_id, languages, faction_membership, current_location_id")
       .in("user_id", fallbackUserIds)
       .in("status", ["Active", "Approved", "Pending_Approval"])
       .or(`campaign_id.eq.${campaignId},campaign_id.is.null`);
@@ -188,7 +188,7 @@ export async function getGmCampaignMembersWithCharacters(
       ? supabase
           .from("characters")
           .select(
-            "id, name, class, race, level, status, biography, avatar_url, culture_lore_id, languages, faction_membership, current_location_id",
+            "id, name, class, race, level, status, biography, avatar_url, token_url, token_storage_path, condition_tokens, culture_lore_id, languages, faction_membership, current_location_id",
           )
           .in("id", charIds)
       : { data: [] as any[], error: null },

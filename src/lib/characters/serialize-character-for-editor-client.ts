@@ -143,6 +143,14 @@ export function serializeCharacterForEditorClient(
     }
   }
 
+  if (out.condition_tokens != null && typeof out.condition_tokens === "string") {
+    try {
+      out.condition_tokens = JSON.parse(out.condition_tokens) as unknown;
+    } catch {
+      out.condition_tokens = {};
+    }
+  }
+
   for (const k of Object.keys(out)) {
     if (!ALLOWED_EDITOR_KEYS.has(k)) delete out[k];
   }
