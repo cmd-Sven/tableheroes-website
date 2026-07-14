@@ -12,6 +12,7 @@ import {
   remapEquipmentToCharacterItemIds,
   syncFoundryItemsToCharacterInventory,
 } from "@/src/lib/characters/dnd5e/foundry-equipment-mapper";
+import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -107,11 +108,11 @@ export async function POST(request: Request) {
     sheet_overrides: {},
     sheet_source: "foundry_import",
     sheet_synced_at: now,
-    class: meta.className,
-    subclass: meta.subclass,
-    race: meta.race,
-    background: meta.background,
-    alignment: meta.alignment,
+    class: sanitizeActorDisplayLabel(meta.className),
+    subclass: sanitizeActorDisplayLabel(meta.subclass),
+    race: sanitizeActorDisplayLabel(meta.race),
+    background: sanitizeActorDisplayLabel(meta.background),
+    alignment: sanitizeActorDisplayLabel(meta.alignment),
     level: meta.level,
     experience_points: meta.experiencePoints,
   };

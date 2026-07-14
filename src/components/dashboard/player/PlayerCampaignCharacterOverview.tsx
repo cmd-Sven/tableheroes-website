@@ -18,6 +18,7 @@ import { updateCharacterPlayer } from "@/src/app/dashboard/campaigns/[id]/charac
 import { CharacterWealthInventoryCard } from "./CharacterWealthInventoryCard";
 import { CharacterAvatarImage } from "./CharacterAvatarImage";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
+import { formatCharacterDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 
 type Relationship = {
   relationship_type: string;
@@ -436,7 +437,8 @@ export function PlayerCampaignCharacterOverview({
               ) : null}
             </h2>
             <p className="font-libre text-sm text-stone-700 mt-1">
-              Stufe {character?.level ?? 1} · {character?.class ?? ""} · {character?.race ?? ""}
+              Stufe {character?.level ?? 1} · {formatCharacterDisplayLabel(character?.class)} ·{" "}
+              {formatCharacterDisplayLabel(character?.race)}
             </p>
           </div>
         </div>
@@ -445,11 +447,11 @@ export function PlayerCampaignCharacterOverview({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className={marbleTile}>
           <p className="font-barlow font-bold text-xs uppercase text-stone-400">Klasse</p>
-          <p className="font-libre text-gray-100 mt-1">{character?.class ?? ""}</p>
+          <p className="font-libre text-gray-100 mt-1">{formatCharacterDisplayLabel(character?.class)}</p>
         </div>
         <div className={marbleTile}>
           <p className="font-barlow font-bold text-xs uppercase text-stone-400">Rasse</p>
-          <p className="font-libre text-gray-100 mt-1">{character?.race ?? ""}</p>
+          <p className="font-libre text-gray-100 mt-1">{formatCharacterDisplayLabel(character?.race)}</p>
         </div>
       </div>
 

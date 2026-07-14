@@ -20,6 +20,7 @@ import {
   resolveFoundryProgressionLock,
   stripFoundryLockedCharacterFields,
 } from "@/src/lib/foundry-sync/progression-lock-server";
+import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
 
 const SHEET_SELECT =
@@ -111,11 +112,11 @@ function buildSheetPayload(
     campaignId: character.campaign_id,
     campaignSystem,
     name: character.name,
-    class: character.class,
-    subclass: character.subclass,
-    race: character.race,
-    background: character.background,
-    alignment: character.alignment,
+    class: sanitizeActorDisplayLabel(character.class),
+    subclass: sanitizeActorDisplayLabel(character.subclass),
+    race: sanitizeActorDisplayLabel(character.race),
+    background: sanitizeActorDisplayLabel(character.background),
+    alignment: sanitizeActorDisplayLabel(character.alignment),
     level,
     experiencePoints: Math.max(0, Math.floor(Number(character.experience_points) || 0)),
     sheet,

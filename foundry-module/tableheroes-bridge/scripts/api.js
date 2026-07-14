@@ -179,15 +179,71 @@ export async function syncActorPortrait(actor, direction) {
 /**
  * @param {Actor} actor
  */
+function isProbablyFoundryId(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || trimmed.includes(" ")) return false;
+  return /^[A-Za-z0-9]{12,24}$/.test(trimmed);
+}
+
+function sanitizeActorLabel(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || isProbablyFoundryId(trimmed)) return null;
+  return trimmed;
+}
+
+function resolveActorClassName(actor) {
+  const details = actor.system?.details ?? {};
+  const resolved = sanitizeActorLabel(details.classResolved);
+  if (resolved) return resolved;
+
+  for (const item of actor.items ?? []) {
+    if (String(item.type ?? "").toLowerCase() === "class") {
+      const name = sanitizeActorLabel(item.name);
+      if (name) return name;
+    }
+  }
+
+  const cls = details.class;
+  if (cls && typeof cls === "object") {
+    const fromName = sanitizeActorLabel(cls.name ?? cls.label);
+    if (fromName) return fromName;
+    const fromValue = sanitizeActorLabel(cls.value);
+    if (fromValue) return fromValue;
+  }
+
+  const asString = sanitizeActorLabel(typeof cls === "string" ? cls : null);
+  return asString ?? "Unbekannt";
+}
+
+function resolveActorRaceName(actor) {
+  const details = actor.system?.details ?? {};
+  const resolved = sanitizeActorLabel(details.raceResolved);
+  if (resolved) return resolved;
+
+  const raceTypes = new Set(["race", "species", "ancestry"]);
+  for (const item of actor.items ?? []) {
+    if (raceTypes.has(String(item.type ?? "").toLowerCase())) {
+      const name = sanitizeActorLabel(item.name);
+      if (name) return name;
+    }
+  }
+
+  const raceRef = details.race ?? details.species;
+  if (raceRef && typeof raceRef === "object") {
+    const fromName = sanitizeActorLabel(raceRef.name ?? raceRef.label);
+    if (fromName) return fromName;
+  }
+
+  return sanitizeActorLabel(typeof raceRef === "string" ? raceRef : null);
+}
+
 export async function syncActorXp(actor) {
   const { baseUrl } = getModuleSettings();
   if (!baseUrl) throw new Error("Table Heroes API ist nicht konfiguriert.");
 
   const details = actor.system?.details ?? {};
-  const cls =
-    typeof details.class === "string"
-      ? details.class
-      : details.class?.name ?? actor.system?.details?.class?.value ?? "Unbekannt";
+  const cls = resolveActorClassName(actor);
+  const race = resolveActorRaceName(actor);
   const level = Number(details.level ?? actor.system?.details?.level?.value ?? 0);
   const xp = Number(actor.system?.details?.xp?.value ?? actor.system?.details?.xp ?? 0);
 
@@ -196,7 +252,8 @@ export async function syncActorXp(actor) {
     headers: apiHeaders(),
     body: JSON.stringify({
       foundry_actor_id: normalizeFoundryActorId(actor.id),
-      class: String(cls),
+      class: cls,
+      race: race ?? undefined,
       level: Math.max(0, Math.floor(level)),
       experience_points: Math.max(0, Math.floor(xp)),
     }),
@@ -251,11 +308,12 @@ function buildActorSystemPayload(actor) {
 
   base.details = { ...(base.details ?? {}) };
   let totalLevels = 0;
+  const raceTypes = new Set(["race", "species", "ancestry"]);
   for (const item of actor.items ?? []) {
     const type = String(item.type ?? "").toLowerCase();
     const name = String(item.name ?? "").trim();
     if (!name) continue;
-    if (type === "race") base.details.raceResolved = name;
+    if (raceTypes.has(type)) base.details.raceResolved = name;
     if (type === "background") base.details.backgroundResolved = name;
     if (type === "class") {
       if (!base.details.classResolved) base.details.classResolved = name;
@@ -272,7 +330,7 @@ function buildActorSystemPayload(actor) {
  * @param {Actor} actor
  */
 function serializeActorItems(actor) {
-  const identityTypes = new Set(["class", "subclass", "race", "background", "feat"]);
+  const identityTypes = new Set(["class", "subclass", "race", "species", "ancestry", "background", "feat"]);
   const serialized = [];
   const seen = new Set();
 

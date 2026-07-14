@@ -7,6 +7,7 @@ import {
   resolveFoundryApiCampaign,
 } from "@/src/lib/foundry-sync/foundry-api";
 import { resolveFoundryCharacterMapping } from "@/src/lib/foundry-sync/resolve-foundry-mapping";
+import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ const payloadSchema = z
   .object({
     foundry_actor_id: z.string().trim().min(1, "foundry_actor_id fehlt."),
     class: z.string().trim().min(1, "class fehlt."),
+    race: z.string().trim().optional(),
     level: z.coerce.number().int().nonnegative("level muss >= 0 sein."),
     experience_points: z.coerce
       .number()
@@ -135,11 +137,17 @@ export async function POST(request: Request) {
 
   const mapping = resolved.mapping;
 
-  const updatePayload = {
+  const classLabel = sanitizeActorDisplayLabel(input.class) ?? "Unbekannt";
+  const raceLabel = input.race ? sanitizeActorDisplayLabel(input.race) : null;
+
+  const updatePayload: Record<string, unknown> = {
     level: input.level,
-    class: input.class,
+    class: classLabel,
     experience_points: input.experience_points,
   };
+  if (raceLabel) {
+    updatePayload.race = raceLabel;
+  }
 
   const { error: characterUpdateError } = await (supabase as any)
     .from("characters")

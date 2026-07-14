@@ -21,6 +21,7 @@ import { Dnd5eCharacterSheetPanel } from "@/src/components/characters/Dnd5eChara
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { ClientMountGate } from "@/src/components/ui/ClientMountGate";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
+import { formatCharacterDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 
 type Culture = { id: string; name: string };
 type Language = { id: string; name: string };
@@ -348,7 +349,11 @@ export function MyCharacterSection({
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Klasse</label>
             <input
               type="text"
-              value={form.class}
+              value={
+                profileReadOnly || progressionLocked
+                  ? formatCharacterDisplayLabel(form.class, "—")
+                  : form.class
+              }
               readOnly={profileReadOnly || progressionLocked}
               onChange={(e) => setForm((p) => ({ ...p, class: e.target.value }))}
               className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly || progressionLocked ? "cursor-not-allowed opacity-60" : ""}`}
@@ -358,7 +363,7 @@ export function MyCharacterSection({
             <label className="mb-1 block text-xs font-barlow font-bold uppercase text-gray-500">Rasse</label>
             <input
               type="text"
-              value={form.race}
+              value={profileReadOnly ? formatCharacterDisplayLabel(form.race, "—") : form.race}
               readOnly={profileReadOnly}
               onChange={(e) => setForm((p) => ({ ...p, race: e.target.value }))}
               className={`w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-white focus:border-hero-vibrant outline-none ${profileReadOnly ? "cursor-default opacity-80" : ""}`}

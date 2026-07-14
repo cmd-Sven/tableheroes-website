@@ -12,6 +12,7 @@ import { DND5E_SKILLS } from "./skills";
 import { abilityModifier } from "./formulas";
 import { mapFoundryItemsToEquipment } from "./foundry-equipment-mapper";
 import { normalizeEquipmentState } from "./equipment";
+import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 
 type FoundryAbilityBlock = {
   value?: number;
@@ -88,18 +89,17 @@ function readStringField(value: unknown): string | null {
   return null;
 }
 
-/** Foundry-Item-IDs (z. B. HWIVzf23B9WnGqbA) — keine Anzeigenamen. */
-function isProbablyFoundryId(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.includes(" ")) return false;
-  return /^[A-Za-z0-9]{12,24}$/.test(trimmed);
+/** Foundry-Item-IDs werden in sanitizeActorDisplayLabel gefiltert. */
+function sanitizeDisplayLabel(value: string | null | undefined): string | null {
+  return sanitizeActorDisplayLabel(value);
 }
 
-function sanitizeDisplayLabel(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed || isProbablyFoundryId(trimmed)) return null;
-  return trimmed;
+function findFirstItemByTypes(items: unknown[], types: string[]): FoundryItemRow | null {
+  for (const type of types) {
+    const found = findFirstItemByType(items, type);
+    if (found) return found;
+  }
+  return null;
 }
 
 function findFirstItemByType(items: unknown[], type: string): FoundryItemRow | null {
@@ -170,11 +170,12 @@ function resolveItemLabel(
 }
 
 function resolveRaceName(items: unknown[], details: FoundryActorSystem["details"]): string | null {
-  const raceItem = findFirstItemByType(items, "race");
+  const raceItem = findFirstItemByTypes(items, ["race", "species", "ancestry"]);
+  const detailsRace = (details as { species?: unknown } | undefined)?.species ?? details?.race;
   return (
     sanitizeDisplayLabel(details?.raceResolved) ??
     sanitizeDisplayLabel(raceItem?.name ? String(raceItem.name) : null) ??
-    resolveItemLabel(items, details?.race)
+    resolveItemLabel(items, detailsRace)
   );
 }
 
