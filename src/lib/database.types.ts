@@ -1222,6 +1222,8 @@ export type Database = {
           hq_location_id: string | null
           id: string
           image_display: Json | null
+          image_is_ai_generated: boolean
+          image_upload_rights_confirmed: boolean | null
           image_url: string | null
           important_npcs_info: string | null
           is_revealed: boolean | null
@@ -1250,6 +1252,8 @@ export type Database = {
           hq_location_id?: string | null
           id?: string
           image_display?: Json | null
+          image_is_ai_generated?: boolean
+          image_upload_rights_confirmed?: boolean | null
           image_url?: string | null
           important_npcs_info?: string | null
           is_revealed?: boolean | null
@@ -1278,6 +1282,8 @@ export type Database = {
           hq_location_id?: string | null
           id?: string
           image_display?: Json | null
+          image_is_ai_generated?: boolean
+          image_upload_rights_confirmed?: boolean | null
           image_url?: string | null
           important_npcs_info?: string | null
           is_revealed?: boolean | null

@@ -35,9 +35,14 @@ import {
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
-import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
+import {
+  assertFactionUploadRightsConfirmed,
+  FACTION_UPLOAD_RIGHTS_ERROR,
+  resolveFactionImageMeta,
+} from "@/src/lib/faction-image-meta";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
 import { uploadFactionBanner, uploadFactionEmblem } from "@/src/lib/profile-media";
+import { createClient } from "@/src/lib/supabase/client";
 
 type Location = {
   id: string;
@@ -186,12 +191,35 @@ export function FactionCreationWizard({
   );
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerUploadRightsConfirmed, setBannerUploadRightsConfirmed] = useState(false);
+  const [resolvedWorldId, setResolvedWorldId] = useState<string | null>(worldId ?? null);
 
-  const effectiveWorldId = worldId ?? null;
+  const effectiveWorldId = resolvedWorldId;
 
   const backHref = worldId
     ? `/dashboard/worlds/${worldId}/factions`
     : `/dashboard/campaigns/${campaignId!}?tab=factions`;
+
+  useEffect(() => {
+    if (worldId) {
+      setResolvedWorldId(worldId);
+      return;
+    }
+    if (!campaignId) return;
+    const loadWorldId = async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("campaigns")
+          .select("world_id")
+          .eq("id", campaignId)
+          .maybeSingle();
+        setResolvedWorldId((data as { world_id?: string | null } | null)?.world_id ?? null);
+      } catch (error) {
+        console.error("Welt-ID für Fraktions-Upload konnte nicht geladen werden:", error);
+      }
+    };
+    void loadWorldId();
+  }, [worldId, campaignId]);
 
   useEffect(() => {
     if (worldId) {
@@ -368,14 +396,52 @@ export function FactionCreationWizard({
 
   const goBack = () => setStep((s) => Math.max(s - 1, 1));
 
+  const validateImageFields = (): boolean => {
+    if (portraitFile && !uploadRightsConfirmed) {
+      alert(FACTION_UPLOAD_RIGHTS_ERROR);
+      return false;
+    }
+    if (bannerFile && !bannerUploadRightsConfirmed) {
+      alert(FACTION_UPLOAD_RIGHTS_ERROR);
+      return false;
+    }
+    const emblemUrl = formData.image_url?.trim() || "";
+    if (!portraitFile && emblemUrl && !isAiGenerated && !urlRightsConfirmed) {
+      alert("Bitte bestätige die Nutzungsrechte am Wappen (URL) oder markiere es als KI-Bild.");
+      return false;
+    }
+    const bannerUrl = formData.banner_url?.trim() || "";
+    if (!bannerFile && bannerUrl && !bannerIsAiGenerated && !bannerUrlRightsConfirmed) {
+      alert("Bitte bestätige die Nutzungsrechte am Banner (URL) oder markiere es als KI-Bild.");
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = () => {
     if (!validateStep(1)) {
       setStep(1);
       return;
     }
+    if (!validateImageFields()) {
+      setStep(totalSteps);
+      return;
+    }
 
     startTransition(async () => {
       try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user?.id) throw new Error("Nicht angemeldet.");
+
+        if ((portraitFile || bannerFile) && !effectiveWorldId) {
+          throw new Error(
+            "Für den Bild-Upload ist keine Welt der Kampagne zugewiesen. Bitte weise unter Welt & Lore eine Welt zu.",
+          );
+        }
+
         const filteredPlanned = plannedMembers.filter((m) => m.name.trim() !== "");
         const plannedPayload = filteredPlanned.map((m) => ({
           name: m.name.trim(),
@@ -387,11 +453,9 @@ export function FactionCreationWizard({
 
         let resolvedImageUrl = formData.image_url?.trim() || null;
         if (portraitFile) {
-          if (!effectiveWorldId) {
-            throw new Error("Welt-Kontext fehlt für den Wappen-Upload.");
-          }
+          assertFactionUploadRightsConfirmed(uploadRightsConfirmed);
           const upload = await uploadFactionEmblem(portraitFile, {
-            worldId: effectiveWorldId,
+            worldId: effectiveWorldId!,
             factionId: initialData?.id,
           });
           if ("error" in upload) throw new Error(upload.error);
@@ -400,31 +464,25 @@ export function FactionCreationWizard({
 
         let resolvedBannerUrl = formData.banner_url?.trim() || null;
         if (bannerFile) {
-          if (!effectiveWorldId) {
-            throw new Error("Welt-Kontext fehlt für den Banner-Upload.");
-          }
+          assertFactionUploadRightsConfirmed(bannerUploadRightsConfirmed);
           const upload = await uploadFactionBanner(bannerFile, {
-            worldId: effectiveWorldId,
+            worldId: effectiveWorldId!,
             factionId: initialData?.id,
           });
           if ("error" in upload) throw new Error(upload.error);
           resolvedBannerUrl = upload.publicUrl;
         }
 
-        const imageMeta = buildNpcPortraitMeta({
+        const imageMeta = resolveFactionImageMeta(user.id, "emblem", {
           imageUrl: resolvedImageUrl,
-          portraitFile,
-          portraitIsAiGenerated: isAiGenerated,
-          uploadRightsConfirmed,
-          urlRightsConfirmed,
+          isAiGenerated: isAiGenerated,
+          uploadRightsConfirmed: uploadRightsConfirmed || urlRightsConfirmed,
         });
 
-        const bannerMeta = buildNpcPortraitMeta({
+        const bannerMeta = resolveFactionImageMeta(user.id, "banner", {
           imageUrl: resolvedBannerUrl,
-          portraitFile: bannerFile,
-          portraitIsAiGenerated: bannerIsAiGenerated,
-          uploadRightsConfirmed: bannerUploadRightsConfirmed,
-          urlRightsConfirmed: bannerUrlRightsConfirmed,
+          isAiGenerated: bannerIsAiGenerated,
+          uploadRightsConfirmed: bannerUploadRightsConfirmed || bannerUrlRightsConfirmed,
         });
 
         const payload = {

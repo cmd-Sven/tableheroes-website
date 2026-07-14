@@ -3,6 +3,8 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
 import { revalidatePath } from "next/cache";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { resolveFactionImageMeta } from "@/src/lib/faction-image-meta";
 import { setCampaignVisibility } from "./campaign-visibility-actions";
 
 /**
@@ -63,11 +65,11 @@ export async function createFaction(formData: {
     worldId = formData.world_id;
   } else if (formData.campaign_id) {
     const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-      .select("id, gm_id, world_id")
+      .select("id, gm_id, owner_id, world_id")
       .eq("id", formData.campaign_id)
       .single();
-    const campaign = campaignRaw as { id: string; gm_id: string; world_id: string | null } | null;
-    if (!campaign || campaign.gm_id !== user.id) {
+    const campaign = campaignRaw as { id: string; gm_id: string; owner_id?: string | null; world_id: string | null } | null;
+    if (!campaign || !isCampaignGm(campaign, user.id)) {
       throw new Error("Nur der GM kann Fraktionen erstellen.");
     }
     if (!campaign.world_id) {
@@ -78,6 +80,17 @@ export async function createFaction(formData: {
     throw new Error("Entweder world_id oder campaign_id angeben.");
   }
 
+  const emblemMeta = resolveFactionImageMeta(user.id, "emblem", {
+    imageUrl: formData.image_url,
+    isAiGenerated: formData.image_is_ai_generated,
+    uploadRightsConfirmed: formData.image_upload_rights_confirmed,
+  });
+  const bannerMeta = resolveFactionImageMeta(user.id, "banner", {
+    imageUrl: formData.banner_url,
+    isAiGenerated: formData.banner_is_ai_generated,
+    uploadRightsConfirmed: formData.banner_upload_rights_confirmed,
+  });
+
   const { data: faction, error } = await (supabase.from("factions") as any)
     .insert({
       world_id: worldId,
@@ -86,15 +99,15 @@ export async function createFaction(formData: {
       current_status: formData.current_status || null,
       description: formData.description || null,
       image_url: formData.image_url || null,
-      image_is_ai_generated: formData.image_is_ai_generated ?? false,
-      image_upload_rights_confirmed: formData.image_upload_rights_confirmed ?? null,
+      image_is_ai_generated: emblemMeta.image_is_ai_generated,
+      image_upload_rights_confirmed: emblemMeta.image_upload_rights_confirmed,
       image_display:
         formData.image_display != null && (formData.image_url || "").trim() !== ""
           ? imageDisplayToJson(normalizeImageDisplay(formData.image_display))
           : null,
       banner_url: formData.banner_url || null,
-      banner_is_ai_generated: formData.banner_is_ai_generated ?? false,
-      banner_upload_rights_confirmed: formData.banner_upload_rights_confirmed ?? null,
+      banner_is_ai_generated: bannerMeta.image_is_ai_generated,
+      banner_upload_rights_confirmed: bannerMeta.image_upload_rights_confirmed,
       banner_display:
         formData.banner_display != null && (formData.banner_url || "").trim() !== ""
           ? imageDisplayToJson(normalizeImageDisplay(formData.banner_display))
@@ -409,6 +422,27 @@ export async function updateFaction(
         ? null
         : imageDisplayToJson(normalizeImageDisplay(bannerDisplayRaw));
   }
+
+  if (restUpdates.image_url !== undefined) {
+    const emblemMeta = resolveFactionImageMeta(user.id, "emblem", {
+      imageUrl: restUpdates.image_url,
+      isAiGenerated: restUpdates.image_is_ai_generated as boolean | undefined,
+      uploadRightsConfirmed: restUpdates.image_upload_rights_confirmed as boolean | null | undefined,
+    });
+    updatePayload.image_is_ai_generated = emblemMeta.image_is_ai_generated;
+    updatePayload.image_upload_rights_confirmed = emblemMeta.image_upload_rights_confirmed;
+  }
+
+  if (restUpdates.banner_url !== undefined) {
+    const bannerMeta = resolveFactionImageMeta(user.id, "banner", {
+      imageUrl: restUpdates.banner_url,
+      isAiGenerated: restUpdates.banner_is_ai_generated as boolean | undefined,
+      uploadRightsConfirmed: restUpdates.banner_upload_rights_confirmed as boolean | null | undefined,
+    });
+    updatePayload.banner_is_ai_generated = bannerMeta.image_is_ai_generated;
+    updatePayload.banner_upload_rights_confirmed = bannerMeta.image_upload_rights_confirmed;
+  }
+
   if (pm !== undefined) {
     updatePayload.planned_members = Array.isArray(pm)
       ? pm.map((m) => ({ name: m.name || "", role: m.role || "Mitglied", npc_id: m.npc_id ?? null }))

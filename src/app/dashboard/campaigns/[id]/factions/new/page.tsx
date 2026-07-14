@@ -29,6 +29,26 @@ export default async function CreateFactionPage({ params }: Props) {
   if (!campaign) redirect("/dashboard");
   if (campaign.gm_id !== user.id) redirect(`/dashboard/campaigns/${campaignId}`);
 
+  if (!campaign.world_id) {
+    return (
+      <div className="container mx-auto p-6 max-w-xl space-y-4">
+        <h1 className="font-barlow text-2xl font-bold uppercase text-accent-blood">
+          Keine Welt zugewiesen
+        </h1>
+        <p className="font-libre text-gray-300">
+          Für diese Kampagne ist keine Welt hinterlegt. Fraktionsbilder und der Wizard benötigen eine
+          Welt-Zuordnung. Bitte weise unter <strong>Welt &amp; Lore</strong> eine Welt zu.
+        </p>
+        <a
+          href={`/dashboard/campaigns/${campaignId}?tab=lore`}
+          className="inline-block font-barlow text-sm font-bold uppercase text-hero-vibrant hover:underline"
+        >
+          Zur Welt &amp; Lore
+        </a>
+      </div>
+    );
+  }
+
   // 3. Load locations and factions
   const locations: any[] = (await getAllLocations(campaignId)) || [];
   const factions: any[] = (await getFactions(campaignId)) || [];

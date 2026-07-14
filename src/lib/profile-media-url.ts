@@ -90,3 +90,24 @@ export function classifyProfileMediaBestariumPortrait(
   if (parts.length >= 5) return "user-upload";
   return null;
 }
+
+/** Fraktions-Banner: `{userId}/factions/{worldId}/{segment}/banner-{ts}.webp` */
+export function classifyProfileMediaFactionBanner(
+  publicUrl: string,
+  userId: string,
+): NpcPortraitStorageKind | null {
+  const path = extractProfileMediaObjectPath(publicUrl);
+  if (!path) return null;
+
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length < 4) return null;
+  if (parts[0] !== userId) return null;
+  if (parts[1] !== "factions") return null;
+
+  const fileName = parts[parts.length - 1] ?? "";
+  if (!fileName.startsWith("banner-")) return null;
+
+  if (parts.length === 4) return "ai-generated";
+  if (parts.length >= 5) return "user-upload";
+  return null;
+}
