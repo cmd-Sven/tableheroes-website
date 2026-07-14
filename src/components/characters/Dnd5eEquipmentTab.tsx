@@ -101,10 +101,9 @@ export function Dnd5eEquipmentTab({
   readOnly,
   onEquipmentChange,
 }: Props) {
-  const { t, equipmentSlotLabel, containerKindLabel } = useCharacterSheetLocale();
+  const { t, containerKindLabel } = useCharacterSheetLocale();
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSlot, setActiveSlot] = useState<Dnd5eEquipmentSlot | null>(null);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
 
   const equipment = useMemo(
@@ -142,7 +141,16 @@ export function Dnd5eEquipmentTab({
   const hasBackpack = hasBackpackContainer(equipment);
   const unassigned = getUnassignedItems(items, equipment);
 
-  const backpackCandidates = items.filter(
+  const selectableForSlots = useMemo(() => {
+    const ids = new Set<string>();
+    const list: CharacterItem[] = [];
+    for (const item of [...unassigned, ...items.filter((i) => Object.values(equipment.slots).includes(i.id))]) {
+      if (ids.has(item.id)) continue;
+      ids.add(item.id);
+      list.push(item);
+    }
+    return list;
+  }, [unassigned, items, equipment.slots]);
     (i) => isBackpackItem(i) || inferContainerKind(i) != null,
   );
 
@@ -411,30 +419,12 @@ export function Dnd5eEquipmentTab({
               <EquipmentSilhouette
                 slots={equipment.slots}
                 itemNames={itemNames}
-                activeSlot={activeSlot}
+                selectableItems={selectableForSlots}
                 readOnly={readOnly}
-                onSelectSlot={setActiveSlot}
+                onEquip={(slot, itemId) =>
+                  update(placeItemInSlot(equipment, slot, itemId))
+                }
               />
-              {activeSlot && !readOnly ? (
-                <div className="mt-4 space-y-2 border-t border-hero-dark pt-4">
-                  <p className="font-barlow text-xs uppercase text-gray-500">
-                    {t("equipment.equipSlot", { slot: equipmentSlotLabel(activeSlot) })}
-                  </p>
-                  <ItemSelect
-                    value={equipment.slots[activeSlot] ?? ""}
-                    items={[
-                      ...unassigned,
-                      ...(equipment.slots[activeSlot]
-                        ? items.filter((i) => i.id === equipment.slots[activeSlot])
-                        : []),
-                    ]}
-                    placeholder={t("equipment.nothingEquipped")}
-                    onChange={(id) =>
-                      update(placeItemInSlot(equipment, activeSlot, id || null))
-                    }
-                  />
-                </div>
-              ) : null}
             </section>
 
             <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">

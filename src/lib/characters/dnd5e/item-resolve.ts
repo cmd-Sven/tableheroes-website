@@ -9,7 +9,8 @@ import {
 } from "@/src/lib/shop-resolve-items";
 import type { ShopArchetypeKey } from "@/src/lib/shop-archetypes";
 import { isValidShopArchetypeKey } from "@/src/lib/shop-archetypes";
-import { metaToResolvedStats, parseDnd5eMetaFromDescription } from "./item-meta";
+import { metaToResolvedStats, parseDnd5eMetaFromDescription, parseFoundryItemTag } from "./item-meta";
+import { lookupWeaponStatsByName } from "./weapon-catalog-lookup";
 
 const CATALOG_TAG_RE = /\[catalog:([a-z_]+):([a-z0-9_-]+)\]/i;
 
@@ -163,7 +164,23 @@ export function resolveCharacterItemStats(item: CharacterItem): ResolvedItemStat
   }
 
   const inferred = inferFromName(item.name);
-  return { ...base, ...inferred };
+  const merged = { ...base, ...inferred };
+
+  if (
+    (merged.kind === "unknown" || !merged.damage) &&
+    (item.category === "Weapon" || merged.kind === "weapon")
+  ) {
+    const weaponLookup = lookupWeaponStatsByName(item.name);
+    if (weaponLookup) {
+      return {
+        ...merged,
+        ...weaponLookup,
+        kind: "weapon",
+      };
+    }
+  }
+
+  return merged;
 }
 
 export function catalogTagForResolvedShopItem(item: ResolvedShopItem): string | null {

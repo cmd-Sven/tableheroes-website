@@ -6,12 +6,15 @@ export type Dnd5eEquipmentSlot =
   | "shoulders"
   | "chest"
   | "hands"
+  | "wrists"
   | "waist"
   | "legs"
   | "feet"
   | "mainHand"
   | "offHand"
-  | "back";
+  | "back"
+  | "ring1"
+  | "ring2";
 
 export const DND5E_EQUIPMENT_SLOTS: Dnd5eEquipmentSlot[] = [
   "head",
@@ -20,12 +23,15 @@ export const DND5E_EQUIPMENT_SLOTS: Dnd5eEquipmentSlot[] = [
   "shoulders",
   "chest",
   "hands",
+  "wrists",
   "waist",
   "legs",
   "feet",
   "mainHand",
   "offHand",
   "back",
+  "ring1",
+  "ring2",
 ];
 
 export const EQUIPMENT_SLOT_LABELS_DE: Record<Dnd5eEquipmentSlot, string> = {
@@ -35,12 +41,15 @@ export const EQUIPMENT_SLOT_LABELS_DE: Record<Dnd5eEquipmentSlot, string> = {
   shoulders: "Schultern",
   chest: "Brust",
   hands: "Hände",
+  wrists: "Arme/Handgelenk",
   waist: "Taille",
   legs: "Beine",
   feet: "Füße",
   mainHand: "Haupthand",
   offHand: "Nebenhand",
   back: "Rücken",
+  ring1: "Ring 1",
+  ring2: "Ring 2",
 };
 
 export const EQUIPMENT_SLOT_LABELS_EN: Record<Dnd5eEquipmentSlot, string> = {
@@ -48,14 +57,17 @@ export const EQUIPMENT_SLOT_LABELS_EN: Record<Dnd5eEquipmentSlot, string> = {
   eyes: "Eyes",
   neck: "Neck",
   shoulders: "Shoulders",
-  chest: "Chest",
+  chest: "Torso",
   hands: "Hands",
+  wrists: "Arms/Wrists",
   waist: "Waist",
   legs: "Legs",
   feet: "Feet",
   mainHand: "Main Hand",
   offHand: "Off Hand",
   back: "Back",
+  ring1: "Ring #1",
+  ring2: "Ring #2",
 };
 
 export type Dnd5eContainerKind = "backpack" | "bag_of_holding" | "pouch";

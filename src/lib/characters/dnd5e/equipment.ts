@@ -10,6 +10,8 @@ import {
   createEmptyEquipmentState,
 } from "./equipment-types";
 import { abilityModifier, formatSigned, proficiencyBonus } from "./formulas";
+import { parseFoundryItemTag } from "./item-meta";
+import { isSimpleWeaponName } from "./weapon-catalog-lookup";
 import { resolveCharacterItemStats } from "./item-resolve";
 
 export { createEmptyEquipmentState } from "./equipment-types";
@@ -192,11 +194,76 @@ function weaponUsesDex(properties: string[]): boolean {
   return false;
 }
 
-function hasWeaponProficiency(sheet: Dnd5eSheetData, weaponName: string): boolean {
+function findCharacterItemByRef(
+  items: CharacterItem[],
+  ref: string | null | undefined,
+): CharacterItem | undefined {
+  if (!ref) return undefined;
+  const byId = items.find((i) => i.id === ref);
+  if (byId) return byId;
+  return items.find((i) => parseFoundryItemTag(i.description) === ref);
+}
+
+function hasWeaponProficiency(
+  sheet: Dnd5eSheetData,
+  item: CharacterItem,
+  stats: ReturnType<typeof resolveCharacterItemStats>,
+): boolean {
   const weapons = sheet.proficiencies?.weapons ?? [];
   if (weapons.length === 0) return true;
-  const n = weaponName.toLowerCase();
-  return weapons.some((w) => n.includes(w.toLowerCase()) || w.toLowerCase().includes(n));
+
+  const n = item.name.toLowerCase();
+  const joined = weapons.join(" ").toLowerCase();
+
+  if (
+    weapons.some(
+      (w) =>
+        n.includes(w.toLowerCase()) ||
+        w.toLowerCase().includes(n) ||
+        (w.length >= 3 && n.includes(w.toLowerCase().slice(0, 4))),
+    )
+  ) {
+    return true;
+  }
+
+  const simpleGroup =
+    joined.includes("simple") ||
+    joined.includes("einfach") ||
+    joined.includes("simp");
+  const martialGroup =
+    joined.includes("martial") || joined.includes("krieg") || joined.includes("krieger");
+
+  if (simpleGroup && isSimpleWeaponName(item.name)) return true;
+  if (martialGroup && stats.kind === "weapon" && !isSimpleWeaponName(item.name)) return true;
+
+  return false;
+}
+
+function parseAcFormula(
+  formula: string,
+  dexMod: number,
+): { ac: number; note: string } | null {
+  const trimmed = formula.trim();
+  const maxDexMatch = trimmed.match(/(\d+)\s*\+\s*GES\s*\(\s*max\s*(\d+)\s*\)/i);
+  if (maxDexMatch) {
+    const base = parseInt(maxDexMatch[1], 10);
+    const cap = parseInt(maxDexMatch[2], 10);
+    const effectiveDex = Math.min(dexMod, cap);
+    return {
+      ac: base + effectiveDex,
+      note: `Rüstung ${base} + GES (max ${cap})`,
+    };
+  }
+  const plusDex = trimmed.match(/^(\d+)\s*\+\s*GES$/i);
+  if (plusDex) {
+    const base = parseInt(plusDex[1], 10);
+    return { ac: base + dexMod, note: `Rüstung ${base} + GES` };
+  }
+  if (/^\d+$/.test(trimmed)) {
+    const base = parseInt(trimmed, 10);
+    return { ac: base, note: `Rüstung RK ${base}` };
+  }
+  return null;
 }
 
 export function computeEquippedWeaponAttacks(
@@ -209,38 +276,54 @@ export function computeEquippedWeaponAttacks(
   const pb = proficiencyBonus(level);
   const strMod = derived.abilities.str.modifier;
   const dexMod = derived.abilities.dex.modifier;
-  const itemMap = new Map(items.map((i) => [i.id, i]));
   const previews: WeaponAttackPreview[] = [];
 
   for (const slot of ["mainHand", "offHand"] as const) {
     const itemId = equipment.slots?.[slot];
     if (!itemId) continue;
-    const item = itemMap.get(itemId);
+    const item = findCharacterItemByRef(items, itemId);
     if (!item) continue;
     const stats = resolveCharacterItemStats(item);
     if (stats.kind !== "weapon" && item.category !== "Weapon") continue;
 
+    const sheetAttack =
+      sheet.attacks.find(
+        (a) =>
+          a.name.toLowerCase() === item.name.toLowerCase() ||
+          a.id === item.id ||
+          a.id === parseFoundryItemTag(item.description),
+      ) ?? null;
+
     const useDex = weaponUsesDex(stats.properties);
     const abMod = useDex ? dexMod : strMod;
-    const prof = hasWeaponProficiency(sheet, item.name) ? pb : 0;
-    const attackBonus = abMod + prof;
+    const prof = hasWeaponProficiency(sheet, item, stats) ? pb : 0;
+    let attackBonus =
+      sheetAttack?.attackBonusOverride != null
+        ? sheetAttack.attackBonusOverride
+        : abMod + prof;
 
-    const dmgParts = [stats.damage, stats.damageType].filter(Boolean);
+    const damageDice = stats.damage ?? sheetAttack?.damage?.split(/\s+/)[0] ?? null;
+    const damageType = stats.damageType ?? "";
+    const dmgParts = [damageDice, damageType].filter(Boolean);
     const damage =
       dmgParts.length > 0
         ? `${dmgParts.join(" ")} ${formatSigned(abMod)}`
-        : `— ${formatSigned(abMod)}`;
+        : sheetAttack?.damage
+          ? `${sheetAttack.damage} ${formatSigned(abMod)}`
+          : `— ${formatSigned(abMod)}`;
 
     const notes = [
       stats.properties.length ? stats.properties.join(", ") : null,
+      sheetAttack?.notes ?? null,
       stats.rangeMeters ? `Reichweite ${stats.rangeMeters} m` : null,
       stats.isShield ? "Schild (+2 RK)" : null,
+      !hasWeaponProficiency(sheet, item, stats) ? "Keine Waffenübung" : null,
     ]
       .filter(Boolean)
       .join(" · ");
 
     previews.push({
-      itemId,
+      itemId: item.id,
       name: item.name,
       attackBonus,
       damage,
@@ -259,31 +342,28 @@ export function computeArmorClassPreview(
 ): { ac: number; breakdown: string } {
   const chestId = equipment.slots?.chest;
   const offId = equipment.slots?.offHand;
-  const itemMap = new Map(items.map((i) => [i.id, i]));
   const dexMod = derived.abilities.dex.modifier;
 
   let ac = 10 + dexMod;
   const parts: string[] = ["Basis 10 + GES"];
 
   if (chestId) {
-    const armor = itemMap.get(chestId);
+    const armor = findCharacterItemByRef(items, chestId);
     if (armor) {
       const stats = resolveCharacterItemStats(armor);
       if (stats.acFormula) {
-        const m = stats.acFormula.match(/(\d+)\s*\+\s*GES/i);
-        if (m) {
-          ac = parseInt(m[1], 10) + dexMod;
-          parts.push(`Rüstung ${stats.acFormula}`);
-        } else if (/^\d+$/.test(stats.acFormula.trim())) {
-          ac = parseInt(stats.acFormula, 10);
-          parts.push(`Rüstung RK ${stats.acFormula}`);
+        const parsed = parseAcFormula(stats.acFormula, dexMod);
+        if (parsed) {
+          ac = parsed.ac;
+          parts.length = 0;
+          parts.push(parsed.note);
         }
       }
     }
   }
 
   if (offId) {
-    const off = itemMap.get(offId);
+    const off = findCharacterItemByRef(items, offId);
     if (off) {
       const stats = resolveCharacterItemStats(off);
       if (stats.isShield) {

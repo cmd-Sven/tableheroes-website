@@ -224,7 +224,7 @@ function inferSlotForFoundryItem(
   if (type === "weapon") return "mainHand";
   if (meta.isShield || equipType.includes("shield") || name.includes("schild")) return "offHand";
   if (type === "equipment" || type === "loot") {
-    if (equipType.includes("ring") || name.includes("ring")) return "hands";
+    if (equipType.includes("ring") || name.includes("ring")) return "ring1";
     if (equipType.includes("cloak") || name.includes("umhang")) return "shoulders";
     if (equipType.includes("boot") || name.includes("stiefel")) return "feet";
     if (equipType.includes("glove") || name.includes("handschuh")) return "hands";

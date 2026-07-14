@@ -1,121 +1,194 @@
 "use client";
 
+import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eEquipmentSlot } from "@/src/lib/characters/dnd5e/equipment-types";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type SlotLayout = {
   key: Dnd5eEquipmentSlot;
-  cx: number;
-  cy: number;
+  /** Ankerpunkt auf der Silhouette */
+  ax: number;
+  ay: number;
+  /** Label-Box */
+  lx: number;
+  ly: number;
+  align: "left" | "right";
 };
 
-/** Slot-Positionen auf der Silhouette (viewBox 0 0 200 360) */
+/** Layout wie Referenz: Labels um die Figur, Linien zum Körper (viewBox 0 0 420 520) */
 const SLOT_LAYOUT: SlotLayout[] = [
-  { key: "head", cx: 100, cy: 42 },
-  { key: "eyes", cx: 100, cy: 58 },
-  { key: "neck", cx: 100, cy: 78 },
-  { key: "shoulders", cx: 100, cy: 98 },
-  { key: "chest", cx: 100, cy: 130 },
-  { key: "hands", cx: 38, cy: 145 },
-  { key: "mainHand", cx: 28, cy: 175 },
-  { key: "offHand", cx: 172, cy: 175 },
-  { key: "waist", cx: 100, cy: 175 },
-  { key: "back", cx: 158, cy: 120 },
-  { key: "legs", cx: 100, cy: 230 },
-  { key: "feet", cx: 100, cy: 310 },
+  { key: "head", ax: 210, ay: 52, lx: 24, ly: 28, align: "left" },
+  { key: "eyes", ax: 210, ay: 72, lx: 24, ly: 58, align: "left" },
+  { key: "neck", ax: 210, ay: 92, lx: 24, ly: 88, align: "left" },
+  { key: "shoulders", ax: 248, ay: 118, lx: 268, ly: 98, align: "right" },
+  { key: "back", ax: 172, ay: 130, lx: 268, ly: 128, align: "right" },
+  { key: "chest", ax: 210, ay: 155, lx: 24, ly: 138, align: "left" },
+  { key: "waist", ax: 210, ay: 210, lx: 24, ly: 188, align: "left" },
+  { key: "wrists", ax: 72, ay: 195, lx: 24, ly: 228, align: "left" },
+  { key: "hands", ax: 348, ay: 195, lx: 268, ly: 168, align: "right" },
+  { key: "mainHand", ax: 58, ay: 248, lx: 24, ly: 268, align: "left" },
+  { key: "offHand", ax: 362, ay: 248, lx: 268, ly: 248, align: "right" },
+  { key: "ring1", ax: 330, ay: 285, lx: 268, ly: 288, align: "right" },
+  { key: "ring2", ax: 90, ay: 285, lx: 24, ly: 308, align: "left" },
+  { key: "legs", ax: 210, ay: 340, lx: 24, ly: 348, align: "left" },
+  { key: "feet", ax: 210, ay: 430, lx: 268, ly: 408, align: "right" },
 ];
 
 type Props = {
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
   itemNames: Record<string, string>;
-  activeSlot: Dnd5eEquipmentSlot | null;
+  selectableItems: CharacterItem[];
   readOnly: boolean;
-  onSelectSlot: (slot: Dnd5eEquipmentSlot) => void;
+  onEquip: (slot: Dnd5eEquipmentSlot, itemId: string | null) => void;
 };
+
+function itemsForSlot(
+  slot: Dnd5eEquipmentSlot,
+  currentId: string | null | undefined,
+  selectableItems: CharacterItem[],
+): CharacterItem[] {
+  const base = [...selectableItems];
+  if (currentId && !base.some((i) => i.id === currentId)) {
+    const cur = selectableItems.find((i) => i.id === currentId);
+    if (cur) base.unshift(cur);
+  }
+  return base;
+}
 
 export function EquipmentSilhouette({
   slots,
   itemNames,
-  activeSlot,
+  selectableItems,
   readOnly,
-  onSelectSlot,
+  onEquip,
 }: Props) {
   const { t, equipmentSlotLabel } = useCharacterSheetLocale();
+
   return (
-    <div className="relative mx-auto w-full max-w-[220px]">
+    <div className="relative mx-auto w-full max-w-[440px]">
       <svg
-        viewBox="0 0 200 360"
-        className="w-full h-auto text-hero-border"
+        viewBox="0 0 420 520"
+        className="w-full h-auto"
         aria-label={t("silhouette.aria")}
       >
-        {/* Silhouette */}
-        <ellipse cx="100" cy="38" rx="28" ry="32" fill="currentColor" className="text-hero-dark/80" />
-        <path
-          d="M 72 68 Q 100 82 128 68 L 140 105 Q 155 120 162 145 L 168 200 L 155 205 L 148 280 L 130 340 L 115 340 L 110 280 L 100 200 L 90 280 L 85 340 L 70 340 L 52 280 L 45 205 L 32 200 L 38 145 Q 45 120 60 105 Z"
-          fill="currentColor"
-          className="text-hero-dark/60"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        {/* Arme */}
-        <path
-          d="M 60 105 Q 35 115 22 150 L 18 190 Q 25 195 32 175 Q 40 140 72 120"
-          fill="currentColor"
-          className="text-hero-dark/50"
-        />
-        <path
-          d="M 140 105 Q 165 115 178 150 L 182 190 Q 175 195 168 175 Q 160 140 128 120"
-          fill="currentColor"
-          className="text-hero-dark/50"
+        {/* Pergament-Hintergrund */}
+        <rect
+          x="8"
+          y="8"
+          width="404"
+          height="504"
+          rx="6"
+          className="fill-[#2a2418]/40 stroke-hero-border/40"
+          strokeWidth="1"
         />
 
-        {SLOT_LAYOUT.map(({ key, cx, cy }) => {
-          const itemId = slots[key];
+        {/* Anatomische Silhouette (Umriss) */}
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-gray-400/90"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {/* Kopf */}
+          <ellipse cx="210" cy="48" rx="26" ry="30" />
+          {/* Hals */}
+          <path d="M 198 76 L 198 92 M 222 76 L 222 92" />
+          {/* Torso */}
+          <path d="M 168 98 Q 210 108 252 98 L 268 155 Q 275 210 260 280 L 248 360 Q 210 368 172 360 L 160 280 Q 145 210 152 155 Z" />
+          {/* Arme */}
+          <path d="M 168 108 Q 118 120 78 175 L 58 248 Q 52 268 68 278" />
+          <path d="M 252 108 Q 302 120 342 175 L 362 248 Q 368 268 352 278" />
+          {/* Beine */}
+          <path d="M 188 360 L 178 430 L 168 468" />
+          <path d="M 232 360 L 242 430 L 252 468" />
+        </g>
+
+        {SLOT_LAYOUT.map(({ key, ax, ay, lx, ly, align }) => {
+          const itemId = slots[key] ?? null;
           const filled = Boolean(itemId);
-          const isActive = activeSlot === key;
           const label = equipmentSlotLabel(key);
-          const itemLabel = itemId ? itemNames[itemId] : null;
+          const boxW = align === "left" ? 118 : 118;
+          const boxH = 36;
+          const boxX = align === "left" ? lx : lx - boxW;
+          const lineEndX = align === "left" ? boxX + boxW : boxX;
 
           return (
             <g key={key}>
-              <circle
-                cx={cx}
-                cy={cy}
-                r={isActive ? 14 : 12}
-                className={`transition-all ${
-                  filled
-                    ? "fill-accent-gold/30 stroke-accent-gold"
-                    : "fill-hero-dark/40 stroke-hero-border"
-                } ${isActive ? "stroke-hero-vibrant stroke-[2.5]" : "stroke-[1.5]"} ${
-                  readOnly ? "cursor-default" : "cursor-pointer hover:fill-hero-vibrant/20"
-                }`}
-                onClick={() => !readOnly && onSelectSlot(key)}
-                role="button"
-                aria-label={`${label}${itemLabel ? `: ${itemLabel}` : ""}`}
+              <line
+                x1={lineEndX}
+                y1={ly + boxH / 2}
+                x2={ax}
+                y2={ay}
+                className="stroke-hero-border/70"
+                strokeWidth="1"
               />
+              <rect
+                x={boxX}
+                y={ly}
+                width={boxW}
+                height={boxH}
+                rx="3"
+                className={`fill-background-card stroke-[1.5] ${
+                  filled ? "stroke-accent-gold/70" : "stroke-hero-border/80"
+                }`}
+              />
+              <text
+                x={boxX + 6}
+                y={ly + 12}
+                className="fill-accent-gold font-barlow text-[8px] font-bold uppercase"
+                style={{ fontSize: 8 }}
+              >
+                {label}
+              </text>
+              <text
+                x={boxX + 6}
+                y={ly + 26}
+                className={`font-libre text-[7px] ${filled ? "fill-gray-200" : "fill-gray-500"}`}
+                style={{ fontSize: 7 }}
+              >
+                {itemId ? (itemNames[itemId] ?? "—").slice(0, 16) : "—"}
+              </text>
               {filled ? (
-                <text
-                  x={cx}
-                  y={cy + 1}
-                  textAnchor="middle"
-                  className="fill-accent-gold text-[8px] font-bold pointer-events-none"
-                  style={{ fontSize: 8 }}
-                >
-                  ●
-                </text>
+                <circle cx={boxX + boxW - 8} cy={ly + 8} r="3" className="fill-accent-gold" />
               ) : null}
             </g>
           );
         })}
       </svg>
 
-      <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] font-barlow uppercase text-gray-500">
-        {SLOT_LAYOUT.filter((s) => slots[s.key]).map(({ key }) => (
-          <div key={key} className="truncate">
-            <span className="text-gray-600">{equipmentSlotLabel(key)}:</span>{" "}
-            <span className="text-gray-300">{itemNames[slots[key]!] ?? "—"}</span>
-          </div>
-        ))}
+      {/* Auswahl unter der Silhouette — je Slot eine Zeile */}
+      <div className="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
+        {SLOT_LAYOUT.map(({ key }) => {
+          const currentId = slots[key] ?? "";
+          const options = itemsForSlot(key, currentId || null, selectableItems);
+          return (
+            <div key={key} className="grid grid-cols-[88px_1fr] items-center gap-2">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-500 truncate">
+                {equipmentSlotLabel(key)}
+              </span>
+              {readOnly ? (
+                <span className="font-libre text-xs text-gray-300 truncate">
+                  {currentId ? itemNames[currentId] ?? "—" : "—"}
+                </span>
+              ) : (
+                <select
+                  value={currentId}
+                  onChange={(e) => onEquip(key, e.target.value || null)}
+                  className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-xs text-white focus:border-hero-vibrant outline-none"
+                >
+                  <option value="">{t("equipment.nothingEquipped")}</option>
+                  {options.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
