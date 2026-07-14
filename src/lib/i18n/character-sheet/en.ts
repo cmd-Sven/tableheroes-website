@@ -223,6 +223,16 @@ export const characterSheetMessagesEn = {
   "states.moodSelected": "Active",
   "states.moodSaveError": "Could not save mood state.",
   "states.moodGenerateError": "AI generation for mood state failed.",
+  "states.moodGmHint": "As GM you can generate AI tokens for this character's mood states.",
+  "states.moodProgress": "{generated} of {total} mood states with token.",
+  "states.moodGenerateMissing": "Start AI: generate {count} missing",
+  "states.moodGenerateAll": "Generate all mood states",
+  "states.moodRegenerateAll": "Regenerate all",
+  "states.moodRegenerateAllConfirm":
+    "Regenerate all mood state tokens? Existing images will be replaced. This may take several minutes.",
+  "states.moodAllPresent":
+    'All mood tokens already exist. Use "Regenerate" per mood or "Regenerate all".',
+  "states.moodNoneGenerated": "No tokens generated.",
 
   "itemEditor.titleEdit": "Edit D&D 5e item",
   "itemEditor.titleNew": "Custom D&D 5e item",

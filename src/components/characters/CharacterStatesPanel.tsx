@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Shield, Smile, Sparkles, X, ZoomIn } from "lucide-react";
+import { Loader2, RefreshCw, Shield, Smile, Sparkles, X, ZoomIn } from "lucide-react";
 import {
   CHARACTER_CONDITION_DEFINITIONS,
   type CharacterConditionKey,
@@ -14,6 +14,7 @@ import {
 } from "@/src/lib/characters/mood-states";
 import { resolveCharacterDisplayToken } from "@/src/lib/characters/display-token";
 import {
+  generateAllCharacterMoodTokens,
   generateCharacterMoodToken,
   loadCharacterStateData,
   setCharacterMoodState,
@@ -35,6 +36,7 @@ export type CharacterStatesPanelProps = {
   hasSourceImage: boolean;
   canManageMood?: boolean;
   canManageActiveConditions?: boolean;
+  isGmViewer?: boolean;
 };
 
 function tokenImageSrc(url: string, generatedAt?: string): string {
@@ -59,12 +61,13 @@ export function CharacterStatesPanel({
   hasSourceImage,
   canManageMood = true,
   canManageActiveConditions = false,
+  isGmViewer = false,
 }: CharacterStatesPanelProps) {
   const { t, conditionLabel, locale } = useCharacterSheetLocale();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [generatingMood, setGeneratingMood] = useState<MoodStateKey | null>(null);
+  const [generatingMood, setGeneratingMood] = useState<MoodStateKey | "all" | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const moodLabel = useCallback(
@@ -87,6 +90,19 @@ export function CharacterStatesPanel({
       }),
     [baseTokenUrl, activeConditions, conditionTokens, moodState, moodTokens],
   );
+
+  const moodGeneratedCount = useMemo(
+    () => MOOD_STATE_DEFINITIONS.filter((d) => moodTokens[d.key]?.url).length,
+    [moodTokens],
+  );
+  const moodMissingCount = MOOD_STATE_DEFINITIONS.length - moodGeneratedCount;
+  const isBulkGenerating = generatingMood === "all" && isLoading;
+
+  const ensureSourceImage = () => {
+    if (hasSourceImage) return true;
+    alert(t("condition.needPortrait"));
+    return false;
+  };
 
   const refreshFromServer = useCallback(async () => {
     setIsFetching(true);
@@ -144,10 +160,7 @@ export function CharacterStatesPanel({
 
   const handleGenerateMoodToken = async (key: MoodStateKey) => {
     if (!canManageMood || isLoading) return;
-    if (!hasSourceImage) {
-      alert(t("condition.needPortrait"));
-      return;
-    }
+    if (!ensureSourceImage()) return;
     setGeneratingMood(key);
     setIsLoading(true);
     try {
@@ -164,6 +177,53 @@ export function CharacterStatesPanel({
       await refreshFromServer();
     } catch (error) {
       alert(error instanceof Error ? error.message : t("states.moodGenerateError"));
+    } finally {
+      setIsLoading(false);
+      setGeneratingMood(null);
+    }
+  };
+
+  const handleGenerateAllMoodTokens = async (regenerateExisting: boolean) => {
+    if (!canManageMood || isLoading) return;
+    if (!ensureSourceImage()) return;
+
+    if (regenerateExisting) {
+      const ok = confirm(t("states.moodRegenerateAllConfirm"));
+      if (!ok) return;
+    } else if (moodMissingCount === 0) {
+      alert(t("states.moodAllPresent"));
+      return;
+    }
+
+    setGeneratingMood("all");
+    setIsLoading(true);
+    try {
+      const result = await generateAllCharacterMoodTokens({
+        campaignId,
+        characterId,
+        onlyMissing: !regenerateExisting,
+      });
+
+      if (result.entries && Object.keys(result.entries).length > 0) {
+        onMoodTokensChange({ ...moodTokens, ...result.entries });
+      }
+
+      if (result.errors && Object.keys(result.errors).length > 0) {
+        const failed = Object.entries(result.errors)
+          .map(([k, msg]) => `${k}: ${msg}`)
+          .join("\n");
+        alert(
+          result.generatedCount > 0
+            ? `${result.generatedCount} Token erzeugt. Fehler bei:\n${failed}`
+            : `KI-Generierung fehlgeschlagen:\n${failed}`,
+        );
+      } else if (result.generatedCount === 0) {
+        alert(result.error ?? t("states.moodNoneGenerated"));
+      }
+
+      await refreshFromServer();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : t("condition.generateNetworkError"));
     } finally {
       setIsLoading(false);
       setGeneratingMood(null);
@@ -293,11 +353,59 @@ export function CharacterStatesPanel({
           {t("states.moodTitle")}
         </h3>
         <p className="font-libre text-xs text-gray-500">{t("states.moodHint")}</p>
+        {isGmViewer ? (
+          <p className="font-libre text-xs text-amber-200/90">{t("states.moodGmHint")}</p>
+        ) : null}
+        <p className="font-libre text-xs text-gray-500">
+          {t("states.moodProgress", {
+            generated: moodGeneratedCount,
+            total: MOOD_STATE_DEFINITIONS.length,
+          })}
+        </p>
+        {canManageMood ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isLoading || !hasSourceImage}
+              onClick={() => handleGenerateAllMoodTokens(false)}
+              className="inline-flex items-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/15 px-3 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/25 disabled:opacity-50"
+            >
+              {isBulkGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {moodMissingCount > 0
+                ? t("states.moodGenerateMissing", { count: moodMissingCount })
+                : t("states.moodGenerateAll")}
+            </button>
+            {moodGeneratedCount > 0 ? (
+              <button
+                type="button"
+                disabled={isLoading || !hasSourceImage}
+                onClick={() => handleGenerateAllMoodTokens(true)}
+                className="inline-flex items-center gap-2 rounded border border-hero-border px-3 py-2 font-barlow text-xs font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-white disabled:opacity-50"
+              >
+                {isBulkGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {t("states.moodRegenerateAll")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {!hasSourceImage && canManageMood ? (
+          <p className="rounded border border-amber-700/40 bg-amber-950/20 px-3 py-2 font-libre text-xs text-amber-200">
+            {t("condition.needPortrait")}
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {MOOD_STATE_DEFINITIONS.map((def) => {
             const selected = moodState === def.key;
             const entry = moodTokens[def.key];
-            const isGenerating = generatingMood === def.key && isLoading;
+            const isGenerating = (generatingMood === def.key || isBulkGenerating) && isLoading;
             return (
               <div
                 key={def.key}

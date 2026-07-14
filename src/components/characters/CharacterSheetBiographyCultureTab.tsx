@@ -535,8 +535,9 @@ export function CharacterSheetBiographyCultureTab({
         onActiveConditionsChange={onActiveConditionsChange}
         baseTokenUrl={tokenPreview}
         hasSourceImage={Boolean(portraitPreview || tokenUrl.trim())}
-        canManageMood={canManageMood && !readOnly}
+        canManageMood={canManageMood}
         canManageActiveConditions={canManageActiveConditions || isGmViewer}
+        isGmViewer={isGmViewer}
       />
 
       <CharacterConditionTokensPanel

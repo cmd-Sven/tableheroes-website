@@ -260,6 +260,51 @@ export async function setCharacterMoodState(input: {
   }
 }
 
+async function persistMoodToken(
+  supabase: SupabaseServerClient,
+  character: CharacterStateRow,
+  moodKey: MoodStateKey,
+  pending: { storage_path: string; buffer: Buffer; contentType: string },
+  opts: { isGm: boolean; actorUserId: string; storageOwnerId: string },
+): Promise<NonNullable<MoodTokensMap[MoodStateKey]>> {
+  const writeClient = resolveWriteClient(supabase, opts.isGm, opts.actorUserId, opts.storageOwnerId);
+
+  const { error: uploadError } = await writeClient.storage
+    .from(PROFILE_MEDIA_BUCKET)
+    .upload(
+      pending.storage_path,
+      toStorageUploadBody(pending.buffer, pending.contentType),
+      { contentType: pending.contentType, cacheControl: "31536000", upsert: false },
+    );
+  if (uploadError) throw new Error(`Bild-Upload fehlgeschlagen: ${uploadError.message}`);
+
+  const { data: urlData } = writeClient.storage
+    .from(PROFILE_MEDIA_BUCKET)
+    .getPublicUrl(pending.storage_path);
+
+  const existing = parseMoodTokensMap(character.mood_tokens);
+  const prev = existing[moodKey];
+  if (prev?.storage_path) {
+    await writeClient.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
+  }
+
+  const storedEntry = {
+    url: urlData.publicUrl,
+    storage_path: pending.storage_path,
+    is_ai_generated: true,
+    generated_at: new Date().toISOString(),
+  };
+
+  const nextMap = { ...existing, [moodKey]: storedEntry };
+  const { error: updateError } = await (writeClient.from("characters") as any)
+    .update({ mood_tokens: nextMap })
+    .eq("id", character.id);
+  if (updateError) throw new Error(updateError.message);
+
+  character.mood_tokens = nextMap;
+  return storedEntry;
+}
+
 export async function generateCharacterMoodToken(input: {
   campaignId: string;
   characterId: string;
@@ -270,45 +315,80 @@ export async function generateCharacterMoodToken(input: {
     const { supabase, storageOwnerId, character, isGm, actorUserId } = access;
 
     const rawEntry = await generateMoodTokenEntry(character, storageOwnerId, input.moodKey);
-    const writeClient = resolveWriteClient(supabase, isGm, actorUserId, storageOwnerId);
-
-    const { error: uploadError } = await writeClient.storage
-      .from(PROFILE_MEDIA_BUCKET)
-      .upload(
-        rawEntry.storage_path,
-        toStorageUploadBody(rawEntry.buffer, rawEntry.contentType),
-        { contentType: rawEntry.contentType, cacheControl: "31536000", upsert: false },
-      );
-    if (uploadError) throw new Error(`Bild-Upload fehlgeschlagen: ${uploadError.message}`);
-
-    const { data: urlData } = writeClient.storage
-      .from(PROFILE_MEDIA_BUCKET)
-      .getPublicUrl(rawEntry.storage_path);
-
-    const existing = parseMoodTokensMap(character.mood_tokens);
-    const prev = existing[input.moodKey];
-    if (prev?.storage_path) {
-      await writeClient.storage.from(PROFILE_MEDIA_BUCKET).remove([prev.storage_path]);
-    }
-
-    const storedEntry = {
-      url: urlData.publicUrl,
-      storage_path: rawEntry.storage_path,
-      is_ai_generated: true,
-      generated_at: new Date().toISOString(),
-    };
-
-    const nextMap = { ...existing, [input.moodKey]: storedEntry };
-    const { error: updateError } = await (writeClient.from("characters") as any)
-      .update({ mood_tokens: nextMap })
-      .eq("id", character.id);
-    if (updateError) throw new Error(updateError.message);
+    const storedEntry = await persistMoodToken(supabase, character, input.moodKey, rawEntry, {
+      isGm,
+      actorUserId,
+      storageOwnerId,
+    });
 
     revalidateCharacterPaths(input.campaignId, input.characterId);
     return { success: true, entry: storedEntry };
   } catch (e: unknown) {
     return {
       success: false,
+      error: e instanceof Error ? e.message : "KI-Token-Generierung fehlgeschlagen.",
+    };
+  }
+}
+
+export async function generateAllCharacterMoodTokens(input: {
+  campaignId: string;
+  characterId: string;
+  onlyMissing?: boolean;
+}): Promise<{
+  success: boolean;
+  generatedCount: number;
+  entries?: MoodTokensMap;
+  errors?: Partial<Record<MoodStateKey, string>>;
+  error?: string;
+}> {
+  try {
+    const { supabase, storageOwnerId, character, isGm, actorUserId } =
+      await assertCharacterStateAccess(input.campaignId, input.characterId);
+
+    const existing = parseMoodTokensMap(character.mood_tokens);
+    const keys = MOOD_STATE_KEYS.filter((key) =>
+      input.onlyMissing === false ? true : !existing[key]?.url,
+    );
+
+    if (keys.length === 0) {
+      return {
+        success: true,
+        generatedCount: 0,
+        entries: {},
+        error: "Alle Gemütszustands-Token sind bereits vorhanden.",
+      };
+    }
+
+    const entries: MoodTokensMap = {};
+    const errors: Partial<Record<MoodStateKey, string>> = {};
+
+    for (const key of keys) {
+      try {
+        const rawEntry = await generateMoodTokenEntry(character, storageOwnerId, key);
+        const entry = await persistMoodToken(supabase, character, key, rawEntry, {
+          isGm,
+          actorUserId,
+          storageOwnerId,
+        });
+        entries[key] = entry;
+      } catch (e: unknown) {
+        errors[key] = e instanceof Error ? e.message : "Generierung fehlgeschlagen.";
+      }
+    }
+
+    revalidateCharacterPaths(input.campaignId, input.characterId);
+
+    return {
+      success: Object.keys(errors).length === 0,
+      generatedCount: Object.keys(entries).length,
+      entries,
+      errors: Object.keys(errors).length > 0 ? errors : undefined,
+    };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      generatedCount: 0,
       error: e instanceof Error ? e.message : "KI-Token-Generierung fehlgeschlagen.",
     };
   }

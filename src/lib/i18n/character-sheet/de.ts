@@ -224,6 +224,16 @@ export const characterSheetMessagesDe = {
   "states.moodSelected": "Aktiv",
   "states.moodSaveError": "Gemütszustand konnte nicht gespeichert werden.",
   "states.moodGenerateError": "KI-Generierung für Gemütszustand fehlgeschlagen.",
+  "states.moodGmHint": "Als Spielleiter kannst du KI-Token für die Gemütszustände dieses Charakters erzeugen.",
+  "states.moodProgress": "{generated} von {total} Gemütszuständen mit Token.",
+  "states.moodGenerateMissing": "KI starten: {count} fehlende generieren",
+  "states.moodGenerateAll": "Alle Gemütszustände generieren",
+  "states.moodRegenerateAll": "Alle neu generieren",
+  "states.moodRegenerateAllConfirm":
+    "Alle Gemütszustands-Token neu generieren? Bestehende Bilder werden ersetzt. Das kann einige Minuten dauern.",
+  "states.moodAllPresent":
+    'Alle Gemütszustands-Token existieren bereits. Nutze „Neu generieren“ pro Zustand oder „Alle neu generieren“.',
+  "states.moodNoneGenerated": "Keine Token erzeugt.",
 
   "itemEditor.titleEdit": "D&D-5e-Item bearbeiten",
   "itemEditor.titleNew": "Eigenes D&D-5e-Item",
