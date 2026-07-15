@@ -12,6 +12,7 @@ import {
 } from "./equipment-types";
 import { abilityModifier, formatSigned, proficiencyBonus } from "./formulas";
 import { parseFoundryItemTag } from "./item-meta";
+import { parseDnd5eMetaFromDescription } from "./item-meta";
 import { isSimpleWeaponName } from "./weapon-catalog-lookup";
 import { resolveCharacterItemStats } from "./item-resolve";
 
@@ -51,6 +52,11 @@ export function normalizeEquipmentState(
     belt,
     slots,
     attunedItemIds: [...(raw.attunedItemIds ?? [])].slice(0, MAX_ATTUNEMENT),
+    customCategories: [...(raw.customCategories ?? [])].map((cat) => ({
+      id: String(cat.id),
+      label: String(cat.label ?? "Kategorie"),
+      icon: cat.icon ?? undefined,
+    })),
   };
 }
 
@@ -79,7 +85,10 @@ export function carryingCapacityLb(strScore: number): number {
 }
 
 export function itemWeightLb(item: CharacterItem): number {
-  return resolveCharacterItemStats(item).weightLb ?? 0;
+  const stats = resolveCharacterItemStats(item);
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  const qty = Math.max(1, Math.round(Number(meta?.quantity) || 1));
+  return Math.round((stats.weightLb ?? 0) * qty * 10) / 10;
 }
 
 export function computeEquipmentWeight(
@@ -146,12 +155,40 @@ export function placeItemOnBelt(
   return next;
 }
 
+export function canPlaceItemInContainer(
+  container: Dnd5eEquipmentContainer,
+  items: CharacterItem[],
+  itemId: string,
+): { ok: boolean; reason?: "capacity" | "already" } {
+  if (container.itemIds.includes(itemId)) {
+    return { ok: false, reason: "already" };
+  }
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+  const newItem = itemMap.get(itemId);
+  if (!newItem) return { ok: false };
+  const cap = getContainerMaxCapacityLb(container.kind);
+  const current = containerWeightLb(container, items);
+  const added = itemWeightLb(newItem);
+  if (current + added > cap) {
+    return { ok: false, reason: "capacity" };
+  }
+  return { ok: true };
+}
+
 export function placeItemInContainer(
   equipment: Dnd5eEquipmentState,
   containerId: string,
   itemId: string | null,
+  items?: CharacterItem[],
 ): Dnd5eEquipmentState {
   let next = normalizeEquipmentState(equipment);
+  if (itemId && items) {
+    const container = next.containers.find((c) => c.id === containerId);
+    if (container) {
+      const check = canPlaceItemInContainer(container, items, itemId);
+      if (!check.ok) return next;
+    }
+  }
   if (itemId) next = removeItemFromEquipment(next, itemId);
   next.containers = next.containers.map((c) => {
     if (c.id !== containerId) return c;
@@ -159,6 +196,26 @@ export function placeItemInContainer(
     return { ...c, itemIds };
   });
   return next;
+}
+
+/** Items in einem Container, ohne ausgerüstete (Slots/Gürtel) */
+export function getContainerInventoryItems(
+  container: Dnd5eEquipmentContainer,
+  items: CharacterItem[],
+  equipment: Dnd5eEquipmentState,
+): CharacterItem[] {
+  const equippedIds = new Set<string>();
+  for (const id of Object.values(equipment.slots)) {
+    if (id) equippedIds.add(id);
+  }
+  for (const id of equipment.belt) {
+    if (id) equippedIds.add(id);
+  }
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+  return container.itemIds
+    .filter((id) => !equippedIds.has(id) && id !== container.linkedItemId)
+    .map((id) => itemMap.get(id))
+    .filter((i): i is CharacterItem => Boolean(i));
 }
 
 export function toggleAttunement(

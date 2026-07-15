@@ -101,6 +101,13 @@ export type Dnd5eEquipmentContainer = {
   itemIds: string[];
 };
 
+export type InventoryCustomCategory = {
+  id: string;
+  label: string;
+  /** Lucide icon name (optional) */
+  icon?: string;
+};
+
 export type Dnd5eEquipmentState = {
   /** Mindestens ein Rucksack erforderlich, bevor Gepäck verteilt wird */
   containers: Dnd5eEquipmentContainer[];
@@ -109,6 +116,8 @@ export type Dnd5eEquipmentState = {
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
   /** Eingestimmte magische Gegenstände (max. 3) */
   attunedItemIds: string[];
+  /** Benutzerdefinierte Inventar-Kategorien (Bearbeitungsmodus) */
+  customCategories?: InventoryCustomCategory[];
 };
 
 export const MAX_BELT_SLOTS = 6;
@@ -120,5 +129,6 @@ export function createEmptyEquipmentState(): Dnd5eEquipmentState {
     belt: Array.from({ length: MAX_BELT_SLOTS }, () => null),
     slots: {},
     attunedItemIds: [],
+    customCategories: [],
   };
 }

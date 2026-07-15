@@ -2,18 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Backpack,
-  ChevronDown,
-  ChevronUp,
   Loader2,
-  Package,
-  Pencil,
-  Plus,
   Scale,
   Sparkles,
   Swords,
   Shield,
-  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   deleteCharacterItem,
@@ -23,7 +17,6 @@ import type { CharacterItem, CharacterInventoryPayload } from "@/src/types/inven
 import type { Dnd5eDerivedSheet, Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
 import {
   type Dnd5eEquipmentContainer,
-  type Dnd5eEquipmentSlot,
   type Dnd5eEquipmentState,
   MAX_ATTUNEMENT,
   MAX_BELT_SLOTS,
@@ -33,13 +26,9 @@ import {
   computeArmorClassPreview,
   computeEquippedWeaponAttacks,
   computeEquipmentWeight,
-  containerWeightLb,
-  getContainerMaxCapacityLb,
   getUnassignedItems,
   hasBackpackContainer,
-  itemWeightLb,
   normalizeEquipmentState,
-  placeItemInContainer,
   placeItemInSlot,
   placeItemOnBelt,
   removeItemFromEquipment,
@@ -50,12 +39,22 @@ import {
   isBackpackItem,
   resolveCharacterItemStats,
 } from "@/src/lib/characters/dnd5e/item-resolve";
+import {
+  consumeFromStack,
+  duplicateCharacterItem,
+  setItemInventoryCategory,
+  splitStack,
+} from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhouette";
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
-import { parseFoundryItemTag } from "@/src/lib/characters/dnd5e/item-meta";
+import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
+import {
+  DRAG_MIME,
+  validateItemForBelt,
+} from "@/src/lib/characters/dnd5e/slot-validation";
+import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
-import type { CharacterSheetT } from "@/src/lib/i18n/character-sheet";
 
 type Props = {
   characterId: string;
@@ -66,156 +65,6 @@ type Props = {
   onEquipmentChange: (equipment: Dnd5eEquipmentState) => void;
 };
 
-function ItemSelect({
-  value,
-  items,
-  placeholder,
-  disabled,
-  onChange,
-}: {
-  value: string;
-  items: CharacterItem[];
-  placeholder: string;
-  disabled?: boolean;
-  onChange: (id: string) => void;
-}) {
-  return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white disabled:opacity-60"
-    >
-      <option value="">{placeholder}</option>
-      {items.map((item) => (
-        <option key={item.id} value={item.id}>
-          {item.name} ({itemWeightLb(item)} lb)
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function ContainerCard({
-  container,
-  items,
-  itemNames,
-  unassigned,
-  readOnly,
-  expanded,
-  onToggleExpand,
-  onRemoveContainer,
-  onPackItem,
-  onRemoveItem,
-  t,
-  containerKindLabel,
-}: {
-  container: Dnd5eEquipmentContainer;
-  items: CharacterItem[];
-  itemNames: Record<string, string>;
-  unassigned: CharacterItem[];
-  readOnly: boolean;
-  expanded?: boolean;
-  onToggleExpand?: () => void;
-  onRemoveContainer?: () => void;
-  onPackItem?: (itemId: string) => void;
-  onRemoveItem?: (itemId: string) => void;
-  t: CharacterSheetT;
-  containerKindLabel: (kind: Dnd5eEquipmentContainer["kind"]) => string;
-}) {
-  const cap = getContainerMaxCapacityLb(container.kind);
-  const w = containerWeightLb(container, items);
-  const itemCount = container.itemIds.length;
-  const showItems = expanded ?? false;
-
-  return (
-    <div className="flex flex-col rounded-lg border border-hero-border/50 bg-hero-dark/30 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-barlow text-sm font-bold text-white truncate">{container.label}</p>
-          <p className="font-libre text-[10px] text-gray-500">{containerKindLabel(container.kind)}</p>
-        </div>
-        {!readOnly && onRemoveContainer ? (
-          <button
-            type="button"
-            onClick={onRemoveContainer}
-            className="shrink-0 text-[10px] text-red-400 hover:text-red-300"
-          >
-            {t("equipment.remove")}
-          </button>
-        ) : null}
-      </div>
-
-      <div className="mt-2 space-y-1">
-        <p className="font-libre text-xs text-gray-400">
-          {t("equipment.containerItemCount", { count: itemCount })}
-        </p>
-        <p className="font-barlow text-sm font-bold text-white">
-          {t("equipment.containerWeight", { weight: w })}
-          <span className="ml-1 text-xs font-normal text-gray-500">
-            / {t("equipment.containerMaxCapacity", { cap })}
-          </span>
-        </p>
-        <div className="h-1.5 rounded-full bg-hero-dark overflow-hidden">
-          <div
-            className={`h-full transition-all ${w > cap ? "bg-red-500" : "bg-hero-vibrant"}`}
-            style={{ width: `${Math.min(100, (w / Math.max(1, cap)) * 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {onToggleExpand ? (
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className="mt-2 flex items-center gap-1 font-barlow text-[10px] font-bold uppercase text-gray-500 hover:text-hero-vibrant"
-        >
-          {showItems ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          {itemCount === 0 ? t("equipment.containerEmpty") : t("equipment.containerItemCount", { count: itemCount })}
-        </button>
-      ) : null}
-
-      {showItems ? (
-        <div className="mt-2 space-y-1 border-t border-hero-border/30 pt-2">
-          {container.itemIds.length === 0 ? (
-            <p className="font-libre text-[10px] text-gray-500 italic">{t("equipment.containerEmpty")}</p>
-          ) : (
-            <ul className="space-y-1 max-h-24 overflow-y-auto">
-              {container.itemIds.map((id) => (
-                <li
-                  key={id}
-                  className="flex items-center justify-between gap-1 font-libre text-[10px] text-gray-300"
-                >
-                  <span className="truncate">
-                    {itemNames[id] ?? id.slice(0, 8)} ({itemWeightLb(items.find((i) => i.id === id)!)} lb)
-                  </span>
-                  {!readOnly && onRemoveItem ? (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveItem(id)}
-                      className="shrink-0 text-red-400 hover:text-red-300"
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          {!readOnly && onPackItem ? (
-            <ItemSelect
-              value=""
-              items={unassigned}
-              placeholder={t("equipment.packItem")}
-              onChange={(id) => onPackItem(id)}
-            />
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function Dnd5eEquipmentTab({
   characterId,
   sheet,
@@ -224,11 +73,11 @@ export function Dnd5eEquipmentTab({
   readOnly,
   onEquipmentChange,
 }: Props) {
-  const { t, containerKindLabel } = useCharacterSheetLocale();
+  const { t } = useCharacterSheetLocale();
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
-  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
+  const [invalidBeltSlot, setInvalidBeltSlot] = useState<number | null>(null);
 
   const equipment = useMemo(
     () => normalizeEquipmentState(sheet.equipment),
@@ -254,6 +103,8 @@ export function Dnd5eEquipmentTab({
     [inventory?.items],
   );
 
+  const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
   const itemNames = useMemo(
     () => Object.fromEntries(items.map((i) => [i.id, i.name])),
     [items],
@@ -276,15 +127,22 @@ export function Dnd5eEquipmentTab({
     return list;
   }, [unassigned, items, equipment.slots]);
 
-  const backpackCandidates = items.filter(
-    (i) => isBackpackItem(i) || inferContainerKind(i) != null,
-  );
-
   const weaponAttacks = computeEquippedWeaponAttacks(sheet, derived, items, equipment, level);
   const acPreview = computeArmorClassPreview(sheet, derived, items, equipment);
 
   function update(next: Dnd5eEquipmentState) {
     onEquipmentChange(normalizeEquipmentState(next));
+  }
+
+  function addDefaultBackpack() {
+    const container: Dnd5eEquipmentContainer = {
+      id: crypto.randomUUID(),
+      kind: "backpack",
+      label: t("equipment.defaultBackpack"),
+      linkedItemId: null,
+      itemIds: [],
+    };
+    update({ ...equipment, containers: [...equipment.containers, container] });
   }
 
   function addBackpackFromItem(itemId: string) {
@@ -304,22 +162,43 @@ export function Dnd5eEquipmentTab({
     update(next);
   }
 
-  function addDefaultBackpack() {
-    const container: Dnd5eEquipmentContainer = {
-      id: crypto.randomUUID(),
-      kind: "backpack",
-      label: t("equipment.defaultBackpack"),
-      linkedItemId: null,
-      itemIds: [],
-    };
-    update({ ...equipment, containers: [...equipment.containers, container] });
-  }
-
-  function removeContainer(containerId: string) {
+  function addCustomCategory(label: string) {
+    const cat = { id: crypto.randomUUID(), label };
     update({
       ...equipment,
-      containers: equipment.containers.filter((c) => c.id !== containerId),
+      customCategories: [...(equipment.customCategories ?? []), cat],
     });
+  }
+
+  async function handleDeleteItem(item: CharacterItem) {
+    if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
+    await deleteCharacterItem(item.id);
+    update(removeItemFromEquipment(equipment, item.id));
+    await reloadInventory();
+  }
+
+  function handleBeltDragOver(e: React.DragEvent, index: number) {
+    if (readOnly) return;
+    e.preventDefault();
+    const itemId = getDragItemId();
+    if (!itemId) return;
+    const item = itemMap.get(itemId);
+    if (!item) return;
+    const validation = validateItemForBelt(item);
+    setInvalidBeltSlot(validation.valid ? null : index);
+    e.dataTransfer.dropEffect = validation.valid ? "move" : "none";
+  }
+
+  function handleBeltDrop(e: React.DragEvent, index: number) {
+    if (readOnly) return;
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
+    setInvalidBeltSlot(null);
+    setDragItemId(null);
+    if (!itemId) return;
+    const item = itemMap.get(itemId);
+    if (!item) return;
+    update(placeItemOnBelt(equipment, index, itemId));
   }
 
   if (loading) {
@@ -333,24 +212,18 @@ export function Dnd5eEquipmentTab({
 
   return (
     <div className="space-y-6">
-      {/* Zeile 1: Traglast + Inventar */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-              <Scale className="h-4 w-4" />
-              {t("equipment.carryingCapacity")}
-            </h3>
-            <div className="text-right">
-              <p className="font-barlow text-2xl font-bold text-white">
-                {totalWeight} <span className="text-sm text-gray-500">/ {capacity} lb</span>
-              </p>
-              <p className="font-libre text-xs text-gray-500">
-                {t("equipment.capacityFormula", { str: strScore, cap: capacity })}
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 h-2 rounded-full bg-hero-dark overflow-hidden">
+      {/* Zeile 1: Traglast (kompakt) + Inventar-Grid */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(140px,180px)_1fr]">
+        <section className="rounded-lg border border-hero-dark bg-background-card p-3">
+          <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold flex items-center gap-1.5 mb-2">
+            <Scale className="h-3.5 w-3.5" />
+            {t("equipment.carryingCapacity")}
+          </h3>
+          <p className="font-barlow text-lg font-bold text-white leading-tight">
+            {totalWeight}
+            <span className="text-xs font-normal text-gray-500"> / {capacity} lb</span>
+          </p>
+          <div className="mt-2 h-1.5 rounded-full bg-hero-dark overflow-hidden">
             <div
               className={`h-full transition-all ${
                 totalWeight > capacity ? "bg-red-500" : "bg-hero-vibrant"
@@ -358,142 +231,69 @@ export function Dnd5eEquipmentTab({
               style={{ width: `${Math.min(100, (totalWeight / Math.max(1, capacity)) * 100)}%` }}
             />
           </div>
+          <p className="mt-1.5 font-libre text-[9px] text-gray-600">
+            {t("equipment.capacityFormula", { str: strScore, cap: capacity })}
+          </p>
         </section>
 
-        <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">{t("equipment.inventory")}</h3>
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={() => setItemEditor("new")}
-                className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-3 py-1.5 font-barlow text-xs font-bold uppercase text-black hover:bg-yellow-500"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("equipment.customItem")}
-              </button>
-            ) : null}
-          </div>
-          <p className="font-libre text-xs text-gray-500">
-            {t("equipment.inventoryHint")}
-          </p>
-          {items.length === 0 ? (
-            <p className="font-libre text-sm text-gray-500 italic">{t("equipment.inventoryEmpty")}</p>
-          ) : (
-            <ul className="space-y-2 max-h-48 overflow-y-auto">
-              {items.map((item) => {
-                const stats = resolveCharacterItemStats(item);
-                const isFoundry = Boolean(parseFoundryItemTag(item.description));
-                return (
-                  <li
-                    key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-libre text-sm text-white truncate">{item.name}</p>
-                      <p className="font-libre text-[10px] text-gray-500">
-                        {item.category} · {stats.weightLb} lb
-                        {isFoundry ? ` · ${t("equipment.foundryTag")}` : ` · ${t("equipment.customTag")}`}
-                      </p>
-                    </div>
-                    {!readOnly && !isFoundry ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setItemEditor(item)}
-                          className="rounded p-1.5 text-gray-500 hover:text-hero-vibrant"
-                          title={t("equipment.edit")}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
-                            await deleteCharacterItem(item.id);
-                            update(removeItemFromEquipment(equipment, item.id));
-                            await reloadInventory();
-                          }}
-                          className="rounded p-1.5 text-gray-500 hover:text-red-400"
-                          title={t("equipment.delete")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <InventoryGrid
+          items={items}
+          equipment={equipment}
+          readOnly={readOnly}
+          onEquipmentChange={update}
+          onAddItem={() => setItemEditor("new")}
+          onEditItem={(item) => setItemEditor(item)}
+          onDeleteItem={handleDeleteItem}
+          onDuplicateItem={async (item) => {
+            await duplicateCharacterItem(item);
+            await reloadInventory();
+          }}
+          onSplitStack={async (item, amount) => {
+            await splitStack(item, amount);
+            await reloadInventory();
+          }}
+          onConsumeStack={async (item, amount) => {
+            const result = await consumeFromStack(item, amount);
+            if (!result) {
+              update(removeItemFromEquipment(equipment, item.id));
+            }
+            await reloadInventory();
+          }}
+          onAssignCategory={async (item, category) => {
+            await setItemInventoryCategory(item, category);
+            await reloadInventory();
+          }}
+          onAddDefaultBackpack={addDefaultBackpack}
+          onAddCustomCategory={addCustomCategory}
+        />
       </div>
 
-      {/* Zeile 2: Gepäck-Karten */}
-      <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-        <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-          <Backpack className="h-4 w-4" />
-          {t("equipment.step1Title")}
-        </h3>
-        <p className="font-libre text-sm text-gray-400">
-          {t("equipment.step1Hint")}
-        </p>
+      {/* Rucksack aus Inventar hinzufügen (wenn noch keiner) */}
+      {equipment.containers.length === 0 && !readOnly ? (
+        <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+          <p className="font-libre text-sm text-gray-400 mb-3">{t("equipment.step1Hint")}</p>
+          {items.filter((i) => isBackpackItem(i) || inferContainerKind(i) != null).length > 0 ? (
+            <select
+              value=""
+              onChange={(e) => e.target.value && addBackpackFromItem(e.target.value)}
+              className="w-full max-w-xs rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
+            >
+              <option value="">{t("equipment.chooseBackpack")}</option>
+              {items
+                .filter((i) => isBackpackItem(i) || inferContainerKind(i) != null)
+                .map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+            </select>
+          ) : null}
+        </section>
+      ) : null}
 
-        {equipment.containers.length === 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {backpackCandidates.length > 0 ? (
-              <div className="space-y-2">
-                <p className="font-barlow text-xs uppercase text-gray-500">{t("equipment.chooseFromInventory")}</p>
-                <ItemSelect
-                  value=""
-                  items={backpackCandidates}
-                  placeholder={t("equipment.chooseBackpack")}
-                  disabled={readOnly}
-                  onChange={(id) => addBackpackFromItem(id)}
-                />
-              </div>
-            ) : null}
-            {!readOnly ? (
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={addDefaultBackpack}
-                  className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-dark/50"
-                >
-                  {t("equipment.addDefaultBackpack")}
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {equipment.containers.map((container) => (
-                <ContainerCard
-                  key={container.id}
-                  container={container}
-                  items={items}
-                  itemNames={itemNames}
-                  unassigned={unassigned}
-                  readOnly={readOnly}
-                  onRemoveContainer={() => removeContainer(container.id)}
-                  t={t}
-                  containerKindLabel={containerKindLabel}
-                />
-              ))}
-            </div>
-            {!readOnly && !hasBackpack ? (
-              <p className="font-libre text-xs text-amber-400">
-                {t("equipment.backpackHint")}
-              </p>
-            ) : null}
-          </div>
-        )}
-      </section>
-
-      {hasBackpack ? (
+      {hasBackpack || equipment.containers.length > 0 ? (
         <>
-          {/* Zeile 3: Silhouette + Kampfwerte */}
+          {/* Silhouette + Kampfwerte */}
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-lg border border-hero-dark bg-background-card p-4">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
@@ -503,6 +303,7 @@ export function Dnd5eEquipmentTab({
                 slots={equipment.slots}
                 itemNames={itemNames}
                 selectableItems={selectableForSlots}
+                itemMap={itemMap}
                 readOnly={readOnly}
                 onEquip={(slot, itemId) =>
                   update(placeItemInSlot(equipment, slot, itemId))
@@ -552,7 +353,7 @@ export function Dnd5eEquipmentTab({
             </section>
           </div>
 
-          {/* Zeile 4: Gürtel / Vorbereitet */}
+          {/* Gürtel mit DnD */}
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">
@@ -565,149 +366,111 @@ export function Dnd5eEquipmentTab({
             <p className="font-libre text-xs text-gray-500">
               {t("equipment.beltPreparedHint")}
             </p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-3 sm:grid-cols-6">
               {equipment.belt.map((itemId, index) => (
-                <div key={index} className="space-y-1">
+                <div
+                  key={index}
+                  className="space-y-1"
+                  onDragOver={(e) => handleBeltDragOver(e, index)}
+                  onDragLeave={() => setInvalidBeltSlot(null)}
+                  onDrop={(e) => handleBeltDrop(e, index)}
+                >
                   <div className="flex items-center justify-between gap-1">
                     <span className="font-barlow text-[10px] uppercase text-gray-600">
                       {t("equipment.beltSlot", { n: index + 1 })}
                     </span>
-                    {itemId ? (
+                    {invalidBeltSlot === index ? (
+                      <span title={t("inventory.equipConflict")}>
+                        <AlertTriangle className="h-3 w-3 text-yellow-400" />
+                      </span>
+                    ) : itemId ? (
                       <span className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant">
                         {t("equipment.beltPrepared")}
                       </span>
                     ) : null}
                   </div>
                   {readOnly ? (
-                    <p className="font-libre text-sm text-gray-300">
+                    <p className="font-libre text-sm text-gray-300 truncate">
                       {itemId ? itemNames[itemId] ?? "—" : "—"}
                     </p>
                   ) : (
-                    <ItemSelect
-                      value={itemId ?? ""}
-                      items={[...unassigned, ...(itemId ? items.filter((i) => i.id === itemId) : [])]}
-                      placeholder={t("equipment.empty")}
-                      onChange={(id) =>
-                        update(placeItemOnBelt(equipment, index, id || null))
-                      }
-                    />
+                    <div
+                      className={`min-h-[32px] rounded border px-2 py-1 font-libre text-[10px] text-white ${
+                        itemId
+                          ? "border-hero-vibrant/50 bg-hero-vibrant/10"
+                          : "border-dashed border-hero-border/40 bg-hero-dark/20 text-gray-500"
+                      }`}
+                    >
+                      {itemId ? (
+                        <button
+                          type="button"
+                          onClick={() => update(placeItemOnBelt(equipment, index, null))}
+                          className="truncate w-full text-left hover:text-red-400"
+                          title={itemNames[itemId]}
+                        >
+                          {itemNames[itemId]}
+                        </button>
+                      ) : (
+                        <span>{t("equipment.empty")}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Zeile 5: Gepäck verteilen + Einstimmung */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
-              <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                {t("equipment.step4Title")}
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {equipment.containers.map((container) => (
-                  <ContainerCard
-                    key={container.id}
-                    container={container}
-                    items={items}
-                    itemNames={itemNames}
-                    unassigned={unassigned}
-                    readOnly={readOnly}
-                    expanded={expandedContainers.has(container.id)}
-                    onToggleExpand={() =>
-                      setExpandedContainers((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(container.id)) next.delete(container.id);
-                        else next.add(container.id);
-                        return next;
-                      })
-                    }
-                    onPackItem={(id) => update(placeItemInContainer(equipment, container.id, id))}
-                    onRemoveItem={(id) => {
-                      const next = normalizeEquipmentState(equipment);
-                      next.containers = next.containers.map((c) =>
-                        c.id === container.id
-                          ? { ...c, itemIds: c.itemIds.filter((x) => x !== id) }
-                          : c,
-                      );
-                      update(next);
-                    }}
-                    t={t}
-                    containerKindLabel={containerKindLabel}
-                  />
-                ))}
-              </div>
-
-              {unassigned.length > 0 ? (
-                <div className="border-t border-hero-dark pt-3">
-                  <p className="font-barlow text-xs uppercase text-gray-500 mb-2">
-                    {t("equipment.unassigned", { count: unassigned.length })}
-                  </p>
-                  <ul className="flex flex-wrap gap-2">
-                    {unassigned.map((item) => (
-                      <li
-                        key={item.id}
-                        className="rounded border border-hero-border/30 bg-hero-dark/20 px-2 py-1 font-libre text-xs text-gray-400"
-                      >
-                        {item.name} ({itemWeightLb(item)} lb)
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-              <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                {t("equipment.attunementTitle", { max: MAX_ATTUNEMENT })}
-              </h3>
-              <p className="font-libre text-xs text-gray-500">
-                {t("equipment.attunementCount", {
-                  count: equipment.attunedItemIds.length,
-                  max: MAX_ATTUNEMENT,
+          {/* Einstimmung */}
+          <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
+            <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              {t("equipment.attunementTitle", { max: MAX_ATTUNEMENT })}
+            </h3>
+            <p className="font-libre text-xs text-gray-500">
+              {t("equipment.attunementCount", {
+                count: equipment.attunedItemIds.length,
+                max: MAX_ATTUNEMENT,
+              })}
+            </p>
+            <div className="space-y-2">
+              {items
+                .filter((i) => {
+                  const s = resolveCharacterItemStats(i);
+                  return s.attunement || s.isMagical;
+                })
+                .map((item) => {
+                  const attuned = equipment.attunedItemIds.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className="flex items-center gap-3 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={attuned}
+                        disabled={
+                          readOnly ||
+                          (!attuned && equipment.attunedItemIds.length >= MAX_ATTUNEMENT)
+                        }
+                        onChange={() => update(toggleAttunement(equipment, item.id))}
+                        className="rounded border-hero-border"
+                      />
+                      <span className="font-libre text-sm text-gray-300">{item.name}</span>
+                      {resolveCharacterItemStats(item).attunement ? (
+                        <span className="ml-auto font-barlow text-[10px] uppercase text-accent-gold">
+                          {t("equipment.attunement")}
+                        </span>
+                      ) : null}
+                    </label>
+                  );
                 })}
-              </p>
-              <div className="space-y-2">
-                {items
-                  .filter((i) => {
-                    const s = resolveCharacterItemStats(i);
-                    return s.attunement || s.isMagical;
-                  })
-                  .map((item) => {
-                    const attuned = equipment.attunedItemIds.includes(item.id);
-                    return (
-                      <label
-                        key={item.id}
-                        className="flex items-center gap-3 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={attuned}
-                          disabled={
-                            readOnly ||
-                            (!attuned && equipment.attunedItemIds.length >= MAX_ATTUNEMENT)
-                          }
-                          onChange={() => update(toggleAttunement(equipment, item.id))}
-                          className="rounded border-hero-border"
-                        />
-                        <span className="font-libre text-sm text-gray-300">{item.name}</span>
-                        {resolveCharacterItemStats(item).attunement ? (
-                          <span className="ml-auto font-barlow text-[10px] uppercase text-accent-gold">
-                            {t("equipment.attunement")}
-                          </span>
-                        ) : null}
-                      </label>
-                    );
-                  })}
-                {items.filter((i) => resolveCharacterItemStats(i).isMagical).length === 0 ? (
-                  <p className="font-libre text-sm text-gray-500 italic">
-                    {t("equipment.noMagicItems")}
-                  </p>
-                ) : null}
-              </div>
-            </section>
-          </div>
+              {items.filter((i) => resolveCharacterItemStats(i).isMagical).length === 0 ? (
+                <p className="font-libre text-sm text-gray-500 italic">
+                  {t("equipment.noMagicItems")}
+                </p>
+              ) : null}
+            </div>
+          </section>
         </>
       ) : (
         <section className="rounded-lg border border-hero-dark bg-background-card p-4">
@@ -716,6 +479,7 @@ export function Dnd5eEquipmentTab({
           </p>
         </section>
       )}
+
       {itemEditor !== null ? (
         <CustomDnd5eItemEditorModal
           characterId={characterId}

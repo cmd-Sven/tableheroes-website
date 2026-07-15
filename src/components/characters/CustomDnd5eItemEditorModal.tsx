@@ -18,7 +18,9 @@ import {
   parseDnd5eMetaFromDescription,
   stripMachineTags,
   type Dnd5eItemMeta,
+  type InventoryDisplayCategory,
 } from "@/src/lib/characters/dnd5e/item-meta";
+import { STANDARD_INVENTORY_CATEGORIES } from "@/src/lib/characters/dnd5e/inventory-categories";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
@@ -163,12 +165,22 @@ export function CustomDnd5eItemEditorModal({
             <span className="font-barlow text-xs font-bold uppercase text-gray-500">Art</span>
             <select
               value={meta.kind}
-              onChange={(e) =>
+              onChange={(e) => {
+                const kind = e.target.value as Dnd5eItemMeta["kind"];
+                const categoryMap: Partial<Record<Dnd5eItemMeta["kind"], InventoryDisplayCategory>> = {
+                  weapon: "weapons",
+                  armor: "armor",
+                  consumable: "potions",
+                  tool: "tools",
+                  supply: "gear",
+                  equipment: "gear",
+                };
                 patchMeta({
-                  kind: e.target.value as Dnd5eItemMeta["kind"],
-                  isMagical: e.target.value === "magic",
-                })
-              }
+                  kind,
+                  isMagical: kind === "magic",
+                  inventoryCategory: categoryMap[kind] ?? meta.inventoryCategory,
+                });
+              }}
               className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
             >
               {DND5E_ITEM_KIND_OPTIONS.map((opt) => (
@@ -179,7 +191,24 @@ export function CustomDnd5eItemEditorModal({
             </select>
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="font-barlow text-xs font-bold uppercase text-gray-500">
+              {t("inventory.categoryLabel")}
+            </span>
+            <select
+              value={meta.inventoryCategory ?? "unknown"}
+              onChange={(e) => patchMeta({ inventoryCategory: e.target.value })}
+              className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
+            >
+              {STANDARD_INVENTORY_CATEGORIES.filter((c) => c !== "unknown").map((cat) => (
+                <option key={cat} value={cat}>
+                  {t(`inventory.cat.${cat}` as Parameters<typeof t>[0])}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block space-y-1">
               <span className="font-barlow text-xs font-bold uppercase text-gray-500">
                 Gewicht (lb)
@@ -194,15 +223,46 @@ export function CustomDnd5eItemEditorModal({
               />
             </label>
             <label className="block space-y-1">
-              <span className="font-barlow text-xs font-bold uppercase text-gray-500">Seltenheit</span>
+              <span className="font-barlow text-xs font-bold uppercase text-gray-500">
+                {t("inventory.quantityLabel")}
+              </span>
               <input
-                value={meta.rarity ?? ""}
-                onChange={(e) => patchMeta({ rarity: e.target.value })}
+                type="number"
+                min={1}
+                step={1}
+                value={meta.quantity ?? 1}
+                onChange={(e) => patchMeta({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
                 className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-                placeholder={t("itemEditor.rarityPlaceholder")}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-barlow text-xs font-bold uppercase text-gray-500">
+                {t("inventory.valueGpLabel")}
+              </span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={meta.valueGp ?? ""}
+                onChange={(e) =>
+                  patchMeta({
+                    valueGp: e.target.value ? Math.max(0, Number(e.target.value) || 0) : null,
+                  })
+                }
+                className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
               />
             </label>
           </div>
+
+          <label className="block space-y-1">
+            <span className="font-barlow text-xs font-bold uppercase text-gray-500">Seltenheit</span>
+            <input
+              value={meta.rarity ?? ""}
+              onChange={(e) => patchMeta({ rarity: e.target.value })}
+              className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
+              placeholder={t("itemEditor.rarityPlaceholder")}
+            />
+          </label>
 
           {showWeaponFields ? (
             <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3 space-y-3">

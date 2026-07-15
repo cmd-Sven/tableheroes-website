@@ -1,8 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { AlertTriangle } from "lucide-react";
 import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eEquipmentSlot } from "@/src/lib/characters/dnd5e/equipment-types";
+import {
+  DRAG_MIME,
+  validateItemForSlot,
+} from "@/src/lib/characters/dnd5e/slot-validation";
+import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 /** 11 D&D-relevante Ausrüstungs-Slots (interne Keys → Position auf dem Hintergrundbild). */
@@ -43,6 +50,7 @@ type Props = {
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
   itemNames: Record<string, string>;
   selectableItems: CharacterItem[];
+  itemMap: Map<string, CharacterItem>;
   readOnly: boolean;
   onEquip: (slot: Dnd5eEquipmentSlot, itemId: string | null) => void;
 };
@@ -60,10 +68,46 @@ export function EquipmentSilhouette({
   slots,
   itemNames,
   selectableItems,
+  itemMap,
   readOnly,
   onEquip,
 }: Props) {
   const { t } = useCharacterSheetLocale();
+  const [dragOverSlot, setDragOverSlot] = useState<Dnd5eEquipmentSlot | null>(null);
+  const [invalidSlot, setInvalidSlot] = useState<Dnd5eEquipmentSlot | null>(null);
+
+  function handleDragOver(e: React.DragEvent, slot: Dnd5eEquipmentSlot) {
+    if (readOnly) return;
+    e.preventDefault();
+    const itemId = getDragItemId();
+    if (!itemId) return;
+    const item = itemMap.get(itemId);
+    if (!item) return;
+    const validation = validateItemForSlot(item, slot);
+    setDragOverSlot(slot);
+    setInvalidSlot(validation.valid ? null : slot);
+    e.dataTransfer.dropEffect = validation.valid ? "move" : "none";
+  }
+
+  function handleDrop(e: React.DragEvent, slot: Dnd5eEquipmentSlot) {
+    if (readOnly) return;
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
+    setDragOverSlot(null);
+    setInvalidSlot(null);
+    setDragItemId(null);
+    if (!itemId) return;
+    const item = itemMap.get(itemId);
+    if (!item) return;
+    const validation = validateItemForSlot(item, slot);
+    if (!validation.valid) return;
+    onEquip(slot, itemId);
+  }
+
+  function handleDragLeave() {
+    setDragOverSlot(null);
+    setInvalidSlot(null);
+  }
 
   return (
     <div
@@ -84,6 +128,8 @@ export function EquipmentSilhouette({
           const currentId = slots[key] ?? "";
           const anchorRight = left === "92%";
           const anchorCenter = left === "50%";
+          const isDragOver = dragOverSlot === key;
+          const isInvalid = invalidSlot === key;
 
           return (
             <div
@@ -99,9 +145,17 @@ export function EquipmentSilhouette({
                     ? "translateX(-100%)"
                     : undefined,
               }}
+              onDragOver={(e) => handleDragOver(e, key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, key)}
             >
-              <label className="mb-0.5 block font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+              <label className="mb-0.5 flex items-center gap-1 font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                 {t(labelKey)}
+                {isInvalid ? (
+                  <span title={t("inventory.equipConflict")} className="text-yellow-400">
+                    <AlertTriangle className="h-3 w-3" />
+                  </span>
+                ) : null}
               </label>
               {readOnly ? (
                 <p className="truncate rounded border border-hero-border/60 bg-background-card/90 px-2 py-1 font-libre text-[10px] text-gray-200 backdrop-blur-sm">
@@ -111,8 +165,20 @@ export function EquipmentSilhouette({
                 <select
                   value={currentId}
                   onChange={(e) => onEquip(key, e.target.value || null)}
-                  className="w-full rounded border border-hero-border/80 bg-background-card/95 px-2 py-1 font-libre text-[10px] text-white shadow-md backdrop-blur-sm focus:border-hero-vibrant outline-none"
-                  title={currentId ? itemNames[currentId] : t("equipment.nothingEquipped")}
+                  className={`w-full rounded border bg-background-card/95 px-2 py-1 font-libre text-[10px] text-white shadow-md backdrop-blur-sm focus:border-hero-vibrant outline-none transition-colors ${
+                    isDragOver && isInvalid
+                      ? "border-yellow-500 ring-1 ring-yellow-500/50"
+                      : isDragOver
+                        ? "border-hero-vibrant ring-1 ring-hero-vibrant/50"
+                        : "border-hero-border/80"
+                  }`}
+                  title={
+                    isInvalid
+                      ? t("inventory.equipConflict")
+                      : currentId
+                        ? itemNames[currentId]
+                        : t("equipment.nothingEquipped")
+                  }
                 >
                   <option value="">{t("equipment.nothingEquipped")}</option>
                   {itemsForSlot(currentId || null, selectableItems).map((item) => (

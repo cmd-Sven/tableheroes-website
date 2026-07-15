@@ -1,6 +1,11 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
+import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
+import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import {
   INVENTORY_CATEGORIES,
   type CharacterGem,
@@ -65,6 +70,108 @@ async function requireUser() {
   }
 
   return { supabase, user };
+}
+
+export type CharacterEquipmentPayload = CharacterInventoryPayload & {
+  campaignId: string;
+  equipment: Dnd5eEquipmentState;
+  sheetLocale: string;
+};
+
+async function assertCharacterInventoryAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  characterId: string,
+): Promise<{ campaignId: string; isGm: boolean }> {
+  const { data: chRaw, error: chErr } = await supabase
+    .from("characters")
+    .select("id, user_id, campaign_id")
+    .eq("id", characterId)
+    .single();
+
+  if (chErr || !chRaw) throw new Error("Charakter nicht gefunden.");
+  const ch = chRaw as { user_id: string | null; campaign_id: string };
+  const campaignId = String(ch.campaign_id);
+
+  const { data: campRaw } = await supabase
+    .from("campaigns")
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const camp = campRaw as { gm_id?: string | null; owner_id?: string | null } | null;
+  const isGm = camp ? isCampaignGm(camp, userId) : false;
+  const isOwner = ch.user_id === userId;
+
+  if (!isOwner && !isGm) {
+    throw new Error("Keine Berechtigung für dieses Inventar.");
+  }
+
+  return { campaignId, isGm };
+}
+
+export async function getCharacterEquipmentPayload(
+  characterId: string,
+): Promise<CharacterEquipmentPayload> {
+  assertUuidLike(characterId, "Charakter");
+  const { supabase, user } = await requireUser();
+  const { campaignId } = await assertCharacterInventoryAccess(supabase, user.id, characterId);
+
+  const inventory = await getCharacterInventory(characterId);
+
+  const { data: chRaw, error: sheetErr } = await supabase
+    .from("characters")
+    .select("sheet_data, sheet_locale")
+    .eq("id", characterId)
+    .single();
+
+  if (sheetErr) {
+    throw new Error(sheetErr.message || "Ausrüstungsdaten konnten nicht geladen werden.");
+  }
+
+  const ch = chRaw as { sheet_data?: unknown; sheet_locale?: string | null };
+  const sheet = parseSheetData(ch.sheet_data);
+  const equipment = normalizeEquipmentState(sheet?.equipment);
+
+  return {
+    ...inventory,
+    campaignId,
+    equipment,
+    sheetLocale: normalizeCharacterSheetLocale(ch.sheet_locale),
+  };
+}
+
+export async function saveCharacterEquipment(
+  characterId: string,
+  equipment: Dnd5eEquipmentState,
+): Promise<void> {
+  assertUuidLike(characterId, "Charakter");
+  const { supabase, user } = await requireUser();
+  await assertCharacterInventoryAccess(supabase, user.id, characterId);
+
+  const { data: chRaw, error: loadErr } = await supabase
+    .from("characters")
+    .select("sheet_data")
+    .eq("id", characterId)
+    .single();
+
+  if (loadErr || !chRaw) {
+    throw new Error(loadErr?.message || "Charakter nicht gefunden.");
+  }
+
+  const parsed = parseSheetData((chRaw as { sheet_data?: unknown }).sheet_data);
+  const merged = mergeSheetWithDefaults({
+    ...(parsed ?? {}),
+    equipment: normalizeEquipmentState(equipment),
+  });
+
+  const { error: upErr } = await (supabase as any)
+    .from("characters")
+    .update({ sheet_data: merged, sheet_source: "manual" })
+    .eq("id", characterId);
+
+  if (upErr) {
+    throw new Error(upErr.message || "Ausrüstung konnte nicht gespeichert werden.");
+  }
 }
 
 async function ensureWealthRow(

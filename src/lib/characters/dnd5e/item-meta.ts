@@ -1,6 +1,17 @@
 import type { ShopCatalogItem } from "@/src/lib/shop-catalog/types";
 import type { InventoryCategory } from "@/src/types/inventory";
 
+/** Inventar-Kategorien für Grid-Filter und Icons */
+export type InventoryDisplayCategory =
+  | "weapons"
+  | "armor"
+  | "potions"
+  | "tools"
+  | "gear"
+  | "ingredients"
+  | "ammunition"
+  | "unknown";
+
 /** Strukturierte D&D-5e-Item-Daten in character_items.description */
 export type Dnd5eItemMeta = {
   version: 1;
@@ -17,6 +28,12 @@ export type Dnd5eItemMeta = {
   strRequirement?: number | null;
   rangeMeters?: string | null;
   rarity?: string | null;
+  /** Stapelmenge (Standard 1) */
+  quantity?: number;
+  /** Explizite Inventar-Kategorie für Grid-Filter */
+  inventoryCategory?: InventoryDisplayCategory | string | null;
+  /** Geschätzter Wert in GP */
+  valueGp?: number | null;
 };
 
 const META_BLOCK_RE = /\[dnd5e-meta\]([\s\S]*?)\[\/dnd5e-meta\]/i;
@@ -47,6 +64,9 @@ export function parseDnd5eMetaFromDescription(
       strRequirement: raw.strRequirement ?? null,
       rangeMeters: raw.rangeMeters ?? null,
       rarity: raw.rarity ?? null,
+      quantity: Math.max(1, Math.round(Number(raw.quantity) || 1)),
+      inventoryCategory: raw.inventoryCategory ?? null,
+      valueGp: raw.valueGp != null ? Math.max(0, Number(raw.valueGp) || 0) : null,
     };
   } catch {
     return null;
@@ -123,6 +143,7 @@ export function createEmptyCustomItemMeta(
     version: 1,
     kind,
     weightLb: 0,
+    quantity: 1,
     damage: null,
     damageType: null,
     properties: [],

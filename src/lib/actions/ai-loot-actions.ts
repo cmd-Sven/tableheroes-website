@@ -1,6 +1,13 @@
 "use server";
 
 import OpenAI from "openai";
+import {
+  parseAiInventoryCategory,
+} from "@/src/lib/characters/dnd5e/loot-to-inventory";
+import type { InventoryDisplayCategory } from "@/src/lib/characters/dnd5e/item-meta";
+import { buildLootReferenceConstantsForAi } from "@/src/lib/characters/dnd5e/loot-reference-catalog";
+import { enrichLootMechanics } from "@/src/lib/characters/dnd5e/loot-mechanics";
+import type { LootMechanicsFields } from "@/src/lib/characters/dnd5e/loot-mechanics";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,7 +22,10 @@ export type LootSuggestionItem = {
   rarity: string;
   price: number;
   isMagical: boolean;
-};
+  inventoryCategory?: InventoryDisplayCategory;
+  kind?: string;
+  weightLb?: number;
+} & LootMechanicsFields;
 
 export type LootSuggestion = {
   name: string;
@@ -80,6 +90,8 @@ function padLootItems(
         rarity: "common",
         price: 0,
         isMagical: false,
+        inventoryCategory: "gear",
+        kind: "gear",
       });
     }
   }
@@ -96,6 +108,8 @@ function padLootItems(
         rarity: "uncommon",
         price: 15,
         isMagical: true,
+        inventoryCategory: "gear",
+        kind: "magic",
       });
     }
   }
@@ -148,7 +162,13 @@ export async function requestLootSuggestion(
 - Reihenfolge im Array: zuerst alle profanen (isMagical false), danach alle magischen (isMagical true), damit die App die Vorgaben leicht prüfen kann.
 - gp und sp im JSON: nur Platzhalter (0), die App überschreibt mit SL-Vorgaben.`;
 
+  const referenceConstants = buildLootReferenceConstantsForAi();
+
   const systemPrompt = `Du bist ein Fantasy-Rollenspiel-Beute-Generator (an D&D 5e angelehnt). Alle sichtbaren Texte für Spieler:innen und SL MÜSSEN auf DEUTSCH sein (kein Englisch in name, desc, mundaneName, mundaneDesc, name des Stapels).
+
+KANONISCHE ITEM-KONSTANTEN (harte Fakten — bei passendem Standard-Item MUSS referenceId gesetzt und Werte übernommen werden):
+Format pro Zeile: refId|name|category|kind|preis|gewicht|[mechanische Felder]
+${referenceConstants}
 
 Antworte NUR mit JSON in exakt diesem Schema (keine Erklärungen außerhalb des JSON):
 {
@@ -162,7 +182,20 @@ Antworte NUR mit JSON in exakt diesem Schema (keine Erklärungen außerhalb des 
     "mundaneDesc": string,
     "rarity": string,
     "price": number,
-    "isMagical": boolean
+    "isMagical": boolean,
+    "inventoryCategory": string,
+    "kind": string,
+    "weightLb": number,
+    "referenceId": string,
+    "attunement": boolean,
+    "damage": string,
+    "damageType": string,
+    "properties": string[],
+    "rangeMeters": string,
+    "acFormula": string,
+    "strRequirement": number,
+    "isShield": boolean,
+    "effect": string
   }>
 }
 
@@ -170,7 +203,16 @@ Regeln für Sprache und Inhalt:
 - name (Stapel): kurzer deutscher Titel, z. B. "Beute aus dem Verlies".
 ${countRules}
 - rarity NUR als englischer Kleinbuch-String (für die App): common, uncommon, rare, very rare, legendary.
-- price: grober Goldwert in gp, ganze Zahl.
+- price: Goldwert in gp (ganze Zahl). Bei referenceId: Preis aus Konstanten übernehmen.
+- inventoryCategory: EXAKT einer dieser Werte: weapons, armor, potions, tools, gear, ingredients, ammunition.
+- kind: weapon, armor, equipment, magic, consumable, tool, supply.
+- weightLb: Gewicht in Pfund — bei referenceId aus Konstanten, sonst schätzen.
+- referenceId: Wenn der Gegenstand einem Eintrag in KANONISCHE ITEM-KONSTANTEN entspricht (z. B. Langschwert, Lederrüstung, Heiltrank), setze die exakte refId (z. B. waffenmeister:wpn-longsword). Sonst leerer String "".
+- Bei Waffen (kind=weapon): damage als Würfelnotation (z. B. "1W8"), damageType als "Wucht", "Hieb" oder "Stich", properties als deutsches Array (z. B. ["Vielseitig","Finesse"]).
+- Bei Rüstung (kind=armor): acFormula (z. B. "14 + GE (max. +2)"), strRequirement wenn nötig, isShield true nur für Schilde.
+- Bei Tränken/Verbrauch (kind=consumable): effect mit Mechanik (z. B. "Heilt 2W4+2 TP").
+- isMagical: true für magische Varianten (+1, Einstimmung, etc.); profane Standard-PHB-Items = false.
+- attunement: true nur wenn Einstimmung nötig.
 - ${critHint}
 
 Für jedes Item, ALLE Texte deutsch:
@@ -210,7 +252,29 @@ Vorgaben des Spielleiters (strikt einhalten):
       mundaneName = undefined;
       mundaneDesc = undefined;
     }
-    return {
+    const inventoryCategory = parseAiInventoryCategory(
+      o.inventoryCategory,
+      name,
+      String(o.desc ?? ""),
+      isMagical,
+    );
+    const kind = String(o.kind ?? "").trim().toLowerCase() || undefined;
+    const weightLb = clampInt(o.weightLb, 0, 500);
+    const referenceId = String(o.referenceId ?? "").trim() || undefined;
+    const attunement = Boolean(o.attunement);
+    const damage = String(o.damage ?? "").trim() || null;
+    const damageType = String(o.damageType ?? "").trim() || null;
+    const properties = Array.isArray(o.properties)
+      ? o.properties.map(String).filter(Boolean)
+      : undefined;
+    const rangeMeters = String(o.rangeMeters ?? "").trim() || null;
+    const acFormula = String(o.acFormula ?? "").trim() || null;
+    const strRequirement =
+      o.strRequirement != null ? clampInt(o.strRequirement, 0, 30) : null;
+    const isShield = Boolean(o.isShield);
+    const effect = String(o.effect ?? "").trim() || null;
+
+    const rawItem: LootSuggestionItem = {
       name,
       desc: String(o.desc ?? "").trim().slice(0, 800),
       mundaneName,
@@ -218,7 +282,22 @@ Vorgaben des Spielleiters (strikt einhalten):
       rarity: rarity || "common",
       price: clampInt(o.price, 0, 50000),
       isMagical,
+      inventoryCategory,
+      kind,
+      weightLb,
+      referenceId,
+      attunement,
+      damage,
+      damageType,
+      properties,
+      rangeMeters,
+      acFormula,
+      strRequirement,
+      isShield,
+      effect,
     };
+
+    return enrichLootMechanics(rawItem);
   });
 
   const items =

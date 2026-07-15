@@ -4,6 +4,16 @@ import { addCharacterWealthGpSp } from "@/src/lib/character-gold";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
+import {
+  autoPackItemToContainer,
+  buildLootCharacterItemInsert,
+  inferLootInventoryCategory,
+  normalizeLootInventoryCategory,
+} from "@/src/lib/characters/dnd5e/loot-to-inventory";
+import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import { parseSheetData } from "@/src/lib/characters/dnd5e/defaults";
+import { saveCharacterEquipment } from "@/src/lib/actions/character-inventory-actions";
+import type { CharacterItem } from "@/src/types/inventory";
 import type { Json } from "@/src/lib/database.types";
 import {
   disguisedLootTitle,
@@ -76,17 +86,17 @@ export async function publishLootToSession(
         (it.mundaneName ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_NAME_FALLBACK : it.name);
       const mundaneDesc =
         (it.mundaneDesc ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_DESC_FALLBACK : it.desc);
-      return {
-        id: String(it.id).trim(),
-        name: it.name,
-        desc: it.desc,
+      const inventoryCategory = normalizeLootInventoryCategory(
+        it.inventoryCategory,
+        inferLootInventoryCategory(it.name, it.desc, isMagical, it.kind),
+      );
+      return lootItemToJson({
+        ...it,
         mundaneName: mundaneName.slice(0, 160),
         mundaneDesc: mundaneDesc.slice(0, 800),
-        rarity: it.rarity,
-        price: Math.max(0, Math.round(it.price)),
-        isMagical,
+        inventoryCategory,
         identified: !isMagical,
-      };
+      });
     });
 
     const { data: ins, error: insErr } = await (supabase as any)
@@ -261,23 +271,83 @@ export async function claimLootItemFromContainer(
     const useMundane = Boolean(p.isMagical) && !p.identified;
     const invName = (useMundane ? (p.mundaneName?.trim() || LOOT_UNIDENTIFIED_NAME_FALLBACK) : p.name).slice(0, 160);
     const mundaneBody = (p.mundaneDesc && p.mundaneDesc.trim()) || LOOT_UNIDENTIFIED_DESC_FALLBACK;
-    const descParts = useMundane
-      ? [mundaneBody, `Seltenheit (geschätzt): ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null]
-      : [p.desc, `Seltenheit: ${p.rarity}`, p.price ? `Geschätzter Wert: ${p.price} gp` : null].filter(Boolean);
-    const description = descParts.join("\n\n").slice(0, 1200) || null;
+    const descBody = useMundane ? mundaneBody : p.desc;
+    const extraLines = [
+      !useMundane && p.rarity ? `Seltenheit: ${p.rarity}` : useMundane ? `Seltenheit (geschätzt): ${p.rarity}` : null,
+      p.price ? `Geschätzter Wert: ${p.price} gp` : null,
+    ].filter(Boolean) as string[];
 
-    const { error: insErr } = await (supabase as any).from("character_items").insert({
-      character_id: characterId,
+    const lootCategory = normalizeLootInventoryCategory(
+      p.inventoryCategory,
+      inferLootInventoryCategory(p.name, p.desc, knownMagical || p.isMagical, p.kind),
+    );
+
+    const insertPayload = buildLootCharacterItemInsert({
       name: invName,
-      description,
-      category: "Equipment",
-      icon_type: knownMagical ? "potion" : "gear",
-      target_fap: 0,
-      current_fap: 0,
-      is_deleted: false,
+      desc: descBody,
+      rarity: p.rarity,
+      price: p.price,
+      isMagical: knownMagical,
+      inventoryCategory: lootCategory,
+      kind: p.kind,
+      weightLb: p.weightLb,
+      referenceId: p.referenceId,
+      attunement: p.attunement,
+      damage: p.damage,
+      damageType: p.damageType,
+      properties: p.properties,
+      rangeMeters: p.rangeMeters,
+      acFormula: p.acFormula,
+      strRequirement: p.strRequirement,
+      isShield: p.isShield,
+      effect: p.effect,
+      extraUserLines: extraLines,
     });
 
-    if (insErr) return { ok: false, error: insErr.message ?? "Item konnte nicht ins Inventar." };
+    const { data: inserted, error: insErr } = await (supabase as any)
+      .from("character_items")
+      .insert({
+        character_id: characterId,
+        name: invName,
+        description: insertPayload.description,
+        category: insertPayload.category,
+        icon_type: insertPayload.icon_type,
+        target_fap: 0,
+        current_fap: 0,
+        is_deleted: false,
+      })
+      .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+      .single();
+
+    if (insErr || !inserted) {
+      return { ok: false, error: insErr?.message ?? "Item konnte nicht ins Inventar." };
+    }
+
+    const newItem = inserted as CharacterItem;
+    const { data: chSheet } = await supabase
+      .from("characters")
+      .select("sheet_data")
+      .eq("id", characterId)
+      .single();
+    const sheet = parseSheetData((chSheet as { sheet_data?: unknown } | null)?.sheet_data);
+    const equipment = normalizeEquipmentState(sheet?.equipment);
+    const { data: allItems } = await (supabase as any)
+      .from("character_items")
+      .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+      .eq("character_id", characterId)
+      .eq("is_deleted", false);
+    const itemRows = ((allItems ?? []) as CharacterItem[]).map((row) => ({
+      ...row,
+      category: row.category ?? "Equipment",
+    }));
+    const packed = autoPackItemToContainer(equipment, newItem.id, itemRows);
+    if (packed !== equipment) {
+      try {
+        await saveCharacterEquipment(characterId, packed);
+      } catch (packErr) {
+        console.warn("[claimLootItemFromContainer] auto-pack:", packErr);
+      }
+    }
 
     const nextRequests = parseIdentifyRequests(b.identify_requests).filter((r) => r.item_id !== id);
 
@@ -618,6 +688,7 @@ export type CampaignShopLootPickRow = {
   base_price_gp: number;
   is_magical: boolean;
   rarity: string;
+  item_type: string;
 };
 
 /** Alle Shop-Items der Kampagne (über Shops) — Auswahl für manuelle Truhen-Beute. */
@@ -644,7 +715,7 @@ export async function listCampaignShopItemsForLootDraft(
 
     const { data: rows, error: itemsErr } = await supabase
       .from("campaign_shop_items")
-      .select("id, name, description, base_price_gp, is_magical, rarity")
+      .select("id, name, description, base_price_gp, is_magical, rarity, item_type")
       .in("shop_id", shopIds)
       .order("name", { ascending: true });
 
@@ -657,6 +728,7 @@ export async function listCampaignShopItemsForLootDraft(
       base_price_gp: Math.max(0, Math.round(Number(r.base_price_gp ?? 0))),
       is_magical: Boolean(r.is_magical),
       rarity: String(r.rarity ?? "common").toLowerCase(),
+      item_type: String(r.item_type ?? "gear").toLowerCase(),
     })).filter((r) => r.id.length > 0);
 
     return { ok: true, items };

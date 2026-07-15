@@ -16,6 +16,17 @@ import {
   type LootDraftPayload,
   type LootItemRow,
 } from "@/src/lib/actions/loot-actions";
+import {
+  CATEGORY_COLORS,
+  CATEGORY_ICONS,
+  STANDARD_INVENTORY_CATEGORIES,
+  type InventoryDisplayCategory,
+} from "@/src/lib/characters/dnd5e/inventory-categories";
+import {
+  inferLootInventoryCategory,
+  itemTypeToDisplayCategory,
+} from "@/src/lib/characters/dnd5e/loot-to-inventory";
+import { enrichLootMechanics } from "@/src/lib/characters/dnd5e/loot-mechanics";
 
 type DraftItem = LootItemRow;
 
@@ -29,21 +40,39 @@ function suggestionToDraftItems(items: LootSuggestionItem[]): DraftItem[] {
     rarity: it.rarity,
     price: it.price,
     isMagical: it.isMagical,
+    inventoryCategory:
+      it.inventoryCategory ??
+      inferLootInventoryCategory(it.name, it.desc, it.isMagical, it.kind),
+    kind: it.kind,
+    weightLb: it.weightLb,
+    referenceId: it.referenceId,
+    attunement: it.attunement,
+    damage: it.damage,
+    damageType: it.damageType,
+    properties: it.properties,
+    rangeMeters: it.rangeMeters,
+    acFormula: it.acFormula,
+    strRequirement: it.strRequirement,
+    isShield: it.isShield,
+    effect: it.effect,
   }));
 }
 
 function shopRowToDraftItem(row: CampaignShopLootPickRow): DraftItem {
   const isMagical = row.is_magical;
-  return {
+  const base: DraftItem = {
     id: crypto.randomUUID(),
     name: row.name.trim() || "Gegenstand",
     desc: (row.description ?? "").trim(),
     rarity: row.rarity.trim().toLowerCase() || "common",
     price: Math.max(0, Math.round(row.base_price_gp)),
     isMagical,
+    inventoryCategory: itemTypeToDisplayCategory(row.item_type),
+    kind: row.item_type,
     mundaneName: isMagical ? undefined : undefined,
     mundaneDesc: isMagical ? undefined : undefined,
   };
+  return enrichLootMechanics(base);
 }
 
 type Props = {
@@ -84,6 +113,7 @@ export function LootDraftPanel({
   const [customName, setCustomName] = useState("");
   const [customDesc, setCustomDesc] = useState("");
   const [customMagical, setCustomMagical] = useState(false);
+  const [customCategory, setCustomCategory] = useState<InventoryDisplayCategory>("gear");
 
   const applySuggestion = useCallback((s: LootSuggestion) => {
     setName(s.name);
@@ -128,20 +158,25 @@ export function LootDraftPanel({
     const desc = customDesc.trim();
     setItems((prev) => [
       ...prev,
-      {
+      enrichLootMechanics({
         id: crypto.randomUUID(),
         name: n,
         desc: desc || "—",
         rarity: "common",
         price: 0,
         isMagical: customMagical,
+        inventoryCategory:
+          customCategory ||
+          inferLootInventoryCategory(n, desc, customMagical),
+        kind: customCategory === "weapons" ? "weapon" : customCategory === "armor" ? "armor" : customCategory === "potions" ? "consumable" : "gear",
         mundaneName: customMagical ? "" : undefined,
         mundaneDesc: customMagical ? "" : undefined,
-      },
+      }),
     ]);
     setCustomName("");
     setCustomDesc("");
     setCustomMagical(false);
+    setCustomCategory("gear");
     toast.success("Gegenstand zum Pool hinzugefügt.");
   }
 
@@ -369,6 +404,25 @@ export function LootDraftPanel({
               />
               Magisch
             </label>
+            <div className="flex flex-wrap gap-1">
+              {STANDARD_INVENTORY_CATEGORIES.filter((c) => c !== "unknown").map((cat) => {
+                const Icon = CATEGORY_ICONS[cat];
+                const active = customCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    title={cat}
+                    onClick={() => setCustomCategory(cat)}
+                    className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+                      active ? "ring-1 ring-hero-vibrant border-hero-vibrant" : ""
+                    } ${CATEGORY_COLORS[cat]}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
               onClick={addCustomItem}
@@ -542,6 +596,25 @@ export function LootDraftPanel({
                     className="w-20 rounded border border-hero-dark/80 bg-slate-900 px-1 py-0.5 font-barlow text-[10px] text-gray-200"
                     title="gp"
                   />
+                  <div className="flex flex-wrap gap-0.5">
+                    {STANDARD_INVENTORY_CATEGORIES.filter((c) => c !== "unknown").map((cat) => {
+                      const Icon = CATEGORY_ICONS[cat];
+                      const active = (it.inventoryCategory ?? "gear") === cat;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          title={cat}
+                          onClick={() => updateItem(it.id, { inventoryCategory: cat })}
+                          className={`flex h-7 w-7 items-center justify-center rounded border ${
+                            active ? "ring-1 ring-accent-gold" : "opacity-60"
+                          } ${CATEGORY_COLORS[cat]}`}
+                        >
+                          <Icon className="h-3 w-3" />
+                        </button>
+                      );
+                    })}
+                  </div>
                   <label className="flex items-center gap-1 font-barlow text-[9px] uppercase text-gray-500">
                     <input
                       type="checkbox"

@@ -1,39 +1,51 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   Briefcase,
   Coins,
-  FlaskConical,
-  Info,
   Minus,
   Plus,
-  ScrollText,
-  Shield,
-  Sword,
   Trash2,
   X,
 } from "lucide-react";
 import {
   deleteCharacterItem,
-  getCharacterInventory,
+  getCharacterEquipmentPayload,
+  saveCharacterEquipment,
   updateCharacterWealth,
+  type CharacterEquipmentPayload,
 } from "@/src/lib/actions/character-inventory-actions";
 import { distributeRations } from "@/src/lib/actions/downtime-actions";
 import {
   type CharacterGem,
-  type CharacterInventoryPayload,
   type CharacterItem,
   type CharacterWealth,
-  type InventoryCategory,
 } from "@/src/types/inventory";
-import { ItemEditorModal } from "./ItemEditorModal";
+import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
+import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
 import { DND_COIN_TYPES, type DndCoinCode } from "@/src/lib/dnd-currency";
 import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
+import {
+  normalizeEquipmentState,
+  removeItemFromEquipment,
+} from "@/src/lib/characters/dnd5e/equipment";
+import type {
+  Dnd5eEquipmentContainer,
+  Dnd5eEquipmentState,
+} from "@/src/lib/characters/dnd5e/equipment-types";
+import {
+  consumeFromStack,
+  duplicateCharacterItem,
+  setItemInventoryCategory,
+  splitStack,
+} from "@/src/lib/characters/dnd5e/inventory-item-ops";
+import { CharacterSheetLocaleProvider } from "@/src/lib/i18n/character-sheet/context";
+import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 const COIN_FIELD_ORDER: DndCoinCode[] = ["pp", "gp", "ep", "sp", "cp"];
 
-type InventoryTab = InventoryCategory;
+type ViewTab = "inventory" | "wealth";
 
 type InventoryCharacter = {
   id: string;
@@ -43,66 +55,10 @@ type InventoryCharacter = {
   avatar_url: string | null;
 };
 
-const TABS: Array<{ id: InventoryTab; label: string }> = [
-  { id: "Weapon", label: "Waffen" },
-  { id: "Equipment", label: "Ausrüstung" },
-  { id: "Consumable", label: "Verbrauchsgüter" },
-  { id: "Story", label: "Story-Items" },
-  { id: "CoinGem", label: "Coins & Gems" },
+const VIEW_TABS: Array<{ id: ViewTab; label: string; Icon: typeof Briefcase }> = [
+  { id: "inventory", label: "Inventar", Icon: Briefcase },
+  { id: "wealth", label: "Coins & Gems", Icon: Coins },
 ];
-
-function visualForTab(tab: InventoryTab) {
-  if (tab === "Weapon") {
-    return {
-      Icon: Sword,
-      className: "bg-red-950 text-red-200 shadow-[0_0_18px_rgba(127,29,29,0.55)]",
-    };
-  }
-  if (tab === "Consumable") {
-    return {
-      Icon: FlaskConical,
-      className: "bg-blue-950 text-blue-200 shadow-[0_0_18px_rgba(30,58,138,0.55)]",
-    };
-  }
-  if (tab === "Story") {
-    return {
-      Icon: ScrollText,
-      className: "bg-amber-950 text-accent-gold shadow-[0_0_18px_rgba(146,64,14,0.55)]",
-    };
-  }
-  if (tab === "CoinGem") {
-    return {
-      Icon: Coins,
-      className: "bg-yellow-950 text-yellow-200 shadow-[0_0_18px_rgba(202,138,4,0.55)]",
-    };
-  }
-  return {
-    Icon: Briefcase,
-    className: "bg-emerald-950 text-emerald-200 shadow-[0_0_18px_rgba(6,78,59,0.55)]",
-  };
-}
-
-function iconForItem(item: Pick<CharacterItem, "category" | "icon_type">) {
-  const icon = item.icon_type ?? "";
-  if (item.category === "Weapon" || icon.includes("sword")) return Sword;
-  if (item.category === "Consumable" || icon.includes("flask")) return FlaskConical;
-  if (item.category === "Story" || icon.includes("scroll")) return ScrollText;
-  if (item.category === "CoinGem") return Coins;
-  return Briefcase;
-}
-
-function emptyWealth(characterId: string): CharacterWealth {
-  return {
-    id: "",
-    character_id: characterId,
-    gp: 0,
-    sp: 0,
-    cp: 0,
-    ep: 0,
-    pp: 0,
-    gem_data: [],
-  };
-}
 
 function currencyField(
   code: DndCoinCode,
@@ -139,29 +95,97 @@ type GmRationsDistributionProps = {
   onDistributed: () => void | Promise<void>;
 };
 
-export function PrivateInventoryModal({
+function SessionInventoryBody({
   character,
+  initialPayload,
   onClose,
   gmRationsDistribution,
 }: {
   character: InventoryCharacter;
+  initialPayload: CharacterEquipmentPayload;
   onClose: () => void;
   gmRationsDistribution?: GmRationsDistributionProps;
 }) {
-  const [activeTab, setActiveTab] = useState<InventoryTab>("Weapon");
-  const [payload, setPayload] = useState<CharacterInventoryPayload | null>(null);
-  const [wealthDraft, setWealthDraft] = useState<CharacterWealth>(() =>
-    emptyWealth(character.id),
+  const { t } = useCharacterSheetLocale();
+  const [activeTab, setActiveTab] = useState<ViewTab>("inventory");
+  const [payload, setPayload] = useState<CharacterEquipmentPayload>(initialPayload);
+  const [equipment, setEquipment] = useState<Dnd5eEquipmentState>(() =>
+    normalizeEquipmentState(initialPayload.equipment),
   );
-  const [editorItem, setEditorItem] = useState<CharacterItem | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [wealthDraft, setWealthDraft] = useState<CharacterWealth>(() => initialPayload.wealth);
+  const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, startLoading] = useTransition();
   const [isSavingWealth, startSavingWealth] = useTransition();
-  const [isDeleting, startDeleting] = useTransition();
+  const [isSavingEquipment, startSavingEquipment] = useTransition();
   const [rationsModalOpen, setRationsModalOpen] = useState(false);
   const [rationsDraft, setRationsDraft] = useState<Record<string, number>>({});
   const [isDistributing, startDistributing] = useTransition();
+
+  const reload = useCallback(async () => {
+    const next = await getCharacterEquipmentPayload(character.id);
+    setPayload(next);
+    setEquipment(normalizeEquipmentState(next.equipment));
+    setWealthDraft(next.wealth);
+    return next;
+  }, [character.id]);
+
+  useEffect(() => {
+    setPayload(initialPayload);
+    setEquipment(normalizeEquipmentState(initialPayload.equipment));
+    setWealthDraft(initialPayload.wealth);
+  }, [initialPayload]);
+
+  const items = useMemo(
+    () => (payload?.items ?? []).filter((item) => !item.is_deleted),
+    [payload?.items],
+  );
+
+  const gemTotal = wealthDraft.gem_data.reduce(
+    (sum, gem) => sum + Math.max(0, Number(gem.estimated_value) || 0),
+    0,
+  );
+
+  function persistEquipment(next: Dnd5eEquipmentState) {
+    const normalized = normalizeEquipmentState(next);
+    setEquipment(normalized);
+    startSavingEquipment(async () => {
+      try {
+        await saveCharacterEquipment(character.id, normalized);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Ausrüstung konnte nicht gespeichert werden.",
+        );
+      }
+    });
+  }
+
+  function addDefaultBackpack() {
+    const container: Dnd5eEquipmentContainer = {
+      id: crypto.randomUUID(),
+      kind: "backpack",
+      label: t("equipment.defaultBackpack"),
+      linkedItemId: null,
+      itemIds: [],
+    };
+    persistEquipment({ ...equipment, containers: [...equipment.containers, container] });
+  }
+
+  function addCustomCategory(label: string) {
+    persistEquipment({
+      ...equipment,
+      customCategories: [
+        ...(equipment.customCategories ?? []),
+        { id: crypto.randomUUID(), label },
+      ],
+    });
+  }
+
+  async function handleDeleteItem(item: CharacterItem) {
+    if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
+    await deleteCharacterItem(item.id);
+    persistEquipment(removeItemFromEquipment(equipment, item.id));
+    await reload();
+  }
 
   function openRationsModal() {
     if (!gmRationsDistribution) return;
@@ -193,9 +217,7 @@ export function PrivateInventoryModal({
         }
         setRationsModalOpen(false);
         try {
-          const inv = await getCharacterInventory(character.id);
-          setPayload(inv);
-          setWealthDraft(inv.wealth);
+          await reload();
         } catch {
           /* ignore */
         }
@@ -204,66 +226,6 @@ export function PrivateInventoryModal({
         setError(
           err instanceof Error ? err.message : "Rationen konnten nicht verteilt werden.",
         );
-      }
-    });
-  }
-
-  useEffect(() => {
-    setError(null);
-    startLoading(async () => {
-      try {
-        const next = await getCharacterInventory(character.id);
-        setPayload(next);
-        setWealthDraft(next.wealth);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Inventar konnte nicht geladen werden.",
-        );
-      }
-    });
-  }, [character.id]);
-
-  const visibleItems = useMemo(
-    () => (payload?.items ?? []).filter((item) => item.category === activeTab),
-    [activeTab, payload?.items],
-  );
-
-  const gemTotal = wealthDraft.gem_data.reduce(
-    (sum, gem) => sum + Math.max(0, Number(gem.estimated_value) || 0),
-    0,
-  );
-
-  function openCreate() {
-    setEditorItem(null);
-    setIsEditorOpen(true);
-  }
-
-  function handleSaved(item: CharacterItem) {
-    setPayload((current) => {
-      if (!current) return current;
-      const exists = current.items.some((row) => row.id === item.id);
-      return {
-        ...current,
-        items: exists
-          ? current.items.map((row) => (row.id === item.id ? item : row))
-          : [...current.items, item],
-      };
-    });
-    setActiveTab(item.category === "CoinGem" ? "Equipment" : item.category);
-    setIsEditorOpen(false);
-  }
-
-  function deleteItem(item: CharacterItem) {
-    startDeleting(async () => {
-      try {
-        await deleteCharacterItem(item.id);
-        setPayload((current) =>
-          current
-            ? { ...current, items: current.items.filter((row) => row.id !== item.id) }
-            : current,
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Item konnte nicht geloescht werden.");
       }
     });
   }
@@ -310,29 +272,30 @@ export function PrivateInventoryModal({
           }}
         >
           <div className="absolute inset-x-0 -top-16 z-20 flex justify-center gap-3">
-            {TABS.map((tab) => (
-              (() => {
-                const visual = visualForTab(tab.id);
-                const Icon = visual.Icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`grid h-12 w-12 place-items-center rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${visual.className} ${
-                      isActive
-                        ? "scale-110 ring-2 ring-accent-gold"
-                        : "opacity-75 hover:opacity-100"
-                    }`}
-                    title={tab.label}
-                    aria-label={tab.label}
-                  >
-                    <Icon className="h-6 w-6" strokeWidth={1.8} />
-                  </button>
-                );
-              })()
-            ))}
+            {VIEW_TABS.map((tab) => {
+              const Icon = tab.Icon;
+              const isActive = activeTab === tab.id;
+              const visual =
+                tab.id === "wealth"
+                  ? "bg-yellow-950 text-yellow-200 shadow-[0_0_18px_rgba(202,138,4,0.55)]"
+                  : "bg-emerald-950 text-emerald-200 shadow-[0_0_18px_rgba(6,78,59,0.55)]";
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`grid h-12 w-12 place-items-center rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${visual} ${
+                    isActive
+                      ? "scale-110 ring-2 ring-accent-gold"
+                      : "opacity-75 hover:opacity-100"
+                  }`}
+                  title={tab.label}
+                  aria-label={tab.label}
+                >
+                  <Icon className="h-6 w-6" strokeWidth={1.8} />
+                </button>
+              );
+            })}
           </div>
 
           <button
@@ -345,7 +308,7 @@ export function PrivateInventoryModal({
           </button>
 
           <div className="absolute inset-x-[16%] bottom-[13%] top-[17%] z-10 flex flex-col overflow-hidden px-2 py-3">
-            <div className="mb-3 shrink-0 text-center">
+            <div className="mb-2 shrink-0 text-center">
               <h2 className="truncate font-barlow text-xl font-extrabold uppercase tracking-wide text-slate-100 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
                 {character.name}
               </h2>
@@ -364,195 +327,171 @@ export function PrivateInventoryModal({
             </div>
 
             {error ? (
-              <p className="mb-3 rounded bg-red-950/70 px-3 py-2 font-libre text-xs text-red-100">
+              <p className="mb-2 rounded bg-red-950/70 px-3 py-2 font-libre text-xs text-red-100">
                 {error}
               </p>
             ) : null}
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-              {isLoading ? (
-              <p className="font-libre text-sm text-slate-100">Inventar wird geladen...</p>
-            ) : activeTab === "CoinGem" ? (
-              <div className="space-y-3">
-                <div className="rounded-xl bg-black/25 p-3">
-                  <h3 className="mb-2 font-barlow text-xs font-bold uppercase text-accent-gold">
-                    Münzbeutel
-                  </h3>
-                  <DndCoinWalletRow pouch={wealthDraft} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {COIN_FIELD_ORDER.map((code) =>
-                    currencyField(code, wealthDraft[code], (next) =>
-                      setWealthDraft((current) => ({ ...current, [code]: next })),
-                    ),
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-black/25 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <h3 className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                      Edelsteine
+              {activeTab === "wealth" ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-black/25 p-3">
+                    <h3 className="mb-2 font-barlow text-xs font-bold uppercase text-accent-gold">
+                      Münzbeutel
                     </h3>
+                    <DndCoinWalletRow pouch={wealthDraft} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {COIN_FIELD_ORDER.map((code) =>
+                      currencyField(code, wealthDraft[code], (next) =>
+                        setWealthDraft((current) => ({ ...current, [code]: next })),
+                      ),
+                    )}
+                  </div>
+
+                  <div className="rounded-xl bg-black/25 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="font-barlow text-xs font-bold uppercase text-accent-gold">
+                        Edelsteine
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWealthDraft((current) => ({
+                            ...current,
+                            gem_data: [
+                              ...current.gem_data,
+                              { name: "", estimated_value: 0 },
+                            ],
+                          }))
+                        }
+                        className="inline-flex items-center gap-1 rounded-full bg-accent-gold/20 px-2.5 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/30"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Stein
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {wealthDraft.gem_data.map((gem, index) => (
+                        <div key={index} className="grid grid-cols-[1fr_5rem_auto] gap-1.5">
+                          <input
+                            value={gem.name}
+                            onChange={(e) => updateGem(index, { name: e.target.value })}
+                            placeholder="Name"
+                            className="rounded bg-black/35 px-2 py-1.5 font-libre text-xs text-white outline-none focus:bg-black/55"
+                          />
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              value={gem.estimated_value}
+                              onChange={(e) =>
+                                updateGem(index, {
+                                  estimated_value: Number(e.target.value),
+                                })
+                              }
+                              placeholder="Wert"
+                              aria-label="Geschätzter Wert in Goldmünzen"
+                              className="w-full rounded bg-black/35 py-1.5 pl-2 pr-7 font-barlow text-xs font-bold text-white outline-none focus:bg-black/55"
+                            />
+                            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2">
+                              <DndCoinIcon code="gp" size="xs" />
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setWealthDraft((current) => ({
+                                ...current,
+                                gem_data: current.gem_data.filter((_, i) => i !== index),
+                              }))
+                            }
+                            className="rounded bg-red-950/50 px-2 text-red-200 hover:bg-red-900/70"
+                            aria-label="Edelstein entfernen"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between pt-2">
+                      <span className="font-libre text-xs text-slate-100">
+                        Edelstein-Summe
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-barlow text-base font-extrabold text-accent-gold">
+                        {gemTotal.toLocaleString("de-DE")}
+                        <DndCoinIcon code="gp" size="sm" />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center">
                     <button
                       type="button"
-                      onClick={() =>
-                        setWealthDraft((current) => ({
-                          ...current,
-                          gem_data: [
-                            ...current.gem_data,
-                            { name: "", estimated_value: 0 },
-                          ],
-                        }))
-                      }
-                      className="inline-flex items-center gap-1 rounded-full bg-accent-gold/20 px-2.5 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/30"
+                      onClick={saveWealth}
+                      disabled={isSavingWealth}
+                      className="rounded-full bg-accent-gold/20 px-4 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/30 disabled:opacity-50"
                     >
-                      <Plus className="h-3 w-3" />
-                      Stein
+                      {isSavingWealth ? "Speichert..." : "Coins & Gems speichern"}
                     </button>
                   </div>
-
-                  <div className="space-y-2">
-                    {wealthDraft.gem_data.map((gem, index) => (
-                      <div key={index} className="grid grid-cols-[1fr_5rem_auto] gap-1.5">
-                        <input
-                          value={gem.name}
-                          onChange={(e) => updateGem(index, { name: e.target.value })}
-                          placeholder="Name"
-                          className="rounded bg-black/35 px-2 py-1.5 font-libre text-xs text-white outline-none focus:bg-black/55"
-                        />
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min={0}
-                            value={gem.estimated_value}
-                            onChange={(e) =>
-                              updateGem(index, {
-                                estimated_value: Number(e.target.value),
-                              })
-                            }
-                            placeholder="Wert"
-                            aria-label="Geschätzter Wert in Goldmünzen"
-                            className="w-full rounded bg-black/35 py-1.5 pl-2 pr-7 font-barlow text-xs font-bold text-white outline-none focus:bg-black/55"
-                          />
-                          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2">
-                            <DndCoinIcon code="gp" size="xs" />
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setWealthDraft((current) => ({
-                              ...current,
-                              gem_data: current.gem_data.filter((_, i) => i !== index),
-                            }))
-                          }
-                          className="rounded bg-red-950/50 px-2 text-red-200 hover:bg-red-900/70"
-                          aria-label="Edelstein entfernen"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between pt-2">
-                    <span className="font-libre text-xs text-slate-100">
-                      Edelstein-Summe
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-barlow text-base font-extrabold text-accent-gold">
-                      {gemTotal.toLocaleString("de-DE")}
-                      <DndCoinIcon code="gp" size="sm" />
-                    </span>
-                  </div>
                 </div>
-
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={saveWealth}
-                    disabled={isSavingWealth}
-                    className="rounded-full bg-accent-gold/20 px-4 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/30 disabled:opacity-50"
-                  >
-                    {isSavingWealth ? "Speichert..." : "Coins & Gems speichern"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={openCreate}
-                    className="inline-flex items-center gap-1 rounded-full bg-accent-gold/20 px-4 py-2 font-barlow text-xs font-bold uppercase text-accent-gold hover:bg-accent-gold/30"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Item
-                  </button>
-                </div>
-
-                {visibleItems.length === 0 ? (
-                  <div className="rounded-xl bg-black/25 px-4 py-8 text-center">
-                    <Shield className="mx-auto mb-2 h-8 w-8 text-accent-gold/80" />
-                    <p className="font-libre text-sm text-slate-100">
-                      Keine Einträge in dieser Kategorie.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {visibleItems.map((item) => {
-                      const Icon = iconForItem(item);
-                      return (
-                        <div
-                          key={item.id}
-                          className="group flex items-center gap-2 rounded-xl bg-black/30 px-3 py-2.5"
-                        >
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-background-card/80">
-                            <Icon className="h-4 w-4 text-accent-gold" />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditorItem(item);
-                              setIsEditorOpen(true);
-                            }}
-                            className="min-w-0 flex-1 text-left font-barlow text-xs font-bold uppercase text-white hover:text-accent-gold"
-                          >
-                            <span className="block truncate">{item.name}</span>
-                          </button>
-                          <div className="relative">
-                            <Info className="peer h-4 w-4 text-accent-gold/80" />
-                            <div className="pointer-events-none absolute right-0 top-6 z-10 hidden w-56 rounded bg-background-dark p-3 font-libre text-xs text-gray-200 shadow-xl peer-hover:block">
-                              {item.description || "Keine Beschreibung hinterlegt."}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteItem(item)}
-                            disabled={isDeleting}
-                            className="rounded p-1 text-red-300 opacity-80 transition-colors hover:bg-red-950/50 hover:text-red-100 disabled:opacity-40"
-                            aria-label={`${item.name} löschen`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+              ) : (
+                <InventoryGrid
+                  variant="session"
+                  items={items}
+                  equipment={equipment}
+                  readOnly={false}
+                  onEquipmentChange={persistEquipment}
+                  onAddItem={() => setItemEditor("new")}
+                  onEditItem={(item) => setItemEditor(item)}
+                  onDeleteItem={handleDeleteItem}
+                  onDuplicateItem={async (item) => {
+                    await duplicateCharacterItem(item);
+                    await reload();
+                  }}
+                  onSplitStack={async (item, amount) => {
+                    await splitStack(item, amount);
+                    await reload();
+                  }}
+                  onConsumeStack={async (item, amount) => {
+                    const result = await consumeFromStack(item, amount);
+                    if (!result) {
+                      persistEquipment(removeItemFromEquipment(equipment, item.id));
+                    }
+                    await reload();
+                  }}
+                  onAssignCategory={async (item, category) => {
+                    await setItemInventoryCategory(item, category);
+                    await reload();
+                  }}
+                  onAddDefaultBackpack={addDefaultBackpack}
+                  onAddCustomCategory={addCustomCategory}
+                />
+              )}
             </div>
+
+            {isSavingEquipment ? (
+              <p className="mt-1 text-center font-libre text-[9px] text-slate-400">
+                Ausrüstung wird gespeichert…
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {isEditorOpen ? (
-        <ItemEditorModal
+      {itemEditor !== null ? (
+        <CustomDnd5eItemEditorModal
           characterId={character.id}
-          item={editorItem}
-          onClose={() => setIsEditorOpen(false)}
-          onSaved={handleSaved}
+          item={itemEditor === "new" ? null : itemEditor}
+          onClose={() => setItemEditor(null)}
+          onSaved={async () => {
+            setItemEditor(null);
+            await reload();
+          }}
         />
       ) : null}
 
@@ -663,5 +602,76 @@ export function PrivateInventoryModal({
         </div>
       ) : null}
     </>
+  );
+}
+
+export function PrivateInventoryModal({
+  character,
+  onClose,
+  gmRationsDistribution,
+}: {
+  character: InventoryCharacter;
+  onClose: () => void;
+  gmRationsDistribution?: GmRationsDistributionProps;
+}) {
+  const [bootstrap, setBootstrap] = useState<CharacterEquipmentPayload | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCharacterEquipmentPayload(character.id)
+      .then((payload) => {
+        if (!cancelled) setBootstrap(payload);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setBootstrapError(
+            err instanceof Error ? err.message : "Inventar konnte nicht geladen werden.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [character.id]);
+
+  if (bootstrapError) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4">
+        <div className="rounded-xl border border-red-900/60 bg-background-card p-6 text-center">
+          <p className="font-libre text-sm text-red-200">{bootstrapError}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-4 rounded border border-gray-600 px-4 py-2 font-barlow text-xs uppercase text-gray-300"
+          >
+            Schließen
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!bootstrap) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4">
+        <p className="font-libre text-sm text-slate-200">Inventar wird geladen…</p>
+      </div>
+    );
+  }
+
+  return (
+    <CharacterSheetLocaleProvider
+      campaignId={bootstrap.campaignId}
+      characterId={character.id}
+      initialLocale={bootstrap.sheetLocale}
+    >
+      <SessionInventoryBody
+        character={character}
+        initialPayload={bootstrap}
+        onClose={onClose}
+        gmRationsDistribution={gmRationsDistribution}
+      />
+    </CharacterSheetLocaleProvider>
   );
 }
