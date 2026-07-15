@@ -164,11 +164,17 @@ export async function resolveCombatRequest(input: {
   const req = logs.find((l) => l.id === input.requestId && l.type === "attack_pending");
   if (!req) throw new Error("Anfrage nicht gefunden.");
 
+  const reqMeta = (req.meta ?? {}) as {
+    weaponName?: string;
+    damage?: string;
+    isCritical?: boolean;
+  };
   const name = req.author_name ?? "Spieler";
+  const critical = input.critical ?? Boolean(reqMeta.isCritical);
   const resultText = input.hit
-    ? input.critical
-      ? `${name} trifft KRITISCH! — Schaden würfeln.`
-      : `${name} trifft! — Schaden würfeln.`
+    ? critical
+      ? `${name} trifft KRITISCH mit ${reqMeta.weaponName ?? "Waffe"}! — Schaden würfeln (doppelte Würfel).`
+      : `${name} trifft mit ${reqMeta.weaponName ?? "Waffe"}! — Schaden würfeln.`
     : `${name} verfehlt das Ziel.`;
 
   await appendSessionActivity({
@@ -177,6 +183,13 @@ export async function resolveCombatRequest(input: {
     text: resultText,
     characterId: req.character_id,
     characterName: name,
-    meta: { requestId: input.requestId, hit: input.hit, critical: input.critical },
+    meta: {
+      requestId: input.requestId,
+      hit: input.hit,
+      critical,
+      weaponName: reqMeta.weaponName,
+      damage: reqMeta.damage,
+      awaitsDamageRoll: input.hit,
+    },
   });
 }

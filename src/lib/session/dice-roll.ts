@@ -26,14 +26,24 @@ const ROLL_RE =
 export function parseRollCommand(input: string): ParsedRollCommand | null {
   const trimmed = input.trim();
   const m = trimmed.match(ROLL_RE);
-  if (!m) return null;
+  if (m) {
+    const dice = m[1] ? Math.max(1, parseInt(m[1], 10)) : 1;
+    const sides = Math.max(2, parseInt(m[2] ?? m[3] ?? m[4] ?? "20", 10));
+    const modRaw = (m[5] ?? "").replace(/\s/g, "");
+    const modifier = modRaw ? parseInt(modRaw, 10) : 0;
+    return { dice, sides, modifier: Number.isFinite(modifier) ? modifier : 0 };
+  }
 
-  const dice = m[1] ? Math.max(1, parseInt(m[1], 10)) : 1;
-  const sides = Math.max(2, parseInt(m[2] ?? m[3] ?? m[4] ?? "20", 10));
-  const modRaw = (m[5] ?? "").replace(/\s/g, "");
-  const modifier = modRaw ? parseInt(modRaw, 10) : 0;
+  const damageM = trimmed.match(/^(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?$/i);
+  if (damageM) {
+    const dice = Math.max(1, parseInt(damageM[1], 10));
+    const sides = Math.max(2, parseInt(damageM[2], 10));
+    const sign = damageM[3] === "-" ? -1 : 1;
+    const mod = damageM[4] ? sign * parseInt(damageM[4], 10) : 0;
+    return { dice, sides, modifier: mod };
+  }
 
-  return { dice, sides, modifier: Number.isFinite(modifier) ? modifier : 0 };
+  return null;
 }
 
 export function rollOnce(sides: number): number {

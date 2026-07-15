@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ChevronDown, ChevronUp, Dices, MessageSquare, Send, Swords, X } from "lucide-react";
+import { Dices, MessageSquare, Send, Swords, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   appendSessionActivity,
   resolveCombatRequest,
   type SessionActivityEntry,
 } from "@/src/lib/actions/session-activity-actions";
+import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
 import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
+import {
+  computeEquippedWeaponAttacks,
+  type WeaponAttackPreview,
+} from "@/src/lib/characters/dnd5e/equipment";
 import {
   executeDiceRoll,
   parseRollCommand,
@@ -25,6 +30,7 @@ const ACTIVITY_TYPES = new Set([
   "attack_hit",
   "attack_miss",
   "skill_check",
+  "damage_roll",
 ]);
 
 type Props = {
@@ -52,6 +58,7 @@ export function LiveSessionActivityPanel({
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
   const [selectedSkill, setSelectedSkill] = useState("");
   const [skillBonus, setSkillBonus] = useState(0);
+  const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -61,13 +68,34 @@ export function LiveSessionActivityPanel({
     [logs],
   );
 
+  const rolledDamageForRequest = useMemo(() => {
+    const set = new Set<string>();
+    for (const log of activityLogs) {
+      if (log.type === "damage_roll" && log.meta?.requestId) {
+        set.add(String(log.meta.requestId));
+      }
+    }
+    return set;
+  }, [activityLogs]);
+
   useEffect(() => {
     if (!open || !currentCharacter) return;
-    void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
+    void Promise.all([
+      loadDnd5eCharacterSheet(campaignId, currentCharacter.id),
+      getCharacterEquipmentPayload(currentCharacter.id),
+    ]).then(([payload, equip]) => {
       if (!payload) return;
       const derived = computeDerivedDnd5eSheet(payload.sheet, payload.level);
-      if (selectedSkill && derived.skills[selectedSkill as keyof typeof derived.skills]) {
-        setSkillBonus(derived.skills[selectedSkill as keyof typeof derived.skills].total);
+      const attacks = computeEquippedWeaponAttacks(
+        payload.sheet,
+        derived,
+        equip.items.filter((i) => !i.is_deleted),
+        equip.equipment,
+        payload.level,
+      );
+      setPrimaryAttack(attacks[0] ?? null);
+      if (selectedSkill) {
+        setSkillBonus(derived.skills[selectedSkill as keyof typeof derived.skills]?.total ?? 0);
       }
     });
   }, [campaignId, currentCharacter, open, selectedSkill]);
@@ -100,11 +128,7 @@ export function LiveSessionActivityPanel({
     }
     const outcome = executeDiceRoll({ dice: 1, sides, modifier }, mode);
     const prefix = label ? `${currentCharacter.name} würfelt ${label}` : `${currentCharacter.name} w${sides} gewürfelt`;
-    const text = `${prefix}: ${outcome.display}`;
-    postActivity("dice", text, {
-      ...outcome,
-      label,
-    });
+    postActivity("dice", `${prefix}: ${outcome.display}`, { ...outcome, label });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -133,11 +157,49 @@ export function LiveSessionActivityPanel({
 
   function handleAttackRoll() {
     if (!currentCharacter) return;
-    const outcome = executeDiceRoll({ dice: 1, sides: 20, modifier: 0 }, rollMode);
-    postActivity("attack_pending", `${currentCharacter.name} — Angriff: ${outcome.display} — SL: trifft?`, {
-      ...outcome,
-      pending: true,
-    });
+    const bonus = primaryAttack?.attackBonus ?? 0;
+    const weaponName = primaryAttack?.name ?? "Waffe";
+    const outcome = executeDiceRoll({ dice: 1, sides: 20, modifier: bonus }, rollMode);
+    const bonusLabel = bonus !== 0 ? ` (${formatSigned(bonus)})` : "";
+    postActivity(
+      "attack_pending",
+      `${currentCharacter.name} — ${weaponName} Angriff${bonusLabel}: ${outcome.display} — SL: trifft?`,
+      {
+        ...outcome,
+        pending: true,
+        weaponName,
+        damage: primaryAttack?.damage ?? null,
+        attackBonus: bonus,
+      },
+    );
+  }
+
+  function handleDamageRoll(
+    damageFormula: string | null | undefined,
+    critical: boolean,
+    requestId?: string,
+    weaponName?: string,
+  ) {
+    if (!currentCharacter || !damageFormula) {
+      toast.error("Kein Schadenswert für diese Waffe hinterlegt.");
+      return;
+    }
+    const parsed = parseRollCommand(damageFormula.replace(/\s+/g, ""));
+    if (!parsed) {
+      toast.error(`Schaden „${damageFormula}" konnte nicht gelesen werden.`);
+      return;
+    }
+    const diceCount = critical ? parsed.dice * 2 : parsed.dice;
+    const outcome = executeDiceRoll(
+      { dice: diceCount, sides: parsed.sides, modifier: parsed.modifier },
+      "normal",
+    );
+    const critTag = critical ? "KRITISCH " : "";
+    postActivity(
+      "damage_roll",
+      `${currentCharacter.name} — ${critTag}Schaden (${weaponName ?? "Waffe"}): ${outcome.display}`,
+      { ...outcome, requestId, critical, damageFormula },
+    );
   }
 
   function resolveAttack(requestId: string, hit: boolean, critical = false) {
@@ -178,9 +240,25 @@ export function LiveSessionActivityPanel({
               <p className="font-libre text-xs text-gray-500 italic">Noch keine Aktivität.</p>
             ) : (
               activityLogs.map((entry) => {
-                const meta = entry.meta as { isCritical?: boolean; isFumble?: boolean; pending?: boolean } | undefined;
-                const isCrit = meta?.isCritical;
+                const meta = entry.meta as {
+                  isCritical?: boolean;
+                  isFumble?: boolean;
+                  pending?: boolean;
+                  awaitsDamageRoll?: boolean;
+                  damage?: string;
+                  critical?: boolean;
+                  requestId?: string;
+                  weaponName?: string;
+                } | undefined;
+                const isCrit = meta?.isCritical || meta?.critical;
                 const isFumble = meta?.isFumble;
+                const requestId = meta?.requestId ?? entry.id;
+                const showDamageBtn =
+                  entry.type === "attack_hit" &&
+                  meta?.awaitsDamageRoll &&
+                  entry.character_id === currentCharacter?.id &&
+                  !rolledDamageForRequest.has(requestId);
+
                 return (
                   <div
                     key={entry.id}
@@ -201,7 +279,8 @@ export function LiveSessionActivityPanel({
                         isCrit ? "text-accent-gold font-bold" : isFumble ? "text-red-300" : "text-gray-200"
                       }`}
                     >
-                      {isCrit ? "⚡ KRITISCH! " : isFumble ? "💀 Patzer! " : ""}
+                      {isCrit && entry.type !== "damage_roll" ? "⚡ KRITISCH! " : ""}
+                      {isFumble ? "💀 Patzer! " : ""}
                       {entry.text}
                     </p>
                     {isGM && entry.type === "attack_pending" ? (
@@ -209,7 +288,7 @@ export function LiveSessionActivityPanel({
                         <button
                           type="button"
                           disabled={pending}
-                          onClick={() => resolveAttack(entry.id, true, isCrit)}
+                          onClick={() => resolveAttack(entry.id, true, Boolean(meta?.isCritical))}
                           className="rounded border border-hero-vibrant px-2 py-0.5 font-barlow text-[9px] uppercase text-hero-vibrant"
                         >
                           Trifft
@@ -232,6 +311,19 @@ export function LiveSessionActivityPanel({
                         </button>
                       </div>
                     ) : null}
+                    {showDamageBtn ? (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          handleDamageRoll(meta?.damage, Boolean(meta?.critical), requestId, meta?.weaponName)
+                        }
+                        className="mt-1.5 w-full rounded border border-accent-blood/50 bg-accent-blood/15 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-blood"
+                      >
+                        Schaden würfeln ({meta?.damage ?? "?"})
+                        {meta?.critical ? " · doppelte Würfel" : ""}
+                      </button>
+                    ) : null}
                   </div>
                 );
               })
@@ -239,6 +331,13 @@ export function LiveSessionActivityPanel({
           </div>
 
           <div className="shrink-0 border-t border-amber-900/50 p-3 space-y-2">
+            {primaryAttack ? (
+              <p className="font-libre text-[9px] text-gray-500">
+                Waffe: <span className="text-gray-300">{primaryAttack.name}</span> · Angriff{" "}
+                {formatSigned(primaryAttack.attackBonus)} · Schaden {primaryAttack.damage}
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap gap-1">
               {DICE_SIDES.map((s) => (
                 <button
@@ -302,9 +401,7 @@ export function LiveSessionActivityPanel({
               </button>
             </div>
             {selectedSkill ? (
-              <p className="font-barlow text-[9px] text-gray-500">
-                Bonus: {formatSigned(skillBonus)}
-              </p>
+              <p className="font-barlow text-[9px] text-gray-500">Bonus: {formatSigned(skillBonus)}</p>
             ) : null}
 
             <button
@@ -315,6 +412,7 @@ export function LiveSessionActivityPanel({
             >
               <Swords className="h-3.5 w-3.5" />
               Angriff würfeln
+              {primaryAttack ? ` (${formatSigned(primaryAttack.attackBonus)})` : ""}
             </button>
 
             <form onSubmit={handleSubmit} className="flex gap-1">

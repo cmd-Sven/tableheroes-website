@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { normalizeGuestSlots } from "@/src/lib/session-guest-slots";
@@ -1594,6 +1595,29 @@ export function LiveSessionBoard({
     !forcePlayerView &&
     (isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId));
   const systemLogs = liveState?.system_logs ?? [];
+  const prevSystemLogCountRef = useRef(systemLogs.length);
+
+  useEffect(() => {
+    if (!isGM || forcePlayerView) {
+      prevSystemLogCountRef.current = systemLogs.length;
+      return;
+    }
+    if (systemLogs.length <= prevSystemLogCountRef.current) {
+      prevSystemLogCountRef.current = systemLogs.length;
+      return;
+    }
+    const fresh = systemLogs.slice(prevSystemLogCountRef.current);
+    prevSystemLogCountRef.current = systemLogs.length;
+    for (const entry of fresh) {
+      const text = entry.text ?? "";
+      if (
+        entry.type === "player_action" &&
+        (text.includes("Ausrüstung") || text.includes("Loadout") || text.includes("Waffenkombination"))
+      ) {
+        toast.info(text, { duration: 9000 });
+      }
+    }
+  }, [systemLogs, isGM, forcePlayerView]);
   const physicallyPresentIdSet = new Set(
     normalizePhysicallyPresentUserIds(liveState?.physically_present_user_ids),
   );
