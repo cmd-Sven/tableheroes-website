@@ -37,10 +37,14 @@ type Props = {
   sessionId: string;
   campaignId: string;
   isGM: boolean;
+  isPrepMode?: boolean;
   open: boolean;
   onToggle: () => void;
   logs: SessionActivityEntry[];
   currentCharacter: { id: string; name: string } | null;
+  prepTestCharacters?: { id: string; name: string }[];
+  prepTestCharacterId?: string | null;
+  onPrepTestCharacterChange?: (id: string) => void;
 };
 
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
@@ -49,10 +53,14 @@ export function LiveSessionActivityPanel({
   sessionId,
   campaignId,
   isGM,
+  isPrepMode = false,
   open,
   onToggle,
   logs,
   currentCharacter,
+  prepTestCharacters,
+  prepTestCharacterId,
+  onPrepTestCharacterChange,
 }: Props) {
   const [input, setInput] = useState("");
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
@@ -226,9 +234,26 @@ export function LiveSessionActivityPanel({
       {open ? (
         <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-amber-900/50 px-3 py-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">Session-Chat</h2>
-              <p className="font-libre text-[10px] text-gray-500">Würfe & Aktionen</p>
+              <p className="font-libre text-[10px] text-gray-500">
+                {isPrepMode ? "Vorbereitung · Würfe & Aktionen testen" : "Würfe & Aktionen"}
+              </p>
+              {prepTestCharacters && prepTestCharacters.length > 0 ? (
+                <select
+                  value={prepTestCharacterId ?? prepTestCharacters[0]?.id ?? ""}
+                  onChange={(e) => onPrepTestCharacterChange?.(e.target.value)}
+                  className="mt-1 w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
+                >
+                  {prepTestCharacters.map((pc) => (
+                    <option key={pc.id} value={pc.id}>
+                      Test als: {pc.name}
+                    </option>
+                  ))}
+                </select>
+              ) : currentCharacter ? (
+                <p className="mt-0.5 truncate font-libre text-[10px] text-gray-400">{currentCharacter.name}</p>
+              ) : null}
             </div>
             <button type="button" onClick={onToggle} className="rounded p-1 text-gray-400 hover:text-white">
               <X className="h-4 w-4" />

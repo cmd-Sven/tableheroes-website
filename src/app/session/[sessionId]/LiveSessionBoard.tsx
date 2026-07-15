@@ -1360,6 +1360,8 @@ export function LiveSessionBoard({
   const [downtimePlayerDismissed, setDowntimePlayerDismissed] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  /** GM in Vorbereitung: Charakter zum Testen von Würfeln/Aktionen */
+  const [prepTestCharacterId, setPrepTestCharacterId] = useState<string | null>(null);
   const [isEnding, startEndTransition] = useTransition();
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
   const [recordingNoticeModalOpen, setRecordingNoticeModalOpen] = useState(false);
@@ -1653,6 +1655,39 @@ export function LiveSessionBoard({
   const currentPlayerCharacter = useMemo(() => {
     return partyCharacters.find((pc) => pc.playerUserId === userId) ?? null;
   }, [partyCharacters, userId]);
+
+  const activityCharacter = useMemo(() => {
+    if (currentPlayerCharacter) {
+      return { id: currentPlayerCharacter.id, name: currentPlayerCharacter.name };
+    }
+    if (isPrepMode && isGM && !forcePlayerView) {
+      const testId = prepTestCharacterId ?? partyCharacters.find((pc) => !pc.isSessionDummy)?.id ?? null;
+      const pc = partyCharacters.find((p) => p.id === testId);
+      if (pc) return { id: pc.id, name: pc.name };
+    }
+    return null;
+  }, [
+    currentPlayerCharacter,
+    isPrepMode,
+    isGM,
+    forcePlayerView,
+    prepTestCharacterId,
+    partyCharacters,
+  ]);
+
+  useEffect(() => {
+    if (!isPrepMode || !isGM || forcePlayerView || currentPlayerCharacter) return;
+    if (prepTestCharacterId) return;
+    const first = partyCharacters.find((pc) => !pc.isSessionDummy);
+    if (first) setPrepTestCharacterId(first.id);
+  }, [
+    isPrepMode,
+    isGM,
+    forcePlayerView,
+    currentPlayerCharacter,
+    prepTestCharacterId,
+    partyCharacters,
+  ]);
 
   useEffect(() => {
     setDowntimePlayerDismissed(false);
@@ -2819,7 +2854,13 @@ export function LiveSessionBoard({
             <span className="rounded border border-accent-gold/40 bg-background-dark/70 px-2 py-0.5 font-barlow font-bold uppercase tracking-wide">
               Vorbereitungs-Modus
             </span>
-            <span>Spieler haben noch keinen Zugriff. Änderungen an Wetter, Bühne und Journal werden bereits gespeichert.</span>
+            <span>Spieler haben noch keinen Zugriff. Wetter, Bühne, Journal, Inventar, Charakterblatt und Session-Chat kannst du hier bereits testen.</span>
+            <Link
+              href={`/session/${sessionId}?mode=player`}
+              className="rounded border border-accent-gold/50 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/15"
+            >
+              Spieleransicht testen
+            </Link>
             {isLiveStateInitializing && (
               <span className="text-gray-300">Session-Zustand wird initialisiert...</span>
             )}
@@ -3965,6 +4006,9 @@ export function LiveSessionBoard({
                     ((actualUserIsGM && !forcePlayerView) || pid === userId) &&
                     !pc.isSessionDummy;
                   const canOpenSheet = canOpenInventory && showDnd5eSheet;
+                  const canQuickEquip =
+                    canOpenSheet &&
+                    (pid === userId || (isPrepMode && actualUserIsGM && !forcePlayerView));
                   const isActiveTurn =
                     liveState?.is_combat_mode &&
                     activeCombatParticipant?.type === "player" &&
@@ -4079,7 +4123,7 @@ export function LiveSessionBoard({
                             <ScrollText className="h-9 w-9" aria-hidden />
                           </button>
                         ) : null}
-                        {canOpenSheet && pid === userId && showDnd5eSheet ? (
+                        {canQuickEquip ? (
                           <LiveSessionQuickEquipment
                             sessionId={sessionId}
                             characterId={pc.id}
@@ -4272,14 +4316,20 @@ export function LiveSessionBoard({
           sessionId={sessionId}
           campaignId={campaignId}
           isGM={isGM && !forcePlayerView}
+          isPrepMode={isPrepMode}
           open={isActivityOpen}
           onToggle={() => setIsActivityOpen((v) => !v)}
           logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
-          currentCharacter={
-            currentPlayerCharacter
-              ? { id: currentPlayerCharacter.id, name: currentPlayerCharacter.name }
-              : null
+          currentCharacter={activityCharacter}
+          prepTestCharacters={
+            isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
+              ? partyCharacters
+                  .filter((pc) => !pc.isSessionDummy)
+                  .map((pc) => ({ id: pc.id, name: pc.name }))
+              : undefined
           }
+          prepTestCharacterId={prepTestCharacterId}
+          onPrepTestCharacterChange={setPrepTestCharacterId}
         />
       ) : null}
 

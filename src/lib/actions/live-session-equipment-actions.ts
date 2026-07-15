@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
@@ -24,16 +25,37 @@ export async function saveLiveSessionEquipment(input: {
 
   const { data: chRaw, error: loadErr } = await supabase
     .from("characters")
-    .select("sheet_data, user_id")
+    .select("sheet_data, user_id, campaign_id")
     .eq("id", input.characterId)
     .single();
 
   if (loadErr || !chRaw) throw new Error("Charakter nicht gefunden.");
-  if ((chRaw as { user_id?: string }).user_id !== user.id) {
+
+  const ch = chRaw as { user_id?: string | null; campaign_id?: string | null; sheet_data?: unknown };
+  const isOwner = ch.user_id === user.id;
+
+  let allowGmPrepEdit = false;
+  if (!isOwner && ch.campaign_id) {
+    const [{ data: sessionRaw }, { data: campRaw }] = await Promise.all([
+      (supabase.from("sessions") as any)
+        .select("status")
+        .eq("id", input.sessionId)
+        .maybeSingle(),
+      (supabase.from("campaigns") as any)
+        .select("gm_id, owner_id")
+        .eq("id", ch.campaign_id)
+        .maybeSingle(),
+    ]);
+    const sessionStatus = String((sessionRaw as { status?: string } | null)?.status ?? "");
+    const isGm = isCampaignGm(campRaw as { gm_id?: string | null; owner_id?: string | null } | null, user.id);
+    allowGmPrepEdit = isGm && sessionStatus === "Scheduled";
+  }
+
+  if (!isOwner && !allowGmPrepEdit) {
     throw new Error("Nur der Charakterbesitzer kann Ausrüstung ändern.");
   }
 
-  const parsed = parseSheetData((chRaw as { sheet_data?: unknown }).sheet_data);
+  const parsed = parseSheetData(ch.sheet_data);
   const merged = mergeSheetWithDefaults({
     ...(parsed ?? {}),
     equipment: normalizeEquipmentState(input.equipment),
