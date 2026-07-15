@@ -19,19 +19,24 @@ type Props = {
   campaignId: string;
   character: SheetCharacter;
   onClose: () => void;
+  /** Live-Bühne: nur Blatt-Inhalt, kein Sprach-Umschalter */
+  liveSessionMode?: boolean;
+  onSaved?: () => void;
 };
 
 function Dnd5eCharacterSheetModalHeader({
   character,
   onClose,
+  liveSessionMode,
 }: {
   character: SheetCharacter;
   onClose: () => void;
+  liveSessionMode?: boolean;
 }) {
   const { t } = useCharacterSheetLocale();
 
   return (
-    <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hero-dark px-5 py-4">
+    <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hero-dark px-5 py-3">
       <div>
         <h2 className="font-barlow text-lg font-bold uppercase text-white">
           {character.name}
@@ -42,7 +47,7 @@ function Dnd5eCharacterSheetModalHeader({
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <CharacterSheetLanguageToggle />
+        {!liveSessionMode ? <CharacterSheetLanguageToggle /> : null}
         <button
           type="button"
           onClick={onClose}
@@ -56,7 +61,13 @@ function Dnd5eCharacterSheetModalHeader({
   );
 }
 
-export function Dnd5eCharacterSheetModal({ campaignId, character, onClose }: Props) {
+export function Dnd5eCharacterSheetModal({
+  campaignId,
+  character,
+  onClose,
+  liveSessionMode = false,
+  onSaved,
+}: Props) {
   const { t } = useCharacterSheetLocale();
 
   return (
@@ -67,9 +78,19 @@ export function Dnd5eCharacterSheetModal({ campaignId, character, onClose }: Pro
         aria-label={t("sheet.modalAria", { name: character.name })}
         className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-amber-800/60 bg-background-card shadow-2xl"
       >
-        <Dnd5eCharacterSheetModalHeader character={character} onClose={onClose} />
+        <Dnd5eCharacterSheetModalHeader
+          character={character}
+          onClose={onClose}
+          liveSessionMode={liveSessionMode}
+        />
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <Dnd5eCharacterSheetPanel campaignId={campaignId} characterId={character.id} compact />
+          <Dnd5eCharacterSheetPanel
+            campaignId={campaignId}
+            characterId={character.id}
+            compact
+            liveSessionMode={liveSessionMode}
+            onSaved={onSaved}
+          />
         </div>
       </div>
     </div>

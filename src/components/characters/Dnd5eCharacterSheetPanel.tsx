@@ -136,6 +136,9 @@ type Props = {
   onClose?: () => void;
   /** Biografie, Kultur, Portrait, Token & Zustands-Token */
   biographyCulture?: CharacterSheetBiographyCultureTabProps;
+  /** Live-Session: schlankes Blatt ohne Dashboard-Chrome */
+  liveSessionMode?: boolean;
+  onSaved?: () => void;
 };
 
 export function Dnd5eCharacterSheetPanelWithLocale(props: Props) {
@@ -157,6 +160,8 @@ export function Dnd5eCharacterSheetPanel({
   characterId,
   compact = false,
   biographyCulture,
+  liveSessionMode = false,
+  onSaved,
 }: Props) {
   const { t, abilityLabel, skillLabel, formatDateTime, hydrateLocale } = useCharacterSheetLocale();
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
@@ -316,8 +321,9 @@ export function Dnd5eCharacterSheetPanel({
       }
       if (!silent) {
         toast.success(t("sheet.saved"));
-        setEditMode(false);
+        if (!liveSessionMode) setEditMode(false);
       }
+      onSaved?.();
       await reload();
     });
   }
@@ -352,6 +358,7 @@ export function Dnd5eCharacterSheetPanel({
 
   return (
     <div className="space-y-6">
+      {!liveSessionMode ? (
       <div
         className={`flex flex-wrap items-center justify-between gap-4 ${compact ? "" : "rounded-lg border border-hero-dark bg-background-card p-4"}`}
       >
@@ -382,6 +389,32 @@ export function Dnd5eCharacterSheetPanel({
         </label>
         </div>
       </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hero-dark/80 bg-hero-dark/20 px-3 py-2">
+          <p className="font-barlow text-xs font-bold uppercase text-gray-400">
+            {editMode ? t("sheet.editMode") : t("sheet.viewMode")}
+          </p>
+          <div className="flex items-center gap-3">
+            <ToggleSwitch
+              checked={editMode}
+              disabled={!canEdit}
+              onToggle={() => setEditMode((v) => !v)}
+              label={editMode ? t("sheet.editModeAria") : t("sheet.viewModeAria")}
+            />
+            {editMode && canEdit ? (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleSave()}
+                className="inline-flex items-center gap-1.5 rounded bg-hero-vibrant px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-black disabled:opacity-50"
+              >
+                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {t("sheet.save")}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-hero-dark">
         <button
@@ -984,7 +1017,7 @@ export function Dnd5eCharacterSheetPanel({
             </div>
           </div>
 
-          {editMode && canEdit ? (
+          {editMode && canEdit && !liveSessionMode ? (
             <div className="flex justify-end">
               <button
                 type="button"

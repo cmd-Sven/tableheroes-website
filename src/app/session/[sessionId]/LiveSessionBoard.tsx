@@ -83,6 +83,8 @@ import {
 } from "@/src/lib/session-weather";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
+import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
+import { LiveSessionQuickEquipment } from "@/src/components/session/LiveSessionQuickEquipment";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -222,6 +224,14 @@ function normalizeLiveRow(row: unknown): LiveState {
             at: String(entry.at ?? ""),
             text: String(entry.text ?? ""),
             type: entry.type != null ? String(entry.type) : undefined,
+            author_name: entry.author_name != null ? String(entry.author_name) : undefined,
+            author_user_id:
+              entry.author_user_id != null ? String(entry.author_user_id) : undefined,
+            character_id: entry.character_id != null ? String(entry.character_id) : undefined,
+            meta:
+              entry.meta != null && typeof entry.meta === "object"
+                ? (entry.meta as Record<string, unknown>)
+                : undefined,
           }))
           .filter((entry) => entry.text.trim().length > 0)
       : [],
@@ -509,6 +519,9 @@ type SystemLogEntry = {
   text: string;
   type?: string;
   author_name?: string;
+  author_user_id?: string;
+  character_id?: string;
+  meta?: Record<string, unknown>;
 };
 
 type CombatParticipant = {
@@ -1345,6 +1358,7 @@ export function LiveSessionBoard({
   const [showQuests, setShowQuests] = useState(false);
   const [downtimePlayerDismissed, setDowntimePlayerDismissed] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isEnding, startEndTransition] = useTransition();
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
   const [recordingNoticeModalOpen, setRecordingNoticeModalOpen] = useState(false);
@@ -4041,6 +4055,13 @@ export function LiveSessionBoard({
                             <ScrollText className="h-9 w-9" aria-hidden />
                           </button>
                         ) : null}
+                        {canOpenSheet && pid === userId && showDnd5eSheet ? (
+                          <LiveSessionQuickEquipment
+                            sessionId={sessionId}
+                            characterId={pc.id}
+                            characterName={pc.name}
+                          />
+                        ) : null}
                       </div>
                       <div className="mt-1 w-full rounded-md bg-black/50 px-2 py-1.5 text-center backdrop-blur-sm">
                         <p
@@ -4213,7 +4234,28 @@ export function LiveSessionBoard({
             class: sheetCharacter.class,
             level: sheetCharacter.level,
           }}
+          liveSessionMode
+          onSaved={() => {
+            void refreshLiveState();
+            router.refresh();
+          }}
           onClose={() => setSheetCharacter(null)}
+        />
+      ) : null}
+
+      {!isGuest ? (
+        <LiveSessionActivityPanel
+          sessionId={sessionId}
+          campaignId={campaignId}
+          isGM={isGM && !forcePlayerView}
+          open={isActivityOpen}
+          onToggle={() => setIsActivityOpen((v) => !v)}
+          logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
+          currentCharacter={
+            currentPlayerCharacter
+              ? { id: currentPlayerCharacter.id, name: currentPlayerCharacter.name }
+              : null
+          }
         />
       ) : null}
 
