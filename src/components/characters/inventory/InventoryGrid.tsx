@@ -126,6 +126,16 @@ export function InventoryGrid({
   const containerCap = activeContainer ? getContainerMaxCapacityLb(activeContainer.kind) : 0;
   const atCapacity = activeContainer ? containerWeight >= containerCap : false;
 
+  const weightByContainer = useMemo(
+    () =>
+      equipment.containers.map((c) => ({
+        id: c.id,
+        weightLb: containerWeightLb(c, items),
+        maxLb: getContainerMaxCapacityLb(c.kind),
+      })),
+    [equipment.containers, items],
+  );
+
   function handleContextAction(action: ContextMenuAction, containerId?: string) {
     if (!contextMenu) return;
     const stack = contextMenu.stack;
@@ -195,6 +205,7 @@ export function InventoryGrid({
         containers={equipment.containers}
         activeId={activeContainer?.id ?? (activeContainerId === UNASSIGNED_ID ? UNASSIGNED_ID : null)}
         readOnly={readOnly}
+        weightByContainer={weightByContainer}
         onSelect={(id) => {
           setActiveContainerId(id);
           setPage(0);
@@ -236,11 +247,11 @@ export function InventoryGrid({
         className={
           isSession
             ? "rounded-lg border border-black/30 bg-black/20 p-1.5"
-            : "rounded-lg border-2 border-hero-border/60 bg-hero-dark/20 p-3"
+            : "rounded-lg border-2 border-hero-border/60 bg-hero-dark/20 p-2"
         }
       >
         <div
-          className="grid gap-2"
+          className="grid gap-1"
           style={{ gridTemplateColumns: `repeat(${INVENTORY_GRID_COLS}, minmax(0, 1fr))` }}
         >
           {pageStacks.map((stack) => (
@@ -269,9 +280,9 @@ export function InventoryGrid({
                   ? t("inventory.capacityFull")
                   : t("equipment.customItem")
               }
-              className="flex aspect-square w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-hero-border/40 text-gray-500 transition-colors hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex aspect-square w-full flex-col items-center justify-center rounded border border-dashed border-hero-border/40 text-gray-500 transition-colors hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Plus className="h-6 w-6" />
+              <Plus className="h-4 w-4" />
             </button>
           ) : null}
 

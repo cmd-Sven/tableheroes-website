@@ -56,6 +56,33 @@ export const characterSheetMessagesDe = {
   "combat.deathSaveSuccesses": "Erfolge",
   "combat.deathSaveFailures": "Fehlschläge",
 
+  "rest.title": "Rast",
+  "rest.hint": "Kurze Rast (1 h): Trefferwürfel einsetzen, kurz-Rast-Ressourcen. Lange Rast (8 h): LP voll, halbe TW zurück, Zauberplätze & Todesrettungen.",
+  "rest.shortRest": "Kurze Rast",
+  "rest.longRest": "Lange Rast",
+  "rest.longRestConfirm": "Lange Rast durchführen? Alle LP werden wiederhergestellt, halbe Trefferwürfel kommen zurück, Zauberplätze und Todesrettungen werden zurückgesetzt.",
+  "rest.hitDiceTitle": "Trefferwürfel einsetzen?",
+  "rest.hitDiceHint": "Nach einer kurzen Rast kannst du Trefferwürfel ausgeben, um LP zu heilen (Würfel + KON-Modifikator pro Würfel).",
+  "rest.diceCount": "Anzahl Würfel",
+  "rest.rollDice": "Würfeln",
+  "rest.rolls": "Ergebnis: {rolls}",
+  "rest.hpManual": "Heilung (manuell oder nach Wurf)",
+  "rest.skipHitDice": "Ohne TW",
+  "rest.applyShortRest": "Kurze Rast anwenden",
+  "rest.hpRecovered": "{amount} LP wiederhergestellt.",
+  "rest.hitDiceRemaining": "Trefferwürfel: {remaining} / {total} (d{die})",
+  "rest.classResources": "Klassenressourcen",
+  "rest.shortRestResource": "Erholt sich bei kurzer Rast",
+
+  "xp.maxLevel": "Max. Stufe",
+  "xp.maxLevelTooltip": "{xp} XP — maximale Stufe erreicht",
+  "xp.exact": "{current} / {next} XP",
+  "xp.tooltip": "{current} XP gesamt · Stufe {level}: {inLevel} / {needed} bis nächste Stufe",
+
+  "achievements.title": "Achievements",
+  "achievements.empty": "Noch keine Achievements mit diesem Charakter freigeschaltet.",
+  "achievements.accountHint": "Achievements gelten für dein Spielerkonto und werden hier am Charakterblatt angezeigt.",
+
   "features.title": "Merkmale & Feats",
   "features.add": "+ Feat",
   "features.empty": "Keine Feats vorhanden.",
@@ -147,9 +174,36 @@ export const characterSheetMessagesDe = {
   "equipment.beltPrepared": "Vorbereitet",
   "equipment.beltPreparedHint":
     "Gegenstände am Gürtel gelten als vorbereitet und sind im Kampf schnell erreichbar.",
+  "equipment.beltRequiresWaist":
+    "Lege zuerst einen Gürtel am Taillen-Slot aus, um Gürtelplätze zu nutzen.",
   "equipment.containerItemCount": "{count} Gegenstände",
   "equipment.containerWeight": "{weight} lb",
   "equipment.containerMaxCapacity": "max. {cap} lb",
+  "equipment.generalSlotsTitle": "Allgemeine Ausrüstung",
+  "equipment.uiClothing": "Kleidung",
+  "equipment.uiAccessories": "Accessoires",
+  "equipment.uiMisc": "Sonstiges",
+  "equipment.weaponPresetsTitle": "Waffenkombinationen (max. {max})",
+  "equipment.weaponPresetsHint": "Schnellwechsel im Kampf oder auf Reisen — ohne Rast erforderlich.",
+  "equipment.saveWeaponPreset": "Aktuelle Hände speichern",
+  "equipment.weaponPresetNamePrompt": "Name der Waffenkombination:",
+  "equipment.noWeaponPresets": "Noch keine Waffenkombination gespeichert.",
+  "equipment.applyWeaponPreset": "Waffenkombination anlegen",
+  "equipment.deleteWeaponPreset": "Waffenkombination löschen",
+  "equipment.deleteWeaponPresetConfirm": "'{name}' wirklich löschen?",
+  "equipment.loadoutsTitle": "Vollständige Ausrüstungen",
+  "equipment.loadoutRestWarning":
+    "Vollständige Ausrüstungen dürfen laut PHB nur während einer kurzen oder langen Rast gewechselt werden.",
+  "equipment.saveLoadout": "Aktuelle Ausrüstung speichern",
+  "equipment.loadoutSaveConfirm":
+    "Hinweis: Das Anwenden einer Voll-Ausrüstung ist nur während einer kurzen oder langen Rast erlaubt. Trotzdem speichern?",
+  "equipment.loadoutNamePrompt": "Name der Ausrüstung (z. B. Kampfausrüstung):",
+  "equipment.noLoadouts": "Noch keine Ausrüstung gespeichert.",
+  "equipment.applyLoadout": "Ausrüstung anlegen",
+  "equipment.loadoutApplyConfirm":
+    "Vollständige Ausrüstung anlegen? Laut PHB nur während einer kurzen oder langen Rast erlaubt.",
+  "equipment.deleteLoadout": "Ausrüstung löschen",
+  "equipment.deleteLoadoutConfirm": "'{name}' wirklich löschen?",
 
   "inventory.allCategories": "Alle",
   "inventory.noBackpack": "Noch kein Rucksack angelegt.",
@@ -180,6 +234,11 @@ export const characterSheetMessagesDe = {
   "inventory.categoryLabel": "Inventar-Kategorie",
   "inventory.quantityLabel": "Stapelmenge",
   "inventory.valueGpLabel": "Wert (GP)",
+  "inventory.magical": "Magisch",
+  "inventory.containerOverweight":
+    '{name} überlastet: {weight} / {max} lb — Gegenstände auspacken oder Kapazität erhöhen.',
+  "inventory.carryingOverCapacity":
+    "Traglast überschritten: {weight} / {max} lb — Geschwindigkeit kann halbiert sein.",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":

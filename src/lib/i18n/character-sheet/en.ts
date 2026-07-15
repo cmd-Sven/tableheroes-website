@@ -56,6 +56,33 @@ export const characterSheetMessagesEn = {
   "combat.deathSaveSuccesses": "Successes",
   "combat.deathSaveFailures": "Failures",
 
+  "rest.title": "Rest",
+  "rest.hint": "Short rest (1 h): spend hit dice, short-rest resources. Long rest (8 h): full HP, half hit dice back, spell slots & death saves reset.",
+  "rest.shortRest": "Short Rest",
+  "rest.longRest": "Long Rest",
+  "rest.longRestConfirm": "Take a long rest? All HP restored, half hit dice recovered, spell slots and death saves reset.",
+  "rest.hitDiceTitle": "Spend hit dice?",
+  "rest.hitDiceHint": "After a short rest you may spend hit dice to heal (die + CON modifier per die).",
+  "rest.diceCount": "Number of dice",
+  "rest.rollDice": "Roll",
+  "rest.rolls": "Result: {rolls}",
+  "rest.hpManual": "Healing (manual or after roll)",
+  "rest.skipHitDice": "Skip dice",
+  "rest.applyShortRest": "Apply short rest",
+  "rest.hpRecovered": "{amount} HP recovered.",
+  "rest.hitDiceRemaining": "Hit dice: {remaining} / {total} (d{die})",
+  "rest.classResources": "Class resources",
+  "rest.shortRestResource": "Recovers on short rest",
+
+  "xp.maxLevel": "Max level",
+  "xp.maxLevelTooltip": "{xp} XP — maximum level reached",
+  "xp.exact": "{current} / {next} XP",
+  "xp.tooltip": "{current} XP total · Level {level}: {inLevel} / {needed} to next level",
+
+  "achievements.title": "Achievements",
+  "achievements.empty": "No achievements unlocked for this character yet.",
+  "achievements.accountHint": "Achievements belong to your player account and are shown on this character sheet.",
+
   "features.title": "Features & Feats",
   "features.add": "+ Feat",
   "features.empty": "No feats yet.",
@@ -147,9 +174,36 @@ export const characterSheetMessagesEn = {
   "equipment.beltPrepared": "Prepared",
   "equipment.beltPreparedHint":
     "Items on the belt count as prepared and are quickly reachable in combat.",
+  "equipment.beltRequiresWaist":
+    "Equip a belt in the waist slot first to use belt quick-access slots.",
   "equipment.containerItemCount": "{count} items",
   "equipment.containerWeight": "{weight} lb",
   "equipment.containerMaxCapacity": "max. {cap} lb",
+  "equipment.generalSlotsTitle": "General equipment",
+  "equipment.uiClothing": "Clothing",
+  "equipment.uiAccessories": "Accessories",
+  "equipment.uiMisc": "Other",
+  "equipment.weaponPresetsTitle": "Weapon sets (max. {max})",
+  "equipment.weaponPresetsHint": "Quick-swap in combat or while traveling — no rest required.",
+  "equipment.saveWeaponPreset": "Save current hands",
+  "equipment.weaponPresetNamePrompt": "Name for this weapon set:",
+  "equipment.noWeaponPresets": "No weapon sets saved yet.",
+  "equipment.applyWeaponPreset": "Equip weapon set",
+  "equipment.deleteWeaponPreset": "Delete weapon set",
+  "equipment.deleteWeaponPresetConfirm": 'Delete "{name}"?',
+  "equipment.loadoutsTitle": "Full loadouts",
+  "equipment.loadoutRestWarning":
+    "Per PHB, full loadouts may only be changed during a short or long rest.",
+  "equipment.saveLoadout": "Save current loadout",
+  "equipment.loadoutSaveConfirm":
+    "Note: Applying a full loadout is only allowed during a short or long rest. Save anyway?",
+  "equipment.loadoutNamePrompt": "Loadout name (e.g. Combat gear):",
+  "equipment.noLoadouts": "No loadouts saved yet.",
+  "equipment.applyLoadout": "Apply loadout",
+  "equipment.loadoutApplyConfirm":
+    "Apply full loadout? Per PHB, this is only allowed during a short or long rest.",
+  "equipment.deleteLoadout": "Delete loadout",
+  "equipment.deleteLoadoutConfirm": 'Delete "{name}"?',
 
   "inventory.allCategories": "All",
   "inventory.noBackpack": "No backpack set up yet.",
@@ -180,6 +234,11 @@ export const characterSheetMessagesEn = {
   "inventory.categoryLabel": "Inventory category",
   "inventory.quantityLabel": "Stack quantity",
   "inventory.valueGpLabel": "Value (GP)",
+  "inventory.magical": "Magical",
+  "inventory.containerOverweight":
+    "“{name}” overloaded: {weight} / {max} lb — unpack items or increase capacity.",
+  "inventory.carryingOverCapacity":
+    "Carrying capacity exceeded: {weight} / {max} lb — speed may be halved.",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":

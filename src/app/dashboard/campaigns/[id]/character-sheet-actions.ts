@@ -18,6 +18,8 @@ import type {
 } from "@/src/lib/characters/dnd5e/types";
 import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
+import type { Dnd5eCharacterAchievement } from "@/src/lib/characters/dnd5e/types";
+import { getAchievementImageForName } from "@/src/lib/constants/achievements";
 import {
   resolveFoundryProgressionLock,
   stripFoundryLockedCharacterFields,
@@ -104,6 +106,7 @@ function buildSheetPayload(
   canEdit: boolean,
   progressionLocked: boolean,
   progressionLockMessage: string,
+  achievements: Dnd5eCharacterAchievement[] = [],
 ): CharacterSheetPayload {
   const level = Math.max(1, Math.floor(Number(character.level) || 1));
   const parsed = parseSheetData(character.sheet_data);
@@ -131,7 +134,35 @@ function buildSheetPayload(
     progressionLocked,
     progressionLockMessage,
     sheetLocale: normalizeCharacterSheetLocale(character.sheet_locale),
+    achievements,
   };
+}
+
+async function loadCharacterAchievements(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string | null,
+): Promise<Dnd5eCharacterAchievement[]> {
+  if (!userId) return [];
+  const { data, error } = await (supabase.from("user_achievements") as any)
+    .select("awarded_at, achievements(id, name, icon, points_awarded)")
+    .eq("user_id", userId)
+    .order("awarded_at", { ascending: false });
+
+  if (error || !Array.isArray(data)) return [];
+
+  return data
+    .map((row: { awarded_at?: string; achievements?: { id: string; name: string; icon?: string | null; points_awarded?: number } }) => {
+      const a = row.achievements;
+      if (!a?.id) return null;
+      return {
+        id: a.id,
+        name: a.name,
+        imageUrl: getAchievementImageForName(a.name) ?? a.icon ?? null,
+        awardedAt: row.awarded_at ?? null,
+        pointsAwarded: Number(a.points_awarded) || 0,
+      } satisfies Dnd5eCharacterAchievement;
+    })
+    .filter(Boolean) as Dnd5eCharacterAchievement[];
 }
 
 export async function loadDnd5eCharacterSheet(
@@ -148,6 +179,7 @@ export async function loadDnd5eCharacterSheet(
   }
 
   const lock = await resolveFoundryProgressionLock(supabase, campaignId, characterId);
+  const achievements = await loadCharacterAchievements(supabase, character.user_id);
 
   return buildSheetPayload(
     character,
@@ -155,6 +187,7 @@ export async function loadDnd5eCharacterSheet(
     true,
     lock.locked,
     lock.message,
+    achievements,
   );
 }
 

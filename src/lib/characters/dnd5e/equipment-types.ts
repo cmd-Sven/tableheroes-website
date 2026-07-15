@@ -16,6 +16,45 @@ export type Dnd5eEquipmentSlot =
   | "ring1"
   | "ring2";
 
+/** Allgemeine Ausrüstungsfelder (nicht an Körper-Silhouette gebunden) */
+export type Dnd5eGeneralEquipmentSlot = "clothing" | "accessories" | "misc";
+
+export const DND5E_GENERAL_EQUIPMENT_SLOTS: Dnd5eGeneralEquipmentSlot[] = [
+  "clothing",
+  "accessories",
+  "misc",
+];
+
+export const GENERAL_SLOT_LABELS_DE: Record<Dnd5eGeneralEquipmentSlot, string> = {
+  clothing: "Kleidung",
+  accessories: "Accessoires",
+  misc: "Sonstiges",
+};
+
+export const GENERAL_SLOT_LABELS_EN: Record<Dnd5eGeneralEquipmentSlot, string> = {
+  clothing: "Clothing",
+  accessories: "Accessories",
+  misc: "Other",
+};
+
+/** Schnellwechsel: max. 2 Waffenkombinationen (Haupthand + Nebenhand) */
+export type Dnd5eWeaponPreset = {
+  id: string;
+  name: string;
+  mainHand: string | null;
+  offHand: string | null;
+};
+
+/** Vollständige Ausrüstung unter eigenem Namen (nur bei Rast anwendbar) */
+export type Dnd5eEquipmentLoadout = {
+  id: string;
+  name: string;
+  belt: (string | null)[];
+  slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
+  generalSlots: Partial<Record<Dnd5eGeneralEquipmentSlot, string | null>>;
+  attunedItemIds: string[];
+};
+
 export const DND5E_EQUIPMENT_SLOTS: Dnd5eEquipmentSlot[] = [
   "head",
   "eyes",
@@ -114,21 +153,31 @@ export type Dnd5eEquipmentState = {
   /** Gürtel-Schnellzugriff (max. 6) */
   belt: (string | null)[];
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
+  /** Kleidung, Accessoires, Sonstiges — außerhalb der Silhouette */
+  generalSlots?: Partial<Record<Dnd5eGeneralEquipmentSlot, string | null>>;
   /** Eingestimmte magische Gegenstände (max. 3) */
   attunedItemIds: string[];
+  /** Bis zu 2 Waffenkombinationen für schnellen Wechsel */
+  weaponPresets?: Dnd5eWeaponPreset[];
+  /** Benannte Voll-Ausrüstungen (Rast erforderlich zum Anwenden) */
+  loadouts?: Dnd5eEquipmentLoadout[];
   /** Benutzerdefinierte Inventar-Kategorien (Bearbeitungsmodus) */
   customCategories?: InventoryCustomCategory[];
 };
 
 export const MAX_BELT_SLOTS = 6;
 export const MAX_ATTUNEMENT = 3;
+export const MAX_WEAPON_PRESETS = 2;
 
 export function createEmptyEquipmentState(): Dnd5eEquipmentState {
   return {
     containers: [],
     belt: Array.from({ length: MAX_BELT_SLOTS }, () => null),
     slots: {},
+    generalSlots: {},
     attunedItemIds: [],
+    weaponPresets: [],
+    loadouts: [],
     customCategories: [],
   };
 }

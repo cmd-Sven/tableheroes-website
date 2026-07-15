@@ -13,6 +13,7 @@ import type { CharacterItem } from "@/src/types/inventory";
 import type { InventoryCustomCategory } from "./equipment-types";
 import {
   type InventoryDisplayCategory,
+  type Dnd5eItemMeta,
   parseDnd5eMetaFromDescription,
 } from "./item-meta";
 import { resolveCharacterItemStats } from "./item-resolve";
@@ -153,3 +154,57 @@ export function isConsumableItem(item: CharacterItem): boolean {
 }
 
 export const EQUIP_CONFLICT_ICON = AlertTriangle;
+
+/** Meta-Art → Anzeige-Kategorie (Legacy-Items mit kind „magic“). */
+export function metaKindToDisplayCategory(
+  kind: Dnd5eItemMeta["kind"],
+): InventoryDisplayCategory {
+  switch (kind) {
+    case "weapon":
+      return "weapons";
+    case "armor":
+      return "armor";
+    case "consumable":
+      return "potions";
+    case "tool":
+      return "tools";
+    case "supply":
+      return "gear";
+    case "magic":
+      return "gear";
+    default:
+      return "gear";
+  }
+}
+
+/** Inventar-Kategorie → D&D-Item-Art (ein Feld für Editor & Loot). */
+export function displayCategoryToMetaKind(
+  category: InventoryDisplayCategory | string,
+): Dnd5eItemMeta["kind"] {
+  switch (category) {
+    case "weapons":
+      return "weapon";
+    case "armor":
+      return "armor";
+    case "potions":
+      return "consumable";
+    case "tools":
+      return "tool";
+    case "ingredients":
+    case "ammunition":
+      return "supply";
+    default:
+      return "equipment";
+  }
+}
+
+export function patchMetaFromDisplayCategory(
+  category: InventoryDisplayCategory,
+  isMagical: boolean,
+): Pick<Dnd5eItemMeta, "inventoryCategory" | "kind" | "isMagical"> {
+  return {
+    inventoryCategory: category,
+    kind: displayCategoryToMetaKind(category),
+    isMagical,
+  };
+}

@@ -8,6 +8,9 @@ import {
   Swords,
   Shield,
   AlertTriangle,
+  Save,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import {
   deleteCharacterItem,
@@ -19,19 +22,25 @@ import {
   type Dnd5eEquipmentContainer,
   type Dnd5eEquipmentState,
   MAX_ATTUNEMENT,
-  MAX_BELT_SLOTS,
+  MAX_WEAPON_PRESETS,
 } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
+  applyEquipmentLoadout,
+  applyWeaponPreset,
   carryingCapacityLb,
   computeArmorClassPreview,
   computeEquippedWeaponAttacks,
   computeEquipmentWeight,
+  deleteEquipmentLoadout,
+  deleteWeaponPreset,
   getUnassignedItems,
   hasBackpackContainer,
   normalizeEquipmentState,
+  placeItemInGeneralSlot,
   placeItemInSlot,
-  placeItemOnBelt,
   removeItemFromEquipment,
+  saveEquipmentLoadout,
+  saveWeaponPreset,
   toggleAttunement,
 } from "@/src/lib/characters/dnd5e/equipment";
 import {
@@ -49,11 +58,7 @@ import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhouette";
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
 import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
-import {
-  DRAG_MIME,
-  validateItemForBelt,
-} from "@/src/lib/characters/dnd5e/slot-validation";
-import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
+import { BeltSlotsStrip } from "@/src/components/characters/inventory/BeltSlotsStrip";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
@@ -77,7 +82,6 @@ export function Dnd5eEquipmentTab({
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
-  const [invalidBeltSlot, setInvalidBeltSlot] = useState<number | null>(null);
 
   const equipment = useMemo(
     () => normalizeEquipmentState(sheet.equipment),
@@ -113,19 +117,24 @@ export function Dnd5eEquipmentTab({
   const strScore = sheet.abilities.str?.score ?? 10;
   const capacity = carryingCapacityLb(strScore);
   const totalWeight = computeEquipmentWeight(items, equipment);
+  const overCapacity = totalWeight > capacity;
   const hasBackpack = hasBackpackContainer(equipment);
   const unassigned = getUnassignedItems(items, equipment);
 
   const selectableForSlots = useMemo(() => {
     const ids = new Set<string>();
     const list: CharacterItem[] = [];
-    for (const item of [...unassigned, ...items.filter((i) => Object.values(equipment.slots).includes(i.id))]) {
+    const equippedIds = new Set([
+      ...Object.values(equipment.slots).filter(Boolean),
+      ...Object.values(equipment.generalSlots ?? {}).filter(Boolean),
+    ] as string[]);
+    for (const item of [...unassigned, ...items.filter((i) => equippedIds.has(i.id))]) {
       if (ids.has(item.id)) continue;
       ids.add(item.id);
       list.push(item);
     }
     return list;
-  }, [unassigned, items, equipment.slots]);
+  }, [unassigned, items, equipment.slots, equipment.generalSlots]);
 
   const weaponAttacks = computeEquippedWeaponAttacks(sheet, derived, items, equipment, level);
   const acPreview = computeArmorClassPreview(sheet, derived, items, equipment);
@@ -177,30 +186,6 @@ export function Dnd5eEquipmentTab({
     await reloadInventory();
   }
 
-  function handleBeltDragOver(e: React.DragEvent, index: number) {
-    if (readOnly) return;
-    e.preventDefault();
-    const itemId = getDragItemId();
-    if (!itemId) return;
-    const item = itemMap.get(itemId);
-    if (!item) return;
-    const validation = validateItemForBelt(item);
-    setInvalidBeltSlot(validation.valid ? null : index);
-    e.dataTransfer.dropEffect = validation.valid ? "move" : "none";
-  }
-
-  function handleBeltDrop(e: React.DragEvent, index: number) {
-    if (readOnly) return;
-    e.preventDefault();
-    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
-    setInvalidBeltSlot(null);
-    setDragItemId(null);
-    if (!itemId) return;
-    const item = itemMap.get(itemId);
-    if (!item) return;
-    update(placeItemOnBelt(equipment, index, itemId));
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-gray-400">
@@ -214,19 +199,30 @@ export function Dnd5eEquipmentTab({
     <div className="space-y-6">
       {/* Zeile 1: Traglast (kompakt) + Inventar-Grid */}
       <div className="grid gap-4 lg:grid-cols-[minmax(140px,180px)_1fr]">
-        <section className="rounded-lg border border-hero-dark bg-background-card p-3">
-          <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold flex items-center gap-1.5 mb-2">
-            <Scale className="h-3.5 w-3.5" />
-            {t("equipment.carryingCapacity")}
-          </h3>
-          <p className="font-barlow text-lg font-bold text-white leading-tight">
+        <section
+          className={`rounded-lg border bg-background-card p-3 ${
+            overCapacity ? "border-red-500/70 bg-red-950/10" : "border-hero-dark"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-1">
+            <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold flex items-center gap-1.5 mb-2">
+              <Scale className="h-3.5 w-3.5" />
+              {t("equipment.carryingCapacity")}
+            </h3>
+            {overCapacity ? (
+              <span title={t("inventory.carryingOverCapacity", { weight: totalWeight, max: capacity })}>
+                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+              </span>
+            ) : null}
+          </div>
+          <p className={`font-barlow text-lg font-bold leading-tight ${overCapacity ? "text-red-300" : "text-white"}`}>
             {totalWeight}
             <span className="text-xs font-normal text-gray-500"> / {capacity} lb</span>
           </p>
           <div className="mt-2 h-1.5 rounded-full bg-hero-dark overflow-hidden">
             <div
               className={`h-full transition-all ${
-                totalWeight > capacity ? "bg-red-500" : "bg-hero-vibrant"
+                overCapacity ? "bg-red-500" : "bg-hero-vibrant"
               }`}
               style={{ width: `${Math.min(100, (totalWeight / Math.max(1, capacity)) * 100)}%` }}
             />
@@ -234,6 +230,20 @@ export function Dnd5eEquipmentTab({
           <p className="mt-1.5 font-libre text-[9px] text-gray-600">
             {t("equipment.capacityFormula", { str: strScore, cap: capacity })}
           </p>
+          {overCapacity ? (
+            <p className="mt-1 font-libre text-[9px] text-red-400/90">
+              {t("inventory.carryingOverCapacity", { weight: totalWeight, max: capacity })}
+            </p>
+          ) : null}
+
+          <BeltSlotsStrip
+            equipment={equipment}
+            itemNames={itemNames}
+            itemMap={itemMap}
+            readOnly={readOnly}
+            onEquipmentChange={update}
+            compact
+          />
         </section>
 
         <InventoryGrid
@@ -301,14 +311,154 @@ export function Dnd5eEquipmentTab({
               </h3>
               <EquipmentSilhouette
                 slots={equipment.slots}
+                generalSlots={equipment.generalSlots}
                 itemNames={itemNames}
                 selectableItems={selectableForSlots}
                 itemMap={itemMap}
                 readOnly={readOnly}
                 onEquip={(slot, itemId) =>
-                  update(placeItemInSlot(equipment, slot, itemId))
+                  update(placeItemInSlot(equipment, slot, itemId, items))
+                }
+                onEquipGeneral={(slot, itemId) =>
+                  update(placeItemInGeneralSlot(equipment, slot, itemId))
                 }
               />
+
+              {/* Waffenkombinationen (max. 2) */}
+              <div className="mt-4 rounded border border-hero-border/40 bg-hero-dark/20 p-3 space-y-2">
+                <h4 className="font-barlow text-xs font-bold uppercase text-accent-gold flex items-center gap-1.5">
+                  <Swords className="h-3.5 w-3.5" />
+                  {t("equipment.weaponPresetsTitle", { max: MAX_WEAPON_PRESETS })}
+                </h4>
+                <p className="font-libre text-[10px] text-gray-500">{t("equipment.weaponPresetsHint")}</p>
+                {!readOnly ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = prompt(t("equipment.weaponPresetNamePrompt"));
+                        if (!name?.trim()) return;
+                        update(saveWeaponPreset(equipment, null, name.trim()));
+                      }}
+                      disabled={(equipment.weaponPresets?.length ?? 0) >= MAX_WEAPON_PRESETS}
+                      className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-dark/40 disabled:opacity-40"
+                    >
+                      <Save className="h-3 w-3" />
+                      {t("equipment.saveWeaponPreset")}
+                    </button>
+                  </div>
+                ) : null}
+                {(equipment.weaponPresets ?? []).length === 0 ? (
+                  <p className="font-libre text-xs text-gray-500 italic">{t("equipment.noWeaponPresets")}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(equipment.weaponPresets ?? []).map((preset) => (
+                      <div
+                        key={preset.id}
+                        className="flex items-center gap-2 rounded border border-hero-border/30 bg-background-card/50 px-2 py-1.5"
+                      >
+                        <span className="font-libre text-xs text-gray-300 flex-1 truncate">{preset.name}</span>
+                        <span className="font-libre text-[10px] text-gray-500 truncate max-w-[40%]">
+                          {[preset.mainHand, preset.offHand]
+                            .filter(Boolean)
+                            .map((id) => itemNames[id!] ?? "?")
+                            .join(" + ") || "—"}
+                        </span>
+                        {!readOnly ? (
+                          <>
+                            <button
+                              type="button"
+                              title={t("equipment.applyWeaponPreset")}
+                              onClick={() => update(applyWeaponPreset(equipment, preset.id, items))}
+                              className="text-hero-vibrant hover:text-white"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title={t("equipment.deleteWeaponPreset")}
+                              onClick={() => {
+                                if (!confirm(t("equipment.deleteWeaponPresetConfirm", { name: preset.name }))) return;
+                                update(deleteWeaponPreset(equipment, preset.id));
+                              }}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Vollständige Ausrüstungen */}
+              <div className="mt-4 rounded border border-hero-border/40 bg-hero-dark/20 p-3 space-y-2">
+                <h4 className="font-barlow text-xs font-bold uppercase text-accent-gold flex items-center gap-1.5">
+                  <Save className="h-3.5 w-3.5" />
+                  {t("equipment.loadoutsTitle")}
+                </h4>
+                <p className="font-libre text-[10px] text-yellow-600/90 flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                  {t("equipment.loadoutRestWarning")}
+                </p>
+                {!readOnly ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(t("equipment.loadoutSaveConfirm"))) return;
+                      const name = prompt(t("equipment.loadoutNamePrompt"));
+                      if (!name?.trim()) return;
+                      update(saveEquipmentLoadout(equipment, null, name.trim()));
+                    }}
+                    className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-dark/40"
+                  >
+                    <Save className="h-3 w-3" />
+                    {t("equipment.saveLoadout")}
+                  </button>
+                ) : null}
+                {(equipment.loadouts ?? []).length === 0 ? (
+                  <p className="font-libre text-xs text-gray-500 italic">{t("equipment.noLoadouts")}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(equipment.loadouts ?? []).map((loadout) => (
+                      <div
+                        key={loadout.id}
+                        className="flex items-center gap-2 rounded border border-hero-border/30 bg-background-card/50 px-2 py-1.5"
+                      >
+                        <span className="font-libre text-xs text-gray-300 flex-1 truncate">{loadout.name}</span>
+                        {!readOnly ? (
+                          <>
+                            <button
+                              type="button"
+                              title={t("equipment.applyLoadout")}
+                              onClick={() => {
+                                if (!confirm(t("equipment.loadoutApplyConfirm"))) return;
+                                update(applyEquipmentLoadout(equipment, loadout.id, items));
+                              }}
+                              className="text-hero-vibrant hover:text-white"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title={t("equipment.deleteLoadout")}
+                              onClick={() => {
+                                if (!confirm(t("equipment.deleteLoadoutConfirm", { name: loadout.name }))) return;
+                                update(deleteEquipmentLoadout(equipment, loadout.id));
+                              }}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
 
             <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
@@ -352,73 +502,6 @@ export function Dnd5eEquipmentTab({
               )}
             </section>
           </div>
-
-          {/* Gürtel mit DnD */}
-          <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold">
-                {t("equipment.beltQuickAccess", { max: MAX_BELT_SLOTS })}
-              </h3>
-              <span className="rounded border border-hero-vibrant/40 bg-hero-vibrant/10 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant">
-                {t("equipment.beltPrepared")}
-              </span>
-            </div>
-            <p className="font-libre text-xs text-gray-500">
-              {t("equipment.beltPreparedHint")}
-            </p>
-            <div className="grid gap-3 grid-cols-3 sm:grid-cols-6">
-              {equipment.belt.map((itemId, index) => (
-                <div
-                  key={index}
-                  className="space-y-1"
-                  onDragOver={(e) => handleBeltDragOver(e, index)}
-                  onDragLeave={() => setInvalidBeltSlot(null)}
-                  onDrop={(e) => handleBeltDrop(e, index)}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-barlow text-[10px] uppercase text-gray-600">
-                      {t("equipment.beltSlot", { n: index + 1 })}
-                    </span>
-                    {invalidBeltSlot === index ? (
-                      <span title={t("inventory.equipConflict")}>
-                        <AlertTriangle className="h-3 w-3 text-yellow-400" />
-                      </span>
-                    ) : itemId ? (
-                      <span className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant">
-                        {t("equipment.beltPrepared")}
-                      </span>
-                    ) : null}
-                  </div>
-                  {readOnly ? (
-                    <p className="font-libre text-sm text-gray-300 truncate">
-                      {itemId ? itemNames[itemId] ?? "—" : "—"}
-                    </p>
-                  ) : (
-                    <div
-                      className={`min-h-[32px] rounded border px-2 py-1 font-libre text-[10px] text-white ${
-                        itemId
-                          ? "border-hero-vibrant/50 bg-hero-vibrant/10"
-                          : "border-dashed border-hero-border/40 bg-hero-dark/20 text-gray-500"
-                      }`}
-                    >
-                      {itemId ? (
-                        <button
-                          type="button"
-                          onClick={() => update(placeItemOnBelt(equipment, index, null))}
-                          className="truncate w-full text-left hover:text-red-400"
-                          title={itemNames[itemId]}
-                        >
-                          {itemNames[itemId]}
-                        </button>
-                      ) : (
-                        <span>{t("equipment.empty")}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
 
           {/* Einstimmung */}
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">

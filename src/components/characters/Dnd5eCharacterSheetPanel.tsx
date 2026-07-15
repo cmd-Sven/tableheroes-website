@@ -32,6 +32,11 @@ import type { CharacterFlawEntry } from "@/src/lib/characters/character-flaws";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
 import { CharacterSheetLanguageToggle } from "@/src/components/characters/CharacterSheetLanguageToggle";
+import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPanel";
+import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
+import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
+import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
+import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
@@ -181,7 +186,8 @@ export function Dnd5eCharacterSheetPanel({
         return;
       }
       setPayload(data);
-      setSheet(structuredClone(data.sheet));
+      const loadedSheet = ensureClassResources(structuredClone(data.sheet), data.class ?? "");
+      setSheet(loadedSheet);
       setMeta({
         subclass: data.subclass ?? "",
         background: data.background ?? "",
@@ -285,7 +291,7 @@ export function Dnd5eCharacterSheetPanel({
     setSheet({ ...sheet, equipment: normalizeEquipmentState(equipment) });
   }
 
-  function handleSave() {
+  function handleSave(silent = false) {
     if (!sheet || !payload) return;
     startTransition(async () => {
       const result = await saveDnd5eCharacterSheet({
@@ -308,8 +314,10 @@ export function Dnd5eCharacterSheetPanel({
         toast.error(result.error ?? t("sheet.saveError"));
         return;
       }
-      toast.success(t("sheet.saved"));
-      setEditMode(false);
+      if (!silent) {
+        toast.success(t("sheet.saved"));
+        setEditMode(false);
+      }
       await reload();
     });
   }
@@ -496,15 +504,13 @@ export function Dnd5eCharacterSheetPanel({
                   onChange={(v) => setMeta({ ...meta, alignment: v })}
                 />
               </label>
-              <label className="lg:col-span-2 space-y-1">
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  {t("field.experiencePoints")}
-                </span>
-                <NumberInput
-                  value={meta.experiencePoints}
-                  min={0}
-                  disabled={readOnly || payload.progressionLocked}
-                  onChange={(v) => setMeta({ ...meta, experiencePoints: Math.max(0, v) })}
+              <label className="lg:col-span-3 space-y-1">
+                <XpProgressBar
+                  currentXp={meta.experiencePoints}
+                  level={meta.level}
+                  editMode={editMode}
+                  readOnly={readOnly || payload.progressionLocked}
+                  onChange={(v) => setMeta({ ...meta, experiencePoints: v })}
                 />
               </label>
               <div className="lg:col-span-2 flex items-end">
@@ -769,6 +775,24 @@ export function Dnd5eCharacterSheetPanel({
                 </div>
               </section>
 
+              {sheet ? (
+                <CharacterRestPanel
+                  sheet={sheet}
+                  className={meta.className}
+                  readOnly={readOnly}
+                  onSheetChange={setSheet}
+                  onPersist={() => handleSave(true)}
+                />
+              ) : null}
+
+              {sheet ? (
+                <ClassResourcesPanel
+                  sheet={sheet}
+                  readOnly={readOnly}
+                  onSheetChange={setSheet}
+                />
+              ) : null}
+
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 grid grid-cols-2 gap-4">
                 <label className="space-y-1">
                   <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hitDice")}</span>
@@ -905,6 +929,8 @@ export function Dnd5eCharacterSheetPanel({
                 ) : null}
               </section>
 
+              <CharacterAchievementsPanel achievements={payload.achievements ?? []} />
+
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-2">
                   {t("field.notes")}
@@ -963,7 +989,7 @@ export function Dnd5eCharacterSheetPanel({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -983,7 +1009,7 @@ export function Dnd5eCharacterSheetPanel({
           <button
             type="button"
             disabled={isPending}
-            onClick={handleSave}
+            onClick={() => handleSave()}
             className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

@@ -70,6 +70,24 @@ export type Dnd5eFeatureEntry = {
 
 export type Dnd5eSpellSlots = Record<string, { max: number; used: number }>;
 
+/** Klassenspezifische Ressourcen (Ki, Raserei, Channel Divinity …). */
+export type Dnd5eClassResource = {
+  id: string;
+  label: string;
+  max: number;
+  current: number;
+  /** true = erholt sich bei kurzer Rast */
+  shortRest?: boolean;
+};
+
+export type Dnd5eCharacterAchievement = {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  awardedAt?: string | null;
+  pointsAwarded?: number;
+};
+
 export type Dnd5eSheetData = {
   version: 1;
   abilities: Record<AbilityKey, { score: number }>;
@@ -81,6 +99,8 @@ export type Dnd5eSheetData = {
     hpTemp: number;
     speed: number;
     hitDice: string;
+    /** Verbleibende Trefferwürfel (null = volle Anzahl aus hitDice) */
+    hitDiceRemaining?: number | null;
     /** Berechneter/manueller AC — acOverride hat Vorrang wenn gesetzt */
     ac: number;
     acOverride?: number | null;
@@ -106,6 +126,8 @@ export type Dnd5eSheetData = {
     spellAttackBonusOverride?: number | null;
     slots?: Dnd5eSpellSlots;
   };
+  /** Klassenspezifische Ressourcen — werden bei Rast zurückgesetzt */
+  classResources?: Dnd5eClassResource[];
   notes?: string | null;
 };
 
@@ -148,4 +170,6 @@ export type CharacterSheetPayload = {
   progressionLocked: boolean;
   progressionLockMessage: string;
   sheetLocale: CharacterSheetLocale;
+  /** Vom Spieler errungene Achievements (Konto des Charakterbesitzers) */
+  achievements?: Dnd5eCharacterAchievement[];
 };

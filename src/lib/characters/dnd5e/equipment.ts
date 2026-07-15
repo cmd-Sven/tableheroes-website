@@ -3,11 +3,15 @@ import type { Dnd5eDerivedSheet, Dnd5eSheetData } from "./types";
 import {
   type Dnd5eContainerKind,
   type Dnd5eEquipmentContainer,
+  type Dnd5eEquipmentLoadout,
   type Dnd5eEquipmentSlot,
   type Dnd5eEquipmentState,
+  type Dnd5eGeneralEquipmentSlot,
+  type Dnd5eWeaponPreset,
   CONTAINER_CAPACITY_LB,
   MAX_ATTUNEMENT,
   MAX_BELT_SLOTS,
+  MAX_WEAPON_PRESETS,
   createEmptyEquipmentState,
 } from "./equipment-types";
 import { abilityModifier, formatSigned, proficiencyBonus } from "./formulas";
@@ -51,7 +55,22 @@ export function normalizeEquipmentState(
     })),
     belt,
     slots,
+    generalSlots: { ...(raw.generalSlots ?? {}) },
     attunedItemIds: [...(raw.attunedItemIds ?? [])].slice(0, MAX_ATTUNEMENT),
+    weaponPresets: [...(raw.weaponPresets ?? [])].slice(0, MAX_WEAPON_PRESETS).map((p) => ({
+      id: String(p.id),
+      name: String(p.name ?? "Waffen"),
+      mainHand: p.mainHand ?? null,
+      offHand: p.offHand ?? null,
+    })),
+    loadouts: [...(raw.loadouts ?? [])].map((l) => ({
+      id: String(l.id),
+      name: String(l.name ?? "Ausrüstung"),
+      belt: [...(l.belt ?? [])].slice(0, MAX_BELT_SLOTS),
+      slots: { ...(l.slots ?? {}) },
+      generalSlots: { ...(l.generalSlots ?? {}) },
+      attunedItemIds: [...(l.attunedItemIds ?? [])].slice(0, MAX_ATTUNEMENT),
+    })),
     customCategories: [...(raw.customCategories ?? [])].map((cat) => ({
       id: String(cat.id),
       label: String(cat.label ?? "Kategorie"),
@@ -71,6 +90,9 @@ export function collectPlacedItemIds(equipment: Dnd5eEquipmentState): Set<string
     if (id) ids.add(id);
   }
   for (const id of Object.values(equipment.slots)) {
+    if (id) ids.add(id);
+  }
+  for (const id of Object.values(equipment.generalSlots ?? {})) {
     if (id) ids.add(id);
   }
   return ids;
@@ -127,18 +149,70 @@ export function removeItemFromEquipment(
   for (const key of Object.keys(next.slots) as Dnd5eEquipmentSlot[]) {
     if (next.slots[key] === itemId) next.slots[key] = null;
   }
+  for (const key of Object.keys(next.generalSlots ?? {}) as Dnd5eGeneralEquipmentSlot[]) {
+    if (next.generalSlots?.[key] === itemId) next.generalSlots[key] = null;
+  }
   next.attunedItemIds = next.attunedItemIds.filter((id) => id !== itemId);
   return next;
+}
+
+export function isTwoHandedWeapon(properties: string[]): boolean {
+  const joined = properties.join(" ").toLowerCase();
+  return joined.includes("zweihändig") || joined.includes("two-handed") || joined.includes("twohanded");
 }
 
 export function placeItemInSlot(
   equipment: Dnd5eEquipmentState,
   slot: Dnd5eEquipmentSlot,
   itemId: string | null,
+  items?: CharacterItem[],
 ): Dnd5eEquipmentState {
   let next = normalizeEquipmentState(equipment);
   if (itemId) next = removeItemFromEquipment(next, itemId);
+
+  if (itemId && items && (slot === "mainHand" || slot === "offHand")) {
+    const item = items.find((i) => i.id === itemId);
+    if (item) {
+      const stats = resolveCharacterItemStats(item);
+      if (isTwoHandedWeapon(stats.properties)) {
+        next.slots = { ...next.slots, mainHand: itemId, offHand: null };
+        return next;
+      }
+      if (slot === "offHand" && next.slots.mainHand) {
+        const mainItem = items.find((i) => i.id === next.slots.mainHand);
+        if (mainItem) {
+          const mainStats = resolveCharacterItemStats(mainItem);
+          if (isTwoHandedWeapon(mainStats.properties)) {
+            next.slots = { ...next.slots, mainHand: null, offHand: itemId };
+            return next;
+          }
+        }
+      }
+      if (slot === "mainHand" && next.slots.offHand) {
+        const offItem = items.find((i) => i.id === next.slots.offHand);
+        if (offItem) {
+          const offStats = resolveCharacterItemStats(offItem);
+          if (isTwoHandedWeapon(offStats.properties)) {
+            next.slots = { ...next.slots, offHand: null, mainHand: itemId };
+            return next;
+          }
+        }
+      }
+    }
+  }
+
   next.slots = { ...next.slots, [slot]: itemId };
+  return next;
+}
+
+export function placeItemInGeneralSlot(
+  equipment: Dnd5eEquipmentState,
+  slot: Dnd5eGeneralEquipmentSlot,
+  itemId: string | null,
+): Dnd5eEquipmentState {
+  let next = normalizeEquipmentState(equipment);
+  if (itemId) next = removeItemFromEquipment(next, itemId);
+  next.generalSlots = { ...next.generalSlots, [slot]: itemId };
   return next;
 }
 
@@ -208,6 +282,9 @@ export function getContainerInventoryItems(
   for (const id of Object.values(equipment.slots)) {
     if (id) equippedIds.add(id);
   }
+  for (const id of Object.values(equipment.generalSlots ?? {})) {
+    if (id) equippedIds.add(id);
+  }
   for (const id of equipment.belt) {
     if (id) equippedIds.add(id);
   }
@@ -258,6 +335,24 @@ export type WeaponAttackPreview = {
   notes: string;
 };
 
+function isWeaponLikeItem(item: CharacterItem, stats: ReturnType<typeof resolveCharacterItemStats>): boolean {
+  if (stats.kind === "weapon" || item.category === "Weapon") return true;
+  if (stats.damage && /^\d+d\d+/i.test(stats.damage)) return true;
+  if (stats.isShield) return false;
+  return false;
+}
+
+function parseDamageDiceFromAttackString(damage: string | null | undefined): string | null {
+  if (!damage) return null;
+  const trimmed = damage.trim();
+  if (!trimmed || trimmed === "—" || trimmed === "-") return null;
+  const diceMatch = trimmed.match(/\d+d\d+(?:\s*\+\s*\d+)?/i);
+  if (diceMatch) return diceMatch[0].replace(/\s+/g, "");
+  const first = trimmed.split(/\s+/)[0];
+  if (first && /^\d+d\d+/i.test(first)) return first;
+  return null;
+}
+
 function weaponUsesDex(properties: string[]): boolean {
   const joined = properties.join(" ").toLowerCase();
   if (joined.includes("geschick") || joined.includes("finesse")) return true;
@@ -302,10 +397,14 @@ function hasWeaponProficiency(
     joined.includes("einfach") ||
     joined.includes("simp");
   const martialGroup =
-    joined.includes("martial") || joined.includes("krieg") || joined.includes("krieger");
+    joined.includes("martial") ||
+    joined.includes("krieg") ||
+    joined.includes("krieger") ||
+    joined.includes("kriegswaffen");
 
-  if (simpleGroup && isSimpleWeaponName(item.name)) return true;
-  if (martialGroup && stats.kind === "weapon" && !isSimpleWeaponName(item.name)) return true;
+  const weaponLike = isWeaponLikeItem(item, stats);
+  if (simpleGroup && weaponLike && isSimpleWeaponName(item.name)) return true;
+  if (martialGroup && weaponLike && !isSimpleWeaponName(item.name)) return true;
 
   return false;
 }
@@ -355,7 +454,8 @@ export function computeEquippedWeaponAttacks(
     const item = findCharacterItemByRef(items, itemId);
     if (!item) continue;
     const stats = resolveCharacterItemStats(item);
-    if (stats.kind !== "weapon" && item.category !== "Weapon") continue;
+    if (!isWeaponLikeItem(item, stats)) continue;
+    if (stats.isShield) continue;
 
     const sheetAttack =
       sheet.attacks.find(
@@ -368,20 +468,18 @@ export function computeEquippedWeaponAttacks(
     const useDex = weaponUsesDex(stats.properties);
     const abMod = useDex ? dexMod : strMod;
     const prof = hasWeaponProficiency(sheet, item, stats) ? pb : 0;
-    let attackBonus =
-      sheetAttack?.attackBonusOverride != null
-        ? sheetAttack.attackBonusOverride
-        : abMod + prof;
+    const attackBonus = abMod + prof;
 
-    const damageDice = stats.damage ?? sheetAttack?.damage?.split(/\s+/)[0] ?? null;
+    const damageDice =
+      stats.damage ??
+      parseDamageDiceFromAttackString(sheetAttack?.damage) ??
+      null;
     const damageType = stats.damageType ?? "";
     const dmgParts = [damageDice, damageType].filter(Boolean);
     const damage =
       dmgParts.length > 0
         ? `${dmgParts.join(" ")} ${formatSigned(abMod)}`
-        : sheetAttack?.damage
-          ? `${sheetAttack.damage} ${formatSigned(abMod)}`
-          : `— ${formatSigned(abMod)}`;
+        : `— ${formatSigned(abMod)}`;
 
     const notes = [
       stats.properties.length ? stats.properties.join(", ") : null,
@@ -449,4 +547,150 @@ export function computeArmorClassPreview(
   }
 
   return { ac, breakdown: parts.join(" · ") };
+}
+
+export function saveWeaponPreset(
+  equipment: Dnd5eEquipmentState,
+  presetId: string | null,
+  name: string,
+): Dnd5eEquipmentState {
+  const next = normalizeEquipmentState(equipment);
+  const preset: Dnd5eWeaponPreset = {
+    id: presetId ?? crypto.randomUUID(),
+    name: name.trim() || "Waffen",
+    mainHand: next.slots.mainHand ?? null,
+    offHand: next.slots.offHand ?? null,
+  };
+
+  const existing = next.weaponPresets ?? [];
+  const idx = existing.findIndex((p) => p.id === preset.id);
+  if (idx >= 0) {
+    const updated = [...existing];
+    updated[idx] = preset;
+    next.weaponPresets = updated;
+    return next;
+  }
+
+  if (existing.length >= MAX_WEAPON_PRESETS) {
+    next.weaponPresets = [...existing.slice(1), preset];
+  } else {
+    next.weaponPresets = [...existing, preset];
+  }
+  return next;
+}
+
+export function applyWeaponPreset(
+  equipment: Dnd5eEquipmentState,
+  presetId: string,
+  items: CharacterItem[],
+): Dnd5eEquipmentState {
+  let next = normalizeEquipmentState(equipment);
+  const preset = next.weaponPresets?.find((p) => p.id === presetId);
+  if (!preset) return next;
+
+  if (preset.mainHand) next = removeItemFromEquipment(next, preset.mainHand);
+  if (preset.offHand) next = removeItemFromEquipment(next, preset.offHand);
+
+  if (preset.mainHand) {
+    next = placeItemInSlot(next, "mainHand", preset.mainHand, items);
+  } else {
+    next.slots = { ...next.slots, mainHand: null };
+  }
+
+  if (preset.offHand && next.slots.mainHand) {
+    const mainItem = items.find((i) => i.id === next.slots.mainHand);
+    const mainStats = mainItem ? resolveCharacterItemStats(mainItem) : null;
+    if (!mainStats || !isTwoHandedWeapon(mainStats.properties)) {
+      next = placeItemInSlot(next, "offHand", preset.offHand, items);
+    }
+  } else if (!preset.offHand) {
+    next.slots = { ...next.slots, offHand: null };
+  }
+
+  return next;
+}
+
+export function deleteWeaponPreset(
+  equipment: Dnd5eEquipmentState,
+  presetId: string,
+): Dnd5eEquipmentState {
+  const next = normalizeEquipmentState(equipment);
+  next.weaponPresets = (next.weaponPresets ?? []).filter((p) => p.id !== presetId);
+  return next;
+}
+
+export function saveEquipmentLoadout(
+  equipment: Dnd5eEquipmentState,
+  loadoutId: string | null,
+  name: string,
+): Dnd5eEquipmentState {
+  const next = normalizeEquipmentState(equipment);
+  const loadout: Dnd5eEquipmentLoadout = {
+    id: loadoutId ?? crypto.randomUUID(),
+    name: name.trim() || "Ausrüstung",
+    belt: [...next.belt],
+    slots: { ...next.slots },
+    generalSlots: { ...(next.generalSlots ?? {}) },
+    attunedItemIds: [...next.attunedItemIds],
+  };
+
+  const existing = next.loadouts ?? [];
+  const idx = existing.findIndex((l) => l.id === loadout.id);
+  if (idx >= 0) {
+    const updated = [...existing];
+    updated[idx] = loadout;
+    next.loadouts = updated;
+  } else {
+    next.loadouts = [...existing, loadout];
+  }
+  return next;
+}
+
+export function applyEquipmentLoadout(
+  equipment: Dnd5eEquipmentState,
+  loadoutId: string,
+  items: CharacterItem[],
+): Dnd5eEquipmentState {
+  const next = normalizeEquipmentState(equipment);
+  const loadout = next.loadouts?.find((l) => l.id === loadoutId);
+  if (!loadout) return next;
+
+  const preservedPresets = next.weaponPresets;
+  const preservedLoadouts = next.loadouts;
+  const preservedContainers = next.containers;
+  const preservedCategories = next.customCategories;
+
+  let result = createEmptyEquipmentState();
+  result.containers = preservedContainers;
+  result.customCategories = preservedCategories;
+  result.weaponPresets = preservedPresets;
+  result.loadouts = preservedLoadouts;
+  result.belt = [...loadout.belt];
+  while (result.belt.length < MAX_BELT_SLOTS) result.belt.push(null);
+  result.belt.length = MAX_BELT_SLOTS;
+  result.slots = { ...loadout.slots };
+  result.generalSlots = { ...(loadout.generalSlots ?? {}) };
+  result.attunedItemIds = [...loadout.attunedItemIds];
+
+  for (const slot of ["mainHand", "offHand"] as const) {
+    const id = result.slots[slot];
+    if (!id) continue;
+    const item = items.find((i) => i.id === id);
+    if (!item) continue;
+    const stats = resolveCharacterItemStats(item);
+    if (isTwoHandedWeapon(stats.properties) && slot === "mainHand") {
+      result.slots.offHand = null;
+    }
+  }
+
+  return normalizeEquipmentState(result);
+}
+
+export function deleteEquipmentLoadout(
+  equipment: Dnd5eEquipmentState,
+  loadoutId: string,
+): Dnd5eEquipmentState {
+  const next = normalizeEquipmentState(equipment);
+  next.loadouts = (next.loadouts ?? []).filter((l) => l.id !== loadoutId);
+  return next;
 }

@@ -55,6 +55,7 @@ export function createEmptyDnd5eSheet(level = 1): Dnd5eSheetData {
     features: [],
     attacks: [],
     equipment: createEmptyEquipmentState(),
+    classResources: [],
     notes: null,
   };
 }
@@ -81,5 +82,6 @@ export function mergeSheetWithDefaults(partial: Partial<Dnd5eSheetData>): Dnd5eS
     attacks: partial.attacks ?? base.attacks,
     equipment: normalizeEquipmentState(partial.equipment ?? base.equipment),
     spellcasting: partial.spellcasting ?? base.spellcasting,
+    classResources: partial.classResources ?? base.classResources,
   };
 }

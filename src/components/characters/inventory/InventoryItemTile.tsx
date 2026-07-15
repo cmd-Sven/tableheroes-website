@@ -40,6 +40,7 @@ export function InventoryItemTile({
   const cat = getItemDisplayCategory(item, customCategories);
   const Icon = isStandardCategory(cat) ? CATEGORY_ICONS[cat] : CATEGORY_ICONS.unknown;
   const colorClass = isStandardCategory(cat) ? CATEGORY_COLORS[cat] : CATEGORY_COLORS.unknown;
+  const isMagical = stats.isMagical || Boolean(meta?.isMagical);
 
   function handleDragStart(e: React.DragEvent) {
     if (readOnly) {
@@ -67,17 +68,19 @@ export function InventoryItemTile({
           e.preventDefault();
           onContextMenu?.(e);
         }}
-        title={`${item.name}\n${stats.weightLb} lb${meta?.rarity ? ` · ${meta.rarity}` : ""}${meta?.valueGp ? ` · ${meta.valueGp} gp` : ""}`}
-        className={`relative flex aspect-square w-full flex-col items-center justify-center rounded-md border-2 p-1 transition-transform hover:scale-[1.03] ${colorClass} ${
-          readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"
-        }`}
+        title={`${item.name}\n${stats.weightLb} lb${meta?.rarity ? ` · ${meta.rarity}` : ""}${meta?.valueGp ? ` · ${meta.valueGp} gp` : ""}${isMagical ? ` · ${t("inventory.magical")}` : ""}`}
+        className={`relative flex aspect-square w-full flex-col items-center justify-center rounded border p-0.5 transition-transform hover:scale-[1.04] ${colorClass} ${
+          isMagical
+            ? "ring-1 ring-accent-gold/80 shadow-[0_0_8px_rgba(202,185,38,0.35)]"
+            : ""
+        } ${readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
       >
-        <Icon className="h-6 w-6 shrink-0 opacity-90" />
-        <span className="mt-0.5 max-w-full truncate px-0.5 font-barlow text-[8px] font-bold uppercase leading-tight text-white/90">
-          {item.name}
+        <Icon className="h-4 w-4 shrink-0 opacity-90" />
+        <span className="mt-0.5 max-w-full truncate px-0.5 font-barlow text-[7px] font-bold uppercase leading-none text-white/80">
+          {item.name.length > 10 ? `${item.name.slice(0, 9)}…` : item.name}
         </span>
         {quantity > 1 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-hero-vibrant bg-background-card px-1 font-barlow text-[10px] font-bold text-hero-vibrant">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-hero-vibrant bg-background-card px-0.5 font-barlow text-[8px] font-bold text-hero-vibrant">
             {quantity}
           </span>
         ) : null}

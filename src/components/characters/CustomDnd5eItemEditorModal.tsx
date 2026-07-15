@@ -12,7 +12,6 @@ import {
   createEmptyCustomItemMeta,
   CUSTOM_DND5E_TAG,
   DND5E_DAMAGE_TYPES,
-  DND5E_ITEM_KIND_OPTIONS,
   DND5E_WEAPON_PROPERTIES,
   metaToInventoryCategory,
   parseDnd5eMetaFromDescription,
@@ -20,7 +19,12 @@ import {
   type Dnd5eItemMeta,
   type InventoryDisplayCategory,
 } from "@/src/lib/characters/dnd5e/item-meta";
-import { STANDARD_INVENTORY_CATEGORIES } from "@/src/lib/characters/dnd5e/inventory-categories";
+import {
+  isStandardCategory,
+  metaKindToDisplayCategory,
+  patchMetaFromDisplayCategory,
+  STANDARD_INVENTORY_CATEGORIES,
+} from "@/src/lib/characters/dnd5e/inventory-categories";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
@@ -70,7 +74,22 @@ export function CustomDnd5eItemEditorModal({
   useEffect(() => {
     setName(item?.name ?? "");
     const parsedMeta = parseDnd5eMetaFromDescription(item?.description);
-    setMeta(parsedMeta ?? createEmptyCustomItemMeta());
+    if (parsedMeta) {
+      const displayCat: InventoryDisplayCategory =
+        parsedMeta.inventoryCategory && isStandardCategory(parsedMeta.inventoryCategory)
+          ? parsedMeta.inventoryCategory
+          : metaKindToDisplayCategory(parsedMeta.kind);
+      const isMagical = Boolean(parsedMeta.isMagical) || parsedMeta.kind === "magic";
+      setMeta({
+        ...parsedMeta,
+        ...patchMetaFromDisplayCategory(displayCat, isMagical),
+      });
+    } else {
+      setMeta({
+        ...createEmptyCustomItemMeta(),
+        inventoryCategory: "gear",
+      });
+    }
     setUserText(item?.description ? stripMachineTags(item.description) : "");
     setError(null);
   }, [item]);
@@ -97,26 +116,35 @@ export function CustomDnd5eItemEditorModal({
     setError(null);
     startTransition(async () => {
       try {
+        const displayCat: InventoryDisplayCategory =
+          meta.inventoryCategory && isStandardCategory(meta.inventoryCategory)
+            ? meta.inventoryCategory
+            : "gear";
+        const normalizedMeta: Dnd5eItemMeta = {
+          ...meta,
+          ...patchMetaFromDisplayCategory(displayCat, Boolean(meta.isMagical)),
+          weightLb: Math.max(0, meta.weightLb),
+        };
         const description = buildItemDescription({
           tags: [CUSTOM_DND5E_TAG],
-          meta: { ...meta, weightLb: Math.max(0, meta.weightLb) },
+          meta: normalizedMeta,
           userText,
         });
-        const category = metaToInventoryCategory(meta);
+        const category = metaToInventoryCategory(normalizedMeta);
         const saved = item
           ? await updateCharacterItem({
               itemId: item.id,
               name: trimmed,
               description,
               category,
-              iconType: meta.kind,
+              iconType: normalizedMeta.kind,
             })
           : await createCharacterItem({
               characterId,
               name: trimmed,
               description,
               category,
-              iconType: meta.kind,
+              iconType: normalizedMeta.kind,
             });
         onSaved(saved);
       } catch (err) {
@@ -125,8 +153,12 @@ export function CustomDnd5eItemEditorModal({
     });
   }
 
-  const showWeaponFields = meta.kind === "weapon";
-  const showArmorFields = meta.kind === "armor";
+  const displayCategory: InventoryDisplayCategory =
+    meta.inventoryCategory && isStandardCategory(meta.inventoryCategory)
+      ? meta.inventoryCategory
+      : "gear";
+  const showWeaponFields = displayCategory === "weapons";
+  const showArmorFields = displayCategory === "armor";
 
   return (
     <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
@@ -162,42 +194,15 @@ export function CustomDnd5eItemEditorModal({
           </label>
 
           <label className="block space-y-1">
-            <span className="font-barlow text-xs font-bold uppercase text-gray-500">Art</span>
-            <select
-              value={meta.kind}
-              onChange={(e) => {
-                const kind = e.target.value as Dnd5eItemMeta["kind"];
-                const categoryMap: Partial<Record<Dnd5eItemMeta["kind"], InventoryDisplayCategory>> = {
-                  weapon: "weapons",
-                  armor: "armor",
-                  consumable: "potions",
-                  tool: "tools",
-                  supply: "gear",
-                  equipment: "gear",
-                };
-                patchMeta({
-                  kind,
-                  isMagical: kind === "magic",
-                  inventoryCategory: categoryMap[kind] ?? meta.inventoryCategory,
-                });
-              }}
-              className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
-            >
-              {DND5E_ITEM_KIND_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block space-y-1">
             <span className="font-barlow text-xs font-bold uppercase text-gray-500">
               {t("inventory.categoryLabel")}
             </span>
             <select
-              value={meta.inventoryCategory ?? "unknown"}
-              onChange={(e) => patchMeta({ inventoryCategory: e.target.value })}
+              value={displayCategory}
+              onChange={(e) => {
+                const category = e.target.value as InventoryDisplayCategory;
+                patchMeta(patchMetaFromDisplayCategory(category, Boolean(meta.isMagical)));
+              }}
               className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
             >
               {STANDARD_INVENTORY_CATEGORIES.filter((c) => c !== "unknown").map((cat) => (

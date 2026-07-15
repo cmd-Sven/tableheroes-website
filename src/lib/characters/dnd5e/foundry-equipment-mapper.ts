@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { Dnd5eAttackEntry } from "./types";
 import type {
   Dnd5eEquipmentContainer,
+  Dnd5eEquipmentLoadout,
   Dnd5eEquipmentSlot,
   Dnd5eEquipmentState,
 } from "./equipment-types";
@@ -439,9 +440,28 @@ export function remapEquipmentToCharacterItemIds(
     slots: Object.fromEntries(
       Object.entries(equipment.slots).map(([k, v]) => [k, mapId(v)]),
     ) as Dnd5eEquipmentState["slots"],
+    generalSlots: Object.fromEntries(
+      Object.entries(equipment.generalSlots ?? {}).map(([k, v]) => [k, mapId(v)]),
+    ) as Dnd5eEquipmentState["generalSlots"],
     attunedItemIds: equipment.attunedItemIds
       .map((id) => mapId(id)!)
       .filter(Boolean),
+    weaponPresets: (equipment.weaponPresets ?? []).map((p) => ({
+      ...p,
+      mainHand: mapId(p.mainHand),
+      offHand: mapId(p.offHand),
+    })),
+    loadouts: (equipment.loadouts ?? []).map((l) => ({
+      ...l,
+      belt: l.belt.map((id) => mapId(id)),
+      slots: Object.fromEntries(
+        Object.entries(l.slots).map(([k, v]) => [k, mapId(v)]),
+      ) as Dnd5eEquipmentLoadout["slots"],
+      generalSlots: Object.fromEntries(
+        Object.entries(l.generalSlots ?? {}).map(([k, v]) => [k, mapId(v)]),
+      ) as Dnd5eEquipmentLoadout["generalSlots"],
+      attunedItemIds: l.attunedItemIds.map((id) => mapId(id)!).filter(Boolean),
+    })),
   };
 }
 

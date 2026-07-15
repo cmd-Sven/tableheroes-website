@@ -167,8 +167,8 @@ export function resolveCharacterItemStats(item: CharacterItem): ResolvedItemStat
   const merged = { ...base, ...inferred };
 
   if (
-    (merged.kind === "unknown" || !merged.damage) &&
-    (item.category === "Weapon" || merged.kind === "weapon")
+    (merged.kind === "unknown" || merged.kind === "magic" || !merged.damage) &&
+    (item.category === "Weapon" || merged.kind === "weapon" || merged.kind === "magic")
   ) {
     const weaponLookup = lookupWeaponStatsByName(item.name);
     if (weaponLookup) {

@@ -9,7 +9,7 @@ export type SlotValidationResult = {
 
 function nameHintsRing(name: string): boolean {
   const n = name.toLowerCase();
-  return n.includes("ring") || n.includes("ring");
+  return n.includes("ring");
 }
 
 function nameHintsCloak(name: string): boolean {
@@ -47,6 +47,24 @@ function nameHintsAmulet(name: string): boolean {
 function nameHintsBelt(name: string): boolean {
   const n = name.toLowerCase();
   return n.includes("gürtel") || n.includes("guertel") || n.includes("belt");
+}
+
+/** Gürtel-Schnellzugriff nur mit ausgerüstetem Gürtel am Taille-Slot. */
+export function hasWaistBeltEquipped(
+  slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>,
+): boolean {
+  return Boolean(slots.waist);
+}
+
+export function validateItemForGeneralSlot(item: CharacterItem): SlotValidationResult {
+  const stats = resolveCharacterItemStats(item);
+  if (stats.kind === "weapon" || item.category === "Weapon") {
+    return { valid: false, reason: "weapon_only" };
+  }
+  if (stats.kind === "armor" && stats.acFormula && !stats.isShield) {
+    return { valid: false, reason: "armor_only" };
+  }
+  return { valid: true };
 }
 
 /** D&D 5e Slot-Zuordnung für Drag & Drop */

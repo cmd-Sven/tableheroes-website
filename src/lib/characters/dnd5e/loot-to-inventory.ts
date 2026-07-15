@@ -50,7 +50,6 @@ export function itemTypeToDisplayCategory(
 
 export function displayCategoryToMetaKind(
   category: InventoryDisplayCategory,
-  isMagical?: boolean,
 ): Dnd5eItemMeta["kind"] {
   switch (category) {
     case "weapons":
@@ -64,10 +63,8 @@ export function displayCategoryToMetaKind(
     case "ingredients":
     case "ammunition":
       return "supply";
-    case "gear":
-      return isMagical ? "magic" : "equipment";
     default:
-      return isMagical ? "magic" : "equipment";
+      return "equipment";
   }
 }
 
@@ -243,7 +240,7 @@ export function buildLootCharacterItemInsert(input: {
   const metaKind =
     enriched.kind != null
       ? kindStringToMetaKind(enriched.kind)
-      : displayCategoryToMetaKind(inventoryCategory, isMagical);
+      : displayCategoryToMetaKind(inventoryCategory);
 
   const mechanics = lootMechanicsToMetaFields(enriched);
 
