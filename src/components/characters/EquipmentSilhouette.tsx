@@ -40,17 +40,17 @@ const EQUIPMENT_UI_SLOTS: {
   width: string;
   anchor: "left" | "center" | "right";
 }[] = [
-  { key: "head", labelKey: "equipment.uiHead", top: "2%", left: "50%", width: "40%", anchor: "center" },
-  { key: "neck", labelKey: "equipment.uiNeck", top: "10%", left: "50%", width: "40%", anchor: "center" },
-  { key: "shoulders", labelKey: "equipment.uiBack1", top: "17%", left: "50%", width: "40%", anchor: "center" },
-  { key: "chest", labelKey: "equipment.uiTorso", top: "25%", left: "50%", width: "42%", anchor: "center" },
-  { key: "back", labelKey: "equipment.uiBack2", top: "33%", left: "78%", width: "34%", anchor: "right" },
-  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "38%", left: "4%", width: "34%", anchor: "left" },
-  { key: "ring2", labelKey: "equipment.uiRingRight", top: "50%", left: "4%", width: "34%", anchor: "left" },
-  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "38%", left: "96%", width: "34%", anchor: "right" },
-  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "50%", left: "96%", width: "34%", anchor: "right" },
-  { key: "waist", labelKey: "equipment.uiWaist", top: "58%", left: "50%", width: "42%", anchor: "center" },
-  { key: "feet", labelKey: "equipment.uiFeet", top: "74%", left: "50%", width: "42%", anchor: "center" },
+  { key: "head", labelKey: "equipment.uiHead", top: "1%", left: "50%", width: "46%", anchor: "center" },
+  { key: "neck", labelKey: "equipment.uiNeck", top: "9%", left: "50%", width: "46%", anchor: "center" },
+  { key: "shoulders", labelKey: "equipment.uiBack1", top: "16%", left: "50%", width: "46%", anchor: "center" },
+  { key: "chest", labelKey: "equipment.uiTorso", top: "24%", left: "50%", width: "48%", anchor: "center" },
+  { key: "back", labelKey: "equipment.uiBack2", top: "32%", left: "92%", width: "38%", anchor: "right" },
+  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "36%", left: "-4%", width: "38%", anchor: "left" },
+  { key: "ring2", labelKey: "equipment.uiRingRight", top: "48%", left: "-4%", width: "38%", anchor: "left" },
+  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "36%", left: "104%", width: "38%", anchor: "right" },
+  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "48%", left: "104%", width: "38%", anchor: "right" },
+  { key: "waist", labelKey: "equipment.uiWaist", top: "57%", left: "50%", width: "48%", anchor: "center" },
+  { key: "feet", labelKey: "equipment.uiFeet", top: "73%", left: "50%", width: "48%", anchor: "center" },
 ];
 
 const GENERAL_SLOT_LABEL_KEYS: Record<
@@ -114,7 +114,7 @@ function SlotSelect({
   if (readOnly) {
     return (
       <p
-        className={`truncate rounded border bg-background-card/90 px-2 py-1 font-libre text-[10px] text-gray-200 backdrop-blur-sm ${
+        className={`truncate rounded border bg-background-card/90 px-2.5 py-1.5 font-libre text-xs text-gray-200 backdrop-blur-sm ${
           equippedMagical
             ? "border-accent-gold/70 ring-1 ring-accent-gold/60 shadow-[0_0_6px_rgba(202,185,38,0.3)]"
             : "border-hero-border/60"
@@ -129,7 +129,7 @@ function SlotSelect({
     <select
       value={currentId}
       onChange={(e) => onChange(e.target.value || null)}
-      className={`w-full rounded border bg-background-card/95 px-2 py-1 font-libre text-[10px] text-white shadow-md backdrop-blur-sm focus:border-hero-vibrant outline-none transition-colors ${
+      className={`w-full rounded border bg-background-card/95 px-2.5 py-1.5 font-libre text-xs text-white shadow-md backdrop-blur-sm focus:border-hero-vibrant outline-none transition-colors ${
         equippedMagical
           ? "border-accent-gold/70 ring-1 ring-accent-gold/60 shadow-[0_0_6px_rgba(202,185,38,0.3)]"
           : isDragOver && isInvalid
@@ -208,18 +208,22 @@ export function EquipmentSilhouette({
   return (
     <div className="space-y-4">
       <div
-        className="relative mx-auto w-full max-w-[360px] overflow-hidden rounded-md border border-hero-dark shadow-lg"
+        className="relative mx-auto w-full max-w-[560px] overflow-visible rounded-md border border-hero-dark shadow-lg px-6 sm:px-10"
         aria-label={t("silhouette.aria")}
       >
-        <div className="relative aspect-[3/4] w-full bg-black">
-          <Image
-            src={BG_SRC}
-            alt=""
-            fill
-            className="object-contain object-center pointer-events-none select-none"
-            sizes="(max-width: 360px) 100vw, 360px"
-            priority
-          />
+        <div className="relative aspect-[2/3] w-full min-h-[480px] overflow-visible bg-black/70">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+            <div className="absolute -inset-[18%] opacity-40">
+              <Image
+                src={BG_SRC}
+                alt=""
+                fill
+                className="object-contain object-center select-none"
+                sizes="(max-width: 560px) 100vw, 560px"
+                priority
+              />
+            </div>
+          </div>
 
           {EQUIPMENT_UI_SLOTS.map(({ key, labelKey, top, left, width, anchor }) => {
             const currentId = slots[key] ?? "";
@@ -245,7 +249,7 @@ export function EquipmentSilhouette({
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, key)}
               >
-                <label className="mb-0.5 flex items-center gap-1 font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                <label className="mb-1 flex items-center gap-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                   {t(labelKey)}
                   {isInvalid ? (
                     <span title={t("inventory.equipConflict")} className="text-yellow-400">

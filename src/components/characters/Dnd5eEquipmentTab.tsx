@@ -304,8 +304,8 @@ export function Dnd5eEquipmentTab({
       {hasBackpack || equipment.containers.length > 0 ? (
         <>
           {/* Silhouette + Kampfwerte */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <section className="rounded-lg border border-hero-dark bg-background-card p-4 overflow-visible">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
                 {t("equipment.step3Title")}
               </h3>
