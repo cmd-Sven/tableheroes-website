@@ -41,8 +41,8 @@ export function InventoryCategoryBar({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <div className="w-full space-y-2">
+      <div className="flex w-full flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => onSelect(null)}

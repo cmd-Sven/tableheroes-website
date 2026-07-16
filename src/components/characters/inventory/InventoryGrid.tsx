@@ -310,17 +310,19 @@ export function InventoryGrid({
         </button>
       ) : null}
 
-      <InventoryCategoryBar
-        activeCategory={categoryFilter}
-        customCategories={equipment.customCategories ?? []}
-        readOnly={readOnly}
-        onSelect={(cat) => {
-          setCategoryFilter(cat);
-          setPage(0);
-        }}
-        onAddCustomCategory={onAddCustomCategory}
-        onAssignUnknown={() => setAssignUnknownMode(true)}
-      />
+      <div className="max-w-full" style={{ width: inventoryGridContentWidthPx() }}>
+        <InventoryCategoryBar
+          activeCategory={categoryFilter}
+          customCategories={equipment.customCategories ?? []}
+          readOnly={readOnly}
+          onSelect={(cat) => {
+            setCategoryFilter(cat);
+            setPage(0);
+          }}
+          onAddCustomCategory={onAddCustomCategory}
+          onAssignUnknown={() => setAssignUnknownMode(true)}
+        />
+      </div>
 
       <div
         className={
