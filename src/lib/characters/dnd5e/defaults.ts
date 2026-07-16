@@ -53,6 +53,7 @@ export function createEmptyDnd5eSheet(level = 1): Dnd5eSheetData {
       languages: [],
     },
     features: [],
+    spells: [],
     attacks: [],
     equipment: createEmptyEquipmentState(),
     classResources: [],
@@ -79,9 +80,17 @@ export function mergeSheetWithDefaults(partial: Partial<Dnd5eSheetData>): Dnd5eS
     combat: { ...base.combat, ...(partial.combat ?? {}) },
     proficiencies: { ...base.proficiencies, ...(partial.proficiencies ?? {}) },
     features: partial.features ?? base.features,
+    spells: partial.spells ?? base.spells,
     attacks: partial.attacks ?? base.attacks,
     equipment: normalizeEquipmentState(partial.equipment ?? base.equipment),
-    spellcasting: partial.spellcasting ?? base.spellcasting,
+    spellcasting: partial.spellcasting
+      ? {
+          ...partial.spellcasting,
+          slots: partial.spellcasting.slots
+            ? { ...(partial.spellcasting.slots ?? {}) }
+            : undefined,
+        }
+      : base.spellcasting,
     classResources: partial.classResources ?? base.classResources,
   };
 }

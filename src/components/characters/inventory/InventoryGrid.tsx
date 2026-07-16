@@ -22,6 +22,9 @@ import {
   groupItemsIntoStacks,
   INVENTORY_GRID_COLS,
   INVENTORY_SLOTS_PER_PAGE,
+  INVENTORY_TILE_GAP_PX,
+  INVENTORY_TILE_PX,
+  inventoryGridContentWidthPx,
   paginateStacks,
   sortStacksForDisplay,
   type InventoryStack,
@@ -231,8 +234,8 @@ export function InventoryGrid({
     <section
       className={
         isSession
-          ? "space-y-2"
-          : "rounded-lg border border-hero-dark bg-background-card p-3 space-y-2"
+          ? "w-fit max-w-full space-y-2"
+          : "w-fit max-w-full rounded-lg border border-hero-dark bg-background-card p-3 space-y-2"
       }
     >
       {!isSession ? (
@@ -322,13 +325,17 @@ export function InventoryGrid({
       <div
         className={
           isSession
-            ? "rounded-lg border border-black/30 bg-black/20 p-1"
-            : "rounded-lg border border-hero-border/60 bg-hero-dark/20 p-1.5"
+            ? "w-fit rounded-lg border border-black/30 bg-black/20 p-1"
+            : "w-fit rounded-lg border border-hero-border/60 bg-hero-dark/20 p-1.5"
         }
       >
         <div
-          className="grid justify-items-center gap-0.5"
-          style={{ gridTemplateColumns: `repeat(${INVENTORY_GRID_COLS}, minmax(0, 1fr))` }}
+          className="grid"
+          style={{
+            gridTemplateColumns: `repeat(${INVENTORY_GRID_COLS}, ${INVENTORY_TILE_PX}px)`,
+            gap: `${INVENTORY_TILE_GAP_PX}px`,
+            width: inventoryGridContentWidthPx(),
+          }}
         >
           {pageStacks.map((stack) => (
             <InventoryItemTile

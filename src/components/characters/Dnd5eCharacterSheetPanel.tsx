@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen } from "lucide-react";
+import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   loadDnd5eCharacterSheet,
@@ -22,6 +22,7 @@ import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { Dnd5eEquipmentTab } from "@/src/components/characters/Dnd5eEquipmentTab";
+import { Dnd5eSpellsFeaturesTab } from "@/src/components/characters/Dnd5eSpellsFeaturesTab";
 import {
   CharacterSheetBiographyCultureTab,
   type CharacterSheetBiographyCultureTabProps,
@@ -38,11 +39,15 @@ import { CharacterAchievementsPanel } from "@/src/components/characters/Characte
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import {
+  localizedFeatureDescription,
+  localizedFeatureName,
+} from "@/src/lib/characters/dnd5e/spellcasting";
+import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
 } from "@/src/lib/i18n/character-sheet/context";
 
-type SheetTab = "attributes" | "equipment" | "biography";
+type SheetTab = "attributes" | "equipment" | "spells" | "biography";
 
 function ToggleSwitch({
   checked,
@@ -163,7 +168,7 @@ export function Dnd5eCharacterSheetPanel({
   liveSessionMode = false,
   onSaved,
 }: Props) {
-  const { t, abilityLabel, skillLabel, formatDateTime, hydrateLocale } = useCharacterSheetLocale();
+  const { t, abilityLabel, skillLabel, formatDateTime, hydrateLocale, locale } = useCharacterSheetLocale();
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
   const [sheet, setSheet] = useState<Dnd5eSheetData | null>(null);
   const [meta, setMeta] = useState({
@@ -443,6 +448,18 @@ export function Dnd5eCharacterSheetPanel({
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("spells")}
+          className={`inline-flex items-center gap-2 px-4 py-2 font-barlow text-xs font-bold uppercase border-b-2 transition-colors ${
+            activeTab === "spells"
+              ? "border-hero-vibrant text-hero-vibrant"
+              : "border-transparent text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          <Wand2 className="h-3.5 w-3.5" />
+          {t("tab.spells")}
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("biography")}
           className={`inline-flex items-center gap-2 px-4 py-2 font-barlow text-xs font-bold uppercase border-b-2 transition-colors ${
             activeTab === "biography"
@@ -463,6 +480,17 @@ export function Dnd5eCharacterSheetPanel({
           level={meta.level}
           readOnly={readOnly}
           onEquipmentChange={handleEquipmentChange}
+        />
+      ) : null}
+
+      {activeTab === "spells" && sheet && derived ? (
+        <Dnd5eSpellsFeaturesTab
+          sheet={sheet}
+          derived={displayDerived}
+          characterClass={meta.className}
+          level={meta.level}
+          readOnly={readOnly}
+          onSheetChange={setSheet}
         />
       ) : null}
 
@@ -897,10 +925,12 @@ export function Dnd5eCharacterSheetPanel({
                       >
                         {readOnly ? (
                           <>
-                            <p className="font-barlow text-sm font-bold text-white">{feat.name}</p>
-                            {feat.description ? (
+                            <p className="font-barlow text-sm font-bold text-white">
+                              {localizedFeatureName(feat, locale)}
+                            </p>
+                            {localizedFeatureDescription(feat, locale) ? (
                               <p className="mt-1 font-libre text-xs text-gray-400 whitespace-pre-wrap line-clamp-4">
-                                {feat.description}
+                                {localizedFeatureDescription(feat, locale)}
                               </p>
                             ) : null}
                           </>
@@ -1037,7 +1067,7 @@ export function Dnd5eCharacterSheetPanel({
         <CharacterSheetBiographyCultureTab {...biographyCulture} />
       ) : null}
 
-      {activeTab === "equipment" && editMode && canEdit ? (
+      {(activeTab === "equipment" || activeTab === "spells") && editMode && canEdit ? (
         <div className="flex justify-end">
           <button
             type="button"
@@ -1046,7 +1076,7 @@ export function Dnd5eCharacterSheetPanel({
             className="inline-flex items-center gap-2 rounded bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 disabled:opacity-50"
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {t("sheet.saveEquipment")}
+            {activeTab === "equipment" ? t("sheet.saveEquipment") : t("sheet.save")}
           </button>
         </div>
       ) : null}

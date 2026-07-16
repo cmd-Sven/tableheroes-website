@@ -64,7 +64,57 @@ export type Dnd5eAttackEntry = {
 export type Dnd5eFeatureEntry = {
   id: string;
   name: string;
+  /** Optional: deutsch / englisch aus Foundry (Babele o. ä.) */
+  nameDe?: string | null;
+  nameEn?: string | null;
   description?: string | null;
+  descriptionDe?: string | null;
+  descriptionEn?: string | null;
+  source?: string | null;
+};
+
+/** Foundry-Vorbereitungsmodus (dnd5e). */
+export type Dnd5eSpellPreparationMode =
+  | "prepared"
+  | "always"
+  | "innate"
+  | "pact"
+  | "atwill"
+  | "known";
+
+export type Dnd5eSpellEntry = {
+  id: string;
+  /** Primärer Name aus Foundry (Welt-Sprache) */
+  name: string;
+  nameDe?: string | null;
+  nameEn?: string | null;
+  description?: string | null;
+  descriptionDe?: string | null;
+  descriptionEn?: string | null;
+  /** 0 = Zaubertrick */
+  level: number;
+  school?: string | null;
+  preparationMode?: Dnd5eSpellPreparationMode | null;
+  /** true = für den Tag vorbereitet (nur relevant bei prepared-Klassen) */
+  prepared?: boolean;
+  ritual?: boolean;
+  concentration?: boolean;
+  castingTime?: string | null;
+  range?: string | null;
+  duration?: string | null;
+  target?: string | null;
+  /** z. B. „V, S, M (…)" — wird aus Komponenten-Flags gebaut */
+  components?: string | null;
+  componentVocal?: boolean;
+  componentSomatic?: boolean;
+  componentMaterial?: boolean;
+  materials?: string | null;
+  damage?: string | null;
+  damageType?: string | null;
+  /** Attribut für Rettungswurf, falls der Zauber einen verlangt */
+  saveAbility?: AbilityKey | null;
+  attackType?: "none" | "melee" | "ranged" | null;
+  higherLevels?: string | null;
   source?: string | null;
 };
 
@@ -117,6 +167,8 @@ export type Dnd5eSheetData = {
     languages: string[];
   };
   features: Dnd5eFeatureEntry[];
+  /** Zauber aus Foundry (type: spell) */
+  spells?: Dnd5eSpellEntry[];
   attacks: Dnd5eAttackEntry[];
   /** Ausrüstung, Gepäck, Gürtel, Einstimmung */
   equipment?: Dnd5eEquipmentState;

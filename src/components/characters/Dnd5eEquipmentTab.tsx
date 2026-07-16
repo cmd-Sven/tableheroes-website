@@ -267,8 +267,8 @@ export function Dnd5eEquipmentTab({
       <div
         className={`grid gap-4 ${
           hasBackpack || equipment.containers.length > 0
-            ? "xl:grid-cols-[minmax(140px,180px)_minmax(260px,1fr)_minmax(300px,1.15fr)]"
-            : "lg:grid-cols-[minmax(140px,180px)_1fr]"
+            ? "xl:grid-cols-[minmax(140px,180px)_auto_minmax(300px,1fr)]"
+            : "lg:grid-cols-[minmax(140px,180px)_auto]"
         }`}
       >
         <section

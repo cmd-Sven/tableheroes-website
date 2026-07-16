@@ -20,14 +20,11 @@ import { appendSessionActivity } from "@/src/lib/actions/session-activity-action
 import { getCharacterInventory } from "@/src/lib/actions/character-inventory-actions";
 import { consumeFromStack } from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import type { Dnd5eClassResource } from "@/src/lib/characters/dnd5e/types";
-
-function isCasterClass(className: string | null | undefined): boolean {
-  const c = (className ?? "").toLowerCase();
-  if (!c) return false;
-  return /magier|wizard|zauberer|sorcerer|kleriker|cleric|paladin|barde|bard|hexer|warlock|druide|druid|waldläufer|waldlaeufer|ranger|artificer|inventor|hexenmeister/.test(
-    c,
-  );
-}
+import {
+  isCasterClass,
+  localizedSpellName,
+} from "@/src/lib/characters/dnd5e/spellcasting";
+import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 
 export type LiveAvatarBeltItem = {
   id: string;
@@ -107,7 +104,7 @@ export async function getLiveSessionAvatarStatus(
   const { data: chRaw, error } = await supabase
     .from("characters")
     .select(
-      "id, name, class, level, avatar_url, token_url, sheet_data, condition_tokens, mood_state, mood_tokens, active_conditions, user_id, campaign_id",
+      "id, name, class, level, avatar_url, token_url, sheet_data, sheet_locale, condition_tokens, mood_state, mood_tokens, active_conditions, user_id, campaign_id",
     )
     .eq("id", characterId)
     .single();
@@ -120,6 +117,7 @@ export async function getLiveSessionAvatarStatus(
     avatar_url?: string | null;
     token_url?: string | null;
     sheet_data?: unknown;
+    sheet_locale?: string | null;
     condition_tokens?: unknown;
     mood_state?: unknown;
     mood_tokens?: unknown;
@@ -215,6 +213,12 @@ export async function getLiveSessionAvatarStatus(
     });
   }
 
+  const sheetLocale = normalizeCharacterSheetLocale(ch.sheet_locale);
+  const spellEntries = (sheet.spells ?? []).slice(0, 40).map((s) => ({
+    id: s.id,
+    name: localizedSpellName(s, sheetLocale) || s.name,
+  }));
+
   return {
     characterId,
     hpCurrent: Math.max(0, Math.round(Number(sheet.combat?.hpCurrent) || 0)),
@@ -228,7 +232,7 @@ export async function getLiveSessionAvatarStatus(
     weaponPresets: (equipment.weaponPresets ?? []).map((p) => ({ id: p.id, name: p.name })),
     loadouts: (equipment.loadouts ?? []).map((l) => ({ id: l.id, name: l.name })),
     beltItems,
-    spells: [],
+    spells: spellEntries,
   };
 }
 

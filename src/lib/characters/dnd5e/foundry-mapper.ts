@@ -5,7 +5,9 @@ import type {
   Dnd5eSheetData,
   Dnd5eSkillEntry,
   Dnd5eSkillKey,
-  SkillProficiency,
+  Dnd5eSpellEntry,
+  Dnd5eSpellPreparationMode,
+  Dnd5eSpellSlots,
 } from "./types";
 import { mergeSheetWithDefaults } from "./defaults";
 import { DND5E_SKILLS } from "./skills";
@@ -13,6 +15,7 @@ import { abilityModifier } from "./formulas";
 import { mapFoundryItemsToEquipment } from "./foundry-equipment-mapper";
 import { normalizeEquipmentState } from "./equipment";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
+import { defaultSpellAbilityForClass } from "./spellcasting";
 
 type FoundryAbilityBlock = {
   value?: number;
@@ -27,16 +30,47 @@ type FoundrySkillBlock = {
   total?: number;
 };
 
+type FoundryLocalizedFlags = {
+  nameDe?: string;
+  nameEn?: string;
+  descriptionDe?: string;
+  descriptionEn?: string;
+};
+
 type FoundryItemRow = {
   _id?: string;
   id?: string;
   name?: string;
   type?: string;
+  flags?: Record<string, unknown>;
   system?: {
     levels?: number;
     hd?: { denomination?: number; faces?: number };
     description?: { value?: string };
+    level?: number;
+    school?: string;
+    preparation?: { mode?: string; prepared?: boolean };
+    components?: {
+      vocal?: boolean;
+      somatic?: boolean;
+      material?: boolean;
+      ritual?: boolean;
+      concentration?: boolean;
+    };
+    properties?: Record<string, boolean> | string[];
+    activation?: { type?: string; cost?: number; condition?: string };
+    duration?: { value?: string | number; units?: string; concentration?: boolean };
+    range?: { value?: string | number; units?: string; special?: string };
+    materials?: { value?: string };
   };
+};
+
+type FoundrySpellSlotBlock = {
+  value?: number;
+  max?: number;
+  override?: number | null;
+  spent?: number;
+  level?: number;
 };
 
 type FoundryActorSystem = {
@@ -47,6 +81,7 @@ type FoundryActorSystem = {
     init?: { bonus?: string | number; value?: number; total?: number };
     speed?: { walk?: number | string; value?: number };
     death?: { success?: number; failure?: number; failures?: number };
+    spellcasting?: string;
   };
   details?: {
     race?: string | { value?: string; name?: string };
@@ -74,6 +109,16 @@ type FoundryActorSystem = {
     ability?: string;
     dc?: number;
     attack?: number;
+    spell1?: FoundrySpellSlotBlock;
+    spell2?: FoundrySpellSlotBlock;
+    spell3?: FoundrySpellSlotBlock;
+    spell4?: FoundrySpellSlotBlock;
+    spell5?: FoundrySpellSlotBlock;
+    spell6?: FoundrySpellSlotBlock;
+    spell7?: FoundrySpellSlotBlock;
+    spell8?: FoundrySpellSlotBlock;
+    spell9?: FoundrySpellSlotBlock;
+    pact?: FoundrySpellSlotBlock;
   };
   currency?: Record<string, number>;
 };
@@ -155,10 +200,7 @@ function itemsById(items: unknown[]): Map<string, FoundryItemRow> {
   return map;
 }
 
-function resolveItemLabel(
-  items: unknown[],
-  ref: unknown,
-): string | null {
+function resolveItemLabel(items: unknown[], ref: unknown): string | null {
   const direct = readStringField(ref);
   if (!direct) return null;
 
@@ -196,8 +238,12 @@ function resolveClassInfo(items: unknown[], originalClassId: string | null) {
     return { className: null as string | null, subclass: null as string | null, level: 0, hitDie: 8 };
   }
 
-  const classes = items.filter((raw) => String((raw as FoundryItemRow).type ?? "").toLowerCase() === "class") as FoundryItemRow[];
-  const subclasses = items.filter((raw) => String((raw as FoundryItemRow).type ?? "").toLowerCase() === "subclass") as FoundryItemRow[];
+  const classes = items.filter(
+    (raw) => String((raw as FoundryItemRow).type ?? "").toLowerCase() === "class",
+  ) as FoundryItemRow[];
+  const subclasses = items.filter(
+    (raw) => String((raw as FoundryItemRow).type ?? "").toLowerCase() === "subclass",
+  ) as FoundryItemRow[];
 
   let primary: FoundryItemRow | null = null;
   if (originalClassId) {
@@ -209,7 +255,10 @@ function resolveClassInfo(items: unknown[], originalClassId: string | null) {
     )[0];
   }
 
-  const level = classes.reduce((sum, row) => sum + Math.max(0, Math.floor(readNumber(row.system?.levels, 0))), 0);
+  const level = classes.reduce(
+    (sum, row) => sum + Math.max(0, Math.floor(readNumber(row.system?.levels, 0))),
+    0,
+  );
   const hitDie =
     readPositiveNumber(primary?.system?.hd?.denomination, 0) ||
     readPositiveNumber(primary?.system?.hd?.faces, 0) ||
@@ -243,8 +292,6 @@ function mapFoundrySkillProficiency(raw: FoundrySkillBlock | undefined): Dnd5eSk
     }
   }
 
-  // In Foundry dnd5e 5.x ist `value` oft der Attributsmodifikator (+2 bei CHA 15),
-  // nicht der Übungsgrad — nur exakte Stufen 0 / 0.5 / 1 / 2 auswerten.
   const value = raw.value;
   if (value != null && Number.isFinite(Number(value))) {
     const n = Number(value);
@@ -283,29 +330,235 @@ function mapFoundrySkills(
   return mapped;
 }
 
+function stripHtml(html: string | null | undefined): string | null {
+  if (!html || typeof html !== "string") return null;
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text || null;
+}
+
+function readOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t || null;
+}
+
+/** DE/EN-Namen aus Foundry-Flags (TableHeroes, Babele, …). */
+function readBilingualLabels(row: FoundryItemRow): {
+  nameDe: string | null;
+  nameEn: string | null;
+  descriptionDe: string | null;
+  descriptionEn: string | null;
+} {
+  const flags = row.flags ?? {};
+  const th = (flags.tableheroes ?? flags["table-heroes"] ?? {}) as FoundryLocalizedFlags;
+  const babele = (flags.babele ?? {}) as { originalName?: string; translated?: boolean };
+  const name = String(row.name ?? "").trim();
+  const originalName = readOptionalString(babele.originalName);
+
+  let nameDe = readOptionalString(th.nameDe);
+  let nameEn = readOptionalString(th.nameEn);
+
+  if (!nameDe && !nameEn && originalName && originalName !== name) {
+    nameEn = originalName;
+    nameDe = name || null;
+  }
+
+  return {
+    nameDe,
+    nameEn,
+    descriptionDe: readOptionalString(th.descriptionDe),
+    descriptionEn: readOptionalString(th.descriptionEn),
+  };
+}
+
 function mapFoundryFeats(items: unknown): Dnd5eFeatureEntry[] {
   if (!Array.isArray(items)) return [];
   return items
     .filter((raw) => String((raw as FoundryItemRow).type ?? "").toLowerCase() === "feat")
     .map((item) => {
-      const row = item as FoundryItemRow & {
-        system?: { description?: { value?: string } };
-      };
+      const row = item as FoundryItemRow;
       const name = String(row.name ?? "").trim();
       if (!name) return null;
-      const descHtml = row.system?.description?.value;
-      const description =
-        typeof descHtml === "string"
-          ? descHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
-          : null;
+      const bilingual = readBilingualLabels(row);
+      const description = stripHtml(row.system?.description?.value);
       return {
         id: String(row._id ?? row.id ?? randomUUID()),
         name,
-        description: description || null,
+        nameDe: bilingual.nameDe,
+        nameEn: bilingual.nameEn,
+        description,
+        descriptionDe: bilingual.descriptionDe,
+        descriptionEn: bilingual.descriptionEn,
         source: "foundry",
       } satisfies Dnd5eFeatureEntry;
     })
     .filter(Boolean) as Dnd5eFeatureEntry[];
+}
+
+function normalizePreparationMode(raw: string | undefined): Dnd5eSpellPreparationMode | null {
+  if (!raw) return null;
+  const mode = raw.toLowerCase().trim();
+  if (
+    mode === "prepared" ||
+    mode === "always" ||
+    mode === "innate" ||
+    mode === "pact" ||
+    mode === "atwill" ||
+    mode === "known"
+  ) {
+    return mode;
+  }
+  return null;
+}
+
+function hasProperty(
+  properties: Record<string, boolean> | string[] | undefined,
+  key: string,
+): boolean {
+  if (!properties) return false;
+  if (Array.isArray(properties)) {
+    return properties.some((p) => String(p).toLowerCase() === key);
+  }
+  return Boolean(properties[key]);
+}
+
+function formatActivation(sys: FoundryItemRow["system"]): string | null {
+  const type = sys?.activation?.type;
+  if (!type) return null;
+  const cost = sys.activation?.cost;
+  if (cost != null && cost > 0) return `${cost} ${type}`;
+  return String(type);
+}
+
+function formatRange(sys: FoundryItemRow["system"]): string | null {
+  const range = sys?.range;
+  if (!range) return null;
+  if (range.special) return String(range.special);
+  const units = range.units ? String(range.units) : "";
+  if (range.value != null && range.value !== "") {
+    return `${range.value}${units ? ` ${units}` : ""}`.trim();
+  }
+  return units || null;
+}
+
+function formatDuration(sys: FoundryItemRow["system"]): string | null {
+  const duration = sys?.duration;
+  if (!duration) return null;
+  const units = duration.units ? String(duration.units) : "";
+  if (duration.value != null && duration.value !== "") {
+    return `${duration.value}${units ? ` ${units}` : ""}`.trim();
+  }
+  return units || null;
+}
+
+function readComponentFlags(sys: FoundryItemRow["system"]): {
+  vocal: boolean;
+  somatic: boolean;
+  material: boolean;
+  materials: string | null;
+} {
+  const c = sys?.components;
+  const props = sys?.properties;
+  return {
+    vocal: Boolean(c?.vocal) || hasProperty(props, "vocal") || hasProperty(props, "v"),
+    somatic: Boolean(c?.somatic) || hasProperty(props, "somatic") || hasProperty(props, "s"),
+    material: Boolean(c?.material) || hasProperty(props, "material") || hasProperty(props, "m"),
+    materials: readOptionalString(sys?.materials?.value),
+  };
+}
+
+function formatComponents(sys: FoundryItemRow["system"]): string | null {
+  const flags = readComponentFlags(sys);
+  const parts: string[] = [];
+  if (flags.vocal) parts.push("V");
+  if (flags.somatic) parts.push("S");
+  if (flags.material) {
+    parts.push(flags.materials ? `M (${flags.materials})` : "M");
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function mapFoundrySpells(items: unknown): Dnd5eSpellEntry[] {
+  if (!Array.isArray(items)) return [];
+  return findAllItemsByType(items, "spell")
+    .map((row) => {
+      const name = String(row.name ?? "").trim();
+      if (!name) return null;
+      const sys = row.system;
+      const bilingual = readBilingualLabels(row);
+      const description = stripHtml(sys?.description?.value);
+      const mode = normalizePreparationMode(sys?.preparation?.mode);
+      const ritual =
+        Boolean(sys?.components?.ritual) || hasProperty(sys?.properties, "ritual");
+      const concentration =
+        Boolean(sys?.components?.concentration) ||
+        Boolean(sys?.duration?.concentration) ||
+        hasProperty(sys?.properties, "concentration");
+      const comps = readComponentFlags(sys);
+
+      return {
+        id: String(row._id ?? row.id ?? randomUUID()),
+        name,
+        nameDe: bilingual.nameDe,
+        nameEn: bilingual.nameEn,
+        description,
+        descriptionDe: bilingual.descriptionDe,
+        descriptionEn: bilingual.descriptionEn,
+        level: Math.max(0, Math.min(9, Math.floor(readNumber(sys?.level, 0)))),
+        school: readOptionalString(sys?.school),
+        preparationMode: mode,
+        prepared: Boolean(sys?.preparation?.prepared) || mode === "always" || mode === "atwill",
+        ritual,
+        concentration,
+        castingTime: formatActivation(sys),
+        range: formatRange(sys),
+        duration: formatDuration(sys),
+        components: formatComponents(sys),
+        componentVocal: comps.vocal,
+        componentSomatic: comps.somatic,
+        componentMaterial: comps.material,
+        materials: comps.materials,
+        source: "foundry",
+      } satisfies Dnd5eSpellEntry;
+    })
+    .filter(Boolean) as Dnd5eSpellEntry[];
+}
+
+function mapFoundrySpellSlots(
+  spells: FoundryActorSystem["spells"] | undefined,
+): Dnd5eSpellSlots | undefined {
+  if (!spells) return undefined;
+  const slots: Dnd5eSpellSlots = {};
+
+  const mapBlock = (key: string, block: FoundrySpellSlotBlock | undefined) => {
+    if (!block) return;
+    const maxOverride = readNumber(block.override, NaN);
+    const max = Math.max(
+      0,
+      Math.floor(
+        Number.isFinite(maxOverride) && maxOverride > 0 ? maxOverride : readNumber(block.max, 0),
+      ),
+    );
+    if (max <= 0) return;
+
+    let used: number;
+    if (block.spent != null && Number.isFinite(Number(block.spent))) {
+      used = Math.max(0, Math.min(max, Math.floor(Number(block.spent))));
+    } else {
+      // Foundry dnd5e: value = verbleibende Slots
+      const remaining = Math.max(0, Math.floor(readNumber(block.value, max)));
+      used = Math.max(0, Math.min(max, max - remaining));
+    }
+    slots[key] = { max, used };
+  };
+
+  for (let lvl = 1; lvl <= 9; lvl++) {
+    const key = `spell${lvl}` as keyof NonNullable<FoundryActorSystem["spells"]>;
+    mapBlock(String(lvl), spells[key] as FoundrySpellSlotBlock | undefined);
+  }
+  mapBlock("pact", spells.pact);
+
+  return Object.keys(slots).length > 0 ? slots : undefined;
 }
 
 function resolveArmorClass(
@@ -371,7 +624,11 @@ export function mapFoundryActorToDnd5eSheet(input: {
   actorName?: string | null;
   actorSystem: FoundryActorSystem;
   actorItems?: unknown[];
-}): { sheet: Dnd5eSheetData; meta: FoundrySheetImportMeta; equipmentImport: ReturnType<typeof mapFoundryItemsToEquipment> } {
+}): {
+  sheet: Dnd5eSheetData;
+  meta: FoundrySheetImportMeta;
+  equipmentImport: ReturnType<typeof mapFoundryItemsToEquipment>;
+} {
   const equipmentImport = mapFoundryItemsToEquipment(input.actorItems);
   const sys = input.actorSystem ?? {};
   const items = input.actorItems ?? [];
@@ -393,7 +650,9 @@ export function mapFoundryActorToDnd5eSheet(input: {
   const classInfo = resolveClassInfo(items, originalClassId);
 
   const detailsLevel = readNumber(
-    typeof details.level === "object" ? (details.level as { value?: number }).value : details.level,
+    typeof details.level === "object"
+      ? (details.level as { value?: number }).value
+      : details.level,
     0,
   );
   const enrichedLevel = readNumber(details.totalLevels, 0);
@@ -429,12 +688,26 @@ export function mapFoundryActorToDnd5eSheet(input: {
     0,
   );
 
-  const spellAbilityRaw = String(sys.spells?.ability ?? "int").toLowerCase();
+  const mappedSpells = mapFoundrySpells(items);
+  const mappedSlots = mapFoundrySpellSlots(sys.spells);
+
+  const spellAbilityRaw = String(
+    sys.spells?.ability ??
+      attrs.spellcasting ??
+      defaultSpellAbilityForClass(className) ??
+      "int",
+  ).toLowerCase();
   const spellAbility = (
     ["str", "dex", "con", "int", "wis", "cha"].includes(spellAbilityRaw)
       ? spellAbilityRaw
-      : "int"
+      : defaultSpellAbilityForClass(className)
   ) as AbilityKey;
+
+  const hasSpellcasting =
+    mappedSpells.length > 0 ||
+    Boolean(mappedSlots) ||
+    (sys.spells != null && (sys.spells.level ?? 0) > 0) ||
+    Boolean(attrs.spellcasting);
 
   const partial: Partial<Dnd5eSheetData> = {
     abilities: abilitiesMapped,
@@ -458,16 +731,17 @@ export function mapFoundryActorToDnd5eSheet(input: {
       languages: [...(sys.traits?.languages?.value ?? [])],
     },
     features: mapFoundryFeats(items),
+    spells: mappedSpells,
     attacks: equipmentImport.attacks,
     equipment: normalizeEquipmentState(equipmentImport.equipment),
-    spellcasting:
-      sys.spells && (sys.spells.level ?? 0) > 0
-        ? {
-            ability: spellAbility,
-            spellSaveDcOverride: readNumber(sys.spells.dc, NaN) || null,
-            spellAttackBonusOverride: readNumber(sys.spells.attack, NaN) || null,
-          }
-        : undefined,
+    spellcasting: hasSpellcasting
+      ? {
+          ability: spellAbility,
+          spellSaveDcOverride: readNumber(sys.spells?.dc, NaN) || null,
+          spellAttackBonusOverride: readNumber(sys.spells?.attack, NaN) || null,
+          slots: mappedSlots,
+        }
+      : undefined,
     notes: null,
   };
 

@@ -71,6 +71,14 @@ export function groupItemsIntoStacks(items: CharacterItem[]): InventoryStack[] {
 export const INVENTORY_SLOTS_PER_PAGE = 25;
 export const INVENTORY_GRID_COLS = 5;
 export const INVENTORY_GRID_ROWS = 5;
+/** Feste Kachelgröße (px) — entspricht Tailwind w-11/h-11 */
+export const INVENTORY_TILE_PX = 44;
+/** Maximaler Abstand zwischen Kacheln (px) */
+export const INVENTORY_TILE_GAP_PX = 10;
+
+export function inventoryGridContentWidthPx(cols = INVENTORY_GRID_COLS): number {
+  return cols * INVENTORY_TILE_PX + (cols - 1) * INVENTORY_TILE_GAP_PX;
+}
 
 export function paginateStacks(stacks: InventoryStack[], page: number): {
   pageStacks: InventoryStack[];
