@@ -21,7 +21,7 @@ import { getCharacterInventory } from "@/src/lib/actions/character-inventory-act
 import { consumeFromStack } from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import type { Dnd5eClassResource } from "@/src/lib/characters/dnd5e/types";
 
-export function isCasterClass(className: string | null | undefined): boolean {
+function isCasterClass(className: string | null | undefined): boolean {
   const c = (className ?? "").toLowerCase();
   if (!c) return false;
   return /magier|wizard|zauberer|sorcerer|kleriker|cleric|paladin|barde|bard|hexer|warlock|druide|druid|waldläufer|waldlaeufer|ranger|artificer|inventor|hexenmeister/.test(
