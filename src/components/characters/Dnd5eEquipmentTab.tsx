@@ -14,7 +14,12 @@ import {
 } from "lucide-react";
 import {
   deleteCharacterItem,
+  getCampaignPartyCharacters,
+  getCharacterEquipmentPayload,
   getCharacterInventory,
+  transferContainerToCharacter,
+  transferItemToCharacter,
+  type PartyCharacterOption,
 } from "@/src/lib/actions/character-inventory-actions";
 import type { CharacterItem, CharacterInventoryPayload } from "@/src/types/inventory";
 import type { Dnd5eDerivedSheet, Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
@@ -33,9 +38,12 @@ import {
   computeEquipmentWeight,
   deleteEquipmentLoadout,
   deleteWeaponPreset,
+  itemWeightLb,
+  collectPlacedItemIds,
   getUnassignedItems,
   hasBackpackContainer,
   normalizeEquipmentState,
+  placeItemInContainer,
   placeItemInGeneralSlot,
   placeItemInSlot,
   removeItemFromEquipment,
@@ -49,7 +57,6 @@ import {
   resolveCharacterItemStats,
 } from "@/src/lib/characters/dnd5e/item-resolve";
 import {
-  consumeFromStack,
   duplicateCharacterItem,
   setItemInventoryCategory,
   splitStack,
@@ -58,6 +65,7 @@ import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhouette";
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
 import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
+import { ContainerSetupModal } from "@/src/components/characters/inventory/ContainerSetupModal";
 import { BeltSlotsStrip } from "@/src/components/characters/inventory/BeltSlotsStrip";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
@@ -82,6 +90,9 @@ export function Dnd5eEquipmentTab({
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
+  const [partyCharacters, setPartyCharacters] = useState<PartyCharacterOption[]>([]);
+  const [highlightItemIds, setHighlightItemIds] = useState<Set<string>>(() => new Set());
+  const [pendingBackpackItemId, setPendingBackpackItemId] = useState<string | null>(null);
 
   const equipment = useMemo(
     () => normalizeEquipmentState(sheet.equipment),
@@ -93,6 +104,7 @@ export function Dnd5eEquipmentTab({
     try {
       const data = await getCharacterInventory(characterId);
       setInventory(data);
+      return data;
     } finally {
       setLoading(false);
     }
@@ -101,6 +113,18 @@ export function Dnd5eEquipmentTab({
   useEffect(() => {
     void reloadInventory();
   }, [reloadInventory]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const payload = await getCharacterEquipmentPayload(characterId);
+        const party = await getCampaignPartyCharacters(payload.campaignId, characterId);
+        setPartyCharacters(party);
+      } catch {
+        setPartyCharacters([]);
+      }
+    })();
+  }, [characterId]);
 
   const items = useMemo(
     () => (inventory?.items ?? []).filter((i) => !i.is_deleted),
@@ -118,6 +142,16 @@ export function Dnd5eEquipmentTab({
   const capacity = carryingCapacityLb(strScore);
   const totalWeight = computeEquipmentWeight(items, equipment);
   const overCapacity = totalWeight > capacity;
+  const heaviestCarried = useMemo(() => {
+    const placed = collectPlacedItemIds(equipment);
+    let best: { item: CharacterItem; weightLb: number } | null = null;
+    for (const item of items) {
+      if (!placed.has(item.id)) continue;
+      const w = itemWeightLb(item);
+      if (!best || w > best.weightLb) best = { item, weightLb: w };
+    }
+    return best;
+  }, [items, equipment]);
   const hasBackpack = hasBackpackContainer(equipment);
   const unassigned = getUnassignedItems(items, equipment);
 
@@ -143,32 +177,65 @@ export function Dnd5eEquipmentTab({
     onEquipmentChange(normalizeEquipmentState(next));
   }
 
-  function addDefaultBackpack() {
-    const container: Dnd5eEquipmentContainer = {
-      id: crypto.randomUUID(),
-      kind: "backpack",
-      label: t("equipment.defaultBackpack"),
-      linkedItemId: null,
-      itemIds: [],
-    };
-    update({ ...equipment, containers: [...equipment.containers, container] });
+  function addContainer(container: Dnd5eEquipmentContainer) {
+    let next = normalizeEquipmentState(equipment);
+    if (container.linkedItemId) {
+      next = removeItemFromEquipment(next, container.linkedItemId);
+    }
+    next.containers = [...next.containers, container];
+    update(next);
+    setPendingBackpackItemId(null);
+  }
+
+  function updateContainer(container: Dnd5eEquipmentContainer) {
+    update({
+      ...equipment,
+      containers: equipment.containers.map((c) => (c.id === container.id ? container : c)),
+    });
   }
 
   function addBackpackFromItem(itemId: string) {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
-    const kind = inferContainerKind(item) ?? "backpack";
-    const container: Dnd5eEquipmentContainer = {
-      id: crypto.randomUUID(),
-      kind,
-      label: item.name,
-      linkedItemId: itemId,
-      itemIds: [],
-    };
-    let next = normalizeEquipmentState(equipment);
-    next = removeItemFromEquipment(next, itemId);
-    next.containers = [...next.containers, container];
-    update(next);
+    setPendingBackpackItemId(itemId);
+  }
+
+  async function placeNewItemInInventory(saved: CharacterItem) {
+    setHighlightItemIds((prev) => new Set([...prev, saved.id]));
+    const data = await reloadInventory();
+    const allItems = data?.items ?? [...items, saved];
+    const targetContainer = equipment.containers[0];
+    if (!targetContainer) return;
+    update(
+      placeItemInContainer(equipment, targetContainer.id, saved.id, allItems, { prepend: true }),
+    );
+  }
+
+  async function handleGiveItem(item: CharacterItem, targetCharacterId: string) {
+    await transferItemToCharacter({
+      itemId: item.id,
+      fromCharacterId: characterId,
+      toCharacterId: targetCharacterId,
+    });
+    update(removeItemFromEquipment(equipment, item.id));
+    await reloadInventory();
+  }
+
+  async function handleTransferContainer(
+    containerId: string,
+    targetCharacterId: string,
+    currentEquipment: Dnd5eEquipmentState,
+  ) {
+    await transferContainerToCharacter({
+      fromCharacterId: characterId,
+      toCharacterId: targetCharacterId,
+      containerId,
+      sourceEquipment: currentEquipment,
+    });
+    update({
+      ...currentEquipment,
+      containers: currentEquipment.containers.filter((c) => c.id !== containerId),
+    });
   }
 
   function addCustomCategory(label: string) {
@@ -180,7 +247,6 @@ export function Dnd5eEquipmentTab({
   }
 
   async function handleDeleteItem(item: CharacterItem) {
-    if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
     await deleteCharacterItem(item.id);
     update(removeItemFromEquipment(equipment, item.id));
     await reloadInventory();
@@ -235,6 +301,14 @@ export function Dnd5eEquipmentTab({
               {t("inventory.carryingOverCapacity", { weight: totalWeight, max: capacity })}
             </p>
           ) : null}
+          {heaviestCarried ? (
+            <p className="mt-1 font-libre text-[9px] text-gray-600">
+              {t("inventory.heaviestItem", {
+                name: heaviestCarried.item.name,
+                weight: heaviestCarried.weightLb,
+              })}
+            </p>
+          ) : null}
 
           <BeltSlotsStrip
             equipment={equipment}
@@ -250,30 +324,28 @@ export function Dnd5eEquipmentTab({
           items={items}
           equipment={equipment}
           readOnly={readOnly}
+          highlightItemIds={highlightItemIds}
+          partyCharacters={partyCharacters}
           onEquipmentChange={update}
           onAddItem={() => setItemEditor("new")}
           onEditItem={(item) => setItemEditor(item)}
           onDeleteItem={handleDeleteItem}
           onDuplicateItem={async (item) => {
-            await duplicateCharacterItem(item);
-            await reloadInventory();
+            const dup = await duplicateCharacterItem(item);
+            await placeNewItemInInventory(dup);
           }}
           onSplitStack={async (item, amount) => {
-            await splitStack(item, amount);
-            await reloadInventory();
-          }}
-          onConsumeStack={async (item, amount) => {
-            const result = await consumeFromStack(item, amount);
-            if (!result) {
-              update(removeItemFromEquipment(equipment, item.id));
-            }
-            await reloadInventory();
+            const result = await splitStack(item, amount);
+            await placeNewItemInInventory(result.split);
           }}
           onAssignCategory={async (item, category) => {
             await setItemInventoryCategory(item, category);
             await reloadInventory();
           }}
-          onAddDefaultBackpack={addDefaultBackpack}
+          onGiveItem={handleGiveItem}
+          onTransferContainer={handleTransferContainer}
+          onAddContainer={addContainer}
+          onUpdateContainer={updateContainer}
           onAddCustomCategory={addCustomCategory}
         />
       </div>
@@ -284,7 +356,7 @@ export function Dnd5eEquipmentTab({
           <p className="font-libre text-sm text-gray-400 mb-3">{t("equipment.step1Hint")}</p>
           {items.filter((i) => isBackpackItem(i) || inferContainerKind(i) != null).length > 0 ? (
             <select
-              value=""
+              value={pendingBackpackItemId ?? ""}
               onChange={(e) => e.target.value && addBackpackFromItem(e.target.value)}
               className="w-full max-w-xs rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
             >
@@ -299,6 +371,32 @@ export function Dnd5eEquipmentTab({
             </select>
           ) : null}
         </section>
+      ) : null}
+
+      {pendingBackpackItemId ? (
+        <ContainerSetupModal
+          mode="create"
+          initial={(() => {
+            const item = items.find((i) => i.id === pendingBackpackItemId);
+            if (!item) return null;
+            return {
+              id: "",
+              kind: inferContainerKind(item) ?? ("backpack" as const),
+              label: item.name,
+              linkedItemId: pendingBackpackItemId,
+              itemIds: [],
+            };
+          })()}
+          linkedItemName={items.find((i) => i.id === pendingBackpackItemId)?.name}
+          onClose={() => setPendingBackpackItemId(null)}
+          onConfirm={(container) =>
+            addContainer({
+              ...container,
+              linkedItemId: pendingBackpackItemId,
+              itemIds: [],
+            })
+          }
+        />
       ) : null}
 
       {hasBackpack || equipment.containers.length > 0 ? (
@@ -568,9 +666,9 @@ export function Dnd5eEquipmentTab({
           characterId={characterId}
           item={itemEditor === "new" ? null : itemEditor}
           onClose={() => setItemEditor(null)}
-          onSaved={async () => {
+          onSaved={async (saved) => {
             setItemEditor(null);
-            await reloadInventory();
+            await placeNewItemInInventory(saved);
           }}
         />
       ) : null}

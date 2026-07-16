@@ -15,6 +15,7 @@ export type CharacterItem = {
   is_deleted: boolean;
   target_fap: number;
   current_fap: number;
+  created_at?: string;
 };
 
 export type CharacterGem = {

@@ -4,7 +4,13 @@ import { resolveCharacterItemStats } from "./item-resolve";
 
 export type SlotValidationResult = {
   valid: boolean;
-  reason?: "weapon_only" | "armor_only" | "shield_offhand" | "ring_only" | "not_equippable";
+  reason?:
+    | "weapon_only"
+    | "armor_only"
+    | "shield_offhand"
+    | "ring_only"
+    | "not_equippable"
+    | "belt_forbidden";
 };
 
 function nameHintsRing(name: string): boolean {
@@ -140,20 +146,34 @@ export function validateItemForSlot(
   return { valid: false, reason: "not_equippable" };
 }
 
+/**
+ * Gürtel-Schnellzugriff: alles erlaubt außer Waffen, Rüstungen und Schilde.
+ */
 export function validateItemForBelt(item: CharacterItem): SlotValidationResult {
   const stats = resolveCharacterItemStats(item);
-  if (stats.kind === "consumable" || item.category === "Consumable") return { valid: true };
-  if (stats.kind === "weapon") {
-    const n = item.name.toLowerCase();
-    if (n.includes("dolch") || n.includes("dagger") || n.includes("wurfmesser")) {
-      return { valid: true };
-    }
-  }
-  if (stats.kind === "magic") return { valid: true };
   const n = item.name.toLowerCase();
-  if (n.includes("trank") || n.includes("potion") || n.includes("zauberstab") || n.includes("wand")) {
-    return { valid: true };
+
+  if (stats.kind === "weapon" || item.category === "Weapon") {
+    return { valid: false, reason: "belt_forbidden" };
   }
+  if (stats.kind === "armor" || stats.isShield) {
+    return { valid: false, reason: "belt_forbidden" };
+  }
+  if (
+    n.includes("schild") ||
+    n.includes("shield") ||
+    n.includes("rüstung") ||
+    n.includes("ruestung") ||
+    n.includes("armor") ||
+    n.includes("plate") ||
+    n.includes("kettenhemd") ||
+    n.includes("chainmail") ||
+    n.includes("brustpanzer") ||
+    n.includes("breastplate")
+  ) {
+    return { valid: false, reason: "belt_forbidden" };
+  }
+
   return { valid: true };
 }
 

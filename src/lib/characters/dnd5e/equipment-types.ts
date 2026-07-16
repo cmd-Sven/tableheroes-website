@@ -137,6 +137,8 @@ export type Dnd5eEquipmentContainer = {
   label: string;
   /** Optional: verknüpftes Inventar-Item (character_items.id) */
   linkedItemId?: string | null;
+  /** Optional: individuelles Gewichtslimit (lb); sonst Standard für kind */
+  maxCapacityLb?: number | null;
   itemIds: string[];
 };
 

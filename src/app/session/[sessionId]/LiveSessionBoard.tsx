@@ -85,7 +85,7 @@ import {
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
 import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
-import { LiveSessionQuickEquipment } from "@/src/components/session/LiveSessionQuickEquipment";
+import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -98,7 +98,6 @@ import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPa
 import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
 import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
-import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
@@ -4005,10 +4004,8 @@ export function LiveSessionBoard({
                     !isGuest &&
                     ((actualUserIsGM && !forcePlayerView) || pid === userId) &&
                     !pc.isSessionDummy;
-                  const canOpenSheet = canOpenInventory && showDnd5eSheet;
-                  const canQuickEquip =
-                    canOpenSheet &&
-                    (pid === userId || (isPrepMode && actualUserIsGM && !forcePlayerView));
+                  const canInteractAvatar =
+                    canOpenInventory && showDnd5eSheet;
                   const isActiveTurn =
                     liveState?.is_combat_mode &&
                     activeCombatParticipant?.type === "player" &&
@@ -4049,28 +4046,22 @@ export function LiveSessionBoard({
                           unoptimized
                         />
                         <div className="absolute inset-x-3 bottom-12 top-8 z-10 flex flex-col items-center justify-end text-center">
-                          <div
-                            className={`relative flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
-                              pc.isSessionDummy
-                                ? "border-dashed border-amber-600/90"
-                                : "border-amber-800/80"
-                            }`}
-                          >
-                            {pc.avatar_url ? (
-                              <div className="absolute inset-0 overflow-hidden rounded-full">
-                                <CharacterAvatarImage
-                                  src={pc.avatar_url}
-                                  avatarDisplay={pc.avatar_display}
-                                  className="h-full w-full"
-                                  alt={pc.name}
-                                />
-                              </div>
-                            ) : (
-                              <span className="font-barlow text-4xl text-accent-gold">
-                                {pc.name[0]?.toUpperCase()}
-                              </span>
-                            )}
-                          </div>
+                          <LiveSessionCharacterAvatar
+                            sessionId={sessionId}
+                            campaignId={campaignId}
+                            characterId={pc.id}
+                            characterName={pc.name}
+                            className={pc.class}
+                            fallbackAvatarUrl={pc.avatar_url}
+                            avatarDisplay={pc.avatar_display}
+                            isDummy={pc.isSessionDummy}
+                            canInteract={
+                              canInteractAvatar &&
+                              (pid === userId ||
+                                (isPrepMode && actualUserIsGM && !forcePlayerView))
+                            }
+                            showDnd5eSheet={showDnd5eSheet}
+                          />
                         </div>
                         {isScribe && (
                           <span
@@ -4111,24 +4102,6 @@ export function LiveSessionBoard({
                               className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
                             />
                           </button>
-                        ) : null}
-                        {canOpenSheet ? (
-                          <button
-                            type="button"
-                            onClick={() => setSheetCharacter(pc)}
-                            className="absolute -right-8 top-[70px] z-50 flex h-[72px] w-[72px] cursor-pointer items-center justify-center rounded-full border-2 border-amber-700/80 bg-background-dark/90 text-accent-gold shadow-lg transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
-                            title={`Charakterblatt von ${pc.name} öffnen`}
-                            aria-label={`Charakterblatt von ${pc.name} öffnen`}
-                          >
-                            <ScrollText className="h-9 w-9" aria-hidden />
-                          </button>
-                        ) : null}
-                        {canQuickEquip ? (
-                          <LiveSessionQuickEquipment
-                            sessionId={sessionId}
-                            characterId={pc.id}
-                            characterName={pc.name}
-                          />
                         ) : null}
                       </div>
                       <div className="mt-1 w-full rounded-md bg-black/50 px-2 py-1.5 text-center backdrop-blur-sm">

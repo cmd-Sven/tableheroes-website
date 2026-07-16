@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
@@ -52,6 +53,24 @@ function normalizeGems(value: unknown): CharacterGem[] {
     })
     .filter((gem) => gem.name.length > 0);
 }
+
+function mapCharacterItemRow(item: Record<string, unknown>): CharacterItem {
+  return {
+    id: String(item.id),
+    character_id: String(item.character_id),
+    name: String(item.name ?? ""),
+    description: item.description != null ? String(item.description) : null,
+    category: normalizeCategory(item.category),
+    icon_type: item.icon_type != null ? String(item.icon_type) : null,
+    is_deleted: Boolean(item.is_deleted),
+    target_fap: Math.max(0, Math.round(Number(item.target_fap ?? 0))),
+    current_fap: Math.max(0, Math.round(Number(item.current_fap ?? 0))),
+    created_at: item.created_at != null ? String(item.created_at) : undefined,
+  };
+}
+
+const CHARACTER_ITEM_SELECT =
+  "id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap, created_at";
 
 function normalizeCurrency(value: unknown): number {
   const n = Number(value ?? 0);
@@ -223,12 +242,10 @@ export async function getCharacterInventory(
   const { data: items, error: itemError } = await ((supabase as any).from(
     "character_items",
   ) as any)
-    .select(
-      "id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap",
-    )
+    .select(CHARACTER_ITEM_SELECT)
     .eq("character_id", characterId)
     .eq("is_deleted", false)
-    .order("name", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (itemError) {
     throw new Error(itemError.message || "Inventar konnte nicht geladen werden.");
@@ -253,17 +270,7 @@ export async function getCharacterInventory(
   } | null;
 
   return {
-    items: ((items ?? []) as Record<string, unknown>[]).map((item) => ({
-      id: String(item.id),
-      character_id: String(item.character_id),
-      name: String(item.name ?? ""),
-      description: item.description != null ? String(item.description) : null,
-      category: normalizeCategory(item.category),
-      icon_type: item.icon_type != null ? String(item.icon_type) : null,
-      is_deleted: Boolean(item.is_deleted),
-      target_fap: Math.max(0, Math.round(Number(item.target_fap ?? 0))),
-      current_fap: Math.max(0, Math.round(Number(item.current_fap ?? 0))),
-    })),
+    items: ((items ?? []) as Record<string, unknown>[]).map(mapCharacterItemRow),
     wealth,
     sleep_debt_fap: Math.max(0, Math.round(Number(chRow?.sleep_debt_fap ?? 0))),
     rations_count: Math.min(10, Math.max(0, Math.round(Number(chRow?.rations_count ?? 0)))),
@@ -291,17 +298,14 @@ export async function createCharacterItem(input: {
       category: normalizeCategory(input.category),
       icon_type: input.iconType?.trim() || null,
     })
-    .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+    .select(CHARACTER_ITEM_SELECT)
     .single();
 
   if (error) {
     throw new Error(error.message || "Item konnte nicht erstellt werden.");
   }
 
-  return {
-    ...(data as Omit<CharacterItem, "category">),
-    category: normalizeCategory((data as { category?: unknown }).category),
-  };
+  return mapCharacterItemRow(data as Record<string, unknown>);
 }
 
 export async function updateCharacterItem(input: {
@@ -325,17 +329,14 @@ export async function updateCharacterItem(input: {
     })
     .eq("id", input.itemId)
     .eq("is_deleted", false)
-    .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+    .select(CHARACTER_ITEM_SELECT)
     .single();
 
   if (error) {
     throw new Error(error.message || "Item konnte nicht aktualisiert werden.");
   }
 
-  return {
-    ...(data as Omit<CharacterItem, "category">),
-    category: normalizeCategory((data as { category?: unknown }).category),
-  };
+  return mapCharacterItemRow(data as Record<string, unknown>);
 }
 
 export async function deleteCharacterItem(itemId: string): Promise<void> {
@@ -386,4 +387,152 @@ export async function updateCharacterWealth(input: {
     ...(data as Omit<CharacterWealth, "gem_data">),
     gem_data: normalizeGems((data as { gem_data?: unknown }).gem_data),
   };
+}
+
+export type PartyCharacterOption = {
+  id: string;
+  name: string;
+};
+
+/** Spieler-Charaktere derselben Kampagne (für Item-Übergabe / Behälter-Tausch) */
+export async function getCampaignPartyCharacters(
+  campaignId: string,
+  excludeCharacterId?: string,
+): Promise<PartyCharacterOption[]> {
+  assertUuidLike(campaignId, "Kampagne");
+  const { supabase, user } = await requireUser();
+
+  const { data: campRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const isGm = isCampaignGm(
+    campRaw as { gm_id?: string | null; owner_id?: string | null } | null,
+    user.id,
+  );
+
+  const { data: memberRaw } = await (supabase.from("campaign_members") as any)
+    .select("status")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const memberStatus = String((memberRaw as { status?: string } | null)?.status ?? "");
+  const isMember = ["Approved", "Active", "Drafting", "Changes_Proposed"].includes(memberStatus);
+
+  if (!isGm && !isMember) {
+    throw new Error("Keine Berechtigung für diese Kampagne.");
+  }
+
+  let query = (supabase.from("characters") as any)
+    .select("id, name")
+    .eq("campaign_id", campaignId)
+    .neq("status", "Archived")
+    .order("name", { ascending: true });
+
+  if (excludeCharacterId) {
+    query = query.neq("id", excludeCharacterId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message || "Gruppe konnte nicht geladen werden.");
+
+  return ((data ?? []) as { id: string; name: string }[]).map((row) => ({
+    id: String(row.id),
+    name: String(row.name ?? "Charakter"),
+  }));
+}
+
+/** Item an einen anderen Charakter übergeben */
+export async function transferItemToCharacter(input: {
+  itemId: string;
+  fromCharacterId: string;
+  toCharacterId: string;
+}): Promise<void> {
+  assertUuidLike(input.itemId, "Item");
+  assertUuidLike(input.fromCharacterId, "Quell-Charakter");
+  assertUuidLike(input.toCharacterId, "Ziel-Charakter");
+
+  const { supabase, user } = await requireUser();
+  await assertCharacterInventoryAccess(supabase, user.id, input.fromCharacterId);
+  await assertCharacterInventoryAccess(supabase, user.id, input.toCharacterId);
+
+  const { data: itemRaw, error: itemErr } = await (supabase.from("character_items") as any)
+    .select("id, character_id")
+    .eq("id", input.itemId)
+    .eq("character_id", input.fromCharacterId)
+    .eq("is_deleted", false)
+    .maybeSingle();
+
+  if (itemErr || !itemRaw) throw new Error("Gegenstand nicht gefunden.");
+
+  const { error: upErr } = await (supabase.from("character_items") as any)
+    .update({ character_id: input.toCharacterId })
+    .eq("id", input.itemId);
+
+  if (upErr) throw new Error(upErr.message || "Übergabe fehlgeschlagen.");
+}
+
+/** Behälter inkl. Inhalt an einen anderen Charakter übergeben */
+export async function transferContainerToCharacter(input: {
+  fromCharacterId: string;
+  toCharacterId: string;
+  containerId: string;
+  sourceEquipment: Dnd5eEquipmentState;
+}): Promise<{ targetEquipment: Dnd5eEquipmentState }> {
+  assertUuidLike(input.fromCharacterId, "Quell-Charakter");
+  assertUuidLike(input.toCharacterId, "Ziel-Charakter");
+
+  const { supabase, user } = await requireUser();
+  await assertCharacterInventoryAccess(supabase, user.id, input.fromCharacterId);
+  await assertCharacterInventoryAccess(supabase, user.id, input.toCharacterId);
+
+  const sourceEq = normalizeEquipmentState(input.sourceEquipment);
+  const container = sourceEq.containers.find((c) => c.id === input.containerId);
+  if (!container) throw new Error("Behälter nicht gefunden.");
+
+  const itemIds = [
+    ...container.itemIds,
+    ...(container.linkedItemId ? [container.linkedItemId] : []),
+  ];
+
+  for (const itemId of itemIds) {
+    const { error } = await (supabase.from("character_items") as any)
+      .update({ character_id: input.toCharacterId })
+      .eq("id", itemId)
+      .eq("character_id", input.fromCharacterId);
+    if (error) throw new Error(error.message || "Behälter-Übergabe fehlgeschlagen.");
+  }
+
+  const { data: targetChRaw, error: targetErr } = await supabase
+    .from("characters")
+    .select("sheet_data")
+    .eq("id", input.toCharacterId)
+    .single();
+
+  if (targetErr || !targetChRaw) throw new Error("Ziel-Charakter nicht gefunden.");
+
+  const targetSheet = parseSheetData((targetChRaw as { sheet_data?: unknown }).sheet_data);
+  let targetEq = normalizeEquipmentState(targetSheet?.equipment);
+
+  const newContainer = {
+    ...container,
+    id: randomUUID(),
+    itemIds: [...container.itemIds],
+    linkedItemId: container.linkedItemId,
+  };
+  targetEq.containers = [...targetEq.containers, newContainer];
+
+  const { error: saveErr } = await (supabase as any)
+    .from("characters")
+    .update({
+      sheet_data: mergeSheetWithDefaults({
+        ...(targetSheet ?? {}),
+        equipment: targetEq,
+      }),
+    })
+    .eq("id", input.toCharacterId);
+
+  if (saveErr) throw new Error(saveErr.message || "Ziel-Ausrüstung konnte nicht gespeichert werden.");
+
+  return { targetEquipment: targetEq };
 }

@@ -173,9 +173,11 @@ export const characterSheetMessagesEn = {
   "equipment.beltQuickAccess": "Belt — Quick access (max. {max})",
   "equipment.beltPrepared": "Prepared",
   "equipment.beltPreparedHint":
-    "Items on the belt count as prepared and are quickly reachable in combat.",
+    "Items on the belt count as prepared. Weapons, armor, and shields cannot be placed here.",
   "equipment.beltRequiresWaist":
     "Equip a belt in the waist slot first to use belt quick-access slots.",
+  "equipment.beltForbidden":
+    "Weapons, armor, and shields cannot be carried on the belt.",
   "equipment.containerItemCount": "{count} items",
   "equipment.containerWeight": "{weight} lb",
   "equipment.containerMaxCapacity": "max. {cap} lb",
@@ -214,6 +216,7 @@ export const characterSheetMessagesEn = {
   "inventory.cat.gear": "Gear",
   "inventory.cat.ingredients": "Ingredients",
   "inventory.cat.ammunition": "Ammunition",
+  "inventory.cat.scrolls": "Spell scrolls",
   "inventory.cat.unknown": "Unknown",
   "inventory.tooltipWeight": "{weight} lb",
   "inventory.page": "Page {current} / {total}",
@@ -235,10 +238,36 @@ export const characterSheetMessagesEn = {
   "inventory.quantityLabel": "Stack quantity",
   "inventory.valueGpLabel": "Value (GP)",
   "inventory.magical": "Magical",
+  "inventory.consumableLabel": "Consumable item",
   "inventory.containerOverweight":
     "“{name}” overloaded: {weight} / {max} lb — unpack items or increase capacity.",
   "inventory.carryingOverCapacity":
     "Carrying capacity exceeded: {weight} / {max} lb — speed may be halved.",
+  "inventory.newItem": "New",
+  "inventory.heaviestItem": "Heaviest: {name} ({weight} lb)",
+  "inventory.heaviestShort": "max. {name} ({weight} lb)",
+  "inventory.move": "Move",
+  "inventory.moveTitle": "Move to another container",
+  "inventory.moveNoTarget": "No other container available.",
+  "inventory.give": "Give",
+  "inventory.giveTitle": "Give to player",
+  "inventory.giveNoTarget": "No other players in the party.",
+  "inventory.duplicateConfirm": "Duplicate “{name}”?",
+  "inventory.containerCreateTitle": "Add container",
+  "inventory.containerEditTitle": "Edit container",
+  "inventory.containerTypeLabel": "Container type",
+  "inventory.containerNameLabel": "Name",
+  "inventory.containerMaxWeightLabel": "Weight limit (lb)",
+  "inventory.containerMaxWeightHint": "Default for this type: {default} lb",
+  "inventory.containerAdd": "Add",
+  "inventory.save": "Save",
+  "inventory.containerManage": "Manage container",
+  "inventory.containerManageHint": "{count} items in this container.",
+  "inventory.containerTransferTitle": "Transfer entire container to player",
+  "inventory.containerTransfer": "Transfer container",
+  "inventory.containerDeleteRedistribute":
+    "Delete container? {count} items will be distributed to other containers.",
+  "inventory.containerDeleteEmpty": "Delete empty container?",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":

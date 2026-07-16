@@ -5,6 +5,7 @@ import {
   FlaskConical,
   HelpCircle,
   Package,
+  ScrollText,
   Shield,
   Swords,
   Wrench,
@@ -28,6 +29,7 @@ export const STANDARD_INVENTORY_CATEGORIES: InventoryDisplayCategory[] = [
   "gear",
   "ingredients",
   "ammunition",
+  "scrolls",
   "unknown",
 ];
 
@@ -39,6 +41,7 @@ export const CATEGORY_ICONS: Record<InventoryDisplayCategory, LucideIcon> = {
   gear: Package,
   ingredients: FlaskConical,
   ammunition: Crosshair,
+  scrolls: ScrollText,
   unknown: HelpCircle,
 };
 
@@ -50,6 +53,7 @@ export const CATEGORY_COLORS: Record<InventoryDisplayCategory, string> = {
   gear: "border-hero-border/60 bg-hero-dark/50 text-gray-300",
   ingredients: "border-lime-600/60 bg-lime-950/40 text-lime-300",
   ammunition: "border-orange-500/60 bg-orange-950/40 text-orange-300",
+  scrolls: "border-indigo-400/60 bg-indigo-950/40 text-indigo-200",
   unknown: "border-gray-500/60 bg-gray-900/50 text-gray-400",
 };
 
@@ -76,6 +80,14 @@ export function inferInventoryCategory(item: CharacterItem): InventoryDisplayCat
 
   if (stats.kind === "weapon" || item.category === "Weapon") return "weapons";
   if (stats.kind === "armor" || stats.isShield) return "armor";
+  if (
+    n.includes("spruchrolle") ||
+    n.includes("scroll") ||
+    desc.includes("spruchrolle") ||
+    desc.includes("spell scroll")
+  ) {
+    return "scrolls";
+  }
   if (stats.kind === "consumable" || item.category === "Consumable") {
     if (n.includes("ration") || n.includes("rationen")) return "gear";
     if (n.includes("trank") || n.includes("potion") || n.includes("elixier")) return "potions";
@@ -140,8 +152,14 @@ export function getStackKey(item: CharacterItem): string {
 }
 
 export function isConsumableItem(item: CharacterItem): boolean {
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  if (meta?.isConsumable === true) return true;
+  if (meta?.isConsumable === false) return false;
+  // Legacy-Fallback für ältere Items ohne Flag
   const stats = resolveCharacterItemStats(item);
   if (stats.kind === "consumable" || item.category === "Consumable") return true;
+  const cat = getItemDisplayCategory(item);
+  if (cat === "scrolls" || cat === "potions" || cat === "ammunition") return true;
   const n = item.name.toLowerCase();
   return (
     n.includes("ration") ||
@@ -149,7 +167,9 @@ export function isConsumableItem(item: CharacterItem): boolean {
     n.includes("potion") ||
     n.includes("munition") ||
     n.includes("pfeil") ||
-    n.includes("arrow")
+    n.includes("arrow") ||
+    n.includes("spruchrolle") ||
+    n.includes("scroll")
   );
 }
 
@@ -188,6 +208,8 @@ export function displayCategoryToMetaKind(
       return "armor";
     case "potions":
       return "consumable";
+    case "scrolls":
+      return "magic";
     case "tools":
       return "tool";
     case "ingredients":
@@ -201,10 +223,12 @@ export function displayCategoryToMetaKind(
 export function patchMetaFromDisplayCategory(
   category: InventoryDisplayCategory,
   isMagical: boolean,
-): Pick<Dnd5eItemMeta, "inventoryCategory" | "kind" | "isMagical"> {
+): Pick<Dnd5eItemMeta, "inventoryCategory" | "kind" | "isMagical" | "isConsumable"> {
+  const consumableCats = new Set(["potions", "scrolls", "ammunition", "ingredients"]);
   return {
     inventoryCategory: category,
     kind: displayCategoryToMetaKind(category),
     isMagical,
+    isConsumable: consumableCats.has(category),
   };
 }

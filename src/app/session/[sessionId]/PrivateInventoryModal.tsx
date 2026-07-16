@@ -11,10 +11,14 @@ import {
 } from "lucide-react";
 import {
   deleteCharacterItem,
+  getCampaignPartyCharacters,
   getCharacterEquipmentPayload,
   saveCharacterEquipment,
+  transferContainerToCharacter,
+  transferItemToCharacter,
   updateCharacterWealth,
   type CharacterEquipmentPayload,
+  type PartyCharacterOption,
 } from "@/src/lib/actions/character-inventory-actions";
 import { distributeRations } from "@/src/lib/actions/downtime-actions";
 import {
@@ -28,6 +32,7 @@ import { DND_COIN_TYPES, type DndCoinCode } from "@/src/lib/dnd-currency";
 import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
 import {
   normalizeEquipmentState,
+  placeItemInContainer,
   removeItemFromEquipment,
 } from "@/src/lib/characters/dnd5e/equipment";
 import type {
@@ -35,7 +40,6 @@ import type {
   Dnd5eEquipmentState,
 } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
-  consumeFromStack,
   duplicateCharacterItem,
   setItemInventoryCategory,
   splitStack,
@@ -114,6 +118,8 @@ function SessionInventoryBody({
   );
   const [wealthDraft, setWealthDraft] = useState<CharacterWealth>(() => initialPayload.wealth);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
+  const [partyCharacters, setPartyCharacters] = useState<PartyCharacterOption[]>([]);
+  const [highlightItemIds, setHighlightItemIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [isSavingWealth, startSavingWealth] = useTransition();
   const [isSavingEquipment, startSavingEquipment] = useTransition();
@@ -133,7 +139,10 @@ function SessionInventoryBody({
     setPayload(initialPayload);
     setEquipment(normalizeEquipmentState(initialPayload.equipment));
     setWealthDraft(initialPayload.wealth);
-  }, [initialPayload]);
+    void getCampaignPartyCharacters(initialPayload.campaignId, character.id)
+      .then(setPartyCharacters)
+      .catch(() => setPartyCharacters([]));
+  }, [initialPayload, character.id]);
 
   const items = useMemo(
     () => (payload?.items ?? []).filter((item) => !item.is_deleted),
@@ -159,15 +168,57 @@ function SessionInventoryBody({
     });
   }
 
-  function addDefaultBackpack() {
-    const container: Dnd5eEquipmentContainer = {
-      id: crypto.randomUUID(),
-      kind: "backpack",
-      label: t("equipment.defaultBackpack"),
-      linkedItemId: null,
-      itemIds: [],
-    };
-    persistEquipment({ ...equipment, containers: [...equipment.containers, container] });
+  function addContainer(container: Dnd5eEquipmentContainer) {
+    let next = normalizeEquipmentState(equipment);
+    if (container.linkedItemId) {
+      next = removeItemFromEquipment(next, container.linkedItemId);
+    }
+    persistEquipment({ ...next, containers: [...next.containers, container] });
+  }
+
+  function updateContainer(container: Dnd5eEquipmentContainer) {
+    persistEquipment({
+      ...equipment,
+      containers: equipment.containers.map((c) => (c.id === container.id ? container : c)),
+    });
+  }
+
+  async function placeNewItemInInventory(saved: CharacterItem) {
+    setHighlightItemIds((prev) => new Set([...prev, saved.id]));
+    const nextPayload = await reload();
+    const allItems = nextPayload?.items ?? [...items, saved];
+    const targetContainer = equipment.containers[0];
+    if (!targetContainer) return;
+    persistEquipment(
+      placeItemInContainer(equipment, targetContainer.id, saved.id, allItems, { prepend: true }),
+    );
+  }
+
+  async function handleGiveItem(item: CharacterItem, targetCharacterId: string) {
+    await transferItemToCharacter({
+      itemId: item.id,
+      fromCharacterId: character.id,
+      toCharacterId: targetCharacterId,
+    });
+    persistEquipment(removeItemFromEquipment(equipment, item.id));
+    await reload();
+  }
+
+  async function handleTransferContainer(
+    containerId: string,
+    targetCharacterId: string,
+    currentEquipment: Dnd5eEquipmentState,
+  ) {
+    await transferContainerToCharacter({
+      fromCharacterId: character.id,
+      toCharacterId: targetCharacterId,
+      containerId,
+      sourceEquipment: currentEquipment,
+    });
+    persistEquipment({
+      ...currentEquipment,
+      containers: currentEquipment.containers.filter((c) => c.id !== containerId),
+    });
   }
 
   function addCustomCategory(label: string) {
@@ -181,7 +232,6 @@ function SessionInventoryBody({
   }
 
   async function handleDeleteItem(item: CharacterItem) {
-    if (!confirm(t("equipment.deleteConfirm", { name: item.name }))) return;
     await deleteCharacterItem(item.id);
     persistEquipment(removeItemFromEquipment(equipment, item.id));
     await reload();
@@ -445,30 +495,28 @@ function SessionInventoryBody({
                   items={items}
                   equipment={equipment}
                   readOnly={false}
+                  highlightItemIds={highlightItemIds}
+                  partyCharacters={partyCharacters}
                   onEquipmentChange={persistEquipment}
                   onAddItem={() => setItemEditor("new")}
                   onEditItem={(item) => setItemEditor(item)}
                   onDeleteItem={handleDeleteItem}
                   onDuplicateItem={async (item) => {
-                    await duplicateCharacterItem(item);
-                    await reload();
+                    const dup = await duplicateCharacterItem(item);
+                    await placeNewItemInInventory(dup);
                   }}
                   onSplitStack={async (item, amount) => {
-                    await splitStack(item, amount);
-                    await reload();
-                  }}
-                  onConsumeStack={async (item, amount) => {
-                    const result = await consumeFromStack(item, amount);
-                    if (!result) {
-                      persistEquipment(removeItemFromEquipment(equipment, item.id));
-                    }
-                    await reload();
+                    const result = await splitStack(item, amount);
+                    await placeNewItemInInventory(result.split);
                   }}
                   onAssignCategory={async (item, category) => {
                     await setItemInventoryCategory(item, category);
                     await reload();
                   }}
-                  onAddDefaultBackpack={addDefaultBackpack}
+                  onGiveItem={handleGiveItem}
+                  onTransferContainer={handleTransferContainer}
+                  onAddContainer={addContainer}
+                  onUpdateContainer={updateContainer}
                   onAddCustomCategory={addCustomCategory}
                 />
               )}
@@ -488,9 +536,9 @@ function SessionInventoryBody({
           characterId={character.id}
           item={itemEditor === "new" ? null : itemEditor}
           onClose={() => setItemEditor(null)}
-          onSaved={async () => {
+          onSaved={async (saved) => {
             setItemEditor(null);
-            await reload();
+            await placeNewItemInInventory(saved);
           }}
         />
       ) : null}

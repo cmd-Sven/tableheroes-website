@@ -372,6 +372,19 @@ export function CustomDnd5eItemEditorModal({
             <label className="flex items-center gap-2 font-libre text-sm text-gray-300">
               <input
                 type="checkbox"
+                checked={Boolean(meta.isConsumable)}
+                onChange={(e) =>
+                  patchMeta({
+                    isConsumable: e.target.checked,
+                    kind: e.target.checked ? "consumable" : meta.kind === "consumable" ? "equipment" : meta.kind,
+                  })
+                }
+              />
+              {t("inventory.consumableLabel")}
+            </label>
+            <label className="flex items-center gap-2 font-libre text-sm text-gray-300">
+              <input
+                type="checkbox"
                 checked={Boolean(meta.isMagical)}
                 onChange={(e) => patchMeta({ isMagical: e.target.checked })}
               />

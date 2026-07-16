@@ -10,6 +10,7 @@ export type InventoryDisplayCategory =
   | "gear"
   | "ingredients"
   | "ammunition"
+  | "scrolls"
   | "unknown";
 
 /** Strukturierte D&D-5e-Item-Daten in character_items.description */
@@ -34,6 +35,8 @@ export type Dnd5eItemMeta = {
   inventoryCategory?: InventoryDisplayCategory | string | null;
   /** Geschätzter Wert in GP */
   valueGp?: number | null;
+  /** Explizit als Verbrauchsgegenstand markiert (Gürtel-Nutzung entfernt 1×) */
+  isConsumable?: boolean;
 };
 
 const META_BLOCK_RE = /\[dnd5e-meta\]([\s\S]*?)\[\/dnd5e-meta\]/i;
@@ -67,6 +70,7 @@ export function parseDnd5eMetaFromDescription(
       quantity: Math.max(1, Math.round(Number(raw.quantity) || 1)),
       inventoryCategory: raw.inventoryCategory ?? null,
       valueGp: raw.valueGp != null ? Math.max(0, Number(raw.valueGp) || 0) : null,
+      isConsumable: Boolean(raw.isConsumable),
     };
   } catch {
     return null;
@@ -155,6 +159,7 @@ export function createEmptyCustomItemMeta(
     strRequirement: null,
     rangeMeters: null,
     rarity: "Gewöhnlich",
+    isConsumable: kind === "consumable",
   };
 }
 

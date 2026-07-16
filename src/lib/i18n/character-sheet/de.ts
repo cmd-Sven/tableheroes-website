@@ -173,9 +173,11 @@ export const characterSheetMessagesDe = {
   "equipment.beltQuickAccess": "Gürtel — Schnellzugriff (max. {max})",
   "equipment.beltPrepared": "Vorbereitet",
   "equipment.beltPreparedHint":
-    "Gegenstände am Gürtel gelten als vorbereitet und sind im Kampf schnell erreichbar.",
+    "Gegenstände am Gürtel gelten als vorbereitet. Waffen, Rüstungen und Schilde können hier nicht platziert werden.",
   "equipment.beltRequiresWaist":
     "Lege zuerst einen Gürtel am Taillen-Slot aus, um Gürtelplätze zu nutzen.",
+  "equipment.beltForbidden":
+    "Waffen, Rüstungen und Schilde können nicht am Gürtel getragen werden.",
   "equipment.containerItemCount": "{count} Gegenstände",
   "equipment.containerWeight": "{weight} lb",
   "equipment.containerMaxCapacity": "max. {cap} lb",
@@ -214,6 +216,7 @@ export const characterSheetMessagesDe = {
   "inventory.cat.gear": "Ausrüstung",
   "inventory.cat.ingredients": "Zutaten",
   "inventory.cat.ammunition": "Munition",
+  "inventory.cat.scrolls": "Spruchrollen",
   "inventory.cat.unknown": "Unbekannt",
   "inventory.tooltipWeight": "{weight} lb",
   "inventory.page": "Seite {current} / {total}",
@@ -235,10 +238,36 @@ export const characterSheetMessagesDe = {
   "inventory.quantityLabel": "Stapelmenge",
   "inventory.valueGpLabel": "Wert (GP)",
   "inventory.magical": "Magisch",
+  "inventory.consumableLabel": "Verbrauchsgegenstand",
   "inventory.containerOverweight":
     '{name} überlastet: {weight} / {max} lb — Gegenstände auspacken oder Kapazität erhöhen.',
   "inventory.carryingOverCapacity":
     "Traglast überschritten: {weight} / {max} lb — Geschwindigkeit kann halbiert sein.",
+  "inventory.newItem": "Neu",
+  "inventory.heaviestItem": "Schwerster: {name} ({weight} lb)",
+  "inventory.heaviestShort": "max. {name} ({weight} lb)",
+  "inventory.move": "Verschieben",
+  "inventory.moveTitle": "In anderen Behälter verschieben",
+  "inventory.moveNoTarget": "Kein weiterer Behälter vorhanden.",
+  "inventory.give": "Geben",
+  "inventory.giveTitle": "An Spieler geben",
+  "inventory.giveNoTarget": "Keine anderen Spieler in der Gruppe.",
+  "inventory.duplicateConfirm": '"{name}" duplizieren?',
+  "inventory.containerCreateTitle": "Behälter hinzufügen",
+  "inventory.containerEditTitle": "Behälter bearbeiten",
+  "inventory.containerTypeLabel": "Behältertyp",
+  "inventory.containerNameLabel": "Name",
+  "inventory.containerMaxWeightLabel": "Gewichtslimit (lb)",
+  "inventory.containerMaxWeightHint": "Standard für diesen Typ: {default} lb",
+  "inventory.containerAdd": "Hinzufügen",
+  "inventory.save": "Speichern",
+  "inventory.containerManage": "Behälter verwalten",
+  "inventory.containerManageHint": "{count} Gegenstände in diesem Behälter.",
+  "inventory.containerTransferTitle": "Komplett an Spieler übergeben",
+  "inventory.containerTransfer": "Behälter übergeben",
+  "inventory.containerDeleteRedistribute":
+    "Behälter löschen? {count} Gegenstände werden auf andere Behälter verteilt.",
+  "inventory.containerDeleteEmpty": "Leeren Behälter wirklich löschen?",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":

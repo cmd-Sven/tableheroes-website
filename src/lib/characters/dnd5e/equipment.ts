@@ -22,7 +22,17 @@ import { resolveCharacterItemStats } from "./item-resolve";
 
 export { createEmptyEquipmentState } from "./equipment-types";
 
-export function getContainerMaxCapacityLb(kind: Dnd5eContainerKind): number {
+export function getContainerMaxCapacityLb(
+  kindOrContainer:
+    | Dnd5eContainerKind
+    | Pick<Dnd5eEquipmentContainer, "kind" | "maxCapacityLb">,
+): number {
+  const kind = typeof kindOrContainer === "string" ? kindOrContainer : kindOrContainer.kind;
+  const custom =
+    typeof kindOrContainer === "object" && kindOrContainer.maxCapacityLb != null
+      ? Number(kindOrContainer.maxCapacityLb)
+      : null;
+  if (custom != null && custom > 0) return custom;
   return CONTAINER_CAPACITY_LB[kind];
 }
 
@@ -51,6 +61,10 @@ export function normalizeEquipmentState(
       kind: c.kind ?? "backpack",
       label: String(c.label ?? "Gepäck"),
       linkedItemId: c.linkedItemId ?? null,
+      maxCapacityLb:
+        c.maxCapacityLb != null && Number(c.maxCapacityLb) > 0
+          ? Number(c.maxCapacityLb)
+          : null,
       itemIds: [...(c.itemIds ?? [])],
     })),
     belt,
@@ -240,7 +254,7 @@ export function canPlaceItemInContainer(
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const newItem = itemMap.get(itemId);
   if (!newItem) return { ok: false };
-  const cap = getContainerMaxCapacityLb(container.kind);
+  const cap = getContainerMaxCapacityLb(container);
   const current = containerWeightLb(container, items);
   const added = itemWeightLb(newItem);
   if (current + added > cap) {
@@ -254,6 +268,7 @@ export function placeItemInContainer(
   containerId: string,
   itemId: string | null,
   items?: CharacterItem[],
+  options?: { prepend?: boolean },
 ): Dnd5eEquipmentState {
   let next = normalizeEquipmentState(equipment);
   if (itemId && items) {
@@ -266,9 +281,78 @@ export function placeItemInContainer(
   if (itemId) next = removeItemFromEquipment(next, itemId);
   next.containers = next.containers.map((c) => {
     if (c.id !== containerId) return c;
-    const itemIds = itemId ? [...c.itemIds, itemId] : c.itemIds;
+    if (!itemId) return c;
+    const filtered = c.itemIds.filter((id) => id !== itemId);
+    const itemIds = options?.prepend ? [itemId, ...filtered] : [...filtered, itemId];
     return { ...c, itemIds };
   });
+  return next;
+}
+
+/** Schwerster Gegenstand in einem Behälter (lb pro Einheit) */
+export function findHeaviestItemInContainer(
+  container: Dnd5eEquipmentContainer,
+  items: CharacterItem[],
+): { item: CharacterItem; weightLb: number } | null {
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+  let heaviest: { item: CharacterItem; weightLb: number } | null = null;
+  const ids = [...container.itemIds];
+  if (container.linkedItemId) ids.push(container.linkedItemId);
+  for (const id of ids) {
+    const item = itemMap.get(id);
+    if (!item) continue;
+    const w = itemWeightLb(item);
+    if (!heaviest || w > heaviest.weightLb) {
+      heaviest = { item, weightLb: w };
+    }
+  }
+  return heaviest;
+}
+
+/** Behälter löschen und Inhalt auf andere Behälter verteilen */
+export function deleteContainerAndRedistribute(
+  equipment: Dnd5eEquipmentState,
+  containerId: string,
+  items: CharacterItem[],
+): Dnd5eEquipmentState {
+  const target = equipment.containers.find((c) => c.id === containerId);
+  if (!target) return equipment;
+
+  const idsToMove = [...target.itemIds];
+  let next = normalizeEquipmentState(equipment);
+  next.containers = next.containers.filter((c) => c.id !== containerId);
+
+  const remaining = next.containers;
+  for (const itemId of idsToMove) {
+    let placed = false;
+    for (const c of remaining) {
+      const check = canPlaceItemInContainer(c, items, itemId);
+      if (check.ok) {
+        next = placeItemInContainer(next, c.id, itemId, items);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      next = removeItemFromEquipment(next, itemId);
+    }
+  }
+
+  if (target.linkedItemId) {
+    let placed = false;
+    for (const c of remaining) {
+      const check = canPlaceItemInContainer(c, items, target.linkedItemId);
+      if (check.ok) {
+        next = placeItemInContainer(next, c.id, target.linkedItemId, items);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      next = removeItemFromEquipment(next, target.linkedItemId);
+    }
+  }
+
   return next;
 }
 

@@ -12,6 +12,35 @@ export type InventoryStack = {
   quantity: number;
 };
 
+export function isRecentlyCreatedItem(item: CharacterItem, withinHours = 48): boolean {
+  if (!item.created_at) return false;
+  const created = new Date(item.created_at).getTime();
+  if (!Number.isFinite(created)) return false;
+  return Date.now() - created < withinHours * 60 * 60 * 1000;
+}
+
+export function sortStacksForDisplay(
+  stacks: InventoryStack[],
+  highlightIds?: Set<string>,
+): InventoryStack[] {
+  return [...stacks].sort((a, b) => {
+    const aNew =
+      highlightIds?.has(a.representative.id) || isRecentlyCreatedItem(a.representative);
+    const bNew =
+      highlightIds?.has(b.representative.id) || isRecentlyCreatedItem(b.representative);
+    if (aNew && !bNew) return -1;
+    if (!aNew && bNew) return 1;
+    const aTime = a.representative.created_at
+      ? new Date(a.representative.created_at).getTime()
+      : 0;
+    const bTime = b.representative.created_at
+      ? new Date(b.representative.created_at).getTime()
+      : 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.representative.name.localeCompare(b.representative.name, "de");
+  });
+}
+
 export function groupItemsIntoStacks(items: CharacterItem[]): InventoryStack[] {
   const map = new Map<string, InventoryStack>();
 
