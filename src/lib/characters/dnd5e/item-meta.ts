@@ -22,6 +22,10 @@ export type Dnd5eItemMeta = {
   damageType?: "Wucht" | "Hieb" | "Stich" | null;
   properties?: string[];
   acFormula?: string | null;
+  /** Additiver RK-Bonus (Ring of Protection, Cloak of Protection, …) */
+  acBonus?: number | null;
+  /** Magischer Angriffs-/Schadensbonus (z. B. +1-Waffe) */
+  magicalBonus?: number | null;
   isShield?: boolean;
   attunement?: boolean;
   isMagical?: boolean;
@@ -60,6 +64,14 @@ export function parseDnd5eMetaFromDescription(
       damageType: raw.damageType ?? null,
       properties: Array.isArray(raw.properties) ? raw.properties.map(String) : [],
       acFormula: raw.acFormula ?? null,
+      acBonus:
+        raw.acBonus != null && Number.isFinite(Number(raw.acBonus))
+          ? Math.round(Number(raw.acBonus))
+          : null,
+      magicalBonus:
+        raw.magicalBonus != null && Number.isFinite(Number(raw.magicalBonus))
+          ? Math.round(Number(raw.magicalBonus))
+          : null,
       isShield: Boolean(raw.isShield),
       attunement: Boolean(raw.attunement),
       isMagical: Boolean(raw.isMagical),
@@ -131,6 +143,14 @@ export function metaToResolvedStats(meta: Dnd5eItemMeta) {
     damageType: meta.damageType ?? null,
     properties: meta.properties ?? [],
     acFormula: meta.acFormula ?? null,
+    acBonus:
+      meta.acBonus != null && Number.isFinite(Number(meta.acBonus))
+        ? Math.round(Number(meta.acBonus))
+        : null,
+    magicalBonus:
+      meta.magicalBonus != null && Number.isFinite(Number(meta.magicalBonus))
+        ? Math.round(Number(meta.magicalBonus))
+        : null,
     isShield: Boolean(meta.isShield),
     attunement: Boolean(meta.attunement),
     isMagical: Boolean(meta.isMagical) || meta.kind === "magic",
@@ -152,6 +172,8 @@ export function createEmptyCustomItemMeta(
     damageType: null,
     properties: [],
     acFormula: null,
+    acBonus: null,
+    magicalBonus: null,
     isShield: false,
     attunement: false,
     isMagical: kind === "magic",

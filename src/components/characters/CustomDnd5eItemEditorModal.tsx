@@ -361,12 +361,43 @@ export function CustomDnd5eItemEditorModal({
                 <input
                   type="checkbox"
                   checked={Boolean(meta.isShield)}
-                  onChange={(e) => patchMeta({ isShield: e.target.checked, acFormula: e.target.checked ? "+2" : meta.acFormula })}
+                  onChange={(e) =>
+                    patchMeta({
+                      isShield: e.target.checked,
+                      acFormula: e.target.checked ? "+2" : meta.acFormula,
+                      acBonus: e.target.checked ? 2 : meta.acBonus,
+                    })
+                  }
                 />
                 Ist ein Schild (+2 RK)
               </label>
             </div>
           ) : null}
+
+          <label className="block space-y-1">
+            <span className="font-barlow text-xs font-bold uppercase text-gray-500">
+              RK-Bonus (additiv)
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={1}
+              value={meta.acBonus ?? ""}
+              onChange={(e) =>
+                patchMeta({
+                  acBonus: e.target.value
+                    ? Math.max(0, Math.round(Number(e.target.value) || 0))
+                    : null,
+                })
+              }
+              placeholder="z. B. 1 für Ring of Protection"
+              className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white sm:max-w-xs"
+            />
+            <span className="font-libre text-[10px] text-gray-500">
+              Magische Boni (Ring/Umhang der Beschützung usw.), zusätzlich zur Rüstungsformel.
+            </span>
+          </label>
 
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 font-libre text-sm text-gray-300">

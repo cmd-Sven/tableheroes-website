@@ -23,6 +23,10 @@ export type ResolvedItemStats = {
   damageType: string | null;
   properties: string[];
   acFormula: string | null;
+  /** Additiver RK-Bonus (Magie, Schild, …) */
+  acBonus: number | null;
+  /** Magischer Angriffs-/Schadensbonus (+1-Waffe etc.) */
+  magicalBonus: number | null;
   isShield: boolean;
   attunement: boolean;
   isMagical: boolean;
@@ -71,6 +75,8 @@ function catalogToStats(
     damageType: entry.damageType ?? null,
     properties: entry.properties ?? [],
     acFormula: entry.acFormula ?? null,
+    acBonus: null,
+    magicalBonus: null,
     isShield: Boolean(entry.isShield),
     attunement: Boolean(entry.attunement),
     isMagical: entry.kind === "magic" || Boolean(entry.attunement),
@@ -100,7 +106,7 @@ function inferFromName(name: string): Partial<ResolvedItemStats> {
     return { ...stats, kind: "magic", weightLb: 15, attunement: false, isMagical: true };
   }
   if (n.includes("schild") || n.includes("shield")) {
-    return { ...stats, kind: "armor", isShield: true, weightLb: 6, acFormula: "+2" };
+    return { ...stats, kind: "armor", isShield: true, weightLb: 6, acFormula: "+2", acBonus: 2 };
   }
   if (n.includes("trank") || n.includes("potion")) {
     return { ...stats, kind: "consumable", weightLb: 0.5 };
@@ -138,6 +144,8 @@ export function resolveCharacterItemStats(item: CharacterItem): ResolvedItemStat
     damageType: null,
     properties: [],
     acFormula: null,
+    acBonus: null,
+    magicalBonus: null,
     isShield: false,
     attunement: false,
     isMagical: false,
@@ -148,7 +156,27 @@ export function resolveCharacterItemStats(item: CharacterItem): ResolvedItemStat
 
   const meta = parseDnd5eMetaFromDescription(item.description);
   if (meta) {
-    return { ...base, ...metaToResolvedStats(meta) };
+    const fromMeta: ResolvedItemStats = { ...base, ...metaToResolvedStats(meta) };
+    const needsWeaponDamage =
+      !fromMeta.damage &&
+      (fromMeta.kind === "weapon" || item.category === "Weapon");
+    if (needsWeaponDamage) {
+      const weaponLookup = lookupWeaponStatsByName(item.name);
+      if (weaponLookup) {
+        return {
+          ...fromMeta,
+          ...weaponLookup,
+          kind: "weapon",
+          properties:
+            fromMeta.properties.length > 0
+              ? fromMeta.properties
+              : (weaponLookup.properties ?? []),
+          magicalBonus: fromMeta.magicalBonus,
+          weightLb: fromMeta.weightLb > 0 ? fromMeta.weightLb : (weaponLookup.weightLb ?? 0),
+        };
+      }
+    }
+    return fromMeta;
   }
 
   const tag = parseCatalogTagFromDescription(item.description);
@@ -194,6 +222,51 @@ export function isBackpackItem(item: CharacterItem): boolean {
   if (stats.catalogId === "misc-backpack") return true;
   const n = item.name.toLowerCase();
   return n.includes("rucksack") || n.includes("backpack");
+}
+
+/** Bekannte Items mit festem RK-Bonus (Fallback ohne Re-Import). */
+export function inferAcBonusFromName(name: string): number {
+  const n = name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+  if (
+    /ring of protection|ring der beschutzung|ring des schutzes|schutzring/.test(n)
+  ) {
+    return 1;
+  }
+  if (
+    /cloak of protection|umhang der beschutzung|umhang des schutzes|schutzumhang/.test(n)
+  ) {
+    return 1;
+  }
+  if (/ioun stone.*protection|stein der beschutzung/.test(n)) {
+    return 1;
+  }
+  return 0;
+}
+
+/** Additiver Bonus aus Meta, Formel „+N“ oder bekannte Item-Namen. */
+export function resolveItemAcBonus(
+  stats: ResolvedItemStats,
+  itemName: string,
+): number {
+  if (stats.acBonus != null && Number.isFinite(stats.acBonus) && stats.acBonus !== 0) {
+    return Math.round(stats.acBonus);
+  }
+  if (stats.isShield) {
+    const fromFormula = parseAdditiveAcFormula(stats.acFormula);
+    return fromFormula ?? 2;
+  }
+  const fromFormula = parseAdditiveAcFormula(stats.acFormula);
+  if (fromFormula != null) return fromFormula;
+  return inferAcBonusFromName(itemName);
+}
+
+/** Parst reine Bonus-Formeln wie „+1“ / „+2“. */
+export function parseAdditiveAcFormula(formula: string | null | undefined): number | null {
+  if (!formula) return null;
+  const m = formula.trim().match(/^\+(\d+)$/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export function isBagOfHoldingItem(item: CharacterItem): boolean {

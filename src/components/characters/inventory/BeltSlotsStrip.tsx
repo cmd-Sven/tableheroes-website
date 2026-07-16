@@ -13,8 +13,8 @@ import {
   validateItemForBelt,
 } from "@/src/lib/characters/dnd5e/slot-validation";
 import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
-import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
+import { EquippedSlotTile } from "./EquippedSlotTile";
 
 type Props = {
   equipment: Dnd5eEquipmentState;
@@ -102,7 +102,6 @@ export function BeltSlotsStrip({
       <div className={`flex flex-col gap-1.5 ${compact ? "" : "max-w-md"}`}>
         {equipment.belt.map((itemId, index) => {
           const item = itemId ? itemMap.get(itemId) : undefined;
-          const magical = item ? resolveCharacterItemStats(item).isMagical : false;
           const disabled = !beltEquipped;
           const isDragOver = dragOverIndex === index;
           const isInvalid = invalidIndex === index;
@@ -118,20 +117,13 @@ export function BeltSlotsStrip({
               <span className="w-3 shrink-0 font-barlow text-[8px] uppercase text-gray-600">
                 {index + 1}
               </span>
-              <div
-                className={`flex min-h-7 flex-1 items-center justify-center rounded border px-1.5 text-center transition-colors ${
-                  disabled
-                    ? "cursor-not-allowed border-hero-border/20 bg-hero-dark/10 opacity-50"
-                    : isInvalid
-                      ? "border-yellow-500 ring-1 ring-yellow-500/50 bg-yellow-950/20"
-                      : isDragOver
-                        ? "border-hero-vibrant ring-1 ring-hero-vibrant/50"
-                        : itemId
-                          ? magical
-                            ? "border-accent-gold/70 bg-accent-gold/10 shadow-[0_0_6px_rgba(202,185,38,0.25)]"
-                            : "border-hero-vibrant/40 bg-hero-vibrant/10"
-                          : "border-dashed border-hero-border/30 bg-hero-dark/15"
-                }`}
+              <EquippedSlotTile
+                item={item}
+                readOnly={readOnly}
+                disabled={disabled}
+                isDragOver={isDragOver}
+                isInvalid={isInvalid}
+                emptyLabel="+"
                 title={
                   disabled
                     ? t("equipment.beltRequiresWaist")
@@ -141,24 +133,17 @@ export function BeltSlotsStrip({
                         ? `${itemNames[itemId]} · ${t("equipment.beltPrepared")}`
                         : t("equipment.empty")
                 }
-              >
-                {itemId && !readOnly ? (
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => onEquipmentChange(placeItemOnBelt(equipment, index, null))}
-                    className="w-full truncate font-libre text-[9px] text-white hover:text-red-300"
-                  >
-                    {itemNames[itemId] ?? "·"}
-                  </button>
-                ) : itemId ? (
-                  <span className="w-full truncate font-libre text-[9px] text-white">
-                    {itemNames[itemId]}
-                  </span>
-                ) : (
-                  <span className="text-gray-600">·</span>
-                )}
-              </div>
+                onClick={
+                  itemId && !readOnly && !disabled
+                    ? () => onEquipmentChange(placeItemOnBelt(equipment, index, null))
+                    : undefined
+                }
+              />
+              {itemId ? (
+                <span className="min-w-0 flex-1 truncate font-libre text-[9px] text-gray-400">
+                  {itemNames[itemId]}
+                </span>
+              ) : null}
             </div>
           );
         })}

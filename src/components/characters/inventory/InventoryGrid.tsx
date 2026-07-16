@@ -17,7 +17,9 @@ import {
   placeItemInContainer,
   removeItemFromEquipment,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { getItemDisplayCategory } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { getItemDisplayCategory, isMagicalItem, MAGICAL_FILTER_ID } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { DRAG_MIME } from "@/src/lib/characters/dnd5e/slot-validation";
+import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
 import {
   groupItemsIntoStacks,
   INVENTORY_GRID_COLS,
@@ -147,6 +149,9 @@ export function InventoryGrid({
 
   const filteredItems = useMemo(() => {
     if (!categoryFilter) return displayItems;
+    if (categoryFilter === MAGICAL_FILTER_ID) {
+      return displayItems.filter((item) => isMagicalItem(item));
+    }
     return displayItems.filter(
       (item) =>
         getItemDisplayCategory(item, equipment.customCategories) === categoryFilter,
@@ -228,6 +233,34 @@ export function InventoryGrid({
     next = placeItemInContainer(next, containerId, item.id, items);
     onEquipmentChange(next);
     setItemModal(null);
+  }
+
+  function handleInventoryDragOver(e: React.DragEvent) {
+    if (readOnly) return;
+    const itemId = getDragItemId();
+    if (!itemId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+
+  function handleInventoryDrop(e: React.DragEvent) {
+    if (readOnly) return;
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
+    setDragItemId(null);
+    if (!itemId) return;
+
+    // Bereits im aktuellen Container → nichts tun
+    if (activeContainer?.itemIds.includes(itemId)) return;
+
+    if (activeContainerId === UNASSIGNED_ID || !activeContainer) {
+      onEquipmentChange(removeItemFromEquipment(equipment, itemId));
+      return;
+    }
+
+    onEquipmentChange(
+      placeItemInContainer(equipment, activeContainer.id, itemId, items, { prepend: true }),
+    );
   }
 
   return (
@@ -330,6 +363,8 @@ export function InventoryGrid({
             ? "w-fit rounded-lg border border-black/30 bg-black/20 p-1"
             : "w-fit rounded-lg border border-hero-border/60 bg-hero-dark/20 p-1.5"
         }
+        onDragOver={handleInventoryDragOver}
+        onDrop={handleInventoryDrop}
       >
         <div
           className="grid"

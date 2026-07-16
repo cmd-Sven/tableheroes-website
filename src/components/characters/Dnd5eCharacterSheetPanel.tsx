@@ -296,9 +296,19 @@ export function Dnd5eCharacterSheetPanel({
     setSheet({ ...sheet, features: sheet.features.filter((_, i) => i !== index) });
   }
 
-  function handleEquipmentChange(equipment: Dnd5eEquipmentState) {
+  function handleEquipmentChange(
+    equipment: Dnd5eEquipmentState,
+    extras?: { combatAc?: number },
+  ) {
     if (!sheet) return;
-    setSheet({ ...sheet, equipment: normalizeEquipmentState(equipment) });
+    setSheet({
+      ...sheet,
+      equipment: normalizeEquipmentState(equipment),
+      combat:
+        extras?.combatAc != null
+          ? { ...sheet.combat, ac: extras.combatAc }
+          : sheet.combat,
+    });
   }
 
   function handleSave(silent = false) {
@@ -740,16 +750,12 @@ export function Dnd5eCharacterSheetPanel({
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.ac")}</p>
-                    {readOnly ? (
-                      <p className="font-barlow text-4xl font-bold text-white mt-1">{derived.ac}</p>
-                    ) : (
-                      <NumberInput
-                        value={sheet.combat.ac}
-                        min={0}
-                        className="mt-1 !text-2xl !font-bold"
-                        onChange={(v) => updateCombat("ac", v)}
-                      />
-                    )}
+                    <p className="font-barlow text-4xl font-bold text-white mt-1">{derived.ac}</p>
+                    <p className="mt-1 font-libre text-[9px] text-gray-500 leading-tight">
+                      {sheet.combat.acOverride != null
+                        ? t("combat.acOverrideHint")
+                        : t("combat.acFromEquipment")}
+                    </p>
                   </div>
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.initiative")}</p>

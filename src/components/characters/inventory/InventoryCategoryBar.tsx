@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { HelpCircle, Plus, X } from "lucide-react";
+import { Plus, Sparkles, X } from "lucide-react";
 import type { InventoryCustomCategory } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
+  MAGICAL_FILTER_ID,
   STANDARD_INVENTORY_CATEGORIES,
-  type InventoryDisplayCategory,
 } from "@/src/lib/characters/dnd5e/inventory-categories";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
@@ -53,6 +53,21 @@ export function InventoryCategoryBar({
           }`}
         >
           {t("inventory.allCategories")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            onSelect(activeCategory === MAGICAL_FILTER_ID ? null : MAGICAL_FILTER_ID)
+          }
+          title={t("inventory.cat.magical")}
+          className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+            activeCategory === MAGICAL_FILTER_ID
+              ? "border-accent-gold ring-1 ring-accent-gold/60 bg-accent-gold/15 text-accent-gold"
+              : "border-transparent text-accent-gold/70 hover:border-accent-gold/40 hover:text-accent-gold"
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
         </button>
 
         {STANDARD_INVENTORY_CATEGORIES.map((cat) => {

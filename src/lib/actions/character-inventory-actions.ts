@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
-import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import { normalizeEquipmentState, withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import {
@@ -178,10 +178,15 @@ export async function saveCharacterEquipment(
   }
 
   const parsed = parseSheetData((chRaw as { sheet_data?: unknown }).sheet_data);
-  const merged = mergeSheetWithDefaults({
-    ...(parsed ?? {}),
-    equipment: normalizeEquipmentState(equipment),
-  });
+  const inventory = await getCharacterInventory(characterId);
+  const merged = withSyncedArmorClass(
+    mergeSheetWithDefaults({
+      ...(parsed ?? {}),
+      equipment: normalizeEquipmentState(equipment),
+    }),
+    inventory.items.filter((i) => !i.is_deleted),
+    equipment,
+  );
 
   const { error: upErr } = await (supabase as any)
     .from("characters")

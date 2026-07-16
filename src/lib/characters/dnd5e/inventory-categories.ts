@@ -33,6 +33,15 @@ export const STANDARD_INVENTORY_CATEGORIES: InventoryDisplayCategory[] = [
   "unknown",
 ];
 
+/** Pseudo-Filter: alle Items mit isMagical (orthogonal zu Display-Kategorien). */
+export const MAGICAL_FILTER_ID = "__magical__";
+
+export function isMagicalItem(item: CharacterItem): boolean {
+  const stats = resolveCharacterItemStats(item);
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  return Boolean(stats.isMagical || meta?.isMagical || stats.kind === "magic");
+}
+
 export const CATEGORY_ICONS: Record<InventoryDisplayCategory, LucideIcon> = {
   weapons: Swords,
   armor: Shield,

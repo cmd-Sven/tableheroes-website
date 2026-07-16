@@ -18,7 +18,11 @@ import { abilityModifier, formatSigned, proficiencyBonus } from "./formulas";
 import { parseFoundryItemTag } from "./item-meta";
 import { parseDnd5eMetaFromDescription } from "./item-meta";
 import { isSimpleWeaponName } from "./weapon-catalog-lookup";
-import { resolveCharacterItemStats } from "./item-resolve";
+import {
+  parseAdditiveAcFormula,
+  resolveCharacterItemStats,
+  resolveItemAcBonus,
+} from "./item-resolve";
 
 export { createEmptyEquipmentState } from "./equipment-types";
 
@@ -421,7 +425,7 @@ export type WeaponAttackPreview = {
 
 function isWeaponLikeItem(item: CharacterItem, stats: ReturnType<typeof resolveCharacterItemStats>): boolean {
   if (stats.kind === "weapon" || item.category === "Weapon") return true;
-  if (stats.damage && /^\d+d\d+/i.test(stats.damage)) return true;
+  if (stats.damage && /^\d+[dDwW]\d+/i.test(stats.damage.trim())) return true;
   if (stats.isShield) return false;
   return false;
 }
@@ -430,18 +434,51 @@ function parseDamageDiceFromAttackString(damage: string | null | undefined): str
   if (!damage) return null;
   const trimmed = damage.trim();
   if (!trimmed || trimmed === "—" || trimmed === "-") return null;
-  const diceMatch = trimmed.match(/\d+d\d+(?:\s*\+\s*\d+)?/i);
+  const diceMatch = trimmed.match(/\d+[dDwW]\d+(?:\s*[+-]\s*\d+)?/i);
   if (diceMatch) return diceMatch[0].replace(/\s+/g, "");
   const first = trimmed.split(/\s+/)[0];
-  if (first && /^\d+d\d+/i.test(first)) return first;
+  if (first && /^\d+[dDwW]\d+/i.test(first)) return first;
   return null;
 }
 
-function weaponUsesDex(properties: string[]): boolean {
+function weaponUsesDex(properties: string[], itemName: string): boolean {
   const joined = properties.join(" ").toLowerCase();
-  if (joined.includes("geschick") || joined.includes("finesse")) return true;
-  if (joined.includes("fernkampf") || joined.includes("ranged")) return true;
+  if (
+    joined.includes("geschick") ||
+    joined.includes("finesse") ||
+    joined.includes("fernkampf") ||
+    joined.includes("ranged") ||
+    joined.includes("reichweite") ||
+    joined.includes("geschosse") ||
+    joined.includes("munition") ||
+    joined.includes("wurfwaffe")
+  ) {
+    return true;
+  }
+  const n = itemName.toLowerCase();
+  if (
+    /bogen|bow|armbrust|crossbow|schleuder|sling|dart|wurfpfeil|wurfnetz/.test(n)
+  ) {
+    return true;
+  }
   return false;
+}
+
+function inferMagicalBonusFromName(name: string): number {
+  const m = name.match(/\+(\d+)\b/);
+  if (!m) return 0;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function resolveWeaponMagicalBonus(
+  stats: ReturnType<typeof resolveCharacterItemStats>,
+  item: CharacterItem,
+): number {
+  if (stats.magicalBonus != null && Number.isFinite(stats.magicalBonus)) {
+    return Math.round(stats.magicalBonus);
+  }
+  return inferMagicalBonusFromName(item.name);
 }
 
 function findCharacterItemByRef(
@@ -528,8 +565,12 @@ export function computeEquippedWeaponAttacks(
   level: number,
 ): WeaponAttackPreview[] {
   const pb = proficiencyBonus(level);
-  const strMod = derived.abilities.str.modifier;
-  const dexMod = derived.abilities.dex.modifier;
+  const strMod =
+    derived.abilities?.str?.modifier ??
+    abilityModifier(sheet.abilities?.str?.score ?? 10);
+  const dexMod =
+    derived.abilities?.dex?.modifier ??
+    abilityModifier(sheet.abilities?.dex?.score ?? 10);
   const previews: WeaponAttackPreview[] = [];
 
   for (const slot of ["mainHand", "offHand"] as const) {
@@ -549,26 +590,43 @@ export function computeEquippedWeaponAttacks(
           a.id === parseFoundryItemTag(item.description),
       ) ?? null;
 
-    const useDex = weaponUsesDex(stats.properties);
-    const abMod = useDex ? dexMod : strMod;
+    const useDex = weaponUsesDex(stats.properties, item.name);
+    const propsJoined = stats.properties.join(" ").toLowerCase();
+    const finesse =
+      propsJoined.includes("finesse") || propsJoined.includes("geschick");
+    const abMod = finesse
+      ? Math.max(strMod, dexMod)
+      : useDex
+        ? dexMod
+        : strMod;
     const prof = hasWeaponProficiency(sheet, item, stats) ? pb : 0;
-    const attackBonus = abMod + prof;
+    const magicalBonus = resolveWeaponMagicalBonus(stats, item);
+
+    let attackBonus = abMod + prof + magicalBonus;
+    if (
+      sheetAttack?.attackBonusOverride != null &&
+      Number.isFinite(sheetAttack.attackBonusOverride)
+    ) {
+      attackBonus = Math.round(sheetAttack.attackBonusOverride);
+    }
 
     const damageDice =
       stats.damage ??
       parseDamageDiceFromAttackString(sheetAttack?.damage) ??
       null;
     const damageType = stats.damageType ?? "";
+    const dmgMod = abMod + magicalBonus;
     const dmgParts = [damageDice, damageType].filter(Boolean);
     const damage =
       dmgParts.length > 0
-        ? `${dmgParts.join(" ")} ${formatSigned(abMod)}`
-        : `— ${formatSigned(abMod)}`;
+        ? `${dmgParts.join(" ")} ${formatSigned(dmgMod)}`
+        : `— ${formatSigned(dmgMod)}`;
 
     const notes = [
       stats.properties.length ? stats.properties.join(", ") : null,
       sheetAttack?.notes ?? null,
       stats.rangeMeters ? `Reichweite ${stats.rangeMeters} m` : null,
+      magicalBonus > 0 ? `Magisch +${magicalBonus}` : null,
       stats.isShield ? "Schild (+2 RK)" : null,
       !hasWeaponProficiency(sheet, item, stats) ? "Keine Waffenübung" : null,
     ]
@@ -587,24 +645,23 @@ export function computeEquippedWeaponAttacks(
   return previews;
 }
 
-export function computeArmorClassPreview(
-  sheet: Dnd5eSheetData,
-  derived: Dnd5eDerivedSheet,
+export function computeEquippedArmorClass(
+  dexMod: number,
   items: CharacterItem[],
   equipment: Dnd5eEquipmentState,
 ): { ac: number; breakdown: string } {
   const chestId = equipment.slots?.chest;
-  const offId = equipment.slots?.offHand;
-  const dexMod = derived.abilities.dex.modifier;
 
   let ac = 10 + dexMod;
   const parts: string[] = ["Basis 10 + GES"];
+  let chestItemId: string | null = null;
 
   if (chestId) {
     const armor = findCharacterItemByRef(items, chestId);
     if (armor) {
+      chestItemId = armor.id;
       const stats = resolveCharacterItemStats(armor);
-      if (stats.acFormula) {
+      if (stats.acFormula && !parseAdditiveAcFormula(stats.acFormula)) {
         const parsed = parseAcFormula(stats.acFormula, dexMod);
         if (parsed) {
           ac = parsed.ac;
@@ -615,22 +672,76 @@ export function computeArmorClassPreview(
     }
   }
 
-  if (offId) {
-    const off = findCharacterItemByRef(items, offId);
-    if (off) {
-      const stats = resolveCharacterItemStats(off);
-      if (stats.isShield) {
-        ac += 2;
-        parts.push("Schild +2");
-      }
-    }
-  }
+  const equippedRefs = [
+    ...Object.values(equipment.slots ?? {}),
+    ...Object.values(equipment.generalSlots ?? {}),
+  ].filter((id): id is string => Boolean(id));
 
-  if (sheet.combat.acOverride != null) {
-    return { ac: derived.ac, breakdown: "Manueller RK-Override" };
+  const countedIds = new Set<string>();
+
+  for (const ref of equippedRefs) {
+    const item = findCharacterItemByRef(items, ref);
+    if (!item || countedIds.has(item.id)) continue;
+    countedIds.add(item.id);
+
+    const stats = resolveCharacterItemStats(item);
+    const bonus = resolveItemAcBonus(stats, item.name);
+    if (bonus <= 0) continue;
+
+    const isChestBaseArmor =
+      item.id === chestItemId &&
+      Boolean(stats.acFormula && !parseAdditiveAcFormula(stats.acFormula));
+    if (isChestBaseArmor && (stats.acBonus == null || stats.acBonus === 0)) {
+      continue;
+    }
+
+    ac += bonus;
+    parts.push(`${item.name} +${bonus}`);
   }
 
   return { ac, breakdown: parts.join(" · ") };
+}
+
+export function computeArmorClassPreview(
+  sheet: Dnd5eSheetData,
+  derived: Dnd5eDerivedSheet,
+  items: CharacterItem[],
+  equipment: Dnd5eEquipmentState,
+): { ac: number; breakdown: string } {
+  if (sheet.combat.acOverride != null) {
+    return { ac: derived.ac, breakdown: "Manueller RK-Override" };
+  }
+  return computeEquippedArmorClass(
+    derived.abilities.dex.modifier,
+    items,
+    equipment,
+  );
+}
+
+/**
+ * Schreibt combat.ac aus der aktuell angelegten Ausrüstung
+ * (außer bei manuellem acOverride).
+ */
+export function withSyncedArmorClass(
+  sheet: Dnd5eSheetData,
+  items: CharacterItem[],
+  equipment?: Dnd5eEquipmentState | null,
+  level = 1,
+): Dnd5eSheetData {
+  const eq = normalizeEquipmentState(equipment ?? sheet.equipment);
+  const nextBase = { ...sheet, equipment: eq };
+  if (nextBase.combat.acOverride != null) {
+    return nextBase;
+  }
+  // Lazy import vermeiden — Dex-Mod direkt aus Scores
+  const dexScore = nextBase.abilities.dex?.score ?? 10;
+  const dexMod = Math.floor((Math.max(1, dexScore) - 10) / 2);
+  const { ac } = computeEquippedArmorClass(dexMod, items, eq);
+  if (nextBase.combat.ac === ac) return nextBase;
+  return {
+    ...nextBase,
+    combat: { ...nextBase.combat, ac },
+  };
 }
 
 export function saveWeaponPreset(

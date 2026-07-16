@@ -70,7 +70,7 @@ export function spellAttackBonus(
   return pb + castingMod;
 }
 
-/** AC — bei Override direkt; sonst gespeicherter Basiswert (aus Foundry/import) */
+/** AC — bei Override direkt; sonst gespeicherter Wert (soll aus Ausrüstung synchronisiert sein). */
 export function armorClassValue(
   storedAc: number,
   override?: number | null,

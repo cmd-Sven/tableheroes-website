@@ -12,7 +12,10 @@ import {
   remapEquipmentToCharacterItemIds,
   syncFoundryItemsToCharacterInventory,
 } from "@/src/lib/characters/dnd5e/foundry-equipment-mapper";
+import { withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
+import type { Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
+import type { CharacterItem, InventoryCategory } from "@/src/types/inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,25 @@ export async function GET() {
     message:
       "POST = vollständiges DnD5e-Charakterblatt von Foundry nach Table Heroes (nur diese Richtung).",
   });
+}
+
+function mapDbRowsToCharacterItems(
+  characterId: string,
+  rows: Record<string, unknown>[],
+): CharacterItem[] {
+  return rows.map((row) => ({
+    id: String(row.id),
+    character_id: characterId,
+    name: String(row.name ?? ""),
+    description: row.description != null ? String(row.description) : null,
+    category:
+      (row.category as InventoryCategory) ?? "Equipment",
+    icon_type: row.icon_type != null ? String(row.icon_type) : null,
+    is_deleted: Boolean(row.is_deleted),
+    target_fap: Math.max(0, Math.round(Number(row.target_fap ?? 0))),
+    current_fap: Math.max(0, Math.round(Number(row.current_fap ?? 0))),
+    created_at: row.created_at != null ? String(row.created_at) : undefined,
+  }));
 }
 
 export async function POST(request: Request) {
@@ -93,14 +115,33 @@ export async function POST(request: Request) {
     equipmentImport.importItems,
   );
 
-  const sheet = {
+  let sheet: Dnd5eSheetData = {
     ...rawSheet,
     equipment: remapEquipmentToCharacterItemIds(rawSheet.equipment!, foundryToTh),
     attacks: rawSheet.attacks.map((atk) => ({
       ...atk,
       id: foundryToTh.get(atk.id) ?? atk.id,
     })),
+    // Foundry-Actor-AC ist nur Snapshot — maßgeblich ist die angelegte Ausrüstung
+    combat: {
+      ...rawSheet.combat,
+      acOverride: null,
+    },
   };
+
+  const { data: itemRows } = await (supabase as any)
+    .from("character_items")
+    .select(
+      "id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap, created_at",
+    )
+    .eq("character_id", characterId)
+    .eq("is_deleted", false);
+
+  const items = mapDbRowsToCharacterItems(
+    characterId,
+    (itemRows ?? []) as Record<string, unknown>[],
+  );
+  sheet = withSyncedArmorClass(sheet, items, sheet.equipment, meta.level);
 
   const now = new Date().toISOString();
   const updatePayload: Record<string, unknown> = {
@@ -141,6 +182,7 @@ export async function POST(request: Request) {
     characterId: mapping.character_id,
     level: meta.level,
     class: meta.className,
+    ac: sheet.combat.ac,
   });
 
   return foundryJson({
@@ -152,5 +194,6 @@ export async function POST(request: Request) {
     sheet_synced_at: now,
     synced_fields: Object.keys(updatePayload),
     equipment_items_synced: foundryToTh.size,
+    armor_class: sheet.combat.ac,
   });
 }

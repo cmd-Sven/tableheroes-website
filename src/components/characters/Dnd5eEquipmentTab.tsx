@@ -50,6 +50,7 @@ import {
   saveEquipmentLoadout,
   saveWeaponPreset,
   toggleAttunement,
+  withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
 import {
   inferContainerKind,
@@ -75,7 +76,10 @@ type Props = {
   derived: Dnd5eDerivedSheet;
   level: number;
   readOnly: boolean;
-  onEquipmentChange: (equipment: Dnd5eEquipmentState) => void;
+  onEquipmentChange: (
+    equipment: Dnd5eEquipmentState,
+    extras?: { combatAc?: number },
+  ) => void;
 };
 
 export function Dnd5eEquipmentTab({
@@ -174,8 +178,26 @@ export function Dnd5eEquipmentTab({
   const acPreview = computeArmorClassPreview(sheet, derived, items, equipment);
 
   function update(next: Dnd5eEquipmentState) {
-    onEquipmentChange(normalizeEquipmentState(next));
+    const normalized = normalizeEquipmentState(next);
+    if (sheet.combat.acOverride != null) {
+      onEquipmentChange(normalized);
+      return;
+    }
+    const synced = withSyncedArmorClass(sheet, items, normalized, level);
+    onEquipmentChange(normalized, { combatAc: synced.combat.ac });
   }
+
+  // Nach Inventar-Laden / Ausrüstungswechsel: Blatt-RK an Ausrüstung angleichen
+  useEffect(() => {
+    if (loading || items.length === 0) return;
+    if (sheet.combat.acOverride != null) return;
+    const synced = withSyncedArmorClass(sheet, items, equipment, level);
+    if (synced.combat.ac !== sheet.combat.ac) {
+      onEquipmentChange(equipment, { combatAc: synced.combat.ac });
+    }
+    // Nur bei Items/Equipment-Änderungen nachziehen, nicht bei jedem Sheet-Render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- absichtlich an Inventar/Ausrüstung gebunden
+  }, [loading, items, equipment, level]);
 
   function addContainer(container: Dnd5eEquipmentContainer) {
     let next = normalizeEquipmentState(equipment);
@@ -263,6 +285,53 @@ export function Dnd5eEquipmentTab({
 
   return (
     <div className="space-y-6">
+      {/* Kampfwerte oben, über Traglast / Inventar / Ausrüstung */}
+      {hasBackpack || equipment.containers.length > 0 ? (
+        <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
+          <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
+            <Swords className="h-4 w-4" />
+            {t("equipment.combatValues")}
+          </h3>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(140px,180px)_1fr]">
+            <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
+              <p className="font-barlow text-xs uppercase text-gray-500 flex items-center gap-1">
+                <Shield className="h-3.5 w-3.5" /> {t("equipment.acPreview")}
+              </p>
+              <p className="font-barlow text-3xl font-bold text-white mt-1">{acPreview.ac}</p>
+              <p className="font-libre text-xs text-gray-500 mt-1">{acPreview.breakdown}</p>
+              <p className="font-libre text-[10px] text-gray-600 mt-1">
+                {t("equipment.acSyncedHint")}
+              </p>
+            </div>
+
+            {weaponAttacks.length === 0 ? (
+              <p className="font-libre text-sm text-gray-500 self-center">
+                {t("equipment.noWeapons")}
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {weaponAttacks.map((atk) => (
+                  <div
+                    key={atk.itemId}
+                    className="rounded border border-hero-border/40 bg-hero-dark/20 p-3"
+                  >
+                    <p className="font-barlow font-bold text-white">{atk.name}</p>
+                    <p className="font-libre text-sm text-accent-gold mt-1">
+                      {t("equipment.attack")} {formatSigned(atk.attackBonus)} ·{" "}
+                      {t("equipment.damage")} {atk.damage}
+                    </p>
+                    {atk.notes ? (
+                      <p className="font-libre text-xs text-gray-500 mt-1">{atk.notes}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
+
       {/* Traglast | Inventar | Ausrüstung nebeneinander */}
       <div
         className={`grid gap-4 ${
@@ -429,7 +498,7 @@ export function Dnd5eEquipmentTab({
 
       {hasBackpack || equipment.containers.length > 0 ? (
         <>
-          {/* Waffenkombinationen + Loadouts + Kampfwerte */}
+          {/* Waffenkombinationen + Loadouts + Eingestimmte Gegenstände */}
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-2">
                 <h4 className="font-barlow text-xs font-bold uppercase text-accent-gold flex items-center gap-1.5">
@@ -566,99 +635,58 @@ export function Dnd5eEquipmentTab({
                 )}
               </div>
 
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4 lg:col-span-2 xl:col-span-1">
+            {/* Eingestimmte Gegenstände (früher Kampfwerte-Platz) */}
+            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3 lg:col-span-2 xl:col-span-1">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-                <Swords className="h-4 w-4" />
-                {t("equipment.combatValues")}
+                <Sparkles className="h-4 w-4" />
+                {t("equipment.attunementTitle", { max: MAX_ATTUNEMENT })}
               </h3>
-
-              <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
-                <p className="font-barlow text-xs uppercase text-gray-500 flex items-center gap-1">
-                  <Shield className="h-3.5 w-3.5" /> {t("equipment.acPreview")}
-                </p>
-                <p className="font-barlow text-3xl font-bold text-white mt-1">{acPreview.ac}</p>
-                <p className="font-libre text-xs text-gray-500 mt-1">{acPreview.breakdown}</p>
-                <p className="font-libre text-[10px] text-gray-600 mt-1">
-                  {t("equipment.storedAc")} {derived.ac}
-                </p>
+              <p className="font-libre text-xs text-gray-500">
+                {t("equipment.attunementCount", {
+                  count: equipment.attunedItemIds.length,
+                  max: MAX_ATTUNEMENT,
+                })}
+              </p>
+              <div className="space-y-2">
+                {items
+                  .filter((i) => {
+                    const s = resolveCharacterItemStats(i);
+                    return s.attunement || s.isMagical;
+                  })
+                  .map((item) => {
+                    const attuned = equipment.attunedItemIds.includes(item.id);
+                    return (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-3 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={attuned}
+                          disabled={
+                            readOnly ||
+                            (!attuned && equipment.attunedItemIds.length >= MAX_ATTUNEMENT)
+                          }
+                          onChange={() => update(toggleAttunement(equipment, item.id))}
+                          className="rounded border-hero-border"
+                        />
+                        <span className="font-libre text-sm text-gray-300">{item.name}</span>
+                        {resolveCharacterItemStats(item).attunement ? (
+                          <span className="ml-auto font-barlow text-[10px] uppercase text-accent-gold">
+                            {t("equipment.attunement")}
+                          </span>
+                        ) : null}
+                      </label>
+                    );
+                  })}
+                {items.filter((i) => resolveCharacterItemStats(i).isMagical).length === 0 ? (
+                  <p className="font-libre text-sm text-gray-500 italic">
+                    {t("equipment.noMagicItems")}
+                  </p>
+                ) : null}
               </div>
-
-              {weaponAttacks.length === 0 ? (
-                <p className="font-libre text-sm text-gray-500">
-                  {t("equipment.noWeapons")}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {weaponAttacks.map((atk) => (
-                    <div
-                      key={atk.itemId}
-                      className="rounded border border-hero-border/40 bg-hero-dark/20 p-3"
-                    >
-                      <p className="font-barlow font-bold text-white">{atk.name}</p>
-                      <p className="font-libre text-sm text-accent-gold mt-1">
-                        {t("equipment.attack")} {formatSigned(atk.attackBonus)} · {t("equipment.damage")} {atk.damage}
-                      </p>
-                      {atk.notes ? (
-                        <p className="font-libre text-xs text-gray-500 mt-1">{atk.notes}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              )}
             </section>
           </div>
-
-          {/* Einstimmung */}
-          <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-            <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              {t("equipment.attunementTitle", { max: MAX_ATTUNEMENT })}
-            </h3>
-            <p className="font-libre text-xs text-gray-500">
-              {t("equipment.attunementCount", {
-                count: equipment.attunedItemIds.length,
-                max: MAX_ATTUNEMENT,
-              })}
-            </p>
-            <div className="space-y-2">
-              {items
-                .filter((i) => {
-                  const s = resolveCharacterItemStats(i);
-                  return s.attunement || s.isMagical;
-                })
-                .map((item) => {
-                  const attuned = equipment.attunedItemIds.includes(item.id);
-                  return (
-                    <label
-                      key={item.id}
-                      className="flex items-center gap-3 rounded border border-hero-border/30 bg-hero-dark/20 px-3 py-2 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={attuned}
-                        disabled={
-                          readOnly ||
-                          (!attuned && equipment.attunedItemIds.length >= MAX_ATTUNEMENT)
-                        }
-                        onChange={() => update(toggleAttunement(equipment, item.id))}
-                        className="rounded border-hero-border"
-                      />
-                      <span className="font-libre text-sm text-gray-300">{item.name}</span>
-                      {resolveCharacterItemStats(item).attunement ? (
-                        <span className="ml-auto font-barlow text-[10px] uppercase text-accent-gold">
-                          {t("equipment.attunement")}
-                        </span>
-                      ) : null}
-                    </label>
-                  );
-                })}
-              {items.filter((i) => resolveCharacterItemStats(i).isMagical).length === 0 ? (
-                <p className="font-libre text-sm text-gray-500 italic">
-                  {t("equipment.noMagicItems")}
-                </p>
-              ) : null}
-            </div>
-          </section>
         </>
       ) : (
         <section className="rounded-lg border border-hero-dark bg-background-card p-4">

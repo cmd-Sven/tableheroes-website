@@ -13,6 +13,7 @@ import {
   buildItemDescription,
   stripMachineTags,
 } from "./item-meta";
+import { lookupWeaponStatsByName } from "./weapon-catalog-lookup";
 import type { InventoryCategory } from "@/src/types/inventory";
 
 type FoundryItemRow = {
@@ -61,23 +62,126 @@ function mapDamageTypeEnToDe(raw: string): "Wucht" | "Hieb" | "Stich" | null {
   return null;
 }
 
+function readDamageTypes(raw: unknown): string {
+  if (Array.isArray(raw)) return raw.map(String).join(" ");
+  if (raw && typeof raw === "object") {
+    // Foundry Set serializes as array or { values }
+    const values = (raw as { values?: unknown }).values;
+    if (Array.isArray(values)) return values.map(String).join(" ");
+    return Object.keys(raw as Record<string, unknown>).join(" ");
+  }
+  if (typeof raw === "string") return raw;
+  return "";
+}
+
+function readDamageField(field: unknown): {
+  damage: string | null;
+  damageType: "Wucht" | "Hieb" | "Stich" | null;
+} {
+  if (!field || typeof field !== "object") {
+    return { damage: null, damageType: null };
+  }
+  const data = field as {
+    number?: unknown;
+    denomination?: unknown;
+    bonus?: unknown;
+    types?: unknown;
+    custom?: { enabled?: unknown; formula?: unknown };
+  };
+
+  const typeRaw = readDamageTypes(data.types);
+  const damageType = mapDamageTypeEnToDe(typeRaw);
+
+  if (data.custom?.enabled && typeof data.custom.formula === "string") {
+    const formula = data.custom.formula.trim();
+    if (formula) return { damage: formula, damageType };
+  }
+
+  const number = readNumber(data.number, 0);
+  const denomination = readNumber(data.denomination, 0);
+  if (number > 0 && denomination > 0) {
+    let dice = `${number}d${denomination}`;
+    const bonus = typeof data.bonus === "string" ? data.bonus.trim() : "";
+    if (bonus && bonus !== "@mod" && !/^@/.test(bonus)) {
+      const cleaned = bonus.replace(/^\+/, "");
+      if (cleaned) dice = `${dice}+${cleaned}`;
+    }
+    return { damage: dice, damageType };
+  }
+
+  return { damage: null, damageType };
+}
+
+function readFoundryDamageFromActivities(
+  system: Record<string, unknown>,
+): { damage: string | null; damageType: "Wucht" | "Hieb" | "Stich" | null } {
+  const activities = system.activities;
+  if (!activities || typeof activities !== "object") {
+    return { damage: null, damageType: null };
+  }
+  const list = Array.isArray(activities)
+    ? activities
+    : Object.values(activities as Record<string, unknown>);
+
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const activity = raw as {
+      type?: unknown;
+      damage?: { parts?: unknown[]; includeBase?: unknown };
+    };
+    const type = String(activity.type ?? "").toLowerCase();
+    if (type && !["attack", "damage", "save", "heal"].includes(type)) continue;
+    const parts = activity.damage?.parts;
+    if (!Array.isArray(parts)) continue;
+    for (const part of parts) {
+      const parsed = readDamageField(part);
+      if (parsed.damage) return parsed;
+      if (Array.isArray(part)) {
+        const dice = String(part[0] ?? "").trim();
+        const typeRaw = String(part[1] ?? "");
+        if (dice) {
+          return { damage: dice, damageType: mapDamageTypeEnToDe(typeRaw) };
+        }
+      }
+    }
+  }
+  return { damage: null, damageType: null };
+}
+
 function readFoundryDamage(system: Record<string, unknown>): {
   damage: string | null;
   damageType: "Wucht" | "Hieb" | "Stich" | null;
 } {
-  const damage = system.damage as { parts?: unknown[] } | undefined;
+  const damage = system.damage as
+    | { parts?: unknown[]; base?: unknown; versatile?: unknown }
+    | undefined;
+
+  // Legacy dnd5e ≤3.x
   const parts = damage?.parts;
-  if (!Array.isArray(parts) || parts.length === 0) {
-    return { damage: null, damageType: null };
+  if (Array.isArray(parts) && parts.length > 0) {
+    const first = parts[0];
+    if (Array.isArray(first)) {
+      const dice = String(first[0] ?? "").trim();
+      const typeRaw = String(first[1] ?? "");
+      if (dice) {
+        return { damage: dice, damageType: mapDamageTypeEnToDe(typeRaw) };
+      }
+    }
+    const fromField = readDamageField(first);
+    if (fromField.damage) return fromField;
   }
-  const first = parts[0];
-  if (!Array.isArray(first)) return { damage: null, damageType: null };
-  const dice = String(first[0] ?? "").trim();
-  const typeRaw = String(first[1] ?? "");
-  return {
-    damage: dice || null,
-    damageType: mapDamageTypeEnToDe(typeRaw),
-  };
+
+  // dnd5e 4.0+: system.damage.base
+  const fromBase = readDamageField(damage?.base);
+  if (fromBase.damage) return fromBase;
+
+  // Activities (attack/damage)
+  return readFoundryDamageFromActivities(system);
+}
+
+function readFoundryMagicalBonus(system: Record<string, unknown>): number | null {
+  const bonus = readNumber(system.magicalBonus, 0);
+  return bonus !== 0 ? Math.round(bonus) : null;
 }
 
 function readFoundryProperties(system: Record<string, unknown>): string[] {
@@ -162,22 +266,47 @@ function mapFoundryItemToMeta(item: FoundryItemRow): Dnd5eItemMeta {
   const type = String(item.type ?? "loot").toLowerCase();
   const kind = foundryTypeToKind(type, system);
   const { damage, damageType } = readFoundryDamage(system);
+  const magicalBonus = readFoundryMagicalBonus(system);
   const properties = readFoundryProperties(system);
   const armor = system.armor as { value?: number; type?: string; dex?: number | null } | undefined;
   const equipType = String(
     (system.type as { value?: string } | undefined)?.value ?? "",
   ).toLowerCase();
+  const armorType = String(armor?.type ?? "").toLowerCase();
+  const isBodyArmor = ["light", "medium", "heavy"].includes(armorType);
 
   let acFormula: string | null = null;
-  const isShield = equipType.includes("shield");
-  if (armor?.value != null && !isShield) {
+  let acBonus: number | null = null;
+  const isShield = equipType.includes("shield") || armorType === "shield";
+
+  if (isShield) {
+    const shieldBonus = armor?.value != null ? readNumber(armor.value, 2) : 2;
+    acBonus = Math.max(1, shieldBonus);
+    acFormula = `+${acBonus}`;
+  } else if (isBodyArmor && armor?.value != null) {
     const base = readNumber(armor.value, 0);
     const dex = armor.dex;
     if (dex === 0) acFormula = String(base);
     else if (dex != null && dex > 0) acFormula = `${base} + GES (max ${dex})`;
     else acFormula = `${base} + GES`;
-  } else if (isShield) {
-    acFormula = "+2";
+  } else if (armor?.value != null && readNumber(armor.value, 0) > 0) {
+    // Ringe/Umhänge/Schmuck: armor.value ist additiver Bonus, keine Basis-RK
+    acBonus = Math.round(readNumber(armor.value, 0));
+    acFormula = `+${acBonus}`;
+  }
+
+  const effectBonus = readAcBonusFromFoundryEffects(item);
+  if (effectBonus !== 0) {
+    acBonus = (acBonus ?? 0) + effectBonus;
+    if (!acFormula || acFormula.startsWith("+")) {
+      acFormula = `+${acBonus}`;
+    }
+  }
+
+  const nameBonus = inferAcBonusFromItemName(String(item.name ?? ""));
+  if ((acBonus == null || acBonus === 0) && nameBonus > 0) {
+    acBonus = nameBonus;
+    acFormula = `+${nameBonus}`;
   }
 
   const range = system.range as { value?: number; long?: number } | undefined;
@@ -200,14 +329,57 @@ function mapFoundryItemToMeta(item: FoundryItemRow): Dnd5eItemMeta {
     damageType,
     properties,
     acFormula,
+    acBonus,
+    magicalBonus,
     isShield,
     attunement: requiresAttunement(system),
-    isMagical: kind === "magic" || properties.some((p) => p.toLowerCase().includes("magisch")),
+    isMagical:
+      kind === "magic" ||
+      (magicalBonus != null && magicalBonus > 0) ||
+      properties.some((p) => p.toLowerCase().includes("magisch") || p === "mgc") ||
+      (acBonus != null && acBonus > 0 && !isBodyArmor),
     effect: stripHtml(descHtml),
     strRequirement: readNumber((system.strength as number | undefined) ?? system.str, 0) || null,
     rangeMeters,
     rarity: String((system.rarity as string | undefined) ?? "Gewöhnlich"),
   };
+}
+
+function inferAcBonusFromItemName(name: string): number {
+  const n = name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+  if (/ring of protection|ring der beschutzung|ring des schutzes|schutzring/.test(n)) {
+    return 1;
+  }
+  if (/cloak of protection|umhang der beschutzung|umhang des schutzes|schutzumhang/.test(n)) {
+    return 1;
+  }
+  return 0;
+}
+
+/** Foundry Active Effects → system.attributes.ac.bonus */
+function readAcBonusFromFoundryEffects(item: FoundryItemRow): number {
+  const effects = (item as { effects?: unknown }).effects;
+  if (!Array.isArray(effects)) return 0;
+  let bonus = 0;
+  for (const raw of effects) {
+    const effect = raw as {
+      disabled?: boolean;
+      transfer?: boolean;
+      changes?: Array<{ key?: string; mode?: number; value?: unknown }>;
+    };
+    if (effect.disabled) continue;
+    for (const change of effect.changes ?? []) {
+      const key = String(change.key ?? "").toLowerCase();
+      if (!key.includes("attributes.ac.bonus") && key !== "system.attributes.ac.bonus") {
+        continue;
+      }
+      const value = Number(change.value);
+      if (!Number.isFinite(value)) continue;
+      // mode 2 = ADD in Foundry; ohne Mode trotzdem als Bonus werten
+      bonus += value;
+    }
+  }
+  return Math.round(bonus);
 }
 
 function inferSlotForFoundryItem(
@@ -306,8 +478,18 @@ export function mapFoundryItemsToEquipment(
     });
 
     if (type === "weapon") {
-      const dmg = meta.damage
-        ? `${meta.damage}${meta.damageType ? ` ${meta.damageType}` : ""}`
+      let damageDice = meta.damage;
+      let damageType = meta.damageType;
+      if (!damageDice) {
+        const fallback = lookupWeaponStatsByName(name);
+        if (fallback?.damage) {
+          damageDice = fallback.damage;
+          damageType =
+            (fallback.damageType as Dnd5eItemMeta["damageType"]) ?? damageType;
+        }
+      }
+      const dmg = damageDice
+        ? `${damageDice}${damageType ? ` ${damageType}` : ""}`
         : "—";
       attacks.push({
         id: foundryItemId,

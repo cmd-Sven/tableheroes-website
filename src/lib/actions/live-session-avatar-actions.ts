@@ -8,6 +8,7 @@ import {
   applyWeaponPreset,
   normalizeEquipmentState,
   placeItemOnBelt,
+  withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
 import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import { isConsumableItem } from "@/src/lib/characters/dnd5e/inventory-categories";
@@ -387,10 +388,15 @@ export async function applyLiveSessionWeaponPreset(input: {
   if (!preset) throw new Error("Waffenkombination nicht gefunden.");
 
   const next = applyWeaponPreset(equipment, input.presetId, items);
+  const synced = withSyncedArmorClass(
+    mergeSheetWithDefaults({ ...(sheet ?? {}), equipment: next }),
+    items,
+    next,
+  );
   await (supabase as any)
     .from("characters")
     .update({
-      sheet_data: mergeSheetWithDefaults({ ...(sheet ?? {}), equipment: next }),
+      sheet_data: synced,
       sheet_source: "manual",
     })
     .eq("id", input.characterId);
@@ -432,10 +438,15 @@ export async function applyLiveSessionLoadout(input: {
   if (!loadout) throw new Error("Ausrüstungsset nicht gefunden.");
 
   const next = applyEquipmentLoadout(equipment, input.loadoutId, items);
+  const synced = withSyncedArmorClass(
+    mergeSheetWithDefaults({ ...(sheet ?? {}), equipment: next }),
+    items,
+    next,
+  );
   await (supabase as any)
     .from("characters")
     .update({
-      sheet_data: mergeSheetWithDefaults({ ...(sheet ?? {}), equipment: next }),
+      sheet_data: synced,
       sheet_source: "manual",
     })
     .eq("id", input.characterId);

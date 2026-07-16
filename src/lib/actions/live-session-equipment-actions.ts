@@ -3,9 +3,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
-import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import { normalizeEquipmentState, withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
+import { getCharacterInventory } from "@/src/lib/actions/character-inventory-actions";
 
 export async function saveLiveSessionEquipment(input: {
   sessionId: string;
@@ -56,10 +57,15 @@ export async function saveLiveSessionEquipment(input: {
   }
 
   const parsed = parseSheetData(ch.sheet_data);
-  const merged = mergeSheetWithDefaults({
-    ...(parsed ?? {}),
-    equipment: normalizeEquipmentState(input.equipment),
-  });
+  const inventory = await getCharacterInventory(input.characterId);
+  const merged = withSyncedArmorClass(
+    mergeSheetWithDefaults({
+      ...(parsed ?? {}),
+      equipment: normalizeEquipmentState(input.equipment),
+    }),
+    inventory.items.filter((i) => !i.is_deleted),
+    input.equipment,
+  );
 
   const { error: upErr } = await (supabase as any)
     .from("characters")
