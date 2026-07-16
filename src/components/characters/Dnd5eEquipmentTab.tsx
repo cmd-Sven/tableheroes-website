@@ -263,8 +263,14 @@ export function Dnd5eEquipmentTab({
 
   return (
     <div className="space-y-6">
-      {/* Zeile 1: Traglast (kompakt) + Inventar-Grid */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(140px,180px)_1fr]">
+      {/* Traglast | Inventar | Ausrüstung nebeneinander */}
+      <div
+        className={`grid gap-4 ${
+          hasBackpack || equipment.containers.length > 0
+            ? "xl:grid-cols-[minmax(140px,180px)_minmax(260px,1fr)_minmax(300px,1.15fr)]"
+            : "lg:grid-cols-[minmax(140px,180px)_1fr]"
+        }`}
+      >
         <section
           className={`rounded-lg border bg-background-card p-3 ${
             overCapacity ? "border-red-500/70 bg-red-950/10" : "border-hero-dark"
@@ -348,6 +354,28 @@ export function Dnd5eEquipmentTab({
           onUpdateContainer={updateContainer}
           onAddCustomCategory={addCustomCategory}
         />
+
+        {hasBackpack || equipment.containers.length > 0 ? (
+          <section className="rounded-lg border border-hero-dark bg-background-card p-4 overflow-visible">
+            <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
+              {t("equipment.step3Title")}
+            </h3>
+            <EquipmentSilhouette
+              slots={equipment.slots}
+              generalSlots={equipment.generalSlots}
+              itemNames={itemNames}
+              selectableItems={selectableForSlots}
+              itemMap={itemMap}
+              readOnly={readOnly}
+              onEquip={(slot, itemId) =>
+                update(placeItemInSlot(equipment, slot, itemId, items))
+              }
+              onEquipGeneral={(slot, itemId) =>
+                update(placeItemInGeneralSlot(equipment, slot, itemId))
+              }
+            />
+          </section>
+        ) : null}
       </div>
 
       {/* Rucksack aus Inventar hinzufügen (wenn noch keiner) */}
@@ -401,29 +429,9 @@ export function Dnd5eEquipmentTab({
 
       {hasBackpack || equipment.containers.length > 0 ? (
         <>
-          {/* Silhouette + Kampfwerte */}
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4 overflow-visible">
-              <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
-                {t("equipment.step3Title")}
-              </h3>
-              <EquipmentSilhouette
-                slots={equipment.slots}
-                generalSlots={equipment.generalSlots}
-                itemNames={itemNames}
-                selectableItems={selectableForSlots}
-                itemMap={itemMap}
-                readOnly={readOnly}
-                onEquip={(slot, itemId) =>
-                  update(placeItemInSlot(equipment, slot, itemId, items))
-                }
-                onEquipGeneral={(slot, itemId) =>
-                  update(placeItemInGeneralSlot(equipment, slot, itemId))
-                }
-              />
-
-              {/* Waffenkombinationen (max. 2) */}
-              <div className="mt-4 rounded border border-hero-border/40 bg-hero-dark/20 p-3 space-y-2">
+          {/* Waffenkombinationen + Loadouts + Kampfwerte */}
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-2">
                 <h4 className="font-barlow text-xs font-bold uppercase text-accent-gold flex items-center gap-1.5">
                   <Swords className="h-3.5 w-3.5" />
                   {t("equipment.weaponPresetsTitle", { max: MAX_WEAPON_PRESETS })}
@@ -492,7 +500,7 @@ export function Dnd5eEquipmentTab({
               </div>
 
               {/* Vollständige Ausrüstungen */}
-              <div className="mt-4 rounded border border-hero-border/40 bg-hero-dark/20 p-3 space-y-2">
+              <div className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-2">
                 <h4 className="font-barlow text-xs font-bold uppercase text-accent-gold flex items-center gap-1.5">
                   <Save className="h-3.5 w-3.5" />
                   {t("equipment.loadoutsTitle")}
@@ -557,9 +565,8 @@ export function Dnd5eEquipmentTab({
                   </div>
                 )}
               </div>
-            </section>
 
-            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
+            <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4 lg:col-span-2 xl:col-span-1">
               <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2">
                 <Swords className="h-4 w-4" />
                 {t("equipment.combatValues")}
