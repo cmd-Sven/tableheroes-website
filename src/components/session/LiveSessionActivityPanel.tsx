@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Dices, MessageSquare, Send, Swords, X } from "lucide-react";
+import { Dices, Eraser, MessageSquare, Send, Swords, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   appendSessionActivity,
+  clearSessionActivity,
+  deleteSessionActivityEntry,
   resolveCombatRequest,
   type SessionActivityEntry,
 } from "@/src/lib/actions/session-activity-actions";
@@ -23,6 +25,11 @@ import {
   type DiceRollOutcome,
 } from "@/src/lib/session/dice-roll";
 import { dispatchAvatarRollFx } from "@/src/lib/session/avatar-roll-fx";
+import {
+  dispatchAvatarSpeechBubble,
+  formatDiceSpeechBubbleText,
+  truncateSpeechBubbleText,
+} from "@/src/lib/session/avatar-speech-bubble";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 
 const ACTIVITY_TYPES = new Set([
@@ -47,6 +54,10 @@ type Props = {
   prepTestCharacters?: { id: string; name: string }[];
   prepTestCharacterId?: string | null;
   onPrepTestCharacterChange?: (id: string) => void;
+  /** Sofortige lokale Sync nach erfolgreichem Insert (vor Realtime). */
+  onActivityPosted?: (entry: SessionActivityEntry) => void;
+  onActivityCleared?: () => void;
+  onActivityDeleted?: (entryId: string) => void;
 };
 
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
@@ -63,6 +74,9 @@ export function LiveSessionActivityPanel({
   prepTestCharacters,
   prepTestCharacterId,
   onPrepTestCharacterChange,
+  onActivityPosted,
+  onActivityCleared,
+  onActivityDeleted,
 }: Props) {
   const [input, setInput] = useState("");
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
@@ -122,19 +136,61 @@ export function LiveSessionActivityPanel({
     }
   }
 
-  function postActivity(type: string, text: string, meta?: Record<string, unknown>) {
+  function postActivity(
+    type: string,
+    text: string,
+    meta?: Record<string, unknown>,
+    opts?: { speechKind?: "dice" | "chat"; speechText?: string },
+  ) {
+    const characterId = currentCharacter?.id;
     startTransition(async () => {
       try {
-        await appendSessionActivity({
+        const entry = await appendSessionActivity({
           sessionId,
           type,
           text,
-          characterId: currentCharacter?.id,
+          characterId,
           characterName: currentCharacter?.name,
           meta,
         });
+        if (!entry) return;
+        onActivityPosted?.(entry);
+        if (characterId && opts?.speechKind && opts.speechText) {
+          dispatchAvatarSpeechBubble({
+            characterId,
+            kind: opts.speechKind,
+            text: opts.speechText,
+            sourceId: entry.id,
+          });
+        }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Eintrag fehlgeschlagen.");
+      }
+    });
+  }
+
+  function handleClearChat() {
+    if (!isGM) return;
+    if (!window.confirm("Gesamten Session-Chat wirklich leeren?")) return;
+    startTransition(async () => {
+      try {
+        await clearSessionActivity(sessionId);
+        onActivityCleared?.();
+        toast.success("Chat geleert.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Chat konnte nicht geleert werden.");
+      }
+    });
+  }
+
+  function handleDeleteEntry(entryId: string) {
+    if (!isGM) return;
+    startTransition(async () => {
+      try {
+        await deleteSessionActivityEntry(sessionId, entryId);
+        onActivityDeleted?.(entryId);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Nachricht konnte nicht gelöscht werden.");
       }
     });
   }
@@ -147,7 +203,11 @@ export function LiveSessionActivityPanel({
     const outcome = executeDiceRoll({ dice: 1, sides, modifier }, mode);
     maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
     const prefix = label ? `${currentCharacter.name} würfelt ${label}` : `${currentCharacter.name} w${sides} gewürfelt`;
-    postActivity("dice", `${prefix}: ${outcome.display}`, { ...outcome, label });
+    const meta = { ...outcome, label };
+    postActivity("dice", `${prefix}: ${outcome.display}`, meta, {
+      speechKind: "dice",
+      speechText: formatDiceSpeechBubbleText(meta),
+    });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -159,12 +219,23 @@ export function LiveSessionActivityPanel({
     if (parsed) {
       const outcome = executeDiceRoll(parsed, rollMode);
       maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
-      postActivity("dice", `${currentCharacter.name}: ${outcome.formula} → ${outcome.display}`, outcome);
+      postActivity(
+        "dice",
+        `${currentCharacter.name}: ${outcome.formula} → ${outcome.display}`,
+        outcome,
+        {
+          speechKind: "dice",
+          speechText: formatDiceSpeechBubbleText(outcome),
+        },
+      );
       setInput("");
       return;
     }
 
-    postActivity("player_action", `${currentCharacter.name}: ${trimmed}`);
+    postActivity("player_action", `${currentCharacter.name}: ${trimmed}`, undefined, {
+      speechKind: "chat",
+      speechText: truncateSpeechBubbleText(trimmed),
+    });
     setInput("");
   }
 
@@ -182,15 +253,20 @@ export function LiveSessionActivityPanel({
     const outcome = executeDiceRoll({ dice: 1, sides: 20, modifier: bonus }, rollMode);
     maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
     const bonusLabel = bonus !== 0 ? ` (${formatSigned(bonus)})` : "";
+    const meta = {
+      ...outcome,
+      pending: true,
+      weaponName,
+      damage: primaryAttack?.damage ?? null,
+      attackBonus: bonus,
+    };
     postActivity(
       "attack_pending",
       `${currentCharacter.name} — ${weaponName} Angriff${bonusLabel}: ${outcome.display} — SL: trifft?`,
+      meta,
       {
-        ...outcome,
-        pending: true,
-        weaponName,
-        damage: primaryAttack?.damage ?? null,
-        attackBonus: bonus,
+        speechKind: "dice",
+        speechText: formatDiceSpeechBubbleText(meta),
       },
     );
   }
@@ -216,10 +292,15 @@ export function LiveSessionActivityPanel({
       "normal",
     );
     const critTag = critical ? "KRITISCH " : "";
+    const meta = { ...outcome, requestId, critical, damageFormula, label: "Schaden" };
     postActivity(
       "damage_roll",
       `${currentCharacter.name} — ${critTag}Schaden (${weaponName ?? "Waffe"}): ${outcome.display}`,
-      { ...outcome, requestId, critical, damageFormula },
+      meta,
+      {
+        speechKind: "dice",
+        speechText: formatDiceSpeechBubbleText(meta),
+      },
     );
   }
 
@@ -268,9 +349,23 @@ export function LiveSessionActivityPanel({
                 <p className="mt-0.5 truncate font-libre text-[10px] text-gray-400">{currentCharacter.name}</p>
               ) : null}
             </div>
-            <button type="button" onClick={onToggle} className="rounded p-1 text-gray-400 hover:text-white">
-              <X className="h-4 w-4" />
-            </button>
+            <div className="ml-2 flex shrink-0 items-center gap-1">
+              {isGM ? (
+                <button
+                  type="button"
+                  disabled={pending || activityLogs.length === 0}
+                  onClick={handleClearChat}
+                  title="Chat leeren"
+                  aria-label="Chat leeren"
+                  className="rounded p-1 text-gray-500 hover:bg-red-950/40 hover:text-red-300 disabled:opacity-40"
+                >
+                  <Eraser className="h-4 w-4" />
+                </button>
+              ) : null}
+              <button type="button" onClick={onToggle} className="rounded p-1 text-gray-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-2 space-y-2">
@@ -300,7 +395,7 @@ export function LiveSessionActivityPanel({
                 return (
                   <div
                     key={entry.id}
-                    className={`rounded border px-2 py-1.5 ${
+                    className={`group relative rounded border px-2 py-1.5 ${
                       isCrit
                         ? "border-accent-gold/70 bg-accent-gold/10"
                         : isFumble
@@ -308,10 +403,24 @@ export function LiveSessionActivityPanel({
                           : "border-hero-border/30 bg-hero-dark/25"
                     }`}
                   >
-                    <p className="font-libre text-[10px] text-gray-500">
-                      {new Date(entry.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                      {entry.author_name ? ` · ${entry.author_name}` : ""}
-                    </p>
+                    <div className="flex items-start justify-between gap-1">
+                      <p className="font-libre text-[10px] text-gray-500">
+                        {new Date(entry.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                        {entry.author_name ? ` · ${entry.author_name}` : ""}
+                      </p>
+                      {isGM ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          title="Nachricht löschen"
+                          aria-label="Nachricht löschen"
+                          className="shrink-0 rounded p-0.5 text-gray-600 opacity-70 hover:bg-red-950/50 hover:text-red-300 group-hover:opacity-100 disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      ) : null}
+                    </div>
                     <p
                       className={`font-libre text-xs leading-snug ${
                         isCrit ? "text-accent-gold font-bold" : isFumble ? "text-red-300" : "text-gray-200"

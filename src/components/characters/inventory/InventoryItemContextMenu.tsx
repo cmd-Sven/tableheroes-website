@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   ArrowLeftRight,
+  Backpack,
   Copy,
   Gift,
   Pencil,
@@ -20,13 +21,15 @@ export type ContextMenuAction =
   | "split"
   | "move"
   | "give"
-  | "assignCategory";
+  | "assignCategory"
+  | "equipAsContainer";
 
 type Props = {
   stack: InventoryStack;
   position: { x: number; y: number };
   readOnly: boolean;
   canGive: boolean;
+  canEquipAsContainer?: boolean;
   onAction: (action: ContextMenuAction) => void;
   onClose: () => void;
 };
@@ -36,6 +39,7 @@ export function InventoryItemContextMenu({
   position,
   readOnly,
   canGive,
+  canEquipAsContainer = false,
   onAction,
   onClose,
 }: Props) {
@@ -69,6 +73,12 @@ export function InventoryItemContextMenu({
   }[] = [
     { action: "edit", label: t("equipment.edit"), icon: Pencil },
     { action: "assignCategory", label: t("inventory.assignCategory"), icon: Tags },
+    {
+      action: "equipAsContainer",
+      label: t("inventory.equipAsContainer"),
+      icon: Backpack,
+      hidden: !canEquipAsContainer,
+    },
     { action: "delete", label: t("equipment.delete"), icon: Trash2, danger: true },
     { action: "duplicate", label: t("inventory.duplicate"), icon: Copy },
     { action: "split", label: t("inventory.split"), icon: Scissors, hidden: !canSplit },

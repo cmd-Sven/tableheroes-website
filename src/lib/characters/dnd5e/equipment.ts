@@ -159,10 +159,11 @@ export function removeItemFromEquipment(
   itemId: string,
 ): Dnd5eEquipmentState {
   const next = normalizeEquipmentState(equipment);
+  // linkedItemId bewusst nicht anfassen: es definiert den Behälter selbst,
+  // nicht die Lagerposition des Items (sonst verschwinden Rucksäcke beim Umpacken).
   next.containers = next.containers.map((c) => ({
     ...c,
     itemIds: c.itemIds.filter((id) => id !== itemId),
-    linkedItemId: c.linkedItemId === itemId ? null : c.linkedItemId,
   }));
   next.belt = next.belt.map((id) => (id === itemId ? null : id));
   for (const key of Object.keys(next.slots) as Dnd5eEquipmentSlot[]) {
@@ -173,6 +174,68 @@ export function removeItemFromEquipment(
   }
   next.attunedItemIds = next.attunedItemIds.filter((id) => id !== itemId);
   return next;
+}
+
+/** Behälter, der an dieses Item gekoppelt ist (Rucksack als Container). */
+export function findContainerByLinkedItemId(
+  equipment: Dnd5eEquipmentState,
+  itemId: string,
+): Dnd5eEquipmentContainer | undefined {
+  return equipment.containers.find((c) => c.linkedItemId === itemId);
+}
+
+export function isContainerContentEmpty(container: Dnd5eEquipmentContainer): boolean {
+  return container.itemIds.length === 0;
+}
+
+/**
+ * Darf dieses Gepäck-Item als neuer/aktiver Behälter ausgerüstet werden?
+ * Nur leeres Gepäck — bereits gekoppelte Behälter mit Inhalt sind gesperrt.
+ */
+export function canEquipItemAsContainer(
+  equipment: Dnd5eEquipmentState,
+  itemId: string,
+): { ok: boolean; reason?: "already_equipped" | "not_empty" } {
+  const existing = findContainerByLinkedItemId(equipment, itemId);
+  if (!existing) return { ok: true };
+  if (!isContainerContentEmpty(existing)) return { ok: false, reason: "not_empty" };
+  return { ok: false, reason: "already_equipped" };
+}
+
+function isContainerReachableFrom(
+  equipment: Dnd5eEquipmentState,
+  fromContainerId: string,
+  targetContainerId: string,
+  seen: Set<string> = new Set(),
+): boolean {
+  if (fromContainerId === targetContainerId) return true;
+  if (seen.has(fromContainerId)) return false;
+  seen.add(fromContainerId);
+  const from = equipment.containers.find((c) => c.id === fromContainerId);
+  if (!from) return false;
+  for (const id of from.itemIds) {
+    const nested = findContainerByLinkedItemId(equipment, id);
+    if (nested && isContainerReachableFrom(equipment, nested.id, targetContainerId, seen)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True wenn itemId in targetContainer gelegt würde → Self-Nest (Rucksack in sich selbst). */
+export function wouldSelfContain(
+  equipment: Dnd5eEquipmentState,
+  targetContainerId: string,
+  itemId: string,
+): boolean {
+  const target = equipment.containers.find((c) => c.id === targetContainerId);
+  if (!target) return false;
+  if (target.linkedItemId === itemId) return true;
+
+  const source = findContainerByLinkedItemId(equipment, itemId);
+  if (!source) return false;
+  if (source.id === targetContainerId) return true;
+  return isContainerReachableFrom(equipment, source.id, targetContainerId);
 }
 
 export function isTwoHandedWeapon(properties: string[]): boolean {
@@ -252,13 +315,16 @@ export function canPlaceItemInContainer(
   container: Dnd5eEquipmentContainer,
   items: CharacterItem[],
   itemId: string,
-): { ok: boolean; reason?: "capacity" | "already" } {
+): { ok: boolean; reason?: "capacity" | "already" | "self_nest" | "missing" } {
   if (container.itemIds.includes(itemId)) {
     return { ok: false, reason: "already" };
   }
+  if (container.linkedItemId === itemId) {
+    return { ok: false, reason: "self_nest" };
+  }
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const newItem = itemMap.get(itemId);
-  if (!newItem) return { ok: false };
+  if (!newItem) return { ok: false, reason: "missing" };
   const cap = getContainerMaxCapacityLb(container);
   const current = containerWeightLb(container, items);
   const added = itemWeightLb(newItem);
@@ -273,14 +339,22 @@ export function placeItemInContainer(
   containerId: string,
   itemId: string | null,
   items?: CharacterItem[],
-  options?: { prepend?: boolean },
+  options?: { prepend?: boolean; force?: boolean },
 ): Dnd5eEquipmentState {
   let next = normalizeEquipmentState(equipment);
-  if (itemId && items) {
-    const container = next.containers.find((c) => c.id === containerId);
-    if (container) {
-      const check = canPlaceItemInContainer(container, items, itemId);
-      if (!check.ok) return next;
+  if (itemId) {
+    if (wouldSelfContain(next, containerId, itemId)) {
+      return next;
+    }
+    if (items && !options?.force) {
+      const container = next.containers.find((c) => c.id === containerId);
+      if (container) {
+        const check = canPlaceItemInContainer(container, items, itemId);
+        if (!check.ok) return next;
+      }
+    } else if (items && options?.force) {
+      const container = next.containers.find((c) => c.id === containerId);
+      if (container?.linkedItemId === itemId) return next;
     }
   }
   if (itemId) next = removeItemFromEquipment(next, itemId);
@@ -306,24 +380,78 @@ export function stowUnassignedIntoContainer(
   const unassigned = getUnassignedItems(items, equipment);
   if (unassigned.length === 0) return equipment;
 
-  const targetId =
-    preferContainerId &&
-    equipment.containers.some((c) => c.id === preferContainerId)
-      ? preferContainerId
-      : equipment.containers[0]?.id;
-  if (!targetId) return equipment;
+  const orderedIds = orderedContainerIds(equipment, preferContainerId);
+  if (orderedIds.length === 0) return equipment;
 
   let next = normalizeEquipmentState(equipment);
   for (const item of unassigned) {
-    const container = next.containers.find((c) => c.id === targetId);
-    if (!container) break;
-    if (container.linkedItemId === item.id) continue;
-    const check = canPlaceItemInContainer(container, items, item.id);
-    if (!check.ok) {
-      if (check.reason === "capacity") break;
-      continue;
+    let placed = false;
+    for (const targetId of orderedIds) {
+      const container = next.containers.find((c) => c.id === targetId);
+      if (!container) continue;
+      if (container.linkedItemId === item.id) continue;
+      if (wouldSelfContain(next, targetId, item.id)) continue;
+      const check = canPlaceItemInContainer(container, items, item.id);
+      if (!check.ok) {
+        if (check.reason === "capacity") continue;
+        continue;
+      }
+      next = placeItemInContainer(next, targetId, item.id, items, { prepend: true });
+      placed = true;
+      break;
     }
-    next = placeItemInContainer(next, targetId, item.id, items, { prepend: true });
+    if (!placed) {
+      // Letzter Versuch: in bevorzugten/ersten Behälter erzwingen (sichtbar > still verschwunden)
+      for (const targetId of orderedIds) {
+        if (wouldSelfContain(next, targetId, item.id)) continue;
+        next = placeItemInContainer(next, targetId, item.id, items, {
+          prepend: true,
+          force: true,
+        });
+        if (next.containers.some((c) => c.id === targetId && c.itemIds.includes(item.id))) {
+          break;
+        }
+      }
+    }
+  }
+  return next;
+}
+
+function orderedContainerIds(
+  equipment: Dnd5eEquipmentState,
+  preferContainerId?: string | null,
+): string[] {
+  const ids = equipment.containers.map((c) => c.id);
+  if (!preferContainerId || !ids.includes(preferContainerId)) return ids;
+  return [preferContainerId, ...ids.filter((id) => id !== preferContainerId)];
+}
+
+/** Item in offenen/ersten Behälter legen — Kapazität darf überschritten werden, Self-Nest nie. */
+export function placeItemIntoBestContainer(
+  equipment: Dnd5eEquipmentState,
+  items: CharacterItem[],
+  itemId: string,
+  preferContainerId?: string | null,
+): Dnd5eEquipmentState {
+  const orderedIds = orderedContainerIds(equipment, preferContainerId);
+  if (orderedIds.length === 0) return equipment;
+
+  let next = normalizeEquipmentState(equipment);
+  for (const targetId of orderedIds) {
+    if (wouldSelfContain(next, targetId, itemId)) continue;
+    const container = next.containers.find((c) => c.id === targetId);
+    if (!container) continue;
+    const check = canPlaceItemInContainer(container, items, itemId);
+    if (check.ok) {
+      return placeItemInContainer(next, targetId, itemId, items, { prepend: true });
+    }
+  }
+  for (const targetId of orderedIds) {
+    if (wouldSelfContain(next, targetId, itemId)) continue;
+    next = placeItemInContainer(next, targetId, itemId, items, { prepend: true, force: true });
+    if (next.containers.some((c) => c.id === targetId && c.itemIds.includes(itemId))) {
+      return next;
+    }
   }
   return next;
 }
@@ -350,16 +478,20 @@ export function unequipToContainer(
     next = placeItemInGeneralSlot(next, opts.generalSlot, null);
   }
 
-  const targetId =
-    opts.preferContainerId &&
-    next.containers.some((c) => c.id === opts.preferContainerId)
-      ? opts.preferContainerId
-      : next.containers[0]?.id;
+  return placeItemIntoBestContainer(next, items, itemId, opts.preferContainerId);
+}
 
-  if (targetId) {
-    next = placeItemInContainer(next, targetId, itemId, items, { prepend: true });
-  }
-  return next;
+/** Gürtelplatz leeren und Gegenstand zurück in Gepäck legen. */
+export function unequipBeltToContainer(
+  equipment: Dnd5eEquipmentState,
+  items: CharacterItem[],
+  beltIndex: number,
+  preferContainerId?: string | null,
+): Dnd5eEquipmentState {
+  const itemId = equipment.belt[beltIndex] ?? null;
+  if (!itemId) return equipment;
+  let next = placeItemOnBelt(equipment, beltIndex, null);
+  return placeItemIntoBestContainer(next, items, itemId, preferContainerId);
 }
 
 /** Schwerster Gegenstand in einem Behälter (lb pro Einheit) */

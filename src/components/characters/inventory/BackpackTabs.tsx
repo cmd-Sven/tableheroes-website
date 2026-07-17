@@ -18,6 +18,10 @@ type Props = {
   onAdd?: () => void;
   onManage?: (containerId: string) => void;
   weightByContainer?: ContainerWeightInfo[];
+  /** Drop eines Items auf einen bestehenden Behälter-Tab */
+  onDropOnContainer?: (e: React.DragEvent, containerId: string) => void;
+  /** Drop eines Rucksack-Items auf „+“ → als Gepäck ausrüsten */
+  onDropEquipNew?: (e: React.DragEvent) => void;
 };
 
 function containerIcon(kind: Dnd5eEquipmentContainer["kind"]) {
@@ -34,6 +38,8 @@ export function BackpackTabs({
   onAdd,
   onManage,
   weightByContainer = [],
+  onDropOnContainer,
+  onDropEquipNew,
 }: Props) {
   const { t } = useCharacterSheetLocale();
   const weightMap = new Map(weightByContainer.map((w) => [w.id, w]));
@@ -46,6 +52,15 @@ export function BackpackTabs({
           <button
             type="button"
             onClick={onAdd}
+            onDragOver={
+              onDropEquipNew
+                ? (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }
+                : undefined
+            }
+            onDrop={onDropEquipNew}
             className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-dark/50"
           >
             <Plus className="h-3 w-3" />
@@ -65,7 +80,21 @@ export function BackpackTabs({
         const overweight = w ? w.weightLb > w.maxLb : false;
 
         return (
-          <div key={container.id} className="relative flex items-center">
+          <div
+            key={container.id}
+            className="relative flex items-center"
+            onDragOver={
+              onDropOnContainer
+                ? (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }
+                : undefined
+            }
+            onDrop={
+              onDropOnContainer ? (e) => onDropOnContainer(e, container.id) : undefined
+            }
+          >
             <button
               type="button"
               onClick={() => onSelect(container.id)}
@@ -113,6 +142,15 @@ export function BackpackTabs({
         <button
           type="button"
           onClick={onAdd}
+          onDragOver={
+            onDropEquipNew
+              ? (e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }
+              : undefined
+          }
+          onDrop={onDropEquipNew}
           title={t("equipment.addDefaultBackpack")}
           className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-dashed border-hero-border/40 text-gray-500 hover:border-hero-vibrant hover:text-hero-vibrant"
         >

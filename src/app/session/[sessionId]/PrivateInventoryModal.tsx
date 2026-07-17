@@ -31,10 +31,13 @@ import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGr
 import { DND_COIN_TYPES, type DndCoinCode } from "@/src/lib/dnd-currency";
 import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
 import {
+  canEquipItemAsContainer,
   normalizeEquipmentState,
-  placeItemInContainer,
+  placeItemIntoBestContainer,
   removeItemFromEquipment,
 } from "@/src/lib/characters/dnd5e/equipment";
+import { inferContainerKind, isBackpackItem } from "@/src/lib/characters/dnd5e/item-resolve";
+import { toast } from "sonner";
 import type {
   Dnd5eEquipmentContainer,
   Dnd5eEquipmentState,
@@ -120,6 +123,9 @@ function SessionInventoryBody({
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
   const [partyCharacters, setPartyCharacters] = useState<PartyCharacterOption[]>([]);
   const [highlightItemIds, setHighlightItemIds] = useState<Set<string>>(() => new Set());
+  const [activeInventoryContainerId, setActiveInventoryContainerId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSavingWealth, startSavingWealth] = useTransition();
   const [isSavingEquipment, startSavingEquipment] = useTransition();
@@ -169,11 +175,23 @@ function SessionInventoryBody({
   }
 
   function addContainer(container: Dnd5eEquipmentContainer) {
+    if (container.linkedItemId) {
+      const gate = canEquipItemAsContainer(equipment, container.linkedItemId);
+      if (!gate.ok) {
+        toast.error(
+          gate.reason === "not_empty"
+            ? "Nur leeres Gepäck kann als Behälter ausgerüstet werden."
+            : "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
+        );
+        return;
+      }
+    }
     let next = normalizeEquipmentState(equipment);
     if (container.linkedItemId) {
       next = removeItemFromEquipment(next, container.linkedItemId);
     }
     persistEquipment({ ...next, containers: [...next.containers, container] });
+    if (container.id) setActiveInventoryContainerId(container.id);
   }
 
   function updateContainer(container: Dnd5eEquipmentContainer) {
@@ -183,15 +201,57 @@ function SessionInventoryBody({
     });
   }
 
+  function equipItemAsContainer(item: CharacterItem) {
+    if (!(isBackpackItem(item) || inferContainerKind(item) != null)) {
+      toast.error("Nur Gepäck-/Rucksack-Gegenstände können hier ausgerüstet werden.");
+      return;
+    }
+    const gate = canEquipItemAsContainer(equipment, item.id);
+    if (!gate.ok) {
+      toast.error(
+        gate.reason === "not_empty"
+          ? "Nur leeres Gepäck kann als Behälter ausgerüstet werden."
+          : "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
+      );
+      return;
+    }
+    const kind = inferContainerKind(item) ?? "backpack";
+    addContainer({
+      id: crypto.randomUUID(),
+      kind,
+      label: item.name,
+      linkedItemId: item.id,
+      itemIds: [],
+    });
+  }
+
   async function placeNewItemInInventory(saved: CharacterItem) {
     setHighlightItemIds((prev) => new Set([...prev, saved.id]));
-    const nextPayload = await reload();
-    const allItems = nextPayload?.items ?? [...items, saved];
-    const targetContainer = equipment.containers[0];
-    if (!targetContainer) return;
-    persistEquipment(
-      placeItemInContainer(equipment, targetContainer.id, saved.id, allItems, { prepend: true }),
-    );
+    const nextPayload = await getCharacterEquipmentPayload(character.id);
+    setPayload(nextPayload);
+    // Equipment aus dem Server nicht überschreiben — lokale Placement-Änderungen behalten
+    const allItems = (nextPayload.items ?? []).filter((i) => !i.is_deleted);
+    if (!allItems.some((i) => i.id === saved.id)) {
+      allItems.push(saved);
+    }
+
+    const prefer =
+      activeInventoryContainerId && activeInventoryContainerId !== "__unassigned__"
+        ? activeInventoryContainerId
+        : equipment.containers[0]?.id ?? null;
+
+    if (!prefer && equipment.containers.length === 0) {
+      setActiveInventoryContainerId("__unassigned__");
+      return;
+    }
+
+    const next = placeItemIntoBestContainer(equipment, allItems, saved.id, prefer);
+    persistEquipment(next);
+    const landedIn =
+      next.containers.find((c) => c.itemIds.includes(saved.id))?.id ??
+      prefer ??
+      "__unassigned__";
+    setActiveInventoryContainerId(landedIn);
   }
 
   async function handleGiveItem(item: CharacterItem, targetCharacterId: string) {
@@ -498,6 +558,8 @@ function SessionInventoryBody({
                   highlightItemIds={highlightItemIds}
                   partyCharacters={partyCharacters}
                   onEquipmentChange={persistEquipment}
+                  activeContainerId={activeInventoryContainerId}
+                  onActiveContainerIdChange={setActiveInventoryContainerId}
                   onAddItem={() => setItemEditor("new")}
                   onEditItem={(item) => setItemEditor(item)}
                   onDeleteItem={handleDeleteItem}
@@ -518,6 +580,7 @@ function SessionInventoryBody({
                   onAddContainer={addContainer}
                   onUpdateContainer={updateContainer}
                   onAddCustomCategory={addCustomCategory}
+                  onEquipAsContainer={equipItemAsContainer}
                 />
               )}
             </div>

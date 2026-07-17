@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Scale } from "lucide-react";
 import type { CharacterItem } from "@/src/types/inventory";
 import type {
@@ -8,6 +8,7 @@ import type {
   Dnd5eEquipmentState,
 } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
+  canEquipItemAsContainer,
   containerWeightLb,
   deleteContainerAndRedistribute,
   findHeaviestItemInContainer,
@@ -16,10 +17,13 @@ import {
   getUnassignedItems,
   placeItemInContainer,
   removeItemFromEquipment,
+  wouldSelfContain,
 } from "@/src/lib/characters/dnd5e/equipment";
 import { getItemDisplayCategory, isMagicalItem, MAGICAL_FILTER_ID } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { inferContainerKind, isBackpackItem } from "@/src/lib/characters/dnd5e/item-resolve";
 import { DRAG_MIME } from "@/src/lib/characters/dnd5e/slot-validation";
 import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
+import { toast } from "sonner";
 import {
   groupItemsIntoStacks,
   INVENTORY_GRID_COLS,
@@ -75,6 +79,8 @@ type Props = {
   onAddContainer: (container: Dnd5eEquipmentContainer) => void;
   onUpdateContainer: (container: Dnd5eEquipmentContainer) => void;
   onAddCustomCategory: (label: string) => void;
+  /** Gepäck-Item als Behälter-Tab ausrüsten (nur leeres Gepäck) */
+  onEquipAsContainer?: (item: CharacterItem) => void;
   variant?: "sheet" | "session";
   /** Kontrollierter aktiver Behälter (für Ablegen aus Ausrüstungsslots) */
   activeContainerId?: string | null;
@@ -106,6 +112,7 @@ export function InventoryGrid({
   onAddContainer,
   onUpdateContainer,
   onAddCustomCategory,
+  onEquipAsContainer,
   variant = "sheet",
   activeContainerId: controlledActiveId,
   onActiveContainerIdChange,
@@ -138,6 +145,13 @@ export function InventoryGrid({
     | null
   >(null);
   const [manageContainerId, setManageContainerId] = useState<string | null>(null);
+
+  // Neues/hervorgehobenes Item sichtbar machen (Filter + Seite)
+  useEffect(() => {
+    if (!highlightItemIds || highlightItemIds.size === 0) return;
+    setCategoryFilter(null);
+    setPage(0);
+  }, [highlightItemIds]);
 
   const unassigned = useMemo(
     () => getUnassignedItems(items, equipment),
@@ -240,12 +254,19 @@ export function InventoryGrid({
       case "give":
         setItemModal({ type: "give", item });
         break;
+      case "equipAsContainer":
+        onEquipAsContainer?.(item);
+        break;
     }
   }
 
   function handleMoveItem(item: CharacterItem, containerId: string) {
+    if (wouldSelfContain(equipment, containerId, item.id)) {
+      toast.error(t("inventory.selfNestForbidden"));
+      return;
+    }
     let next = removeItemFromEquipment(equipment, item.id);
-    next = placeItemInContainer(next, containerId, item.id, items);
+    next = placeItemInContainer(next, containerId, item.id, items, { force: true });
     onEquipmentChange(next);
     setItemModal(null);
   }
@@ -273,9 +294,63 @@ export function InventoryGrid({
       return;
     }
 
+    if (wouldSelfContain(equipment, activeContainer.id, itemId)) {
+      toast.error(t("inventory.selfNestForbidden"));
+      return;
+    }
+
+    // Ausrüstungsslots → Inventar: immer ablegen (force), sonst verschwindet das Item still
     onEquipmentChange(
-      placeItemInContainer(equipment, activeContainer.id, itemId, items, { prepend: true }),
+      placeItemInContainer(equipment, activeContainer.id, itemId, items, {
+        prepend: true,
+        force: true,
+      }),
     );
+  }
+
+  function handleBackpackTabDrop(e: React.DragEvent, targetContainerId: string) {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
+    setDragItemId(null);
+    if (!itemId) return;
+    if (wouldSelfContain(equipment, targetContainerId, itemId)) {
+      toast.error(t("inventory.selfNestForbidden"));
+      return;
+    }
+    onEquipmentChange(
+      placeItemInContainer(equipment, targetContainerId, itemId, items, {
+        prepend: true,
+        force: true,
+      }),
+    );
+    setActiveContainerId(targetContainerId);
+    setPage(0);
+  }
+
+  function handleEquipBackpackDrop(e: React.DragEvent) {
+    if (readOnly || !onEquipAsContainer) return;
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData(DRAG_MIME) || getDragItemId();
+    setDragItemId(null);
+    if (!itemId) return;
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    if (!(isBackpackItem(item) || inferContainerKind(item) != null)) {
+      toast.error(t("inventory.notABackpack"));
+      return;
+    }
+    const gate = canEquipItemAsContainer(equipment, itemId);
+    if (!gate.ok) {
+      toast.error(
+        gate.reason === "not_empty"
+          ? t("inventory.backpackNotEmpty")
+          : t("inventory.backpackAlreadyEquipped"),
+      );
+      return;
+    }
+    onEquipAsContainer(item);
   }
 
   return (
@@ -339,6 +414,8 @@ export function InventoryGrid({
         }}
         onAdd={readOnly ? undefined : () => setContainerSetup({ mode: "create" })}
         onManage={readOnly ? undefined : (id) => setManageContainerId(id)}
+        onDropOnContainer={readOnly ? undefined : handleBackpackTabDrop}
+        onDropEquipNew={readOnly || !onEquipAsContainer ? undefined : handleEquipBackpackDrop}
       />
 
       {unassigned.length > 0 ? (
@@ -462,6 +539,12 @@ export function InventoryGrid({
           position={{ x: contextMenu.x, y: contextMenu.y }}
           readOnly={readOnly}
           canGive={partyCharacters.length > 0 && Boolean(onGiveItem)}
+          canEquipAsContainer={Boolean(
+            onEquipAsContainer &&
+              (isBackpackItem(contextMenu.stack.representative) ||
+                inferContainerKind(contextMenu.stack.representative) != null) &&
+              canEquipItemAsContainer(equipment, contextMenu.stack.representative.id).ok,
+          )}
           onAction={handleContextAction}
           onClose={() => setContextMenu(null)}
         />

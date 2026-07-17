@@ -432,6 +432,11 @@ export const characterSheetMessagesEn = {
   "inventory.containerDeleteRedistribute":
     "Delete container? {count} items will be distributed to other containers.",
   "inventory.containerDeleteEmpty": "Delete empty container?",
+  "inventory.selfNestForbidden": "Luggage cannot be placed inside itself.",
+  "inventory.equipAsContainer": "Equip as luggage",
+  "inventory.backpackNotEmpty": "Only empty luggage can be equipped as a container.",
+  "inventory.backpackAlreadyEquipped": "This luggage is already equipped as a container.",
+  "inventory.notABackpack": "Only luggage/backpack items can be equipped here.",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":

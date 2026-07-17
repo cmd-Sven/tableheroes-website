@@ -90,6 +90,10 @@ import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
 } from "@/src/lib/session/avatar-roll-fx";
+import {
+  dispatchAvatarSpeechBubble,
+  speechBubbleFromActivityEntry,
+} from "@/src/lib/session/avatar-speech-bubble";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -1625,7 +1629,7 @@ export function LiveSessionBoard({
     }
   }, [systemLogs, isGM, forcePlayerView]);
 
-  /** Crit/Patzer-Avatar-FX für alle Clients (inkl. Remote nach Live-State-Sync). */
+  /** Crit/Patzer-Avatar-FX + Sprechblasen für alle Clients (inkl. Remote nach Live-State-Sync). */
   useEffect(() => {
     if (systemLogs.length < prevRollFxLogCountRef.current) {
       prevRollFxLogCountRef.current = systemLogs.length;
@@ -1635,18 +1639,25 @@ export function LiveSessionBoard({
     const fresh = systemLogs.slice(prevRollFxLogCountRef.current);
     prevRollFxLogCountRef.current = systemLogs.length;
     for (const entry of fresh) {
-      if (entry.type !== "dice" && entry.type !== "attack_pending" && entry.type !== "skill_check") {
-        continue;
-      }
       const characterId = entry.character_id?.trim();
-      if (!characterId) continue;
-      const kind = rollFxKindFromMeta(entry.meta);
-      if (!kind) continue;
-      dispatchAvatarRollFx({
-        characterId,
-        kind,
-        sourceId: entry.id,
-      });
+      if (characterId) {
+        if (
+          entry.type === "dice" ||
+          entry.type === "attack_pending" ||
+          entry.type === "skill_check"
+        ) {
+          const kind = rollFxKindFromMeta(entry.meta);
+          if (kind) {
+            dispatchAvatarRollFx({
+              characterId,
+              kind,
+              sourceId: entry.id,
+            });
+          }
+        }
+      }
+      const bubble = speechBubbleFromActivityEntry(entry);
+      if (bubble) dispatchAvatarSpeechBubble(bubble);
     }
   }, [systemLogs]);
 
@@ -4334,6 +4345,39 @@ export function LiveSessionBoard({
           }
           prepTestCharacterId={prepTestCharacterId}
           onPrepTestCharacterChange={setPrepTestCharacterId}
+          onActivityPosted={(entry) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+              if (logs.some((l) => l.id === entry.id)) return prev;
+              const next = {
+                ...prev,
+                system_logs: [...logs, entry].slice(-120),
+              };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          onActivityCleared={() => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, system_logs: [] };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          onActivityDeleted={(entryId) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+              const next = {
+                ...prev,
+                system_logs: logs.filter((l) => l.id !== entryId),
+              };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
         />
       ) : null}
 

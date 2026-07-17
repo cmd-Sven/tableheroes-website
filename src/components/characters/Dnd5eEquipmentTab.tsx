@@ -34,6 +34,7 @@ import {
 import {
   applyEquipmentLoadout,
   applyWeaponPreset,
+  canEquipItemAsContainer,
   carryingCapacityLb,
   computeArmorClassPreview,
   computeEquippedWeaponAttacks,
@@ -45,9 +46,9 @@ import {
   getUnassignedItems,
   hasBackpackContainer,
   normalizeEquipmentState,
-  placeItemInContainer,
   placeItemInGeneralSlot,
   placeItemInSlot,
+  placeItemIntoBestContainer,
   removeItemFromEquipment,
   stowUnassignedIntoContainer,
   unequipToContainer,
@@ -111,14 +112,14 @@ export function Dnd5eEquipmentTab({
     [sheet.equipment],
   );
 
-  const reloadInventory = useCallback(async () => {
-    setLoading(true);
+  const reloadInventory = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     try {
       const data = await getCharacterInventory(characterId);
       setInventory(data);
       return data;
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) setLoading(false);
     }
   }, [characterId]);
 
@@ -177,6 +178,7 @@ export function Dnd5eEquipmentTab({
       return;
     }
     setActiveInventoryContainerId((prev) => {
+      if (prev === "__unassigned__") return prev;
       if (prev && equipment.containers.some((c) => c.id === prev)) return prev;
       return equipment.containers[0]?.id ?? null;
     });
@@ -188,11 +190,11 @@ export function Dnd5eEquipmentTab({
     if (equipment.containers.length === 0) return;
     const orphans = getUnassignedItems(items, equipment);
     if (orphans.length === 0) return;
-    const stowed = stowUnassignedIntoContainer(
-      equipment,
-      items,
-      activeInventoryContainerId,
-    );
+    const prefer =
+      activeInventoryContainerId && activeInventoryContainerId !== "__unassigned__"
+        ? activeInventoryContainerId
+        : null;
+    const stowed = stowUnassignedIntoContainer(equipment, items, prefer);
     const after = getUnassignedItems(items, stowed).length;
     if (after < orphans.length) {
       update(stowed);
@@ -226,6 +228,18 @@ export function Dnd5eEquipmentTab({
   }, [loading, items, equipment, level]);
 
   function addContainer(container: Dnd5eEquipmentContainer) {
+    if (container.linkedItemId) {
+      const gate = canEquipItemAsContainer(equipment, container.linkedItemId);
+      if (!gate.ok) {
+        toast.error(
+          gate.reason === "not_empty"
+            ? t("inventory.backpackNotEmpty")
+            : t("inventory.backpackAlreadyEquipped"),
+        );
+        setPendingBackpackItemId(null);
+        return;
+      }
+    }
     let next = normalizeEquipmentState(equipment);
     if (container.linkedItemId) {
       next = removeItemFromEquipment(next, container.linkedItemId);
@@ -233,6 +247,7 @@ export function Dnd5eEquipmentTab({
     next.containers = [...next.containers, container];
     update(next);
     setPendingBackpackItemId(null);
+    if (container.id) setActiveInventoryContainerId(container.id);
   }
 
   function updateContainer(container: Dnd5eEquipmentContainer) {
@@ -245,18 +260,46 @@ export function Dnd5eEquipmentTab({
   function addBackpackFromItem(itemId: string) {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
+    const gate = canEquipItemAsContainer(equipment, itemId);
+    if (!gate.ok) {
+      toast.error(
+        gate.reason === "not_empty"
+          ? t("inventory.backpackNotEmpty")
+          : t("inventory.backpackAlreadyEquipped"),
+      );
+      return;
+    }
     setPendingBackpackItemId(itemId);
   }
 
   async function placeNewItemInInventory(saved: CharacterItem) {
     setHighlightItemIds((prev) => new Set([...prev, saved.id]));
-    const data = await reloadInventory();
-    const allItems = data?.items ?? [...items, saved];
-    const targetContainer = equipment.containers[0];
-    if (!targetContainer) return;
-    update(
-      placeItemInContainer(equipment, targetContainer.id, saved.id, allItems, { prepend: true }),
-    );
+    const data = await reloadInventory({ quiet: true });
+    const allItems = (data?.items ?? []).filter((i) => !i.is_deleted);
+    if (!allItems.some((i) => i.id === saved.id)) {
+      allItems.push(saved);
+    }
+
+    const prefer =
+      activeInventoryContainerId && activeInventoryContainerId !== "__unassigned__"
+        ? activeInventoryContainerId
+        : equipment.containers[0]?.id ?? null;
+
+    if (!prefer && equipment.containers.length === 0) {
+      // Item existiert, erscheint unter „Noch nicht verteilt“
+      setActiveInventoryContainerId("__unassigned__");
+      return;
+    }
+
+    const next = placeItemIntoBestContainer(equipment, allItems, saved.id, prefer);
+    update(next);
+
+    const landedIn =
+      next.containers.find((c) => c.itemIds.includes(saved.id))?.id ??
+      (getUnassignedItems(allItems, next).some((i) => i.id === saved.id)
+        ? "__unassigned__"
+        : prefer);
+    if (landedIn) setActiveInventoryContainerId(landedIn);
   }
 
   async function handleGiveItem(item: CharacterItem, targetCharacterId: string) {
@@ -443,9 +486,11 @@ export function Dnd5eEquipmentTab({
 
           <BeltSlotsStrip
             equipment={equipment}
+            items={items}
             itemNames={itemNames}
             itemMap={itemMap}
             readOnly={readOnly}
+            preferContainerId={activeInventoryContainerId}
             onEquipmentChange={update}
             compact
           />
@@ -512,6 +557,7 @@ export function Dnd5eEquipmentTab({
             onAddContainer={addContainer}
             onUpdateContainer={updateContainer}
             onAddCustomCategory={addCustomCategory}
+            onEquipAsContainer={(item) => addBackpackFromItem(item.id)}
           />
         </div>
 
@@ -534,7 +580,10 @@ export function Dnd5eEquipmentTab({
                   update(
                     unequipToContainer(equipment, items, {
                       slot,
-                      preferContainerId: activeInventoryContainerId,
+                      preferContainerId:
+                        activeInventoryContainerId === "__unassigned__"
+                          ? null
+                          : activeInventoryContainerId,
                     }),
                   );
                   return;
@@ -546,7 +595,10 @@ export function Dnd5eEquipmentTab({
                   update(
                     unequipToContainer(equipment, items, {
                       generalSlot: slot,
-                      preferContainerId: activeInventoryContainerId,
+                      preferContainerId:
+                        activeInventoryContainerId === "__unassigned__"
+                          ? null
+                          : activeInventoryContainerId,
                     }),
                   );
                   return;
@@ -557,7 +609,10 @@ export function Dnd5eEquipmentTab({
                 update(
                   unequipToContainer(equipment, items, {
                     slot,
-                    preferContainerId: activeInventoryContainerId,
+                    preferContainerId:
+                      activeInventoryContainerId === "__unassigned__"
+                        ? null
+                        : activeInventoryContainerId,
                   }),
                 )
               }
@@ -565,7 +620,10 @@ export function Dnd5eEquipmentTab({
                 update(
                   unequipToContainer(equipment, items, {
                     generalSlot: slot,
-                    preferContainerId: activeInventoryContainerId,
+                    preferContainerId:
+                      activeInventoryContainerId === "__unassigned__"
+                        ? null
+                        : activeInventoryContainerId,
                   }),
                 )
               }
@@ -578,7 +636,11 @@ export function Dnd5eEquipmentTab({
       {equipment.containers.length === 0 && !readOnly ? (
         <section className="rounded-lg border border-hero-dark bg-background-card p-4">
           <p className="font-libre text-sm text-gray-400 mb-3">{t("equipment.step1Hint")}</p>
-          {items.filter((i) => isBackpackItem(i) || inferContainerKind(i) != null).length > 0 ? (
+          {items.filter(
+            (i) =>
+              (isBackpackItem(i) || inferContainerKind(i) != null) &&
+              canEquipItemAsContainer(equipment, i.id).ok,
+          ).length > 0 ? (
             <select
               value={pendingBackpackItemId ?? ""}
               onChange={(e) => e.target.value && addBackpackFromItem(e.target.value)}
@@ -586,7 +648,11 @@ export function Dnd5eEquipmentTab({
             >
               <option value="">{t("equipment.chooseBackpack")}</option>
               {items
-                .filter((i) => isBackpackItem(i) || inferContainerKind(i) != null)
+                .filter(
+                  (i) =>
+                    (isBackpackItem(i) || inferContainerKind(i) != null) &&
+                    canEquipItemAsContainer(equipment, i.id).ok,
+                )
                 .map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}

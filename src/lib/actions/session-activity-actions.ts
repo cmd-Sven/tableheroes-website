@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient, createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
 
@@ -19,6 +19,19 @@ function normalizeLogs(value: unknown): SessionActivityEntry[] {
   return Array.isArray(value)
     ? value.filter((e): e is SessionActivityEntry => e != null && typeof e === "object")
     : [];
+}
+
+function entryToJson(entry: SessionActivityEntry): Record<string, unknown> {
+  return {
+    id: entry.id,
+    at: entry.at,
+    text: entry.text,
+    type: entry.type,
+    author_name: entry.author_name,
+    author_user_id: entry.author_user_id,
+    character_id: entry.character_id,
+    meta: entry.meta ?? null,
+  };
 }
 
 async function assertSessionParticipant(
@@ -64,6 +77,47 @@ async function assertSessionParticipant(
   };
 }
 
+/** Fallback wenn RPC noch nicht deployed: Admin-Write mit Verify (Spieler haben kein UPDATE-RLS). */
+async function appendWithAdminFallback(
+  sessionId: string,
+  entry: SessionActivityEntry,
+): Promise<void> {
+  const admin = tryCreateAdminClient();
+  if (!admin) {
+    throw new Error(
+      "Würfel/Chat konnte nicht gespeichert werden (RPC fehlt und Service-Role nicht verfügbar).",
+    );
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: liveRaw, error: liveErr } = await (admin.from("session_live_states") as any)
+      .select("system_logs")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (liveErr) throw new Error(liveErr.message || "Live-State nicht gefunden.");
+    if (!liveRaw) throw new Error("Live-State nicht gefunden.");
+
+    const current = normalizeLogs(liveRaw.system_logs);
+    if (current.some((e) => e.id === entry.id)) return;
+
+    const nextLogs = [...current, entry].slice(-120);
+    const { data: updated, error: upErr } = await (admin.from("session_live_states") as any)
+      .update({ system_logs: nextLogs })
+      .eq("session_id", sessionId)
+      .select("system_logs")
+      .maybeSingle();
+
+    if (upErr) throw new Error(upErr.message || "Aktivität konnte nicht gespeichert werden.");
+    if (!updated) throw new Error("Aktivität konnte nicht gespeichert werden (0 Zeilen).");
+
+    const saved = normalizeLogs(updated.system_logs);
+    if (saved.some((e) => e.id === entry.id)) return;
+  }
+
+  throw new Error("Aktivität konnte nach mehreren Versuchen nicht gespeichert werden.");
+}
+
 export async function appendSessionActivity(input: {
   sessionId: string;
   type: string;
@@ -83,25 +137,11 @@ export async function appendSessionActivity(input: {
   const trimmed = input.text.trim();
   if (!trimmed) return null;
 
-  const { campaignId, isGm, username } = await assertSessionParticipant(
+  const { campaignId, username } = await assertSessionParticipant(
     supabase,
     input.sessionId,
     user.id,
   );
-
-  let writeClient = supabase;
-  try {
-    writeClient = createAdminClient();
-  } catch {
-    writeClient = supabase;
-  }
-
-  const { data: liveRaw, error: liveErr } = await (writeClient.from("session_live_states") as any)
-    .select("system_logs")
-    .eq("session_id", input.sessionId)
-    .maybeSingle();
-
-  if (liveErr) throw new Error(liveErr.message || "Live-State nicht gefunden.");
 
   const authorName = input.characterName?.trim() || username || "Spieler";
   const entry: SessionActivityEntry = {
@@ -115,13 +155,23 @@ export async function appendSessionActivity(input: {
     meta: input.meta,
   };
 
-  const nextLogs = [...normalizeLogs(liveRaw?.system_logs), entry].slice(-120);
+  const { error: rpcErr } = await (supabase as any).rpc("append_session_system_log", {
+    p_session_id: input.sessionId,
+    p_entry: entryToJson(entry),
+  });
 
-  const { error: upErr } = await (writeClient.from("session_live_states") as any)
-    .update({ system_logs: nextLogs })
-    .eq("session_id", input.sessionId);
-
-  if (upErr) throw new Error(upErr.message || "Aktivität konnte nicht gespeichert werden.");
+  if (rpcErr) {
+    const msg = String(rpcErr.message ?? "");
+    const missingRpc =
+      /append_session_system_log/i.test(msg) ||
+      /Could not find the function/i.test(msg) ||
+      rpcErr.code === "PGRST202" ||
+      rpcErr.code === "42883";
+    if (!missingRpc) {
+      throw new Error(msg || "Aktivität konnte nicht gespeichert werden.");
+    }
+    await appendWithAdminFallback(input.sessionId, entry);
+  }
 
   if (input.notifyGm && input.characterId && input.gmEditSummary) {
     try {
@@ -140,6 +190,89 @@ export async function appendSessionActivity(input: {
   return entry;
 }
 
+export async function clearSessionActivity(sessionId: string): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { isGm } = await assertSessionParticipant(supabase, sessionId, user.id);
+  if (!isGm) throw new Error("Nur der Spielleiter kann den Chat leeren.");
+
+  const { error: rpcErr } = await (supabase as any).rpc("clear_session_system_logs", {
+    p_session_id: sessionId,
+  });
+
+  if (!rpcErr) return;
+
+  const msg = String(rpcErr.message ?? "");
+  const missingRpc =
+    /clear_session_system_logs/i.test(msg) ||
+    /Could not find the function/i.test(msg) ||
+    rpcErr.code === "PGRST202" ||
+    rpcErr.code === "42883";
+  if (!missingRpc) throw new Error(msg || "Chat konnte nicht geleert werden.");
+
+  const admin = tryCreateAdminClient() ?? createAdminClient();
+  const { data, error } = await (admin.from("session_live_states") as any)
+    .update({ system_logs: [] })
+    .eq("session_id", sessionId)
+    .select("session_id")
+    .maybeSingle();
+  if (error) throw new Error(error.message || "Chat konnte nicht geleert werden.");
+  if (!data) throw new Error("Live-State nicht gefunden.");
+}
+
+export async function deleteSessionActivityEntry(
+  sessionId: string,
+  entryId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { isGm } = await assertSessionParticipant(supabase, sessionId, user.id);
+  if (!isGm) throw new Error("Nur der Spielleiter kann Nachrichten löschen.");
+
+  const trimmedId = entryId.trim();
+  if (!trimmedId) throw new Error("Ungültige Eintrags-ID.");
+
+  const { error: rpcErr } = await (supabase as any).rpc("delete_session_system_log", {
+    p_session_id: sessionId,
+    p_entry_id: trimmedId,
+  });
+
+  if (!rpcErr) return;
+
+  const msg = String(rpcErr.message ?? "");
+  const missingRpc =
+    /delete_session_system_log/i.test(msg) ||
+    /Could not find the function/i.test(msg) ||
+    rpcErr.code === "PGRST202" ||
+    rpcErr.code === "42883";
+  if (!missingRpc) throw new Error(msg || "Nachricht konnte nicht gelöscht werden.");
+
+  const admin = tryCreateAdminClient() ?? createAdminClient();
+  const { data: liveRaw, error: liveErr } = await (admin.from("session_live_states") as any)
+    .select("system_logs")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (liveErr) throw new Error(liveErr.message || "Live-State nicht gefunden.");
+  if (!liveRaw) throw new Error("Live-State nicht gefunden.");
+
+  const nextLogs = normalizeLogs(liveRaw.system_logs).filter((e) => e.id !== trimmedId);
+  const { data, error } = await (admin.from("session_live_states") as any)
+    .update({ system_logs: nextLogs })
+    .eq("session_id", sessionId)
+    .select("session_id")
+    .maybeSingle();
+  if (error) throw new Error(error.message || "Nachricht konnte nicht gelöscht werden.");
+  if (!data) throw new Error("Nachricht konnte nicht gelöscht werden (0 Zeilen).");
+}
+
 export async function resolveCombatRequest(input: {
   sessionId: string;
   requestId: string;
@@ -155,7 +288,8 @@ export async function resolveCombatRequest(input: {
   const { isGm } = await assertSessionParticipant(supabase, input.sessionId, user.id);
   if (!isGm) throw new Error("Nur der SL kann Angriffe bestätigen.");
 
-  const { data: liveRaw } = await (supabase.from("session_live_states") as any)
+  const admin = tryCreateAdminClient() ?? supabase;
+  const { data: liveRaw } = await (admin.from("session_live_states") as any)
     .select("system_logs")
     .eq("session_id", input.sessionId)
     .maybeSingle();

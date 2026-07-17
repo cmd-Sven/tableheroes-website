@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import { MAX_BELT_SLOTS } from "@/src/lib/characters/dnd5e/equipment-types";
-import { placeItemOnBelt } from "@/src/lib/characters/dnd5e/equipment";
+import {
+  placeItemOnBelt,
+  unequipBeltToContainer,
+} from "@/src/lib/characters/dnd5e/equipment";
 import {
   DRAG_MIME,
   hasWaistBeltEquipped,
@@ -18,19 +21,23 @@ import { EquippedSlotTile } from "./EquippedSlotTile";
 
 type Props = {
   equipment: Dnd5eEquipmentState;
+  items: CharacterItem[];
   itemNames: Record<string, string>;
   itemMap: Map<string, CharacterItem>;
   readOnly: boolean;
   onEquipmentChange: (equipment: Dnd5eEquipmentState) => void;
+  preferContainerId?: string | null;
   compact?: boolean;
 };
 
 export function BeltSlotsStrip({
   equipment,
+  items,
   itemNames,
   itemMap,
   readOnly,
   onEquipmentChange,
+  preferContainerId = null,
   compact = true,
 }: Props) {
   const { t } = useCharacterSheetLocale();
@@ -71,6 +78,14 @@ export function BeltSlotsStrip({
       return;
     }
     onEquipmentChange(placeItemOnBelt(equipment, index, itemId));
+  }
+
+  function handleUnequip(index: number) {
+    const prefer =
+      preferContainerId && preferContainerId !== "__unassigned__"
+        ? preferContainerId
+        : null;
+    onEquipmentChange(unequipBeltToContainer(equipment, items, index, prefer));
   }
 
   return (
@@ -134,9 +149,7 @@ export function BeltSlotsStrip({
                         : t("equipment.empty")
                 }
                 onClick={
-                  itemId && !readOnly && !disabled
-                    ? () => onEquipmentChange(placeItemOnBelt(equipment, index, null))
-                    : undefined
+                  itemId && !readOnly && !disabled ? () => handleUnequip(index) : undefined
                 }
               />
               {itemId ? (

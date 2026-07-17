@@ -432,6 +432,11 @@ export const characterSheetMessagesDe = {
   "inventory.containerDeleteRedistribute":
     "Behälter löschen? {count} Gegenstände werden auf andere Behälter verteilt.",
   "inventory.containerDeleteEmpty": "Leeren Behälter wirklich löschen?",
+  "inventory.selfNestForbidden": "Gepäck kann nicht in sich selbst gelegt werden.",
+  "inventory.equipAsContainer": "Als Gepäck ausrüsten",
+  "inventory.backpackNotEmpty": "Nur leeres Gepäck kann als Behälter ausgerüstet werden.",
+  "inventory.backpackAlreadyEquipped": "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
+  "inventory.notABackpack": "Nur Gepäck-/Rucksack-Gegenstände können hier ausgerüstet werden.",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":

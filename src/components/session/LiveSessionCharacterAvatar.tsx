@@ -44,6 +44,12 @@ import {
   type AvatarRollFxDetail,
   type AvatarRollFxKind,
 } from "@/src/lib/session/avatar-roll-fx";
+import {
+  AVATAR_SPEECH_BUBBLE_DURATION_MS,
+  AVATAR_SPEECH_BUBBLE_EVENT,
+  type AvatarSpeechBubbleDetail,
+  type AvatarSpeechBubbleKind,
+} from "@/src/lib/session/avatar-speech-bubble";
 
 type RadialPanel =
   | "weapons"
@@ -140,28 +146,39 @@ export function LiveSessionCharacterAvatar({
     moodKey: MoodStateKey;
     endsAt: number;
   } | null>(null);
+  const [speechBubble, setSpeechBubble] = useState<{
+    kind: AvatarSpeechBubbleKind;
+    text: string;
+    key: string;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const rollFxTimerRef = useRef<number | null>(null);
+  const speechBubbleTimerRef = useRef<number | null>(null);
   const seenRollFxIdsRef = useRef<Set<string>>(new Set());
+  const seenSpeechBubbleIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    function rememberSourceId(set: Set<string>, sourceId: string | undefined): boolean {
+      if (!sourceId) return false;
+      if (set.has(sourceId)) return true;
+      set.add(sourceId);
+      if (set.size > 40) {
+        const oldest = set.values().next().value;
+        if (oldest) set.delete(oldest);
+      }
+      return false;
+    }
+
     function onRollFx(e: Event) {
       const detail = (e as CustomEvent<AvatarRollFxDetail>).detail;
       if (!detail || detail.characterId !== characterId) return;
-      if (detail.sourceId) {
-        if (seenRollFxIdsRef.current.has(detail.sourceId)) return;
-        seenRollFxIdsRef.current.add(detail.sourceId);
-        if (seenRollFxIdsRef.current.size > 40) {
-          const oldest = seenRollFxIdsRef.current.values().next().value;
-          if (oldest) seenRollFxIdsRef.current.delete(oldest);
-        }
-      }
+      if (rememberSourceId(seenRollFxIdsRef.current, detail.sourceId)) return;
       const duration = detail.durationMs ?? AVATAR_ROLL_FX_DURATION_MS;
       const moodKey = moodKeyForRollFx(detail.kind);
       setRollFx({ kind: detail.kind, moodKey, endsAt: Date.now() + duration });
@@ -171,10 +188,28 @@ export function LiveSessionCharacterAvatar({
         rollFxTimerRef.current = null;
       }, duration);
     }
+
+    function onSpeechBubble(e: Event) {
+      const detail = (e as CustomEvent<AvatarSpeechBubbleDetail>).detail;
+      if (!detail || detail.characterId !== characterId) return;
+      if (rememberSourceId(seenSpeechBubbleIdsRef.current, detail.sourceId)) return;
+      const duration = detail.durationMs ?? AVATAR_SPEECH_BUBBLE_DURATION_MS;
+      const key = detail.sourceId ?? `${Date.now()}-${detail.text}`;
+      setSpeechBubble({ kind: detail.kind, text: detail.text, key });
+      if (speechBubbleTimerRef.current != null) window.clearTimeout(speechBubbleTimerRef.current);
+      speechBubbleTimerRef.current = window.setTimeout(() => {
+        setSpeechBubble(null);
+        speechBubbleTimerRef.current = null;
+      }, duration);
+    }
+
     window.addEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
+    window.addEventListener(AVATAR_SPEECH_BUBBLE_EVENT, onSpeechBubble);
     return () => {
       window.removeEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
+      window.removeEventListener(AVATAR_SPEECH_BUBBLE_EVENT, onSpeechBubble);
       if (rollFxTimerRef.current != null) window.clearTimeout(rollFxTimerRef.current);
+      if (speechBubbleTimerRef.current != null) window.clearTimeout(speechBubbleTimerRef.current);
     };
   }, [characterId]);
 
@@ -630,6 +665,50 @@ export function LiveSessionCharacterAvatar({
 
   return (
     <div ref={rootRef} className="relative flex h-full w-full flex-col items-center">
+      {/* Feste Höhe über dem Avatar → kein CLS beim Einblenden */}
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-[70] mb-1 flex h-[3.25rem] w-[11.5rem] -translate-x-1/2 items-end justify-center">
+        <AnimatePresence mode="wait">
+          {speechBubble ? (
+            <motion.div
+              key={speechBubble.key}
+              role="status"
+              aria-live="polite"
+              initial={{ opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              className="relative max-w-full"
+            >
+              <div
+                className={`rounded-lg border px-2.5 py-1.5 shadow-lg ${
+                  speechBubble.kind === "dice"
+                    ? "border-accent-gold/70 bg-background-dark/95 text-accent-gold"
+                    : "border-hero-border/80 bg-background-card/95 text-gray-100"
+                }`}
+              >
+                <p
+                  className={`text-center leading-snug ${
+                    speechBubble.kind === "dice"
+                      ? "font-barlow text-xs font-bold uppercase tracking-wide"
+                      : "font-libre text-[11px]"
+                  }`}
+                >
+                  {speechBubble.text}
+                </p>
+              </div>
+              <span
+                aria-hidden
+                className={`absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[7px] border-x-transparent ${
+                  speechBubble.kind === "dice"
+                    ? "border-t-accent-gold/70"
+                    : "border-t-hero-border/80"
+                }`}
+              />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
       <motion.button
         ref={avatarBtnRef}
         type="button"
