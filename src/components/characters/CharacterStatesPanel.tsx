@@ -69,6 +69,10 @@ export function CharacterStatesPanel({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [generatingMood, setGeneratingMood] = useState<MoodStateKey | "all" | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMoodKey, setPreviewMoodKey] = useState<MoodStateKey | null>(null);
+  const [brokenMoodImages, setBrokenMoodImages] = useState<Partial<Record<MoodStateKey, boolean>>>(
+    {},
+  );
 
   const moodLabel = useCallback(
     (key: MoodStateKey) => {
@@ -135,6 +139,30 @@ export function CharacterStatesPanel({
   useEffect(() => {
     void refreshFromServer();
   }, [refreshFromServer]);
+
+  useEffect(() => {
+    if (!previewUrl && !previewMoodKey) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewUrl(null);
+        setPreviewMoodKey(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewUrl, previewMoodKey]);
+
+  const openMoodPreview = (key: MoodStateKey) => {
+    const entry = moodTokens[key];
+    if (!entry?.url || brokenMoodImages[key]) return;
+    setPreviewMoodKey(key);
+    setPreviewUrl(tokenImageSrc(entry.url, entry.generated_at));
+  };
+
+  const closePreview = () => {
+    setPreviewUrl(null);
+    setPreviewMoodKey(null);
+  };
 
   const handleMoodSelect = async (key: MoodStateKey) => {
     if (!canManageMood || isLoading) return;
@@ -273,7 +301,10 @@ export function CharacterStatesPanel({
           {display.url ? (
             <button
               type="button"
-              onClick={() => setPreviewUrl(display.url)}
+              onClick={() => {
+                setPreviewMoodKey(null);
+                setPreviewUrl(display.url);
+              }}
               className="group relative h-24 w-24 overflow-hidden rounded-full border-2 border-hero-border bg-hero-dark hover:border-hero-vibrant"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -401,22 +432,24 @@ export function CharacterStatesPanel({
             {t("condition.needPortrait")}
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MOOD_STATE_DEFINITIONS.map((def) => {
             const selected = moodState === def.key;
             const entry = moodTokens[def.key];
             const isGenerating = (generatingMood === def.key || isBulkGenerating) && isLoading;
+            const imageBroken = Boolean(entry?.url && brokenMoodImages[def.key]);
+            const canPreview = Boolean(entry?.url && !imageBroken);
             return (
               <div
                 key={def.key}
-                className={`rounded-lg border p-3 flex flex-col gap-2 ${
+                className={`rounded-lg border p-4 flex flex-col gap-3 ${
                   selected
                     ? "border-accent-gold/60 bg-accent-gold/10"
                     : "border-hero-border/50 bg-hero-dark/30"
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-barlow text-xs font-bold uppercase text-white">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-barlow text-sm font-bold uppercase text-white truncate">
                     {moodLabel(def.key)}
                   </p>
                   {canManageMood ? (
@@ -424,7 +457,7 @@ export function CharacterStatesPanel({
                       type="button"
                       disabled={isLoading}
                       onClick={() => handleMoodSelect(def.key)}
-                      className={`rounded border px-2 py-0.5 font-barlow text-[9px] font-bold uppercase ${
+                      className={`shrink-0 rounded border px-2 py-0.5 font-barlow text-[9px] font-bold uppercase ${
                         selected
                           ? "border-accent-gold text-accent-gold"
                           : "border-hero-border text-gray-400 hover:text-white"
@@ -433,35 +466,60 @@ export function CharacterStatesPanel({
                       {selected ? t("states.moodSelected") : t("states.moodSelect")}
                     </button>
                   ) : selected ? (
-                    <span className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
+                    <span className="shrink-0 font-barlow text-[9px] font-bold uppercase text-accent-gold">
                       {t("states.moodSelected")}
                     </span>
                   ) : null}
                 </div>
-                {entry?.url ? (
+                {canPreview ? (
                   <button
                     type="button"
-                    onClick={() => setPreviewUrl(tokenImageSrc(entry.url, entry.generated_at))}
-                    className="mx-auto h-20 w-20 overflow-hidden rounded-full border border-hero-border"
+                    onClick={() => openMoodPreview(def.key)}
+                    className="group relative mx-auto h-36 w-36 overflow-hidden rounded-full border-2 border-hero-border bg-hero-dark transition-colors hover:border-hero-vibrant focus:outline-none focus-visible:ring-2 focus-visible:ring-hero-vibrant focus-visible:ring-offset-2 focus-visible:ring-offset-background-card cursor-zoom-in"
+                    title={moodLabel(def.key)}
+                    aria-label={moodLabel(def.key)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={tokenImageSrc(entry.url, entry.generated_at)}
+                      src={tokenImageSrc(entry!.url, entry!.generated_at)}
                       alt={moodLabel(def.key)}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      onError={() =>
+                        setBrokenMoodImages((prev) => ({ ...prev, [def.key]: true }))
+                      }
                     />
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
+                      <ZoomIn className="h-8 w-8 text-white opacity-0 transition-opacity group-hover:opacity-100 drop-shadow-lg" />
+                    </span>
+                    {entry?.is_ai_generated ? (
+                      <span
+                        className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1.5 py-0.5"
+                        title="KI-generiert"
+                      >
+                        <Sparkles className="h-3 w-3 text-accent-gold" />
+                      </span>
+                    ) : null}
                   </button>
                 ) : (
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-dashed border-hero-border/50 font-libre text-[9px] text-gray-600 text-center px-1">
-                    {t("condition.noTokenYet")}
+                  <div className="relative mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-hero-border/50 bg-hero-dark font-libre text-[10px] text-gray-600 text-center px-2">
+                    {entry?.url && imageBroken ? (
+                      <span className="text-red-400">Bild beschädigt</span>
+                    ) : (
+                      t("condition.noTokenYet")
+                    )}
                   </div>
                 )}
+                {canPreview ? (
+                  <p className="text-center font-libre text-[10px] text-gray-500">
+                    Klicken zum Vergrößern
+                  </p>
+                ) : null}
                 {canManageMood ? (
                   <button
                     type="button"
                     disabled={isLoading || !hasSourceImage}
                     onClick={() => handleGenerateMoodToken(def.key)}
-                    className="inline-flex items-center justify-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
                   >
                     {isGenerating ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -478,25 +536,64 @@ export function CharacterStatesPanel({
       </section>
 
       {previewUrl ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={previewMoodKey ? "mood-token-preview-title" : undefined}
+        >
           <button
             type="button"
             className="absolute inset-0 bg-black/75 backdrop-blur-sm"
             aria-label={t("condition.previewClose")}
-            onClick={() => setPreviewUrl(null)}
+            onClick={closePreview}
           />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setPreviewUrl(null)}
-              className="absolute right-3 top-3 rounded border border-hero-border p-1.5 text-gray-400 hover:text-white"
-              aria-label={t("condition.close")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <div className="mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-full border-4 border-hero-border">
+          <div className="relative z-10 w-full max-w-md rounded-xl border border-hero-border bg-background-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                {previewMoodKey ? (
+                  <h4
+                    id="mood-token-preview-title"
+                    className="font-barlow text-xl font-bold uppercase text-hero-vibrant"
+                  >
+                    {moodLabel(previewMoodKey)}
+                  </h4>
+                ) : (
+                  <h4 className="font-barlow text-xl font-bold uppercase text-hero-vibrant">
+                    {displayLabel}
+                  </h4>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="rounded border border-hero-border p-2 text-gray-400 hover:text-white hover:border-hero-vibrant"
+                aria-label={t("condition.close")}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mx-auto aspect-square w-full max-w-[min(80vw,20rem)] overflow-hidden rounded-full border-4 border-hero-border bg-hero-dark shadow-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              {previewMoodKey && moodTokens[previewMoodKey]?.is_ai_generated ? (
+                <span className="inline-flex items-center gap-1.5 font-barlow text-xs font-bold uppercase text-accent-gold">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t("condition.aiGenerated")}
+                </span>
+              ) : null}
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-barlow text-xs font-bold uppercase text-gray-400 hover:text-hero-vibrant"
+              >
+                Original öffnen
+              </a>
             </div>
           </div>
         </div>
