@@ -10,7 +10,6 @@ type Props = {
   sides: number;
   faces: number[];
   seed: string;
-  startAt: number;
   aimX: number;
   aimZ: number;
   throwDirX?: number;
@@ -53,7 +52,6 @@ export default function DiceRollCanvas({
   sides,
   faces,
   seed,
-  startAt,
   aimX,
   aimZ,
   throwDirX,
@@ -82,7 +80,6 @@ export default function DiceRollCanvas({
         sides={sides}
         faces={faces}
         seed={seed}
-        startAt={startAt}
         aimX={aimX}
         aimZ={aimZ}
         throwDirX={throwDirX}

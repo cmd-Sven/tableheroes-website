@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -22,7 +22,7 @@ type DieMeshProps = {
   sides: number;
   frames: DieKeyframe[];
   index: number;
-  startAt: number;
+  playbackStartRef: RefObject<number>;
   aimX: number;
   aimZ: number;
   durationMs?: number;
@@ -70,7 +70,7 @@ function AnimatedDie({
   sides,
   frames,
   index,
-  startAt,
+  playbackStartRef,
   aimX,
   aimZ,
   durationMs = DICE_PHYSICS_MAX_MS,
@@ -89,6 +89,8 @@ function AnimatedDie({
   useFrame((_, delta) => {
     const g = group.current;
     if (!g) return;
+    const startAt = playbackStartRef.current;
+    if (!startAt) return;
     const elapsed = performance.now() - startAt;
     const t = Math.min(1, Math.max(0, elapsed / durationMs));
     const done = sampleTrajectory(frames, t, pos.current, quat.current);
@@ -138,7 +140,6 @@ type DiceSceneProps = {
   sides: number;
   faces: number[];
   seed: string;
-  startAt: number;
   aimX: number;
   aimZ: number;
   throwDirX?: number;
@@ -153,7 +154,6 @@ export function DiceRollScene({
   sides,
   faces,
   seed,
-  startAt,
   aimX,
   aimZ,
   throwDirX,
@@ -166,6 +166,10 @@ export function DiceRollScene({
   const settled = useRef<Set<number>>(new Set());
   const done = useRef(false);
   const expected = faces.length;
+  /** Playback-Start erst nach Trajektorie + Canvas-Mount — nicht beim Log-Enqueue. */
+  const playbackStartRef = useRef(0);
+
+  const rollKey = `${seed}:${faces.join(",")}:${aimX}:${aimZ}:${throwDirX}:${throwDirZ}:${throwStrength}:${isTap}`;
 
   const { trajectories, durationMs } = useMemo(
     () =>
@@ -182,6 +186,12 @@ export function DiceRollScene({
       }),
     [sides, faces, seed, aimX, aimZ, throwDirX, throwDirZ, throwStrength, isTap],
   );
+
+  useLayoutEffect(() => {
+    playbackStartRef.current = performance.now();
+    settled.current.clear();
+    done.current = false;
+  }, [rollKey, durationMs]);
 
   const handleSettled = useCallback(
     (index: number) => {
@@ -213,7 +223,7 @@ export function DiceRollScene({
           sides={sides}
           frames={trajectories[i] ?? []}
           index={i}
-          startAt={startAt}
+          playbackStartRef={playbackStartRef}
           aimX={aimX}
           aimZ={aimZ}
           durationMs={durationMs}

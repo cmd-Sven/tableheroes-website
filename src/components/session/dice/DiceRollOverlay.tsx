@@ -46,7 +46,6 @@ type ActiveRoll = {
   sides: number;
   faces: number[];
   seed: string;
-  startAt: number;
   use3d: boolean;
   dropNx: number;
   dropNy: number;
@@ -323,7 +322,6 @@ export function DiceRollOverlay({ logs }: Props) {
         sides,
         faces: faces.slice(0, 12),
         seed: typeof meta.seed === "string" ? meta.seed : entry.id,
-        startAt: performance.now(),
         use3d: webgl && supports3dDice(sides),
         dropNx,
         dropNy,
@@ -518,7 +516,6 @@ export function DiceRollOverlay({ logs }: Props) {
                   sides={active.sides}
                   faces={active.faces}
                   seed={active.seed}
-                  startAt={active.startAt}
                   aimX={active.aimX}
                   aimZ={active.aimZ}
                   throwDirX={active.throwDirX}
