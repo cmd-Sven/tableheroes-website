@@ -107,6 +107,10 @@ import {
 } from "@/src/lib/session/dice-reveal-store";
 import { dismissSessionHand } from "@/src/lib/actions/session-hand-raise-actions";
 import {
+  FALLBACK_PLAYER_COLOR,
+  getPlayerColorForClass,
+} from "@/src/lib/session/class-player-color";
+import {
   normalizeHandRaises,
   type SessionHandRaise,
 } from "@/src/lib/session/hand-raises";
@@ -1733,6 +1737,25 @@ export function LiveSessionBoard({
     }
     return [...partyCharacters, ...dummies];
   }, [partyCharacters, dummyPlayerCountLive, liveState?.guest_slots]);
+
+  const playerColorByCharacterId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const pc of displayPartyCharacters) {
+      map[pc.id] = getPlayerColorForClass(pc.class);
+    }
+    return map;
+  }, [displayPartyCharacters]);
+
+  const playerColorByUserId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const pc of displayPartyCharacters) {
+      if (pc.playerUserId) {
+        map[pc.playerUserId] = getPlayerColorForClass(pc.class);
+      }
+    }
+    return map;
+  }, [displayPartyCharacters]);
+
   const temperatureValue = isGM
     ? temperatureDraft
     : normalizeTemperatureValue(liveState?.temperature_value);
@@ -4103,6 +4126,7 @@ export function LiveSessionBoard({
                         (pid && r.userId === pid) ||
                         (r.characterId != null && r.characterId === pc.id),
                     ) ?? null;
+                  const playerColor = playerColorByCharacterId[pc.id] ?? FALLBACK_PLAYER_COLOR;
                   return (
                     <motion.div
                       key={pc.id}
@@ -4161,8 +4185,16 @@ export function LiveSessionBoard({
                             className={`absolute left-1/2 top-4 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border px-2 py-1 shadow-lg ${
                               handRaise.urgent
                                 ? "border-accent-gold bg-accent-blood/90 text-accent-gold"
-                                : "border-hero-vibrant bg-background-dark/90 text-hero-vibrant"
+                                : "bg-background-dark/90"
                             }`}
+                            style={
+                              handRaise.urgent
+                                ? undefined
+                                : {
+                                    borderColor: playerColor,
+                                    color: playerColor,
+                                  }
+                            }
                           >
                             <Hand className="h-4 w-4" />
                             {handRaise.urgent ? (
@@ -4213,7 +4245,8 @@ export function LiveSessionBoard({
                       </div>
                       <div className="mt-1 w-full rounded-md bg-black/50 px-2 py-1.5 text-center backdrop-blur-sm">
                         <p
-                          className="font-barlow text-sm font-extrabold uppercase leading-snug tracking-wide text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
+                          className="font-barlow text-sm font-extrabold uppercase leading-snug tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
+                          style={{ color: playerColor }}
                           title={pc.name}
                         >
                           {pc.name}
@@ -4449,6 +4482,7 @@ export function LiveSessionBoard({
           }}
           handRaises={handRaises}
           currentUserId={userId}
+          playerColorByCharacterId={playerColorByCharacterId}
           onHandRaisesChanged={(next) => {
             if (next === "refresh") {
               void refreshLiveState();
@@ -4471,6 +4505,8 @@ export function LiveSessionBoard({
         <>
           <LiveSessionHandRaiseQueue
             raises={handRaises}
+            playerColorByCharacterId={playerColorByCharacterId}
+            playerColorByUserId={playerColorByUserId}
             pending={isUpdating}
             onDismiss={(raiseId) => {
               startTransition(async () => {
@@ -4494,6 +4530,8 @@ export function LiveSessionBoard({
           />
           <LiveSessionUrgentHandBanner
             raise={urgentHandRaise}
+            playerColorByCharacterId={playerColorByCharacterId}
+            playerColorByUserId={playerColorByUserId}
             pending={isUpdating}
             onDismiss={(raiseId) => {
               startTransition(async () => {

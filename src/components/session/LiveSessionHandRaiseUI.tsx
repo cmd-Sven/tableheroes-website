@@ -3,11 +3,17 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Hand, X } from "lucide-react";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
+import {
+  FALLBACK_PLAYER_COLOR,
+  playerColorAlpha,
+} from "@/src/lib/session/class-player-color";
 
 type Props = {
   raises: SessionHandRaise[];
   onDismiss: (raiseId: string) => void;
   pending?: boolean;
+  playerColorByCharacterId?: Record<string, string>;
+  playerColorByUserId?: Record<string, string>;
 };
 
 function formatTime(at: string): string {
@@ -22,8 +28,28 @@ function formatTime(at: string): string {
   }
 }
 
+function colorForRaise(
+  raise: SessionHandRaise,
+  playerColorByCharacterId?: Record<string, string>,
+  playerColorByUserId?: Record<string, string>,
+): string {
+  if (raise.characterId && playerColorByCharacterId?.[raise.characterId]) {
+    return playerColorByCharacterId[raise.characterId];
+  }
+  if (playerColorByUserId?.[raise.userId]) {
+    return playerColorByUserId[raise.userId];
+  }
+  return FALLBACK_PLAYER_COLOR;
+}
+
 /** SL-Warteschlange der Meldungen (Reihenfolge = zuerst gemeldet). */
-export function LiveSessionHandRaiseQueue({ raises, onDismiss, pending }: Props) {
+export function LiveSessionHandRaiseQueue({
+  raises,
+  onDismiss,
+  pending,
+  playerColorByCharacterId,
+  playerColorByUserId,
+}: Props) {
   if (raises.length === 0) return null;
 
   return (
@@ -35,42 +61,55 @@ export function LiveSessionHandRaiseQueue({ raises, onDismiss, pending }: Props)
         </h2>
       </div>
       <ul className="max-h-56 space-y-1 overflow-y-auto">
-        {raises.map((raise, index) => (
-          <li
-            key={raise.id}
-            className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
-              raise.urgent
-                ? "border-accent-blood/70 bg-accent-blood/20"
-                : "border-hero-border/40 bg-hero-dark/40"
-            }`}
-          >
-            <span className="font-barlow text-[10px] font-bold text-gray-500">#{index + 1}</span>
-            {raise.urgent ? (
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-accent-gold" />
-            ) : (
-              <Hand className="h-3.5 w-3.5 shrink-0 text-hero-vibrant" />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-barlow text-xs font-bold uppercase text-gray-100">
-                {raise.displayName}
-              </p>
-              <p className="font-libre text-[9px] text-gray-500">
-                {formatTime(raise.at)}
-                {raise.urgent ? " · dringend" : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onDismiss(raise.id)}
-              title="Meldung entfernen"
-              aria-label={`${raise.displayName} entfernen`}
-              className="rounded p-1 text-gray-500 hover:bg-red-950/50 hover:text-red-300 disabled:opacity-40"
+        {raises.map((raise, index) => {
+          const playerColor = colorForRaise(
+            raise,
+            playerColorByCharacterId,
+            playerColorByUserId,
+          );
+          return (
+            <li
+              key={raise.id}
+              className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
+                raise.urgent ? "border-accent-blood/70 bg-accent-blood/20" : "bg-hero-dark/40"
+              }`}
+              style={
+                raise.urgent
+                  ? undefined
+                  : { borderColor: playerColorAlpha(playerColor, 0.55) }
+              }
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </li>
-        ))}
+              <span className="font-barlow text-[10px] font-bold text-gray-500">#{index + 1}</span>
+              {raise.urgent ? (
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-accent-gold" />
+              ) : (
+                <Hand className="h-3.5 w-3.5 shrink-0" style={{ color: playerColor }} />
+              )}
+              <div className="min-w-0 flex-1">
+                <p
+                  className="truncate font-barlow text-xs font-bold uppercase"
+                  style={{ color: playerColor }}
+                >
+                  {raise.displayName}
+                </p>
+                <p className="font-libre text-[9px] text-gray-500">
+                  {formatTime(raise.at)}
+                  {raise.urgent ? " · dringend" : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onDismiss(raise.id)}
+                title="Meldung entfernen"
+                aria-label={`${raise.displayName} entfernen`}
+                className="rounded p-1 text-gray-500 hover:bg-red-950/50 hover:text-red-300 disabled:opacity-40"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -80,10 +119,22 @@ type UrgentProps = {
   raise: SessionHandRaise | null;
   onDismiss: (raiseId: string) => void;
   pending?: boolean;
+  playerColorByCharacterId?: Record<string, string>;
+  playerColorByUserId?: Record<string, string>;
 };
 
 /** Zentrale dringende Meldung nur für den SL. */
-export function LiveSessionUrgentHandBanner({ raise, onDismiss, pending }: UrgentProps) {
+export function LiveSessionUrgentHandBanner({
+  raise,
+  onDismiss,
+  pending,
+  playerColorByCharacterId,
+  playerColorByUserId,
+}: UrgentProps) {
+  const playerColor = raise
+    ? colorForRaise(raise, playerColorByCharacterId, playerColorByUserId)
+    : FALLBACK_PLAYER_COLOR;
+
   return (
     <AnimatePresence>
       {raise ? (
@@ -112,7 +163,10 @@ export function LiveSessionUrgentHandBanner({ raise, onDismiss, pending }: Urgen
             <p className="text-center font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
               Dringende Meldung
             </p>
-            <p className="mt-2 text-center font-cinzel text-2xl font-bold text-hero-vibrant">
+            <p
+              className="mt-2 text-center font-cinzel text-2xl font-bold"
+              style={{ color: playerColor }}
+            >
               {raise.displayName}
             </p>
             <p className="mt-1 text-center font-libre text-xs text-gray-400">

@@ -15,6 +15,9 @@ import {
   raiseSessionHand,
 } from "@/src/lib/actions/session-hand-raise-actions";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
+import {
+  FALLBACK_PLAYER_COLOR,
+} from "@/src/lib/session/class-player-color";
 import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
 import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
@@ -81,6 +84,8 @@ type Props = {
   /** Aktive Meldungen (für eigenen Status + Badge). */
   handRaises?: SessionHandRaise[];
   currentUserId?: string | null;
+  /** Klassen-Spielfarben der Charaktere (characterId → Hex). */
+  playerColorByCharacterId?: Record<string, string>;
   onHandRaisesChanged?: (raises: SessionHandRaise[] | "refresh") => void;
 };
 
@@ -103,6 +108,7 @@ export function LiveSessionActivityPanel({
   onActivityDeleted,
   handRaises = [],
   currentUserId = null,
+  playerColorByCharacterId = {},
   onHandRaisesChanged,
 }: Props) {
   const [input, setInput] = useState("");
@@ -542,11 +548,35 @@ export function LiveSessionActivityPanel({
                             ? "border-accent-gold/40 bg-accent-gold/5"
                             : "border-hero-border/30 bg-hero-dark/25"
                     }`}
+                    style={
+                      !isCrit && !isFumble && !animating && entry.character_id
+                        ? {
+                            borderLeftWidth: 3,
+                            borderLeftColor:
+                              playerColorByCharacterId[entry.character_id] ??
+                              FALLBACK_PLAYER_COLOR,
+                          }
+                        : undefined
+                    }
                   >
                     <div className="flex items-start justify-between gap-1">
                       <p className="font-libre text-[10px] text-gray-500">
                         {new Date(entry.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                        {entry.author_name ? ` · ${entry.author_name}` : ""}
+                        {entry.author_name ? (
+                          <>
+                            {" · "}
+                            <span
+                              style={{
+                                color: entry.character_id
+                                  ? playerColorByCharacterId[entry.character_id] ??
+                                    FALLBACK_PLAYER_COLOR
+                                  : undefined,
+                              }}
+                            >
+                              {entry.author_name}
+                            </span>
+                          </>
+                        ) : null}
                       </p>
                       {isGM ? (
                         <button

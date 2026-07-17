@@ -50,6 +50,10 @@ import {
   type AvatarSpeechBubbleDetail,
   type AvatarSpeechBubbleKind,
 } from "@/src/lib/session/avatar-speech-bubble";
+import {
+  getPlayerColorForClass,
+  playerColorAlpha,
+} from "@/src/lib/session/class-player-color";
 
 type RadialPanel =
   | "weapons"
@@ -295,6 +299,7 @@ export function LiveSessionCharacterAvatar({
   const hpPct = Math.min(100, Math.round((hpCurrent / hpMax) * 100));
   const weaponLine =
     status?.weaponLabels?.length ? status.weaponLabels.join(" · ") : "Keine Waffe";
+  const playerColor = getPlayerColorForClass(className);
 
   const visibleRadial = useMemo(() => {
     const filtered = RADIAL_ITEMS.filter((item) => {
@@ -682,9 +687,13 @@ export function LiveSessionCharacterAvatar({
               <div
                 className={`rounded-lg border px-2.5 py-1.5 shadow-lg ${
                   speechBubble.kind === "dice"
-                    ? "border-accent-gold/70 bg-background-dark/95 text-accent-gold"
-                    : "border-hero-border/80 bg-background-card/95 text-gray-100"
+                    ? "bg-background-dark/95 text-accent-gold"
+                    : "bg-background-card/95 text-gray-100"
                 }`}
+                style={{
+                  borderColor: playerColor,
+                  boxShadow: `0 8px 24px ${playerColorAlpha(playerColor, 0.35)}`,
+                }}
               >
                 <p
                   className={`text-center leading-snug ${
@@ -698,11 +707,8 @@ export function LiveSessionCharacterAvatar({
               </div>
               <span
                 aria-hidden
-                className={`absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[7px] border-x-transparent ${
-                  speechBubble.kind === "dice"
-                    ? "border-t-accent-gold/70"
-                    : "border-t-hero-border/80"
-                }`}
+                className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[7px] border-x-transparent"
+                style={{ borderTopColor: playerColor }}
               />
             </motion.div>
           ) : null}
@@ -725,9 +731,17 @@ export function LiveSessionCharacterAvatar({
           opacity: 1,
         }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
-          isDummy ? "border-dashed border-amber-600/90" : isCritFx ? "border-accent-gold" : "border-amber-800/80"
+        className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] bg-hero-dark shadow-xl ${
+          isDummy ? "border-dashed border-amber-600/90" : isCritFx ? "border-accent-gold" : ""
         } ${canInteract && !isDummy ? "cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-accent-gold" : "cursor-default"}`}
+        style={
+          isDummy || isCritFx
+            ? undefined
+            : {
+                borderColor: playerColor,
+                boxShadow: `0 0 0 2px ${playerColorAlpha(playerColor, 0.35)}, 0 10px 28px rgba(0,0,0,0.45)`,
+              }
+        }
         title={canInteract && !isDummy ? `${characterName} — Aktionen` : characterName}
         aria-label={canInteract && !isDummy ? `Aktionen für ${characterName}` : characterName}
       >
