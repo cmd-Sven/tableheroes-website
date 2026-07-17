@@ -99,6 +99,12 @@ import {
   dispatchAvatarSpeechBubble,
   speechBubbleFromActivityEntry,
 } from "@/src/lib/session/avatar-speech-bubble";
+import { DiceRollOverlay } from "@/src/components/session/dice/DiceRollOverlay";
+import { shouldAnimateDiceEntry } from "@/src/lib/session/dice-animation";
+import {
+  useDiceRevealBridge,
+  useOnDiceAnimComplete,
+} from "@/src/lib/session/dice-reveal-store";
 import {
   dismissSessionHand,
   normalizeHandRaises,
@@ -1644,37 +1650,60 @@ export function LiveSessionBoard({
     }
   }, [systemLogs, isGM, forcePlayerView]);
 
-  /** Crit/Patzer-Avatar-FX + Sprechblasen für alle Clients (inkl. Remote nach Live-State-Sync). */
+  useDiceRevealBridge();
+  const pendingDiceFxRef = useRef<globalThis.Map<string, (typeof systemLogs)[number]>>(
+    new globalThis.Map(),
+  );
+
+  function applyDiceResolveFx(entry: (typeof systemLogs)[number]) {
+    const characterId = entry.character_id?.trim();
+    if (characterId) {
+      if (
+        entry.type === "dice" ||
+        entry.type === "attack_pending" ||
+        entry.type === "skill_check" ||
+        entry.type === "saving_throw" ||
+        entry.type === "damage_roll"
+      ) {
+        const kind = rollFxKindFromMeta(entry.meta);
+        if (kind) {
+          dispatchAvatarRollFx({
+            characterId,
+            kind,
+            sourceId: entry.id,
+          });
+        }
+      }
+    }
+    const bubble = speechBubbleFromActivityEntry(entry);
+    if (bubble) dispatchAvatarSpeechBubble(bubble);
+  }
+
+  /** Crit/Patzer-Avatar-FX + Sprechblasen: bei 3D-Würfeln erst nach Animation. */
   useEffect(() => {
     if (systemLogs.length < prevRollFxLogCountRef.current) {
       prevRollFxLogCountRef.current = systemLogs.length;
+      pendingDiceFxRef.current.clear();
       return;
     }
     if (systemLogs.length === prevRollFxLogCountRef.current) return;
     const fresh = systemLogs.slice(prevRollFxLogCountRef.current);
     prevRollFxLogCountRef.current = systemLogs.length;
     for (const entry of fresh) {
-      const characterId = entry.character_id?.trim();
-      if (characterId) {
-        if (
-          entry.type === "dice" ||
-          entry.type === "attack_pending" ||
-          entry.type === "skill_check"
-        ) {
-          const kind = rollFxKindFromMeta(entry.meta);
-          if (kind) {
-            dispatchAvatarRollFx({
-              characterId,
-              kind,
-              sourceId: entry.id,
-            });
-          }
-        }
+      if (shouldAnimateDiceEntry(entry)) {
+        pendingDiceFxRef.current.set(entry.id, entry);
+        continue;
       }
-      const bubble = speechBubbleFromActivityEntry(entry);
-      if (bubble) dispatchAvatarSpeechBubble(bubble);
+      applyDiceResolveFx(entry);
     }
   }, [systemLogs]);
+
+  useOnDiceAnimComplete((sourceId) => {
+    const entry = pendingDiceFxRef.current.get(sourceId);
+    if (!entry) return;
+    pendingDiceFxRef.current.delete(sourceId);
+    applyDiceResolveFx(entry);
+  });
 
   const physicallyPresentIdSet = new Set(
     normalizePhysicallyPresentUserIds(liveState?.physically_present_user_ids),
@@ -4361,6 +4390,10 @@ export function LiveSessionBoard({
           onClose={() => setSheetCharacter(null)}
         />
       ) : null}
+
+      <DiceRollOverlay
+        logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
+      />
 
       {!isGuest ? (
         <LiveSessionActivityPanel

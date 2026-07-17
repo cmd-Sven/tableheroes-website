@@ -20,6 +20,7 @@ const DICE_ACTIVITY_TYPES = new Set([
   "dice",
   "attack_pending",
   "skill_check",
+  "saving_throw",
   "damage_roll",
 ]);
 

@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@supabase/supabase-js", "@supabase/ssr"],
+  transpilePackages: [
+    "@supabase/supabase-js",
+    "@supabase/ssr",
+    "three",
+    "@react-three/fiber",
+    "@react-three/drei",
+  ],
   images: {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
