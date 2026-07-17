@@ -10,6 +10,7 @@ import {
   DICE_PHYSICS_DURATION_MS,
   sampleTrajectory,
 } from "@/src/lib/session/dice-physics";
+import { DieFaceLabels } from "./DieFaceLabels";
 
 type DieMeshProps = {
   sides: number;
@@ -22,7 +23,6 @@ type DieMeshProps = {
   aimZ: number;
   durationMs?: number;
   onSettled?: () => void;
-  showFaceLabel: boolean;
 };
 
 function DieGeometry({ sides }: { sides: number }) {
@@ -46,7 +46,6 @@ export function AnimatedDie({
   aimZ,
   durationMs = DICE_PHYSICS_DURATION_MS,
   onSettled,
-  showFaceLabel,
 }: DieMeshProps) {
   const group = useRef<THREE.Group>(null);
   const settledRef = useRef(false);
@@ -54,6 +53,7 @@ export function AnimatedDie({
   const quat = useRef(new THREE.Quaternion());
   const scale = dieScale(sides);
   const color = dieColor(sides);
+  const lightDie = sides >= 12;
 
   const frames = useMemo(
     () => buildDieTrajectory({ sides, face, seed, index, count, aimX, aimZ }),
@@ -88,13 +88,7 @@ export function AnimatedDie({
           emissiveIntensity={0.32}
         />
       </mesh>
-      {showFaceLabel ? (
-        <Html center distanceFactor={5.5} style={{ pointerEvents: "none" }}>
-          <div className="select-none font-barlow text-2xl font-extrabold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-            {face}
-          </div>
-        </Html>
-      ) : null}
+      <DieFaceLabels sides={sides} lightDie={lightDie} />
     </group>
   );
 }
@@ -163,7 +157,6 @@ export function DiceRollScene({
           aimX={aimX}
           aimZ={aimZ}
           onSettled={handleSettled}
-          showFaceLabel={showResult}
         />
       ))}
       {/* Unsichtbare Empfangsfläche — Tisch bleibt sichtbar darunter */}

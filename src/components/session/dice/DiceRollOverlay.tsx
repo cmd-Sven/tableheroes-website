@@ -81,12 +81,14 @@ export function DiceRollOverlay({ logs }: Props) {
   const seenRef = useRef<Set<string>>(new Set());
   const finishingRef = useRef<string | null>(null);
   const activeRef = useRef<ActiveRoll | null>(null);
+  const cursorElRef = useRef<HTMLDivElement>(null);
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
   const [webgl, setWebgl] = useState(true);
   const [showResult, setShowResult] = useState(false);
-  const [cursor, setCursor] = useState({ x: 0, y: 0 });
   const placement = useDicePlacementPending();
+  const placementId = placement?.id ?? null;
   const active = queue[0] ?? null;
+  const activeId = active?.sourceId ?? null;
   activeRef.current = active;
 
   useEffect(() => {
@@ -95,27 +97,32 @@ export function DiceRollOverlay({ logs }: Props) {
 
   useEffect(() => {
     setShowResult(false);
-  }, [active?.sourceId]);
+  }, [activeId]);
 
+  // Cursor: DOM via ref — kein setState bei mousemove (verhindert Update-Depth-Loop)
   useEffect(() => {
-    if (!placement) return;
+    if (!placementId) return;
+    const el = cursorElRef.current;
+    const setPos = (x: number, y: number) => {
+      if (!el) return;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+    };
+    setPos(window.innerWidth * 0.5, window.innerHeight * 0.42);
+
     const onMove = (e: PointerEvent) => {
-      setCursor({ x: e.clientX, y: e.clientY });
+      setPos(e.clientX, e.clientY);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") cancelDiceDropPlacement();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("keydown", onKey);
-    setCursor({
-      x: window.innerWidth * 0.5,
-      y: window.innerHeight * 0.42,
-    });
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("keydown", onKey);
     };
-  }, [placement]);
+  }, [placementId]);
 
   const handlePlacementPointer = useCallback(
     (e: React.PointerEvent) => {
@@ -195,16 +202,16 @@ export function DiceRollOverlay({ logs }: Props) {
 
   useEffect(() => {
     finishingRef.current = null;
-  }, [active?.sourceId]);
+  }, [activeId]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!activeId) return;
     const t = window.setTimeout(
       finishActive,
       DICE_ANIMATION_DURATION_MS + RESULT_HOLD_MS + 700,
     );
     return () => window.clearTimeout(t);
-  }, [active, finishActive]);
+  }, [activeId, finishActive]);
 
   const fallbackLabel = useMemo(() => {
     if (!active) return "";
@@ -232,8 +239,13 @@ export function DiceRollOverlay({ logs }: Props) {
           role="presentation"
         >
           <div
+            ref={cursorElRef}
             className="pointer-events-none fixed z-[71] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
-            style={{ left: cursor.x, top: cursor.y }}
+            style={{
+              left: "50%",
+              top: "42%",
+              willChange: "left, top",
+            }}
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-md border border-hero-border bg-background-card/90 text-accent-gold shadow-lg">
               <Dices className="h-7 w-7" strokeWidth={2.25} />

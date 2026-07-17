@@ -21,11 +21,32 @@ type Pending = DicePlacementRequest & {
 };
 
 let pending: Pending | null = null;
-let version = 0;
+/** Stabile Snapshot-Referenz — darf sich nur bei echten Pending-Änderungen ändern. */
+let pendingSnapshot: DicePlacementRequest | null = null;
 const listeners = new Set<() => void>();
 
+function syncSnapshot() {
+  if (!pending) {
+    pendingSnapshot = null;
+    return;
+  }
+  if (
+    pendingSnapshot &&
+    pendingSnapshot.id === pending.id &&
+    pendingSnapshot.sides === pending.sides &&
+    pendingSnapshot.count === pending.count
+  ) {
+    return;
+  }
+  pendingSnapshot = {
+    id: pending.id,
+    sides: pending.sides,
+    count: pending.count,
+  };
+}
+
 function emit() {
-  version += 1;
+  syncSnapshot();
   for (const l of listeners) l();
 }
 
@@ -36,12 +57,8 @@ function subscribe(listener: () => void) {
   };
 }
 
-function getSnapshot() {
-  return version;
-}
-
-function getServerSnapshot() {
-  return 0;
+function getServerSnapshot(): DicePlacementRequest | null {
+  return null;
 }
 
 /** Initiator: Cursor-Modus starten, auf Klick-Position warten. */
@@ -70,8 +87,7 @@ export function requestDiceDropPlacement(opts: {
 }
 
 export function getDicePlacementPending(): DicePlacementRequest | null {
-  if (!pending) return null;
-  return { id: pending.id, sides: pending.sides, count: pending.count };
+  return pendingSnapshot;
 }
 
 export function confirmDiceDropPlacement(point: DiceDropPoint): boolean {
@@ -95,6 +111,5 @@ export function cancelDiceDropPlacement(reason = "placement-cancelled"): boolean
 }
 
 export function useDicePlacementPending(): DicePlacementRequest | null {
-  useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  return getDicePlacementPending();
+  return useSyncExternalStore(subscribe, getDicePlacementPending, getServerSnapshot);
 }
