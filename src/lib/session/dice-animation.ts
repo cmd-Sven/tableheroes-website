@@ -30,11 +30,14 @@ export type DiceRollAnimMeta = {
 
 export function dispatchDiceAnimComplete(sourceId: string): void {
   if (typeof window === "undefined" || !sourceId) return;
-  window.dispatchEvent(
-    new CustomEvent(DICE_ANIM_COMPLETE_EVENT, {
-      detail: { sourceId } satisfies DiceAnimCompleteDetail,
-    }),
-  );
+  // Listener (Reveal-Store) nie synchron im Render/setState-Pfad anderer Komponenten
+  queueMicrotask(() => {
+    window.dispatchEvent(
+      new CustomEvent(DICE_ANIM_COMPLETE_EVENT, {
+        detail: { sourceId } satisfies DiceAnimCompleteDetail,
+      }),
+    );
+  });
 }
 
 export function isDiceAnimMeta(meta: unknown): meta is DiceRollAnimMeta {

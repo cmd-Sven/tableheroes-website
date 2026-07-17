@@ -54,10 +54,12 @@ function detectWebGL(): boolean {
 export function DiceRollOverlay({ logs }: Props) {
   const seenRef = useRef<Set<string>>(new Set());
   const finishingRef = useRef<string | null>(null);
+  const activeRef = useRef<ActiveRoll | null>(null);
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
   const [webgl, setWebgl] = useState(true);
   const [showResult, setShowResult] = useState(false);
   const active = queue[0] ?? null;
+  activeRef.current = active;
 
   useEffect(() => {
     setWebgl(detectWebGL());
@@ -70,12 +72,13 @@ export function DiceRollOverlay({ logs }: Props) {
   useEffect(() => {
     const now = Date.now();
     const fresh: ActiveRoll[] = [];
+    const staleCompleteIds: string[] = [];
     for (const entry of logs) {
       if (!entry?.id || seenRef.current.has(entry.id)) continue;
       if (!shouldAnimateDiceEntry(entry, now)) {
         if (isDiceAnimMeta(entry.meta) && entry.meta.animate) {
           seenRef.current.add(entry.id);
-          dispatchDiceAnimComplete(entry.id);
+          staleCompleteIds.push(entry.id);
         }
         continue;
       }
@@ -97,17 +100,23 @@ export function DiceRollOverlay({ logs }: Props) {
     if (fresh.length > 0) {
       setQueue((q) => [...q, ...fresh]);
     }
+    // Reveal/Chat erst nach dem Effect — nie synchron während Queue-Update
+    if (staleCompleteIds.length > 0) {
+      queueMicrotask(() => {
+        for (const id of staleCompleteIds) dispatchDiceAnimComplete(id);
+      });
+    }
   }, [logs, webgl]);
 
   const finishActive = useCallback(() => {
-    setQueue((q) => {
-      const current = q[0];
-      if (!current) return q;
-      if (finishingRef.current === current.sourceId) return q;
-      finishingRef.current = current.sourceId;
-      dispatchDiceAnimComplete(current.sourceId);
-      return q.slice(1);
-    });
+    const current = activeRef.current;
+    if (!current) return;
+    if (finishingRef.current === current.sourceId) return;
+    finishingRef.current = current.sourceId;
+    const sourceId = current.sourceId;
+    setQueue((q) => (q[0]?.sourceId === sourceId ? q.slice(1) : q));
+    // Store-Update (LiveSessionActivityPanel) nie im setState-Updater / Render-Pfad
+    queueMicrotask(() => dispatchDiceAnimComplete(sourceId));
   }, []);
 
   const handleSettled = useCallback(() => {
