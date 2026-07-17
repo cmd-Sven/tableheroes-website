@@ -31,12 +31,13 @@ import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGr
 import { DND_COIN_TYPES, type DndCoinCode } from "@/src/lib/dnd-currency";
 import { DndCoinIcon, DndCoinWalletRow } from "@/src/components/currency/DndCoinDisplay";
 import {
-  canEquipItemAsContainer,
+  equipItemAsLuggage,
+  MAX_LUGGAGE_SLOTS,
   normalizeEquipmentState,
   placeItemIntoBestContainer,
   removeItemFromEquipment,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { inferContainerKind, isBackpackItem } from "@/src/lib/characters/dnd5e/item-resolve";
+import { isLuggageItem } from "@/src/lib/characters/dnd5e/item-resolve";
 import { toast } from "sonner";
 import type {
   Dnd5eEquipmentContainer,
@@ -174,26 +175,6 @@ function SessionInventoryBody({
     });
   }
 
-  function addContainer(container: Dnd5eEquipmentContainer) {
-    if (container.linkedItemId) {
-      const gate = canEquipItemAsContainer(equipment, container.linkedItemId);
-      if (!gate.ok) {
-        toast.error(
-          gate.reason === "not_empty"
-            ? "Nur leeres Gepäck kann als Behälter ausgerüstet werden."
-            : "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
-        );
-        return;
-      }
-    }
-    let next = normalizeEquipmentState(equipment);
-    if (container.linkedItemId) {
-      next = removeItemFromEquipment(next, container.linkedItemId);
-    }
-    persistEquipment({ ...next, containers: [...next.containers, container] });
-    if (container.id) setActiveInventoryContainerId(container.id);
-  }
-
   function updateContainer(container: Dnd5eEquipmentContainer) {
     persistEquipment({
       ...equipment,
@@ -202,27 +183,25 @@ function SessionInventoryBody({
   }
 
   function equipItemAsContainer(item: CharacterItem) {
-    if (!(isBackpackItem(item) || inferContainerKind(item) != null)) {
+    if (!isLuggageItem(item)) {
       toast.error("Nur Gepäck-/Rucksack-Gegenstände können hier ausgerüstet werden.");
       return;
     }
-    const gate = canEquipItemAsContainer(equipment, item.id);
-    if (!gate.ok) {
+    const result = equipItemAsLuggage(equipment, item);
+    if (!result.ok) {
       toast.error(
-        gate.reason === "not_empty"
+        result.reason === "not_empty"
           ? "Nur leeres Gepäck kann als Behälter ausgerüstet werden."
-          : "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
+          : result.reason === "slots_full"
+            ? `Maximal ${MAX_LUGGAGE_SLOTS} Gepäckstücke können ausgerüstet werden.`
+            : result.reason === "not_luggage"
+              ? "Nur Gepäck-/Rucksack-Gegenstände können hier ausgerüstet werden."
+              : "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
       );
       return;
     }
-    const kind = inferContainerKind(item) ?? "backpack";
-    addContainer({
-      id: crypto.randomUUID(),
-      kind,
-      label: item.name,
-      linkedItemId: item.id,
-      itemIds: [],
-    });
+    persistEquipment(result.equipment);
+    setActiveInventoryContainerId(result.container.id);
   }
 
   async function placeNewItemInInventory(saved: CharacterItem) {
@@ -577,7 +556,6 @@ function SessionInventoryBody({
                   }}
                   onGiveItem={handleGiveItem}
                   onTransferContainer={handleTransferContainer}
-                  onAddContainer={addContainer}
                   onUpdateContainer={updateContainer}
                   onAddCustomCategory={addCustomCategory}
                   onEquipAsContainer={equipItemAsContainer}

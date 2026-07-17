@@ -283,12 +283,12 @@ export const characterSheetMessagesDe = {
   "equipment.edit": "Bearbeiten",
   "equipment.delete": "Löschen",
   "equipment.deleteConfirm": '„{name}" wirklich löschen?',
-  "equipment.step1Title": "1. Gepäck — Rucksack festlegen",
+  "equipment.step1Title": "1. Gepäck — aus Inventar ausrüsten",
   "equipment.step1Hint":
-    "Bevor du Ausrüstung verteilst, lege mindestens einen Rucksack oder eine Tasche der haltenden Magie fest. Gegenstände aus Shops und Loot landen in deinem Inventar.",
+    "Gepäckstücke sind echte Inventar-Gegenstände (Kategorie Gepäck). Rüste bis zu 5 davon oberhalb des Inventars aus — danach erscheint jeder Behälter als Tab.",
   "equipment.chooseFromInventory": "Aus Inventar wählen",
-  "equipment.chooseBackpack": "Rucksack wählen…",
-  "equipment.addDefaultBackpack": "Standard-Rucksack hinzufügen",
+  "equipment.chooseBackpack": "Gepäck aus Inventar wählen…",
+  "equipment.addDefaultBackpack": "Gepäck aus Inventar ausrüsten",
   "equipment.defaultBackpack": "Rucksack",
   "equipment.remove": "Entfernen",
   "equipment.backpackHint": "Hinweis: Mindestens ein Rucksack-Typ wird empfohlen.",
@@ -437,6 +437,20 @@ export const characterSheetMessagesDe = {
   "inventory.backpackNotEmpty": "Nur leeres Gepäck kann als Behälter ausgerüstet werden.",
   "inventory.backpackAlreadyEquipped": "Dieses Gepäck ist bereits als Behälter ausgerüstet.",
   "inventory.notABackpack": "Nur Gepäck-/Rucksack-Gegenstände können hier ausgerüstet werden.",
+  "inventory.luggageSlots": "Gepäck {used}/{max}",
+  "inventory.luggageSlotsFull": "Maximal {max} Gepäckstücke können ausgerüstet werden.",
+  "inventory.luggageRequiresItem": "Gepäckstücke müssen mit einem Inventar-Gegenstand verknüpft sein.",
+  "inventory.equipLuggageTitle": "Gepäck aus Inventar ausrüsten",
+  "inventory.equipLuggageHint":
+    "Wähle ein Gepäckstück aus dem Inventar. Es wird in einen der 5 Gepäckplätze gelegt und als Inventar-Tab verfügbar.",
+  "inventory.equipLuggageNone": "Kein freies Gepäck im Inventar. Lege zuerst ein Gepäckstück an oder räume eines frei.",
+  "inventory.equipLuggageSlotHint": "Gepäck hierher ziehen oder aus Inventar auswählen",
+  "inventory.unequipLuggage": "Gepäck ablegen",
+  "inventory.unequipLuggageEmpty": "Gepäck ablegen? Das Item kehrt ins Inventar zurück.",
+  "inventory.unequipLuggageRedistribute":
+    "Gepäck ablegen? {count} Gegenstände werden auf andere Gepäckstücke verteilt, das Behälter-Item kehrt ins Inventar zurück.",
+  "inventory.unequipLuggageBlocked":
+    "Dieses Gepäck ist noch gefüllt und es gibt keinen anderen Behälter. Leere es zuerst oder rüste ein weiteres Gepäckstück aus.",
 
   "biography.portraitToken": "Portrait & Karten-Token",
   "biography.portraitTokenHint":

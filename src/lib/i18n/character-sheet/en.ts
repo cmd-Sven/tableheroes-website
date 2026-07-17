@@ -283,12 +283,12 @@ export const characterSheetMessagesEn = {
   "equipment.edit": "Edit",
   "equipment.delete": "Delete",
   "equipment.deleteConfirm": 'Delete "{name}"?',
-  "equipment.step1Title": "1. Gear — Set backpack",
+  "equipment.step1Title": "1. Luggage — equip from inventory",
   "equipment.step1Hint":
-    "Before distributing equipment, assign at least one backpack or bag of holding. Shop and loot items land in your inventory.",
+    "Luggage pieces are real inventory items (Luggage category). Equip up to 5 above the inventory — each becomes an inventory tab.",
   "equipment.chooseFromInventory": "Choose from inventory",
-  "equipment.chooseBackpack": "Choose backpack…",
-  "equipment.addDefaultBackpack": "Add default backpack",
+  "equipment.chooseBackpack": "Choose luggage from inventory…",
+  "equipment.addDefaultBackpack": "Equip luggage from inventory",
   "equipment.defaultBackpack": "Backpack",
   "equipment.remove": "Remove",
   "equipment.backpackHint": "Note: At least one backpack-type container is recommended.",
@@ -437,6 +437,20 @@ export const characterSheetMessagesEn = {
   "inventory.backpackNotEmpty": "Only empty luggage can be equipped as a container.",
   "inventory.backpackAlreadyEquipped": "This luggage is already equipped as a container.",
   "inventory.notABackpack": "Only luggage/backpack items can be equipped here.",
+  "inventory.luggageSlots": "Luggage {used}/{max}",
+  "inventory.luggageSlotsFull": "You can equip at most {max} luggage pieces.",
+  "inventory.luggageRequiresItem": "Luggage must be linked to an inventory item.",
+  "inventory.equipLuggageTitle": "Equip luggage from inventory",
+  "inventory.equipLuggageHint":
+    "Pick a luggage item from inventory. It fills one of 5 luggage slots and becomes an inventory tab.",
+  "inventory.equipLuggageNone": "No free luggage in inventory. Create a luggage item first or free one up.",
+  "inventory.equipLuggageSlotHint": "Drop luggage here or pick from inventory",
+  "inventory.unequipLuggage": "Unequip luggage",
+  "inventory.unequipLuggageEmpty": "Unequip luggage? The item returns to inventory.",
+  "inventory.unequipLuggageRedistribute":
+    "Unequip luggage? {count} items will be moved to other luggage; the container item returns to inventory.",
+  "inventory.unequipLuggageBlocked":
+    "This luggage still has contents and there is no other container. Empty it first or equip another luggage piece.",
 
   "biography.portraitToken": "Portrait & Map Token",
   "biography.portraitTokenHint":

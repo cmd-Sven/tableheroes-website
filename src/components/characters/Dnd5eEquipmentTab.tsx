@@ -41,10 +41,12 @@ import {
   computeEquipmentWeight,
   deleteEquipmentLoadout,
   deleteWeaponPreset,
+  equipItemAsLuggage,
   itemWeightLb,
   collectPlacedItemIds,
   getUnassignedItems,
   hasBackpackContainer,
+  MAX_LUGGAGE_SLOTS,
   normalizeEquipmentState,
   placeItemInGeneralSlot,
   placeItemInSlot,
@@ -58,8 +60,7 @@ import {
   withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
 import {
-  inferContainerKind,
-  isBackpackItem,
+  isLuggageItem,
   resolveCharacterItemStats,
 } from "@/src/lib/characters/dnd5e/item-resolve";
 import {
@@ -72,7 +73,6 @@ import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhou
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
 import { ItemCatalogPickerModal } from "@/src/components/characters/ItemCatalogPickerModal";
 import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
-import { ContainerSetupModal } from "@/src/components/characters/inventory/ContainerSetupModal";
 import { BeltSlotsStrip } from "@/src/components/characters/inventory/BeltSlotsStrip";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 import { enrichItemDescriptionFromCatalog } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
@@ -105,7 +105,6 @@ export function Dnd5eEquipmentTab({
   const [reconciling, setReconciling] = useState(false);
   const [partyCharacters, setPartyCharacters] = useState<PartyCharacterOption[]>([]);
   const [highlightItemIds, setHighlightItemIds] = useState<Set<string>>(() => new Set());
-  const [pendingBackpackItemId, setPendingBackpackItemId] = useState<string | null>(null);
 
   const equipment = useMemo(
     () => normalizeEquipmentState(sheet.equipment),
@@ -227,29 +226,6 @@ export function Dnd5eEquipmentTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- absichtlich an Inventar/Ausrüstung gebunden
   }, [loading, items, equipment, level]);
 
-  function addContainer(container: Dnd5eEquipmentContainer) {
-    if (container.linkedItemId) {
-      const gate = canEquipItemAsContainer(equipment, container.linkedItemId);
-      if (!gate.ok) {
-        toast.error(
-          gate.reason === "not_empty"
-            ? t("inventory.backpackNotEmpty")
-            : t("inventory.backpackAlreadyEquipped"),
-        );
-        setPendingBackpackItemId(null);
-        return;
-      }
-    }
-    let next = normalizeEquipmentState(equipment);
-    if (container.linkedItemId) {
-      next = removeItemFromEquipment(next, container.linkedItemId);
-    }
-    next.containers = [...next.containers, container];
-    update(next);
-    setPendingBackpackItemId(null);
-    if (container.id) setActiveInventoryContainerId(container.id);
-  }
-
   function updateContainer(container: Dnd5eEquipmentContainer) {
     update({
       ...equipment,
@@ -260,16 +236,21 @@ export function Dnd5eEquipmentTab({
   function addBackpackFromItem(itemId: string) {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
-    const gate = canEquipItemAsContainer(equipment, itemId);
-    if (!gate.ok) {
+    const result = equipItemAsLuggage(equipment, item);
+    if (!result.ok) {
       toast.error(
-        gate.reason === "not_empty"
+        result.reason === "not_empty"
           ? t("inventory.backpackNotEmpty")
-          : t("inventory.backpackAlreadyEquipped"),
+          : result.reason === "slots_full"
+            ? t("inventory.luggageSlotsFull", { max: MAX_LUGGAGE_SLOTS })
+            : result.reason === "not_luggage"
+              ? t("inventory.notABackpack")
+              : t("inventory.backpackAlreadyEquipped"),
       );
       return;
     }
-    setPendingBackpackItemId(itemId);
+    update(result.equipment);
+    setActiveInventoryContainerId(result.container.id);
   }
 
   async function placeNewItemInInventory(saved: CharacterItem) {
@@ -554,7 +535,6 @@ export function Dnd5eEquipmentTab({
             }}
             onGiveItem={handleGiveItem}
             onTransferContainer={handleTransferContainer}
-            onAddContainer={addContainer}
             onUpdateContainer={updateContainer}
             onAddCustomCategory={addCustomCategory}
             onEquipAsContainer={(item) => addBackpackFromItem(item.id)}
@@ -632,26 +612,22 @@ export function Dnd5eEquipmentTab({
         ) : null}
       </div>
 
-      {/* Rucksack aus Inventar hinzufügen (wenn noch keiner) */}
+      {/* Gepäck aus Inventar ausrüsten (wenn noch keiner) */}
       {equipment.containers.length === 0 && !readOnly ? (
         <section className="rounded-lg border border-hero-dark bg-background-card p-4">
           <p className="font-libre text-sm text-gray-400 mb-3">{t("equipment.step1Hint")}</p>
           {items.filter(
-            (i) =>
-              (isBackpackItem(i) || inferContainerKind(i) != null) &&
-              canEquipItemAsContainer(equipment, i.id).ok,
+            (i) => isLuggageItem(i) && canEquipItemAsContainer(equipment, i.id).ok,
           ).length > 0 ? (
             <select
-              value={pendingBackpackItemId ?? ""}
+              value=""
               onChange={(e) => e.target.value && addBackpackFromItem(e.target.value)}
               className="w-full max-w-xs rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white"
             >
               <option value="">{t("equipment.chooseBackpack")}</option>
               {items
                 .filter(
-                  (i) =>
-                    (isBackpackItem(i) || inferContainerKind(i) != null) &&
-                    canEquipItemAsContainer(equipment, i.id).ok,
+                  (i) => isLuggageItem(i) && canEquipItemAsContainer(equipment, i.id).ok,
                 )
                 .map((i) => (
                   <option key={i.id} value={i.id}>
@@ -659,34 +635,10 @@ export function Dnd5eEquipmentTab({
                   </option>
                 ))}
             </select>
-          ) : null}
+          ) : (
+            <p className="font-libre text-xs text-gray-500">{t("inventory.equipLuggageNone")}</p>
+          )}
         </section>
-      ) : null}
-
-      {pendingBackpackItemId ? (
-        <ContainerSetupModal
-          mode="create"
-          initial={(() => {
-            const item = items.find((i) => i.id === pendingBackpackItemId);
-            if (!item) return null;
-            return {
-              id: "",
-              kind: inferContainerKind(item) ?? ("backpack" as const),
-              label: item.name,
-              linkedItemId: pendingBackpackItemId,
-              itemIds: [],
-            };
-          })()}
-          linkedItemName={items.find((i) => i.id === pendingBackpackItemId)?.name}
-          onClose={() => setPendingBackpackItemId(null)}
-          onConfirm={(container) =>
-            addContainer({
-              ...container,
-              linkedItemId: pendingBackpackItemId,
-              itemIds: [],
-            })
-          }
-        />
       ) : null}
 
       {hasBackpack || equipment.containers.length > 0 ? (

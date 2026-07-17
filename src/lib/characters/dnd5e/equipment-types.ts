@@ -166,6 +166,8 @@ export type Dnd5eEquipmentState = {
 export const MAX_BELT_SLOTS = 6;
 export const MAX_ATTUNEMENT = 3;
 export const MAX_WEAPON_PRESETS = 2;
+/** Max. ausgerüstete Gepäckstücke (Rucksack / Tasche / Beutel) */
+export const MAX_LUGGAGE_SLOTS = 5;
 
 export function createEmptyEquipmentState(): Dnd5eEquipmentState {
   return {

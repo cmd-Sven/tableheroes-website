@@ -93,14 +93,20 @@ export function ContainerManageModal({
               className="flex w-full items-center gap-2 rounded border border-red-500/40 px-3 py-2 font-libre text-sm text-red-400 hover:bg-red-950/30"
             >
               <Trash2 className="h-4 w-4" />
-              {t("equipment.delete")}
+              {container.linkedItemId
+                ? t("inventory.unequipLuggage")
+                : t("equipment.delete")}
             </button>
           ) : (
             <div className="rounded border border-red-500/50 bg-red-950/20 p-3 space-y-2">
               <p className="font-libre text-xs text-red-300">
-                {itemCount > 0
-                  ? t("inventory.containerDeleteRedistribute", { count: itemCount })
-                  : t("inventory.containerDeleteEmpty")}
+                {container.linkedItemId
+                  ? itemCount > 0
+                    ? t("inventory.unequipLuggageRedistribute", { count: itemCount })
+                    : t("inventory.unequipLuggageEmpty")
+                  : itemCount > 0
+                    ? t("inventory.containerDeleteRedistribute", { count: itemCount })
+                    : t("inventory.containerDeleteEmpty")}
               </p>
               <div className="flex gap-2">
                 <button
@@ -115,7 +121,9 @@ export function ContainerManageModal({
                   onClick={onDelete}
                   className="flex-1 rounded bg-red-600 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-white"
                 >
-                  {t("equipment.delete")}
+                  {container.linkedItemId
+                    ? t("inventory.unequipLuggage")
+                    : t("equipment.delete")}
                 </button>
               </div>
             </div>

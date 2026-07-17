@@ -239,8 +239,17 @@ export function isBackpackItem(item: CharacterItem): boolean {
     n.includes("rucksack") ||
     n.includes("backpack") ||
     n.includes("gepaeck") ||
-    n.includes("gepäck")
+    n.includes("gepäck") ||
+    n.includes("beutel") ||
+    n.includes("pouch") ||
+    n.includes("satteltasche") ||
+    n.includes("sack")
   );
+}
+
+/** Alias: Gepäck-Item, das als Behälter-Slot ausrüstbar ist. */
+export function isLuggageItem(item: CharacterItem): boolean {
+  return inferContainerKind(item) != null;
 }
 
 /** Bekannte Items mit festem RK-Bonus (Fallback ohne Re-Import). */
@@ -311,8 +320,30 @@ export function isBeltWearableItem(item: CharacterItem): boolean {
   return n.includes("gürtel") || n.includes("guertel") || n.includes("belt");
 }
 
-export function inferContainerKind(item: CharacterItem): "backpack" | "bag_of_holding" | null {
+export function inferContainerKind(
+  item: CharacterItem,
+): "backpack" | "bag_of_holding" | "pouch" | null {
   if (isBagOfHoldingItem(item)) return "bag_of_holding";
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  const n = item.name.toLowerCase();
+  if (
+    meta?.inventoryCategory === "gepaeck" ||
+    n.includes("rucksack") ||
+    n.includes("backpack") ||
+    n.includes("gepaeck") ||
+    n.includes("gepäck") ||
+    resolveCharacterItemStats(item).catalogId === "misc-backpack"
+  ) {
+    return "backpack";
+  }
+  if (
+    n.includes("beutel") ||
+    n.includes("pouch") ||
+    n.includes("satteltasche") ||
+    (n.includes("sack") && !n.includes("rucksack"))
+  ) {
+    return "pouch";
+  }
   if (isBackpackItem(item)) return "backpack";
   return null;
 }

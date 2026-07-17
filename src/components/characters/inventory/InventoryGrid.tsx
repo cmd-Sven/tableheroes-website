@@ -10,17 +10,18 @@ import type {
 import {
   canEquipItemAsContainer,
   containerWeightLb,
-  deleteContainerAndRedistribute,
   findHeaviestItemInContainer,
   getContainerInventoryItems,
   getContainerMaxCapacityLb,
   getUnassignedItems,
   placeItemInContainer,
   removeItemFromEquipment,
+  unequipLuggageContainer,
   wouldSelfContain,
 } from "@/src/lib/characters/dnd5e/equipment";
+import { MAX_LUGGAGE_SLOTS } from "@/src/lib/characters/dnd5e/equipment-types";
 import { getItemDisplayCategory, isMagicalItem, MAGICAL_FILTER_ID } from "@/src/lib/characters/dnd5e/inventory-categories";
-import { inferContainerKind, isBackpackItem } from "@/src/lib/characters/dnd5e/item-resolve";
+import { isLuggageItem } from "@/src/lib/characters/dnd5e/item-resolve";
 import { DRAG_MIME } from "@/src/lib/characters/dnd5e/slot-validation";
 import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ import { BackpackTabs } from "./BackpackTabs";
 import { CategoryAssignModal } from "./CategoryAssignModal";
 import { ContainerManageModal } from "./ContainerManageModal";
 import { ContainerSetupModal } from "./ContainerSetupModal";
+import { EquipLuggagePickerModal } from "./EquipLuggagePickerModal";
 import { InventoryCategoryBar } from "./InventoryCategoryBar";
 import {
   InventoryItemContextMenu,
@@ -76,7 +78,6 @@ type Props = {
     targetCharacterId: string,
     equipment: Dnd5eEquipmentState,
   ) => Promise<void>;
-  onAddContainer: (container: Dnd5eEquipmentContainer) => void;
   onUpdateContainer: (container: Dnd5eEquipmentContainer) => void;
   onAddCustomCategory: (label: string) => void;
   /** Gepäck-Item als Behälter-Tab ausrüsten (nur leeres Gepäck) */
@@ -109,7 +110,6 @@ export function InventoryGrid({
   onAssignCategory,
   onGiveItem,
   onTransferContainer,
-  onAddContainer,
   onUpdateContainer,
   onAddCustomCategory,
   onEquipAsContainer,
@@ -140,11 +140,10 @@ export function InventoryGrid({
   const [assignModal, setAssignModal] = useState<CharacterItem | null>(null);
   const [assignUnknownMode, setAssignUnknownMode] = useState(false);
   const [containerSetup, setContainerSetup] = useState<
-    | { mode: "create"; linkedItemId?: string | null; linkedItemName?: string }
-    | { mode: "edit"; container: Dnd5eEquipmentContainer }
-    | null
+    { mode: "edit"; container: Dnd5eEquipmentContainer } | null
   >(null);
   const [manageContainerId, setManageContainerId] = useState<string | null>(null);
+  const [luggagePickerOpen, setLuggagePickerOpen] = useState(false);
 
   // Neues/hervorgehobenes Item sichtbar machen (Filter + Seite)
   useEffect(() => {
@@ -215,6 +214,14 @@ export function InventoryGrid({
   const manageContainer = manageContainerId
     ? equipment.containers.find((c) => c.id === manageContainerId)
     : null;
+
+  const equippableLuggage = useMemo(
+    () =>
+      items.filter(
+        (i) => isLuggageItem(i) && canEquipItemAsContainer(equipment, i.id).ok,
+      ),
+    [items, equipment],
+  );
 
   function openContextMenu(stack: InventoryStack, e: React.MouseEvent) {
     if (readOnly) return;
@@ -337,7 +344,7 @@ export function InventoryGrid({
     if (!itemId) return;
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
-    if (!(isBackpackItem(item) || inferContainerKind(item) != null)) {
+    if (!isLuggageItem(item)) {
       toast.error(t("inventory.notABackpack"));
       return;
     }
@@ -346,11 +353,18 @@ export function InventoryGrid({
       toast.error(
         gate.reason === "not_empty"
           ? t("inventory.backpackNotEmpty")
-          : t("inventory.backpackAlreadyEquipped"),
+          : gate.reason === "slots_full"
+            ? t("inventory.luggageSlotsFull", { max: MAX_LUGGAGE_SLOTS })
+            : t("inventory.backpackAlreadyEquipped"),
       );
       return;
     }
     onEquipAsContainer(item);
+  }
+
+  function handlePickLuggage(item: CharacterItem) {
+    setLuggagePickerOpen(false);
+    onEquipAsContainer?.(item);
   }
 
   return (
@@ -412,7 +426,11 @@ export function InventoryGrid({
           setActiveContainerId(id);
           setPage(0);
         }}
-        onAdd={readOnly ? undefined : () => setContainerSetup({ mode: "create" })}
+        onEquipFromInventory={
+          readOnly || !onEquipAsContainer
+            ? undefined
+            : () => setLuggagePickerOpen(true)
+        }
         onManage={readOnly ? undefined : (id) => setManageContainerId(id)}
         onDropOnContainer={readOnly ? undefined : handleBackpackTabDrop}
         onDropEquipNew={readOnly || !onEquipAsContainer ? undefined : handleEquipBackpackDrop}
@@ -541,8 +559,7 @@ export function InventoryGrid({
           canGive={partyCharacters.length > 0 && Boolean(onGiveItem)}
           canEquipAsContainer={Boolean(
             onEquipAsContainer &&
-              (isBackpackItem(contextMenu.stack.representative) ||
-                inferContainerKind(contextMenu.stack.representative) != null) &&
+              isLuggageItem(contextMenu.stack.representative) &&
               canEquipItemAsContainer(equipment, contextMenu.stack.representative.id).ok,
           )}
           onAction={handleContextAction}
@@ -607,24 +624,21 @@ export function InventoryGrid({
 
       {containerSetup ? (
         <ContainerSetupModal
-          mode={containerSetup.mode}
-          initial={containerSetup.mode === "edit" ? containerSetup.container : null}
-          linkedItemName={
-            containerSetup.mode === "create" ? containerSetup.linkedItemName : undefined
-          }
+          mode="edit"
+          initial={containerSetup.container}
           onClose={() => setContainerSetup(null)}
           onConfirm={(container) => {
-            if (containerSetup.mode === "create") {
-              onAddContainer({
-                ...container,
-                linkedItemId: containerSetup.linkedItemId ?? container.linkedItemId ?? null,
-                itemIds: container.itemIds ?? [],
-              });
-            } else {
-              onUpdateContainer({ ...containerSetup.container, ...container });
-            }
+            onUpdateContainer({ ...containerSetup.container, ...container });
             setContainerSetup(null);
           }}
+        />
+      ) : null}
+
+      {luggagePickerOpen ? (
+        <EquipLuggagePickerModal
+          candidates={equippableLuggage}
+          onClose={() => setLuggagePickerOpen(false)}
+          onSelect={handlePickLuggage}
         />
       ) : null}
 
@@ -639,10 +653,18 @@ export function InventoryGrid({
             setContainerSetup({ mode: "edit", container: manageContainer });
           }}
           onDelete={() => {
-            const next = deleteContainerAndRedistribute(equipment, manageContainer.id, items);
-            onEquipmentChange(next);
+            const result = unequipLuggageContainer(equipment, manageContainer.id, items);
+            if (!result.ok) {
+              toast.error(
+                result.reason === "not_empty"
+                  ? t("inventory.unequipLuggageBlocked")
+                  : t("inventory.containerManage"),
+              );
+              return;
+            }
+            onEquipmentChange(result.equipment);
             if (activeContainerId === manageContainer.id) {
-              setActiveContainerId(next.containers[0]?.id ?? null);
+              setActiveContainerId(result.equipment.containers[0]?.id ?? null);
             }
             setManageContainerId(null);
           }}

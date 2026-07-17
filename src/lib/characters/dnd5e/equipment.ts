@@ -11,6 +11,7 @@ import {
   CONTAINER_CAPACITY_LB,
   MAX_ATTUNEMENT,
   MAX_BELT_SLOTS,
+  MAX_LUGGAGE_SLOTS,
   MAX_WEAPON_PRESETS,
   createEmptyEquipmentState,
 } from "./equipment-types";
@@ -19,12 +20,13 @@ import { parseFoundryItemTag } from "./item-meta";
 import { parseDnd5eMetaFromDescription } from "./item-meta";
 import { isSimpleWeaponName } from "./weapon-catalog-lookup";
 import {
+  inferContainerKind,
   parseAdditiveAcFormula,
   resolveCharacterItemStats,
   resolveItemAcBonus,
 } from "./item-resolve";
 
-export { createEmptyEquipmentState } from "./equipment-types";
+export { createEmptyEquipmentState, MAX_LUGGAGE_SLOTS } from "./equipment-types";
 
 export function getContainerMaxCapacityLb(
   kindOrContainer:
@@ -191,15 +193,76 @@ export function isContainerContentEmpty(container: Dnd5eEquipmentContainer): boo
 /**
  * Darf dieses Gepäck-Item als neuer/aktiver Behälter ausgerüstet werden?
  * Nur leeres Gepäck — bereits gekoppelte Behälter mit Inhalt sind gesperrt.
+ * Maximal MAX_LUGGAGE_SLOTS ausgerüstete Gepäckstücke.
  */
 export function canEquipItemAsContainer(
   equipment: Dnd5eEquipmentState,
   itemId: string,
-): { ok: boolean; reason?: "already_equipped" | "not_empty" } {
+): { ok: boolean; reason?: "already_equipped" | "not_empty" | "slots_full" } {
   const existing = findContainerByLinkedItemId(equipment, itemId);
-  if (!existing) return { ok: true };
-  if (!isContainerContentEmpty(existing)) return { ok: false, reason: "not_empty" };
-  return { ok: false, reason: "already_equipped" };
+  if (existing) {
+    if (!isContainerContentEmpty(existing)) return { ok: false, reason: "not_empty" };
+    return { ok: false, reason: "already_equipped" };
+  }
+  if (equipment.containers.length >= MAX_LUGGAGE_SLOTS) {
+    return { ok: false, reason: "slots_full" };
+  }
+  return { ok: true };
+}
+
+/**
+ * Gepäck-Item aus dem Inventar als einen der max. 5 Gepäck-Slots ausrüsten.
+ * Entfernt das Item aus anderen Plätzen und legt einen leeren Behälter an.
+ */
+export function equipItemAsLuggage(
+  equipment: Dnd5eEquipmentState,
+  item: CharacterItem,
+):
+  | { ok: true; equipment: Dnd5eEquipmentState; container: Dnd5eEquipmentContainer }
+  | { ok: false; reason: "already_equipped" | "not_empty" | "slots_full" | "not_luggage" } {
+  const kind = inferContainerKind(item);
+  if (!kind) return { ok: false, reason: "not_luggage" };
+
+  const gate = canEquipItemAsContainer(equipment, item.id);
+  if (!gate.ok) return { ok: false, reason: gate.reason ?? "already_equipped" };
+
+  let next = normalizeEquipmentState(equipment);
+  next = removeItemFromEquipment(next, item.id);
+  const container: Dnd5eEquipmentContainer = {
+    id: crypto.randomUUID(),
+    kind,
+    label: item.name,
+    linkedItemId: item.id,
+    itemIds: [],
+  };
+  next.containers = [...next.containers, container];
+  return { ok: true, equipment: next, container };
+}
+
+/**
+ * Gepäck-Slot ablegen: Behälter entfernen, Inhalt auf andere Slots verteilen,
+ * verknüpftes Item zurück ins Inventar (unassigned / anderer Behälter).
+ * Bei Inhalt und keinem weiteren Behälter → Warnung (not_empty).
+ */
+export function unequipLuggageContainer(
+  equipment: Dnd5eEquipmentState,
+  containerId: string,
+  items: CharacterItem[],
+):
+  | { ok: true; equipment: Dnd5eEquipmentState }
+  | { ok: false; reason: "not_found" | "not_empty" } {
+  const target = equipment.containers.find((c) => c.id === containerId);
+  if (!target) return { ok: false, reason: "not_found" };
+
+  const remaining = equipment.containers.filter((c) => c.id !== containerId);
+  if (target.itemIds.length > 0 && remaining.length === 0) {
+    return { ok: false, reason: "not_empty" };
+  }
+
+  return {
+    ok: true,
+    equipment: deleteContainerAndRedistribute(equipment, containerId, items),
+  };
 }
 
 function isContainerReachableFrom(
