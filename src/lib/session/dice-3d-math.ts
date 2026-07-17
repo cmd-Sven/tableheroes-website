@@ -3,7 +3,6 @@ import * as THREE from "three";
 type Vec3 = readonly [number, number, number];
 
 const _up = new THREE.Vector3(0, 1, 0);
-const _tmp = new THREE.Vector3();
 
 /** d6: klassische Gegenseiten (1↔6, 2↔5, 3↔4). */
 const D6_NORMALS: Record<number, Vec3> = {
@@ -89,18 +88,6 @@ const D20_NORMALS: Vec3[] = [
   [0, -0.9342, -0.3568],
 ];
 
-/** Inradius der jeweiligen Geometrie + Luft, damit Labels nicht im Mesh stecken. */
-const FACE_INRADIUS: Record<number, number> = {
-  4: 0.3333,
-  6: 0.575,
-  8: 0.5774,
-  10: 0.584,
-  12: 0.7553,
-  20: 0.7947,
-};
-
-const LABEL_PAD = 0.07;
-
 function normalsForSides(sides: number): Vec3[] | null {
   switch (Math.round(sides)) {
     case 4:
@@ -118,7 +105,7 @@ function normalsForSides(sides: number): Vec3[] | null {
   }
 }
 
-/** Face-Normal (lokal) — muss zu `quaternionForFaceUp` und Label-Positionen passen. */
+/** Face-Normal (lokal) — muss zu `quaternionForFaceUp` und Face-Textur-Matching passen. */
 export function faceNormal(sides: number, face: number, out = new THREE.Vector3()): THREE.Vector3 {
   const n = Math.max(2, Math.round(sides));
   const v = Math.min(n, Math.max(1, Math.round(face)));
@@ -141,38 +128,6 @@ export function faceNormal(sides: number, face: number, out = new THREE.Vector3(
   const radius = Math.sqrt(Math.max(0, 1 - y * y));
   const theta = golden * i;
   return out.set(Math.cos(theta) * radius, y, Math.sin(theta) * radius).normalize();
-}
-
-/** Abstand Face-Label vom Zentrum (klar außerhalb der Fläche). */
-export function faceLabelRadius(sides: number): number {
-  const s = Math.round(sides);
-  const r = FACE_INRADIUS[s];
-  if (r != null) return r + LABEL_PAD;
-  return 0.85;
-}
-
-/** Plane-Größe für Face-Zahlen — groß genug zum Lesen beim Roll. */
-export function faceLabelSize(sides: number): number {
-  const s = Math.round(sides);
-  if (s <= 4) return 0.62;
-  if (s <= 6) return 0.58;
-  if (s <= 8) return 0.5;
-  if (s <= 10) return 0.42;
-  if (s <= 12) return 0.4;
-  return 0.36;
-}
-
-/** Quaternion: Plane (+Z) zeigt entlang der Face-Normale. */
-export function quaternionFacingOut(normal: THREE.Vector3, out = new THREE.Quaternion()): THREE.Quaternion {
-  _tmp.copy(normal).normalize();
-  // Stabil bei Anti-Parallel zu +Z (z. B. d6 Face 4)
-  if (_tmp.z < -0.999) {
-    return out.set(0, 1, 0, 0);
-  }
-  if (_tmp.z > 0.999) {
-    return out.identity();
-  }
-  return out.setFromUnitVectors(new THREE.Vector3(0, 0, 1), _tmp);
 }
 
 /** Ziel-Quaternion: Face-Wert zeigt nach oben (+Y). */
