@@ -178,6 +178,19 @@ function entryToStats(entry: ShopCatalogItem): Partial<ResolvedItemStats> {
   };
 }
 
+/** Vermeidet Teilstring-Fallen (z. B. „mace“ in „morningstar“). */
+function weaponNameMatches(bare: string, candidate: string): boolean {
+  if (!candidate) return false;
+  if (bare === candidate) return true;
+  // kurze Tokens nur exakt (sonst false positives)
+  if (candidate.length <= 4) return false;
+  return (
+    bare.startsWith(candidate) ||
+    bare.endsWith(candidate) ||
+    bare.includes(candidate)
+  );
+}
+
 export function lookupWeaponStatsByName(name: string): Partial<ResolvedItemStats> | null {
   const norm = normalizeWeaponName(name);
   if (!norm) return null;
@@ -192,7 +205,7 @@ export function lookupWeaponStatsByName(name: string): Partial<ResolvedItemStats
   );
   for (const [alias, id] of aliases) {
     const a = normalizeWeaponName(alias);
-    if (bare === a || bare.includes(a)) {
+    if (weaponNameMatches(bare, a)) {
       catalogId = id;
       break;
     }
@@ -205,13 +218,13 @@ export function lookupWeaponStatsByName(name: string): Partial<ResolvedItemStats
 
   const direct = WEAPON_CATALOGS.find((e) => {
     const n = normalizeWeaponName(e.name);
-    return bare === n || bare.includes(n) || n.includes(bare);
+    return weaponNameMatches(bare, n) || (n.length > 4 && n.includes(bare));
   });
   if (direct) return entryToStats(direct);
 
   for (const [key, stats] of Object.entries(SRD_WEAPON_FALLBACK)) {
     const k = normalizeWeaponName(key);
-    if (bare === k || bare.includes(k)) {
+    if (weaponNameMatches(bare, k)) {
       return { kind: "weapon", ...stats };
     }
   }

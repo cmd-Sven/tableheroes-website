@@ -419,7 +419,7 @@ export function MyCharacterSection({
         </div>
       )}
 
-      {progressionLocked && progressionLockMessage ? (
+      {progressionLockMessage ? (
         <div className="mb-4">
           <FoundryProgressionLockNotice message={progressionLockMessage} />
         </div>

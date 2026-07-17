@@ -396,13 +396,14 @@ function inferSlotForFoundryItem(
 
   if (type === "weapon") return "mainHand";
   if (meta.isShield || equipType.includes("shield") || name.includes("schild")) return "offHand";
+  // Rucksack/Container → kein Körper-Slot mehr (nur containers[])
   if (
     type === "container" ||
     equipType.includes("backpack") ||
     name.includes("rucksack") ||
     name.includes("backpack")
   ) {
-    return "back";
+    return null;
   }
   if (type === "equipment" || type === "loot") {
     if (equipType.includes("ring") || name.includes("ring")) return "ring1";
@@ -520,9 +521,6 @@ export function mapFoundryItemsToEquipment(
       linkedItemId: fid,
       itemIds: [],
     });
-    if (isEquipped(containerItem.system ?? {}) && !equipment.slots.back) {
-      equipment.slots.back = fid;
-    }
   }
 
   if (equipment.containers.length === 0 && stowedItems.length > 0) {

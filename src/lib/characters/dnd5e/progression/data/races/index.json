@@ -1,0 +1,47 @@
+[
+  {
+    "id": "dragonborn",
+    "nameEn": "Dragonborn",
+    "nameDe": "Drachenblütiger"
+  },
+  {
+    "id": "dwarf",
+    "nameEn": "Dwarf",
+    "nameDe": "Zwerg"
+  },
+  {
+    "id": "elf",
+    "nameEn": "Elf",
+    "nameDe": "Elf"
+  },
+  {
+    "id": "gnome",
+    "nameEn": "Gnome",
+    "nameDe": "Gnom"
+  },
+  {
+    "id": "half-elf",
+    "nameEn": "Half-Elf",
+    "nameDe": "Halbelf"
+  },
+  {
+    "id": "half-orc",
+    "nameEn": "Half-Orc",
+    "nameDe": "Halbork"
+  },
+  {
+    "id": "halfling",
+    "nameEn": "Halfling",
+    "nameDe": "Halbling"
+  },
+  {
+    "id": "human",
+    "nameEn": "Human",
+    "nameDe": "Mensch"
+  },
+  {
+    "id": "tiefling",
+    "nameEn": "Tiefling",
+    "nameDe": "Tiefling"
+  }
+]

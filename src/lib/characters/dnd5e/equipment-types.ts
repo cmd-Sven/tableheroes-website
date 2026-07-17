@@ -12,7 +12,6 @@ export type Dnd5eEquipmentSlot =
   | "feet"
   | "mainHand"
   | "offHand"
-  | "back"
   | "ring1"
   | "ring2";
 
@@ -68,7 +67,6 @@ export const DND5E_EQUIPMENT_SLOTS: Dnd5eEquipmentSlot[] = [
   "feet",
   "mainHand",
   "offHand",
-  "back",
   "ring1",
   "ring2",
 ];
@@ -86,7 +84,6 @@ export const EQUIPMENT_SLOT_LABELS_DE: Record<Dnd5eEquipmentSlot, string> = {
   feet: "Füße",
   mainHand: "Haupthand",
   offHand: "Nebenhand",
-  back: "Rücken",
   ring1: "Ring 1",
   ring2: "Ring 2",
 };
@@ -104,7 +101,6 @@ export const EQUIPMENT_SLOT_LABELS_EN: Record<Dnd5eEquipmentSlot, string> = {
   feet: "Feet",
   mainHand: "Main Hand",
   offHand: "Off Hand",
-  back: "Back",
   ring1: "Ring #1",
   ring2: "Ring #2",
 };

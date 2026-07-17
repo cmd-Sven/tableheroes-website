@@ -38,6 +38,9 @@ import {
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 import type { CharacterSheetT } from "@/src/lib/i18n/character-sheet";
 import { SpellEditorModal } from "@/src/components/characters/SpellEditorModal";
+import { SpellCatalogPickerModal } from "@/src/components/characters/SpellCatalogPickerModal";
+import { applyClassBasicsFromCatalog } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import { resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
 
 type Props = {
   sheet: Dnd5eSheetData;
@@ -275,6 +278,8 @@ export function Dnd5eSpellsFeaturesTab({
     defaultSpellAbilityForClass(characterClass)) as AbilityKey;
   const abilityMod = derived.abilities[castAbility]?.modifier ?? 0;
   const [editorSpell, setEditorSpell] = useState<Dnd5eSpellEntry | null | "new">(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const classId = resolveClassId(characterClass);
 
   const grouped = useMemo(() => groupSpellsByLevel(spells), [spells]);
 
@@ -341,6 +346,16 @@ export function Dnd5eSpellsFeaturesTab({
     setEditorSpell(null);
   }
 
+  function addFromCatalog(spell: Dnd5eSpellEntry) {
+    let next = ensureSpellcasting({ ...sheet });
+    if (!next.spellcasting?.slots || Object.keys(next.spellcasting.slots).length === 0) {
+      next = applyClassBasicsFromCatalog(next, characterClass, level);
+    }
+    const existing = next.spells ?? [];
+    if (existing.some((s) => s.id === spell.id)) return;
+    onSheetChange({ ...next, spells: [...existing, spell] });
+  }
+
   function deleteSpell(spellId: string) {
     if (readOnly) return;
     const name =
@@ -392,14 +407,24 @@ export function Dnd5eSpellsFeaturesTab({
                 </div>
               ) : null}
               {!readOnly ? (
-                <button
-                  type="button"
-                  onClick={() => setEditorSpell("new")}
-                  className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t("spellEditor.add")}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                  >
+                    <BookMarked className="h-3.5 w-3.5" />
+                    {t("spellCatalog.open")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorSpell("new")}
+                    className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t("spellEditor.addCustom")}
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
@@ -467,6 +492,12 @@ export function Dnd5eSpellsFeaturesTab({
             </div>
           ) : null}
 
+          {!classId && !readOnly ? (
+            <p className="font-libre text-xs text-accent-blood">
+              {t("spellCatalog.pickClassFirst")}
+            </p>
+          ) : null}
+
           {spells.length === 0 ? (
             <p className="font-libre text-sm text-gray-500">{t("spells.emptyEditable")}</p>
           ) : (
@@ -523,6 +554,16 @@ export function Dnd5eSpellsFeaturesTab({
           spell={editorSpell === "new" ? null : editorSpell}
           onClose={() => setEditorSpell(null)}
           onSave={saveSpell}
+        />
+      ) : null}
+
+      {catalogOpen ? (
+        <SpellCatalogPickerModal
+          sheet={sheet}
+          characterClass={characterClass}
+          level={level}
+          onClose={() => setCatalogOpen(false)}
+          onAdd={addFromCatalog}
         />
       ) : null}
     </div>

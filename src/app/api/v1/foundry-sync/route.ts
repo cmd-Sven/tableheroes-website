@@ -8,6 +8,7 @@ import {
 } from "@/src/lib/foundry-sync/foundry-api";
 import { resolveFoundryCharacterMapping } from "@/src/lib/foundry-sync/resolve-foundry-mapping";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
+import { canApplyFoundryProgressionFromSync } from "@/src/lib/foundry-sync/progression-lock-server";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,24 @@ export async function POST(request: Request) {
 
   const mapping = resolved.mapping;
 
+  const applyProgression = await canApplyFoundryProgressionFromSync(
+    supabase,
+    String(mapping.character_id),
+  );
+
+  if (!applyProgression) {
+    return foundryJson({
+      success: true,
+      skipped: true,
+      reason:
+        "Stufe, Klasse und XP werden nur einmalig aus Foundry übernommen; danach Selbstpflege im Charakterblatt.",
+      campaign_id: campaignId,
+      character_id: mapping.character_id,
+      foundry_actor_id: actorId,
+      synced_fields: {},
+    });
+  }
+
   const classLabel = sanitizeActorDisplayLabel(input.class) ?? "Unbekannt";
   const raceLabel = input.race ? sanitizeActorDisplayLabel(input.race) : null;
 
@@ -144,6 +163,8 @@ export async function POST(request: Request) {
     level: input.level,
     class: classLabel,
     experience_points: input.experience_points,
+    // Markiert einmalige Übernahme — Folge-Syncs überschreiben Progression nicht
+    sheet_source: "foundry_import",
   };
   if (raceLabel) {
     updatePayload.race = raceLabel;

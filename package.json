@@ -8,7 +8,9 @@
     "dev:webpack": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "catalog:dnd5e": "node scripts/build-dnd5e-progression-catalog.mjs",
+    "test:progression": "npx tsx src/lib/characters/dnd5e/progression/progression.selftest.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

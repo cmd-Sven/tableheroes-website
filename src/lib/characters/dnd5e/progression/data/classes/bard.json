@@ -1,0 +1,646 @@
+{
+  "id": "bard",
+  "nameEn": "Bard",
+  "nameDe": "Barde",
+  "hitDie": 8,
+  "caster": "full",
+  "subclassLevel": 3,
+  "asiLevels": [
+    4,
+    8,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "spellcasting-bard",
+        "bardic-inspiration-d6"
+      ],
+      "spellSlots": {
+        "1": 2
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 4
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "jack-of-all-trades",
+        "song-of-rest-d6"
+      ],
+      "spellSlots": {
+        "1": 3
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 5
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "bard-expertise-1",
+        "bard-college"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 2
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 6
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "bard-ability-score-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 7
+    },
+    {
+      "level": 5,
+      "featureIds": [
+        "bardic-inspiration-d8",
+        "font-of-inspiration"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 8
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "countercharm",
+        "bard-college-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 9
+    },
+    {
+      "level": 7,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 1
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 10
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "bard-ability-score-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 11
+    },
+    {
+      "level": 9,
+      "featureIds": [
+        "song-of-rest-d8"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 1
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 12
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "bard-expertise-2",
+        "bardic-inspiration-d10",
+        "magical-secrets-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 14
+    },
+    {
+      "level": 11,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 15
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "bard-ability-score-improvement-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 15
+    },
+    {
+      "level": 13,
+      "featureIds": [
+        "song-of-rest-d10"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 16
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "magical-secrets-2",
+        "bard-college-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 18
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "bardic-inspiration-d12"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 19
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "bard-ability-score-improvement-4"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 19
+    },
+    {
+      "level": 17,
+      "featureIds": [
+        "song-of-rest-d12"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 20
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "magical-secrets-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 22
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "bard-ability-score-improvement-5"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 2,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 22
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "superior-inspiration"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 2,
+        "7": 2,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 22
+    }
+  ],
+  "features": [
+    {
+      "id": "spellcasting-bard",
+      "level": 1,
+      "nameEn": "Spellcasting: Bard",
+      "nameDe": "Spellcasting: Bard",
+      "descriptionEn": "You have learned to untangle and reshape the fabric of reality in harmony with your wishes and music. Your spells are part of your vast repertoire, magic that you can tune to different situations.",
+      "descriptionDe": "You have learned to untangle and reshape the fabric of reality in harmony with your wishes and music. Your spells are part of your vast repertoire, magic that you can tune to different situations.",
+      "subclass": null
+    },
+    {
+      "id": "bardic-inspiration-d6",
+      "level": 1,
+      "nameEn": "Bardic Inspiration (d6)",
+      "nameDe": "Bardic Inspiration (d6)",
+      "descriptionEn": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "descriptionDe": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "subclass": null
+    },
+    {
+      "id": "jack-of-all-trades",
+      "level": 2,
+      "nameEn": "Jack of All Trades",
+      "nameDe": "Jack of All Trades",
+      "descriptionEn": "Starting at 2nd level, you can add half your proficiency bonus, rounded down, to any ability check you make that doesn't already include your proficiency bonus.",
+      "descriptionDe": "Starting at 2nd level, you can add half your proficiency bonus, rounded down, to any ability check you make that doesn't already include your proficiency bonus.",
+      "subclass": null
+    },
+    {
+      "id": "song-of-rest-d6",
+      "level": 2,
+      "nameEn": "Song of Rest (d6)",
+      "nameDe": "Song of Rest (d6)",
+      "descriptionEn": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "descriptionDe": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-expertise-1",
+      "level": 3,
+      "nameEn": "Expertise",
+      "nameDe": "Expertise",
+      "descriptionEn": "At 3rd level, choose two of your skill proficiencies. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies. At 10th level, you can choose another two skill proficiencies to gain this benefit.",
+      "descriptionDe": "At 3rd level, choose two of your skill proficiencies. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies. At 10th level, you can choose another two skill proficiencies to gain this benefit.",
+      "subclass": null
+    },
+    {
+      "id": "bard-college",
+      "level": 3,
+      "nameEn": "Bard College",
+      "nameDe": "Bard College",
+      "descriptionEn": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "descriptionDe": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "bardic-inspiration-d8",
+      "level": 5,
+      "nameEn": "Bardic Inspiration (d8)",
+      "nameDe": "Bardic Inspiration (d8)",
+      "descriptionEn": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "descriptionDe": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "subclass": null
+    },
+    {
+      "id": "font-of-inspiration",
+      "level": 5,
+      "nameEn": "Font of Inspiration",
+      "nameDe": "Font of Inspiration",
+      "descriptionEn": "Beginning when you reach 5th level, you regain all of your expended uses of Bardic Inspiration when you finish a short or long rest.",
+      "descriptionDe": "Beginning when you reach 5th level, you regain all of your expended uses of Bardic Inspiration when you finish a short or long rest.",
+      "subclass": null
+    },
+    {
+      "id": "countercharm",
+      "level": 6,
+      "nameEn": "Countercharm",
+      "nameDe": "Countercharm",
+      "descriptionEn": "At 6th level, you gain the ability to use musical notes or words of power to disrupt mind-influencing effects. As an action, you can start a performance that lasts until the end of your next turn. During that time, you and any friendly creatures within 30 feet of you have advantage on saving throws against being frightened or charmed. A creature must be able to hear you to gain this benefit. The performance ends early if you are incapacitated or silenced or if you voluntarily end it (no action required).",
+      "descriptionDe": "At 6th level, you gain the ability to use musical notes or words of power to disrupt mind-influencing effects. As an action, you can start a performance that lasts until the end of your next turn. During that time, you and any friendly creatures within 30 feet of you have advantage on saving throws against being frightened or charmed. A creature must be able to hear you to gain this benefit. The performance ends early if you are incapacitated or silenced or if you voluntarily end it (no action required).",
+      "subclass": null
+    },
+    {
+      "id": "bard-college-improvement-1",
+      "level": 6,
+      "nameEn": "Bard College feature",
+      "nameDe": "Bard College feature",
+      "descriptionEn": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "descriptionDe": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "song-of-rest-d8",
+      "level": 9,
+      "nameEn": "Song of Rest (d8)",
+      "nameDe": "Song of Rest (d8)",
+      "descriptionEn": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "descriptionDe": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-expertise-2",
+      "level": 10,
+      "nameEn": "Expertise",
+      "nameDe": "Expertise",
+      "descriptionEn": "At 3rd level, choose two of your skill proficiencies. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies. At 10th level, you can choose another two skill proficiencies to gain this benefit.",
+      "descriptionDe": "At 3rd level, choose two of your skill proficiencies. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies. At 10th level, you can choose another two skill proficiencies to gain this benefit.",
+      "subclass": null
+    },
+    {
+      "id": "bardic-inspiration-d10",
+      "level": 10,
+      "nameEn": "Bardic Inspiration (d10)",
+      "nameDe": "Bardic Inspiration (d10)",
+      "descriptionEn": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "descriptionDe": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "subclass": null
+    },
+    {
+      "id": "magical-secrets-1",
+      "level": 10,
+      "nameEn": "Magical Secrets",
+      "nameDe": "Magical Secrets",
+      "descriptionEn": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "descriptionDe": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-ability-score-improvement-3",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "song-of-rest-d10",
+      "level": 13,
+      "nameEn": "Song of Rest (d10)",
+      "nameDe": "Song of Rest (d10)",
+      "descriptionEn": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "descriptionDe": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "magical-secrets-2",
+      "level": 14,
+      "nameEn": "Magical Secrets",
+      "nameDe": "Magical Secrets",
+      "descriptionEn": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "descriptionDe": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-college-improvement-2",
+      "level": 14,
+      "nameEn": "Bard College feature",
+      "nameDe": "Bard College feature",
+      "descriptionEn": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "descriptionDe": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "bardic-inspiration-d12",
+      "level": 15,
+      "nameEn": "Bardic Inspiration (d12)",
+      "nameDe": "Bardic Inspiration (d12)",
+      "descriptionEn": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "descriptionDe": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. \n\nYour Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-ability-score-improvement-4",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "song-of-rest-d12",
+      "level": 17,
+      "nameEn": "Song of Rest (d12)",
+      "nameDe": "Song of Rest (d12)",
+      "descriptionEn": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "descriptionDe": "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. \n\nThe extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "magical-secrets-3",
+      "level": 18,
+      "nameEn": "Magical Secrets",
+      "nameDe": "Magical Secrets",
+      "descriptionEn": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "descriptionDe": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. \n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table. \n\nYou learn two additional spells from any class at 14th level and again at 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "bard-ability-score-improvement-5",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "superior-inspiration",
+      "level": 20,
+      "nameEn": "Superior Inspiration",
+      "nameDe": "Superior Inspiration",
+      "descriptionEn": "At 20th level, when you roll initiative and have no uses of Bardic Inspiration left, you regain one use.",
+      "descriptionDe": "At 20th level, when you roll initiative and have no uses of Bardic Inspiration left, you regain one use.",
+      "subclass": null
+    },
+    {
+      "id": "bonus-proficiencies",
+      "level": 3,
+      "nameEn": "Bonus Proficiencies",
+      "nameDe": "Bonus Proficiencies",
+      "descriptionEn": "When you join the College of Lore at 3rd level, you gain proficiency with three skills of your choice.",
+      "descriptionDe": "When you join the College of Lore at 3rd level, you gain proficiency with three skills of your choice.",
+      "subclass": "lore"
+    },
+    {
+      "id": "cutting-words",
+      "level": 3,
+      "nameEn": "Cutting Words",
+      "nameDe": "Cutting Words",
+      "descriptionEn": "Also at 3rd level, you learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.\n\nWhen a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll.\n\nYou can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
+      "descriptionDe": "Also at 3rd level, you learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.\n\nWhen a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll.\n\nYou can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
+      "subclass": "lore"
+    },
+    {
+      "id": "additional-magical-secrets",
+      "level": 6,
+      "nameEn": "Additional Magical Secrets",
+      "nameDe": "Additional Magical Secrets",
+      "descriptionEn": "At 6th level, you learn two spells of your choice from any class. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you but don't count against the number of bard spells you know.",
+      "descriptionDe": "At 6th level, you learn two spells of your choice from any class. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you but don't count against the number of bard spells you know.",
+      "subclass": "lore"
+    },
+    {
+      "id": "peerless-skill",
+      "level": 14,
+      "nameEn": "Peerless Skill",
+      "nameDe": "Peerless Skill",
+      "descriptionEn": "Starting at 14th level, when you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail.",
+      "descriptionDe": "Starting at 14th level, when you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail.",
+      "subclass": "lore"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "lore",
+      "nameEn": "Lore",
+      "nameDe": "Lore",
+      "features": [
+        {
+          "id": "bonus-proficiencies",
+          "level": 3,
+          "nameEn": "Bonus Proficiencies",
+          "nameDe": "Bonus Proficiencies",
+          "descriptionEn": "When you join the College of Lore at 3rd level, you gain proficiency with three skills of your choice.",
+          "descriptionDe": "When you join the College of Lore at 3rd level, you gain proficiency with three skills of your choice.",
+          "subclass": "lore"
+        },
+        {
+          "id": "cutting-words",
+          "level": 3,
+          "nameEn": "Cutting Words",
+          "nameDe": "Cutting Words",
+          "descriptionEn": "Also at 3rd level, you learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.\n\nWhen a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll.\n\nYou can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
+          "descriptionDe": "Also at 3rd level, you learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.\n\nWhen a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll.\n\nYou can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
+          "subclass": "lore"
+        },
+        {
+          "id": "additional-magical-secrets",
+          "level": 6,
+          "nameEn": "Additional Magical Secrets",
+          "nameDe": "Additional Magical Secrets",
+          "descriptionEn": "At 6th level, you learn two spells of your choice from any class. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you but don't count against the number of bard spells you know.",
+          "descriptionDe": "At 6th level, you learn two spells of your choice from any class. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you but don't count against the number of bard spells you know.",
+          "subclass": "lore"
+        },
+        {
+          "id": "peerless-skill",
+          "level": 14,
+          "nameEn": "Peerless Skill",
+          "nameDe": "Peerless Skill",
+          "descriptionEn": "Starting at 14th level, when you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail.",
+          "descriptionDe": "Starting at 14th level, when you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail.",
+          "subclass": "lore"
+        }
+      ]
+    }
+  ]
+}

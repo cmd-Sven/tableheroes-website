@@ -1,0 +1,12 @@
+{
+  "source": "dnd5eapi.co / SRD 5.1",
+  "license": "CC-BY-4.0",
+  "attribution": "This work includes material from the System Reference Document 5.1 (SRD 5.1) © Wizards of the Coast LLC, available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under CC-BY-4.0.",
+  "builtAt": "2026-07-16T16:54:32.711Z",
+  "counts": {
+    "classes": 12,
+    "spells": 319,
+    "races": 9,
+    "feats": 40
+  }
+}

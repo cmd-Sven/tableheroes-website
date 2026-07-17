@@ -1,0 +1,542 @@
+{
+  "id": "paladin",
+  "nameEn": "Paladin",
+  "nameDe": "Paladin",
+  "hitDie": 10,
+  "caster": "half",
+  "subclassLevel": 3,
+  "asiLevels": [
+    4,
+    8,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "divine-sense",
+        "lay-on-hands"
+      ]
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "paladin-fighting-style",
+        "spellcasting-paladin",
+        "divine-smite"
+      ],
+      "spellSlots": {
+        "1": 2
+      }
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "divine-health",
+        "sacred-oath",
+        "oath-spells",
+        "channel-divinity"
+      ],
+      "spellSlots": {
+        "1": 3
+      }
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "paladin-ability-score-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 3
+      }
+    },
+    {
+      "level": 5,
+      "featureIds": [
+        "paladin-extra-attack"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 2
+      }
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "aura-of-protection"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 2
+      }
+    },
+    {
+      "level": 7,
+      "featureIds": [
+        "sacred-oath-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3
+      }
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "paladin-ability-score-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3
+      }
+    },
+    {
+      "level": 9,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 2
+      }
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "aura-of-courage"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 2
+      }
+    },
+    {
+      "level": 11,
+      "featureIds": [
+        "improved-divine-smite"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3
+      }
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "paladin-ability-score-improvement-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3
+      }
+    },
+    {
+      "level": 13,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 1
+      }
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "cleansing-touch"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 1
+      }
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "sacred-oath-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 2
+      }
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "paladin-ability-score-improvement-4"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 2
+      }
+    },
+    {
+      "level": 17,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 1
+      }
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "aura-improvements"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 1
+      }
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "paladin-ability-score-improvement-5"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2
+      }
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "sacred-oath-improvement-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2
+      }
+    }
+  ],
+  "features": [
+    {
+      "id": "divine-sense",
+      "level": 1,
+      "nameEn": "Divine Sense",
+      "nameDe": "Divine Sense",
+      "descriptionEn": "The presence of strong evil registers on your senses like a noxious odor, and powerful good rings like heavenly music in your ears. As an action, you can open your awareness to detect such forces. Until the end of your next turn, you know the location of any celestial, fiend, or undead within 60 feet of you that is not behind total cover. You know the type (celestial, fiend, or undead) of any being whose presence you sense, but not its identity. Within the same radius, you also detect the presence of any place or object that has been consecrated or desecrated, as with the hallow spell.\n\nYou can use this feature a number of times equal to 1 + your Charisma modifier. When you finish a long rest, you regain all expended uses.",
+      "descriptionDe": "The presence of strong evil registers on your senses like a noxious odor, and powerful good rings like heavenly music in your ears. As an action, you can open your awareness to detect such forces. Until the end of your next turn, you know the location of any celestial, fiend, or undead within 60 feet of you that is not behind total cover. You know the type (celestial, fiend, or undead) of any being whose presence you sense, but not its identity. Within the same radius, you also detect the presence of any place or object that has been consecrated or desecrated, as with the hallow spell.\n\nYou can use this feature a number of times equal to 1 + your Charisma modifier. When you finish a long rest, you regain all expended uses.",
+      "subclass": null
+    },
+    {
+      "id": "lay-on-hands",
+      "level": 1,
+      "nameEn": "Lay on Hands",
+      "nameDe": "Lay on Hands",
+      "descriptionEn": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you take a long rest. With that pool, you can restore a total number of hit points equal to your paladin level x 5.\n\nAs an action, you can touch a creature and draw power from the pool to restore a number of hit points to that creature, up to the maximum amount remaining in your pool.\n\nAlternatively, you can expend 5 hit points from your pool of healing to cure the target of one disease or neutralize one poison affecting it. You can cure multiple diseases and neutralize multiple poisons with a single use of Lay on Hands, expending hit points separately for each one.\n\nThis feature has no effect on undead and constructs.",
+      "descriptionDe": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you take a long rest. With that pool, you can restore a total number of hit points equal to your paladin level x 5.\n\nAs an action, you can touch a creature and draw power from the pool to restore a number of hit points to that creature, up to the maximum amount remaining in your pool.\n\nAlternatively, you can expend 5 hit points from your pool of healing to cure the target of one disease or neutralize one poison affecting it. You can cure multiple diseases and neutralize multiple poisons with a single use of Lay on Hands, expending hit points separately for each one.\n\nThis feature has no effect on undead and constructs.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-fighting-style",
+      "level": 2,
+      "nameEn": "Fighting Style",
+      "nameDe": "Fighting Style",
+      "descriptionEn": "At 2nd level, you adopt a style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again.",
+      "descriptionDe": "At 2nd level, you adopt a style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again.",
+      "subclass": null
+    },
+    {
+      "id": "spellcasting-paladin",
+      "level": 2,
+      "nameEn": "Spellcasting: Paladin",
+      "nameDe": "Spellcasting: Paladin",
+      "descriptionEn": "By 2nd level, you have learned to draw on divine magic through meditation and prayer to cast spells as a cleric does.",
+      "descriptionDe": "By 2nd level, you have learned to draw on divine magic through meditation and prayer to cast spells as a cleric does.",
+      "subclass": null
+    },
+    {
+      "id": "divine-smite",
+      "level": 2,
+      "nameEn": "Divine Smite",
+      "nameDe": "Divine Smite",
+      "descriptionEn": "Starting at 2nd level, when you hit a creature with a melee weapon attack, you can expend one spell slot to deal radiant damage to the target, in addition to the weapon's damage. The extra damage is 2d8 for a 1st-level spell slot, plus 1d8 for each spell level higher than 1st, to a maximum of 5d8. The damage increases by 1d8 if the target is an undead or a fiend.",
+      "descriptionDe": "Starting at 2nd level, when you hit a creature with a melee weapon attack, you can expend one spell slot to deal radiant damage to the target, in addition to the weapon's damage. The extra damage is 2d8 for a 1st-level spell slot, plus 1d8 for each spell level higher than 1st, to a maximum of 5d8. The damage increases by 1d8 if the target is an undead or a fiend.",
+      "subclass": null
+    },
+    {
+      "id": "divine-health",
+      "level": 3,
+      "nameEn": "Divine Health",
+      "nameDe": "Divine Health",
+      "descriptionEn": "By 3rd level, the divine magic flowing through you makes you immune to disease.",
+      "descriptionDe": "By 3rd level, the divine magic flowing through you makes you immune to disease.",
+      "subclass": null
+    },
+    {
+      "id": "sacred-oath",
+      "level": 3,
+      "nameEn": "Sacred Oath",
+      "nameDe": "Sacred Oath",
+      "descriptionEn": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "descriptionDe": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "subclass": null
+    },
+    {
+      "id": "oath-spells",
+      "level": 3,
+      "nameEn": "Oath Spells",
+      "nameDe": "Oath Spells",
+      "descriptionEn": "Each oath has a list of associated spells. You gain access to these spells at the levels specified in the oath description. Once you gain access to an oath spell, you always have it prepared. Oath spells don't count against the number of spells you can prepare each day.\n\nIf you gain an oath spell that doesn't appear on the paladin spell list, the spell is nonetheless a paladin spell for you.",
+      "descriptionDe": "Each oath has a list of associated spells. You gain access to these spells at the levels specified in the oath description. Once you gain access to an oath spell, you always have it prepared. Oath spells don't count against the number of spells you can prepare each day.\n\nIf you gain an oath spell that doesn't appear on the paladin spell list, the spell is nonetheless a paladin spell for you.",
+      "subclass": null
+    },
+    {
+      "id": "channel-divinity",
+      "level": 3,
+      "nameEn": "Channel Divinity",
+      "nameDe": "Channel Divinity",
+      "descriptionEn": "Your oath allows you to channel divine energy to fuel magical effects. Each Channel Divinity option provided by your oath explains how to use it.\n\nWhen you use your Channel Divinity, you choose which option to use. You must then finish a short or long rest to use your Channel Divinity again.\n\nSome Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your paladin spell save DC.",
+      "descriptionDe": "Your oath allows you to channel divine energy to fuel magical effects. Each Channel Divinity option provided by your oath explains how to use it.\n\nWhen you use your Channel Divinity, you choose which option to use. You must then finish a short or long rest to use your Channel Divinity again.\n\nSome Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your paladin spell save DC.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-extra-attack",
+      "level": 5,
+      "nameEn": "Extra Attack",
+      "nameDe": "Extra Attack",
+      "descriptionEn": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn.",
+      "descriptionDe": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn.",
+      "subclass": null
+    },
+    {
+      "id": "aura-of-protection",
+      "level": 6,
+      "nameEn": "Aura of Protection",
+      "nameDe": "Aura of Protection",
+      "descriptionEn": "Starting at 6th level, whenever you or a friendly creature within 10 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "descriptionDe": "Starting at 6th level, whenever you or a friendly creature within 10 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "subclass": null
+    },
+    {
+      "id": "sacred-oath-improvement-1",
+      "level": 7,
+      "nameEn": "Sacred Oath feature",
+      "nameDe": "Sacred Oath feature",
+      "descriptionEn": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "descriptionDe": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "aura-of-courage",
+      "level": 10,
+      "nameEn": "Aura of Courage",
+      "nameDe": "Aura of Courage",
+      "descriptionEn": "Starting at 10th level, you and friendly creatures within 10 feet of you can't be frightened while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "descriptionDe": "Starting at 10th level, you and friendly creatures within 10 feet of you can't be frightened while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "subclass": null
+    },
+    {
+      "id": "improved-divine-smite",
+      "level": 11,
+      "nameEn": "Improved Divine Smite",
+      "nameDe": "Improved Divine Smite",
+      "descriptionEn": "By 11th level, you are so suffused with righteous might that all your melee weapon strikes carry divine power with them. Whenever you hit a creature with a melee weapon, the creature takes an extra 1d8 radiant damage. If you also use your Divine Smite with an attack, you add this damage to the extra damage of your Divine Smite.",
+      "descriptionDe": "By 11th level, you are so suffused with righteous might that all your melee weapon strikes carry divine power with them. Whenever you hit a creature with a melee weapon, the creature takes an extra 1d8 radiant damage. If you also use your Divine Smite with an attack, you add this damage to the extra damage of your Divine Smite.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-ability-score-improvement-3",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "cleansing-touch",
+      "level": 14,
+      "nameEn": "Cleansing Touch",
+      "nameDe": "Cleansing Touch",
+      "descriptionEn": "Beginning at 14th level, you can use your action to end one spell on yourself or on one willing creature that you touch.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain expended uses when you finish a long rest.",
+      "descriptionDe": "Beginning at 14th level, you can use your action to end one spell on yourself or on one willing creature that you touch.\n\nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain expended uses when you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "sacred-oath-improvement-2",
+      "level": 15,
+      "nameEn": "Sacred Oath feature",
+      "nameDe": "Sacred Oath feature",
+      "descriptionEn": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "descriptionDe": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-ability-score-improvement-4",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "aura-improvements",
+      "level": 18,
+      "nameEn": "Aura improvements",
+      "nameDe": "Aura improvements",
+      "descriptionEn": "At 18th level, the range of your auras increase to 30 feet.",
+      "descriptionDe": "At 18th level, the range of your auras increase to 30 feet.",
+      "subclass": null
+    },
+    {
+      "id": "paladin-ability-score-improvement-5",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "sacred-oath-improvement-3",
+      "level": 20,
+      "nameEn": "Sacred Oath feature",
+      "nameDe": "Sacred Oath feature",
+      "descriptionEn": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "descriptionDe": "When you reach 3rd level, you swear the oath that binds you as a paladin forever. Up to this time you have been in a preparatory stage, committed to the path but not yet sworn to it. Now you choose an oath, such as the Oath of Devotion.\n\nYour choice grants you features at 3rd level and again at 7th, 15th, and 20th level. Those features include oath spells and the Channel Divinity feature.",
+      "subclass": null
+    },
+    {
+      "id": "channel-divinity-sacred-weapon",
+      "level": 3,
+      "nameEn": "Channel Divinity: Sacred Weapon",
+      "nameDe": "Channel Divinity: Sacred Weapon",
+      "descriptionEn": "As an action, you can imbue one weapon that you are holding with positive energy, using your Channel Divinity. For 1 minute, you add your Charisma modifier to attack rolls made with that weapon (with a minimum bonus of +1). The weapon also emits bright light in a 20-foot radius and dim light 20 feet beyond that. If the weapon is not already magical, it becomes magical for the duration.\n\nYou can end this effect on your turn as part of any other action. If you are no longer holding or carrying this weapon, or if you fall unconscious, this effect ends.",
+      "descriptionDe": "As an action, you can imbue one weapon that you are holding with positive energy, using your Channel Divinity. For 1 minute, you add your Charisma modifier to attack rolls made with that weapon (with a minimum bonus of +1). The weapon also emits bright light in a 20-foot radius and dim light 20 feet beyond that. If the weapon is not already magical, it becomes magical for the duration.\n\nYou can end this effect on your turn as part of any other action. If you are no longer holding or carrying this weapon, or if you fall unconscious, this effect ends.",
+      "subclass": "devotion"
+    },
+    {
+      "id": "channel-divinity-turn-the-unholy",
+      "level": 3,
+      "nameEn": "Channel Divinity: Turn the Unholy",
+      "nameDe": "Channel Divinity: Turn the Unholy",
+      "descriptionEn": "As an action, you present your holy symbol and speak a prayer censuring fiends and undead, using your Channel Divinity. Each fiend or undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action.",
+      "descriptionDe": "As an action, you present your holy symbol and speak a prayer censuring fiends and undead, using your Channel Divinity. Each fiend or undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action.",
+      "subclass": "devotion"
+    },
+    {
+      "id": "aura-of-devotion",
+      "level": 7,
+      "nameEn": "Aura of Devotion",
+      "nameDe": "Aura of Devotion",
+      "descriptionEn": "Starting at 7th level, you and friendly creatures within 10 feet of you can't be charmed while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "descriptionDe": "Starting at 7th level, you and friendly creatures within 10 feet of you can't be charmed while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+      "subclass": "devotion"
+    },
+    {
+      "id": "purity-of-spirit",
+      "level": 15,
+      "nameEn": "Purity of Spirit",
+      "nameDe": "Purity of Spirit",
+      "descriptionEn": "Beginning at 15th level, you are always under the effects of a protection from evil and good spell.",
+      "descriptionDe": "Beginning at 15th level, you are always under the effects of a protection from evil and good spell.",
+      "subclass": "devotion"
+    },
+    {
+      "id": "holy-nimbus",
+      "level": 20,
+      "nameEn": "Holy Nimbus",
+      "nameDe": "Holy Nimbus",
+      "descriptionEn": "At 20th level, as an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that.\n\nWhenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage.\n\nIn addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead.",
+      "descriptionDe": "At 20th level, as an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that.\n\nWhenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage.\n\nIn addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead.",
+      "subclass": "devotion"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "devotion",
+      "nameEn": "Devotion",
+      "nameDe": "Devotion",
+      "features": [
+        {
+          "id": "channel-divinity-sacred-weapon",
+          "level": 3,
+          "nameEn": "Channel Divinity: Sacred Weapon",
+          "nameDe": "Channel Divinity: Sacred Weapon",
+          "descriptionEn": "As an action, you can imbue one weapon that you are holding with positive energy, using your Channel Divinity. For 1 minute, you add your Charisma modifier to attack rolls made with that weapon (with a minimum bonus of +1). The weapon also emits bright light in a 20-foot radius and dim light 20 feet beyond that. If the weapon is not already magical, it becomes magical for the duration.\n\nYou can end this effect on your turn as part of any other action. If you are no longer holding or carrying this weapon, or if you fall unconscious, this effect ends.",
+          "descriptionDe": "As an action, you can imbue one weapon that you are holding with positive energy, using your Channel Divinity. For 1 minute, you add your Charisma modifier to attack rolls made with that weapon (with a minimum bonus of +1). The weapon also emits bright light in a 20-foot radius and dim light 20 feet beyond that. If the weapon is not already magical, it becomes magical for the duration.\n\nYou can end this effect on your turn as part of any other action. If you are no longer holding or carrying this weapon, or if you fall unconscious, this effect ends.",
+          "subclass": "devotion"
+        },
+        {
+          "id": "channel-divinity-turn-the-unholy",
+          "level": 3,
+          "nameEn": "Channel Divinity: Turn the Unholy",
+          "nameDe": "Channel Divinity: Turn the Unholy",
+          "descriptionEn": "As an action, you present your holy symbol and speak a prayer censuring fiends and undead, using your Channel Divinity. Each fiend or undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action.",
+          "descriptionDe": "As an action, you present your holy symbol and speak a prayer censuring fiends and undead, using your Channel Divinity. Each fiend or undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action.",
+          "subclass": "devotion"
+        },
+        {
+          "id": "aura-of-devotion",
+          "level": 7,
+          "nameEn": "Aura of Devotion",
+          "nameDe": "Aura of Devotion",
+          "descriptionEn": "Starting at 7th level, you and friendly creatures within 10 feet of you can't be charmed while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+          "descriptionDe": "Starting at 7th level, you and friendly creatures within 10 feet of you can't be charmed while you are conscious.\n\nAt 18th level, the range of this aura increases to 30 feet.",
+          "subclass": "devotion"
+        },
+        {
+          "id": "purity-of-spirit",
+          "level": 15,
+          "nameEn": "Purity of Spirit",
+          "nameDe": "Purity of Spirit",
+          "descriptionEn": "Beginning at 15th level, you are always under the effects of a protection from evil and good spell.",
+          "descriptionDe": "Beginning at 15th level, you are always under the effects of a protection from evil and good spell.",
+          "subclass": "devotion"
+        },
+        {
+          "id": "holy-nimbus",
+          "level": 20,
+          "nameEn": "Holy Nimbus",
+          "nameDe": "Holy Nimbus",
+          "descriptionEn": "At 20th level, as an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that.\n\nWhenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage.\n\nIn addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead.",
+          "descriptionDe": "At 20th level, as an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that.\n\nWhenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage.\n\nIn addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead.",
+          "subclass": "devotion"
+        }
+      ]
+    }
+  ]
+}

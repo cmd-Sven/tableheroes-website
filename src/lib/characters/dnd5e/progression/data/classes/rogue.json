@@ -1,0 +1,439 @@
+{
+  "id": "rogue",
+  "nameEn": "Rogue",
+  "nameDe": "Schurke",
+  "hitDie": 8,
+  "caster": "none",
+  "subclassLevel": 3,
+  "asiLevels": [
+    4,
+    8,
+    10,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "rogue-expertise-1",
+        "sneak-attack",
+        "thieves-cant"
+      ]
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "cunning-action"
+      ]
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "roguish-archetype"
+      ]
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "rogue-ability-score-improvement-1"
+      ]
+    },
+    {
+      "level": 5,
+      "featureIds": [
+        "uncanny-dodge"
+      ]
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "rogue-expertise-2"
+      ]
+    },
+    {
+      "level": 7,
+      "featureIds": [
+        "rogue-evasion"
+      ]
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "rogue-ability-score-improvement-2"
+      ]
+    },
+    {
+      "level": 9,
+      "featureIds": [
+        "roguish-archetype-improvement-1"
+      ]
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "rogue-ability-score-improvement-3"
+      ]
+    },
+    {
+      "level": 11,
+      "featureIds": [
+        "reliable-talent"
+      ]
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "rogue-ability-score-improvement-4"
+      ]
+    },
+    {
+      "level": 13,
+      "featureIds": [
+        "roguish-archetype-improvement-2"
+      ]
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "blindsense"
+      ]
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "slippery-mind"
+      ]
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "rogue-ability-score-improvement-5"
+      ]
+    },
+    {
+      "level": 17,
+      "featureIds": [
+        "roguish-archetype-improvement-3"
+      ]
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "elusive"
+      ]
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "rogue-ability-score-improvement-6"
+      ]
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "stroke-of-luck"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "rogue-expertise-1",
+      "level": 1,
+      "nameEn": "Expertise",
+      "nameDe": "Expertise",
+      "descriptionEn": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
+      "descriptionDe": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
+      "subclass": null
+    },
+    {
+      "id": "sneak-attack",
+      "level": 1,
+      "nameEn": "Sneak Attack",
+      "nameDe": "Sneak Attack",
+      "descriptionEn": "Beginning at 1st level, you know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon.\n\nYou don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll.\n\nThe amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table.",
+      "descriptionDe": "Beginning at 1st level, you know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon.\n\nYou don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll.\n\nThe amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table.",
+      "subclass": null
+    },
+    {
+      "id": "thieves-cant",
+      "level": 1,
+      "nameEn": "Thieves' Cant",
+      "nameDe": "Thieves' Cant",
+      "descriptionEn": "During your rogue training you learned thieves' cant, a secret mix of dialect, jargon, and code that allows you to hide messages in seemingly normal conversation. Only another creature that knows thieves' cant understands such messages. It takes four times longer to convey such a message than it does to speak the same idea plainly.\n\nIn addition, you understand a set of secret signs and symbols used to convey short, simple messages, such as whether an area is dangerous or the territory of a thieves' guild, whether loot is nearby, or whether the people in an area are easy marks or will provide a safe house for thieves on the run.",
+      "descriptionDe": "During your rogue training you learned thieves' cant, a secret mix of dialect, jargon, and code that allows you to hide messages in seemingly normal conversation. Only another creature that knows thieves' cant understands such messages. It takes four times longer to convey such a message than it does to speak the same idea plainly.\n\nIn addition, you understand a set of secret signs and symbols used to convey short, simple messages, such as whether an area is dangerous or the territory of a thieves' guild, whether loot is nearby, or whether the people in an area are easy marks or will provide a safe house for thieves on the run.",
+      "subclass": null
+    },
+    {
+      "id": "cunning-action",
+      "level": 2,
+      "nameEn": "Cunning Action",
+      "nameDe": "Cunning Action",
+      "descriptionEn": "Starting at 2nd level, your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action.",
+      "descriptionDe": "Starting at 2nd level, your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action.",
+      "subclass": null
+    },
+    {
+      "id": "roguish-archetype",
+      "level": 3,
+      "nameEn": "Roguish Archetype",
+      "nameDe": "Roguish Archetype",
+      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "uncanny-dodge",
+      "level": 5,
+      "nameEn": "Uncanny Dodge",
+      "nameDe": "Uncanny Dodge",
+      "descriptionEn": "Starting at 5th level, when an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.",
+      "descriptionDe": "Starting at 5th level, when an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-expertise-2",
+      "level": 6,
+      "nameEn": "Expertise",
+      "nameDe": "Expertise",
+      "descriptionEn": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
+      "descriptionDe": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
+      "subclass": null
+    },
+    {
+      "id": "rogue-evasion",
+      "level": 7,
+      "nameEn": "Evasion",
+      "nameDe": "Evasion",
+      "descriptionEn": "Beginning at 7th level, you can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+      "descriptionDe": "Beginning at 7th level, you can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "roguish-archetype-improvement-1",
+      "level": 9,
+      "nameEn": "Roguish Archetype feature",
+      "nameDe": "Roguish Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-3",
+      "level": 10,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "reliable-talent",
+      "level": 11,
+      "nameEn": "Reliable Talent",
+      "nameDe": "Reliable Talent",
+      "descriptionEn": "By 11th level, you have refined your chosen skills until they approach perfection. Whenever you make an ability check that lets you add your proficiency bonus, you can treat a d20 roll of 9 or lower as a 10.",
+      "descriptionDe": "By 11th level, you have refined your chosen skills until they approach perfection. Whenever you make an ability check that lets you add your proficiency bonus, you can treat a d20 roll of 9 or lower as a 10.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-4",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "roguish-archetype-improvement-2",
+      "level": 13,
+      "nameEn": "Roguish Archetype feature",
+      "nameDe": "Roguish Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "blindsense",
+      "level": 14,
+      "nameEn": "Blindsense",
+      "nameDe": "Blindsense",
+      "descriptionEn": "Starting at 14th level, if you are able to hear, you are aware of the location of any hidden or invisible creature within 10 feet of you.",
+      "descriptionDe": "Starting at 14th level, if you are able to hear, you are aware of the location of any hidden or invisible creature within 10 feet of you.",
+      "subclass": null
+    },
+    {
+      "id": "slippery-mind",
+      "level": 15,
+      "nameEn": "Slippery Mind",
+      "nameDe": "Slippery Mind",
+      "descriptionEn": "By 15th level, you have acquired greater mental strength. You gain proficiency in Wisdom saving throws.",
+      "descriptionDe": "By 15th level, you have acquired greater mental strength. You gain proficiency in Wisdom saving throws.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-5",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "roguish-archetype-improvement-3",
+      "level": 17,
+      "nameEn": "Roguish Archetype feature",
+      "nameDe": "Roguish Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "elusive",
+      "level": 18,
+      "nameEn": "Elusive",
+      "nameDe": "Elusive",
+      "descriptionEn": "Beginning at 18th level, you are so evasive that attackers rarely gain the upper hand against you. No attack roll has advantage against you while you aren't incapacitated.",
+      "descriptionDe": "Beginning at 18th level, you are so evasive that attackers rarely gain the upper hand against you. No attack roll has advantage against you while you aren't incapacitated.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-ability-score-improvement-6",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "stroke-of-luck",
+      "level": 20,
+      "nameEn": "Stroke of Luck",
+      "nameDe": "Stroke of Luck",
+      "descriptionEn": "At 20th level, you have an uncanny knack for succeeding when you need to. If your attack misses a target within range, you can turn the miss into a hit. Alternatively, if you fail an ability check, you can treat the d20 roll as a 20.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+      "descriptionDe": "At 20th level, you have an uncanny knack for succeeding when you need to. If your attack misses a target within range, you can turn the miss into a hit. Alternatively, if you fail an ability check, you can treat the d20 roll as a 20.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+      "subclass": null
+    },
+    {
+      "id": "fast-hands",
+      "level": 3,
+      "nameEn": "Fast Hands",
+      "nameDe": "Fast Hands",
+      "descriptionEn": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
+      "descriptionDe": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
+      "subclass": "thief"
+    },
+    {
+      "id": "second-story-work",
+      "level": 3,
+      "nameEn": "Second-Story Work",
+      "nameDe": "Second-Story Work",
+      "descriptionEn": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+      "descriptionDe": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+      "subclass": "thief"
+    },
+    {
+      "id": "supreme-sneak",
+      "level": 9,
+      "nameEn": "Supreme Sneak",
+      "nameDe": "Supreme Sneak",
+      "descriptionEn": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+      "descriptionDe": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+      "subclass": "thief"
+    },
+    {
+      "id": "use-magic-device",
+      "level": 13,
+      "nameEn": "Use Magic Device",
+      "nameDe": "Use Magic Device",
+      "descriptionEn": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
+      "descriptionDe": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
+      "subclass": "thief"
+    },
+    {
+      "id": "thiefs-reflexes",
+      "level": 17,
+      "nameEn": "Thief's Reflexes",
+      "nameDe": "Thief's Reflexes",
+      "descriptionEn": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
+      "descriptionDe": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
+      "subclass": "thief"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "thief",
+      "nameEn": "Thief",
+      "nameDe": "Thief",
+      "features": [
+        {
+          "id": "fast-hands",
+          "level": 3,
+          "nameEn": "Fast Hands",
+          "nameDe": "Fast Hands",
+          "descriptionEn": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "descriptionDe": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
+          "subclass": "thief"
+        },
+        {
+          "id": "second-story-work",
+          "level": 3,
+          "nameEn": "Second-Story Work",
+          "nameDe": "Second-Story Work",
+          "descriptionEn": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "descriptionDe": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
+          "subclass": "thief"
+        },
+        {
+          "id": "supreme-sneak",
+          "level": 9,
+          "nameEn": "Supreme Sneak",
+          "nameDe": "Supreme Sneak",
+          "descriptionEn": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "descriptionDe": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
+          "subclass": "thief"
+        },
+        {
+          "id": "use-magic-device",
+          "level": 13,
+          "nameEn": "Use Magic Device",
+          "nameDe": "Use Magic Device",
+          "descriptionEn": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
+          "descriptionDe": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
+          "subclass": "thief"
+        },
+        {
+          "id": "thiefs-reflexes",
+          "level": 17,
+          "nameEn": "Thief's Reflexes",
+          "nameDe": "Thief's Reflexes",
+          "descriptionEn": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
+          "descriptionDe": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
+          "subclass": "thief"
+        }
+      ]
+    }
+  ]
+}

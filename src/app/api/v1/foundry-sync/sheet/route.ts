@@ -14,6 +14,7 @@ import {
 } from "@/src/lib/characters/dnd5e/foundry-equipment-mapper";
 import { withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
+import { canApplyFoundryProgressionFromSync } from "@/src/lib/foundry-sync/progression-lock-server";
 import type { Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
 import type { CharacterItem, InventoryCategory } from "@/src/types/inventory";
 
@@ -144,19 +145,29 @@ export async function POST(request: Request) {
   sheet = withSyncedArmorClass(sheet, items, sheet.equipment, meta.level);
 
   const now = new Date().toISOString();
+  const applyProgression = await canApplyFoundryProgressionFromSync(
+    supabase,
+    characterId,
+  );
+
   const updatePayload: Record<string, unknown> = {
     sheet_data: sheet,
     sheet_overrides: {},
     sheet_source: "foundry_import",
     sheet_synced_at: now,
-    class: sanitizeActorDisplayLabel(meta.className),
-    subclass: sanitizeActorDisplayLabel(meta.subclass),
     race: sanitizeActorDisplayLabel(meta.race),
     background: sanitizeActorDisplayLabel(meta.background),
     alignment: sanitizeActorDisplayLabel(meta.alignment),
-    level: meta.level,
-    experience_points: meta.experiencePoints,
   };
+
+  // Stufe / Klasse / XP nur beim ersten Foundry-Import — danach Selbstpflege
+  if (applyProgression) {
+    updatePayload.class = sanitizeActorDisplayLabel(meta.className);
+    updatePayload.subclass = sanitizeActorDisplayLabel(meta.subclass);
+    updatePayload.level = meta.level;
+    updatePayload.experience_points = meta.experiencePoints;
+  }
+
   if (input.actor_name?.trim()) {
     updatePayload.name = input.actor_name.trim();
   }

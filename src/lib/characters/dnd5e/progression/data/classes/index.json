@@ -1,0 +1,62 @@
+[
+  {
+    "id": "barbarian",
+    "nameEn": "Barbarian",
+    "nameDe": "Barbar"
+  },
+  {
+    "id": "bard",
+    "nameEn": "Bard",
+    "nameDe": "Barde"
+  },
+  {
+    "id": "cleric",
+    "nameEn": "Cleric",
+    "nameDe": "Kleriker"
+  },
+  {
+    "id": "druid",
+    "nameEn": "Druid",
+    "nameDe": "Druide"
+  },
+  {
+    "id": "fighter",
+    "nameEn": "Fighter",
+    "nameDe": "Kämpfer"
+  },
+  {
+    "id": "monk",
+    "nameEn": "Monk",
+    "nameDe": "Mönch"
+  },
+  {
+    "id": "paladin",
+    "nameEn": "Paladin",
+    "nameDe": "Paladin"
+  },
+  {
+    "id": "ranger",
+    "nameEn": "Ranger",
+    "nameDe": "Waldläufer"
+  },
+  {
+    "id": "rogue",
+    "nameEn": "Rogue",
+    "nameDe": "Schurke"
+  },
+  {
+    "id": "sorcerer",
+    "nameEn": "Sorcerer",
+    "nameDe": "Zauberer"
+  },
+  {
+    "id": "warlock",
+    "nameEn": "Warlock",
+    "nameDe": "Hexer"
+  },
+  {
+    "id": "wizard",
+    "nameEn": "Wizard",
+    "nameDe": "Magier"
+  }
+]

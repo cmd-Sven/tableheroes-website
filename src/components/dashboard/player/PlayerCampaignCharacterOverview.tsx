@@ -284,7 +284,7 @@ export function PlayerCampaignCharacterOverview({
 
   return (
     <section className="rounded-xl border border-stone-700/40 bg-player-paper p-6 space-y-6">
-      {progressionLocked && progressionLockMessage ? (
+      {progressionLockMessage ? (
         <FoundryProgressionLockNotice message={progressionLockMessage} />
       ) : null}
       {modal ? (

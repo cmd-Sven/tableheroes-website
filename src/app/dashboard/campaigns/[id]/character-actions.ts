@@ -265,6 +265,7 @@ export async function createCharacterWithRelations(data: {
   campaign_id: string;
   name: string;
   class: string;
+  subclass?: string | null;
   race: string;
   level: number;
   biography?: string | null;
@@ -274,6 +275,8 @@ export async function createCharacterWithRelations(data: {
   location_id?: string | null;
   culture_lore_id?: string | null;
   languages?: string[];
+  /** Optional D&D 5e sheet bootstrap (Level-1 Wizard) */
+  sheet_data?: unknown | null;
   existing_contacts: Array<{ npc_id: string; relationship_type: string }>;
   new_contacts: Array<{
     name: string;
@@ -372,6 +375,7 @@ export async function createCharacterWithRelations(data: {
         campaign_id: data.campaign_id,
         name: data.name,
         class: data.class,
+        subclass: data.subclass || null,
         race: data.race,
         level: data.level || 1,
         biography: data.biography || null,
@@ -381,6 +385,8 @@ export async function createCharacterWithRelations(data: {
         current_location_id: data.location_id || null,
         culture_lore_id: data.culture_lore_id || null,
         languages: data.languages && data.languages.length > 0 ? data.languages : [],
+        sheet_data: data.sheet_data ?? null,
+        sheet_source: data.sheet_data ? "manual" : null,
         status: "Active",
       })
       .select()

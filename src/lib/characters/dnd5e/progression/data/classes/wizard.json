@@ -1,0 +1,508 @@
+{
+  "id": "wizard",
+  "nameEn": "Wizard",
+  "nameDe": "Magier",
+  "hitDie": 6,
+  "caster": "full",
+  "subclassLevel": 2,
+  "asiLevels": [
+    4,
+    8,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "spellcasting-wizard",
+        "arcane-recovery"
+      ],
+      "spellSlots": {
+        "1": 2
+      },
+      "cantripsKnown": 3
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "arcane-tradition"
+      ],
+      "spellSlots": {
+        "1": 3
+      },
+      "cantripsKnown": 3
+    },
+    {
+      "level": 3,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 2
+      },
+      "cantripsKnown": 3
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "wizard-ability-score-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 5,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 2
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "arcane-tradition-improvement-1"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 7,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 1
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "wizard-ability-score-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 2
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 9,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 1
+      },
+      "cantripsKnown": 4
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "arcane-tradition-improvement-2"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 11,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "wizard-ability-score-improvement-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 13,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "arcane-tradition-improvement-3"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 15,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "wizard-ability-score-improvement-4"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 17,
+      "featureIds": [],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "spell-mastery"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "wizard-ability-score-improvement-5"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 2,
+        "7": 1,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 5
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "signature-spell"
+      ],
+      "spellSlots": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 2,
+        "7": 2,
+        "8": 1,
+        "9": 1
+      },
+      "cantripsKnown": 5
+    }
+  ],
+  "features": [
+    {
+      "id": "spellcasting-wizard",
+      "level": 1,
+      "nameEn": "Spellcasting: Wizard",
+      "nameDe": "Spellcasting: Wizard",
+      "descriptionEn": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.",
+      "descriptionDe": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.",
+      "subclass": null
+    },
+    {
+      "id": "arcane-recovery",
+      "level": 1,
+      "nameEn": "Arcane Recovery",
+      "nameDe": "Arcane Recovery",
+      "descriptionEn": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.\n\nFor example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
+      "descriptionDe": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.\n\nFor example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
+      "subclass": null
+    },
+    {
+      "id": "arcane-tradition",
+      "level": 2,
+      "nameEn": "Arcane Tradition",
+      "nameDe": "Arcane Tradition",
+      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "wizard-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "arcane-tradition-improvement-1",
+      "level": 6,
+      "nameEn": "Arcane Tradition feature",
+      "nameDe": "Arcane Tradition feature",
+      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "wizard-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "arcane-tradition-improvement-2",
+      "level": 10,
+      "nameEn": "Arcane Tradition feature",
+      "nameDe": "Arcane Tradition feature",
+      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "wizard-ability-score-improvement-3",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "arcane-tradition-improvement-3",
+      "level": 14,
+      "nameEn": "Arcane Tradition feature",
+      "nameDe": "Arcane Tradition feature",
+      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "wizard-ability-score-improvement-4",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "spell-mastery",
+      "level": 18,
+      "nameEn": "Spell Mastery",
+      "nameDe": "Spell Mastery",
+      "descriptionEn": "At 18th level, you have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal.\n\nBy spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels.",
+      "descriptionDe": "At 18th level, you have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal.\n\nBy spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels.",
+      "subclass": null
+    },
+    {
+      "id": "wizard-ability-score-improvement-5",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "signature-spell",
+      "level": 20,
+      "nameEn": "Signature Spell",
+      "nameDe": "Signature Spell",
+      "descriptionEn": "When you reach 20th level, you gain mastery over two powerful spells and can cast them with little effort. Choose two 3rd-level wizard spells in your spellbook as your signature spells. You always have these spells prepared, they don't count against the number of spells you have prepared, and you can cast each of them once at 3rd level without expending a spell slot. When you do so, you can't do so again until you finish a short or long rest.\n\nIf you want to cast either spell at a higher level, you must expend a spell slot as normal.",
+      "descriptionDe": "When you reach 20th level, you gain mastery over two powerful spells and can cast them with little effort. Choose two 3rd-level wizard spells in your spellbook as your signature spells. You always have these spells prepared, they don't count against the number of spells you have prepared, and you can cast each of them once at 3rd level without expending a spell slot. When you do so, you can't do so again until you finish a short or long rest.\n\nIf you want to cast either spell at a higher level, you must expend a spell slot as normal.",
+      "subclass": null
+    },
+    {
+      "id": "evocation-savant",
+      "level": 2,
+      "nameEn": "Evocation Savant",
+      "nameDe": "Evocation Savant",
+      "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+      "descriptionDe": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+      "subclass": "evocation"
+    },
+    {
+      "id": "sculpt-spells",
+      "level": 2,
+      "nameEn": "Sculpt Spells",
+      "nameDe": "Sculpt Spells",
+      "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+      "descriptionDe": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+      "subclass": "evocation"
+    },
+    {
+      "id": "potent-cantrip",
+      "level": 6,
+      "nameEn": "Potent Cantrip",
+      "nameDe": "Potent Cantrip",
+      "descriptionEn": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+      "descriptionDe": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+      "subclass": "evocation"
+    },
+    {
+      "id": "empowered-evocation",
+      "level": 10,
+      "nameEn": "Empowered Evocation",
+      "nameDe": "Empowered Evocation",
+      "descriptionEn": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+      "descriptionDe": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+      "subclass": "evocation"
+    },
+    {
+      "id": "overchannel",
+      "level": 14,
+      "nameEn": "Overchannel",
+      "nameDe": "Overchannel",
+      "descriptionEn": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+      "descriptionDe": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+      "subclass": "evocation"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "evocation",
+      "nameEn": "Evocation",
+      "nameDe": "Evocation",
+      "features": [
+        {
+          "id": "evocation-savant",
+          "level": 2,
+          "nameEn": "Evocation Savant",
+          "nameDe": "Evocation Savant",
+          "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+          "descriptionDe": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+          "subclass": "evocation"
+        },
+        {
+          "id": "sculpt-spells",
+          "level": 2,
+          "nameEn": "Sculpt Spells",
+          "nameDe": "Sculpt Spells",
+          "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+          "descriptionDe": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+          "subclass": "evocation"
+        },
+        {
+          "id": "potent-cantrip",
+          "level": 6,
+          "nameEn": "Potent Cantrip",
+          "nameDe": "Potent Cantrip",
+          "descriptionEn": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+          "descriptionDe": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+          "subclass": "evocation"
+        },
+        {
+          "id": "empowered-evocation",
+          "level": 10,
+          "nameEn": "Empowered Evocation",
+          "nameDe": "Empowered Evocation",
+          "descriptionEn": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+          "descriptionDe": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+          "subclass": "evocation"
+        },
+        {
+          "id": "overchannel",
+          "level": 14,
+          "nameEn": "Overchannel",
+          "nameDe": "Overchannel",
+          "descriptionEn": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+          "descriptionDe": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+          "subclass": "evocation"
+        }
+      ]
+    }
+  ]
+}

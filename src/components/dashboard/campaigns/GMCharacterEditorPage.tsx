@@ -416,7 +416,7 @@ export function GMCharacterEditorPage({
 
   return (
     <div className="space-y-8">
-      {progressionLocked && progressionLockMessage ? (
+      {progressionLockMessage ? (
         <FoundryProgressionLockNotice message={progressionLockMessage} />
       ) : null}
       {/* Header */}

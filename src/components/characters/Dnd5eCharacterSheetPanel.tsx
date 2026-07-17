@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen, Wand2 } from "lucide-react";
+import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen, Wand2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   loadDnd5eCharacterSheet,
@@ -37,11 +37,21 @@ import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPan
 import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
 import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
+import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
+import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
 import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import {
   localizedFeatureDescription,
   localizedFeatureName,
 } from "@/src/lib/characters/dnd5e/spellcasting";
+import {
+  applyClassBasicsFromCatalog,
+  matchSheetFeatureToFeat,
+  featDefinitionToFeatureEntry,
+} from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import { CLASS_IDS, resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
+import { CLASS_NAME_DE } from "@/src/lib/characters/dnd5e/progression/labels-de";
+import { getClassProgression } from "@/src/lib/characters/dnd5e/progression/catalog";
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
@@ -182,6 +192,8 @@ export function Dnd5eCharacterSheetPanel({
     experiencePoints: 0,
   });
   const [editMode, setEditMode] = useState(false);
+  const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [featPicker, setFeatPicker] = useState<null | "add" | number>(null);
   const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -281,6 +293,10 @@ export function Dnd5eCharacterSheetPanel({
   }
 
   function addFeature() {
+    setFeatPicker("add");
+  }
+
+  function addCustomFeature() {
     if (!sheet) return;
     setSheet({
       ...sheet,
@@ -289,6 +305,68 @@ export function Dnd5eCharacterSheetPanel({
         { id: crypto.randomUUID(), name: t("field.newFeat"), description: null, source: "manual" },
       ],
     });
+  }
+
+  function replaceFeatureFromCatalog(index: number) {
+    setFeatPicker(index);
+  }
+
+  function applyFeatPick(entry: Dnd5eFeatureEntry) {
+    if (!sheet) return;
+    if (featPicker === "add") {
+      setSheet({ ...sheet, features: [...sheet.features, entry] });
+    } else if (typeof featPicker === "number") {
+      const features = [...sheet.features];
+      features[featPicker] = entry;
+      setSheet({ ...sheet, features });
+    }
+    setFeatPicker(null);
+  }
+
+  function matchFeatureToCatalog(index: number) {
+    if (!sheet) return;
+    const matched = matchSheetFeatureToFeat(sheet.features[index]);
+    if (!matched) {
+      toast.error(t("featCatalog.noMatch"));
+      return;
+    }
+    const features = [...sheet.features];
+    features[index] = featDefinitionToFeatureEntry(matched);
+    setSheet({ ...sheet, features });
+    toast.success(t("featCatalog.matched", { name: matched.nameDe || matched.nameEn }));
+  }
+
+  function setClassFromCatalog(classId: string) {
+    if (!sheet) return;
+    const prog = getClassProgression(resolveClassId(classId));
+    const className =
+      locale === "de" && prog
+        ? prog.nameDe
+        : prog?.nameEn ?? classId;
+    const nextMeta = { ...meta, className };
+    setMeta(nextMeta);
+    setSheet(
+      applyClassBasicsFromCatalog(
+        ensureClassResources(sheet, className),
+        className,
+        nextMeta.level,
+        nextMeta.subclass || null,
+      ),
+    );
+  }
+
+  function setLevelWithCatalogSync(level: number) {
+    if (!sheet) return;
+    const nextLevel = Math.max(1, level);
+    setMeta({ ...meta, level: nextLevel });
+    setSheet(
+      applyClassBasicsFromCatalog(
+        sheet,
+        meta.className,
+        nextLevel,
+        meta.subclass || null,
+      ),
+    );
   }
 
   function removeFeature(index: number) {
@@ -362,9 +440,7 @@ export function Dnd5eCharacterSheetPanel({
     );
   }
 
-  const classLevelLabel = [meta.className, meta.subclass ? `(${meta.subclass})` : null]
-    .filter(Boolean)
-    .join(" ");
+  const resolvedClassId = resolveClassId(meta.className);
 
   const portraitSrc =
     biographyCulture?.avatarBlobUrl ||
@@ -506,7 +582,7 @@ export function Dnd5eCharacterSheetPanel({
 
       {activeTab === "attributes" ? (
         <>
-          {payload.progressionLocked ? (
+          {payload.progressionLockMessage ? (
             <FoundryProgressionLockNotice message={payload.progressionLockMessage} />
           ) : null}
 
@@ -529,21 +605,88 @@ export function Dnd5eCharacterSheetPanel({
                   {t("field.classLevel")}
                 </span>
                 <div className="flex gap-2">
-                  <TextInput
-                    value={classLevelLabel}
-                    disabled={readOnly || payload.progressionLocked}
-                    placeholder={t("field.classPlaceholder")}
-                    onChange={(v) => setMeta({ ...meta, className: v })}
-                    className="flex-1"
-                  />
+                  {readOnly || payload.progressionLocked ? (
+                    <TextInput
+                      value={[
+                        meta.className,
+                        meta.subclass ? `(${meta.subclass})` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      disabled
+                      onChange={() => {}}
+                      className="flex-1"
+                    />
+                  ) : (
+                    <select
+                      value={resolvedClassId ?? ""}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) {
+                          setMeta({ ...meta, className: "" });
+                          return;
+                        }
+                        setClassFromCatalog(id);
+                      }}
+                      className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-barlow text-sm uppercase text-white outline-none focus:border-hero-vibrant"
+                    >
+                      <option value="">{t("field.classPlaceholder")}</option>
+                      {CLASS_IDS.map((id) => (
+                        <option key={id} value={id}>
+                          {locale === "de" ? CLASS_NAME_DE[id] : id}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <NumberInput
                     value={meta.level}
                     min={1}
                     disabled={readOnly || payload.progressionLocked}
-                    onChange={(v) => setMeta({ ...meta, level: Math.max(1, v) })}
+                    onChange={(v) => setLevelWithCatalogSync(Math.max(1, v))}
                     className="!w-16"
                   />
                 </div>
+                {!readOnly && !payload.progressionLocked && resolvedClassId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!sheet) return;
+                      setSheet(
+                        applyClassBasicsFromCatalog(
+                          sheet,
+                          meta.className,
+                          meta.level,
+                          meta.subclass || null,
+                        ),
+                      );
+                      toast.success(t("classCatalog.synced"));
+                    }}
+                    className="mt-1 font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
+                  >
+                    {t("classCatalog.sync")}
+                  </button>
+                ) : null}
+                {!readOnly && !payload.progressionLocked ? (
+                  <TextInput
+                    value={meta.subclass}
+                    disabled={readOnly}
+                    placeholder={t("field.subclassPlaceholder")}
+                    onChange={(v) => {
+                      setMeta({ ...meta, subclass: v });
+                      if (sheet) {
+                        setSheet(
+                          applyClassBasicsFromCatalog(
+                            sheet,
+                            meta.className,
+                            meta.level,
+                            v || null,
+                          ),
+                        );
+                      }
+                    }}
+                    className="mt-1 !text-xs"
+                  />
+                ) : null}
               </label>
               <label className="lg:col-span-2 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
@@ -584,13 +727,26 @@ export function Dnd5eCharacterSheetPanel({
                   onChange={(v) => setMeta({ ...meta, experiencePoints: v })}
                 />
               </label>
-              <div className="lg:col-span-2 flex items-end">
+              <div className="lg:col-span-2 flex flex-col justify-end gap-2">
                 <div className="w-full rounded border border-hero-border/60 bg-hero-dark/40 px-3 py-2 text-center">
                   <p className="font-barlow text-[10px] uppercase text-gray-500">{t("field.proficiencyBonus")}</p>
                   <p className="font-barlow text-2xl font-bold text-accent-gold">
                     {formatSigned(derived.proficiencyBonus)}
                   </p>
                 </div>
+                {canEdit && meta.level < 20 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editMode) setEditMode(true);
+                      setLevelUpOpen(true);
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    {t("levelUp.open")}
+                  </button>
+                ) : null}
               </div>
             </div>
           </section>
@@ -911,20 +1067,33 @@ export function Dnd5eCharacterSheetPanel({
                     {t("features.title")}
                   </h3>
                   {!readOnly ? (
-                    <button
-                      type="button"
-                      onClick={addFeature}
-                      className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
-                    >
-                      {t("features.add")}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={addFeature}
+                        className="font-barlow text-[10px] font-bold uppercase text-accent-gold hover:text-white"
+                      >
+                        {t("featCatalog.open")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addCustomFeature}
+                        className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
+                      >
+                        {t("features.addCustom")}
+                      </button>
+                    </div>
                   ) : null}
                 </div>
                 {sheet.features.length === 0 ? (
                   <p className="font-libre text-sm text-gray-500 flex-1">{t("features.empty")}</p>
                 ) : (
                   <div className="space-y-2 flex-1 overflow-y-auto max-h-[24rem] pr-1">
-                    {sheet.features.map((feat, index) => (
+                    {sheet.features.map((feat, index) => {
+                      const catalogMatch = matchSheetFeatureToFeat(feat);
+                      const isCatalog =
+                        feat.source === "srd-feat" || Boolean(catalogMatch);
+                      return (
                       <div
                         key={feat.id}
                         className="rounded border border-hero-border/40 bg-hero-dark/20 p-2.5"
@@ -934,6 +1103,11 @@ export function Dnd5eCharacterSheetPanel({
                             <p className="font-barlow text-sm font-bold text-white">
                               {localizedFeatureName(feat, locale)}
                             </p>
+                            {isCatalog ? (
+                              <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
+                                {t("featCatalog.matchedBadge")}
+                              </p>
+                            ) : null}
                             {localizedFeatureDescription(feat, locale) ? (
                               <p className="mt-1 font-libre text-xs text-gray-400 whitespace-pre-wrap line-clamp-4">
                                 {localizedFeatureDescription(feat, locale)}
@@ -942,7 +1116,7 @@ export function Dnd5eCharacterSheetPanel({
                           </>
                         ) : (
                           <div className="space-y-2">
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <TextInput
                                 value={feat.name}
                                 onChange={(v) => updateFeature(index, { name: v })}
@@ -956,6 +1130,24 @@ export function Dnd5eCharacterSheetPanel({
                                 ×
                               </button>
                             </div>
+                            <div className="flex flex-wrap gap-2">
+                              {catalogMatch && feat.source !== "srd-feat" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => matchFeatureToCatalog(index)}
+                                  className="font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
+                                >
+                                  {t("featCatalog.match")}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => replaceFeatureFromCatalog(index)}
+                                className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:text-white"
+                              >
+                                {t("featCatalog.replace")}
+                              </button>
+                            </div>
                             <textarea
                               value={feat.description ?? ""}
                               onChange={(e) => updateFeature(index, { description: e.target.value })}
@@ -966,7 +1158,8 @@ export function Dnd5eCharacterSheetPanel({
                           </div>
                         )}
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </section>
@@ -1023,7 +1216,7 @@ export function Dnd5eCharacterSheetPanel({
                 <CharacterFlawPicker
                   characterFlaws={characterFlaws}
                   onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
-                  readOnly={biographyCulture.readOnly}
+                  readOnly={readOnly}
                   compact
                 />
               ) : null}
@@ -1085,6 +1278,30 @@ export function Dnd5eCharacterSheetPanel({
             {activeTab === "equipment" ? t("sheet.saveEquipment") : t("sheet.save")}
           </button>
         </div>
+      ) : null}
+
+      {levelUpOpen && sheet && payload ? (
+        <LevelUpWizardModal
+          open={levelUpOpen}
+          onClose={() => setLevelUpOpen(false)}
+          campaignId={campaignId}
+          characterId={characterId}
+          sheet={sheet}
+          meta={meta}
+          overrides={payload.overrides}
+          onApplied={async () => {
+            await reload();
+            onSaved?.();
+          }}
+        />
+      ) : null}
+
+      {featPicker !== null ? (
+        <FeatCatalogPickerModal
+          onClose={() => setFeatPicker(null)}
+          onPick={applyFeatPick}
+          excludeIds={(sheet?.features ?? []).map((f) => f.id)}
+        />
       ) : null}
     </div>
   );

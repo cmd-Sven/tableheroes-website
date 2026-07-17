@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { X, User, ChevronRight, ChevronLeft, Plus, Trash2, Loader2, Info, Image } from "lucide-react";
 import { createCharacterWithRelations, getCharacterWizardLoreData } from "@/src/app/dashboard/campaigns/[id]/character-actions";
@@ -11,6 +11,19 @@ import {
 } from "@/src/lib/profile-media";
 import { getNPCsByFactionForOnboarding } from "@/src/app/dashboard/campaigns/[id]/npc-actions";
 import { getChildLocationsForOnboarding } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import {
+  buildLevel1Sheet,
+  planLevel1Creation,
+  resolveRaceId,
+  STANDARD_ARRAY,
+  type AbilityKeyShort,
+  type ClassId,
+  type RaceId,
+} from "@/src/lib/characters/dnd5e/progression";
+import {
+  CharacterCreateRulesPanel,
+  spellsStepValid,
+} from "@/src/components/dashboard/CharacterCreateRulesPanel";
 
 type Faction = {
   id: string;
@@ -49,6 +62,27 @@ type NewContact = {
   status: "Alive" | "Deceased" | "Missing" | "Unknown";
 };
 
+type CreateStepId =
+  | "identity"
+  | "class"
+  | "abilities"
+  | "spells"
+  | "origin"
+  | "world"
+  | "contacts"
+  | "avatar";
+
+const STEP_LABELS: Record<CreateStepId, string> = {
+  identity: "Identität",
+  class: "Klasse",
+  abilities: "Attribute",
+  spells: "Zauber",
+  origin: "Herkunft",
+  world: "Welt",
+  contacts: "Kontakte",
+  avatar: "Bild",
+};
+
 type Props = {
   campaignId: string;
   isOpen: boolean;
@@ -59,9 +93,18 @@ type Props = {
   mode?: "modal" | "page";
 };
 
+const DEFAULT_ABILITIES: Record<AbilityKeyShort, number> = {
+  str: STANDARD_ARRAY[0],
+  dex: STANDARD_ARRAY[1],
+  con: STANDARD_ARRAY[2],
+  int: STANDARD_ARRAY[3],
+  wis: STANDARD_ARRAY[4],
+  cha: STANDARD_ARRAY[5],
+};
+
 export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], locations = [], npcs = [], mode = "modal" }: Props) {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  const [stepIndex, setStepIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   // Lore-Daten für Rasse/Kultur/Sprache
@@ -74,18 +117,25 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [wizardLanguages, setWizardLanguages] = useState<WizardLanguage[]>([]);
   const [loreLoading, setLoreLoading] = useState(true);
 
-  // Step A: Basis-Daten
+  // D&D 5e Katalog
+  const [classId, setClassId] = useState<ClassId | "">("");
+  const [subclassId, setSubclassId] = useState("");
+  const [srdRaceId, setSrdRaceId] = useState<RaceId>("human");
+  const [baseAbilities, setBaseAbilities] =
+    useState<Record<AbilityKeyShort, number>>(DEFAULT_ABILITIES);
+  const [applyRacialBonuses, setApplyRacialBonuses] = useState(true);
+  const [spellIds, setSpellIds] = useState<string[]>([]);
+
+  // Step: Identität
   const [name, setName] = useState("");
-  const [class_name, setClassName] = useState("");
   const [race, setRace] = useState("");
   const [raceCustom, setRaceCustom] = useState("");
   const [selectedCultureId, setSelectedCultureId] = useState("");
   /** Lore-IDs (`world_lore.id`) – muss mit Server-Validierung (campaign_visibility) übereinstimmen, nicht Anzeigenamen. */
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [level, setLevel] = useState(1);
   const [biography, setBiography] = useState("");
 
-  // Step B: Welt-Integration
+  // Welt-Integration
   const [faction_id, setFactionId] = useState("");
   const [location_id, setLocationId] = useState("");
   const [selectedOriginId, setSelectedOriginId] = useState("");
@@ -94,14 +144,45 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [loadingFactionMembers, setLoadingFactionMembers] = useState(false);
   const [loadingChildLocations, setLoadingChildLocations] = useState(false);
 
-  // Step C: Beziehungen
+  // Beziehungen
   const [existingContacts, setExistingContacts] = useState<ExistingContact[]>([]);
   const [newContacts, setNewContacts] = useState<NewContact[]>([]);
 
-  // Step D: Avatar
+  // Avatar
   const [avatar_url, setAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
+
+  const showSpellsStep = useMemo(() => {
+    if (!classId) return false;
+    try {
+      const plan = planLevel1Creation({
+        classId,
+        subclassId: subclassId || null,
+      });
+      if (!plan.spellcasting) return false;
+      return (
+        plan.spellcasting.cantripsToLearn > 0 || plan.spellcasting.spellsToLearn > 0
+      );
+    } catch {
+      return false;
+    }
+  }, [classId, subclassId]);
+
+  const createSteps = useMemo((): CreateStepId[] => {
+    const list: CreateStepId[] = ["identity", "class", "origin", "abilities"];
+    if (showSpellsStep) list.push("spells");
+    list.push("world", "contacts", "avatar");
+    return list;
+  }, [showSpellsStep]);
+
+  const step = createSteps[Math.min(stepIndex, createSteps.length - 1)] ?? "identity";
+
+  useEffect(() => {
+    if (stepIndex >= createSteps.length) {
+      setStepIndex(Math.max(0, createSteps.length - 1));
+    }
+  }, [createSteps.length, stepIndex]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -170,7 +251,15 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     setSelectedLanguages([]);
   }, [selectedCultureId]);
 
-  // Fraktions-Kontext: NPCs der gewählten Fraktion laden (für "Bekannte Mitglieder" & Schritt 3)
+  // Lore-Rasse → SRD-Mapping vorschlagen
+  useEffect(() => {
+    const effective = race === "__custom" ? raceCustom : race;
+    if (!effective) return;
+    const resolved = resolveRaceId(effective);
+    if (resolved !== "unknown") setSrdRaceId(resolved);
+  }, [race, raceCustom]);
+
+  // Fraktions-Kontext: NPCs der gewählten Fraktion laden (für "Bekannte Mitglieder" & Schritt Kontakte)
   useEffect(() => {
     if (!faction_id) {
       setFactionMembers([]);
@@ -225,8 +314,12 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const effectiveRace = race === "__custom" ? raceCustom : race;
 
   const handleSubmit = () => {
-    if (!name || !class_name || !effectiveRace) {
+    if (!name || !classId || !effectiveRace) {
       alert("Bitte fülle alle Pflichtfelder aus (Name, Klasse, Rasse).");
+      return;
+    }
+    if (planLevel1Creation({ classId, subclassId: subclassId || null }).needsSubclass && !subclassId) {
+      alert("Bitte wähle eine Subklasse / Domäne.");
       return;
     }
 
@@ -245,12 +338,24 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           finalAvatarPath = r.path;
         }
 
+        const built = buildLevel1Sheet({
+          classId,
+          subclassId: subclassId || null,
+          raceName: effectiveRace,
+          raceId: srdRaceId,
+          baseAbilities,
+          applyRacialBonuses,
+          spellIds,
+          skillKeys: [],
+        });
+
         await createCharacterWithRelations({
           campaign_id: campaignId,
           name,
-          class: class_name,
+          class: built.meta.className,
+          subclass: built.meta.subclass,
           race: effectiveRace,
-          level,
+          level: 1,
           biography: biography || null,
           avatar_url: finalAvatarUrl,
           avatar_storage_path: finalAvatarPath,
@@ -260,6 +365,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           languages: selectedLanguages,
           existing_contacts: existingContacts.filter((c) => c.npc_id && c.relationship_type),
           new_contacts: newContacts,
+          sheet_data: built.sheet,
         });
         if (mode === "page") {
           router.push(`/dashboard/campaigns/${campaignId}`);
@@ -276,14 +382,24 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   if (!isOpen && mode !== "page") return null;
 
   const canGoNext = () => {
-    if (step === 1) return name && class_name && effectiveRace;
-    if (step === 2) return true;
-    if (step === 3) return true;
-    if (step === 4) return true;
+    if (step === "identity") return Boolean(name.trim());
+    if (step === "class") {
+      if (!classId) return false;
+      const plan = planLevel1Creation({ classId, subclassId: subclassId || null });
+      if (plan.needsSubclass && !subclassId) return false;
+      return true;
+    }
+    if (step === "abilities") return true;
+    if (step === "spells") return spellsStepValid(classId, subclassId, spellIds);
+    if (step === "origin") return Boolean(effectiveRace);
+    if (step === "world") return true;
+    if (step === "contacts") return true;
+    if (step === "avatar") return Boolean(name && classId && effectiveRace);
     return false;
   };
 
   const isPageMode = mode === "page";
+  const isLastStep = stepIndex >= createSteps.length - 1;
 
   return (
     <div className={isPageMode ? "w-full" : "fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"}>
@@ -304,7 +420,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
             <div>
               <h2 className="font-cinzel font-bold text-2xl text-white">Charakter erstellen</h2>
               <p className="font-libre text-sm text-gray-400">
-                Schritt {step} von 4
+                Schritt {stepIndex + 1} von {createSteps.length}: {STEP_LABELS[step]}
               </p>
             </div>
           </div>
@@ -321,18 +437,19 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
 
         {/* Progress Bar */}
         <div className="flex-none px-6 py-4 border-b border-accent-gold/20 bg-background-dark/70">
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className="flex-1 flex items-center">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {createSteps.map((s, i) => (
+              <div key={s} className="flex min-w-0 flex-1 items-center">
                 <div
                   className={`flex-1 h-2 rounded ${
-                    step >= s ? "bg-hero-vibrant" : "bg-hero-dark"
+                    i <= stepIndex ? "bg-hero-vibrant" : "bg-hero-dark"
                   }`}
+                  title={STEP_LABELS[s]}
                 />
-                {s < 4 && (
+                {i < createSteps.length - 1 && (
                   <ChevronRight
-                    className={`h-4 w-4 mx-1 ${
-                      step > s ? "text-hero-vibrant" : "text-gray-600"
+                    className={`h-3 w-3 mx-0.5 shrink-0 ${
+                      i < stepIndex ? "text-hero-vibrant" : "text-gray-600"
                     }`}
                   />
                 )}
@@ -343,13 +460,14 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
 
         {/* Body (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-6 bg-background-dark/60">
-          {/* Step 1: Basis-Daten */}
-          {step === 1 && (
+          {step === "identity" && (
             <div className="space-y-5">
               <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4">
-                Basis-Daten
+                Identität
               </h3>
-
+              <p className="font-libre text-sm text-gray-400">
+                Charaktererstellung auf Stufe 1 mit D&amp;D-5e-Katalogregeln.
+              </p>
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
                   Name *
@@ -362,20 +480,84 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                   placeholder="z.B. Aria Mondlicht"
                 />
               </div>
-
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Klasse *
+                  Biografie / Hintergrundgeschichte (Optional)
                 </label>
-                <input
-                  type="text"
-                  value={class_name}
-                  onChange={(e) => setClassName(e.target.value)}
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                  placeholder="z.B. Kleriker"
+                <textarea
+                  value={biography}
+                  onChange={(e) => setBiography(e.target.value)}
+                  rows={6}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold resize-y"
+                  placeholder="Erzähle die Hintergrundgeschichte deines Charakters... Wo kommt er her? Was hat ihn geprägt? Was sind seine Ziele?"
                 />
+                <p className="mt-1 text-xs text-gray-500 font-libre italic">
+                  Optional: Beschreibe die Vergangenheit und Motivation deines Charakters.
+                </p>
               </div>
 
+            </div>
+          )}
+
+          {step === "class" && (
+            <CharacterCreateRulesPanel
+              mode="class"
+              classId={classId}
+              onClassId={setClassId}
+              subclassId={subclassId}
+              onSubclassId={setSubclassId}
+              srdRaceId={srdRaceId}
+              onSrdRaceId={setSrdRaceId}
+              baseAbilities={baseAbilities}
+              onBaseAbilities={setBaseAbilities}
+              applyRacialBonuses={applyRacialBonuses}
+              onApplyRacialBonuses={setApplyRacialBonuses}
+              spellIds={spellIds}
+              onSpellIds={setSpellIds}
+            />
+          )}
+
+          {step === "abilities" && (
+            <CharacterCreateRulesPanel
+              mode="abilities"
+              classId={classId}
+              onClassId={setClassId}
+              subclassId={subclassId}
+              onSubclassId={setSubclassId}
+              srdRaceId={srdRaceId}
+              onSrdRaceId={setSrdRaceId}
+              baseAbilities={baseAbilities}
+              onBaseAbilities={setBaseAbilities}
+              applyRacialBonuses={applyRacialBonuses}
+              onApplyRacialBonuses={setApplyRacialBonuses}
+              spellIds={spellIds}
+              onSpellIds={setSpellIds}
+            />
+          )}
+
+          {step === "spells" && (
+            <CharacterCreateRulesPanel
+              mode="spells"
+              classId={classId}
+              onClassId={setClassId}
+              subclassId={subclassId}
+              onSubclassId={setSubclassId}
+              srdRaceId={srdRaceId}
+              onSrdRaceId={setSrdRaceId}
+              baseAbilities={baseAbilities}
+              onBaseAbilities={setBaseAbilities}
+              applyRacialBonuses={applyRacialBonuses}
+              onApplyRacialBonuses={setApplyRacialBonuses}
+              spellIds={spellIds}
+              onSpellIds={setSpellIds}
+            />
+          )}
+
+          {step === "origin" && (
+            <div className="space-y-5">
+              <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4">
+                Herkunft (Kampagnen-Lore)
+              </h3>
               {/* Kultur → Rasse → Sprachen (Hierarchie) */}
               {loreLoading ? (
                 <div className="flex items-center gap-2 p-3 font-libre text-sm text-gray-500">
@@ -576,40 +758,12 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 </div>
               )}
 
-              <div>
-                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Level
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={level}
-                  onChange={(e) => setLevel(parseInt(e.target.value) || 1)}
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-                />
-              </div>
 
-              <div>
-                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                  Biografie / Hintergrundgeschichte (Optional)
-                </label>
-                <textarea
-                  value={biography}
-                  onChange={(e) => setBiography(e.target.value)}
-                  rows={6}
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold resize-y"
-                  placeholder="Erzähle die Hintergrundgeschichte deines Charakters... Wo kommt er her? Was hat ihn geprägt? Was sind seine Ziele?"
-                />
-                <p className="mt-1 text-xs text-gray-500 font-libre italic">
-                  Optional: Beschreibe die Vergangenheit und Motivation deines Charakters.
-                </p>
-              </div>
             </div>
           )}
 
-          {/* Step 2: Welt-Integration */}
-          {step === 2 && (
+          {/* Welt-Integration */}
+          {step === "world" && (
             <div className="space-y-5">
               <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4">
                 Welt-Integration
@@ -721,7 +875,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           )}
 
           {/* Step 3: Beziehungen & NPCs */}
-          {step === 3 && (
+          {step === "contacts" && (
             <div className="space-y-6">
               <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4">
                 Beziehungen & NPCs
@@ -996,7 +1150,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           )}
 
           {/* Step 4: Charakterbild / Avatar */}
-          {step === 4 && (
+          {step === "avatar" && (
             <div className="space-y-5">
               <h3 className="font-barlow font-bold text-lg text-white uppercase mb-4 flex items-center gap-2">
                 <Image className="h-5 w-5 text-accent-gold" />
@@ -1065,17 +1219,17 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           <div className="flex justify-between">
             <button
               type="button"
-              onClick={() => step > 1 && setStep(step - 1)}
-              disabled={step === 1 || isPending}
+              onClick={() => stepIndex > 0 && setStepIndex(stepIndex - 1)}
+              disabled={stepIndex === 0 || isPending}
               className="flex items-center gap-2 rounded border border-hero-border px-6 py-2 font-barlow font-bold uppercase text-gray-300 transition-colors hover:bg-hero-dark disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
               Zurück
             </button>
-            {step < 4 ? (
+            {!isLastStep ? (
               <button
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={() => setStepIndex(stepIndex + 1)}
                 disabled={!canGoNext() || isPending}
                 className="flex items-center gap-2 rounded bg-accent-gold px-6 py-2.5 font-barlow font-bold uppercase text-background-dark transition-colors hover:bg-yellow-400 disabled:opacity-40 shadow-md"
               >

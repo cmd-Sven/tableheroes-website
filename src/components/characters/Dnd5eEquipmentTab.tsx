@@ -19,8 +19,10 @@ import {
   getCharacterInventory,
   transferContainerToCharacter,
   transferItemToCharacter,
+  updateCharacterItem,
   type PartyCharacterOption,
 } from "@/src/lib/actions/character-inventory-actions";
+import { toast } from "sonner";
 import type { CharacterItem, CharacterInventoryPayload } from "@/src/types/inventory";
 import type { Dnd5eDerivedSheet, Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
 import {
@@ -47,6 +49,8 @@ import {
   placeItemInGeneralSlot,
   placeItemInSlot,
   removeItemFromEquipment,
+  stowUnassignedIntoContainer,
+  unequipToContainer,
   saveEquipmentLoadout,
   saveWeaponPreset,
   toggleAttunement,
@@ -65,10 +69,12 @@ import {
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { EquipmentSilhouette } from "@/src/components/characters/EquipmentSilhouette";
 import { CustomDnd5eItemEditorModal } from "@/src/components/characters/CustomDnd5eItemEditorModal";
+import { ItemCatalogPickerModal } from "@/src/components/characters/ItemCatalogPickerModal";
 import { InventoryGrid } from "@/src/components/characters/inventory/InventoryGrid";
 import { ContainerSetupModal } from "@/src/components/characters/inventory/ContainerSetupModal";
 import { BeltSlotsStrip } from "@/src/components/characters/inventory/BeltSlotsStrip";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
+import { enrichItemDescriptionFromCatalog } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
 
 type Props = {
   characterId: string;
@@ -94,6 +100,8 @@ export function Dnd5eEquipmentTab({
   const [inventory, setInventory] = useState<CharacterInventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemEditor, setItemEditor] = useState<CharacterItem | null | "new">(null);
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [partyCharacters, setPartyCharacters] = useState<PartyCharacterOption[]>([]);
   const [highlightItemIds, setHighlightItemIds] = useState<Set<string>>(() => new Set());
   const [pendingBackpackItemId, setPendingBackpackItemId] = useState<string | null>(null);
@@ -159,20 +167,38 @@ export function Dnd5eEquipmentTab({
   const hasBackpack = hasBackpackContainer(equipment);
   const unassigned = getUnassignedItems(items, equipment);
 
-  const selectableForSlots = useMemo(() => {
-    const ids = new Set<string>();
-    const list: CharacterItem[] = [];
-    const equippedIds = new Set([
-      ...Object.values(equipment.slots).filter(Boolean),
-      ...Object.values(equipment.generalSlots ?? {}).filter(Boolean),
-    ] as string[]);
-    for (const item of [...unassigned, ...items.filter((i) => equippedIds.has(i.id))]) {
-      if (ids.has(item.id)) continue;
-      ids.add(item.id);
-      list.push(item);
+  const [activeInventoryContainerId, setActiveInventoryContainerId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (equipment.containers.length === 0) {
+      setActiveInventoryContainerId(null);
+      return;
     }
-    return list;
-  }, [unassigned, items, equipment.slots, equipment.generalSlots]);
+    setActiveInventoryContainerId((prev) => {
+      if (prev && equipment.containers.some((c) => c.id === prev)) return prev;
+      return equipment.containers[0]?.id ?? null;
+    });
+  }, [equipment.containers]);
+
+  // Verwaiste Items (nicht im Rucksack, aber vorhanden) automatisch verstauen
+  useEffect(() => {
+    if (loading || readOnly || items.length === 0) return;
+    if (equipment.containers.length === 0) return;
+    const orphans = getUnassignedItems(items, equipment);
+    if (orphans.length === 0) return;
+    const stowed = stowUnassignedIntoContainer(
+      equipment,
+      items,
+      activeInventoryContainerId,
+    );
+    const after = getUnassignedItems(items, stowed).length;
+    if (after < orphans.length) {
+      update(stowed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- verstauen bei Inventarwechsel
+  }, [loading, items, equipment.containers.length, unassigned.length]);
 
   const weaponAttacks = computeEquippedWeaponAttacks(sheet, derived, items, equipment, level);
   const acPreview = computeArmorClassPreview(sheet, derived, items, equipment);
@@ -272,6 +298,36 @@ export function Dnd5eEquipmentTab({
     await deleteCharacterItem(item.id);
     update(removeItemFromEquipment(equipment, item.id));
     await reloadInventory();
+  }
+
+  async function reconcileInventoryWithCatalog() {
+    if (readOnly || items.length === 0) return;
+    setReconciling(true);
+    try {
+      let updated = 0;
+      for (const item of items) {
+        const nextDesc = enrichItemDescriptionFromCatalog(item);
+        if (!nextDesc || nextDesc === item.description) continue;
+        await updateCharacterItem({
+          itemId: item.id,
+          name: item.name,
+          description: nextDesc,
+          category: item.category,
+          iconType: item.icon_type,
+        });
+        updated += 1;
+      }
+      await reloadInventory();
+      toast.success(
+        updated > 0
+          ? t("itemCatalog.reconcileDone", { count: updated })
+          : t("itemCatalog.reconcileNone"),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("itemCatalog.reconcileError"));
+    } finally {
+      setReconciling(false);
+    }
   }
 
   if (loading) {
@@ -395,52 +451,123 @@ export function Dnd5eEquipmentTab({
           />
         </section>
 
-        <InventoryGrid
-          items={items}
-          equipment={equipment}
-          readOnly={readOnly}
-          highlightItemIds={highlightItemIds}
-          partyCharacters={partyCharacters}
-          onEquipmentChange={update}
-          onAddItem={() => setItemEditor("new")}
-          onEditItem={(item) => setItemEditor(item)}
-          onDeleteItem={handleDeleteItem}
-          onDuplicateItem={async (item) => {
-            const dup = await duplicateCharacterItem(item);
-            await placeNewItemInInventory(dup);
-          }}
-          onSplitStack={async (item, amount) => {
-            const result = await splitStack(item, amount);
-            await placeNewItemInInventory(result.split);
-          }}
-          onAssignCategory={async (item, category) => {
-            await setItemInventoryCategory(item, category);
-            await reloadInventory();
-          }}
-          onGiveItem={handleGiveItem}
-          onTransferContainer={handleTransferContainer}
-          onAddContainer={addContainer}
-          onUpdateContainer={updateContainer}
-          onAddCustomCategory={addCustomCategory}
-        />
+        <div className="space-y-2">
+          {!readOnly ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCatalogPickerOpen(true)}
+                className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+              >
+                {t("itemCatalog.open")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setItemEditor("new")}
+                className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow text-[9px] font-bold uppercase text-gray-400 hover:text-white"
+              >
+                {t("equipment.customItem")}
+              </button>
+              <button
+                type="button"
+                disabled={reconciling || items.length === 0}
+                onClick={() => void reconcileInventoryWithCatalog()}
+                className="inline-flex items-center gap-1 rounded border border-hero-vibrant/50 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/10 disabled:opacity-40"
+              >
+                {reconciling ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                {t("itemCatalog.reconcile")}
+              </button>
+            </div>
+          ) : null}
+          <InventoryGrid
+            items={items}
+            equipment={equipment}
+            readOnly={readOnly}
+            highlightItemIds={highlightItemIds}
+            partyCharacters={partyCharacters}
+            onEquipmentChange={update}
+            activeContainerId={activeInventoryContainerId}
+            onActiveContainerIdChange={setActiveInventoryContainerId}
+            onAddItem={() => setCatalogPickerOpen(true)}
+            onEditItem={(item) => setItemEditor(item)}
+            onDeleteItem={handleDeleteItem}
+            onDuplicateItem={async (item) => {
+              const dup = await duplicateCharacterItem(item);
+              await placeNewItemInInventory(dup);
+            }}
+            onSplitStack={async (item, amount) => {
+              const result = await splitStack(item, amount);
+              await placeNewItemInInventory(result.split);
+            }}
+            onAssignCategory={async (item, category) => {
+              await setItemInventoryCategory(item, category);
+              await reloadInventory();
+            }}
+            onGiveItem={handleGiveItem}
+            onTransferContainer={handleTransferContainer}
+            onAddContainer={addContainer}
+            onUpdateContainer={updateContainer}
+            onAddCustomCategory={addCustomCategory}
+          />
+        </div>
 
         {hasBackpack || equipment.containers.length > 0 ? (
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 overflow-visible">
             <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-4">
               {t("equipment.step3Title")}
             </h3>
+            <p className="mb-3 font-libre text-[10px] text-gray-500">
+              {t("equipment.dragOnlyHint")}
+            </p>
             <EquipmentSilhouette
               slots={equipment.slots}
               generalSlots={equipment.generalSlots}
               itemNames={itemNames}
-              selectableItems={selectableForSlots}
               itemMap={itemMap}
               readOnly={readOnly}
-              onEquip={(slot, itemId) =>
-                update(placeItemInSlot(equipment, slot, itemId, items))
+              onEquip={(slot, itemId) => {
+                if (!itemId) {
+                  update(
+                    unequipToContainer(equipment, items, {
+                      slot,
+                      preferContainerId: activeInventoryContainerId,
+                    }),
+                  );
+                  return;
+                }
+                update(placeItemInSlot(equipment, slot, itemId, items));
+              }}
+              onEquipGeneral={(slot, itemId) => {
+                if (!itemId) {
+                  update(
+                    unequipToContainer(equipment, items, {
+                      generalSlot: slot,
+                      preferContainerId: activeInventoryContainerId,
+                    }),
+                  );
+                  return;
+                }
+                update(placeItemInGeneralSlot(equipment, slot, itemId));
+              }}
+              onUnequip={(slot) =>
+                update(
+                  unequipToContainer(equipment, items, {
+                    slot,
+                    preferContainerId: activeInventoryContainerId,
+                  }),
+                )
               }
-              onEquipGeneral={(slot, itemId) =>
-                update(placeItemInGeneralSlot(equipment, slot, itemId))
+              onUnequipGeneral={(slot) =>
+                update(
+                  unequipToContainer(equipment, items, {
+                    generalSlot: slot,
+                    preferContainerId: activeInventoryContainerId,
+                  }),
+                )
               }
             />
           </section>
@@ -703,6 +830,17 @@ export function Dnd5eEquipmentTab({
           onClose={() => setItemEditor(null)}
           onSaved={async (saved) => {
             setItemEditor(null);
+            await placeNewItemInInventory(saved);
+          }}
+        />
+      ) : null}
+
+      {catalogPickerOpen ? (
+        <ItemCatalogPickerModal
+          characterId={characterId}
+          onClose={() => setCatalogPickerOpen(false)}
+          onSaved={async (saved) => {
+            setCatalogPickerOpen(false);
             await placeNewItemInInventory(saved);
           }}
         />

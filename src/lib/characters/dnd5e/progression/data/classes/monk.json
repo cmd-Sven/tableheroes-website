@@ -1,0 +1,500 @@
+{
+  "id": "monk",
+  "nameEn": "Monk",
+  "nameDe": "Mönch",
+  "hitDie": 8,
+  "caster": "none",
+  "subclassLevel": 3,
+  "asiLevels": [
+    4,
+    8,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "monk-unarmored-defense",
+        "martial-arts"
+      ]
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "ki",
+        "flurry-of-blows",
+        "patient-defense",
+        "step-of-the-wind",
+        "unarmored-movement-1"
+      ]
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "monastic-tradition",
+        "deflect-missiles"
+      ]
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "monk-ability-score-improvement-1",
+        "slow-fall"
+      ]
+    },
+    {
+      "level": 5,
+      "featureIds": [
+        "monk-extra-attack",
+        "stunning-strike"
+      ]
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "ki-empowered-strikes",
+        "monastic-tradition-improvement-1"
+      ]
+    },
+    {
+      "level": 7,
+      "featureIds": [
+        "monk-evasion",
+        "stillness-of-mind"
+      ]
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "monk-ability-score-improvement-2"
+      ]
+    },
+    {
+      "level": 9,
+      "featureIds": [
+        "unarmored-movement-2"
+      ]
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "purity-of-body"
+      ]
+    },
+    {
+      "level": 11,
+      "featureIds": [
+        "monastic-tradition-improvement-2"
+      ]
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "monk-ability-score-improvement-3"
+      ]
+    },
+    {
+      "level": 13,
+      "featureIds": [
+        "tongue-of-the-sun-and-moon"
+      ]
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "diamond-soul"
+      ]
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "monk-timeless-body"
+      ]
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "monk-ability-score-improvement-4"
+      ]
+    },
+    {
+      "level": 17,
+      "featureIds": [
+        "monastic-tradition-improvement-3"
+      ]
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "empty-body"
+      ]
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "monk-ability-score-improvement-5"
+      ]
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "perfect-self"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "monk-unarmored-defense",
+      "level": 1,
+      "nameEn": "Unarmored Defense",
+      "nameDe": "Unarmored Defense",
+      "descriptionEn": "Beginning at 1st level, while you are wearing no armor and not wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+      "descriptionDe": "Beginning at 1st level, while you are wearing no armor and not wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+      "subclass": null
+    },
+    {
+      "id": "martial-arts",
+      "level": 1,
+      "nameEn": "Martial Arts",
+      "nameDe": "Martial Arts",
+      "descriptionEn": "At 1st level, your practice of martial arts gives you mastery of combat styles that use unarmed strikes and monk weapons, which are shortswords and any simple melee weapons that don't have the two- handed or heavy property.\n\nYou gain the following benefits while you are unarmed or wielding only monk weapons and you aren't wearing armor or wielding a shield:\n\n- You can use Dexterity instead of Strength for the attack and damage rolls of your unarmed strikes and monk weapons.\n\n- You can roll a d4 in place of the normal damage of your unarmed strike or monk weapon. This die changes as you gain monk levels, as shown in the Martial Arts column of Table: The Monk.\n\n- When you use the Attack action with an unarmed strike or a monk weapon on your turn, you can make one unarmed strike as a bonus action. For example, if you take the Attack action and attack with a quarterstaff, you can also make an unarmed strike as a bonus action, assuming you haven't already taken a bonus action this turn.\n\nCertain monasteries use specialized forms of the monk weapons. For example, you might use a club that is two lengths of wood connected by a short chain (called a nunchaku) or a sickle with a shorter, straighter blade (called a kama). Whatever name you use for a monk weapon, you can use the game statistics provided for the weapon.",
+      "descriptionDe": "At 1st level, your practice of martial arts gives you mastery of combat styles that use unarmed strikes and monk weapons, which are shortswords and any simple melee weapons that don't have the two- handed or heavy property.\n\nYou gain the following benefits while you are unarmed or wielding only monk weapons and you aren't wearing armor or wielding a shield:\n\n- You can use Dexterity instead of Strength for the attack and damage rolls of your unarmed strikes and monk weapons.\n\n- You can roll a d4 in place of the normal damage of your unarmed strike or monk weapon. This die changes as you gain monk levels, as shown in the Martial Arts column of Table: The Monk.\n\n- When you use the Attack action with an unarmed strike or a monk weapon on your turn, you can make one unarmed strike as a bonus action. For example, if you take the Attack action and attack with a quarterstaff, you can also make an unarmed strike as a bonus action, assuming you haven't already taken a bonus action this turn.\n\nCertain monasteries use specialized forms of the monk weapons. For example, you might use a club that is two lengths of wood connected by a short chain (called a nunchaku) or a sickle with a shorter, straighter blade (called a kama). Whatever name you use for a monk weapon, you can use the game statistics provided for the weapon.",
+      "subclass": null
+    },
+    {
+      "id": "ki",
+      "level": 2,
+      "nameEn": "Ki",
+      "nameDe": "Ki",
+      "descriptionEn": "Starting at 2nd level, your training allows you to harness the mystic energy of ki. Your access to this energy is represented by a number of ki points. Your monk level determines the number of points you have, as shown in the Ki Points column of Table: The Monk.\n\nYou can spend these points to fuel various ki features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind. You learn more ki features as you gain levels in this class.\n\nWhen you spend a ki point, it is unavailable until you finish a short or long rest, at the end of which you draw all of your expended ki back into yourself. You must spend at least 30 minutes of the rest meditating to regain your ki points.\n\nSome of your ki features require your target to make a saving throw to resist the feature's effects. The saving throw DC is calculated as follows:\n\nKi save DC = 8 + your proficiency bonus + your Wisdom modifier",
+      "descriptionDe": "Starting at 2nd level, your training allows you to harness the mystic energy of ki. Your access to this energy is represented by a number of ki points. Your monk level determines the number of points you have, as shown in the Ki Points column of Table: The Monk.\n\nYou can spend these points to fuel various ki features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind. You learn more ki features as you gain levels in this class.\n\nWhen you spend a ki point, it is unavailable until you finish a short or long rest, at the end of which you draw all of your expended ki back into yourself. You must spend at least 30 minutes of the rest meditating to regain your ki points.\n\nSome of your ki features require your target to make a saving throw to resist the feature's effects. The saving throw DC is calculated as follows:\n\nKi save DC = 8 + your proficiency bonus + your Wisdom modifier",
+      "subclass": null
+    },
+    {
+      "id": "flurry-of-blows",
+      "level": 2,
+      "nameEn": "Flurry of Blows",
+      "nameDe": "Flurry of Blows",
+      "descriptionEn": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action.",
+      "descriptionDe": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action.",
+      "subclass": null
+    },
+    {
+      "id": "patient-defense",
+      "level": 2,
+      "nameEn": "Patient Defense",
+      "nameDe": "Patient Defense",
+      "descriptionEn": "You can spend 1 ki point to take the Dodge action as a bonus action on your turn.",
+      "descriptionDe": "You can spend 1 ki point to take the Dodge action as a bonus action on your turn.",
+      "subclass": null
+    },
+    {
+      "id": "step-of-the-wind",
+      "level": 2,
+      "nameEn": "Step of the Wind",
+      "nameDe": "Step of the Wind",
+      "descriptionEn": "You can spend 1 ki point to take the Disengage or Dash action as a bonus action on your turn, and your jump distance is doubled for the turn.",
+      "descriptionDe": "You can spend 1 ki point to take the Disengage or Dash action as a bonus action on your turn, and your jump distance is doubled for the turn.",
+      "subclass": null
+    },
+    {
+      "id": "unarmored-movement-1",
+      "level": 2,
+      "nameEn": "Unarmored Movement",
+      "nameDe": "Unarmored Movement",
+      "descriptionEn": "Starting at 2nd level, your speed increases by 10 feet while you are not wearing armor or wielding a shield. This bonus increases when you reach certain monk levels, as shown in Table: The Monk.\n\nAt 9th level, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the move.",
+      "descriptionDe": "Starting at 2nd level, your speed increases by 10 feet while you are not wearing armor or wielding a shield. This bonus increases when you reach certain monk levels, as shown in Table: The Monk.\n\nAt 9th level, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the move.",
+      "subclass": null
+    },
+    {
+      "id": "monastic-tradition",
+      "level": 3,
+      "nameEn": "Monastic Tradition",
+      "nameDe": "Monastic Tradition",
+      "descriptionEn": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "descriptionDe": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "deflect-missiles",
+      "level": 3,
+      "nameEn": "Deflect Missiles",
+      "nameDe": "Deflect Missiles",
+      "descriptionEn": "Starting at 3rd level, you can use your reaction to deflect or catch the missile when you are hit by a ranged weapon attack. When you do so, the damage you take from the attack is reduced by 1d10 + your Dexterity modifier + your monk level.\n\nIf you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in one hand and you have at least one hand free. If you catch a missile in this way, you can spend 1 ki point to make a ranged attack with the weapon or piece of ammunition you just caught, as part of the same reaction. You make this attack with proficiency, regardless of your weapon proficiencies, and the missile counts as a monk weapon for the attack, which has a normal range of 20 feet and a long range of 60 feet.",
+      "descriptionDe": "Starting at 3rd level, you can use your reaction to deflect or catch the missile when you are hit by a ranged weapon attack. When you do so, the damage you take from the attack is reduced by 1d10 + your Dexterity modifier + your monk level.\n\nIf you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in one hand and you have at least one hand free. If you catch a missile in this way, you can spend 1 ki point to make a ranged attack with the weapon or piece of ammunition you just caught, as part of the same reaction. You make this attack with proficiency, regardless of your weapon proficiencies, and the missile counts as a monk weapon for the attack, which has a normal range of 20 feet and a long range of 60 feet.",
+      "subclass": null
+    },
+    {
+      "id": "monk-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "slow-fall",
+      "level": 4,
+      "nameEn": "Slow Fall",
+      "nameDe": "Slow Fall",
+      "descriptionEn": "Beginning at 4th level, you can use your reaction when you fall to reduce any falling damage you take by an amount equal to five times your monk level.",
+      "descriptionDe": "Beginning at 4th level, you can use your reaction when you fall to reduce any falling damage you take by an amount equal to five times your monk level.",
+      "subclass": null
+    },
+    {
+      "id": "monk-extra-attack",
+      "level": 5,
+      "nameEn": "Extra Attack",
+      "nameDe": "Extra Attack",
+      "descriptionEn": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn.",
+      "descriptionDe": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn.",
+      "subclass": null
+    },
+    {
+      "id": "stunning-strike",
+      "level": 5,
+      "nameEn": "Stunning Strike",
+      "nameDe": "Stunning Strike",
+      "descriptionEn": "Starting at 5th level, you can interfere with the flow of ki in an opponent's body. When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn.",
+      "descriptionDe": "Starting at 5th level, you can interfere with the flow of ki in an opponent's body. When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn.",
+      "subclass": null
+    },
+    {
+      "id": "ki-empowered-strikes",
+      "level": 6,
+      "nameEn": "Ki Empowered Strikes",
+      "nameDe": "Ki Empowered Strikes",
+      "descriptionEn": "Starting at 6th level, your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+      "descriptionDe": "Starting at 6th level, your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+      "subclass": null
+    },
+    {
+      "id": "monastic-tradition-improvement-1",
+      "level": 6,
+      "nameEn": "Monastic Tradition feature",
+      "nameDe": "Monastic Tradition feature",
+      "descriptionEn": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "descriptionDe": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "monk-evasion",
+      "level": 7,
+      "nameEn": "Evasion",
+      "nameDe": "Evasion",
+      "descriptionEn": "At 7th level, your instinctive agility lets you dodge out of the way of certain area effects, such as a blue dragon's lightning breath or a fireball spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+      "descriptionDe": "At 7th level, your instinctive agility lets you dodge out of the way of certain area effects, such as a blue dragon's lightning breath or a fireball spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+      "subclass": null
+    },
+    {
+      "id": "stillness-of-mind",
+      "level": 7,
+      "nameEn": "Stillness of Mind",
+      "nameDe": "Stillness of Mind",
+      "descriptionEn": "Starting at 7th level, you can use your action to end one effect on yourself that is causing you to be charmed or frightened.",
+      "descriptionDe": "Starting at 7th level, you can use your action to end one effect on yourself that is causing you to be charmed or frightened.",
+      "subclass": null
+    },
+    {
+      "id": "monk-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "unarmored-movement-2",
+      "level": 9,
+      "nameEn": "Unarmored Movement",
+      "nameDe": "Unarmored Movement",
+      "descriptionEn": "Starting at 2nd level, your speed increases by 10 feet while you are not wearing armor or wielding a shield. This bonus increases when you reach certain monk levels, as shown in Table: The Monk.\n\nAt 9th level, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the move.",
+      "descriptionDe": "Starting at 2nd level, your speed increases by 10 feet while you are not wearing armor or wielding a shield. This bonus increases when you reach certain monk levels, as shown in Table: The Monk.\n\nAt 9th level, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the move.",
+      "subclass": null
+    },
+    {
+      "id": "purity-of-body",
+      "level": 10,
+      "nameEn": "Purity of Body",
+      "nameDe": "Purity of Body",
+      "descriptionEn": "At 10th level, your mastery of the ki flowing through you makes you immune to disease and poison.",
+      "descriptionDe": "At 10th level, your mastery of the ki flowing through you makes you immune to disease and poison.",
+      "subclass": null
+    },
+    {
+      "id": "monastic-tradition-improvement-2",
+      "level": 11,
+      "nameEn": "Monastic Tradition feature",
+      "nameDe": "Monastic Tradition feature",
+      "descriptionEn": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "descriptionDe": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "monk-ability-score-improvement-3",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "tongue-of-the-sun-and-moon",
+      "level": 13,
+      "nameEn": "Tongue of the Sun and Moon",
+      "nameDe": "Tongue of the Sun and Moon",
+      "descriptionEn": "Starting at 13th level, you learn to touch the ki of other minds so that you understand all spoken languages. Moreover, any creature that can understand a language can understand what you say.",
+      "descriptionDe": "Starting at 13th level, you learn to touch the ki of other minds so that you understand all spoken languages. Moreover, any creature that can understand a language can understand what you say.",
+      "subclass": null
+    },
+    {
+      "id": "diamond-soul",
+      "level": 14,
+      "nameEn": "Diamond Soul",
+      "nameDe": "Diamond Soul",
+      "descriptionEn": "Beginning at 14th level, your mastery of ki grants you proficiency in all saving throws.\n\nAdditionally, whenever you make a saving throw and fail, you can spend 1 ki point to reroll it and take the second result.",
+      "descriptionDe": "Beginning at 14th level, your mastery of ki grants you proficiency in all saving throws.\n\nAdditionally, whenever you make a saving throw and fail, you can spend 1 ki point to reroll it and take the second result.",
+      "subclass": null
+    },
+    {
+      "id": "monk-timeless-body",
+      "level": 15,
+      "nameEn": "Timeless Body",
+      "nameDe": "Timeless Body",
+      "descriptionEn": "At 15th level, your ki sustains you so that you suffer none of the frailty of old age, and you can't be aged magically. You can still die of old age, however. In addition, you no longer need food or water.",
+      "descriptionDe": "At 15th level, your ki sustains you so that you suffer none of the frailty of old age, and you can't be aged magically. You can still die of old age, however. In addition, you no longer need food or water.",
+      "subclass": null
+    },
+    {
+      "id": "monk-ability-score-improvement-4",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "monastic-tradition-improvement-3",
+      "level": 17,
+      "nameEn": "Monastic Tradition feature",
+      "nameDe": "Monastic Tradition feature",
+      "descriptionEn": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "descriptionDe": "When you reach 3rd level, you commit yourself to a monastic tradition, such as the Way of the Open Hand. Your tradition grants you features at 3rd level and again at 6th, 11th, and 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "empty-body",
+      "level": 18,
+      "nameEn": "Empty Body",
+      "nameDe": "Empty Body",
+      "descriptionEn": "Beginning at 18th level, you can use your action to spend 4 ki points to become invisible for 1 minute. During that time, you also have resistance to all damage but force damage.\n\nAdditionally, you can spend 8 ki points to cast the astral projection spell, without needing material components. When you do so, you can't take any other creatures with you.",
+      "descriptionDe": "Beginning at 18th level, you can use your action to spend 4 ki points to become invisible for 1 minute. During that time, you also have resistance to all damage but force damage.\n\nAdditionally, you can spend 8 ki points to cast the astral projection spell, without needing material components. When you do so, you can't take any other creatures with you.",
+      "subclass": null
+    },
+    {
+      "id": "monk-ability-score-improvement-5",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "perfect-self",
+      "level": 20,
+      "nameEn": "Perfect Self",
+      "nameDe": "Perfect Self",
+      "descriptionEn": "At 20th level, when you roll for initiative and have no ki points remaining, you regain 4 ki points.",
+      "descriptionDe": "At 20th level, when you roll for initiative and have no ki points remaining, you regain 4 ki points.",
+      "subclass": null
+    },
+    {
+      "id": "open-hand-technique",
+      "level": 3,
+      "nameEn": "Open Hand Technique",
+      "nameDe": "Open Hand Technique",
+      "descriptionEn": "Starting when you choose this tradition at 3rd level, you can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:\n\n- It must succeed on a Dexterity saving throw or be knocked prone.\n\n- It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.\n\n- It can't take reactions until the end of your next turn.",
+      "descriptionDe": "Starting when you choose this tradition at 3rd level, you can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:\n\n- It must succeed on a Dexterity saving throw or be knocked prone.\n\n- It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.\n\n- It can't take reactions until the end of your next turn.",
+      "subclass": "open-hand"
+    },
+    {
+      "id": "wholeness-of-body",
+      "level": 6,
+      "nameEn": "Wholeness of Body",
+      "nameDe": "Wholeness of Body",
+      "descriptionEn": "At 6th level, you gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+      "descriptionDe": "At 6th level, you gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+      "subclass": "open-hand"
+    },
+    {
+      "id": "tranquility",
+      "level": 11,
+      "nameEn": "Tranquility",
+      "nameDe": "Tranquility",
+      "descriptionEn": "Beginning at 11th level, you can enter a special meditation that surrounds you with an aura of peace. At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC for the spell equals 8 + your Wisdom modifier + your proficiency bonus.",
+      "descriptionDe": "Beginning at 11th level, you can enter a special meditation that surrounds you with an aura of peace. At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC for the spell equals 8 + your Wisdom modifier + your proficiency bonus.",
+      "subclass": "open-hand"
+    },
+    {
+      "id": "quivering-palm",
+      "level": 17,
+      "nameEn": "Quivering Palm",
+      "nameDe": "Quivering Palm",
+      "descriptionEn": "At 17th level, you gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an unarmed strike, you can spend 3 ki points to start these imperceptible vibrations, which last for a number of days equal to your monk level. The vibrations are harmless unless you use your action to end them. To do so, you and the target must be on the same plane of existence. When you use this action, the creature must make a Constitution saving throw. If it fails, it is reduced to 0 hit points. If it succeeds, it takes 10d10 necrotic damage.\n\nYou can have only one creature under the effect of this feature at a time. You can choose to end the vibrations harmlessly without using an action.",
+      "descriptionDe": "At 17th level, you gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an unarmed strike, you can spend 3 ki points to start these imperceptible vibrations, which last for a number of days equal to your monk level. The vibrations are harmless unless you use your action to end them. To do so, you and the target must be on the same plane of existence. When you use this action, the creature must make a Constitution saving throw. If it fails, it is reduced to 0 hit points. If it succeeds, it takes 10d10 necrotic damage.\n\nYou can have only one creature under the effect of this feature at a time. You can choose to end the vibrations harmlessly without using an action.",
+      "subclass": "open-hand"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "open-hand",
+      "nameEn": "Open Hand",
+      "nameDe": "Open Hand",
+      "features": [
+        {
+          "id": "open-hand-technique",
+          "level": 3,
+          "nameEn": "Open Hand Technique",
+          "nameDe": "Open Hand Technique",
+          "descriptionEn": "Starting when you choose this tradition at 3rd level, you can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:\n\n- It must succeed on a Dexterity saving throw or be knocked prone.\n\n- It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.\n\n- It can't take reactions until the end of your next turn.",
+          "descriptionDe": "Starting when you choose this tradition at 3rd level, you can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:\n\n- It must succeed on a Dexterity saving throw or be knocked prone.\n\n- It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.\n\n- It can't take reactions until the end of your next turn.",
+          "subclass": "open-hand"
+        },
+        {
+          "id": "wholeness-of-body",
+          "level": 6,
+          "nameEn": "Wholeness of Body",
+          "nameDe": "Wholeness of Body",
+          "descriptionEn": "At 6th level, you gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "descriptionDe": "At 6th level, you gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "subclass": "open-hand"
+        },
+        {
+          "id": "tranquility",
+          "level": 11,
+          "nameEn": "Tranquility",
+          "nameDe": "Tranquility",
+          "descriptionEn": "Beginning at 11th level, you can enter a special meditation that surrounds you with an aura of peace. At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC for the spell equals 8 + your Wisdom modifier + your proficiency bonus.",
+          "descriptionDe": "Beginning at 11th level, you can enter a special meditation that surrounds you with an aura of peace. At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC for the spell equals 8 + your Wisdom modifier + your proficiency bonus.",
+          "subclass": "open-hand"
+        },
+        {
+          "id": "quivering-palm",
+          "level": 17,
+          "nameEn": "Quivering Palm",
+          "nameDe": "Quivering Palm",
+          "descriptionEn": "At 17th level, you gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an unarmed strike, you can spend 3 ki points to start these imperceptible vibrations, which last for a number of days equal to your monk level. The vibrations are harmless unless you use your action to end them. To do so, you and the target must be on the same plane of existence. When you use this action, the creature must make a Constitution saving throw. If it fails, it is reduced to 0 hit points. If it succeeds, it takes 10d10 necrotic damage.\n\nYou can have only one creature under the effect of this feature at a time. You can choose to end the vibrations harmlessly without using an action.",
+          "descriptionDe": "At 17th level, you gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an unarmed strike, you can spend 3 ki points to start these imperceptible vibrations, which last for a number of days equal to your monk level. The vibrations are harmless unless you use your action to end them. To do so, you and the target must be on the same plane of existence. When you use this action, the creature must make a Constitution saving throw. If it fails, it is reduced to 0 hit points. If it succeeds, it takes 10d10 necrotic damage.\n\nYou can have only one creature under the effect of this feature at a time. You can choose to end the vibrations harmlessly without using an action.",
+          "subclass": "open-hand"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "dwarf",
+  "nameEn": "Dwarf",
+  "nameDe": "Zwerg",
+  "features": [
+    {
+      "id": "darkvision",
+      "level": 1,
+      "nameEn": "Darkvision",
+      "nameDe": "Darkvision",
+      "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "subclass": null
+    },
+    {
+      "id": "dwarven-resilience",
+      "level": 1,
+      "nameEn": "Dwarven Resilience",
+      "nameDe": "Dwarven Resilience",
+      "descriptionEn": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
+      "descriptionDe": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
+      "subclass": null
+    },
+    {
+      "id": "stonecunning",
+      "level": 1,
+      "nameEn": "Stonecunning",
+      "nameDe": "Stonecunning",
+      "descriptionEn": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus.",
+      "descriptionDe": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus.",
+      "subclass": null
+    },
+    {
+      "id": "dwarven-combat-training",
+      "level": 1,
+      "nameEn": "Dwarven Combat Training",
+      "nameDe": "Dwarven Combat Training",
+      "descriptionEn": "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer.",
+      "descriptionDe": "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer.",
+      "subclass": null
+    },
+    {
+      "id": "tool-proficiency",
+      "level": 1,
+      "nameEn": "Tool Proficiency",
+      "nameDe": "Tool Proficiency",
+      "descriptionEn": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.",
+      "descriptionDe": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.",
+      "subclass": null
+    }
+  ]
+}

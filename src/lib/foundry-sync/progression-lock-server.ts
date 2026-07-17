@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  FOUNDRY_ONE_TIME_PROGRESSION_FIELDS,
   foundryProgressionLockMessage,
   isFoundryProgressionLocked,
+  shouldShowFoundryProgressionInfo,
   type CampaignMode,
 } from "./progression-lock";
 
-const LOCKED_CHARACTER_FIELDS = ["level", "class", "experience_points"] as const;
+const LOCKED_CHARACTER_FIELDS = FOUNDRY_ONE_TIME_PROGRESSION_FIELDS;
 
 export async function resolveFoundryProgressionLock(
   supabase: SupabaseClient,
@@ -23,29 +25,31 @@ export async function resolveFoundryProgressionLock(
     return { locked: false, message: "", campaignMode };
   }
 
-  if (campaignMode === "Online") {
-    return {
-      locked: true,
-      message: foundryProgressionLockMessage({ campaignMode }),
-      campaignMode,
-    };
+  let hasFoundryCharacterMapping = false;
+  if (campaignMode === "Hybrid") {
+    const { data: mappingRaw } = await (supabase as any)
+      .from("foundry_character_mapping")
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("character_id", characterId)
+      .maybeSingle();
+    hasFoundryCharacterMapping = Boolean(mappingRaw);
   }
 
-  const { data: mappingRaw } = await (supabase as any)
-    .from("foundry_character_mapping")
-    .select("id")
-    .eq("campaign_id", campaignId)
-    .eq("character_id", characterId)
-    .maybeSingle();
+  const showInfo = shouldShowFoundryProgressionInfo({
+    campaignMode,
+    hasFoundryCharacterMapping:
+      campaignMode === "Online" ? true : hasFoundryCharacterMapping,
+  });
 
   const locked = isFoundryProgressionLocked({
     campaignMode,
-    hasFoundryCharacterMapping: Boolean(mappingRaw),
+    hasFoundryCharacterMapping,
   });
 
   return {
     locked,
-    message: locked ? foundryProgressionLockMessage({ campaignMode }) : "",
+    message: showInfo ? foundryProgressionLockMessage({ campaignMode }) : "",
     campaignMode,
   };
 }
@@ -64,6 +68,27 @@ export async function stripFoundryLockedCharacterFields(
     delete next[key];
   }
   return next;
+}
+
+/** true = Stufe/Klasse/XP dürfen aus Foundry gesetzt werden (noch kein Import). */
+export async function canApplyFoundryProgressionFromSync(
+  supabase: SupabaseClient,
+  characterId: string,
+): Promise<boolean> {
+  const { data } = await (supabase as any)
+    .from("characters")
+    .select("sheet_synced_at, sheet_source")
+    .eq("id", characterId)
+    .maybeSingle();
+
+  const row = data as {
+    sheet_synced_at?: string | null;
+    sheet_source?: string | null;
+  } | null;
+
+  if (row?.sheet_synced_at) return false;
+  if (row?.sheet_source === "foundry_import") return false;
+  return true;
 }
 
 export async function loadFoundryCharacterMappingSet(

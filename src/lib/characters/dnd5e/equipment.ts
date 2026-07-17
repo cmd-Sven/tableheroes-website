@@ -54,10 +54,11 @@ export function normalizeEquipmentState(
     ...(raw.slots ?? {}),
   };
   const legacy = raw.slots as Record<string, string | null | undefined> | undefined;
+  // Legacy: back1 → shoulders; back/back2 (Rücken-Slot) entfällt — Items werden verwaisen & verstaut
   if (legacy?.back1 && !slots.shoulders) slots.shoulders = legacy.back1;
-  if (legacy?.back2 && !slots.back) slots.back = legacy.back2;
   delete (slots as Record<string, unknown>).back1;
   delete (slots as Record<string, unknown>).back2;
+  delete (slots as Record<string, unknown>).back;
 
   return {
     containers: (raw.containers ?? []).map((c) => ({
@@ -290,6 +291,74 @@ export function placeItemInContainer(
     const itemIds = options?.prepend ? [itemId, ...filtered] : [...filtered, itemId];
     return { ...c, itemIds };
   });
+  return next;
+}
+
+/**
+ * Verwaiste Items (weder Behälter noch Slot/Gürtel) in den Ziel-Rucksack legen.
+ * Überspringt Items, die als Behälter selbst gelinkt sind, und stoppt bei voller Kapazität.
+ */
+export function stowUnassignedIntoContainer(
+  equipment: Dnd5eEquipmentState,
+  items: CharacterItem[],
+  preferContainerId?: string | null,
+): Dnd5eEquipmentState {
+  const unassigned = getUnassignedItems(items, equipment);
+  if (unassigned.length === 0) return equipment;
+
+  const targetId =
+    preferContainerId &&
+    equipment.containers.some((c) => c.id === preferContainerId)
+      ? preferContainerId
+      : equipment.containers[0]?.id;
+  if (!targetId) return equipment;
+
+  let next = normalizeEquipmentState(equipment);
+  for (const item of unassigned) {
+    const container = next.containers.find((c) => c.id === targetId);
+    if (!container) break;
+    if (container.linkedItemId === item.id) continue;
+    const check = canPlaceItemInContainer(container, items, item.id);
+    if (!check.ok) {
+      if (check.reason === "capacity") break;
+      continue;
+    }
+    next = placeItemInContainer(next, targetId, item.id, items, { prepend: true });
+  }
+  return next;
+}
+
+/** Slot leeren und Gegenstand in den offenen/ersten Behälter zurücklegen. */
+export function unequipToContainer(
+  equipment: Dnd5eEquipmentState,
+  items: CharacterItem[],
+  opts: {
+    slot?: Dnd5eEquipmentSlot;
+    generalSlot?: Dnd5eGeneralEquipmentSlot;
+    preferContainerId?: string | null;
+  },
+): Dnd5eEquipmentState {
+  let itemId: string | null = null;
+  if (opts.slot) itemId = equipment.slots?.[opts.slot] ?? null;
+  if (opts.generalSlot) itemId = equipment.generalSlots?.[opts.generalSlot] ?? null;
+  if (!itemId) return equipment;
+
+  let next = normalizeEquipmentState(equipment);
+  if (opts.slot) {
+    next = placeItemInSlot(next, opts.slot, null, items);
+  } else if (opts.generalSlot) {
+    next = placeItemInGeneralSlot(next, opts.generalSlot, null);
+  }
+
+  const targetId =
+    opts.preferContainerId &&
+    next.containers.some((c) => c.id === opts.preferContainerId)
+      ? opts.preferContainerId
+      : next.containers[0]?.id;
+
+  if (targetId) {
+    next = placeItemInContainer(next, targetId, itemId, items, { prepend: true });
+  }
   return next;
 }
 

@@ -18,15 +18,14 @@ import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-st
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 import { EquippedSlotTile } from "@/src/components/characters/inventory/EquippedSlotTile";
 
-/** Körper-Slots — Positionen ohne Überlappung um die Silhouette */
+/** Körper-Slots — Paper-Doll ohne Rücken-Slot, ausgewogen um die Silhouette */
 const EQUIPMENT_UI_SLOTS: {
   key: Dnd5eEquipmentSlot;
   labelKey:
     | "equipment.uiHead"
     | "equipment.uiNeck"
-    | "equipment.uiBack1"
+    | "equipment.uiShoulders"
     | "equipment.uiTorso"
-    | "equipment.uiBack2"
     | "equipment.uiHandLeft"
     | "equipment.uiRingLeft"
     | "equipment.uiHandRight"
@@ -38,17 +37,18 @@ const EQUIPMENT_UI_SLOTS: {
   width: string;
   anchor: "left" | "center" | "right";
 }[] = [
-  { key: "head", labelKey: "equipment.uiHead", top: "1%", left: "50%", width: "46%", anchor: "center" },
-  { key: "neck", labelKey: "equipment.uiNeck", top: "9%", left: "50%", width: "46%", anchor: "center" },
-  { key: "shoulders", labelKey: "equipment.uiBack1", top: "16%", left: "50%", width: "46%", anchor: "center" },
-  { key: "chest", labelKey: "equipment.uiTorso", top: "24%", left: "50%", width: "48%", anchor: "center" },
-  { key: "back", labelKey: "equipment.uiBack2", top: "32%", left: "92%", width: "38%", anchor: "right" },
-  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "36%", left: "-4%", width: "38%", anchor: "left" },
-  { key: "ring2", labelKey: "equipment.uiRingRight", top: "48%", left: "-4%", width: "38%", anchor: "left" },
-  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "36%", left: "104%", width: "38%", anchor: "right" },
-  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "48%", left: "104%", width: "38%", anchor: "right" },
-  { key: "waist", labelKey: "equipment.uiWaist", top: "57%", left: "50%", width: "48%", anchor: "center" },
-  { key: "feet", labelKey: "equipment.uiFeet", top: "73%", left: "50%", width: "48%", anchor: "center" },
+  // Mitte: Kopf → Hals → Umhang → Torso → Gürtel → Füße (gleichmäßiger Abstand)
+  { key: "head", labelKey: "equipment.uiHead", top: "2%", left: "50%", width: "42%", anchor: "center" },
+  { key: "neck", labelKey: "equipment.uiNeck", top: "12%", left: "50%", width: "42%", anchor: "center" },
+  { key: "shoulders", labelKey: "equipment.uiShoulders", top: "22%", left: "50%", width: "42%", anchor: "center" },
+  { key: "chest", labelKey: "equipment.uiTorso", top: "33%", left: "50%", width: "44%", anchor: "center" },
+  // Seiten: Hände auf Torso-Höhe, Ringe darunter — freier Raum durch weggefallenen Rücken-Slot
+  { key: "mainHand", labelKey: "equipment.uiHandRight", top: "30%", left: "0%", width: "36%", anchor: "left" },
+  { key: "offHand", labelKey: "equipment.uiHandLeft", top: "30%", left: "100%", width: "36%", anchor: "right" },
+  { key: "ring2", labelKey: "equipment.uiRingRight", top: "44%", left: "0%", width: "36%", anchor: "left" },
+  { key: "ring1", labelKey: "equipment.uiRingLeft", top: "44%", left: "100%", width: "36%", anchor: "right" },
+  { key: "waist", labelKey: "equipment.uiWaist", top: "56%", left: "50%", width: "44%", anchor: "center" },
+  { key: "feet", labelKey: "equipment.uiFeet", top: "70%", left: "50%", width: "44%", anchor: "center" },
 ];
 
 const GENERAL_SLOT_LABEL_KEYS: Record<
@@ -66,11 +66,13 @@ type Props = {
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;
   generalSlots?: Partial<Record<Dnd5eGeneralEquipmentSlot, string | null>>;
   itemNames: Record<string, string>;
-  selectableItems: CharacterItem[];
   itemMap: Map<string, CharacterItem>;
   readOnly: boolean;
   onEquip: (slot: Dnd5eEquipmentSlot, itemId: string | null) => void;
   onEquipGeneral?: (slot: Dnd5eGeneralEquipmentSlot, itemId: string | null) => void;
+  /** Klick auf belegten Slot → ablegen (zurück in offenen Rucksack) */
+  onUnequip?: (slot: Dnd5eEquipmentSlot) => void;
+  onUnequipGeneral?: (slot: Dnd5eGeneralEquipmentSlot) => void;
 };
 
 function slotTransform(anchor: "left" | "center" | "right"): string | undefined {
@@ -83,11 +85,12 @@ export function EquipmentSilhouette({
   slots,
   generalSlots = {},
   itemNames,
-  selectableItems,
   itemMap,
   readOnly,
   onEquip,
   onEquipGeneral,
+  onUnequip,
+  onUnequipGeneral,
 }: Props) {
   const { t } = useCharacterSheetLocale();
   const [dragOverSlot, setDragOverSlot] = useState<Dnd5eEquipmentSlot | null>(null);
@@ -213,32 +216,17 @@ export function EquipmentSilhouette({
                       isInvalid
                         ? t("inventory.equipConflict")
                         : equippedItem
-                          ? itemNames[equippedItem.id]
-                          : t("equipment.nothingEquipped")
+                          ? `${itemNames[equippedItem.id]}\n${t("equipment.dragHint")}`
+                          : t("equipment.dropToEquip")
                     }
                     onClick={
                       !readOnly && equippedItem
-                        ? () => onEquip(key, null)
+                        ? () => (onUnequip ? onUnequip(key) : onEquip(key, null))
                         : undefined
                     }
                   />
-                  {!readOnly ? (
-                    <select
-                      value={currentId}
-                      onChange={(e) => onEquip(key, e.target.value || null)}
-                      className="min-w-0 flex-1 rounded border border-hero-border/50 bg-background-card/90 px-1.5 py-1 font-libre text-[10px] text-white outline-none focus:border-hero-vibrant"
-                      title={t("equipment.nothingEquipped")}
-                      aria-label={t(labelKey)}
-                    >
-                      <option value="">{t("equipment.nothingEquipped")}</option>
-                      {selectableItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : equippedItem ? (
-                    <p className="min-w-0 flex-1 truncate font-libre text-[10px] text-gray-300">
+                  {equippedItem ? (
+                    <p className="min-w-0 flex-1 truncate font-libre text-[10px] text-gray-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       {itemNames[equippedItem.id]}
                     </p>
                   ) : null}
@@ -260,9 +248,6 @@ export function EquipmentSilhouette({
               const equippedItem = currentId ? itemMap.get(currentId) : undefined;
               const isDragOver = dragOverGeneral === key;
               const isInvalid = invalidGeneral === key;
-              const generalSelectable = selectableItems.filter(
-                (item) => validateItemForGeneralSlot(item).valid,
-              );
 
               return (
                 <div
@@ -284,25 +269,24 @@ export function EquipmentSilhouette({
                       isDragOver={isDragOver}
                       isInvalid={isInvalid}
                       emptyLabel="+"
+                      title={
+                        equippedItem
+                          ? `${itemNames[equippedItem.id]}\n${t("equipment.dragHint")}`
+                          : t("equipment.dropToEquip")
+                      }
                       onClick={
                         !readOnly && equippedItem
-                          ? () => onEquipGeneral(key, null)
+                          ? () =>
+                              onUnequipGeneral
+                                ? onUnequipGeneral(key)
+                                : onEquipGeneral?.(key, null)
                           : undefined
                       }
                     />
-                    {!readOnly ? (
-                      <select
-                        value={currentId}
-                        onChange={(e) => onEquipGeneral(key, e.target.value || null)}
-                        className="min-w-0 flex-1 rounded border border-hero-border/50 bg-background-card/90 px-1.5 py-1 font-libre text-[10px] text-white outline-none focus:border-hero-vibrant"
-                      >
-                        <option value="">{t("equipment.nothingEquipped")}</option>
-                        {generalSelectable.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
+                    {equippedItem ? (
+                      <p className="min-w-0 flex-1 truncate font-libre text-[10px] text-gray-300">
+                        {itemNames[equippedItem.id]}
+                      </p>
                     ) : null}
                   </div>
                 </div>

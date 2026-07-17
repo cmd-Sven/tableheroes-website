@@ -1,0 +1,440 @@
+{
+  "id": "fighter",
+  "nameEn": "Fighter",
+  "nameDe": "Kämpfer",
+  "hitDie": 10,
+  "caster": "none",
+  "subclassLevel": 3,
+  "asiLevels": [
+    4,
+    6,
+    8,
+    12,
+    14,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "fighter-fighting-style",
+        "second-wind"
+      ]
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "action-surge-1-use"
+      ]
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "martial-archetype"
+      ]
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "fighter-ability-score-improvement-1"
+      ]
+    },
+    {
+      "level": 5,
+      "featureIds": [
+        "extra-attack-1"
+      ]
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "fighter-ability-score-improvement-2"
+      ]
+    },
+    {
+      "level": 7,
+      "featureIds": [
+        "martial-archetype-improvement-1"
+      ]
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "fighter-ability-score-improvement-3"
+      ]
+    },
+    {
+      "level": 9,
+      "featureIds": [
+        "indomitable-1-use"
+      ]
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "martial-archetype-improvement-2"
+      ]
+    },
+    {
+      "level": 11,
+      "featureIds": [
+        "extra-attack-2"
+      ]
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "fighter-ability-score-improvement-4"
+      ]
+    },
+    {
+      "level": 13,
+      "featureIds": [
+        "indomitable-2-uses"
+      ]
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "fighter-ability-score-improvement-5"
+      ]
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "martial-archetype-improvement-3"
+      ]
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "fighter-ability-score-improvement-6"
+      ]
+    },
+    {
+      "level": 17,
+      "featureIds": [
+        "action-surge-2-uses",
+        "indomitable-3-uses"
+      ]
+    },
+    {
+      "level": 18,
+      "featureIds": [
+        "martial-archetype-improvement-4"
+      ]
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "fighter-ability-score-improvement-7"
+      ]
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "extra-attack-3"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "fighter-fighting-style",
+      "level": 1,
+      "nameEn": "Fighting Style",
+      "nameDe": "Fighting Style",
+      "descriptionEn": "You adopt a particular style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again.",
+      "descriptionDe": "You adopt a particular style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again.",
+      "subclass": null
+    },
+    {
+      "id": "second-wind",
+      "level": 1,
+      "nameEn": "Second Wind",
+      "nameDe": "Second Wind",
+      "descriptionEn": "You have a limited well of stamina that you can draw on to protect yourself from harm. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once you use this feature, you must finish a short or long rest before you can use it again.",
+      "descriptionDe": "You have a limited well of stamina that you can draw on to protect yourself from harm. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once you use this feature, you must finish a short or long rest before you can use it again.",
+      "subclass": null
+    },
+    {
+      "id": "action-surge-1-use",
+      "level": 2,
+      "nameEn": "Action Surge (1 use)",
+      "nameDe": "Action Surge (1 use)",
+      "descriptionEn": "Starting at 2nd level, you can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action.\n\nOnce you use this feature, you must finish a short or long rest before you can use it again. Starting at 17th level, you can use it twice before a rest, but only once on the same turn.",
+      "descriptionDe": "Starting at 2nd level, you can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action.\n\nOnce you use this feature, you must finish a short or long rest before you can use it again. Starting at 17th level, you can use it twice before a rest, but only once on the same turn.",
+      "subclass": null
+    },
+    {
+      "id": "martial-archetype",
+      "level": 3,
+      "nameEn": "Martial Archetype",
+      "nameDe": "Martial Archetype",
+      "descriptionEn": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "extra-attack-1",
+      "level": 5,
+      "nameEn": "Extra Attack",
+      "nameDe": "Extra Attack",
+      "descriptionEn": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "descriptionDe": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-2",
+      "level": 6,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "martial-archetype-improvement-1",
+      "level": 7,
+      "nameEn": "Martial Archetype feature",
+      "nameDe": "Martial Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-3",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "indomitable-1-use",
+      "level": 9,
+      "nameEn": "Indomitable (1 use)",
+      "nameDe": "Indomitable (1 use)",
+      "descriptionEn": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "descriptionDe": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "martial-archetype-improvement-2",
+      "level": 10,
+      "nameEn": "Martial Archetype feature",
+      "nameDe": "Martial Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "extra-attack-2",
+      "level": 11,
+      "nameEn": "Extra Attack (2)",
+      "nameDe": "Extra Attack (2)",
+      "descriptionEn": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "descriptionDe": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-4",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "indomitable-2-uses",
+      "level": 13,
+      "nameEn": "Indomitable (2 uses)",
+      "nameDe": "Indomitable (2 uses)",
+      "descriptionEn": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "descriptionDe": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-5",
+      "level": 14,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "martial-archetype-improvement-3",
+      "level": 15,
+      "nameEn": "Martial Archetype feature",
+      "nameDe": "Martial Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-6",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "action-surge-2-uses",
+      "level": 17,
+      "nameEn": "Action Surge (2 uses)",
+      "nameDe": "Action Surge (2 uses)",
+      "descriptionEn": "Starting at 2nd level, you can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action.\n\nOnce you use this feature, you must finish a short or long rest before you can use it again. Starting at 17th level, you can use it twice before a rest, but only once on the same turn.",
+      "descriptionDe": "Starting at 2nd level, you can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action.\n\nOnce you use this feature, you must finish a short or long rest before you can use it again. Starting at 17th level, you can use it twice before a rest, but only once on the same turn.",
+      "subclass": null
+    },
+    {
+      "id": "indomitable-3-uses",
+      "level": 17,
+      "nameEn": "Indomitable (3 uses)",
+      "nameDe": "Indomitable (3 uses)",
+      "descriptionEn": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "descriptionDe": "Beginning at 9th level, you can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest. You can use this feature twice between long rests starting at 13th level and three times between long rests starting at 17th level.",
+      "subclass": null
+    },
+    {
+      "id": "martial-archetype-improvement-4",
+      "level": 18,
+      "nameEn": "Martial Archetype feature",
+      "nameDe": "Martial Archetype feature",
+      "descriptionEn": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "descriptionDe": "At 3rd level, you choose an archetype that you strive to emulate in your combat styles and techniques, such as Champion. The archetype you choose grants you features at 3rd level and again at 7th, 10th, 15th, and 18th level.",
+      "subclass": null
+    },
+    {
+      "id": "fighter-ability-score-improvement-7",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 6th, 8th, 12th, 14th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "extra-attack-3",
+      "level": 20,
+      "nameEn": "Extra Attack (3)",
+      "nameDe": "Extra Attack (3)",
+      "descriptionEn": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "descriptionDe": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn. The number of attacks increases to three when you reach 11th level in this class and to four when you reach 20th level in this class.",
+      "subclass": null
+    },
+    {
+      "id": "improved-critical",
+      "level": 3,
+      "nameEn": "Improved Critical",
+      "nameDe": "Improved Critical",
+      "descriptionEn": "Beginning when you choose this archetype at 3rd level, your weapon attacks score a critical hit on a roll of 19 or 20.",
+      "descriptionDe": "Beginning when you choose this archetype at 3rd level, your weapon attacks score a critical hit on a roll of 19 or 20.",
+      "subclass": "champion"
+    },
+    {
+      "id": "remarkable-athlete",
+      "level": 7,
+      "nameEn": "Remarkable Athlete",
+      "nameDe": "Remarkable Athlete",
+      "descriptionEn": "Starting at 7th level, you can add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn't already use your proficiency bonus. In addition, when you make a running long jump, the distance you can cover increases by a number of feet equal to your Strength modifier.",
+      "descriptionDe": "Starting at 7th level, you can add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn't already use your proficiency bonus. In addition, when you make a running long jump, the distance you can cover increases by a number of feet equal to your Strength modifier.",
+      "subclass": "champion"
+    },
+    {
+      "id": "additional-fighting-style",
+      "level": 10,
+      "nameEn": "Additional Fighting Style",
+      "nameDe": "Additional Fighting Style",
+      "descriptionEn": "At 10th level, you can choose a second option from the Fighting Style class feature.",
+      "descriptionDe": "At 10th level, you can choose a second option from the Fighting Style class feature.",
+      "subclass": "champion"
+    },
+    {
+      "id": "superior-critical",
+      "level": 15,
+      "nameEn": "Superior Critical",
+      "nameDe": "Superior Critical",
+      "descriptionEn": "Starting at 15th level, your weapon attacks score a critical hit on a roll of 18-20.",
+      "descriptionDe": "Starting at 15th level, your weapon attacks score a critical hit on a roll of 18-20.",
+      "subclass": "champion"
+    },
+    {
+      "id": "survivor",
+      "level": 18,
+      "nameEn": "Survivor",
+      "nameDe": "Survivor",
+      "descriptionEn": "At 18th level, you attain the pinnacle of resilience in battle. At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half of your hit points left. You don't gain this benefit if you have 0 hit points.",
+      "descriptionDe": "At 18th level, you attain the pinnacle of resilience in battle. At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half of your hit points left. You don't gain this benefit if you have 0 hit points.",
+      "subclass": "champion"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "champion",
+      "nameEn": "Champion",
+      "nameDe": "Champion",
+      "features": [
+        {
+          "id": "improved-critical",
+          "level": 3,
+          "nameEn": "Improved Critical",
+          "nameDe": "Improved Critical",
+          "descriptionEn": "Beginning when you choose this archetype at 3rd level, your weapon attacks score a critical hit on a roll of 19 or 20.",
+          "descriptionDe": "Beginning when you choose this archetype at 3rd level, your weapon attacks score a critical hit on a roll of 19 or 20.",
+          "subclass": "champion"
+        },
+        {
+          "id": "remarkable-athlete",
+          "level": 7,
+          "nameEn": "Remarkable Athlete",
+          "nameDe": "Remarkable Athlete",
+          "descriptionEn": "Starting at 7th level, you can add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn't already use your proficiency bonus. In addition, when you make a running long jump, the distance you can cover increases by a number of feet equal to your Strength modifier.",
+          "descriptionDe": "Starting at 7th level, you can add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn't already use your proficiency bonus. In addition, when you make a running long jump, the distance you can cover increases by a number of feet equal to your Strength modifier.",
+          "subclass": "champion"
+        },
+        {
+          "id": "additional-fighting-style",
+          "level": 10,
+          "nameEn": "Additional Fighting Style",
+          "nameDe": "Additional Fighting Style",
+          "descriptionEn": "At 10th level, you can choose a second option from the Fighting Style class feature.",
+          "descriptionDe": "At 10th level, you can choose a second option from the Fighting Style class feature.",
+          "subclass": "champion"
+        },
+        {
+          "id": "superior-critical",
+          "level": 15,
+          "nameEn": "Superior Critical",
+          "nameDe": "Superior Critical",
+          "descriptionEn": "Starting at 15th level, your weapon attacks score a critical hit on a roll of 18-20.",
+          "descriptionDe": "Starting at 15th level, your weapon attacks score a critical hit on a roll of 18-20.",
+          "subclass": "champion"
+        },
+        {
+          "id": "survivor",
+          "level": 18,
+          "nameEn": "Survivor",
+          "nameDe": "Survivor",
+          "descriptionEn": "At 18th level, you attain the pinnacle of resilience in battle. At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half of your hit points left. You don't gain this benefit if you have 0 hit points.",
+          "descriptionDe": "At 18th level, you attain the pinnacle of resilience in battle. At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half of your hit points left. You don't gain this benefit if you have 0 hit points.",
+          "subclass": "champion"
+        }
+      ]
+    }
+  ]
+}

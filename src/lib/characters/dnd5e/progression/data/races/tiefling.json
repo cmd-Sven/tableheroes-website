@@ -1,0 +1,34 @@
+{
+  "id": "tiefling",
+  "nameEn": "Tiefling",
+  "nameDe": "Tiefling",
+  "features": [
+    {
+      "id": "darkvision",
+      "level": 1,
+      "nameEn": "Darkvision",
+      "nameDe": "Darkvision",
+      "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "subclass": null
+    },
+    {
+      "id": "hellish-resistance",
+      "level": 1,
+      "nameEn": "Hellish Resistance",
+      "nameDe": "Hellish Resistance",
+      "descriptionEn": "You have resistance to fire damage.",
+      "descriptionDe": "You have resistance to fire damage.",
+      "subclass": null
+    },
+    {
+      "id": "infernal-legacy",
+      "level": 1,
+      "nameEn": "Infernal Legacy",
+      "nameDe": "Infernal Legacy",
+      "descriptionEn": "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
+      "descriptionDe": "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
+      "subclass": null
+    }
+  ]
+}

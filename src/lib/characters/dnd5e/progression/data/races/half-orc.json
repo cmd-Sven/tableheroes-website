@@ -1,0 +1,43 @@
+{
+  "id": "half-orc",
+  "nameEn": "Half-Orc",
+  "nameDe": "Halbork",
+  "features": [
+    {
+      "id": "darkvision",
+      "level": 1,
+      "nameEn": "Darkvision",
+      "nameDe": "Darkvision",
+      "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "subclass": null
+    },
+    {
+      "id": "savage-attacks",
+      "level": 1,
+      "nameEn": "Savage Attacks",
+      "nameDe": "Savage Attacks",
+      "descriptionEn": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
+      "descriptionDe": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
+      "subclass": null
+    },
+    {
+      "id": "relentless-endurance",
+      "level": 1,
+      "nameEn": "Relentless Endurance",
+      "nameDe": "Relentless Endurance",
+      "descriptionEn": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
+      "descriptionDe": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "menacing",
+      "level": 1,
+      "nameEn": "Menacing",
+      "nameDe": "Menacing",
+      "descriptionEn": "You gain proficiency in the Intimidation skill.",
+      "descriptionDe": "You gain proficiency in the Intimidation skill.",
+      "subclass": null
+    }
+  ]
+}

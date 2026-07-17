@@ -104,7 +104,7 @@ export function validateItemForSlot(
   }
 
   if (nameHintsCloak(n)) {
-    if (slot === "shoulders" || slot === "back") return { valid: true };
+    if (slot === "shoulders") return { valid: true };
   }
 
   if (nameHintsAmulet(n)) {

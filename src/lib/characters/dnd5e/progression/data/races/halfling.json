@@ -1,0 +1,34 @@
+{
+  "id": "halfling",
+  "nameEn": "Halfling",
+  "nameDe": "Halbling",
+  "features": [
+    {
+      "id": "brave",
+      "level": 1,
+      "nameEn": "Brave",
+      "nameDe": "Brave",
+      "descriptionEn": "You have advantage on saving throw against being frightened.",
+      "descriptionDe": "You have advantage on saving throw against being frightened.",
+      "subclass": null
+    },
+    {
+      "id": "halfling-nimbleness",
+      "level": 1,
+      "nameEn": "Halfling Nimbleness",
+      "nameDe": "Halfling Nimbleness",
+      "descriptionEn": "You can move through the space of any creature that is of a size larger than yours.",
+      "descriptionDe": "You can move through the space of any creature that is of a size larger than yours.",
+      "subclass": null
+    },
+    {
+      "id": "lucky",
+      "level": 1,
+      "nameEn": "Lucky",
+      "nameDe": "Lucky",
+      "descriptionEn": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
+      "descriptionDe": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
+      "subclass": null
+    }
+  ]
+}

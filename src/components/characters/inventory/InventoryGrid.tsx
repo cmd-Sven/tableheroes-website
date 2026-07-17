@@ -76,6 +76,9 @@ type Props = {
   onUpdateContainer: (container: Dnd5eEquipmentContainer) => void;
   onAddCustomCategory: (label: string) => void;
   variant?: "sheet" | "session";
+  /** Kontrollierter aktiver Behälter (für Ablegen aus Ausrüstungsslots) */
+  activeContainerId?: string | null;
+  onActiveContainerIdChange?: (id: string | null) => void;
 };
 
 type ItemModal =
@@ -104,12 +107,21 @@ export function InventoryGrid({
   onUpdateContainer,
   onAddCustomCategory,
   variant = "sheet",
+  activeContainerId: controlledActiveId,
+  onActiveContainerIdChange,
 }: Props) {
   const { t } = useCharacterSheetLocale();
   const isSession = variant === "session";
-  const [activeContainerId, setActiveContainerId] = useState<string | null>(
+  const [internalActiveId, setInternalActiveId] = useState<string | null>(
     equipment.containers[0]?.id ?? null,
   );
+  const activeContainerId =
+    controlledActiveId !== undefined ? controlledActiveId : internalActiveId;
+
+  function setActiveContainerId(id: string | null) {
+    if (onActiveContainerIdChange) onActiveContainerIdChange(id);
+    else setInternalActiveId(id);
+  }
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [contextMenu, setContextMenu] = useState<{

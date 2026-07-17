@@ -1,0 +1,466 @@
+{
+  "id": "warlock",
+  "nameEn": "Warlock",
+  "nameDe": "Hexer",
+  "hitDie": 8,
+  "caster": "pact",
+  "subclassLevel": 1,
+  "asiLevels": [
+    4,
+    8,
+    12,
+    16,
+    19
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "featureIds": [
+        "otherworldly-patron",
+        "pact-magic"
+      ],
+      "spellSlots": {
+        "1": 1
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 2
+    },
+    {
+      "level": 2,
+      "featureIds": [
+        "eldritch-invocations"
+      ],
+      "spellSlots": {
+        "1": 2
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 3
+    },
+    {
+      "level": 3,
+      "featureIds": [
+        "pact-boon"
+      ],
+      "spellSlots": {
+        "2": 2
+      },
+      "cantripsKnown": 2,
+      "spellsKnown": 4
+    },
+    {
+      "level": 4,
+      "featureIds": [
+        "warlock-ability-score-improvement-1"
+      ],
+      "spellSlots": {
+        "2": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 5
+    },
+    {
+      "level": 5,
+      "featureIds": [],
+      "spellSlots": {
+        "3": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 6
+    },
+    {
+      "level": 6,
+      "featureIds": [
+        "otherworldly-patron-improvement-1"
+      ],
+      "spellSlots": {
+        "3": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 7
+    },
+    {
+      "level": 7,
+      "featureIds": [],
+      "spellSlots": {
+        "4": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 8
+    },
+    {
+      "level": 8,
+      "featureIds": [
+        "warlock-ability-score-improvement-2"
+      ],
+      "spellSlots": {
+        "4": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 9
+    },
+    {
+      "level": 9,
+      "featureIds": [],
+      "spellSlots": {
+        "5": 2
+      },
+      "cantripsKnown": 3,
+      "spellsKnown": 10
+    },
+    {
+      "level": 10,
+      "featureIds": [
+        "otherworldly-patron-improvement-2"
+      ],
+      "spellSlots": {
+        "5": 2
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 10
+    },
+    {
+      "level": 11,
+      "featureIds": [
+        "mystic-arcanum-6th-level"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 11
+    },
+    {
+      "level": 12,
+      "featureIds": [
+        "warlock-ability-score-improvement-3"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 11
+    },
+    {
+      "level": 13,
+      "featureIds": [
+        "mystic-arcanum-7th-level"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 12
+    },
+    {
+      "level": 14,
+      "featureIds": [
+        "otherworldly-patron-improvement-3"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 12
+    },
+    {
+      "level": 15,
+      "featureIds": [
+        "mystic-arcanum-8th-level"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 13
+    },
+    {
+      "level": 16,
+      "featureIds": [
+        "warlock-ability-score-improvement-4"
+      ],
+      "spellSlots": {
+        "5": 3
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 13
+    },
+    {
+      "level": 17,
+      "featureIds": [
+        "mystic-arcanum-9th-level"
+      ],
+      "spellSlots": {
+        "5": 4
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 14
+    },
+    {
+      "level": 18,
+      "featureIds": [],
+      "spellSlots": {
+        "5": 4
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 14
+    },
+    {
+      "level": 19,
+      "featureIds": [
+        "warlock-ability-score-improvement-5"
+      ],
+      "spellSlots": {
+        "5": 4
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 15
+    },
+    {
+      "level": 20,
+      "featureIds": [
+        "eldritch-master"
+      ],
+      "spellSlots": {
+        "5": 4
+      },
+      "cantripsKnown": 4,
+      "spellsKnown": 15
+    }
+  ],
+  "features": [
+    {
+      "id": "otherworldly-patron",
+      "level": 1,
+      "nameEn": "Otherworldly Patron",
+      "nameDe": "Otherworldly Patron",
+      "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "pact-magic",
+      "level": 1,
+      "nameEn": "Pact Magic",
+      "nameDe": "Pact Magic",
+      "descriptionEn": "Your arcane research and the magic bestowed on you by your patron have given you facility with spells.",
+      "descriptionDe": "Your arcane research and the magic bestowed on you by your patron have given you facility with spells.",
+      "subclass": null
+    },
+    {
+      "id": "eldritch-invocations",
+      "level": 2,
+      "nameEn": "Eldritch Invocations",
+      "nameDe": "Eldritch Invocations",
+      "descriptionEn": "In your study of occult lore, you have unearthed eldritch invocations, fragments of forbidden knowledge that imbue you with an abiding magical ability.\n\nAt 2nd level, you gain two eldritch invocations of your choice. Your invocation options are detailed at the end of the class description. When you gain certain warlock levels, you gain additional invocations of your choice, as shown in the Invocations Known column of the Warlock table.\n\nAdditionally, when you gain a level in this class, you can choose one of the invocations you know and replace it with another invocation that you could learn at that level.",
+      "descriptionDe": "In your study of occult lore, you have unearthed eldritch invocations, fragments of forbidden knowledge that imbue you with an abiding magical ability.\n\nAt 2nd level, you gain two eldritch invocations of your choice. Your invocation options are detailed at the end of the class description. When you gain certain warlock levels, you gain additional invocations of your choice, as shown in the Invocations Known column of the Warlock table.\n\nAdditionally, when you gain a level in this class, you can choose one of the invocations you know and replace it with another invocation that you could learn at that level.",
+      "subclass": null
+    },
+    {
+      "id": "pact-boon",
+      "level": 3,
+      "nameEn": "Pact Boon",
+      "nameDe": "Pact Boon",
+      "descriptionEn": "At 3rd level, your otherworldly patron bestows a gift upon you for your loyal service. You gain one of the following features of your choice.",
+      "descriptionDe": "At 3rd level, your otherworldly patron bestows a gift upon you for your loyal service. You gain one of the following features of your choice.",
+      "subclass": null
+    },
+    {
+      "id": "warlock-ability-score-improvement-1",
+      "level": 4,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "otherworldly-patron-improvement-1",
+      "level": 6,
+      "nameEn": "Otherworldly Patron feature",
+      "nameDe": "Otherworldly Patron feature",
+      "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "warlock-ability-score-improvement-2",
+      "level": 8,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "otherworldly-patron-improvement-2",
+      "level": 10,
+      "nameEn": "Otherworldly Patron feature",
+      "nameDe": "Otherworldly Patron feature",
+      "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "mystic-arcanum-6th-level",
+      "level": 11,
+      "nameEn": "Mystic Arcanum (6th level)",
+      "nameDe": "Mystic Arcanum (6th level)",
+      "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "warlock-ability-score-improvement-3",
+      "level": 12,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "mystic-arcanum-7th-level",
+      "level": 13,
+      "nameEn": "Mystic Arcanum (7th level)",
+      "nameDe": "Mystic Arcanum (7th level)",
+      "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "otherworldly-patron-improvement-3",
+      "level": 14,
+      "nameEn": "Otherworldly Patron feature",
+      "nameDe": "Otherworldly Patron feature",
+      "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "subclass": null
+    },
+    {
+      "id": "mystic-arcanum-8th-level",
+      "level": 15,
+      "nameEn": "Mystic Arcanum (8th level)",
+      "nameDe": "Mystic Arcanum (8th level)",
+      "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "warlock-ability-score-improvement-4",
+      "level": 16,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "mystic-arcanum-9th-level",
+      "level": 17,
+      "nameEn": "Mystic Arcanum (9th level)",
+      "nameDe": "Mystic Arcanum (9th level)",
+      "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "subclass": null
+    },
+    {
+      "id": "warlock-ability-score-improvement-5",
+      "level": 19,
+      "nameEn": "Ability Score Improvement",
+      "nameDe": "Ability Score Improvement",
+      "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "subclass": null
+    },
+    {
+      "id": "eldritch-master",
+      "level": 20,
+      "nameEn": "Eldritch Master",
+      "nameDe": "Eldritch Master",
+      "descriptionEn": "At 20th level, you can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature.\n\nOnce you regain spell slots with this feature, you must finish a long rest before you can do so again.",
+      "descriptionDe": "At 20th level, you can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature.\n\nOnce you regain spell slots with this feature, you must finish a long rest before you can do so again.",
+      "subclass": null
+    },
+    {
+      "id": "dark-ones-blessing",
+      "level": 1,
+      "nameEn": "Dark One's Blessing",
+      "nameDe": "Dark One's Blessing",
+      "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+      "descriptionDe": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+      "subclass": "fiend"
+    },
+    {
+      "id": "dark-ones-own-luck",
+      "level": 6,
+      "nameEn": "Dark One's Own Luck",
+      "nameDe": "Dark One's Own Luck",
+      "descriptionEn": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+      "descriptionDe": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+      "subclass": "fiend"
+    },
+    {
+      "id": "fiendish-resilience",
+      "level": 10,
+      "nameEn": "Fiendish Resilience",
+      "nameDe": "Fiendish Resilience",
+      "descriptionEn": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+      "descriptionDe": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+      "subclass": "fiend"
+    },
+    {
+      "id": "hurl-through-hell",
+      "level": 14,
+      "nameEn": "Hurl Through Hell",
+      "nameDe": "Hurl Through Hell",
+      "descriptionEn": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+      "descriptionDe": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+      "subclass": "fiend"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "fiend",
+      "nameEn": "Fiend",
+      "nameDe": "Fiend",
+      "features": [
+        {
+          "id": "dark-ones-blessing",
+          "level": 1,
+          "nameEn": "Dark One's Blessing",
+          "nameDe": "Dark One's Blessing",
+          "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+          "descriptionDe": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+          "subclass": "fiend"
+        },
+        {
+          "id": "dark-ones-own-luck",
+          "level": 6,
+          "nameEn": "Dark One's Own Luck",
+          "nameDe": "Dark One's Own Luck",
+          "descriptionEn": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+          "descriptionDe": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+          "subclass": "fiend"
+        },
+        {
+          "id": "fiendish-resilience",
+          "level": 10,
+          "nameEn": "Fiendish Resilience",
+          "nameDe": "Fiendish Resilience",
+          "descriptionEn": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+          "descriptionDe": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+          "subclass": "fiend"
+        },
+        {
+          "id": "hurl-through-hell",
+          "level": 14,
+          "nameEn": "Hurl Through Hell",
+          "nameDe": "Hurl Through Hell",
+          "descriptionEn": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+          "descriptionDe": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+          "subclass": "fiend"
+        }
+      ]
+    }
+  ]
+}

@@ -157,24 +157,31 @@ export function resolveCharacterItemStats(item: CharacterItem): ResolvedItemStat
   const meta = parseDnd5eMetaFromDescription(item.description);
   if (meta) {
     const fromMeta: ResolvedItemStats = { ...base, ...metaToResolvedStats(meta) };
-    const needsWeaponDamage =
-      !fromMeta.damage &&
-      (fromMeta.kind === "weapon" || item.category === "Weapon");
-    if (needsWeaponDamage) {
-      const weaponLookup = lookupWeaponStatsByName(item.name);
-      if (weaponLookup) {
-        return {
-          ...fromMeta,
-          ...weaponLookup,
-          kind: "weapon",
-          properties:
-            fromMeta.properties.length > 0
-              ? fromMeta.properties
-              : (weaponLookup.properties ?? []),
-          magicalBonus: fromMeta.magicalBonus,
-          weightLb: fromMeta.weightLb > 0 ? fromMeta.weightLb : (weaponLookup.weightLb ?? 0),
-        };
-      }
+    const weaponLookup = lookupWeaponStatsByName(item.name);
+    // Katalog/Name überschreibt Foundry-Kampfwerte (magische Boni bleiben)
+    if (
+      weaponLookup?.damage &&
+      (fromMeta.kind === "weapon" ||
+        item.category === "Weapon" ||
+        fromMeta.kind === "unknown" ||
+        fromMeta.kind === "equipment")
+    ) {
+      return {
+        ...fromMeta,
+        kind: "weapon",
+        damage: weaponLookup.damage ?? fromMeta.damage,
+        damageType: weaponLookup.damageType ?? fromMeta.damageType,
+        properties:
+          weaponLookup.properties && weaponLookup.properties.length > 0
+            ? weaponLookup.properties
+            : fromMeta.properties,
+        rangeMeters: weaponLookup.rangeMeters ?? fromMeta.rangeMeters,
+        magicalBonus: fromMeta.magicalBonus,
+        weightLb:
+          fromMeta.weightLb > 0
+            ? fromMeta.weightLb
+            : (weaponLookup.weightLb ?? 0),
+      };
     }
     return fromMeta;
   }
