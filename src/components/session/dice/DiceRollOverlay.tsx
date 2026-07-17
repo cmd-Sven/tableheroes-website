@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dices } from "lucide-react";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
 import {
   DICE_ANIMATION_DURATION_MS,
@@ -12,6 +13,15 @@ import {
   shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
 import { supports3dDice } from "@/src/lib/session/dice-roll";
+import {
+  cancelDiceDropPlacement,
+  confirmDiceDropPlacement,
+  useDicePlacementPending,
+} from "@/src/lib/session/dice-placement-store";
+import {
+  clientToDropNorm,
+  dropNormToTablePoint,
+} from "@/src/lib/session/dice-screen-project";
 
 const DiceCanvas = dynamic(() => import("./DiceRollCanvas"), {
   ssr: false,
@@ -29,6 +39,10 @@ type ActiveRoll = {
   startAt: number;
   use3d: boolean;
   resultLabel: string;
+  dropNx: number;
+  dropNy: number;
+  aimX: number;
+  aimZ: number;
 };
 
 type Props = {
@@ -47,9 +61,21 @@ function detectWebGL(): boolean {
   }
 }
 
+function readDropNorm(meta: Record<string, unknown>): { dropNx: number; dropNy: number } {
+  const dropNx =
+    typeof meta.dropNx === "number" && Number.isFinite(meta.dropNx)
+      ? Math.min(1, Math.max(0, meta.dropNx))
+      : 0.5;
+  const dropNy =
+    typeof meta.dropNy === "number" && Number.isFinite(meta.dropNy)
+      ? Math.min(1, Math.max(0, meta.dropNy))
+      : 0.42;
+  return { dropNx, dropNy };
+}
+
 /**
- * Overlay-Layer über dem Live-Tisch: 3D-Würfel (oder 2D-Fallback).
- * Blockiert den Tisch nicht dauerhaft (pointer-events-none).
+ * Overlay-Layer über dem Live-Tisch: Placement-Cursor + 3D-Würfel (oder 2D-Fallback).
+ * Kein Abdunkeln; Placement blockiert kurz, Animation ist pointer-events-none.
  */
 export function DiceRollOverlay({ logs }: Props) {
   const seenRef = useRef<Set<string>>(new Set());
@@ -58,6 +84,8 @@ export function DiceRollOverlay({ logs }: Props) {
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
   const [webgl, setWebgl] = useState(true);
   const [showResult, setShowResult] = useState(false);
+  const [cursor, setCursor] = useState({ x: 0, y: 0 });
+  const placement = useDicePlacementPending();
   const active = queue[0] ?? null;
   activeRef.current = active;
 
@@ -70,9 +98,44 @@ export function DiceRollOverlay({ logs }: Props) {
   }, [active?.sourceId]);
 
   useEffect(() => {
+    if (!placement) return;
+    const onMove = (e: PointerEvent) => {
+      setCursor({ x: e.clientX, y: e.clientY });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelDiceDropPlacement();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("keydown", onKey);
+    setCursor({
+      x: window.innerWidth * 0.5,
+      y: window.innerHeight * 0.42,
+    });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [placement]);
+
+  const handlePlacementPointer = useCallback(
+    (e: React.PointerEvent) => {
+      if (!placement) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const { dropNx, dropNy } = clientToDropNorm(e.clientX, e.clientY);
+      confirmDiceDropPlacement({ dropNx, dropNy });
+    },
+    [placement],
+  );
+
+  useEffect(() => {
     const now = Date.now();
     const fresh: ActiveRoll[] = [];
     const staleCompleteIds: string[] = [];
+    const aspect =
+      typeof window !== "undefined"
+        ? window.innerWidth / Math.max(1, window.innerHeight)
+        : 16 / 9;
     for (const entry of logs) {
       if (!entry?.id || seenRef.current.has(entry.id)) continue;
       if (!shouldAnimateDiceEntry(entry, now)) {
@@ -87,6 +150,8 @@ export function DiceRollOverlay({ logs }: Props) {
       const sides = Math.round(Number(meta.sides) || 20);
       if (faces.length === 0) continue;
       seenRef.current.add(entry.id);
+      const { dropNx, dropNy } = readDropNorm(meta as Record<string, unknown>);
+      const { x: aimX, z: aimZ } = dropNormToTablePoint(dropNx, dropNy, aspect);
       fresh.push({
         sourceId: entry.id,
         sides,
@@ -95,6 +160,10 @@ export function DiceRollOverlay({ logs }: Props) {
         startAt: performance.now(),
         use3d: webgl && supports3dDice(sides),
         resultLabel: formatDiceResultLabel(meta),
+        dropNx,
+        dropNy,
+        aimX,
+        aimZ,
       });
     }
     if (fresh.length > 0) {
@@ -144,63 +213,99 @@ export function DiceRollOverlay({ logs }: Props) {
     return `${active.faces.length}×W${active.sides}`;
   }, [active, showResult]);
 
+  const fallbackStyle = useMemo(() => {
+    if (!active) return undefined;
+    return {
+      left: `${active.dropNx * 100}%`,
+      top: `${active.dropNy * 100}%`,
+      transform: "translate(-50%, -50%)",
+    } as const;
+  }, [active]);
+
   return (
-    <AnimatePresence>
-      {active ? (
-        <motion.div
-          key={active.sourceId}
-          className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+    <>
+      {placement ? (
+        <div
+          className="fixed inset-0 z-[70] cursor-none"
+          style={{ background: "transparent" }}
+          onPointerDown={handlePlacementPointer}
+          role="presentation"
         >
-          <div className="absolute inset-0 bg-background-dark/35" />
-          {active.use3d ? (
-            <div className="relative h-[min(56vh,460px)] w-[min(94vw,600px)]">
-              <DiceCanvas
-                sides={active.sides}
-                faces={active.faces}
-                seed={active.seed}
-                startAt={active.startAt}
-                onSettled={handleSettled}
-                resultLabel={active.resultLabel}
-                showResult={showResult}
-              />
+          <div
+            className="pointer-events-none fixed z-[71] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+            style={{ left: cursor.x, top: cursor.y }}
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-hero-border bg-background-card/90 text-accent-gold shadow-lg">
+              <Dices className="h-7 w-7" strokeWidth={2.25} />
             </div>
-          ) : (
-            <motion.div
-              className="relative flex flex-col items-center gap-3 rounded-md border border-hero-border bg-background-card/95 px-8 py-6 shadow-2xl"
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: -8 }}
-              transition={{ duration: 0.35 }}
-              onAnimationComplete={() => {
-                window.setTimeout(handleSettled, DICE_ANIMATION_DURATION_MS);
-              }}
-            >
-              <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
-                {showResult ? "Ergebnis" : "Würfel rollen…"}
-              </p>
+            <span className="font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold drop-shadow">
+              {placement.count > 1
+                ? `${placement.count}×W${placement.sides} · Klick zum Ablegen`
+                : `W${placement.sides} · Klick zum Ablegen`}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <AnimatePresence>
+        {active ? (
+          <motion.div
+            key={active.sourceId}
+            className="pointer-events-none fixed inset-0 z-[60]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {active.use3d ? (
+              <div className="absolute inset-0">
+                <DiceCanvas
+                  sides={active.sides}
+                  faces={active.faces}
+                  seed={active.seed}
+                  startAt={active.startAt}
+                  aimX={active.aimX}
+                  aimZ={active.aimZ}
+                  onSettled={handleSettled}
+                  resultLabel={active.resultLabel}
+                  showResult={showResult}
+                />
+              </div>
+            ) : (
               <motion.div
-                className="font-barlow text-5xl font-extrabold text-hero-vibrant"
-                initial={{ rotate: -12, scale: 0.8 }}
-                animate={
-                  showResult
-                    ? { rotate: 0, scale: 1 }
-                    : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
-                }
-                transition={{
-                  duration: showResult ? 0.25 : DICE_ANIMATION_DURATION_MS / 1000,
-                  ease: "easeOut",
+                className="absolute flex flex-col items-center gap-3 rounded-md border border-hero-border bg-background-card/95 px-8 py-6 shadow-2xl"
+                style={fallbackStyle}
+                initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: -8 }}
+                transition={{ duration: 0.35 }}
+                onAnimationComplete={() => {
+                  window.setTimeout(handleSettled, DICE_ANIMATION_DURATION_MS);
                 }}
               >
-                {fallbackLabel}
+                <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
+                  {showResult ? "Ergebnis" : "Würfel rollen…"}
+                </p>
+                <motion.div
+                  className="font-barlow text-5xl font-extrabold text-hero-vibrant"
+                  initial={{ rotate: -12, scale: 0.8 }}
+                  animate={
+                    showResult
+                      ? { rotate: 0, scale: 1 }
+                      : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
+                  }
+                  transition={{
+                    duration: showResult ? 0.25 : DICE_ANIMATION_DURATION_MS / 1000,
+                    ease: "easeOut",
+                  }}
+                >
+                  {fallbackLabel}
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+            )}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }

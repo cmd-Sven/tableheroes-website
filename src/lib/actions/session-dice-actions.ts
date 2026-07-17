@@ -37,6 +37,9 @@ export type RequestLiveDiceRollInput = {
   skillKey?: string;
   /** Attribut-Key für Rettungswurf — Server liest Bonus aus dem Bogen. */
   saveAbility?: string;
+  /** Initiator-Drop-Punkt (Viewport 0…1) für Sync der 3D-Animation. */
+  dropNx?: number;
+  dropNy?: number;
 };
 
 function buildActivityText(
@@ -138,6 +141,15 @@ export async function requestLiveDiceRoll(
     critical: input.critical,
   });
 
+  const dropNx =
+    typeof input.dropNx === "number" && Number.isFinite(input.dropNx)
+      ? Math.min(1, Math.max(0, input.dropNx))
+      : undefined;
+  const dropNy =
+    typeof input.dropNy === "number" && Number.isFinite(input.dropNy)
+      ? Math.min(1, Math.max(0, input.dropNy))
+      : undefined;
+
   const meta: Record<string, unknown> = {
     ...outcome,
     animate: true,
@@ -149,6 +161,8 @@ export async function requestLiveDiceRoll(
     total: outcome.total,
     display: outcome.display,
   };
+  if (dropNx !== undefined) meta.dropNx = dropNx;
+  if (dropNy !== undefined) meta.dropNy = dropNy;
 
   if (input.kind === "attack") {
     meta.pending = true;

@@ -26,6 +26,9 @@ export type DiceRollAnimMeta = {
   isFumble?: boolean;
   label?: string;
   weaponName?: string;
+  /** Initiator-Drop: Viewport-Norm 0…1 (Sync für alle Clients). */
+  dropNx?: number;
+  dropNy?: number;
 };
 
 export function dispatchDiceAnimComplete(sourceId: string): void {

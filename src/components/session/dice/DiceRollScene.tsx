@@ -18,6 +18,8 @@ type DieMeshProps = {
   index: number;
   count: number;
   startAt: number;
+  aimX: number;
+  aimZ: number;
   durationMs?: number;
   onSettled?: () => void;
   showFaceLabel: boolean;
@@ -40,6 +42,8 @@ export function AnimatedDie({
   index,
   count,
   startAt,
+  aimX,
+  aimZ,
   durationMs = DICE_PHYSICS_DURATION_MS,
   onSettled,
   showFaceLabel,
@@ -52,8 +56,8 @@ export function AnimatedDie({
   const color = dieColor(sides);
 
   const frames = useMemo(
-    () => buildDieTrajectory({ sides, face, seed, index, count }),
-    [sides, face, seed, index, count],
+    () => buildDieTrajectory({ sides, face, seed, index, count, aimX, aimZ }),
+    [sides, face, seed, index, count, aimX, aimZ],
   );
 
   useFrame(() => {
@@ -73,7 +77,7 @@ export function AnimatedDie({
   });
 
   return (
-    <group ref={group} position={[0, 1.5, 0]}>
+    <group ref={group} position={[aimX, 2.2, aimZ]}>
       <mesh castShadow receiveShadow>
         <DieGeometry sides={sides} />
         <meshStandardMaterial
@@ -100,6 +104,8 @@ type DiceSceneProps = {
   faces: number[];
   seed: string;
   startAt: number;
+  aimX: number;
+  aimZ: number;
   onAllSettled: () => void;
   /** Nach Landung: Total-Zeile (z. B. „17 + 3 = 20“). */
   resultLabel?: string | null;
@@ -111,6 +117,8 @@ export function DiceRollScene({
   faces,
   seed,
   startAt,
+  aimX,
+  aimZ,
   onAllSettled,
   resultLabel,
   showResult = false,
@@ -128,10 +136,10 @@ export function DiceRollScene({
 
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[4, 9, 3]} intensity={1.2} castShadow />
-      <pointLight position={[-3, 4, -2]} intensity={0.45} color="#cab926" />
-      <Html position={[0, 2.35, 0]} center style={{ pointerEvents: "none" }}>
+      <ambientLight intensity={0.75} />
+      <directionalLight position={[4, 9, 3]} intensity={1.25} castShadow />
+      <pointLight position={[-3, 4, -2]} intensity={0.4} color="#cab926" />
+      <Html position={[aimX, 2.5, aimZ]} center style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1">
           <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold drop-shadow">
             {faces.length > 1 ? `${faces.length}×W${sides}` : `W${sides}`}
@@ -152,24 +160,16 @@ export function DiceRollScene({
           index={i}
           count={faces.length}
           startAt={startAt}
+          aimX={aimX}
+          aimZ={aimZ}
           onSettled={handleSettled}
           showFaceLabel={showResult}
         />
       ))}
-      {/* Tischfläche */}
+      {/* Unsichtbare Empfangsfläche — Tisch bleibt sichtbar darunter */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[7.2, 5.2]} />
-        <meshStandardMaterial
-          color="#0f2416"
-          metalness={0.08}
-          roughness={0.92}
-          transparent
-          opacity={0.88}
-        />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <ringGeometry args={[2.4, 3.05, 64]} />
-        <meshStandardMaterial color="#217d42" transparent opacity={0.35} roughness={0.8} />
+        <planeGeometry args={[9, 7]} />
+        <shadowMaterial opacity={0.18} />
       </mesh>
     </>
   );

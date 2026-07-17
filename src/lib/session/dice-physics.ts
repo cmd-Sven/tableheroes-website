@@ -35,7 +35,7 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 
 /**
  * Baut eine deterministische Bounce-/Roll-Trajektorie (Tisch-Kollision).
- * Letzte Phase slerpt fest auf die Server-Face (Augenzahl oben).
+ * Spawn nahe aimX/aimZ (Cursor-Drop), Fall mit Schwung; Ende = Server-Face.
  */
 export function buildDieTrajectory(opts: {
   sides: number;
@@ -43,8 +43,13 @@ export function buildDieTrajectory(opts: {
   seed: string;
   index: number;
   count: number;
+  /** Welt-Ziel auf Tisch-Ebene (Cursor-Projektion). */
+  aimX?: number;
+  aimZ?: number;
 }): DieKeyframe[] {
   const { sides, face, seed, index, count } = opts;
+  const aimX = Number.isFinite(opts.aimX) ? (opts.aimX as number) : 0;
+  const aimZ = Number.isFinite(opts.aimZ) ? (opts.aimZ as number) : 0;
   const rng = createSeededRng(`${seed}:traj:${index}`);
   const r = () => rng();
 
@@ -52,7 +57,7 @@ export function buildDieTrajectory(opts: {
   const half = 0.55 * scale;
   const targetQ = quaternionForFaceUp(sides, face);
 
-  const spread = Math.max(1.05, Math.min(2.15, 4.0 / Math.max(1, count)));
+  const spread = Math.max(0.55, Math.min(1.35, 2.6 / Math.max(1, count)));
   const baseX = (index - (count - 1) / 2) * spread;
 
   const u1 = r();
@@ -62,12 +67,15 @@ export function buildDieTrajectory(opts: {
   const u5 = r();
   const u6 = r();
 
-  let x = baseX + (u1 - 0.5) * 0.5;
-  let y = 2.45 + u2 * 0.9;
-  let z = (u3 - 0.5) * 0.85;
-  let vx = (u1 - 0.5) * 3.4 + (baseX >= 0 ? -0.55 : 0.55);
-  let vy = 1.4 + u2 * 2.6;
-  let vz = (u3 - 0.5) * 3.0;
+  // Vom Cursor-Punkt fallen: leicht oberhalb + kleiner Offset, mit Abwärts-Schwung
+  let x = aimX + baseX * 0.4 + (u1 - 0.5) * 0.35;
+  let y = 3.35 + u2 * 0.75;
+  let z = aimZ + (u3 - 0.5) * 0.35;
+  const restX = aimX + baseX + (u1 - 0.5) * 0.14;
+  const restZ = aimZ + (u3 - 0.5) * 0.16;
+  let vx = (restX - x) * 1.55 + (u1 - 0.5) * 2.4;
+  let vy = -3.2 - u2 * 4.2;
+  let vz = (restZ - z) * 1.55 + (u3 - 0.5) * 2.2;
 
   const spinAxis = new THREE.Vector3(u4 * 2 - 1, 0.4 + u5, u6 * 2 - 1).normalize();
   let spinSpeed = 15 + u4 * 11 + index * 0.75;
@@ -113,7 +121,7 @@ export function buildDieTrajectory(opts: {
         }
       }
 
-      const bound = 2.55;
+      const bound = 3.35;
       if (Math.abs(x) > bound) {
         x = Math.sign(x) * bound;
         vx *= -0.4;
@@ -131,8 +139,6 @@ export function buildDieTrajectory(opts: {
     blended.copy(tumbleQ).slerp(targetQ, settleEase);
 
     const restY = TABLE_Y + half;
-    const restX = baseX + (u1 - 0.5) * 0.12;
-    const restZ = (u3 - 0.5) * 0.18;
     const px = THREE.MathUtils.lerp(x, restX, settleEase);
     const py = THREE.MathUtils.lerp(Math.max(y, restY), restY, settleEase);
     const pz = THREE.MathUtils.lerp(z, restZ, settleEase);

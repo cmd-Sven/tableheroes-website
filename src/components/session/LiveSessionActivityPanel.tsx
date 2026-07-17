@@ -30,6 +30,7 @@ import {
 } from "@/src/lib/characters/dnd5e/equipment";
 import { parseRollCommand, type DiceRollMode } from "@/src/lib/session/dice-roll";
 import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
+import { requestDiceDropPlacement } from "@/src/lib/session/dice-placement-store";
 import {
   dispatchAvatarSpeechBubble,
   truncateSpeechBubbleText,
@@ -212,11 +213,26 @@ export function LiveSessionActivityPanel({
     const characterName = currentCharacter.name;
     startTransition(async () => {
       try {
+        let dropNx: number | undefined;
+        let dropNy: number | undefined;
+        try {
+          const drop = await requestDiceDropPlacement({
+            sides: input.sides,
+            count: input.dice,
+          });
+          dropNx = drop.dropNx;
+          dropNy = drop.dropNy;
+        } catch {
+          // Escape / abgebrochen — kein Wurf
+          return;
+        }
         const entry = await requestLiveDiceRoll({
           sessionId,
           characterId,
           characterName,
           ...input,
+          dropNx,
+          dropNy,
         });
         onActivityPosted?.(entry);
         // Crit/Fumble-FX + Sprechblase erst nach 3D-Animation (LiveSessionBoard).
