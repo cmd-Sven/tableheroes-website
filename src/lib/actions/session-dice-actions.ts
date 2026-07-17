@@ -16,8 +16,6 @@ import {
   type LiveDiceRollKind,
 } from "@/src/lib/session/resolve-live-dice-modifier";
 
-export type { LiveDiceRollKind };
-
 export type RequestLiveDiceRollInput = {
   sessionId: string;
   characterId: string;
