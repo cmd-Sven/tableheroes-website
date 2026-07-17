@@ -22,6 +22,12 @@ import {
   clientToDropNorm,
   dropNormToTablePoint,
 } from "@/src/lib/session/dice-screen-project";
+import {
+  dieNatHighlight,
+  rollMoodFromFaces,
+  type DieNatHighlight,
+} from "@/src/lib/session/dice-nat-highlight";
+import { DiceRollMoodFx } from "./DiceRollMoodFx";
 
 const DiceCanvas = dynamic(() => import("./DiceRollCanvas"), {
   ssr: false,
@@ -226,6 +232,11 @@ export function DiceRollOverlay({ logs }: Props) {
     return `${active.faces.length}×W${active.sides}`;
   }, [active, showResult]);
 
+  const rollMood = useMemo((): DieNatHighlight | null => {
+    if (!active || !showResult) return null;
+    return rollMoodFromFaces(active.faces, active.sides);
+  }, [active, showResult]);
+
   const fallbackStyle = useMemo(() => {
     if (!active) return undefined;
     return {
@@ -234,6 +245,11 @@ export function DiceRollOverlay({ logs }: Props) {
       transform: "translate(-50%, -50%)",
     } as const;
   }, [active]);
+
+  const fallbackNatHighlight = useMemo((): DieNatHighlight | null => {
+    if (!active || !showResult || active.faces.length !== 1) return null;
+    return dieNatHighlight(active.sides, active.faces[0] ?? 0);
+  }, [active, showResult]);
 
   return (
     <>
@@ -275,6 +291,8 @@ export function DiceRollOverlay({ logs }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
+            {rollMood ? <DiceRollMoodFx kind={rollMood} /> : null}
+
             {active.use3d ? (
               <div className="absolute inset-0">
                 <DiceCanvas
@@ -291,29 +309,62 @@ export function DiceRollOverlay({ logs }: Props) {
               </div>
             ) : (
               <motion.div
-                className="absolute flex flex-col items-center gap-3 rounded-md border border-hero-border bg-background-card/95 px-8 py-6 shadow-2xl"
-                style={fallbackStyle}
+                className={`absolute flex flex-col items-center gap-3 rounded-md border px-8 py-6 shadow-2xl ${
+                  fallbackNatHighlight === "crit"
+                    ? "border-accent-gold bg-background-card/95"
+                    : fallbackNatHighlight === "fumble"
+                      ? "border-accent-blood bg-background-dark/95"
+                      : "border-hero-border bg-background-card/95"
+                }`}
+                style={{
+                  ...fallbackStyle,
+                  boxShadow:
+                    fallbackNatHighlight === "crit"
+                      ? "0 0 36px rgba(202,185,38,0.45), 0 12px 32px rgba(0,0,0,0.5)"
+                      : fallbackNatHighlight === "fumble"
+                        ? "0 0 28px rgba(88,24,13,0.5), 0 12px 32px rgba(0,0,0,0.55)"
+                        : undefined,
+                }}
                 initial={{ opacity: 0, scale: 0.92, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
+                animate={
+                  showResult && fallbackNatHighlight === "fumble"
+                    ? { opacity: 1, scale: 1, y: 0, x: [0, -5, 5, -3, 3, 0] }
+                    : showResult && fallbackNatHighlight === "crit"
+                      ? { opacity: 1, scale: [0.92, 1.06, 1], y: 0 }
+                      : { opacity: 1, scale: 1, y: 0 }
+                }
                 exit={{ opacity: 0, scale: 0.96, y: -8 }}
-                transition={{ duration: 0.35 }}
+                transition={{
+                  duration: showResult && fallbackNatHighlight ? 0.45 : 0.35,
+                  ease: "easeOut",
+                }}
                 onAnimationComplete={() => {
-                  window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
+                  if (!showResult) {
+                    window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
+                  }
                 }}
               >
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
                   {showResult ? "Ergebnis" : "Würfel rollen…"}
                 </p>
                 <motion.div
-                  className="font-barlow text-5xl font-extrabold text-hero-vibrant"
+                  className={`font-barlow text-5xl font-extrabold ${
+                    fallbackNatHighlight === "crit"
+                      ? "text-accent-gold"
+                      : fallbackNatHighlight === "fumble"
+                        ? "text-accent-blood"
+                        : "text-hero-vibrant"
+                  }`}
                   initial={{ rotate: -12, scale: 0.8 }}
                   animate={
-                    showResult
-                      ? { rotate: 0, scale: 1 }
-                      : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
+                    showResult && fallbackNatHighlight === "crit"
+                      ? { rotate: 0, scale: [0.85, 1.12, 1.04] }
+                      : showResult
+                        ? { rotate: 0, scale: 1 }
+                        : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
                   }
                   transition={{
-                    duration: showResult ? 0.25 : DICE_ANIMATION_DURATION_MS / 1000,
+                    duration: showResult ? 0.35 : DICE_ANIMATION_DURATION_MS / 1000,
                     ease: "easeOut",
                   }}
                 >
