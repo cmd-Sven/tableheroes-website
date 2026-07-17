@@ -8,9 +8,12 @@ export const SLINGSHOT_TAP_THRESHOLD_PX = 10;
 /** Max. Zugweite (px) → Stärke = 1. */
 export const SLINGSHOT_MAX_STRETCH_PX = 180;
 
-export const SLINGSHOT_MIN_SPEED = 2.0;
-export const SLINGSHOT_DEFAULT_SPEED = 3.45;
-export const SLINGSHOT_MAX_SPEED = 5.9;
+/** Schwacher Zug → kurzes, langsames Rollen. */
+export const SLINGSHOT_MIN_SPEED = 1.35;
+/** Tap ohne Zug. */
+export const SLINGSHOT_DEFAULT_SPEED = 3.1;
+/** Voller Zug → weites, schnelles Rollen. */
+export const SLINGSHOT_MAX_SPEED = 8.4;
 
 export type SlingshotThrow = {
   isTap: boolean;
@@ -45,16 +48,18 @@ export function computeSlingshotThrow(
   const oTable = dropNormToTablePoint(oNorm.dropNx, oNorm.dropNy, aspect);
   const rTable = dropNormToTablePoint(rNorm.dropNx, rNorm.dropNy, aspect);
 
-  const tdx = rTable.x - oTable.x;
-  const tdz = rTable.z - oTable.z;
-  const tableDist = Math.hypot(tdx, tdz);
+  // pullVector = Richtung vom Origin weg gezogen (Release − Origin)
+  const pullX = rTable.x - oTable.x;
+  const pullZ = rTable.z - oTable.z;
+  const tableDist = Math.hypot(pullX, pullZ);
 
   if (tableDist < 0.02) {
     return { isTap: true, throwStrength: 0.42 };
   }
 
-  const throwDirX = -tdx / tableDist;
-  const throwDirZ = -tdz / tableDist;
+  // throwDir = normalize(origin − pull) — entgegen Spannrichtung (Zwille)
+  const throwDirX = (oTable.x - rTable.x) / tableDist;
+  const throwDirZ = (oTable.z - rTable.z) / tableDist;
   const strength = Math.min(1, dragPx / SLINGSHOT_MAX_STRETCH_PX);
 
   return {
@@ -75,10 +80,12 @@ export function slingshotSpeedFromStrength(
     return SLINGSHOT_DEFAULT_SPEED + jitter * 0.35;
   }
   const s = Math.min(1, Math.max(0, strength));
+  // Leicht gekrümmt: schwache Würfe langsamer, starke deutlich schneller
+  const curved = s * (0.25 + 0.75 * s);
   return (
     SLINGSHOT_MIN_SPEED +
-    s * (SLINGSHOT_MAX_SPEED - SLINGSHOT_MIN_SPEED) +
-    jitter * 0.4
+    curved * (SLINGSHOT_MAX_SPEED - SLINGSHOT_MIN_SPEED) +
+    jitter * 0.35
   );
 }
 

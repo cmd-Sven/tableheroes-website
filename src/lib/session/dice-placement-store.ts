@@ -104,7 +104,14 @@ export function confirmDiceDropPlacement(point: DiceDropPoint): boolean {
   emit();
   const dropNx = Math.min(1, Math.max(0, point.dropNx));
   const dropNy = Math.min(1, Math.max(0, point.dropNy));
-  current.resolve({ dropNx, dropNy });
+  current.resolve({
+    dropNx,
+    dropNy,
+    throwDirX: point.throwDirX,
+    throwDirZ: point.throwDirZ,
+    throwStrength: point.throwStrength,
+    isTap: point.isTap,
+  });
   return true;
 }
 

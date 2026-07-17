@@ -25,6 +25,7 @@ import {
 import {
   computeSlingshotThrow,
   slingshotStretchRatio,
+  SLINGSHOT_MAX_STRETCH_PX,
 } from "@/src/lib/session/dice-slingshot";
 import {
   dieNatHighlight,
@@ -121,7 +122,9 @@ export function DiceRollOverlay({ logs }: Props) {
   const cursorElRef = useRef<HTMLDivElement>(null);
   const originIconRef = useRef<HTMLDivElement>(null);
   const bandLineRef = useRef<SVGLineElement>(null);
+  const throwLineRef = useRef<SVGLineElement>(null);
   const stretchFillRef = useRef<HTMLDivElement>(null);
+  const stretchTrackRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLSpanElement>(null);
   const aimingRef = useRef(false);
   const originRef = useRef({ x: 0, y: 0 });
@@ -177,6 +180,9 @@ export function DiceRollOverlay({ logs }: Props) {
   const updateAimVisual = useCallback((x: number, y: number) => {
     const ox = originRef.current.x;
     const oy = originRef.current.y;
+    const pullDx = x - ox;
+    const pullDy = y - oy;
+    const dragPx = Math.hypot(pullDx, pullDy);
     const line = bandLineRef.current;
     if (line) {
       line.setAttribute("x1", String(ox));
@@ -184,10 +190,29 @@ export function DiceRollOverlay({ logs }: Props) {
       line.setAttribute("x2", String(x));
       line.setAttribute("y2", String(y));
     }
-    const dragPx = Math.hypot(x - ox, y - oy);
+    const throwLine = throwLineRef.current;
+    if (throwLine) {
+      if (dragPx < 4) {
+        throwLine.setAttribute("opacity", "0");
+      } else {
+        const throwLen = Math.min(dragPx * 0.9, SLINGSHOT_MAX_STRETCH_PX * 0.55);
+        const ndx = -pullDx / dragPx;
+        const ndy = -pullDy / dragPx;
+        throwLine.setAttribute("x1", String(ox));
+        throwLine.setAttribute("y1", String(oy));
+        throwLine.setAttribute("x2", String(ox + ndx * throwLen));
+        throwLine.setAttribute("y2", String(oy + ndy * throwLen));
+        throwLine.setAttribute("opacity", String(0.35 + slingshotStretchRatio(dragPx) * 0.55));
+      }
+    }
     const ratio = slingshotStretchRatio(dragPx);
     if (stretchFillRef.current) {
       stretchFillRef.current.style.transform = `scaleX(${ratio})`;
+    }
+    if (stretchTrackRef.current && dragPx > 2) {
+      const throwAngle =
+        (Math.atan2(-pullDy, -pullDx) * 180) / Math.PI;
+      stretchTrackRef.current.style.transform = `rotate(${throwAngle}deg)`;
     }
     if (hintRef.current) {
       hintRef.current.textContent =
@@ -409,6 +434,30 @@ export function DiceRollOverlay({ logs }: Props) {
               strokeDasharray="6 4"
               opacity={0.85}
             />
+            <line
+              ref={throwLineRef}
+              x1={0}
+              y1={0}
+              x2={0}
+              y2={0}
+              stroke="#379806"
+              strokeWidth={3}
+              strokeLinecap="round"
+              opacity={0}
+              markerEnd="url(#dice-throw-arrow)"
+            />
+            <defs>
+              <marker
+                id="dice-throw-arrow"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="4"
+                orient="auto"
+              >
+                <path d="M0,0 L8,4 L0,8 Z" fill="#379806" />
+              </marker>
+            </defs>
           </svg>
 
           <div
@@ -433,7 +482,10 @@ export function DiceRollOverlay({ logs }: Props) {
             <div className="flex h-10 w-10 items-center justify-center rounded-md border border-hero-border/80 bg-background-card/75 text-accent-gold/90 shadow-md">
               <Dices className="h-6 w-6" strokeWidth={2} />
             </div>
-            <div className="h-1 w-16 overflow-hidden rounded-full bg-background-dark/80">
+            <div
+              ref={stretchTrackRef}
+              className="h-1 w-16 overflow-hidden rounded-full bg-background-dark/80"
+            >
               <div
                 ref={stretchFillRef}
                 className="h-full w-full origin-left bg-accent-gold/80"
