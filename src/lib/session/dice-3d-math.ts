@@ -1,8 +1,11 @@
 import * as THREE from "three";
+import { DICE_CAMERA } from "@/src/lib/session/dice-screen-project";
 
 type Vec3 = readonly [number, number, number];
 
-const _up = new THREE.Vector3(0, 1, 0);
+const _reading = new THREE.Vector3();
+const _normal = new THREE.Vector3();
+const _world = new THREE.Vector3();
 
 /** d6: klassische Gegenseiten (1↔6, 2↔5, 3↔4). */
 const D6_NORMALS: Record<number, Vec3> = {
@@ -16,11 +19,11 @@ const D6_NORMALS: Record<number, Vec3> = {
 
 /**
  * Echte Face-Normalen der Three.js-Geometrien (nicht Fibonacci).
- * Index 0 = Face-Wert 1. Sortiert stabil (oben zuerst).
+ * Index 0 = Face-Wert 1. Sortiert stabil (−Y, −X, −Z).
  */
 const D4_NORMALS: Vec3[] = [
-  [-0.5774, 0.5774, 0.5774],
   [0.5774, 0.5774, -0.5774],
+  [-0.5774, 0.5774, 0.5774],
   [0.5774, -0.5774, 0.5774],
   [-0.5774, -0.5774, -0.5774],
 ];
@@ -69,20 +72,20 @@ const D20_NORMALS: Vec3[] = [
   [0, 0.9342, 0.3568],
   [0, 0.9342, -0.3568],
   [0.5774, 0.5774, 0.5774],
-  [-0.5774, 0.5774, 0.5774],
   [0.5774, 0.5774, -0.5774],
+  [-0.5774, 0.5774, 0.5774],
   [-0.5774, 0.5774, -0.5774],
   [0.9342, 0.3568, 0],
   [-0.9342, 0.3568, 0],
   [0.3568, 0, 0.9342],
-  [-0.3568, 0, 0.9342],
   [0.3568, 0, -0.9342],
+  [-0.3568, 0, 0.9342],
   [-0.3568, 0, -0.9342],
   [0.9342, -0.3568, 0],
   [-0.9342, -0.3568, 0],
   [0.5774, -0.5774, 0.5774],
-  [-0.5774, -0.5774, 0.5774],
   [0.5774, -0.5774, -0.5774],
+  [-0.5774, -0.5774, 0.5774],
   [-0.5774, -0.5774, -0.5774],
   [0, -0.9342, 0.3568],
   [0, -0.9342, -0.3568],
@@ -103,6 +106,20 @@ function normalsForSides(sides: number): Vec3[] | null {
     default:
       return null;
   }
+}
+
+/**
+ * Lesrichtung der Ergebnis-Face: vom Tisch zur Kamera.
+ * Reine +Y lässt Nachbarflächen aus Kamerawinkel dominieren (besonders d20).
+ */
+export function diceReadingDirection(out = _reading): THREE.Vector3 {
+  return out
+    .set(
+      DICE_CAMERA.position[0],
+      DICE_CAMERA.position[1] - 0.35,
+      DICE_CAMERA.position[2],
+    )
+    .normalize();
 }
 
 /** Face-Normal (lokal) — muss zu `quaternionForFaceUp` und Face-Textur-Matching passen. */
@@ -130,12 +147,35 @@ export function faceNormal(sides: number, face: number, out = new THREE.Vector3(
   return out.set(Math.cos(theta) * radius, y, Math.sin(theta) * radius).normalize();
 }
 
-/** Ziel-Quaternion: Face-Wert zeigt nach oben (+Y). */
+/**
+ * Ziel-Quaternion: Face-Wert zeigt zur Lesrichtung (Kamera), nicht nur reines +Y.
+ * So ist die Server-Face die dominant sichtbare Fläche.
+ */
 export function quaternionForFaceUp(sides: number, face: number): THREE.Quaternion {
-  const normal = faceNormal(sides, face);
+  const normal = faceNormal(sides, face, _normal);
   const q = new THREE.Quaternion();
-  q.setFromUnitVectors(normal, _up);
+  q.setFromUnitVectors(normal, diceReadingDirection());
   return q;
+}
+
+/** Welche Face-Nummer zeigt nach Orientierung am stärksten in `dir`? */
+export function faceValueMostAligned(
+  sides: number,
+  quat: THREE.Quaternion,
+  dir: THREE.Vector3 = diceReadingDirection(),
+): number {
+  const n = Math.max(2, Math.round(sides));
+  let best = 1;
+  let bestDot = -Infinity;
+  for (let v = 1; v <= n; v++) {
+    faceNormal(n, v, _world).applyQuaternion(quat);
+    const d = _world.dot(dir);
+    if (d > bestDot) {
+      bestDot = d;
+      best = v;
+    }
+  }
+  return best;
 }
 
 export function seededTumbleAxes(seed: string, index: number): THREE.Vector3 {

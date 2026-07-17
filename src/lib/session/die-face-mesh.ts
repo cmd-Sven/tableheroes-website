@@ -14,16 +14,17 @@ const _delta = new THREE.Vector3();
 const _match = new THREE.Vector3();
 
 function textureKey(value: number, bg: string): string {
-  return `face-v3:${value}:${bg}`;
+  return `face-v4:${value}:${bg}`;
 }
 
-/** Opake Face-Textur: volle Fläche in Würfelfarbe, zentrierte Zahl. */
+/** Opake Face-Textur: Würfelfarbe + kleinere, gepolsterte Augenzahl. */
 export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasTexture {
   const key = textureKey(value, bgColor);
   const cached = textureCache.get(key);
   if (cached) return cached;
 
   const size = 256;
+  const pad = 36;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -34,21 +35,22 @@ export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasT
 
   // Leichter Rand / Facetten-Hint
   ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = 10;
-  ctx.strokeRect(5, 5, size - 10, size - 10);
+  ctx.lineWidth = 8;
+  ctx.strokeRect(pad * 0.35, pad * 0.35, size - pad * 0.7, size - pad * 0.7);
 
   const label = String(value);
-  const fontPx = value >= 10 ? 112 : 140;
-  ctx.font = `900 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
+  // Deutlich kleiner als zuvor (140/112) — lesbar, ohne Face zu füllen
+  const fontPx = value >= 10 ? 54 : 68;
+  ctx.font = `800 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
   ctx.miterLimit = 2;
 
   const cx = size / 2;
-  const cy = size / 2 + 4;
+  const cy = size / 2 + 2;
 
-  ctx.lineWidth = 20;
+  ctx.lineWidth = 10;
   ctx.strokeStyle = "#000000";
   ctx.strokeText(label, cx, cy);
 
@@ -67,7 +69,7 @@ export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasT
 }
 
 function createBlankTexture(bgColor: string): THREE.CanvasTexture {
-  const key = `blank-v3:${bgColor}`;
+  const key = `blank-v4:${bgColor}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
 
@@ -208,7 +210,8 @@ function applyCenteredFaceUVs(
     maxAbs = Math.max(maxAbs, Math.abs(u), Math.abs(v));
   }
 
-  const scale = maxAbs > 1e-8 ? 0.36 / maxAbs : 1;
+  // Größerer UV-Radius → mehr Canvas-Padding sichtbar → Zahl wirkt kleiner
+  const scale = maxAbs > 1e-8 ? 0.46 / maxAbs : 1;
   for (let i = 0; i < vertexIndices.length; i++) {
     const p = pts[i]!;
     uv.setXY(vertexIndices[i]!, 0.5 + p.u * scale, 0.5 + p.v * scale);
@@ -242,8 +245,8 @@ export function buildDieFaceMesh(sides: number): DieFaceMeshData {
   const bg = dieColor(n);
   let geometry = baseGeometry(n);
 
-  // Cone ist indexed + shared verts → non-indexed für saubere UVs/Gruppen
-  if (n === 10 && geometry.index) {
+  // Indexed + shared verts würden Face-UVs überschreiben → immer unique verts
+  if (geometry.index) {
     geometry = geometry.toNonIndexed();
   }
 

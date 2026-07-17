@@ -12,7 +12,8 @@
     "catalog:dnd5e": "node scripts/build-dnd5e-progression-catalog.mjs",
     "catalog:dnd5e:de": "node scripts/dnd5e-de/apply-from-foundry-lang-de.mjs",
     "catalog:dnd5e:patch": "node scripts/dnd5e-patches/apply-catalog-patches.mjs",
-    "test:progression": "npx tsx src/lib/characters/dnd5e/progression/progression.selftest.ts"
+    "test:progression": "npx tsx src/lib/characters/dnd5e/progression/progression.selftest.ts",
+    "test:dice-faces": "npx tsx src/lib/session/dice-face-mapping.selftest.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
