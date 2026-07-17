@@ -190,13 +190,14 @@ export function seededTumbleAxes(seed: string, index: number): THREE.Vector3 {
   return v.normalize();
 }
 
+/** Mesh-Scale (~20 % kleiner als frühere Werte). */
 export function dieScale(sides: number): number {
-  if (sides <= 4) return 0.72;
-  if (sides <= 6) return 0.78;
-  if (sides <= 8) return 0.74;
-  if (sides <= 10) return 0.7;
-  if (sides <= 12) return 0.72;
-  return 0.8;
+  if (sides <= 4) return 0.58;
+  if (sides <= 6) return 0.62;
+  if (sides <= 8) return 0.59;
+  if (sides <= 10) return 0.56;
+  if (sides <= 12) return 0.58;
+  return 0.64;
 }
 
 export function dieColor(sides: number): string {

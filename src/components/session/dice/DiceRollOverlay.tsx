@@ -80,6 +80,7 @@ function readDropNorm(meta: Record<string, unknown>): { dropNx: number; dropNy: 
 export function DiceRollOverlay({ logs }: Props) {
   const seenRef = useRef<Set<string>>(new Set());
   const finishingRef = useRef<string | null>(null);
+  const settledOnceRef = useRef(false);
   const activeRef = useRef<ActiveRoll | null>(null);
   const cursorElRef = useRef<HTMLDivElement>(null);
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
@@ -195,20 +196,25 @@ export function DiceRollOverlay({ logs }: Props) {
     queueMicrotask(() => dispatchDiceAnimComplete(sourceId));
   }, []);
 
-  const handleSettled = useCallback(() => {
+  /** Erst wenn ALLE Würfel der Scene liegen (onAllSettled) → Result + Chat/Bubble. */
+  const handleAllSettled = useCallback(() => {
+    if (settledOnceRef.current) return;
+    settledOnceRef.current = true;
     setShowResult(true);
     window.setTimeout(finishActive, RESULT_HOLD_MS);
   }, [finishActive]);
 
   useEffect(() => {
     finishingRef.current = null;
+    settledOnceRef.current = false;
   }, [activeId]);
 
   useEffect(() => {
     if (!activeId) return;
+    // Safety: nie vor voller Physik-Dauer + Hold; Chat erst via finishActive
     const t = window.setTimeout(
       finishActive,
-      DICE_ANIMATION_DURATION_MS + RESULT_HOLD_MS + 700,
+      DICE_ANIMATION_DURATION_MS + RESULT_HOLD_MS + 900,
     );
     return () => window.clearTimeout(t);
   }, [activeId, finishActive]);
@@ -278,7 +284,7 @@ export function DiceRollOverlay({ logs }: Props) {
                   startAt={active.startAt}
                   aimX={active.aimX}
                   aimZ={active.aimZ}
-                  onSettled={handleSettled}
+                  onSettled={handleAllSettled}
                   resultLabel={active.resultLabel}
                   showResult={showResult}
                 />
@@ -292,7 +298,7 @@ export function DiceRollOverlay({ logs }: Props) {
                 exit={{ opacity: 0, scale: 0.96, y: -8 }}
                 transition={{ duration: 0.35 }}
                 onAnimationComplete={() => {
-                  window.setTimeout(handleSettled, DICE_ANIMATION_DURATION_MS);
+                  window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
                 }}
               >
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">

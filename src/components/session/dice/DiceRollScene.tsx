@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -22,7 +22,7 @@ type DieMeshProps = {
   aimX: number;
   aimZ: number;
   durationMs?: number;
-  onSettled?: () => void;
+  onSettled?: (index: number) => void;
 };
 
 export function AnimatedDie({
@@ -60,7 +60,7 @@ export function AnimatedDie({
 
     if (done && !settledRef.current) {
       settledRef.current = true;
-      onSettled?.();
+      onSettled?.(index);
     }
   });
 
@@ -95,16 +95,21 @@ export function DiceRollScene({
   resultLabel,
   showResult = false,
 }: DiceSceneProps) {
-  const settledCount = useRef(0);
+  const settled = useRef<Set<number>>(new Set());
   const done = useRef(false);
+  const expected = faces.length;
 
-  function handleSettled() {
-    settledCount.current += 1;
-    if (!done.current && settledCount.current >= faces.length) {
-      done.current = true;
-      onAllSettled();
-    }
-  }
+  const handleSettled = useCallback(
+    (index: number) => {
+      if (done.current) return;
+      settled.current.add(index);
+      if (settled.current.size >= expected) {
+        done.current = true;
+        onAllSettled();
+      }
+    },
+    [expected, onAllSettled],
+  );
 
   return (
     <>

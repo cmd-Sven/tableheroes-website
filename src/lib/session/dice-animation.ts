@@ -4,7 +4,7 @@ import { DICE_PHYSICS_DURATION_MS } from "@/src/lib/session/dice-physics";
 export const DICE_ANIMATION_DURATION_MS = DICE_PHYSICS_DURATION_MS;
 
 /** Nach dieser Zeit gilt ein Wurf für Late-Joiner als bereits aufgelöst. */
-export const DICE_ANIMATION_STALE_MS = 5500;
+export const DICE_ANIMATION_STALE_MS = 6200;
 
 export const DICE_ANIM_COMPLETE_EVENT = "th:dice-anim-complete";
 
