@@ -6,23 +6,27 @@ import {
   faceLabelRadius,
   faceLabelSize,
   faceNormal,
+  quaternionFacingOut,
 } from "@/src/lib/session/dice-3d-math";
 
 const textureCache = new Map<string, THREE.CanvasTexture>();
-const _z = new THREE.Vector3(0, 0, 1);
 const _normal = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
 
 function faceTextureKey(value: number, lightDie: boolean): string {
-  return `${value}:${lightDie ? "L" : "D"}`;
+  return `v2:${value}:${lightDie ? "L" : "D"}`;
 }
 
-/** Canvas-Textur für eine Augenzahl — gecacht, hoher Kontrast. */
+/**
+ * Canvas-Textur für eine Augenzahl — opaker Disk, weiße Zahl, starker Outline.
+ * (v2-Cache-Key, falls alte schwache Texturen im HMR hängen.)
+ */
 export function getFaceNumberTexture(value: number, lightDie: boolean): THREE.CanvasTexture {
   const key = faceTextureKey(value, lightDie);
   const cached = textureCache.get(key);
   if (cached) return cached;
 
-  const size = 128;
+  const size = 256;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -30,29 +34,43 @@ export function getFaceNumberTexture(value: number, lightDie: boolean): THREE.Ca
 
   ctx.clearRect(0, 0, size, size);
 
-  // Dunkler/heller Disk für Lesbarkeit auf dem Mesh
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.46;
+
+  // Voll opaker Disk — kein Alpha-Loch, das den Kontrast killt
   ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size * 0.42, 0, Math.PI * 2);
-  ctx.fillStyle = lightDie ? "rgba(10, 31, 16, 0.82)" : "rgba(8, 20, 12, 0.55)";
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = lightDie ? "#0a1f10" : "#06140c";
   ctx.fill();
 
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = lightDie ? "#cab926" : "#23c763";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
   const label = String(value);
-  const fontPx = value >= 10 ? 58 : 72;
-  ctx.font = `800 ${fontPx}px "Barlow Condensed", "Arial Narrow", Impact, sans-serif`;
+  const fontPx = value >= 10 ? 118 : 148;
+  ctx.font = `900 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Outline für Kontrast
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = lightDie ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.9)";
-  ctx.strokeText(label, size / 2, size / 2 + 2);
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.lineWidth = 18;
+  ctx.strokeStyle = "#000000";
+  ctx.strokeText(label, cx, cy + 4);
 
-  ctx.fillStyle = lightDie ? "#f5f0d8" : "#ffffff";
-  ctx.fillText(label, size / 2, size / 2 + 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(label, cx, cy + 4);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
   tex.needsUpdate = true;
   textureCache.set(key, tex);
   return tex;
@@ -60,13 +78,13 @@ export function getFaceNumberTexture(value: number, lightDie: boolean): THREE.Ca
 
 type DieFaceLabelsProps = {
   sides: number;
-  /** Hellere Würfel (z. B. d12/d20) → dunklerer Disk / hellere Zahl. */
+  /** Hellere Würfel (z. B. d12/d20) → dunklerer Disk. */
   lightDie?: boolean;
 };
 
 /**
  * Zahlen auf allen Faces — Kinder des Die-Groups, rotieren mit Bounce/Roll.
- * Positionen folgen denselben Normalen wie `quaternionForFaceUp` (Server-Face oben).
+ * Position = echte Face-Normale × (Inradius + Pad), damit Labels nicht im Mesh liegen.
  */
 export function DieFaceLabels({ sides, lightDie = false }: DieFaceLabelsProps) {
   const n = Math.max(2, Math.round(sides));
@@ -81,9 +99,9 @@ export function DieFaceLabels({ sides, lightDie = false }: DieFaceLabelsProps) {
       map: THREE.CanvasTexture;
     }[] = [];
     for (let value = 1; value <= n; value++) {
-      const normal = faceNormal(n, value, _normal);
+      const normal = faceNormal(n, value, _normal).clone();
       const position = normal.clone().multiplyScalar(radius);
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(_z, normal.clone());
+      const quaternion = quaternionFacingOut(normal, _quat).clone();
       list.push({
         value,
         position,
@@ -101,15 +119,19 @@ export function DieFaceLabels({ sides, lightDie = false }: DieFaceLabelsProps) {
           key={value}
           position={position}
           quaternion={quaternion}
-          renderOrder={2}
+          renderOrder={10}
+          frustumCulled={false}
         >
           <planeGeometry args={[plane, plane]} />
           <meshBasicMaterial
             map={map}
             transparent
+            alphaTest={0.15}
+            depthTest={false}
             depthWrite={false}
             side={THREE.DoubleSide}
             toneMapped={false}
+            fog={false}
           />
         </mesh>
       ))}
