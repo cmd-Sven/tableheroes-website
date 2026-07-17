@@ -7,27 +7,27 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "hellish-resistance",
       "level": 1,
       "nameEn": "Hellish Resistance",
-      "nameDe": "Hellish Resistance",
+      "nameDe": "Höllische Resistenz",
       "descriptionEn": "You have resistance to fire damage.",
-      "descriptionDe": "You have resistance to fire damage.",
+      "descriptionDe": "Du besitzt eine Resistenz gegen Feuerschaden.",
       "subclass": null
     },
     {
       "id": "infernal-legacy",
       "level": 1,
       "nameEn": "Infernal Legacy",
-      "nameDe": "Infernal Legacy",
+      "nameDe": "Infernalisches Erbe",
       "descriptionEn": "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
-      "descriptionDe": "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
+      "descriptionDe": "Du beherrschst den Zaubertrick @Compendium[dnd5e.spells.MUO1uYN7JR1hm4dR]. Ab der 3. Stufe kannst du dank dieses Merkmals den Spruch @Compendium[dnd5e.spells.22dPoeXfaaAv4K3h] des 2. Grades einmal wirken. Du musst eine lange Rast beenden, bevor du dies erneut kannst. Mit Erreichen der 5. Stufe bist du in der Lage, den Zauber @Compendium[dnd5e.spells.S7VbUetIfVT7B6Eq] auf die gleiche Weise einmal täglich einzusetzen. Das Attribut, mit dem du diese Zauber wirkst, ist Charisma.",
       "subclass": null
     }
   ]

@@ -2,7 +2,7 @@ import { proficiencyBonus } from "../formulas";
 import { abilityModifier } from "../formulas";
 import type { Dnd5eSheetData } from "../types";
 import { levelGrantsAsi } from "./asi";
-import { getClassProgression, getRaceProgression } from "./catalog";
+import { getClassProgression, getRaceProgression, getSpells } from "./catalog";
 import {
   matchSubclassOption,
   resolveClassId,
@@ -11,10 +11,12 @@ import {
 } from "./class-ids";
 import {
   cantripsKnownForClass,
+  cantripsKnownForThirdCaster,
   casterTypeForClass,
   isThirdCasterSubclass,
   slotsForClassLevel,
   spellsKnownForClass,
+  spellsKnownForThirdCaster,
 } from "./spell-slots";
 import type {
   ClassId,
@@ -30,6 +32,32 @@ function countCantrips(sheet: Dnd5eSheetData): number {
 
 function countLeveledSpells(sheet: Dnd5eSheetData): number {
   return (sheet.spells ?? []).filter((s) => s.level >= 1).length;
+}
+
+/** Cantrips granted by this level's features that are not already on the sheet. */
+function newlyGrantedCantripCount(
+  features: ProgressionFeature[],
+  sheet: Dnd5eSheetData,
+): number {
+  const existing = new Set(
+    (sheet.spells ?? [])
+      .filter((s) => s.level <= 0)
+      .map((s) => s.id.toLowerCase()),
+  );
+  const catalog = getSpells();
+  let n = 0;
+  for (const f of features) {
+    for (const id of f.grantedSpellIds ?? []) {
+      const key = id.toLowerCase();
+      if (existing.has(key)) continue;
+      const def = catalog.find((s) => s.id === id || s.id.toLowerCase() === key);
+      if (def && def.level === 0) {
+        n += 1;
+        existing.add(key);
+      }
+    }
+  }
+  return n;
 }
 
 function maxSpellSlotLevel(slots: Partial<Record<SlotKey, number>>): number {
@@ -100,19 +128,68 @@ export function featuresForLevel(
   return out;
 }
 
+/**
+ * All subclass features with level ≤ maxLevel (for catch-up when picking late).
+ */
+export function subclassFeaturesUpToLevel(
+  classId: ClassId,
+  subclassIdOrHint: string,
+  maxLevel: number,
+): ProgressionFeature[] {
+  const prog = getClassProgression(classId);
+  if (!prog?.subclasses?.length) return [];
+  const sub = matchSubclassOption(subclassIdOrHint, prog.subclasses);
+  if (!sub) return [];
+
+  const byId = new Map<string, ProgressionFeature>();
+  for (const f of sub.features) {
+    if (f.level <= maxLevel) byId.set(f.id, f);
+  }
+  for (const f of prog.features) {
+    if (!f.subclass || f.level > maxLevel) continue;
+    if (/ability-score|asi/i.test(f.id)) continue;
+    const featureSub = matchSubclassOption(f.subclass, prog.subclasses);
+    if (featureSub?.id === sub.id) byId.set(f.id, f);
+  }
+  return [...byId.values()].sort(
+    (a, b) => a.level - b.level || a.id.localeCompare(b.id),
+  );
+}
+
+function featureAlreadyOnSheet(
+  sheet: Dnd5eSheetData,
+  f: ProgressionFeature,
+): boolean {
+  return (sheet.features ?? []).some(
+    (x) =>
+      x.id === f.id ||
+      (x.nameEn && x.nameEn === f.nameEn) ||
+      (x.nameDe && x.nameDe === f.nameDe) ||
+      x.name === f.nameDe ||
+      x.name === f.nameEn,
+  );
+}
+
 function raceFeaturesForLevel(raceId: RaceId, level: number): ProgressionFeature[] {
   const race = getRaceProgression(raceId);
   if (!race) return [];
   return race.features.filter((f) => f.level === level);
 }
 
-/** Prefer catalog row spellSlots; Warlock stays on pact table. */
+/** Prefer catalog row spellSlots; third-casters always use table; Warlock stays on pact. */
 function slotsFromCatalogOrTable(
   classId: ClassId | null,
   level: number,
   subclassHint: string | null,
 ): Partial<Record<SlotKey, number>> {
   if (classId === "warlock") {
+    return slotsForClassLevel(classId, level, subclassHint);
+  }
+  // EK / AT: never read empty class rows — always third-caster table
+  if (
+    (classId === "fighter" || classId === "rogue") &&
+    isThirdCasterSubclass(subclassHint)
+  ) {
     return slotsForClassLevel(classId, level, subclassHint);
   }
   const prog = getClassProgression(classId);
@@ -150,83 +227,119 @@ export function planLevelUp(input: PlanLevelUpInput): LevelUpPlan {
       : resolveRaceId(input.raceName);
 
   const metaSubclassHint = resolveSubclassHint(input.className, input.subclass);
+  const matchedFromMeta = resolveSubclassId(classId, metaSubclassHint);
   const subclassHint =
     input.subclassOverride?.trim() || metaSubclassHint;
   const resolvedSubclassId = resolveSubclassId(classId, subclassHint);
+  const effectiveSubclassId = resolvedSubclassId ?? null;
   const prog = getClassProgression(classId);
   const hitDie = prog?.hitDie ?? 8;
   const conMod = abilityModifier(input.sheet.abilities.con?.score ?? 10);
   const hpAverage = Math.floor(hitDie / 2) + 1 + conMod;
 
-  const features = classId
-    ? featuresForLevel(classId, toLevel, resolvedSubclassId ?? subclassHint)
-    : [];
-  const raceFeatures = raceFeaturesForLevel(raceId, toLevel);
-
   const needsAsi = levelGrantsAsi(classId, toLevel);
   const subclassLevel = prog?.subclassLevel ?? 3;
   const hasSubclassOptions = (prog?.subclasses?.length ?? 0) > 0;
-  // Step stays visible while picking in wizard (override does not clear needsSubclass)
+  // Nachholen: Stufe erreicht/überschritten und keine gematchte Katalog-Subklasse
+  // (leerer Meta-String ODER Foundry-Text ohne Match). Override löscht den Step nicht.
   const needsSubclass = Boolean(
     classId &&
       toLevel >= subclassLevel &&
-      !metaSubclassHint &&
+      !matchedFromMeta &&
       hasSubclassOptions,
+  );
+
+  let features: ProgressionFeature[] = classId
+    ? featuresForLevel(classId, toLevel, effectiveSubclassId ?? subclassHint)
+    : [];
+
+  // Subklasse neu gewählt / nachgeholt → Features ab subclassLevel bis toLevel
+  if (classId && effectiveSubclassId && !matchedFromMeta && toLevel >= subclassLevel) {
+    const catchUp = subclassFeaturesUpToLevel(
+      classId,
+      effectiveSubclassId,
+      toLevel,
+    );
+    for (const f of catchUp) {
+      if (!features.some((x) => x.id === f.id)) features.push(f);
+    }
+  }
+
+  // Nur Merkmale anzeigen, die noch nicht auf dem Blatt stehen
+  features = features.filter((f) => !featureAlreadyOnSheet(input.sheet, f));
+
+  const raceFeatures = raceFeaturesForLevel(raceId, toLevel).filter(
+    (f) => !featureAlreadyOnSheet(input.sheet, f),
   );
 
   let caster = prog?.caster ?? casterTypeForClass(classId);
   if (
     caster === "none" &&
     (classId === "fighter" || classId === "rogue") &&
-    isThirdCasterSubclass(subclassHint)
+    isThirdCasterSubclass(effectiveSubclassId ?? subclassHint)
   ) {
     caster = "third";
   }
 
   let spellcasting: LevelUpPlan["spellcasting"] = null;
   if (caster !== "none") {
-    const slotsMax = slotsFromCatalogOrTable(classId, toLevel, subclassHint);
+    const slotHint = effectiveSubclassId ?? subclassHint;
+    const slotsMax = slotsFromCatalogOrTable(classId, toLevel, slotHint);
     const cantripsKnown =
       prog?.levels.find((l) => l.level === toLevel)?.cantripsKnown ??
-      cantripsKnownForClass(classId, toLevel);
+      (caster === "third"
+        ? cantripsKnownForThirdCaster(toLevel)
+        : cantripsKnownForClass(classId, toLevel));
     const spellsKnown =
       prog?.levels.find((l) => l.level === toLevel)?.spellsKnown ??
-      spellsKnownForClass(classId, toLevel);
+      (caster === "third"
+        ? spellsKnownForThirdCaster(toLevel)
+        : spellsKnownForClass(classId, toLevel));
 
     const prevCantrips =
       prog?.levels.find((l) => l.level === fromLevel)?.cantripsKnown ??
-      cantripsKnownForClass(classId, fromLevel) ??
+      (caster === "third"
+        ? cantripsKnownForThirdCaster(fromLevel)
+        : cantripsKnownForClass(classId, fromLevel)) ??
       0;
     const prevSpells =
       prog?.levels.find((l) => l.level === fromLevel)?.spellsKnown ??
-      spellsKnownForClass(classId, fromLevel) ??
+      (caster === "third"
+        ? spellsKnownForThirdCaster(fromLevel)
+        : spellsKnownForClass(classId, fromLevel)) ??
       0;
 
     const currentCantrips = countCantrips(input.sheet);
     const currentSpells = countLeveledSpells(input.sheet);
 
-    const targetCantrips = cantripsKnown ?? prevCantrips;
-    const targetSpells = spellsKnown ?? prevSpells;
+    let cantripsToLearn = Math.max(0, (cantripsKnown ?? 0) - currentCantrips);
+    let spellsToLearn = Math.max(0, (spellsKnown ?? 0) - currentSpells);
 
-    let cantripsToLearn = Math.max(0, (targetCantrips ?? 0) - currentCantrips);
-    let spellsToLearn = Math.max(0, (targetSpells ?? 0) - currentSpells);
     if (classId === "wizard") {
       spellsToLearn = Math.max(spellsToLearn, 2);
       cantripsToLearn = Math.max(0, (cantripsKnown ?? 0) - currentCantrips);
     } else if (classId === "cleric" || classId === "druid" || classId === "paladin") {
       spellsToLearn = 0;
-    }
-
-    if (cantripsKnown != null) {
-      if (cantripsKnown > prevCantrips) {
-        cantripsToLearn = cantripsKnown - prevCantrips;
-      } else {
-        cantripsToLearn = 0;
+    } else if (caster === "third") {
+      // Catch-up / first AT pick: sheet vs target (not only table delta)
+      const autoCantrips = newlyGrantedCantripCount(features, input.sheet);
+      cantripsToLearn = Math.max(
+        0,
+        (cantripsKnown ?? 0) - currentCantrips - autoCantrips,
+      );
+      spellsToLearn = Math.max(0, (spellsKnown ?? 0) - currentSpells);
+    } else {
+      if (cantripsKnown != null) {
+        if (cantripsKnown > prevCantrips) {
+          cantripsToLearn = cantripsKnown - prevCantrips;
+        } else {
+          cantripsToLearn = 0;
+        }
       }
-    }
-    if (spellsKnown != null && classId !== "wizard") {
-      if (spellsKnown > prevSpells) spellsToLearn = spellsKnown - prevSpells;
-      else spellsToLearn = 0;
+      if (spellsKnown != null) {
+        if (spellsKnown > prevSpells) spellsToLearn = spellsKnown - prevSpells;
+        else spellsToLearn = 0;
+      }
     }
 
     spellcasting = {

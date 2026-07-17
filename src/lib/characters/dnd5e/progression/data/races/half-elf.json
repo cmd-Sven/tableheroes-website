@@ -7,27 +7,27 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "fey-ancestry",
       "level": 1,
       "nameEn": "Fey Ancestry",
-      "nameDe": "Fey Ancestry",
+      "nameDe": "Feenblut",
       "descriptionEn": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
-      "descriptionDe": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
+      "descriptionDe": "Du bist bei Rettungswürfen gegen Bezauberungen im Vorteil und immun gegen Schlafzauber.",
       "subclass": null
     },
     {
       "id": "skill-versatility",
       "level": 1,
       "nameEn": "Skill Versatility",
-      "nameDe": "Skill Versatility",
+      "nameDe": "Fertigkeitsvielseitigkeit",
       "descriptionEn": "You gain proficiency in two skills of your choice.",
-      "descriptionDe": "You gain proficiency in two skills of your choice.",
+      "descriptionDe": "Du bist in zwei Fertigkeiten deiner Wahl geübt.",
       "subclass": null
     }
   ]

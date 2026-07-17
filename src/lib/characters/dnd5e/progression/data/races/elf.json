@@ -7,18 +7,18 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "fey-ancestry",
       "level": 1,
       "nameEn": "Fey Ancestry",
-      "nameDe": "Fey Ancestry",
+      "nameDe": "Feenblut",
       "descriptionEn": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
-      "descriptionDe": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
+      "descriptionDe": "Du bist bei Rettungswürfen gegen Bezauberungen im Vorteil und immun gegen Schlafzauber.",
       "subclass": null
     },
     {
@@ -27,16 +27,16 @@
       "nameEn": "Trance",
       "nameDe": "Trance",
       "descriptionEn": "Elves do not need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day. (The Common word for such meditation is \"trance.\") While meditating, you can dream after a fashion; such dreams are actually mental exercises that have become reflexive through years of practice. After resting this way, you gain the same benefit that a human does from 8 hours of sleep.",
-      "descriptionDe": "Elves do not need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day. (The Common word for such meditation is \"trance.\") While meditating, you can dream after a fashion; such dreams are actually mental exercises that have become reflexive through years of practice. After resting this way, you gain the same benefit that a human does from 8 hours of sleep.",
+      "descriptionDe": "Elfen müssen nicht schlafen. Stattdessen meditieren sie 4 Stunden am Tag in einem halbwachen Zustand (Trance). Nach dieser Ruhe bist du so erholt wie ein Mensch nach 8 Stunden Schlaf.",
       "subclass": null
     },
     {
       "id": "keen-senses",
       "level": 1,
       "nameEn": "Keen Senses",
-      "nameDe": "Keen Senses",
+      "nameDe": "Scharfe Sinne",
       "descriptionEn": "You have proficiency in the Perception skill.",
-      "descriptionDe": "You have proficiency in the Perception skill.",
+      "descriptionDe": "Du bist in der Fertigkeit Wahrnehmung geübt.",
       "subclass": null
     }
   ]

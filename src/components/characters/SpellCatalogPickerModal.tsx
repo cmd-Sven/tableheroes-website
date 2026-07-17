@@ -18,6 +18,8 @@ import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context"
 type Props = {
   sheet: Dnd5eSheetData;
   characterClass: string | null;
+  /** Subklasse (für Drittel-Zauberer → Magierliste) */
+  characterSubclass?: string | null;
   level: number;
   onClose: () => void;
   onAdd: (spell: ReturnType<typeof spellDefinitionToSheetEntry>) => void;
@@ -37,6 +39,7 @@ const REASON_KEYS = {
 export function SpellCatalogPickerModal({
   sheet,
   characterClass,
+  characterSubclass = null,
   level,
   onClose,
   onAdd,
@@ -47,8 +50,8 @@ export function SpellCatalogPickerModal({
   const classId = resolveClassId(characterClass);
 
   const all = useMemo(
-    () => catalogSpellsForPicker(characterClass, sheet),
-    [characterClass, sheet],
+    () => catalogSpellsForPicker(characterClass, sheet, characterSubclass),
+    [characterClass, characterSubclass, sheet],
   );
 
   const filtered = useMemo(() => {
@@ -77,7 +80,13 @@ export function SpellCatalogPickerModal({
   }
 
   function addSpell(def: SpellDefinition) {
-    const check = canLearnSpellFromCatalog(sheet, def, characterClass, level);
+    const check = canLearnSpellFromCatalog(
+      sheet,
+      def,
+      characterClass,
+      level,
+      characterSubclass,
+    );
     if (!check.ok) return;
     onAdd(spellDefinitionToSheetEntry(def));
   }
@@ -175,6 +184,7 @@ export function SpellCatalogPickerModal({
                   def,
                   characterClass,
                   level,
+                  characterSubclass,
                 );
                 const name = locale === "de" ? def.nameDe || def.nameEn : def.nameEn;
                 return (

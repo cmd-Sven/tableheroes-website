@@ -1027,8 +1027,21 @@ export async function loadCampaignDetailPageData(
   }
 
   // Kulturen, Sprachen & Ruf für Charakter-Bearbeitung (Spieler mit Charakter)
-  let wizardCultures: { id: string; name: string }[] = [];
+  let wizardCultures: {
+    id: string;
+    name: string;
+    race_ids?: string[];
+    language_ids?: string[];
+    religion_ids?: string[];
+  }[] = [];
   let wizardLanguages: { id: string; name: string }[] = [];
+  let wizardRaces: {
+    id: string;
+    name: string;
+    culture_id?: string | null;
+    race_traits?: string | null;
+  }[] = [];
+  let wizardReligions: { id: string; name: string }[] = [];
   let characterReputations: {
     id: string;
     faction_id: string;
@@ -1042,8 +1055,21 @@ export async function loadCampaignDetailPageData(
       getCharacterWizardLoreData(id),
       getCharacterFactionReputations(myCharacter.id, id),
     ]);
-    wizardCultures = loreData.cultures.map((c) => ({ id: c.id, name: c.name }));
+    wizardCultures = loreData.cultures.map((c) => ({
+      id: c.id,
+      name: c.name,
+      race_ids: c.race_ids,
+      language_ids: c.language_ids,
+      religion_ids: c.religion_ids,
+    }));
     wizardLanguages = loreData.languages.map((l) => ({ id: l.id, name: l.name }));
+    wizardRaces = loreData.races.map((r) => ({
+      id: r.id,
+      name: r.name,
+      culture_id: r.culture_id,
+      race_traits: r.race_traits,
+    }));
+    wizardReligions = loreData.religions.map((r) => ({ id: r.id, name: r.name }));
     characterReputations = repData.map((r) => ({
       id: r.id,
       faction_id: r.faction_id,
@@ -1181,6 +1207,8 @@ export async function loadCampaignDetailPageData(
     wizardLocations,
     wizardCultures,
     wizardLanguages,
+    wizardRaces,
+    wizardReligions,
     characterReputations,
     lastPlayerAchievement,
     foundryProgressionLocked,

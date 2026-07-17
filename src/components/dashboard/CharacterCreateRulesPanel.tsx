@@ -1,9 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ComponentType } from "react";
+import {
+  Axe,
+  BookOpen,
+  BowArrow,
+  Cross,
+  Feather,
+  Flame,
+  Footprints,
+  Leaf,
+  Music,
+  Scroll,
+  Shield,
+  Swords,
+  WandSparkles,
+} from "lucide-react";
 import {
   getAllClassProgressions,
   getSpellsForClass,
+  getSubclassAvailability,
   planLevel1Creation,
   STANDARD_ARRAY,
   type AbilityKeyShort,
@@ -32,6 +48,21 @@ const SRD_RACES: { id: RaceId; label: string }[] = [
   { id: "half-orc", label: "Halbork" },
   { id: "tiefling", label: "Tiefling" },
 ];
+
+const CLASS_ICONS: Record<ClassId, ComponentType<{ className?: string }>> = {
+  barbarian: Axe,
+  bard: Music,
+  cleric: Cross,
+  druid: Leaf,
+  fighter: Swords,
+  monk: Footprints,
+  paladin: Shield,
+  ranger: BowArrow,
+  rogue: Feather,
+  sorcerer: Flame,
+  warlock: BookOpen,
+  wizard: WandSparkles,
+};
 
 type Props = {
   classId: ClassId | "";
@@ -76,6 +107,26 @@ export function CharacterCreateRulesPanel({
         : null,
     [classId, subclassId, srdRaceId],
   );
+
+  const selectedClass = useMemo(
+    () => (classId ? classes.find((c) => c.id === classId) ?? null : null),
+    [classes, classId],
+  );
+
+  const ClassIcon = classId ? CLASS_ICONS[classId] ?? Scroll : null;
+
+  const subclassAvailability = useMemo(
+    () => (classId ? getSubclassAvailability(classId) : null),
+    [classId],
+  );
+
+  const availableSubclassesLabel = useMemo(() => {
+    if (!selectedClass?.subclasses?.length) return null;
+    return selectedClass.subclasses
+      .map((s) => s.nameDe || s.nameEn)
+      .filter(Boolean)
+      .join(", ");
+  }, [selectedClass]);
 
   const spellChoices = useMemo(() => {
     if (!classId || !plan?.spellcasting) return { cantrips: [], leveled: [] };
@@ -128,22 +179,80 @@ export function CharacterCreateRulesPanel({
           <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
             Klasse *
           </label>
-          <select
-            value={classId}
-            onChange={(e) => {
-              onClassId((e.target.value || "") as ClassId | "");
-              onSubclassId("");
-              onSpellIds([]);
-            }}
-            className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none focus:border-accent-gold"
-          >
-            <option value="">-- Klasse wählen --</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nameDe || c.nameEn} (W{c.hitDie})
-              </option>
-            ))}
-          </select>
+          <div className="flex items-stretch gap-3">
+            {ClassIcon ? (
+              <div
+                className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded border border-hero-border/50 bg-hero-dark/30 text-accent-gold"
+                aria-hidden
+              >
+                <ClassIcon className="h-6 w-6" />
+              </div>
+            ) : null}
+            <select
+              value={classId}
+              onChange={(e) => {
+                onClassId((e.target.value || "") as ClassId | "");
+                onSubclassId("");
+                onSpellIds([]);
+              }}
+              className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none focus:border-accent-gold"
+            >
+              <option value="">-- Klasse wählen --</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nameDe || c.nameEn} (W{c.hitDie})
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedClass && subclassAvailability ? (
+            <div className="mt-2 space-y-1 font-libre text-sm text-gray-400">
+              <p>{subclassAvailability.unlockNoteDe}</p>
+              <p>
+                Gängige Unterklassen:{" "}
+                {subclassAvailability.entries.map((entry, i) => (
+                  <span key={entry.id}>
+                    {i > 0 ? ", " : null}
+                    <span
+                      className={
+                        entry.inSystem ? "text-accent-gold" : "text-gray-500"
+                      }
+                    >
+                      {entry.nameDe}
+                      {entry.inSystem ? " (im System)" : " (noch nicht verfügbar)"}
+                    </span>
+                  </span>
+                ))}
+              </p>
+              {availableSubclassesLabel ? (
+                <p className="text-xs text-gray-500">
+                  Wählbar im Katalog:{" "}
+                  <span className="text-accent-gold">{availableSubclassesLabel}</span>
+                  {selectedClass.subclassLevel > 1 ? (
+                    <span>
+                      {" "}
+                      (Wahl ab Stufe {selectedClass.subclassLevel})
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
+          ) : selectedClass && availableSubclassesLabel ? (
+            <p className="mt-2 font-libre text-sm text-gray-400">
+              Verfügbare Unterklassen im System:{" "}
+              <span className="text-accent-gold">{availableSubclassesLabel}</span>
+              {selectedClass.subclassLevel > 1 ? (
+                <span className="text-gray-500">
+                  {" "}
+                  (Wahl ab Stufe {selectedClass.subclassLevel})
+                </span>
+              ) : null}
+            </p>
+          ) : selectedClass ? (
+            <p className="mt-2 font-libre text-sm text-gray-500">
+              Für diese Klasse sind derzeit keine Unterklassen im Katalog hinterlegt.
+            </p>
+          ) : null}
         </div>
 
         {plan?.needsSubclass ? (

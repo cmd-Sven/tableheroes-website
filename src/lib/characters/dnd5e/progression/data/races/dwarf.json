@@ -7,45 +7,45 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "dwarven-resilience",
       "level": 1,
       "nameEn": "Dwarven Resilience",
-      "nameDe": "Dwarven Resilience",
+      "nameDe": "Zwergische Unverwüstlichkeit",
       "descriptionEn": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
-      "descriptionDe": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
+      "descriptionDe": "Du bist bei Rettungswürfen gegen Gifte im Vorteil und besitzt eine Resistenz gegen Schaden durch Gifte.",
       "subclass": null
     },
     {
       "id": "stonecunning",
       "level": 1,
       "nameEn": "Stonecunning",
-      "nameDe": "Stonecunning",
+      "nameDe": "Steingespür",
       "descriptionEn": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus.",
-      "descriptionDe": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus.",
+      "descriptionDe": "Immer wenn du einen Wurf auf Intelligenz (Geschichte) ablegen sollst, der mit der Herkunft von Steinarbeiten zu tun hat, wirst du als geübt in der Fertigkeit angesehen und darfst deinen doppelten Übungsbonus auf den Wurf addieren anstatt nur den einfachen.",
       "subclass": null
     },
     {
       "id": "dwarven-combat-training",
       "level": 1,
       "nameEn": "Dwarven Combat Training",
-      "nameDe": "Dwarven Combat Training",
+      "nameDe": "Zwergische Kampfausbildung",
       "descriptionEn": "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer.",
-      "descriptionDe": "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer.",
+      "descriptionDe": "Du bist im Umgang mit Streitaxt, Handaxt, leichtem und Kriegshammer geübt.",
       "subclass": null
     },
     {
       "id": "tool-proficiency",
       "level": 1,
       "nameEn": "Tool Proficiency",
-      "nameDe": "Tool Proficiency",
+      "nameDe": "Werkzeugübung",
       "descriptionEn": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.",
-      "descriptionDe": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.",
+      "descriptionDe": "Du erhältst Übung mit dem Handwerkszeug deiner Wahl: Schmiedewerkzeug, Brauerausrüstung oder Maurerwerkzeug.",
       "subclass": null
     }
   ]

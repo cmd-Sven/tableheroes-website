@@ -7,36 +7,36 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "savage-attacks",
       "level": 1,
       "nameEn": "Savage Attacks",
-      "nameDe": "Savage Attacks",
+      "nameDe": "Wilde Angriffe",
       "descriptionEn": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
-      "descriptionDe": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
+      "descriptionDe": "Erzielst du einen kritischen Treffer mit einer Nahkampfwaffe, kannst du einen der Schadenswürfel der Waffe erneut würfeln und das Ergebnis zum Zusatzschaden des kritischen Treffers addieren.\n\nInformation: Aktiviere dieses Merkmal im Special Traits-Abschnitt deines Charakterbogens.",
       "subclass": null
     },
     {
       "id": "relentless-endurance",
       "level": 1,
       "nameEn": "Relentless Endurance",
-      "nameDe": "Relentless Endurance",
+      "nameDe": "Durchhaltevermögen",
       "descriptionEn": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
-      "descriptionDe": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
+      "descriptionDe": "Wenn deine Trefferpunkte auf 0 fallen und du nicht stirbst, darfst du sie auf 1 setzen. Diese Fähigkeit kannst du erst nach einer langen Rast erneut verwenden.",
       "subclass": null
     },
     {
       "id": "menacing",
       "level": 1,
       "nameEn": "Menacing",
-      "nameDe": "Menacing",
+      "nameDe": "Bedrohlich",
       "descriptionEn": "You gain proficiency in the Intimidation skill.",
-      "descriptionDe": "You gain proficiency in the Intimidation skill.",
+      "descriptionDe": "Du bist in der Fertigkeit Einschüchtern geübt.",
       "subclass": null
     }
   ]

@@ -13,6 +13,7 @@ import {
   getSpellsForClass,
   highestAvailableSpellLevel,
   planLevelUp,
+  spellListClassIdForSubclass,
   SRD_ATTRIBUTION,
   type AbilityKeyShort,
   type AsiChoice,
@@ -165,13 +166,16 @@ export function LevelUpWizardModal({
   const spellChoices = useMemo(() => {
     if (!plan.classId || !plan.spellcasting) return { cantrips: [], leveled: [] };
     const maxLvl = highestAvailableSpellLevel(plan);
-    const all = getSpellsForClass(plan.classId, Math.max(1, maxLvl));
+    const subclassHint = subclassId || meta.subclass || null;
+    const listClassId =
+      spellListClassIdForSubclass(plan.classId, subclassHint) ?? plan.classId;
+    const all = getSpellsForClass(listClassId, Math.max(1, maxLvl));
     const owned = new Set((sheet.spells ?? []).map((s) => s.id));
     return {
       cantrips: all.filter((s) => s.level === 0 && !owned.has(s.id)),
       leveled: all.filter((s) => s.level >= 1 && s.level <= maxLvl && !owned.has(s.id)),
     };
-  }, [plan, sheet.spells]);
+  }, [plan, sheet.spells, subclassId, meta.subclass]);
 
   if (!open) return null;
 
@@ -366,6 +370,47 @@ export function LevelUpWizardModal({
                   to: formatSigned(plan.proficiencyBonus.to),
                 })}
               </p>
+              {plan.needsSubclass ? (
+                <p className="rounded border border-accent-gold/40 bg-hero-dark/30 px-3 py-2 font-libre text-sm text-accent-gold">
+                  {t("levelUp.subclassCatchUp")}
+                </p>
+              ) : meta.subclass ? (
+                <p className="font-libre text-sm text-gray-400">
+                  {t("levelUp.currentSubclass", { name: meta.subclass })}
+                </p>
+              ) : null}
+              {plan.features.length > 0 ? (
+                <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
+                  <p className="mb-2 font-barlow text-xs font-bold uppercase text-accent-gold">
+                    {t("levelUp.featuresPreview")}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {plan.features.map((f) => (
+                      <li key={f.id} className="font-libre text-sm text-gray-200">
+                        <span className="text-gray-500">St. {f.level}: </span>
+                        {locName(f.nameEn, f.nameDe)}
+                        {f.subclass ? (
+                          <span className="text-accent-gold/80"> · Unterklasse</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="font-libre text-sm text-gray-500">
+                  {plan.needsSubclass
+                    ? t("levelUp.featuresAfterSubclass")
+                    : t("levelUp.noFeatures")}
+                </p>
+              )}
+              {plan.spellcasting ? (
+                <p className="font-libre text-xs text-gray-400">
+                  {t("levelUp.spellcastingPreview", {
+                    cantrips: String(plan.spellcasting.cantripsToLearn),
+                    spells: String(plan.spellcasting.spellsToLearn),
+                  })}
+                </p>
+              ) : null}
               <label className="block space-y-1">
                 <span className="font-barlow text-xs uppercase text-gray-500">
                   {t("levelUp.classDetected")}
@@ -463,6 +508,9 @@ export function LevelUpWizardModal({
               <p className="font-barlow text-sm uppercase text-accent-gold">
                 {t("levelUp.pickSubclass")}
               </p>
+              <p className="font-libre text-sm text-gray-400">
+                {t("levelUp.subclassCatchUpHint")}
+              </p>
               {plan.subclassOptions.map((opt) => (
                 <label
                   key={opt.id}
@@ -479,6 +527,22 @@ export function LevelUpWizardModal({
                   </span>
                 </label>
               ))}
+              {subclassId && plan.features.some((f) => f.subclass) ? (
+                <div className="mt-3 rounded border border-hero-border/30 bg-hero-dark/10 p-3">
+                  <p className="mb-1 font-barlow text-xs uppercase text-accent-gold">
+                    {t("levelUp.subclassFeaturesNow")}
+                  </p>
+                  <ul className="space-y-1">
+                    {plan.features
+                      .filter((f) => f.subclass)
+                      .map((f) => (
+                        <li key={f.id} className="font-libre text-sm text-gray-300">
+                          St. {f.level}: {locName(f.nameEn, f.nameDe)}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -504,6 +568,10 @@ export function LevelUpWizardModal({
                       <div>
                         <p className="font-cinzel font-bold text-accent-gold">
                           {locName(f.nameEn, f.nameDe)}
+                          <span className="ml-2 font-barlow text-xs font-bold uppercase text-gray-500">
+                            St. {f.level}
+                            {f.subclass ? " · UK" : ""}
+                          </span>
                         </p>
                         <p className="mt-1 whitespace-pre-wrap font-libre text-sm text-gray-300">
                           {(locale === "de"

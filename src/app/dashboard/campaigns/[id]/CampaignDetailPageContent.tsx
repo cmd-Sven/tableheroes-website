@@ -108,6 +108,8 @@ export function CampaignDetailPageContent({
     wizardLocations,
     wizardCultures,
     wizardLanguages,
+    wizardRaces,
+    wizardReligions,
     characterReputations,
     lastPlayerAchievement,
     foundryProgressionLocked,
@@ -987,7 +989,9 @@ export function CampaignDetailPageContent({
           campaignId={id}
           character={myCharacterForClient as any}
           cultures={wizardCultures}
+          races={wizardRaces}
           languages={wizardLanguages}
+          religions={wizardReligions}
           factions={wizardFactions.map((f: any) => ({ id: String(f.id), name: String(f.name ?? "") }))}
           locations={wizardLocations.map((l: any) => ({
             id: String(l.id),

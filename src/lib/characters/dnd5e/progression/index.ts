@@ -11,9 +11,18 @@ export {
   slotsForClassLevel,
   casterTypeForClass,
   cantripsKnownForClass,
+  cantripsKnownForThirdCaster,
   spellsKnownForClass,
+  spellsKnownForThirdCaster,
+  isThirdCasterSubclass,
+  spellListClassIdForSubclass,
 } from "./spell-slots";
-export { planLevelUp, highestAvailableSpellLevel, featuresForLevel } from "./engine";
+export {
+  planLevelUp,
+  highestAvailableSpellLevel,
+  featuresForLevel,
+  subclassFeaturesUpToLevel,
+} from "./engine";
 export { applyLevelUpDraft } from "./apply";
 export {
   planLevel1Creation,
@@ -36,6 +45,7 @@ export {
 export {
   spellDefinitionToSheetEntry,
   featDefinitionToFeatureEntry,
+  appendGrantedSpellsFromFeatures,
   applyClassBasicsFromCatalog,
   syncSpellSlotsFromClass,
   canLearnSpellFromCatalog,
@@ -43,3 +53,28 @@ export {
   enrichItemDescriptionFromCatalog,
   matchSheetFeatureToFeat,
 } from "./catalog-bridge";
+export {
+  getSubclassAvailability,
+  SUBCLASS_AVAILABILITY,
+  type SubclassAvailabilityEntry,
+  type ClassSubclassAvailability,
+} from "./subclass-availability";
+export {
+  PROFICIENCY_CATALOG,
+  CLASS_PROFICIENCIES,
+  getProficiencyById,
+  getProficienciesByCategory,
+  matchProficiencyEntry,
+  resolveProficiencyLabel,
+  normalizeProficiencyList,
+  applyClassProficienciesFromCatalog,
+  reconcileProficienciesWithCatalog,
+  getClassProficiencyLabels,
+  listHasProficiency,
+  toggleProficiencyInList,
+  customProficiencyEntries,
+  proficiencyLabel,
+  type ProficiencyCategory,
+  type ProficiencyDefinition,
+  type ClassProficiencyGrant,
+} from "./proficiencies-catalog";

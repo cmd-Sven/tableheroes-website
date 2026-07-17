@@ -1,9 +1,28 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { isExileCultureName } from "@/src/lib/lore-race-bonuses";
 
 /**
  * Reine Datenqueries (kein "use server") – für Server Components.
  * Client nutzt weiterhin die Server-Action-Wrapper in character-actions.ts.
  */
+
+export type WizardRaceOption = {
+  id: string;
+  name: string;
+  culture_id: string | null;
+  race_traits: string | null;
+};
+
+export type WizardCultureOption = {
+  id: string;
+  name: string;
+  race_ids: string[];
+  language_ids: string[];
+  religion_ids: string[];
+};
+
+export type WizardLanguageOption = { id: string; name: string };
+export type WizardReligionOption = { id: string; name: string };
 
 export async function getCharacterWizardLoreData(campaignId: string) {
   const supabase = await createClient();
@@ -12,7 +31,14 @@ export async function getCharacterWizardLoreData(campaignId: string) {
     .select("world_id")
     .eq("id", campaignId)
     .single();
-  if (!campaign?.world_id) return { races: [], cultures: [], languages: [] };
+  if (!campaign?.world_id) {
+    return {
+      races: [] as WizardRaceOption[],
+      cultures: [] as WizardCultureOption[],
+      languages: [] as WizardLanguageOption[],
+      religions: [] as WizardReligionOption[],
+    };
+  }
 
   const worldId = campaign.world_id as string;
 
@@ -25,9 +51,9 @@ export async function getCharacterWizardLoreData(campaignId: string) {
   const revealedIds = new Set(((visRows as any[]) ?? []).map((v: any) => v.entity_id as string));
 
   const { data: loreRows } = await (supabase.from("world_lore") as any)
-    .select("id, name, type, culture_id, race_ids, language_ids")
+    .select("id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits")
     .eq("world_id", worldId)
-    .in("type", ["Rasse", "Kultur", "Sprache"]);
+    .in("type", ["Rasse", "Kultur", "Sprache", "Religion"]);
 
   const all = (loreRows as any[]) ?? [];
 
@@ -40,6 +66,7 @@ export async function getCharacterWizardLoreData(campaignId: string) {
       id: String(l.id),
       name: String(l.name ?? "").trim(),
       culture_id: l.culture_id != null ? String(l.culture_id) : null,
+      race_traits: l.race_traits != null ? String(l.race_traits) : null,
     }));
 
   const cultures = all
@@ -49,6 +76,7 @@ export async function getCharacterWizardLoreData(campaignId: string) {
       name: String(l.name ?? "").trim(),
       race_ids: asStringArray(l.race_ids),
       language_ids: asStringArray(l.language_ids),
+      religion_ids: asStringArray(l.religion_ids),
     }));
 
   const languages = all
@@ -58,7 +86,19 @@ export async function getCharacterWizardLoreData(campaignId: string) {
       name: String(l.name ?? "").trim(),
     }));
 
-  return { races, cultures, languages };
+  const religions = all
+    .filter((l: any) => l.type === "Religion" && revealedIds.has(l.id))
+    .map((l: any) => ({
+      id: String(l.id),
+      name: String(l.name ?? "").trim(),
+    }));
+
+  return { races, cultures, languages, religions };
+}
+
+/** Hilfsfunktion für Clients: Exilanten-Fallback. */
+export function cultureAllowsAllRaces(cultureName: string): boolean {
+  return isExileCultureName(cultureName);
 }
 
 const GEOGRAPHIC_TYPES_GM = [
@@ -85,26 +125,66 @@ export async function getCharacterEditorLoreOptionsForGm(campaignId: string) {
     .eq("id", campaignId)
     .single();
   if (!campaign?.world_id) {
-    return { cultures: [] as { id: string; name: string }[], languages: [] as { id: string; name: string }[], locations: [] as { id: string; name: string; type: string }[], factions: [] as { id: string; name: string }[] };
+    return {
+      cultures: [] as { id: string; name: string; race_ids: string[]; language_ids: string[]; religion_ids: string[] }[],
+      races: [] as WizardRaceOption[],
+      languages: [] as { id: string; name: string }[],
+      religions: [] as { id: string; name: string }[],
+      locations: [] as { id: string; name: string; type: string }[],
+      factions: [] as { id: string; name: string }[],
+    };
   }
 
   const worldId = campaign.world_id as string;
 
   const [{ data: loreRows }, { data: factionRows }] = await Promise.all([
     (supabase.from("world_lore") as any)
-      .select("id, name, type")
+      .select("id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits")
       .eq("world_id", worldId)
-      .in("type", ["Kultur", "Sprache", "Stadt", "Region", "Ort", "Akademie", "Tempel", "Gilde"]),
+      .in("type", [
+        "Kultur",
+        "Rasse",
+        "Sprache",
+        "Religion",
+        "Stadt",
+        "Region",
+        "Ort",
+        "Akademie",
+        "Tempel",
+        "Gilde",
+      ]),
     (supabase.from("factions") as any).select("id, name").eq("world_id", worldId).order("name"),
   ]);
 
   const all = (loreRows as any[]) ?? [];
+  const asStringArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((x) => String(x)) : [];
+
   const cultures = all
     .filter((l: any) => l.type === "Kultur")
-    .map((l: any) => ({ id: String(l.id), name: String(l.name ?? "").trim() || "Ohne Namen" }));
+    .map((l: any) => ({
+      id: String(l.id),
+      name: String(l.name ?? "").trim() || "Ohne Namen",
+      race_ids: asStringArray(l.race_ids),
+      language_ids: asStringArray(l.language_ids),
+      religion_ids: asStringArray(l.religion_ids),
+    }));
+
+  const races = all
+    .filter((l: any) => l.type === "Rasse")
+    .map((l: any) => ({
+      id: String(l.id),
+      name: String(l.name ?? "").trim() || "Ohne Namen",
+      culture_id: l.culture_id != null ? String(l.culture_id) : null,
+      race_traits: l.race_traits != null ? String(l.race_traits) : null,
+    }));
 
   const languages = all
     .filter((l: any) => l.type === "Sprache")
+    .map((l: any) => ({ id: String(l.id), name: String(l.name ?? "").trim() || "—" }));
+
+  const religions = all
+    .filter((l: any) => l.type === "Religion")
     .map((l: any) => ({ id: String(l.id), name: String(l.name ?? "").trim() || "—" }));
 
   const locations = all
@@ -120,5 +200,5 @@ export async function getCharacterEditorLoreOptionsForGm(campaignId: string) {
     name: String(f.name ?? "").trim() || "—",
   }));
 
-  return { cultures, languages, locations, factions };
+  return { cultures, races, languages, religions, locations, factions };
 }

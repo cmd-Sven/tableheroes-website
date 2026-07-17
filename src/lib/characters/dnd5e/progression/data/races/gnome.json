@@ -7,18 +7,18 @@
       "id": "darkvision",
       "level": 1,
       "nameEn": "Darkvision",
-      "nameDe": "Darkvision",
+      "nameDe": "Dunkelsicht",
       "descriptionEn": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
-      "descriptionDe": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
+      "descriptionDe": "Du siehst bei schwachem Licht in 18 m Entfernung wie bei hellem Licht und in Dunkelheit wie bei schwachem Licht. In Dunkelheit siehst du nur Graustufen, keine Farben.",
       "subclass": null
     },
     {
       "id": "gnome-cunning",
       "level": 1,
       "nameEn": "Gnome Cunning",
-      "nameDe": "Gnome Cunning",
+      "nameDe": "Gnomische Gerissenheit",
       "descriptionEn": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.",
-      "descriptionDe": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.",
+      "descriptionDe": "Du bist im Vorteil bei allen Rettungswürfen gegen Magie, wenn sie auf Intelligenz, Weisheit oder Charisma basieren.",
       "subclass": null
     }
   ]

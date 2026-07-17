@@ -232,189 +232,189 @@
       "id": "otherworldly-patron",
       "level": 1,
       "nameEn": "Otherworldly Patron",
-      "nameDe": "Otherworldly Patron",
+      "nameDe": "Andersweltlicher Schutzherr",
       "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Auf der 1. Stufe hast du einen Pakt mit einem andersweltlichen Wesen deiner Wahl geschlossen, wie etwa einem Unhold. Deine Wahl verleiht dir auf der 1., 6., 10. und 14. Stufe jeweils ein Merkmal.",
       "subclass": null
     },
     {
       "id": "pact-magic",
       "level": 1,
       "nameEn": "Pact Magic",
-      "nameDe": "Pact Magic",
+      "nameDe": "Paktmagie",
       "descriptionEn": "Your arcane research and the magic bestowed on you by your patron have given you facility with spells.",
-      "descriptionDe": "Your arcane research and the magic bestowed on you by your patron have given you facility with spells.",
+      "descriptionDe": "Aufgrund deiner arkanen Forschungen und der Magie, die dir durch deinen Schutzherren verliehen wird, besitzt du die Fähigkeit, Zauber zu wirken.\n\nZaubertricks\n\nZu Beginn sind dir zwei beliebige Zaubertricks aus der Zauberliste des Hexenmeisters bekannt. Weitere deiner Wahl lernst du auf höheren Stufen, so wie es in der Spalte für bekannte Zaubertricks in der Aufstiegstabelle des Hexenmeisters angegeben ist.\n\nZauberplätze\n\nDie Aufstiegstabelle des Hexenmeisters gibt an, wie viele Zauberplätze dir auf jeder Stufe zur Verfügung stehen und welchen Grad diese haben. All deine Zauberplätze besitzen den gleichen Grad. Um einen dir bekannten Hexenmeister-Spruch zu wirken, musst du einen Zauberplatz verbrauchen. Alle verbrauchten Zauberplätze stehen dir nach einer kurzen oder langen Rast zur Verfügung.\n\nBist du beispielsweise ein Hexenmeister der 5. Stufe, hast du zwei Zauberplätze des 3. Grades. Um den Zauber Hexenpfeil des 1. Grades zu wirken, musst du einen dieser Zauberplätze aufwenden, und wirkst ihn als Zauber des 3. Grades.\n\nBekannte Zauber des 1. Grades und höher\n\nAuf Stufe 1 kennst du zwei frei wählbare Zauber des 1. Grades aus der Zauberliste des Hexenmeisters.\n\nDer Spalte „Bekannte Zauber“ der Tabelle kannst du entnehmen, wie viele neue Sprüche du dir bei einem Stufenaufstieg aus der Zauberliste des Hexenmeisters aussuchen darfst. Dabei kannst du nur Zauber wählen, deren Grad dem deiner Zauberplätze entspricht. Erreichst du zum Beispiel die 6. Stufe als Hexenmeister, darfst du einen neuen Zauber des 1., 2. oder 3. Grades erlernen.\n\nSobald du eine Stufe in dieser Klasse aufsteigst, kannst du außerdem einen der Hexenmeisterzauber, die dir bereits bekannt sind, mit einem anderen aus der Zauberliste ersetzen. Auch bei diesem muss der Grad deiner Zauberplätze dem Grad des Spruches entsprechen.\n\nStufe\nBekannte Zaubertricks\nBekannte Zauber\nZauberplätze\nGrad der Plätze\n\n1\n2\n2\n1\n1.\n\n2\n2\n3\n2\n1.\n\n3\n2\n4\n2\n2.\n\n4\n3\n5\n2\n2.\n\n5\n3\n6\n2\n3.\n\n6\n3\n7\n2\n3.\n\n7\n3\n8\n2\n4.\n\n8\n3\n9\n2\n4.\n\n9\n3\n10\n2\n5.\n\n10\n4\n10\n2\n5.\n\n11\n4\n11\n3\n5.\n\n12\n4\n11\n3\n5.\n\n13\n4\n12\n3\n5.\n\n14\n4\n12\n3\n5.\n\n15\n4\n13\n3\n5.\n\n16\n4\n13\n3\n5.\n\n17\n4\n14\n4\n5.\n\n18\n4\n14\n4\n5.\n\n19\n4\n15\n4\n5.\n\n20\n4\n15\n4\n5.\n\nAttribut zum Zauberwirken\n\nDas Attribut, mit dem du deine Hexenmeisterzauber wirkst, ist Charisma. Immer wenn sich ein Zauber auf das zum Zauberwirken nötige Attribut bezieht, verwendest du Charisma. Wird der Schwierigkeitsgrad für einen Rettungswurf gegen deine Hexenmeisterzauber bestimmt, ziehst du deinen Charismamodifikator hinzu. Bei Angriffen mit deinen Hexenmeisterzaubern findet ebenfalls der Charismamodifikator Anwendung.\n\nSG für Rettungswürfe = 8 + dein Übungsbonus + dein Charismamodifikator\n\nModifikator für Zauberangriffe = dein Übungsbonus + dein Charismamodifikator\n\nZauberfokus\n\nDu kannst den arkanen Fokus als Zauberfokus für deine Hexenmeisterzauber verwenden.",
       "subclass": null
     },
     {
       "id": "eldritch-invocations",
       "level": 2,
       "nameEn": "Eldritch Invocations",
-      "nameDe": "Eldritch Invocations",
+      "nameDe": "Schauerliche Anrufungen",
       "descriptionEn": "In your study of occult lore, you have unearthed eldritch invocations, fragments of forbidden knowledge that imbue you with an abiding magical ability.\n\nAt 2nd level, you gain two eldritch invocations of your choice. Your invocation options are detailed at the end of the class description. When you gain certain warlock levels, you gain additional invocations of your choice, as shown in the Invocations Known column of the Warlock table.\n\nAdditionally, when you gain a level in this class, you can choose one of the invocations you know and replace it with another invocation that you could learn at that level.",
-      "descriptionDe": "In your study of occult lore, you have unearthed eldritch invocations, fragments of forbidden knowledge that imbue you with an abiding magical ability.\n\nAt 2nd level, you gain two eldritch invocations of your choice. Your invocation options are detailed at the end of the class description. When you gain certain warlock levels, you gain additional invocations of your choice, as shown in the Invocations Known column of the Warlock table.\n\nAdditionally, when you gain a level in this class, you can choose one of the invocations you know and replace it with another invocation that you could learn at that level.",
+      "descriptionDe": "Bei deinen Studien des okkulten Wissens hast du unheilvolle Beschwörungsformeln zu Tage gefördert, die dich mit anhaltenden magischen Fähigkeiten ausstatten.\n\nAuf der 2. Stufe kannst du dir zwei Schauerliche Anrufungen aussuchen, die du am Ende dieses Merkmals aufgeführt findest. Bei Erreiche bestimmter Hexenmeisterstufen erhältst du weitere Anrufungen deiner Wahl, vergleiche dazu die Spalte “Bekannte Anrufungen“ in der Aufstiegstabelle.\n\nDarüber hinaus kannst du jedes Mal, wenn du in dieser Klasse aufsteigst, eine bereits bekannte Anrufung durch eine andere ersetzen, die du auf der entsprechenden Stufe lernen könntest.\n\nSchauerliche Anrufungen\n\nSind bei einer schauerlichen Anrufung Voraussetzungen aufgelistet, musst du diese erfüllen, um die Anrufung lernen zu können. Du kannst die Anrufung zum gleichen Zeitpunkt lernen, zu dem du die Voraussetzungen erfüllst. Eine Stufenvoraussetzung bezieht sich auf deine Stufe als Hexenmeister.\n\nVoraussetzungen\nAnrufungen\n\nKlassenstufe\nAndere\n\n2\n\n@Compendium[dnd5e.classfeatures.lEZKbWaVrSljRa9n]{Auge des Runenwächters}\n\n@Compendium[dnd5e.classfeatures.MYM908WLZ1lVvA1u]{Pakt des Buches}\n@Compendium[dnd5e.classfeatures.CFIYXDmbmSP8BXjN]{Buch der uralten Geheimnisse}\n\n@Compendium[dnd5e.classfeatures.rhbwDZ9XNTmdkX2u]{Dieb der fünf Schicksale}\n\n@Compendium[dnd5e.classfeatures.65ReXU4ZWqcSs3Cm]{Gedankenblick}\n\n@Compendium[dnd5e.classfeatures.MhJfdBl1B7PdU4oZ]{Maske der vielen Gesichter}\n\n@Compendium[dnd5e.classfeatures.k5DU0mMuYVHejiqz]{Neblige Visionen}\n\n@Compendium[dnd5e.spells.Z9p1vezIn95jw1Yw]{Schauriger Strahl}\n@Compendium[dnd5e.classfeatures.2fyuw7MiCnocDeAU]{Qualvoller Strahl}\n\n@Compendium[dnd5e.classfeatures.alUqO6c6OEKFQJdb]{Schattenrüstung}\n\n@Compendium[dnd5e.classfeatures.Ic1CSjvbWKudVUv9]{Pakt der Kette}\n@Compendium[dnd5e.classfeatures.k5M8gsl7MMcdjOjs]{Stimme des Kettenmeisters}\n\n@Compendium[dnd5e.classfeatures.3sN91lT1R3oxcDKd]{Teufelssicht}\n\n@Compendium[dnd5e.classfeatures.61kXR1sniXHjvN17]{Tiersprache}\n\n@Compendium[dnd5e.classfeatures.bbUEsCPTLzbbwK6o]{Unheimliche Sicht}\n\n@Compendium[dnd5e.spells.Z9p1vezIn95jw1Yw]{Schauriger Strahl}\n@Compendium[dnd5e.classfeatures.r01WtcxTg4yTHm9m]{Unheimlicher Speer}\n\n@Compendium[dnd5e.classfeatures.eNvpIaSnJUdF8fHl]{Verführerischer Einfluss}\n\n@Compendium[dnd5e.classfeatures.id0gmGvzNZBEdzbx]{Vitalität des Unholds}\n\n@Compendium[dnd5e.spells.Z9p1vezIn95jw1Yw]{Schauriger Strahl}\n@Compendium[dnd5e.classfeatures.rdBPd6CwqXT64iJM]{Zurückdrängender Strahl}\n\n5\n@Compendium[dnd5e.classfeatures.9dSSa68mIPoX2ezA]{Pakt der Klinge}\n@Compendium[dnd5e.classfeatures.pJADgAxxefgcATWr]{Dürstende Klinge}\n\n@Compendium[dnd5e.classfeatures.KfnUyjUWAk0bAAus]{Mit den Schatten verschmelzen}\n\n@Compendium[dnd5e.classfeatures.DjXi0IkCTbJx1gsp]{Versumpfen lassen}\n\n@Compendium[dnd5e.classfeatures.dTSV0xZMpY5CxkRk]{Zeichen des schlechten Omens}\n\n7\n\n@Compendium[dnd5e.classfeatures.Xa2MLUJGCReJ28B7]{Fleischbildhauer}\n\n@Compendium[dnd5e.classfeatures.QBk1RsuTIEF4GEBC]{Fürchterliches Wort}\n\n@Compendium[dnd5e.classfeatures.KygHql3cTj4IRrvZ]{Verhexendes Flüstern}\n\n9\n\n@Compendium[dnd5e.classfeatures.QEuH5TeBN4PPYT2g]{Aufsteigender Schritt}\n\n@Compendium[dnd5e.classfeatures.8zciiglzEOZo7DDN]{Ausserweltlicher Sprung}\n\n@Compendium[dnd5e.classfeatures.gFjxo01hAN4c9hDG]{Grabesflüstern}\n\n@Compendium[dnd5e.classfeatures.QnRKYXb2bXpnNd2k]{Untergebene des Chaos}\n\n12\n@Compendium[dnd5e.classfeatures.9dSSa68mIPoX2ezA]{Pakt der Klinge}\n@Compendium[dnd5e.classfeatures.zUIAzBnyt0NDvVXb]{Lebensdrinker}\n\n15\n\n@Compendium[dnd5e.classfeatures.snsjxGfmzWfZR5Nh]{Hexensicht}\n\n@Compendium[dnd5e.classfeatures.Ic1CSjvbWKudVUv9]{Pakt der Kette}\n@Compendium[dnd5e.classfeatures.Phy02H5x0TKHd7T3]{Ketten von Carceri}\n\n@Compendium[dnd5e.classfeatures.lxfdjLer3uKjyZqU]{Meister der myriaden Formen}\n\n@Compendium[dnd5e.classfeatures.zYIdNAjqRyhS6qWs]{Visionen von fernen Gefilden}\n\nDu kannst deine Auswahl auf dein Charakterblatt ziehen und es wird automatisch aktualisiert.",
       "subclass": null
     },
     {
       "id": "pact-boon",
       "level": 3,
       "nameEn": "Pact Boon",
-      "nameDe": "Pact Boon",
+      "nameDe": "Segen des Pakts",
       "descriptionEn": "At 3rd level, your otherworldly patron bestows a gift upon you for your loyal service. You gain one of the following features of your choice.",
-      "descriptionDe": "At 3rd level, your otherworldly patron bestows a gift upon you for your loyal service. You gain one of the following features of your choice.",
+      "descriptionDe": "Auf der 3. Stufe verleiht dein Schutzherr dir ein Geschenk für deine treuen Dienste. Du erhältst eines der folgenden Merkmale deiner Wahl.\n\n@Compendium[dnd5e.classfeatures.MYM908WLZ1lVvA1u]{Pakt des Buches}\n\n@Compendium[dnd5e.classfeatures.Ic1CSjvbWKudVUv9]{Pakt der Kette}\n\n@Compendium[dnd5e.classfeatures.9dSSa68mIPoX2ezA]{Pakt der Klinge}\n\nDu kannst deine Auswahl auf dein Charakterblatt ziehen und es wird automatisch aktualisiert.",
       "subclass": null
     },
     {
       "id": "warlock-ability-score-improvement-1",
       "level": 4,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "otherworldly-patron-improvement-1",
       "level": 6,
       "nameEn": "Otherworldly Patron feature",
-      "nameDe": "Otherworldly Patron feature",
+      "nameDe": "Merkmal des Jenseitigen Patrons",
       "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deines Jenseitigen Patrons.",
       "subclass": null
     },
     {
       "id": "warlock-ability-score-improvement-2",
       "level": 8,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "otherworldly-patron-improvement-2",
       "level": 10,
       "nameEn": "Otherworldly Patron feature",
-      "nameDe": "Otherworldly Patron feature",
+      "nameDe": "Merkmal des Jenseitigen Patrons",
       "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deines Jenseitigen Patrons.",
       "subclass": null
     },
     {
       "id": "mystic-arcanum-6th-level",
       "level": 11,
       "nameEn": "Mystic Arcanum (6th level)",
-      "nameDe": "Mystic Arcanum (6th level)",
+      "nameDe": "Mystisches Arkanum (6. Grad)",
       "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
-      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "Du wählst einen Hexerzauber des 6. Grades als Mystisches Arkanum. Du kannst ihn einmal ohne Zauberplatz wirken; erneuert sich nach langer Rast.",
       "subclass": null
     },
     {
       "id": "warlock-ability-score-improvement-3",
       "level": 12,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "mystic-arcanum-7th-level",
       "level": 13,
       "nameEn": "Mystic Arcanum (7th level)",
-      "nameDe": "Mystic Arcanum (7th level)",
+      "nameDe": "Mystisches Arkanum (7. Grad)",
       "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
-      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "Du wählst einen Hexerzauber des 7. Grades als Mystisches Arkanum. Du kannst ihn einmal ohne Zauberplatz wirken; erneuert sich nach langer Rast.",
       "subclass": null
     },
     {
       "id": "otherworldly-patron-improvement-3",
       "level": 14,
       "nameEn": "Otherworldly Patron feature",
-      "nameDe": "Otherworldly Patron feature",
+      "nameDe": "Merkmal des Jenseitigen Patrons",
       "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deines Jenseitigen Patrons.",
       "subclass": null
     },
     {
       "id": "mystic-arcanum-8th-level",
       "level": 15,
       "nameEn": "Mystic Arcanum (8th level)",
-      "nameDe": "Mystic Arcanum (8th level)",
+      "nameDe": "Mystisches Arkanum (8. Grad)",
       "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
-      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "Du wählst einen Hexerzauber des 8. Grades als Mystisches Arkanum. Du kannst ihn einmal ohne Zauberplatz wirken; erneuert sich nach langer Rast.",
       "subclass": null
     },
     {
       "id": "warlock-ability-score-improvement-4",
       "level": 16,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "mystic-arcanum-9th-level",
       "level": 17,
       "nameEn": "Mystic Arcanum (9th level)",
-      "nameDe": "Mystic Arcanum (9th level)",
+      "nameDe": "Mystisches Arkanum (9. Grad)",
       "descriptionEn": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
-      "descriptionDe": "At 11th level, your patron bestows upon you a magical secret called an arcanum. Choose one 6th- level spell from the warlock spell list as this arcanum.\n\nYou can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again.\n\nAt higher levels, you gain more warlock spells of your choice that can be cast in this way: one 7th- level spell at 13th level, one 8th-level spell at 15th level, and one 9th-level spell at 17th level. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+      "descriptionDe": "Du wählst einen Hexerzauber des 9. Grades als Mystisches Arkanum. Du kannst ihn einmal ohne Zauberplatz wirken; erneuert sich nach langer Rast.",
       "subclass": null
     },
     {
       "id": "warlock-ability-score-improvement-5",
       "level": 19,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "eldritch-master",
       "level": 20,
       "nameEn": "Eldritch Master",
-      "nameDe": "Eldritch Master",
+      "nameDe": "Mystischer Meister",
       "descriptionEn": "At 20th level, you can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature.\n\nOnce you regain spell slots with this feature, you must finish a long rest before you can do so again.",
-      "descriptionDe": "At 20th level, you can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature.\n\nOnce you regain spell slots with this feature, you must finish a long rest before you can do so again.",
+      "descriptionDe": "Ab Stufe 20 bist du mit Hilfe deines Schutzherren dazu in der Lage, von deinen inneren Reserven an mystischer Energie zu zehren, um Zauber zu wirken. Flehst du deinen Schutzherren 1 Minute lang an, erlangst du alle verbrauchten Zauberplätze deines Merkmals Paktmagie zurück. Diese Fähigkeit kannst du erst nach einer langen Rast erneut anwenden.",
       "subclass": null
     },
     {
       "id": "dark-ones-blessing",
       "level": 1,
       "nameEn": "Dark One's Blessing",
-      "nameDe": "Dark One's Blessing",
+      "nameDe": "Segen des Dunklen Meisters",
       "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
-      "descriptionDe": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+      "descriptionDe": "Reduzierst du ab der 1. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
       "subclass": "fiend"
     },
     {
       "id": "dark-ones-own-luck",
       "level": 6,
       "nameEn": "Dark One's Own Luck",
-      "nameDe": "Dark One's Own Luck",
+      "nameDe": "Schicksal des Dunklen Meisters",
       "descriptionEn": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
-      "descriptionDe": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+      "descriptionDe": "Von Stufe 6 an kannst du mit Hilfe deines Schutzherren das Schicksal zu deinen Gunsten ändern. Wenn du einen Attributs- oder Rettungswurf ablegst, kannst du diese Fähigkeit einsetzen, um 1W10 zu deinem Wurf zu addieren. Du kannst dich nach deinem eigentlichen Wurf dazu entscheiden, die Fähigkeit zu nutzen, musst es aber bevor dessen Ergebnis angewendet wird.\n\nHast du die Fähigkeit einmal eingesetzt, steht sie dir erst wieder nach einer kurzen oder langen Rast zur Verfügung.",
       "subclass": "fiend"
     },
     {
       "id": "fiendish-resilience",
       "level": 10,
       "nameEn": "Fiendish Resilience",
-      "nameDe": "Fiendish Resilience",
+      "nameDe": "Widerstandskraft des Unholds",
       "descriptionEn": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
-      "descriptionDe": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+      "descriptionDe": "Mit Erreichen der 10. Stufe kannst du dir nach Beenden einer kurzen oder langen Rast eine Schadensart aussuchen, gegen die du eine Resistenz erhältst. Der Effekt dauert an, bis du auf diese Weise eine andere Schadensart auswählst. Der Schaden von magischen oder silbernen Waffen ignoriert diese Resistenz.",
       "subclass": "fiend"
     },
     {
       "id": "hurl-through-hell",
       "level": 14,
       "nameEn": "Hurl Through Hell",
-      "nameDe": "Hurl Through Hell",
+      "nameDe": "Schlund des Wahnsinns",
       "descriptionEn": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
-      "descriptionDe": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+      "descriptionDe": "Ab der 14. Stufe kannst du eine Kreatur, die du mit einem Angriff triffst, sofort auf die niederen Ebenen befördern, indem du diese Fähigkeit einsetzt. Die Kreatur verschwindet und wird durch eine alptraumhafte Landschaft geschleudert.\n\nZum Ende deines nächsten Zuges kehrt sie an ihren ursprünglichen Platz zurück oder den nächstgelegenen freien Ort. Sollte das Ziel kein Unhold sein, erleidet es 10W10 psychischen Schaden durch die verstörende Erfahrung.\n\nDu musst eine lange Rast beenden, bevor du diese Fähigkeit erneut einsetzen kannst.",
       "subclass": "fiend"
     }
   ],
@@ -422,42 +422,42 @@
     {
       "id": "fiend",
       "nameEn": "Fiend",
-      "nameDe": "Fiend",
+      "nameDe": "Unhold",
       "features": [
         {
           "id": "dark-ones-blessing",
           "level": 1,
           "nameEn": "Dark One's Blessing",
-          "nameDe": "Dark One's Blessing",
+          "nameDe": "Segen des Dunklen Meisters",
           "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
-          "descriptionDe": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+          "descriptionDe": "Reduzierst du ab der 1. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
           "subclass": "fiend"
         },
         {
           "id": "dark-ones-own-luck",
           "level": 6,
           "nameEn": "Dark One's Own Luck",
-          "nameDe": "Dark One's Own Luck",
+          "nameDe": "Schicksal des Dunklen Meisters",
           "descriptionEn": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
-          "descriptionDe": "Starting at 6th level, you can call on your patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add a d10 to your roll. You can do so after seeing the initial roll but before any of the roll's effects occur.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+          "descriptionDe": "Von Stufe 6 an kannst du mit Hilfe deines Schutzherren das Schicksal zu deinen Gunsten ändern. Wenn du einen Attributs- oder Rettungswurf ablegst, kannst du diese Fähigkeit einsetzen, um 1W10 zu deinem Wurf zu addieren. Du kannst dich nach deinem eigentlichen Wurf dazu entscheiden, die Fähigkeit zu nutzen, musst es aber bevor dessen Ergebnis angewendet wird.\n\nHast du die Fähigkeit einmal eingesetzt, steht sie dir erst wieder nach einer kurzen oder langen Rast zur Verfügung.",
           "subclass": "fiend"
         },
         {
           "id": "fiendish-resilience",
           "level": 10,
           "nameEn": "Fiendish Resilience",
-          "nameDe": "Fiendish Resilience",
+          "nameDe": "Widerstandskraft des Unholds",
           "descriptionEn": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
-          "descriptionDe": "Starting at 10th level, you can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+          "descriptionDe": "Mit Erreichen der 10. Stufe kannst du dir nach Beenden einer kurzen oder langen Rast eine Schadensart aussuchen, gegen die du eine Resistenz erhältst. Der Effekt dauert an, bis du auf diese Weise eine andere Schadensart auswählst. Der Schaden von magischen oder silbernen Waffen ignoriert diese Resistenz.",
           "subclass": "fiend"
         },
         {
           "id": "hurl-through-hell",
           "level": 14,
           "nameEn": "Hurl Through Hell",
-          "nameDe": "Hurl Through Hell",
+          "nameDe": "Schlund des Wahnsinns",
           "descriptionEn": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
-          "descriptionDe": "Starting at 14th level, when you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape.\n\nAt the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience.\n\nOnce you use this feature, you can't use it again until you finish a long rest.",
+          "descriptionDe": "Ab der 14. Stufe kannst du eine Kreatur, die du mit einem Angriff triffst, sofort auf die niederen Ebenen befördern, indem du diese Fähigkeit einsetzt. Die Kreatur verschwindet und wird durch eine alptraumhafte Landschaft geschleudert.\n\nZum Ende deines nächsten Zuges kehrt sie an ihren ursprünglichen Platz zurück oder den nächstgelegenen freien Ort. Sollte das Ziel kein Unhold sein, erleidet es 10W10 psychischen Schaden durch die verstörende Erfahrung.\n\nDu musst eine lange Rast beenden, bevor du diese Fähigkeit erneut einsetzen kannst.",
           "subclass": "fiend"
         }
       ]

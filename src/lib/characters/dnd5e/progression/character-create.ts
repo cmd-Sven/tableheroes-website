@@ -5,7 +5,7 @@ import { abilityModifier } from "../formulas";
 import { createEmptyDnd5eSheet } from "../defaults";
 import { defaultSpellAbilityForClass } from "../spellcasting";
 import type { AbilityKey, Dnd5eSheetData, Dnd5eSkillKey } from "../types";
-import { applyClassBasicsFromCatalog, spellDefinitionToSheetEntry } from "./catalog-bridge";
+import { applyClassBasicsFromCatalog, spellDefinitionToSheetEntry, appendGrantedSpellsFromFeatures } from "./catalog-bridge";
 import { getClassProgression, getRaceProgression, getSpells } from "./catalog";
 import { featuresForLevel } from "./engine";
 import { matchSubclassOption, resolveRaceId } from "./class-ids";
@@ -21,6 +21,12 @@ import type {
   RaceId,
   SlotKey,
 } from "./types";
+import {
+  applyLoreAbilityBonusesToScores,
+  applyLoreRaceBonusesToSheet,
+  loreRaceFeaturesToSheetEntries,
+  resolveLoreRaceBonuses,
+} from "@/src/lib/lore-race-bonuses";
 
 export const STANDARD_ARRAY: number[] = [15, 14, 13, 12, 10, 8];
 export const POINT_BUY_BUDGET = 27;
@@ -87,6 +93,11 @@ export type Level1CreationDraft = {
   applyRacialBonuses: boolean;
   spellIds: string[];
   skillKeys: Dnd5eSkillKey[];
+  /** Kampagnen-Lore Rassenboni (überschreiben/ergänzen SRD wenn gesetzt) */
+  loreRaceTraitsRaw?: string | null;
+  loreRaceLoreId?: string | null;
+  /** Wenn Lore-Attributsboni existieren: SRD-ASI nicht zusätzlich anwenden */
+  preferLoreAbilityBonuses?: boolean;
 };
 
 export function planLevel1Creation(input: {
@@ -222,9 +233,24 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
     ? matchSubclassOption(draft.subclassId, plan.subclassOptions)
     : null;
 
-  const scores = draft.applyRacialBonuses
-    ? applyRacialBonuses(draft.baseAbilities, plan.raceId)
-    : { ...draft.baseAbilities };
+  const loreSpec = resolveLoreRaceBonuses({
+    raceName: draft.raceName,
+    raceTraitsRaw: draft.loreRaceTraitsRaw,
+  });
+  const useLoreAbi =
+    draft.applyRacialBonuses &&
+    Boolean(loreSpec?.abilityBonuses) &&
+    (draft.preferLoreAbilityBonuses !== false);
+
+  let scores: Record<AbilityKeyShort, number>;
+  if (!draft.applyRacialBonuses) {
+    scores = { ...draft.baseAbilities };
+  } else if (useLoreAbi) {
+    // Lore-ASI statt SRD — keine doppelten Boni
+    scores = applyLoreAbilityBonusesToScores(draft.baseAbilities, loreSpec);
+  } else {
+    scores = applyRacialBonuses(draft.baseAbilities, plan.raceId);
+  }
 
   let sheet = createEmptyDnd5eSheet(1);
   const keys: AbilityKeyShort[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -258,8 +284,11 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
     subclassOpt?.nameDe || subclassOpt?.nameEn || draft.subclassId,
   );
 
-  // Features
-  const allFeatures = [...plan.classFeatures, ...plan.raceFeatures];
+  // Features: Klasse + SRD-Rasse (nur wenn keine Lore-Features)
+  const loreFeatures = loreRaceFeaturesToSheetEntries(loreSpec);
+  const raceFeatures =
+    loreFeatures.length > 0 ? [] : plan.raceFeatures;
+  const allFeatures = [...plan.classFeatures, ...raceFeatures];
   for (const f of allFeatures) {
     if (sheet.features.some((x) => x.id === f.id)) continue;
     sheet.features.push({
@@ -274,6 +303,17 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
     });
   }
 
+  if (loreSpec) {
+    // Proficiencies + Features + HP aus Lore; Attribute bereits gesetzt → nicht nochmal
+    sheet = applyLoreRaceBonusesToSheet(sheet, {
+      raceName: draft.raceName,
+      raceTraitsRaw: draft.loreRaceTraitsRaw,
+      raceLoreId: draft.loreRaceLoreId,
+      level: 1,
+      applyAbilityBonuses: false,
+    });
+  }
+
   // Spells
   if (plan.spellcasting && draft.spellIds.length > 0) {
     const catalog = getSpells();
@@ -283,6 +323,9 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
       .filter(Boolean)
       .map((def) => spellDefinitionToSheetEntry(def!));
   }
+
+  // Domain / subclass granted spells (always prepared)
+  sheet = appendGrantedSpellsFromFeatures(sheet, allFeatures, "domain");
 
   // Ensure spell ability
   if (plan.spellcasting) {

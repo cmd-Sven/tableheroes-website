@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
   Package,
   ScrollText,
   Shield,
+  ShieldAlert,
+  Smile,
   Sparkles,
   Swords,
   X,
@@ -22,8 +25,28 @@ import {
   useLiveSessionClassAbility,
   type LiveAvatarStatus,
 } from "@/src/lib/actions/live-session-avatar-actions";
+import {
+  setCharacterMoodState,
+  toggleCharacterActiveCondition,
+} from "@/src/app/dashboard/campaigns/[id]/character-state-actions";
+import {
+  CHARACTER_CONDITION_DEFINITIONS,
+  type CharacterConditionKey,
+} from "@/src/lib/characters/condition-tokens";
+import {
+  MOOD_STATE_DEFINITIONS,
+  type MoodStateKey,
+} from "@/src/lib/characters/mood-states";
 
-type RadialPanel = "weapons" | "loadouts" | "spells" | "abilities" | "belt" | null;
+type RadialPanel =
+  | "weapons"
+  | "loadouts"
+  | "spells"
+  | "abilities"
+  | "belt"
+  | "mood"
+  | "gm_state"
+  | null;
 
 function isCasterHeuristic(className: string | null): boolean {
   const c = (className ?? "").toLowerCase();
@@ -49,6 +72,8 @@ type Props = {
   avatarDisplay?: unknown | null;
   isDummy?: boolean;
   canInteract: boolean;
+  /** SL darf Zustände setzen (überlagert Spieler-Gemüt). */
+  isGm?: boolean;
   showDnd5eSheet: boolean;
 };
 
@@ -59,14 +84,30 @@ const RADIAL_ITEMS: {
   angle: number;
   casterOnly?: boolean;
   abilitiesOnly?: boolean;
+  moodOnly?: boolean;
+  gmOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
-  { id: "weapons", label: "Waffenset", Icon: Swords, angle: -30 },
-  { id: "loadouts", label: "Ausrüstungsset", Icon: Shield, angle: 30 },
-  { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 90, casterOnly: true },
-  { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 150, abilitiesOnly: true },
+  { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
+  { id: "gm_state", label: "Zustand (SL)", Icon: ShieldAlert, angle: -15, gmOnly: true },
+  { id: "weapons", label: "Waffenset", Icon: Swords, angle: 30 },
+  { id: "loadouts", label: "Ausrüstungsset", Icon: Shield, angle: 75 },
+  { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
+  { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 165, abilitiesOnly: true },
   { id: "belt", label: "Gürtel", Icon: Package, angle: 210 },
 ];
+
+const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
+  weapons: "Waffenset",
+  loadouts: "Ausrüstungsset",
+  spells: "Zauberbuch",
+  abilities: "Klassenfähigkeiten",
+  belt: "Gürtel",
+  mood: "Gemütszustand auswählen",
+  gm_state: "Zustand zuweisen (SL)",
+};
+
+type AnchorRect = { cx: number; cy: number; top: number; width: number; height: number };
 
 export function LiveSessionCharacterAvatar({
   sessionId,
@@ -78,13 +119,22 @@ export function LiveSessionCharacterAvatar({
   avatarDisplay,
   isDummy,
   canInteract,
+  isGm = false,
   showDnd5eSheet,
 }: Props) {
   const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<RadialPanel>(null);
   const [pending, startTransition] = useTransition();
+  const [mounted, setMounted] = useState(false);
+  const [anchor, setAnchor] = useState<AnchorRect | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const avatarBtnRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const reload = useCallback(async () => {
     if (isDummy) return;
@@ -96,6 +146,19 @@ export function LiveSessionCharacterAvatar({
     }
   }, [characterId, isDummy]);
 
+  const updateAnchor = useCallback(() => {
+    const el = avatarBtnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setAnchor({
+      cx: r.left + r.width / 2,
+      cy: r.top + r.height / 2,
+      top: r.top,
+      width: r.width,
+      height: r.height,
+    });
+  }, []);
+
   useEffect(() => {
     void reload();
     const id = window.setInterval(() => void reload(), 20000);
@@ -104,11 +167,26 @@ export function LiveSessionCharacterAvatar({
 
   useEffect(() => {
     if (!menuOpen) return;
+    updateAnchor();
+    function onScrollOrResize() {
+      updateAnchor();
+    }
+    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    return () => {
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+    };
+  }, [menuOpen, updateAnchor]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
     function onDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-        setPanel(null);
-      }
+      const target = e.target as Node;
+      if (overlayRef.current?.contains(target)) return;
+      if (avatarBtnRef.current?.contains(target)) return;
+      setMenuOpen(false);
+      setPanel(null);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -134,6 +212,8 @@ export function LiveSessionCharacterAvatar({
   const visibleRadial = useMemo(() => {
     const filtered = RADIAL_ITEMS.filter((item) => {
       if (item.id === "sheet") return showDnd5eSheet;
+      if (item.moodOnly) return true;
+      if (item.gmOnly) return isGm;
       if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
       if (item.abilitiesOnly) {
         if ((status?.classResources?.length ?? 0) > 0) return true;
@@ -147,7 +227,7 @@ export function LiveSessionCharacterAvatar({
       ...item,
       angle: -90 + (360 / count) * index,
     }));
-  }, [status, className, showDnd5eSheet]);
+  }, [status, className, showDnd5eSheet, isGm]);
 
   function openSheetTab() {
     window.open(
@@ -179,16 +259,332 @@ export function LiveSessionCharacterAvatar({
     });
   }
 
+  function saveMood(moodKey: MoodStateKey | null) {
+    startTransition(async () => {
+      try {
+        const result = await setCharacterMoodState({
+          campaignId,
+          characterId,
+          moodKey,
+        });
+        if (!result.success) {
+          toast.error(result.error ?? "Gemütszustand konnte nicht gespeichert werden.");
+          return;
+        }
+        await reload();
+        toast.success(
+          moodKey
+            ? `Gemüt: ${MOOD_STATE_DEFINITIONS.find((d) => d.key === moodKey)?.labelDe ?? moodKey}`
+            : "Gemütszustand zurückgesetzt.",
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Gemütszustand fehlgeschlagen.");
+      }
+    });
+  }
+
+  function toggleGmCondition(conditionKey: CharacterConditionKey) {
+    if (!isGm) return;
+    startTransition(async () => {
+      try {
+        const result = await toggleCharacterActiveCondition({
+          campaignId,
+          characterId,
+          conditionKey,
+        });
+        if (!result.success) {
+          toast.error(result.error ?? "Zustand konnte nicht gesetzt werden.");
+          return;
+        }
+        await reload();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Zustand fehlgeschlagen.");
+      }
+    });
+  }
+
+  const overlay =
+    mounted && menuOpen && canInteract && anchor
+      ? createPortal(
+          <div
+            ref={overlayRef}
+            className="pointer-events-none fixed inset-0 z-[220]"
+            aria-hidden={false}
+          >
+            <AnimatePresence>
+              <motion.div
+                key="radial"
+                className="pointer-events-none absolute"
+                style={{ left: anchor.cx, top: anchor.cy }}
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.2 }}
+              >
+                {visibleRadial.map((item) => {
+                  const radius = 92;
+                  const rad = (item.angle * Math.PI) / 180;
+                  const x = Math.cos(rad) * radius;
+                  const y = Math.sin(rad) * radius;
+                  const Icon = item.Icon;
+                  const active = panel === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => handleRadialClick(item.id)}
+                      title={item.label}
+                      aria-label={item.label}
+                      className={`pointer-events-auto absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-xl transition-transform hover:scale-110 ${
+                        active
+                          ? "border-hero-vibrant bg-hero-vibrant/25 text-hero-vibrant"
+                          : "border-amber-700/80 bg-background-dark/95 text-accent-gold"
+                      }`}
+                      style={{ left: x, top: y }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPanel(null);
+                  }}
+                  className="pointer-events-auto absolute left-0 top-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-600 bg-background-card text-gray-400"
+                  title="Schließen"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </motion.div>
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {panel ? (
+                <motion.div
+                  key={panel}
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="pointer-events-auto absolute w-60 -translate-x-1/2 rounded-lg border border-hero-border bg-background-card p-2 shadow-2xl"
+                  style={{
+                    left: anchor.cx,
+                    bottom: `calc(100vh - ${anchor.top}px + 12px)`,
+                  }}
+                >
+                  <p className="mb-2 font-barlow text-[10px] font-bold uppercase text-accent-gold">
+                    {PANEL_TITLES[panel]}
+                  </p>
+
+                  {status?.displaySource === "gm_condition" && panel === "mood" ? (
+                    <p className="mb-2 font-libre text-[10px] leading-snug text-amber-200/90">
+                      Ein SL-Zustand überdeckt aktuell dein Gemüt. Das Gemüt bleibt gespeichert.
+                    </p>
+                  ) : null}
+
+                  {panel === "weapons" ? (
+                    <ActionList
+                      empty="Keine Waffenkombination gespeichert."
+                      items={(status?.weaponPresets ?? []).map((p) => ({
+                        id: p.id,
+                        label: p.name,
+                        onClick: () =>
+                          runAction(() =>
+                            applyLiveSessionWeaponPreset({
+                              sessionId,
+                              characterId,
+                              characterName,
+                              presetId: p.id,
+                            }),
+                          ),
+                      }))}
+                      pending={pending}
+                    />
+                  ) : null}
+
+                  {panel === "loadouts" ? (
+                    <ActionList
+                      empty="Kein Ausrüstungsset gespeichert."
+                      items={(status?.loadouts ?? []).map((l) => ({
+                        id: l.id,
+                        label: l.name,
+                        onClick: () => {
+                          if (
+                            !confirm(
+                              `Loadout „${l.name}" anwenden? Laut PHB nur bei kurzer oder langer Rast.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          runAction(() =>
+                            applyLiveSessionLoadout({
+                              sessionId,
+                              characterId,
+                              characterName,
+                              loadoutId: l.id,
+                            }),
+                          );
+                        },
+                      }))}
+                      pending={pending}
+                    />
+                  ) : null}
+
+                  {panel === "spells" ? (
+                    (status?.spells ?? []).length === 0 ? (
+                      <p className="font-libre text-xs text-gray-500 italic">
+                        Zauberbuch folgt — Zauber werden später integriert.
+                      </p>
+                    ) : (
+                      <ActionList
+                        empty=""
+                        items={(status?.spells ?? []).map((s) => ({
+                          id: s.id,
+                          label: s.name,
+                          onClick: () =>
+                            runAction(async () => {
+                              await announceLiveSessionSpell({
+                                sessionId,
+                                characterId,
+                                characterName,
+                                spellName: s.name,
+                              });
+                              toast.success(`„${s.name}" angekündigt.`);
+                            }),
+                        }))}
+                        pending={pending}
+                      />
+                    )
+                  ) : null}
+
+                  {panel === "abilities" ? (
+                    <ActionList
+                      empty="Keine Klassenfähigkeiten."
+                      items={(status?.classResources ?? []).map((r) => ({
+                        id: r.id,
+                        label: `${r.label} (${r.current}/${r.max})`,
+                        disabled: r.current <= 0,
+                        onClick: () =>
+                          runAction(() =>
+                            useLiveSessionClassAbility({
+                              sessionId,
+                              characterId,
+                              characterName,
+                              resourceId: r.id,
+                            }),
+                          ),
+                      }))}
+                      pending={pending}
+                    />
+                  ) : null}
+
+                  {panel === "belt" ? (
+                    <ActionList
+                      empty="Gürtel ist leer."
+                      items={(status?.beltItems ?? []).map((b) => ({
+                        id: b.id,
+                        label: `${b.name}${b.quantity > 1 ? ` ×${b.quantity}` : ""}${
+                          b.isConsumable ? " · Verbrauch" : ""
+                        }`,
+                        onClick: () =>
+                          runAction(() =>
+                            useLiveSessionBeltItem({
+                              sessionId,
+                              characterId,
+                              characterName,
+                              itemId: b.id,
+                            }),
+                          ),
+                      }))}
+                      pending={pending}
+                    />
+                  ) : null}
+
+                  {panel === "mood" ? (
+                    <div className="max-h-48 space-y-1 overflow-y-auto">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => saveMood(null)}
+                        className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
+                          !status?.moodState
+                            ? "border-hero-vibrant/60 bg-hero-vibrant/10 text-hero-vibrant"
+                            : "border-hero-border/40 text-gray-400"
+                        }`}
+                      >
+                        Neutral (Basis)
+                      </button>
+                      {MOOD_STATE_DEFINITIONS.map((def) => {
+                        const selected = status?.moodState === def.key;
+                        return (
+                          <button
+                            key={def.key}
+                            type="button"
+                            disabled={pending}
+                            onClick={() => saveMood(def.key)}
+                            className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
+                              selected
+                                ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
+                                : "border-hero-border/40 text-gray-200"
+                            }`}
+                          >
+                            {def.labelDe}
+                            {selected ? " · Aktiv" : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {panel === "gm_state" && isGm ? (
+                    <div className="max-h-52 space-y-1 overflow-y-auto">
+                      <p className="mb-1 font-libre text-[10px] text-gray-500">
+                        Überlagert immer den Spieler-Gemütszustand.
+                      </p>
+                      {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
+                        const active = (status?.activeConditions ?? []).includes(def.key);
+                        return (
+                          <button
+                            key={def.key}
+                            type="button"
+                            disabled={pending}
+                            onClick={() => toggleGmCondition(def.key)}
+                            aria-pressed={active}
+                            className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
+                              active
+                                ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
+                                : "border-hero-border/40 text-gray-200"
+                            }`}
+                          >
+                            {def.labelDe}
+                            {active ? " · Aktiv" : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div ref={rootRef} className="relative flex h-full w-full flex-col items-center">
-      {/* Interaktionsfläche: Avatar */}
       <button
+        ref={avatarBtnRef}
         type="button"
         disabled={!canInteract || isDummy}
         onClick={() => {
           if (!canInteract || isDummy) return;
           setMenuOpen((v) => !v);
           setPanel(null);
+          requestAnimationFrame(() => updateAnchor());
           void reload();
         }}
         className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl transition-transform ${
@@ -213,7 +609,6 @@ export function LiveSessionCharacterAvatar({
         )}
       </button>
 
-      {/* Display: Waffen + HP — keine Interaktion */}
       {!isDummy ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[-6px] z-20 flex flex-col items-center gap-1 px-2">
           <p
@@ -240,198 +635,7 @@ export function LiveSessionCharacterAvatar({
         </div>
       ) : null}
 
-      {/* Radmenü */}
-      <AnimatePresence>
-        {menuOpen && canInteract ? (
-          <motion.div
-            className="pointer-events-none absolute left-1/2 top-[72px] z-40"
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            transition={{ duration: 0.18 }}
-          >
-            {visibleRadial.map((item) => {
-              const radius = 92;
-              const rad = (item.angle * Math.PI) / 180;
-              const x = Math.cos(rad) * radius;
-              const y = Math.sin(rad) * radius;
-              const Icon = item.Icon;
-              const active = panel === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => handleRadialClick(item.id)}
-                  title={item.label}
-                  aria-label={item.label}
-                  className={`pointer-events-auto absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-xl transition-transform hover:scale-110 ${
-                    active
-                      ? "border-hero-vibrant bg-hero-vibrant/25 text-hero-vibrant"
-                      : "border-amber-700/80 bg-background-dark/95 text-accent-gold"
-                  }`}
-                  style={{ left: x, top: y }}
-                >
-                  <Icon className="h-5 w-5" />
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                setPanel(null);
-              }}
-              className="pointer-events-auto absolute left-0 top-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-600 bg-background-card text-gray-400"
-              title="Schließen"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {/* Untermenü-Panel */}
-      <AnimatePresence>
-        {panel ? (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="absolute left-1/2 top-[210px] z-50 w-56 -translate-x-1/2 rounded-lg border border-hero-border bg-background-card p-2 shadow-2xl"
-          >
-            <p className="mb-2 font-barlow text-[10px] font-bold uppercase text-accent-gold">
-              {panel === "weapons"
-                ? "Waffenset"
-                : panel === "loadouts"
-                  ? "Ausrüstungsset"
-                  : panel === "spells"
-                    ? "Zauberbuch"
-                    : panel === "abilities"
-                      ? "Klassenfähigkeiten"
-                      : "Gürtel"}
-            </p>
-
-            {panel === "weapons" ? (
-              <ActionList
-                empty="Keine Waffenkombination gespeichert."
-                items={(status?.weaponPresets ?? []).map((p) => ({
-                  id: p.id,
-                  label: p.name,
-                  onClick: () =>
-                    runAction(() =>
-                      applyLiveSessionWeaponPreset({
-                        sessionId,
-                        characterId,
-                        characterName,
-                        presetId: p.id,
-                      }),
-                    ),
-                }))}
-                pending={pending}
-              />
-            ) : null}
-
-            {panel === "loadouts" ? (
-              <ActionList
-                empty="Kein Ausrüstungsset gespeichert."
-                items={(status?.loadouts ?? []).map((l) => ({
-                  id: l.id,
-                  label: l.name,
-                  onClick: () => {
-                    if (
-                      !confirm(
-                        `Loadout „${l.name}" anwenden? Laut PHB nur bei kurzer oder langer Rast.`,
-                      )
-                    ) {
-                      return;
-                    }
-                    runAction(() =>
-                      applyLiveSessionLoadout({
-                        sessionId,
-                        characterId,
-                        characterName,
-                        loadoutId: l.id,
-                      }),
-                    );
-                  },
-                }))}
-                pending={pending}
-              />
-            ) : null}
-
-            {panel === "spells" ? (
-              (status?.spells ?? []).length === 0 ? (
-                <p className="font-libre text-xs text-gray-500 italic">
-                  Zauberbuch folgt — Zauber werden später integriert.
-                </p>
-              ) : (
-                <ActionList
-                  empty=""
-                  items={(status?.spells ?? []).map((s) => ({
-                    id: s.id,
-                    label: s.name,
-                    onClick: () =>
-                      runAction(async () => {
-                        await announceLiveSessionSpell({
-                          sessionId,
-                          characterId,
-                          characterName,
-                          spellName: s.name,
-                        });
-                        toast.success(`„${s.name}" angekündigt.`);
-                      }),
-                  }))}
-                  pending={pending}
-                />
-              )
-            ) : null}
-
-            {panel === "abilities" ? (
-              <ActionList
-                empty="Keine Klassenfähigkeiten."
-                items={(status?.classResources ?? []).map((r) => ({
-                  id: r.id,
-                  label: `${r.label} (${r.current}/${r.max})`,
-                  disabled: r.current <= 0,
-                  onClick: () =>
-                    runAction(() =>
-                      useLiveSessionClassAbility({
-                        sessionId,
-                        characterId,
-                        characterName,
-                        resourceId: r.id,
-                      }),
-                    ),
-                }))}
-                pending={pending}
-              />
-            ) : null}
-
-            {panel === "belt" ? (
-              <ActionList
-                empty="Gürtel ist leer."
-                items={(status?.beltItems ?? []).map((b) => ({
-                  id: b.id,
-                  label: `${b.name}${b.quantity > 1 ? ` ×${b.quantity}` : ""}${
-                    b.isConsumable ? " · Verbrauch" : ""
-                  }`,
-                  onClick: () =>
-                    runAction(() =>
-                      useLiveSessionBeltItem({
-                        sessionId,
-                        characterId,
-                        characterName,
-                        itemId: b.id,
-                      }),
-                    ),
-                }))}
-                pending={pending}
-              />
-            ) : null}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {overlay}
     </div>
   );
 }

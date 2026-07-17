@@ -14,8 +14,16 @@ import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import { isConsumableItem } from "@/src/lib/characters/dnd5e/inventory-categories";
 import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
 import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
-import { parseConditionTokensMap } from "@/src/lib/characters/condition-tokens";
-import { parseMoodTokensMap } from "@/src/lib/characters/mood-states";
+import {
+  parseActiveConditions,
+  parseConditionTokensMap,
+  type CharacterConditionKey,
+} from "@/src/lib/characters/condition-tokens";
+import {
+  normalizeMoodState,
+  parseMoodTokensMap,
+  type MoodStateKey,
+} from "@/src/lib/characters/mood-states";
 import { resolveCharacterDisplayToken } from "@/src/lib/characters/display-token";
 import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
 import { getCharacterInventory } from "@/src/lib/actions/character-inventory-actions";
@@ -40,6 +48,11 @@ export type LiveAvatarStatus = {
   hpMax: number;
   hpTemp: number;
   displayAvatarUrl: string | null;
+  /** Spieler-Gemüt (wird von GM-Zustand visuell überdeckt). */
+  moodState: MoodStateKey | null;
+  /** Aktive SL-Zustände (Vorrang vor moodState). */
+  activeConditions: CharacterConditionKey[];
+  displaySource: "gm_condition" | "mood" | "base";
   weaponLabels: string[];
   className: string;
   isCaster: boolean;
@@ -177,6 +190,8 @@ export async function getLiveSessionAvatarStatus(
     current_fap: Math.max(0, Math.round(Number(row.current_fap ?? 0))),
   }));
   const itemMap = new Map(items.map((i) => [i.id, i]));
+  const moodState = normalizeMoodState(ch.mood_state);
+  const activeConditions = parseActiveConditions(ch.active_conditions);
   const display = resolveCharacterDisplayToken({
     baseTokenUrl: ch.token_url,
     avatarUrl: ch.avatar_url,
@@ -226,6 +241,9 @@ export async function getLiveSessionAvatarStatus(
     hpMax: Math.max(1, Math.round(Number(sheet.combat?.hpMax) || 1)),
     hpTemp: Math.max(0, Math.round(Number(sheet.combat?.hpTemp) || 0)),
     displayAvatarUrl: display.url || ch.avatar_url || null,
+    moodState,
+    activeConditions,
+    displaySource: display.source,
     weaponLabels,
     className,
     isCaster: isCasterClass(className),

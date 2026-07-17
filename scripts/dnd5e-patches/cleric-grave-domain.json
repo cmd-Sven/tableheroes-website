@@ -1,0 +1,239 @@
+{
+  "features": [
+    {
+      "id": "grave-armor",
+      "level": 1,
+      "nameEn": "Grave Domain Armor",
+      "nameDe": "Rüstung der Grab-Domäne",
+      "descriptionEn": "When you choose this domain at 1st level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
+      "descriptionDe": "Wenn du diese Domäne auf der 1. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
+      "subclass": "grave"
+    },
+    {
+      "id": "circle-of-mortality",
+      "level": 1,
+      "nameEn": "Circle of Mortality",
+      "nameDe": "Kreis des Sterbens",
+      "descriptionEn": "At 1st level, you gain the ability to manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
+      "descriptionDe": "Auf der 1. Stufe kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m (30 Fuß), und du kannst ihn als Bonusaktion wirken.",
+      "subclass": "grave",
+      "grantedSpellIds": ["spare-the-dying"]
+    },
+    {
+      "id": "eyes-of-the-grave",
+      "level": 1,
+      "nameEn": "Eyes of the Grave",
+      "nameDe": "Auge des Grabes",
+      "descriptionEn": "At 1st level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+      "descriptionDe": "Auf der 1. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m (60 Fuß), der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+      "subclass": "grave"
+    },
+    {
+      "id": "grave-domain-spells-1",
+      "level": 1,
+      "nameEn": "Domain Spells (1st)",
+      "nameDe": "Domänenzauber (1. Grad)",
+      "descriptionEn": "You always have the following spells prepared: Bane, False Life. They don't count against your number of prepared spells and are cleric spells for you.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Plage, Falsches Leben. Sie zählen nicht gegen deine vorbereiteten Zauber und gelten für dich als Klerikerzauber.",
+      "subclass": "grave",
+      "grantedSpellIds": ["bane", "false-life"]
+    },
+    {
+      "id": "channel-divinity-path-to-the-grave",
+      "level": 2,
+      "nameEn": "Channel Divinity: Path to the Grave",
+      "nameDe": "Göttliche Macht fokussieren: Pfad zum Grab",
+      "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
+      "descriptionDe": "Ab der 2. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
+      "subclass": "grave"
+    },
+    {
+      "id": "grave-domain-spells-2",
+      "level": 3,
+      "nameEn": "Domain Spells (2nd)",
+      "nameDe": "Domänenzauber (2. Grad)",
+      "descriptionEn": "You always have the following spells prepared: Gentle Repose, Ray of Enfeeblement.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Sanfte Ruhe, Strahl der Schwächung.",
+      "subclass": "grave",
+      "grantedSpellIds": ["gentle-repose", "ray-of-enfeeblement"]
+    },
+    {
+      "id": "grave-domain-spells-3",
+      "level": 5,
+      "nameEn": "Domain Spells (3rd)",
+      "nameDe": "Domänenzauber (3. Grad)",
+      "descriptionEn": "You always have the following spells prepared: Animate Dead, Vampiric Touch.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Tote beleben, Vampirberührung.",
+      "subclass": "grave",
+      "grantedSpellIds": ["animate-dead", "vampiric-touch"]
+    },
+    {
+      "id": "sentinel-at-deaths-door",
+      "level": 6,
+      "nameEn": "Sentinel at Death's Door",
+      "nameDe": "Wächter an der Todesschwelle",
+      "descriptionEn": "At 6th level, you gain the ability to impede death's progress. As a reaction when you or a creature you can see within 30 feet of you suffers a critical hit, you can turn that hit into a normal hit. Any effects triggered by a critical hit are canceled.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+      "descriptionDe": "Auf der 6. Stufe kannst du dem Fortschreiten des Todes entgegentreten. Als Reaktion, wenn du oder eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, einen kritischen Treffer erleidet, kannst du diesen Treffer in einen normalen Treffer verwandeln. Alle Effekte, die durch einen kritischen Treffer ausgelöst würden, entfallen.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+      "subclass": "grave"
+    },
+    {
+      "id": "grave-domain-spells-4",
+      "level": 7,
+      "nameEn": "Domain Spells (4th)",
+      "nameDe": "Domänenzauber (4. Grad)",
+      "descriptionEn": "You always have the following spells prepared: Blight, Death Ward.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Verdorren, Todesschutz.",
+      "subclass": "grave",
+      "grantedSpellIds": ["blight", "death-ward"]
+    },
+    {
+      "id": "potent-spellcasting-grave",
+      "level": 8,
+      "nameEn": "Potent Spellcasting",
+      "nameDe": "Mächtiges Zauberwirken",
+      "descriptionEn": "Starting at 8th level, you add your Wisdom modifier to the damage you deal with any cleric cantrip.",
+      "descriptionDe": "Ab der 8. Stufe addierst du deinen Weisheitsmodifikator auf den Schaden, den du mit einem Kleriker-Zaubertrick verursachst.",
+      "subclass": "grave"
+    },
+    {
+      "id": "grave-domain-spells-5",
+      "level": 9,
+      "nameEn": "Domain Spells (5th)",
+      "nameDe": "Domänenzauber (5. Grad)",
+      "descriptionEn": "You always have the following spells prepared: Antilife Shell, Raise Dead.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Lebensfeindliche Hülle (Schutzhülle gegen Lebendes), Tote erwecken.",
+      "subclass": "grave",
+      "grantedSpellIds": ["antilife-shell", "raise-dead"]
+    },
+    {
+      "id": "keeper-of-souls",
+      "level": 17,
+      "nameEn": "Keeper of Souls",
+      "nameDe": "Hüter der Seelen",
+      "descriptionEn": "At 17th level, you can seize a creature's life force as it dies. When an enemy you can see dies within 60 feet of you, you or one ally of your choice that is within 60 feet of you regains hit points equal to the enemy's number of Hit Dice. You can use this feature only if you aren't incapacitated. Once you use this feature, you can't use it again until the start of your next turn.",
+      "descriptionDe": "Auf der 17. Stufe kannst du die Lebenskraft einer sterbenden Kreatur an dich reißen. Stirbt ein Feind, den du innerhalb von 18 m (60 Fuß) sehen kannst, erhältst du oder ein Verbündeter deiner Wahl innerhalb von 18 m Trefferpunkte in Höhe der Anzahl der Trefferwürfel der Kreatur zurück. Du kannst dieses Merkmal nur nutzen, wenn du nicht kampfunfähig bist. Nach dem Einsatz kannst du es erst wieder zu Beginn deines nächsten Zuges verwenden (höchstens 1×/Runde).",
+      "subclass": "grave"
+    }
+  ],
+  "subclass": {
+    "id": "grave",
+    "nameEn": "Grave",
+    "nameDe": "Grab",
+    "features": [
+      {
+        "id": "grave-armor",
+        "level": 1,
+        "nameEn": "Grave Domain Armor",
+        "nameDe": "Rüstung der Grab-Domäne",
+        "descriptionEn": "When you choose this domain at 1st level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
+        "descriptionDe": "Wenn du diese Domäne auf der 1. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
+        "subclass": "grave"
+      },
+      {
+        "id": "circle-of-mortality",
+        "level": 1,
+        "nameEn": "Circle of Mortality",
+        "nameDe": "Kreis des Sterbens",
+        "descriptionEn": "At 1st level, you gain the ability to manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
+        "descriptionDe": "Auf der 1. Stufe kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m (30 Fuß), und du kannst ihn als Bonusaktion wirken.",
+        "subclass": "grave",
+        "grantedSpellIds": ["spare-the-dying"]
+      },
+      {
+        "id": "eyes-of-the-grave",
+        "level": 1,
+        "nameEn": "Eyes of the Grave",
+        "nameDe": "Auge des Grabes",
+        "descriptionEn": "At 1st level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "descriptionDe": "Auf der 1. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m (60 Fuß), der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+        "subclass": "grave"
+      },
+      {
+        "id": "grave-domain-spells-1",
+        "level": 1,
+        "nameEn": "Domain Spells (1st)",
+        "nameDe": "Domänenzauber (1. Grad)",
+        "descriptionEn": "You always have the following spells prepared: Bane, False Life. They don't count against your number of prepared spells and are cleric spells for you.",
+        "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Plage, Falsches Leben. Sie zählen nicht gegen deine vorbereiteten Zauber und gelten für dich als Klerikerzauber.",
+        "subclass": "grave",
+        "grantedSpellIds": ["bane", "false-life"]
+      },
+      {
+        "id": "channel-divinity-path-to-the-grave",
+        "level": 2,
+        "nameEn": "Channel Divinity: Path to the Grave",
+        "nameDe": "Göttliche Macht fokussieren: Pfad zum Grab",
+        "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
+        "descriptionDe": "Ab der 2. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
+        "subclass": "grave"
+      },
+      {
+        "id": "grave-domain-spells-2",
+        "level": 3,
+        "nameEn": "Domain Spells (2nd)",
+        "nameDe": "Domänenzauber (2. Grad)",
+        "descriptionEn": "You always have the following spells prepared: Gentle Repose, Ray of Enfeeblement.",
+        "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Sanfte Ruhe, Strahl der Schwächung.",
+        "subclass": "grave",
+        "grantedSpellIds": ["gentle-repose", "ray-of-enfeeblement"]
+      },
+      {
+        "id": "grave-domain-spells-3",
+        "level": 5,
+        "nameEn": "Domain Spells (3rd)",
+        "nameDe": "Domänenzauber (3. Grad)",
+        "descriptionEn": "You always have the following spells prepared: Animate Dead, Vampiric Touch.",
+        "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Tote beleben, Vampirberührung.",
+        "subclass": "grave",
+        "grantedSpellIds": ["animate-dead", "vampiric-touch"]
+      },
+      {
+        "id": "sentinel-at-deaths-door",
+        "level": 6,
+        "nameEn": "Sentinel at Death's Door",
+        "nameDe": "Wächter an der Todesschwelle",
+        "descriptionEn": "At 6th level, you gain the ability to impede death's progress. As a reaction when you or a creature you can see within 30 feet of you suffers a critical hit, you can turn that hit into a normal hit. Any effects triggered by a critical hit are canceled.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "descriptionDe": "Auf der 6. Stufe kannst du dem Fortschreiten des Todes entgegentreten. Als Reaktion, wenn du oder eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, einen kritischen Treffer erleidet, kannst du diesen Treffer in einen normalen Treffer verwandeln. Alle Effekte, die durch einen kritischen Treffer ausgelöst würden, entfallen.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+        "subclass": "grave"
+      },
+      {
+        "id": "grave-domain-spells-4",
+        "level": 7,
+        "nameEn": "Domain Spells (4th)",
+        "nameDe": "Domänenzauber (4. Grad)",
+        "descriptionEn": "You always have the following spells prepared: Blight, Death Ward.",
+        "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Verdorren, Todesschutz.",
+        "subclass": "grave",
+        "grantedSpellIds": ["blight", "death-ward"]
+      },
+      {
+        "id": "potent-spellcasting-grave",
+        "level": 8,
+        "nameEn": "Potent Spellcasting",
+        "nameDe": "Mächtiges Zauberwirken",
+        "descriptionEn": "Starting at 8th level, you add your Wisdom modifier to the damage you deal with any cleric cantrip.",
+        "descriptionDe": "Ab der 8. Stufe addierst du deinen Weisheitsmodifikator auf den Schaden, den du mit einem Kleriker-Zaubertrick verursachst.",
+        "subclass": "grave"
+      },
+      {
+        "id": "grave-domain-spells-5",
+        "level": 9,
+        "nameEn": "Domain Spells (5th)",
+        "nameDe": "Domänenzauber (5. Grad)",
+        "descriptionEn": "You always have the following spells prepared: Antilife Shell, Raise Dead.",
+        "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Lebensfeindliche Hülle (Schutzhülle gegen Lebendes), Tote erwecken.",
+        "subclass": "grave",
+        "grantedSpellIds": ["antilife-shell", "raise-dead"]
+      },
+      {
+        "id": "keeper-of-souls",
+        "level": 17,
+        "nameEn": "Keeper of Souls",
+        "nameDe": "Hüter der Seelen",
+        "descriptionEn": "At 17th level, you can seize a creature's life force as it dies. When an enemy you can see dies within 60 feet of you, you or one ally of your choice that is within 60 feet of you regains hit points equal to the enemy's number of Hit Dice. You can use this feature only if you aren't incapacitated. Once you use this feature, you can't use it again until the start of your next turn.",
+        "descriptionDe": "Auf der 17. Stufe kannst du die Lebenskraft einer sterbenden Kreatur an dich reißen. Stirbt ein Feind, den du innerhalb von 18 m (60 Fuß) sehen kannst, erhältst du oder ein Verbündeter deiner Wahl innerhalb von 18 m Trefferpunkte in Höhe der Anzahl der Trefferwürfel der Kreatur zurück. Du kannst dieses Merkmal nur nutzen, wenn du nicht kampfunfähig bist. Nach dem Einsatz kannst du es erst wieder zu Beginn deines nächsten Zuges verwenden (höchstens 1×/Runde).",
+        "subclass": "grave"
+      }
+    ]
+  }
+}

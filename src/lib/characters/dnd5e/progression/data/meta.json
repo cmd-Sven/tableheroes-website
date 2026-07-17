@@ -1,12 +1,56 @@
 {
   "source": "dnd5eapi.co / SRD 5.1",
   "license": "CC-BY-4.0",
-  "attribution": "This work includes material from the System Reference Document 5.1 (SRD 5.1) © Wizards of the Coast LLC, available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under CC-BY-4.0.",
+  "attribution": "This work includes material from the System Reference Document 5.1 (SRD 5.1) © Wizards of the Coast LLC, available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under CC-BY-4.0. German names and playable descriptions follow SRD 5.1 de conventions and community glossaries (see translations.sources).",
   "builtAt": "2026-07-16T16:54:32.711Z",
   "counts": {
     "classes": 12,
     "spells": 319,
     "races": 9,
     "feats": 40
+  },
+  "translations": {
+    "appliedAt": "2026-07-17T10:39:49.458Z",
+    "sources": [
+      {
+        "name": "foundryvtt-dnd5e-lang-de (Babele)",
+        "url": "https://github.com/mhilbrunner/foundryvtt-dnd5e-lang-de",
+        "note": "Deutsche Namen und Beschreibungen für SRD-Zauber, Klassenmerkmale und Volksmerkmale"
+      },
+      {
+        "name": "SRD 5.1 de / openrpg.de",
+        "url": "https://openrpg.de/srd/5e/de/",
+        "note": "Offizielle deutsche SRD-Namenskonventionen (CC-BY-4.0)"
+      },
+      {
+        "name": "dnddeutsch.de Übersetzer",
+        "url": "https://www.dnddeutsch.de/uebersetzer/",
+        "note": "Namens-Crosscheck (PHB/SRD DE)"
+      }
+    ],
+    "stats": {
+      "spells": {
+        "total": 319,
+        "named": 319,
+        "described": 319,
+        "missing": [],
+        "diffs": []
+      },
+      "classes": {
+        "named": 373,
+        "described": 373,
+        "subclassNamed": 12,
+        "missing": []
+      },
+      "races": {
+        "named": 27,
+        "described": 27,
+        "missing": []
+      },
+      "feats": {
+        "changed": 1,
+        "total": 40
+      }
+    }
   }
 }

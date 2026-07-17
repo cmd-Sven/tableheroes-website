@@ -875,8 +875,13 @@ export function LoreForm({
                     setFormData({ ...formData, race_traits: e.target.value })
                   }
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-xs text-white outline-none transition-all focus:border-accent-gold resize-none"
-                  placeholder="Physische, kulturelle oder magische Besonderheiten dieser Rasse."
+                  placeholder="Physische/kulturelle Merkmale. Optional am Ende: <<<RACE_BONUSES {JSON} >>> für Attribute/Features."
                 />
+                <p className="mt-1 text-[10px] text-gray-500 font-libre">
+                  Mechanische Boni: JSON-Block mit <code className="text-accent-gold">v:1</code>,{" "}
+                  <code className="text-accent-gold">abilityBonuses</code>,{" "}
+                  <code className="text-accent-gold">features</code>, Proficiencies — wird am Charakterblatt angewendet.
+                </p>
               </div>
             </div>
 

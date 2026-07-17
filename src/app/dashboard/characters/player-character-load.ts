@@ -13,8 +13,21 @@ export type PlayerCharacterEditorPayload = {
   character: Record<string, unknown>;
   playerUserId: string;
   playerUsername: string | null;
-  cultures: { id: string; name: string }[];
+  cultures: {
+    id: string;
+    name: string;
+    race_ids?: string[];
+    language_ids?: string[];
+    religion_ids?: string[];
+  }[];
+  races: {
+    id: string;
+    name: string;
+    culture_id?: string | null;
+    race_traits?: string | null;
+  }[];
   languages: { id: string; name: string }[];
+  religions: { id: string; name: string }[];
   factions: { id: string; name: string }[];
   locations: { id: string; name: string; type: string }[];
   factionReputations: Array<{
@@ -153,8 +166,21 @@ async function buildPlayerCharacterEditorPayload(
     playerUserId,
     playerUsername: (playerUser as { username?: string } | null)?.username ?? null,
     character: serializeCharacterForEditorClient(characterData),
-    cultures: loreData.cultures.map((c) => ({ id: c.id, name: c.name })),
+    cultures: loreData.cultures.map((c) => ({
+      id: c.id,
+      name: c.name,
+      race_ids: c.race_ids,
+      language_ids: c.language_ids,
+      religion_ids: c.religion_ids,
+    })),
+    races: loreData.races.map((r) => ({
+      id: r.id,
+      name: r.name,
+      culture_id: r.culture_id,
+      race_traits: r.race_traits,
+    })),
     languages: loreData.languages.map((l) => ({ id: l.id, name: l.name })),
+    religions: loreData.religions.map((r) => ({ id: r.id, name: r.name })),
     factions: ((factionRows as any[]) ?? []).map((f) => ({
       id: String(f.id),
       name: String(f.name ?? ""),

@@ -14,8 +14,12 @@ import {
 import { defaultSpellAbilityForClass } from "../spellcasting";
 import {
   cantripsKnownForClass,
+  cantripsKnownForThirdCaster,
+  isThirdCasterSubclass,
   slotsForClassLevel,
+  spellListClassIdForSubclass,
   spellsKnownForClass,
+  spellsKnownForThirdCaster,
 } from "./spell-slots";
 import { resolveClassId } from "./class-ids";
 import { CLASS_NAME_DE } from "./labels-de";
@@ -36,6 +40,7 @@ import {
 } from "../item-resolve";
 import { getCatalogForArchetype, type ShopCatalogItem } from "@/src/lib/shop-catalog";
 import type { ShopArchetypeKey } from "@/src/lib/shop-archetypes";
+import { applyClassProficienciesFromCatalog } from "./proficiencies-catalog";
 
 function normalizeMatch(s: string): string {
   return s
@@ -45,7 +50,11 @@ function normalizeMatch(s: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-export function spellDefinitionToSheetEntry(def: SpellDefinition): Dnd5eSpellEntry {
+export function spellDefinitionToSheetEntry(
+  def: SpellDefinition,
+  options?: { alwaysPrepared?: boolean; source?: string },
+): Dnd5eSpellEntry {
+  const always = Boolean(options?.alwaysPrepared) || def.level <= 0;
   return {
     id: def.id.startsWith("srd-") ? def.id : `srd-${def.id}`,
     name: def.nameDe || def.nameEn,
@@ -58,10 +67,58 @@ export function spellDefinitionToSheetEntry(def: SpellDefinition): Dnd5eSpellEnt
     school: def.school || null,
     ritual: Boolean(def.ritual),
     concentration: Boolean(def.concentration),
-    preparationMode: def.level <= 0 ? "always" : "prepared",
-    prepared: def.level <= 0,
-    source: "srd",
+    preparationMode: always ? "always" : "prepared",
+    prepared: always,
+    source: options?.source ?? "srd",
   };
+}
+
+/** Collect grantedSpellIds from progression features and merge onto the sheet (always prepared). */
+export function appendGrantedSpellsFromFeatures(
+  sheet: Dnd5eSheetData,
+  features: Array<{ grantedSpellIds?: string[] }>,
+  source = "domain",
+): Dnd5eSheetData {
+  const ids = new Set<string>();
+  for (const f of features) {
+    for (const id of f.grantedSpellIds ?? []) {
+      if (id) ids.add(id);
+    }
+  }
+  if (ids.size === 0) return sheet;
+
+  const catalog = getSpells();
+  const byId = new Map(catalog.map((s) => [s.id, s]));
+  const existing = new Set(
+    (sheet.spells ?? []).flatMap((s) => {
+      const bare = s.id.replace(/^srd-/, "").toLowerCase();
+      return [
+        s.id.toLowerCase(),
+        bare,
+        (s.nameEn ?? "").toLowerCase(),
+        (s.nameDe ?? "").toLowerCase(),
+        s.name.toLowerCase(),
+      ].filter(Boolean);
+    }),
+  );
+
+  const next = [...(sheet.spells ?? [])];
+  for (const id of ids) {
+    const def = byId.get(id);
+    if (!def) continue;
+    if (
+      existing.has(def.id.toLowerCase()) ||
+      existing.has(`srd-${def.id}`.toLowerCase()) ||
+      existing.has(def.nameEn.toLowerCase()) ||
+      existing.has((def.nameDe ?? "").toLowerCase())
+    ) {
+      continue;
+    }
+    next.push(spellDefinitionToSheetEntry(def, { alwaysPrepared: true, source }));
+    existing.add(def.id.toLowerCase());
+  }
+
+  return { ...sheet, spells: next };
 }
 
 export function featDefinitionToFeatureEntry(feat: FeatDefinition): Dnd5eFeatureEntry {
@@ -172,17 +229,20 @@ export function syncSpellSlotsFromClass(
   };
 }
 
-/** Klasse gewählt → Trefferwürfel, Zauberattribut und Slots aus dem Katalog. */
+/** Klasse gewählt → Trefferwürfel, Zauberattribut, Slots und Übungen aus dem Katalog. */
 export function applyClassBasicsFromCatalog(
   sheet: Dnd5eSheetData,
   className: string | null,
   level: number,
   subclass?: string | null,
+  locale: "de" | "en" = "de",
 ): Dnd5eSheetData {
   const classId = resolveClassId(className);
   const prog = getClassProgression(classId);
   let next = syncSpellSlotsFromClass(sheet, className, level, subclass);
-  if (!prog) return next;
+  if (!prog) {
+    return applyClassProficienciesFromCatalog(next, className, locale);
+  }
 
   const ability = defaultSpellAbilityForClass(className);
   const hitDice = `${Math.max(1, level)}d${prog.hitDie}`;
@@ -205,7 +265,7 @@ export function applyClassBasicsFromCatalog(
       },
     };
   }
-  return next;
+  return applyClassProficienciesFromCatalog(next, className, locale);
 }
 
 export function canLearnSpellFromCatalog(
@@ -213,10 +273,12 @@ export function canLearnSpellFromCatalog(
   def: SpellDefinition,
   className: string | null,
   characterLevel: number,
+  subclass?: string | null,
 ): { ok: boolean; reason?: string } {
   const classId = resolveClassId(className);
   if (!classId) return { ok: false, reason: "no-class" };
-  if (!def.classes.includes(classId)) return { ok: false, reason: "wrong-class" };
+  const listClassId = spellListClassIdForSubclass(classId, subclass) ?? classId;
+  if (!def.classes.includes(listClassId)) return { ok: false, reason: "wrong-class" };
 
   const existing = sheet.spells ?? [];
   if (
@@ -236,8 +298,12 @@ export function canLearnSpellFromCatalog(
     return { ok: false, reason: "level-too-high" };
   }
 
+  const third = isThirdCasterSubclass(subclass);
+
   if (def.level <= 0) {
-    const cap = cantripsKnownForClass(classId, characterLevel);
+    const cap = third
+      ? cantripsKnownForThirdCaster(characterLevel)
+      : cantripsKnownForClass(classId, characterLevel);
     if (cap != null) {
       const current = countSpellsOfLevel(existing, 0);
       if (current >= cap) return { ok: false, reason: "cantrip-limit" };
@@ -250,7 +316,9 @@ export function canLearnSpellFromCatalog(
   const atLevel = countSpellsOfLevel(existing, def.level);
   if (atLevel >= slotMax) return { ok: false, reason: "slot-limit" };
 
-  const knownCap = spellsKnownForClass(classId, characterLevel);
+  const knownCap = third
+    ? spellsKnownForThirdCaster(characterLevel)
+    : spellsKnownForClass(classId, characterLevel);
   if (knownCap != null) {
     const leveled = existing.filter((s) => s.level >= 1).length;
     if (leveled >= knownCap) return { ok: false, reason: "known-limit" };
@@ -262,11 +330,13 @@ export function canLearnSpellFromCatalog(
 export function catalogSpellsForPicker(
   className: string | null,
   sheet: Dnd5eSheetData,
+  subclass?: string | null,
 ): SpellDefinition[] {
   const classId = resolveClassId(className);
   if (!classId) return [];
+  const listClassId = spellListClassIdForSubclass(classId, subclass) ?? classId;
   const maxLvl = Math.max(0, maxSlotLevelFromSheet(sheet));
-  return getSpellsForClass(classId, maxLvl || undefined).sort(
+  return getSpellsForClass(listClassId, maxLvl || undefined).sort(
     (a, b) => a.level - b.level || a.nameEn.localeCompare(b.nameEn),
   );
 }

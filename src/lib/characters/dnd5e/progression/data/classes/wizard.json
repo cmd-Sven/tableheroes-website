@@ -292,162 +292,162 @@
       "id": "spellcasting-wizard",
       "level": 1,
       "nameEn": "Spellcasting: Wizard",
-      "nameDe": "Spellcasting: Wizard",
+      "nameDe": "Zauberwirken: Magier",
       "descriptionEn": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.",
-      "descriptionDe": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.",
+      "descriptionDe": "Du wirkst Magierzauber. Siehe Zauberwirken des Magiers.",
       "subclass": null
     },
     {
       "id": "arcane-recovery",
       "level": 1,
       "nameEn": "Arcane Recovery",
-      "nameDe": "Arcane Recovery",
+      "nameDe": "Arkane Erholung",
       "descriptionEn": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.\n\nFor example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
-      "descriptionDe": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.\n\nFor example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
+      "descriptionDe": "Du hast gelernt, etwas deiner magischen Energie zurückzugewinnen, indem du dein Zauberbuch studierst. Einmal pro Tag kannst du dir im Rahmen einer kurzen Rast eine gewisse Anzahl verbrauchter Zauberplätze aussuchen, die du wiedererlangst. Die Zauberplätze dürfen zusammengenommen höchstens eine Gradzahl besitzen, die kleiner oder gleich der Hälfte deiner Stufe als Magier ist (abgerundet). Darüber hinaus darf keiner der Zauberplätze Grad 6 oder höher sein.\n\nBist du beispielsweise ein Magier der 4. Stufe, kannst du bis zu zwei Grade an Zauberplätzen wiedererlangen. Du kannst also entweder zwei Zauberplätze des 1. Grades oder einen Zauberplatz des 2. Grades zurückgewinnen.",
       "subclass": null
     },
     {
       "id": "arcane-tradition",
       "level": 2,
       "nameEn": "Arcane Tradition",
-      "nameDe": "Arcane Tradition",
+      "nameDe": "Arkane Tradition",
       "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Beim Erreichen der 2. Stufe suchst du dir eine Arkane Tradition aus und orientierst dich dadurch in Richtung einer der acht Schulen der Magie: Bannmagie, Beschwörung, Erkenntnismagie, Verzauberung, Hervorrufung, Illusion, Nekromantie und Verwandlung. Alle werden am Ende dieses Abschnitts ausführlich beschrieben.\n\nDeine Wahl verleiht dir auf der 2., 6., 10. und 14. Stufe jeweils ein Merkmal.",
       "subclass": null
     },
     {
       "id": "wizard-ability-score-improvement-1",
       "level": 4,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "arcane-tradition-improvement-1",
       "level": 6,
       "nameEn": "Arcane Tradition feature",
-      "nameDe": "Arcane Tradition feature",
+      "nameDe": "Merkmal der Arkanen Tradition",
       "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
     {
       "id": "wizard-ability-score-improvement-2",
       "level": 8,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "arcane-tradition-improvement-2",
       "level": 10,
       "nameEn": "Arcane Tradition feature",
-      "nameDe": "Arcane Tradition feature",
+      "nameDe": "Merkmal der Arkanen Tradition",
       "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
     {
       "id": "wizard-ability-score-improvement-3",
       "level": 12,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "arcane-tradition-improvement-3",
       "level": 14,
       "nameEn": "Arcane Tradition feature",
-      "nameDe": "Arcane Tradition feature",
+      "nameDe": "Merkmal der Arkanen Tradition",
       "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
     {
       "id": "wizard-ability-score-improvement-4",
       "level": 16,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "spell-mastery",
       "level": 18,
       "nameEn": "Spell Mastery",
-      "nameDe": "Spell Mastery",
+      "nameDe": "Zaubermeisterschaft",
       "descriptionEn": "At 18th level, you have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal.\n\nBy spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels.",
-      "descriptionDe": "At 18th level, you have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal.\n\nBy spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels.",
+      "descriptionDe": "Auf der 18. Stufe hast du eine solche Meisterschaft in bestimmten Zaubersprüchen erlangt, dass du sie nach Belieben wirken kannst. Wähle aus deinem Zauberbuch einen Magierzauber des 1. Grades und einen des 2. Grades. Du kannst beide auf dem niedrigsten Grad wirken, ohne dafür Zauberplätze verbrauchen zu müssen, falls du sie vorbereitet hast. Du kannst die Sprüche auch auf höheren Graden wirken, musst aber wie sonst auch die dafür notwendigen Zauberplätze aufwenden. Nach 8 Stunden des Lernens darfst du einen oder beide der gewählten Zauber durch andere des gleichen Grades ersetzen.\n\nFalls du möchtest, kannst du diesen Eintrag bearbeiten und deine gewählten Zaubersprüche hier eintragen:\n\n• Zauberspruch des 1. Grades\n\n• Zauberspruch des 2. Grades",
       "subclass": null
     },
     {
       "id": "wizard-ability-score-improvement-5",
       "level": 19,
       "nameEn": "Ability Score Improvement",
-      "nameDe": "Ability Score Improvement",
+      "nameDe": "Attributswerterhöhung",
       "descriptionEn": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "When you reach 4th level, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
+      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
       "subclass": null
     },
     {
       "id": "signature-spell",
       "level": 20,
       "nameEn": "Signature Spell",
-      "nameDe": "Signature Spell",
+      "nameDe": "Signaturzauber",
       "descriptionEn": "When you reach 20th level, you gain mastery over two powerful spells and can cast them with little effort. Choose two 3rd-level wizard spells in your spellbook as your signature spells. You always have these spells prepared, they don't count against the number of spells you have prepared, and you can cast each of them once at 3rd level without expending a spell slot. When you do so, you can't do so again until you finish a short or long rest.\n\nIf you want to cast either spell at a higher level, you must expend a spell slot as normal.",
-      "descriptionDe": "When you reach 20th level, you gain mastery over two powerful spells and can cast them with little effort. Choose two 3rd-level wizard spells in your spellbook as your signature spells. You always have these spells prepared, they don't count against the number of spells you have prepared, and you can cast each of them once at 3rd level without expending a spell slot. When you do so, you can't do so again until you finish a short or long rest.\n\nIf you want to cast either spell at a higher level, you must expend a spell slot as normal.",
+      "descriptionDe": "Du wählst einen Signaturzauber deines Zauberbuchs und kannst ihn freier wirken.",
       "subclass": null
     },
     {
       "id": "evocation-savant",
       "level": 2,
       "nameEn": "Evocation Savant",
-      "nameDe": "Evocation Savant",
+      "nameDe": "Gelehrter der Hervorrufung",
       "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
-      "descriptionDe": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+      "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 2. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszauber in dein Zauberbuch halbiert.",
       "subclass": "evocation"
     },
     {
       "id": "sculpt-spells",
       "level": 2,
       "nameEn": "Sculpt Spells",
-      "nameDe": "Sculpt Spells",
+      "nameDe": "Zauber formen",
       "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
-      "descriptionDe": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+      "descriptionDe": "Ab der 2. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
       "subclass": "evocation"
     },
     {
       "id": "potent-cantrip",
       "level": 6,
       "nameEn": "Potent Cantrip",
-      "nameDe": "Potent Cantrip",
+      "nameDe": "Kraftvolle Zaubertricks",
       "descriptionEn": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
-      "descriptionDe": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+      "descriptionDe": "Angefangen auf der 6. Stufe betreffen deine schadenverursachenden Zaubertricks sogar die Kreaturen, die der vollen Wucht deines magischen Angriffs entgehen konnten. Wenn einer Kreatur der Rettungswurf gegen deinen Zaubertrick gelingt, erleidet sie durch diesen trotzdem die Hälfte des Schadens (wenn er welchen verursacht). Allerdings wird sie von keinem der sonstigen Effekte des Zaubertricks betroffen.",
       "subclass": "evocation"
     },
     {
       "id": "empowered-evocation",
       "level": 10,
       "nameEn": "Empowered Evocation",
-      "nameDe": "Empowered Evocation",
+      "nameDe": "Mächtige Hervorrufung",
       "descriptionEn": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
-      "descriptionDe": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+      "descriptionDe": "Beginnend mit Stufe 10 kannst du einem der Schadenswürfe eines beliebigen Hervorrufungszaubers deinen Intelligenzmodifikator hinzufügen.",
       "subclass": "evocation"
     },
     {
       "id": "overchannel",
       "level": 14,
       "nameEn": "Overchannel",
-      "nameDe": "Overchannel",
+      "nameDe": "Überladen",
       "descriptionEn": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
-      "descriptionDe": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+      "descriptionDe": "Mit Erreichen der 14. Stufe kannst du die Kraft deiner einfachen Zaubersprüche erhöhen. Wenn du einen Magierzauber des 1. bis 5. Grades wirkst, der Schaden verursacht, kannst du mit diesem maximalen Schaden anrichten.\n\nWenn du diese Fähigkeit ein einziges Mal einsetzt, hat dies keine nachteiligen Effekte. Wendest du sie vor Beenden einer langen Rast jedoch erneut an, erleidest du 2W12 nekrotischen Schaden pro Grad des gewirkten Zaubers, sofort nachdem du ihn ausgesprochen hast. Bei jedem weiteren Einsatz vor einer langen Rast steigt der nekrotische Schaden um 1W12 pro Grad des Zaubers. Dieser Schaden ignoriert Resistenzen und Immunitäten.\n\nInformation: Beachte, dass die begrenzte Verwendung dazu dient, die erste, sichere Anwendung von Überladen zu verfolgen. Die Schadensformel ist auf den Basiswert von 2W12 eingestellt. Der Vielseitigkeitswurf wird auf 1W12 gesetzt, um zusätzlichen Schaden hinzuzufügen.",
       "subclass": "evocation"
     }
   ],
@@ -455,51 +455,51 @@
     {
       "id": "evocation",
       "nameEn": "Evocation",
-      "nameDe": "Evocation",
+      "nameDe": "Hervorrufung",
       "features": [
         {
           "id": "evocation-savant",
           "level": 2,
           "nameEn": "Evocation Savant",
-          "nameDe": "Evocation Savant",
+          "nameDe": "Gelehrter der Hervorrufung",
           "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
-          "descriptionDe": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+          "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 2. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszauber in dein Zauberbuch halbiert.",
           "subclass": "evocation"
         },
         {
           "id": "sculpt-spells",
           "level": 2,
           "nameEn": "Sculpt Spells",
-          "nameDe": "Sculpt Spells",
+          "nameDe": "Zauber formen",
           "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
-          "descriptionDe": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+          "descriptionDe": "Ab der 2. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
           "subclass": "evocation"
         },
         {
           "id": "potent-cantrip",
           "level": 6,
           "nameEn": "Potent Cantrip",
-          "nameDe": "Potent Cantrip",
+          "nameDe": "Kraftvolle Zaubertricks",
           "descriptionEn": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
-          "descriptionDe": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+          "descriptionDe": "Angefangen auf der 6. Stufe betreffen deine schadenverursachenden Zaubertricks sogar die Kreaturen, die der vollen Wucht deines magischen Angriffs entgehen konnten. Wenn einer Kreatur der Rettungswurf gegen deinen Zaubertrick gelingt, erleidet sie durch diesen trotzdem die Hälfte des Schadens (wenn er welchen verursacht). Allerdings wird sie von keinem der sonstigen Effekte des Zaubertricks betroffen.",
           "subclass": "evocation"
         },
         {
           "id": "empowered-evocation",
           "level": 10,
           "nameEn": "Empowered Evocation",
-          "nameDe": "Empowered Evocation",
+          "nameDe": "Mächtige Hervorrufung",
           "descriptionEn": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
-          "descriptionDe": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+          "descriptionDe": "Beginnend mit Stufe 10 kannst du einem der Schadenswürfe eines beliebigen Hervorrufungszaubers deinen Intelligenzmodifikator hinzufügen.",
           "subclass": "evocation"
         },
         {
           "id": "overchannel",
           "level": 14,
           "nameEn": "Overchannel",
-          "nameDe": "Overchannel",
+          "nameDe": "Überladen",
           "descriptionEn": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
-          "descriptionDe": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity.",
+          "descriptionDe": "Mit Erreichen der 14. Stufe kannst du die Kraft deiner einfachen Zaubersprüche erhöhen. Wenn du einen Magierzauber des 1. bis 5. Grades wirkst, der Schaden verursacht, kannst du mit diesem maximalen Schaden anrichten.\n\nWenn du diese Fähigkeit ein einziges Mal einsetzt, hat dies keine nachteiligen Effekte. Wendest du sie vor Beenden einer langen Rast jedoch erneut an, erleidest du 2W12 nekrotischen Schaden pro Grad des gewirkten Zaubers, sofort nachdem du ihn ausgesprochen hast. Bei jedem weiteren Einsatz vor einer langen Rast steigt der nekrotische Schaden um 1W12 pro Grad des Zaubers. Dieser Schaden ignoriert Resistenzen und Immunitäten.\n\nInformation: Beachte, dass die begrenzte Verwendung dazu dient, die erste, sichere Anwendung von Überladen zu verfolgen. Die Schadensformel ist auf den Basiswert von 2W12 eingestellt. Der Vielseitigkeitswurf wird auf 1W12 gesetzt, um zusätzlichen Schaden hinzuzufügen.",
           "subclass": "evocation"
         }
       ]

@@ -7,27 +7,27 @@
       "id": "brave",
       "level": 1,
       "nameEn": "Brave",
-      "nameDe": "Brave",
+      "nameDe": "Tapferkeit",
       "descriptionEn": "You have advantage on saving throw against being frightened.",
-      "descriptionDe": "You have advantage on saving throw against being frightened.",
+      "descriptionDe": "Du bist im Vorteil bei Rettungswürfen, um zu vermeiden, verängstigt zu werden.",
       "subclass": null
     },
     {
       "id": "halfling-nimbleness",
       "level": 1,
       "nameEn": "Halfling Nimbleness",
-      "nameDe": "Halfling Nimbleness",
+      "nameDe": "Halblingsgewandheit",
       "descriptionEn": "You can move through the space of any creature that is of a size larger than yours.",
-      "descriptionDe": "You can move through the space of any creature that is of a size larger than yours.",
+      "descriptionDe": "Du kannst dich durch Bereiche bewegen, die von Kreaturen eingenommen werden, die eine Größenkategorie größer sind als du.",
       "subclass": null
     },
     {
       "id": "lucky",
       "level": 1,
       "nameEn": "Lucky",
-      "nameDe": "Lucky",
+      "nameDe": "Halblingsglück",
       "descriptionEn": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
-      "descriptionDe": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
+      "descriptionDe": "Würfelst du bei einem Angriffs-, Attributs- oder Rettungswurf eine 1, darfst du den Wurf wiederholen, musst das zweite Ergebnis aber verwenden.\n\nInformation: Aktiviere dieses Merkmal im Special Traits-Abschnitt deines Charakterbogens.",
       "subclass": null
     }
   ]

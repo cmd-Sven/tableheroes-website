@@ -24,6 +24,13 @@ import {
   CharacterCreateRulesPanel,
   spellsStepValid,
 } from "@/src/components/dashboard/CharacterCreateRulesPanel";
+import {
+  filterRacesForCulture,
+  formatLoreRaceBonusesForDisplay,
+  resolveLoreRaceBonuses,
+  setSheetCampaignLore,
+  getSheetCampaignLore,
+} from "@/src/lib/lore-race-bonuses";
 
 type Faction = {
   id: string;
@@ -107,15 +114,29 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [stepIndex, setStepIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
 
-  // Lore-Daten für Rasse/Kultur/Sprache
-  type WizardRace = { id: string; name: string; culture_id: string | null };
-  type WizardCulture = { id: string; name: string; race_ids: string[]; language_ids: string[] };
+  // Lore-Daten für Rasse/Kultur/Sprache/Religion
+  type WizardRace = {
+    id: string;
+    name: string;
+    culture_id: string | null;
+    race_traits: string | null;
+  };
+  type WizardCulture = {
+    id: string;
+    name: string;
+    race_ids: string[];
+    language_ids: string[];
+    religion_ids: string[];
+  };
   type WizardLanguage = { id: string; name: string };
+  type WizardReligion = { id: string; name: string };
 
   const [wizardRaces, setWizardRaces] = useState<WizardRace[]>([]);
   const [wizardCultures, setWizardCultures] = useState<WizardCulture[]>([]);
   const [wizardLanguages, setWizardLanguages] = useState<WizardLanguage[]>([]);
+  const [wizardReligions, setWizardReligions] = useState<WizardReligion[]>([]);
   const [loreLoading, setLoreLoading] = useState(true);
+  const [selectedReligionIds, setSelectedReligionIds] = useState<string[]>([]);
 
   // D&D 5e Katalog
   const [classId, setClassId] = useState<ClassId | "">("");
@@ -208,35 +229,44 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const revealedNPCs = npcs;
   const largeLocations = revealedLocations.filter((l) => locationTypeMatches(l.type));
 
-  // Rassen/Kulturen/Sprachen laden
+  // Rassen/Kulturen/Sprachen/Religionen laden
   useEffect(() => {
     if (!isOpen) return;
     setLoreLoading(true);
     getCharacterWizardLoreData(campaignId)
-      .then(({ races, cultures, languages }) => {
+      .then(({ races, cultures, languages, religions }) => {
         setWizardRaces(races);
         setWizardCultures(cultures);
         setWizardLanguages(languages);
+        setWizardReligions(religions ?? []);
       })
       .finally(() => setLoreLoading(false));
   }, [isOpen, campaignId]);
 
-  // Hierarchie: Kultur → Rassen + Sprachen
+  // Hierarchie: Kultur → Rassen + Sprachen + Religionen
   const selectedCulture = wizardCultures.find((c) => c.id === selectedCultureId);
 
-  // Rassen der gewählten Kultur (über culture.race_ids ODER race.culture_id)
-  const racesForCulture = selectedCulture
-    ? wizardRaces.filter(
-        (r) =>
-          selectedCulture.race_ids.includes(r.id) ||
-          r.culture_id === selectedCulture.id,
-      )
-    : [];
+  // Rassen der gewählten Kultur (race_ids ∪ culture_id; Exilanten-Fallback)
+  const racesForCulture = filterRacesForCulture(wizardRaces, selectedCulture);
   const hasRacesForCulture = racesForCulture.length > 0;
 
-  const selectedRaceLoreId = race && race !== "__custom"
-    ? (racesForCulture.find((r) => r.name === race) || wizardRaces.find((r) => r.name === race))?.id ?? null
-    : null;
+  const selectedRaceLore =
+    race && race !== "__custom"
+      ? racesForCulture.find((r) => r.name === race) ||
+        wizardRaces.find((r) => r.name === race) ||
+        null
+      : null;
+  const selectedRaceLoreId = selectedRaceLore?.id ?? null;
+
+  const loreRaceBonusLines = useMemo(() => {
+    const effective = race === "__custom" ? raceCustom : race;
+    if (!effective) return [];
+    const spec = resolveLoreRaceBonuses({
+      raceName: effective,
+      raceTraitsRaw: selectedRaceLore?.race_traits,
+    });
+    return formatLoreRaceBonusesForDisplay(spec);
+  }, [race, raceCustom, selectedRaceLore?.race_traits]);
 
   // Sprachen der gewählten Kultur
   const languagesForCulture = selectedCulture
@@ -244,12 +274,32 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     : [];
   const availableLanguages = languagesForCulture.length > 0 ? languagesForCulture : wizardLanguages;
 
-  // Rasse + Sprachen zurücksetzen wenn Kultur wechselt
+  const religionsForCulture = selectedCulture
+    ? wizardReligions.filter((r) => selectedCulture.religion_ids.includes(r.id))
+    : [];
+
+  // Bei Kulturwechsel: Rasse zurücksetzen, vorrangige Sprachen + Religionen übernehmen
   useEffect(() => {
     setRace("");
     setRaceCustom("");
-    setSelectedLanguages([]);
-  }, [selectedCultureId]);
+    if (!selectedCultureId) {
+      setSelectedLanguages([]);
+      setSelectedReligionIds([]);
+      return;
+    }
+    const cult = wizardCultures.find((c) => c.id === selectedCultureId);
+    if (!cult) return;
+    const langIds =
+      cult.language_ids.length > 0
+        ? cult.language_ids.filter((id) => wizardLanguages.some((l) => l.id === id))
+        : [];
+    setSelectedLanguages(langIds);
+    const relIds =
+      cult.religion_ids.length > 0
+        ? cult.religion_ids.filter((id) => wizardReligions.some((r) => r.id === id))
+        : [];
+    setSelectedReligionIds(relIds);
+  }, [selectedCultureId, wizardCultures, wizardLanguages, wizardReligions]);
 
   // Lore-Rasse → SRD-Mapping vorschlagen
   useEffect(() => {
@@ -347,7 +397,22 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           applyRacialBonuses,
           spellIds,
           skillKeys: [],
+          loreRaceTraitsRaw: selectedRaceLore?.race_traits ?? null,
+          loreRaceLoreId: selectedRaceLoreId,
+          preferLoreAbilityBonuses: true,
         });
+
+        let sheetData = built.sheet;
+        if (selectedReligionIds.length > 0) {
+          const names = selectedReligionIds
+            .map((id) => wizardReligions.find((r) => r.id === id)?.name)
+            .filter((n): n is string => Boolean(n?.trim()));
+          sheetData = setSheetCampaignLore(sheetData, {
+            ...getSheetCampaignLore(sheetData),
+            religionIds: selectedReligionIds,
+            religionNames: names,
+          });
+        }
 
         await createCharacterWithRelations({
           campaign_id: campaignId,
@@ -365,7 +430,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           languages: selectedLanguages,
           existing_contacts: existingContacts.filter((c) => c.npc_id && c.relationship_type),
           new_contacts: newContacts,
-          sheet_data: built.sheet,
+          sheet_data: sheetData,
         });
         if (mode === "page") {
           router.push(`/dashboard/campaigns/${campaignId}`);
@@ -680,6 +745,18 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                         placeholder="Rasse eingeben..."
                       />
                     )}
+                    {loreRaceBonusLines.length > 0 ? (
+                      <div className="mt-3 rounded border border-accent-gold/40 bg-accent-gold/5 p-3 space-y-1.5">
+                        <p className="font-barlow text-xs font-bold uppercase text-accent-gold">
+                          Rassenboni / Besonderheiten
+                        </p>
+                        <ul className="space-y-1 font-libre text-xs text-gray-200 leading-relaxed list-disc pl-4">
+                          {loreRaceBonusLines.map((line) => (
+                            <li key={line.slice(0, 48)}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -697,38 +774,37 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                 </div>
               )}
 
-              {/* 3. Sprachen (max 2) */}
+              {/* 3. Sprachen (aus Kultur vorrangig vorausgewählt) */}
               {availableLanguages.length > 0 && (
                 <div>
                   <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-                    Sprachen (max. 2)
+                    Sprachen
                   </label>
+                  <p className="mb-2 font-libre text-xs text-gray-500 italic">
+                    Bei Kulturwahl werden die vorrangigen Sprachen der Kultur vorausgewählt.
+                  </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {availableLanguages
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((lang) => {
                         const isSelected = selectedLanguages.includes(lang.id);
-                        const isDisabled = !isSelected && selectedLanguages.length >= 2;
                         return (
                           <div
                             key={lang.id}
                             className={`flex items-center rounded border p-2.5 transition-colors ${
                               isSelected
                                 ? "border-accent-gold bg-accent-gold/10 text-white"
-                                : isDisabled
-                                  ? "border-hero-dark/50 bg-slate-900/30 text-gray-600"
-                                  : "border-hero-dark bg-slate-900/80 text-gray-300 hover:border-hero-vibrant"
+                                : "border-hero-dark bg-slate-900/80 text-gray-300 hover:border-hero-vibrant"
                             }`}
                           >
-                            <label className={`flex flex-1 items-center gap-2 ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                            <label className="flex flex-1 items-center gap-2 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                disabled={isDisabled}
                                 onChange={() => {
                                   if (isSelected) {
                                     setSelectedLanguages(selectedLanguages.filter((l) => l !== lang.id));
-                                  } else if (selectedLanguages.length < 2) {
+                                  } else {
                                     setSelectedLanguages([...selectedLanguages, lang.id]);
                                   }
                                 }}
@@ -750,11 +826,49 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                         );
                       })}
                   </div>
-                  {selectedLanguages.length >= 2 && (
-                    <p className="mt-1 text-xs text-accent-gold font-libre">
-                      Maximum von 2 Sprachen erreicht.
-                    </p>
-                  )}
+                </div>
+              )}
+
+              {/* 4. Religion (aus Kultur) */}
+              {religionsForCulture.length > 0 && (
+                <div>
+                  <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                    Religion
+                  </label>
+                  <p className="mb-2 font-libre text-xs text-gray-500 italic">
+                    Zugehörige Religion(en) der Kultur — vorausgewählt, anpassbar.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {religionsForCulture
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((rel) => {
+                        const isSelected = selectedReligionIds.includes(rel.id);
+                        return (
+                          <label
+                            key={rel.id}
+                            className={`flex items-center gap-2 rounded border p-2.5 cursor-pointer transition-colors ${
+                              isSelected
+                                ? "border-accent-gold bg-accent-gold/10 text-white"
+                                : "border-hero-dark bg-slate-900/80 text-gray-300 hover:border-hero-vibrant"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                if (isSelected) {
+                                  setSelectedReligionIds(selectedReligionIds.filter((id) => id !== rel.id));
+                                } else {
+                                  setSelectedReligionIds([...selectedReligionIds, rel.id]);
+                                }
+                              }}
+                              className="accent-accent-gold"
+                            />
+                            <span className="font-libre text-sm">{rel.name}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
 

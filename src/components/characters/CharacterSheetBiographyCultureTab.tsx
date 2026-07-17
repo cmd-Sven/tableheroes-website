@@ -36,10 +36,28 @@ import {
   findAlignmentOption,
 } from "@/src/lib/characters/dnd5e-alignments";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
+import {
+  filterRacesForCulture,
+  formatLoreRaceBonusesForDisplay,
+  resolveLoreRaceBonuses,
+} from "@/src/lib/lore-race-bonuses";
 
 type LanguageOption = { id: string; name: string };
 type LocationOption = { id: string; name: string; type?: string };
-type CultureOption = { id: string; name: string };
+type CultureOption = {
+  id: string;
+  name: string;
+  race_ids?: string[];
+  language_ids?: string[];
+  religion_ids?: string[];
+};
+type RaceOption = {
+  id: string;
+  name: string;
+  culture_id?: string | null;
+  race_traits?: string | null;
+};
+type ReligionOption = { id: string; name: string };
 
 export type CharacterSheetBiographyCultureTabProps = {
   campaignId: string;
@@ -75,9 +93,18 @@ export type CharacterSheetBiographyCultureTabProps = {
   cultureLoreId: string;
   onCultureChange: (id: string) => void;
   cultureOptions: CultureOption[];
+  /** Aktueller Rassenname (characters.race / sheet meta) */
+  raceName: string;
+  onRaceNameChange: (name: string) => void;
+  raceOptions: RaceOption[];
   languages: string[];
   onToggleLanguage: (id: string) => void;
+  /** Sprachen setzen (z. B. bei Kulturwahl) */
+  onLanguagesChange?: (ids: string[]) => void;
   languageOptions: LanguageOption[];
+  religionIds: string[];
+  onReligionIdsChange: (ids: string[]) => void;
+  religionOptions: ReligionOption[];
   currentLocationId: string;
   onCurrentLocationChange: (id: string) => void;
   locationOptions: LocationOption[];
@@ -146,9 +173,16 @@ export function CharacterSheetBiographyCultureTab({
   cultureLoreId,
   onCultureChange,
   cultureOptions,
+  raceName,
+  onRaceNameChange,
+  raceOptions,
   languages,
   onToggleLanguage,
+  onLanguagesChange,
   languageOptions,
+  religionIds,
+  onReligionIdsChange,
+  religionOptions,
   currentLocationId,
   onCurrentLocationChange,
   locationOptions,
@@ -169,6 +203,52 @@ export function CharacterSheetBiographyCultureTab({
   const portraitPreview = avatarBlobUrl || avatarUrl.trim();
   const tokenPreview = tokenBlobUrl || tokenUrl.trim() || portraitPreview;
   const selectedAlignment = findAlignmentOption(alignment);
+
+  const selectedCulture = cultureOptions.find((c) => c.id === cultureLoreId);
+  const racesForCulture = filterRacesForCulture(raceOptions, selectedCulture
+    ? {
+        id: selectedCulture.id,
+        name: selectedCulture.name,
+        race_ids: selectedCulture.race_ids ?? [],
+      }
+    : null);
+  const selectedRace = raceOptions.find((r) => r.name === raceName) ?? null;
+  const raceBonusLines = formatLoreRaceBonusesForDisplay(
+    resolveLoreRaceBonuses({
+      raceName,
+      raceTraitsRaw: selectedRace?.race_traits,
+    }),
+  );
+  const religionsForCulture = selectedCulture?.religion_ids?.length
+    ? religionOptions.filter((r) => selectedCulture.religion_ids!.includes(r.id))
+    : religionOptions.filter((r) => religionIds.includes(r.id));
+
+  const handleCultureSelect = (id: string) => {
+    onCultureChange(id);
+    const cult = cultureOptions.find((c) => c.id === id);
+    if (!cult) {
+      onLanguagesChange?.([]);
+      onReligionIdsChange([]);
+      return;
+    }
+    const langIds = (cult.language_ids ?? []).filter((lid) =>
+      languageOptions.some((l) => l.id === lid),
+    );
+    onLanguagesChange?.(langIds);
+    const relIds = (cult.religion_ids ?? []).filter((rid) =>
+      religionOptions.some((r) => r.id === rid),
+    );
+    onReligionIdsChange(relIds);
+    // Rasse zurücksetzen wenn nicht mehr zur Kultur passt
+    const nextRaces = filterRacesForCulture(raceOptions, {
+      id: cult.id,
+      name: cult.name,
+      race_ids: cult.race_ids ?? [],
+    });
+    if (raceName && !nextRaces.some((r) => r.name === raceName)) {
+      onRaceNameChange("");
+    }
+  };
 
   const textareaClass = `w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none ${
     readOnly ? "cursor-default opacity-80" : ""
@@ -430,7 +510,7 @@ export function CharacterSheetBiographyCultureTab({
               <select
                 value={cultureLoreId}
                 disabled={readOnly}
-                onChange={(e) => onCultureChange(e.target.value)}
+                onChange={(e) => handleCultureSelect(e.target.value)}
                 className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
               >
                 <option value="">{t("biography.cultureNone")}</option>
@@ -451,6 +531,119 @@ export function CharacterSheetBiographyCultureTab({
                   <Info className="h-4 w-4" />
                 </Link>
               ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {raceOptions.length > 0 ? (
+          <div>
+            <label className="mb-2 block text-xs font-barlow font-bold uppercase text-gray-500">
+              {t("biography.race")}
+            </label>
+            <div className="flex items-center gap-2">
+              <select
+                value={
+                  racesForCulture.some((r) => r.name === raceName) ||
+                  raceOptions.some((r) => r.name === raceName)
+                    ? raceName
+                    : raceName
+                      ? "__custom"
+                      : ""
+                }
+                disabled={readOnly}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__custom") return;
+                  onRaceNameChange(v);
+                }}
+                className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
+              >
+                <option value="">{t("biography.raceNone")}</option>
+                {(cultureLoreId && racesForCulture.length > 0
+                  ? racesForCulture
+                  : raceOptions
+                )
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((r) => (
+                    <option key={r.id} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                {raceName &&
+                !(cultureLoreId && racesForCulture.length > 0
+                  ? racesForCulture
+                  : raceOptions
+                ).some((r) => r.name === raceName) ? (
+                  <option value={raceName}>{raceName}</option>
+                ) : null}
+              </select>
+              {selectedRace?.id ? (
+                <Link
+                  href={`/dashboard/campaigns/${campaignId}/lore/${selectedRace.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded border border-hero-border bg-hero-dark/60 p-2 text-gray-500 hover:text-accent-gold"
+                  title={t("biography.raceLoreLink")}
+                >
+                  <Info className="h-4 w-4" />
+                </Link>
+              ) : null}
+            </div>
+            {!readOnly ? (
+              <input
+                type="text"
+                value={raceName}
+                onChange={(e) => onRaceNameChange(e.target.value)}
+                placeholder={t("biography.raceCustomPlaceholder")}
+                className="mt-2 w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none"
+              />
+            ) : null}
+            {raceBonusLines.length > 0 ? (
+              <ul className="mt-2 space-y-1 rounded border border-accent-gold/30 bg-accent-gold/5 p-3 font-libre text-xs text-gray-200 leading-relaxed list-disc pl-5">
+                {raceBonusLines.map((line) => (
+                  <li key={line.slice(0, 40)}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {religionsForCulture.length > 0 || religionIds.length > 0 ? (
+          <div>
+            <label className="mb-2 block text-xs font-barlow font-bold uppercase text-gray-500">
+              {t("biography.religion")}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(religionsForCulture.length > 0 ? religionsForCulture : religionOptions)
+                .filter((r) =>
+                  religionsForCulture.length > 0
+                    ? true
+                    : religionIds.includes(r.id) || !readOnly,
+                )
+                .map((rel) => (
+                  <label
+                    key={rel.id}
+                    className={`flex items-center gap-2 rounded border border-hero-border bg-hero-dark/40 px-3 py-2 font-libre text-sm text-gray-200 ${
+                      readOnly ? "opacity-80" : "cursor-pointer hover:border-hero-vibrant/50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={religionIds.includes(rel.id)}
+                      disabled={readOnly}
+                      onChange={() => {
+                        if (religionIds.includes(rel.id)) {
+                          onReligionIdsChange(religionIds.filter((id) => id !== rel.id));
+                        } else {
+                          onReligionIdsChange([...religionIds, rel.id]);
+                        }
+                      }}
+                      className="rounded border-hero-dark"
+                    />
+                    {rel.name}
+                  </label>
+                ))}
             </div>
           </div>
         ) : null}

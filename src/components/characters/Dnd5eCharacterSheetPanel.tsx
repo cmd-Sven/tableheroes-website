@@ -49,6 +49,20 @@ import {
   matchSheetFeatureToFeat,
   featDefinitionToFeatureEntry,
 } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import {
+  applyClassProficienciesFromCatalog,
+  customProficiencyEntries,
+  getClassProficiencyLabels,
+  getProficienciesByCategory,
+  listHasProficiency,
+  matchProficiencyEntry,
+  proficiencyLabel,
+  reconcileProficienciesWithCatalog,
+  resolveProficiencyLabel,
+  toggleProficiencyInList,
+  type ProficiencyCategory,
+  type ProficiencyDefinition,
+} from "@/src/lib/characters/dnd5e/progression/proficiencies-catalog";
 import { CLASS_IDS, resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
 import { CLASS_NAME_DE } from "@/src/lib/characters/dnd5e/progression/labels-de";
 import { getClassProgression } from "@/src/lib/characters/dnd5e/progression/catalog";
@@ -56,6 +70,14 @@ import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
 } from "@/src/lib/i18n/character-sheet/context";
+import {
+  applyLoreRaceBonusesToSheet,
+  filterRacesForCulture,
+  formatLoreRaceBonusesForDisplay,
+  getSheetCampaignLore,
+  resolveLoreRaceBonuses,
+  setSheetCampaignLore,
+} from "@/src/lib/lore-race-bonuses";
 
 type SheetTab = "attributes" | "equipment" | "spells" | "biography";
 
@@ -197,6 +219,11 @@ export function Dnd5eCharacterSheetPanel({
   const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [customProfDraft, setCustomProfDraft] = useState<{
+    armor: string;
+    weapons: string;
+    tools: string;
+  }>({ armor: "", weapons: "", tools: "" });
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -351,6 +378,7 @@ export function Dnd5eCharacterSheetPanel({
         className,
         nextMeta.level,
         nextMeta.subclass || null,
+        locale,
       ),
     );
   }
@@ -365,6 +393,7 @@ export function Dnd5eCharacterSheetPanel({
         meta.className,
         nextLevel,
         meta.subclass || null,
+        locale,
       ),
     );
   }
@@ -372,6 +401,86 @@ export function Dnd5eCharacterSheetPanel({
   function removeFeature(index: number) {
     if (!sheet) return;
     setSheet({ ...sheet, features: sheet.features.filter((_, i) => i !== index) });
+  }
+
+  function updateProficiencyList(category: ProficiencyCategory, next: string[]) {
+    if (!sheet) return;
+    setSheet({
+      ...sheet,
+      proficiencies: { ...sheet.proficiencies, [category]: next },
+    });
+  }
+
+  function toggleCatalogProficiency(def: ProficiencyDefinition) {
+    if (!sheet || readOnly) return;
+    const list = sheet.proficiencies[def.category];
+    updateProficiencyList(
+      def.category,
+      toggleProficiencyInList(list, def, locale),
+    );
+  }
+
+  function syncClassProficiencies() {
+    if (!sheet) return;
+    if (!resolveClassId(meta.className)) {
+      toast.error(t("proficiencies.noClass"));
+      return;
+    }
+    setSheet(
+      applyClassProficienciesFromCatalog(sheet, meta.className, locale, {
+        replaceClassGrants: true,
+      }),
+    );
+    toast.success(t("proficiencies.syncClassDone"));
+  }
+
+  function reconcileProficiencies() {
+    if (!sheet) return;
+    const { sheet: next, changed } = reconcileProficienciesWithCatalog(sheet, locale);
+    setSheet(next);
+    toast.success(
+      changed > 0 ? t("proficiencies.reconcileDone") : t("proficiencies.reconcileNone"),
+    );
+  }
+
+  function addCustomProficiency(category: ProficiencyCategory) {
+    if (!sheet || readOnly) return;
+    const raw = customProfDraft[category].trim();
+    if (!raw) return;
+    const label = resolveProficiencyLabel(raw, locale, category);
+    const list = sheet.proficiencies[category];
+    if (list.some((x) => x.toLowerCase() === label.toLowerCase())) {
+      setCustomProfDraft((p) => ({ ...p, [category]: "" }));
+      return;
+    }
+    updateProficiencyList(category, [...list, label]);
+    setCustomProfDraft((p) => ({ ...p, [category]: "" }));
+  }
+
+  function removeCustomProficiency(category: ProficiencyCategory, value: string) {
+    if (!sheet || readOnly) return;
+    updateProficiencyList(
+      category,
+      sheet.proficiencies[category].filter((x) => x !== value),
+    );
+  }
+
+  /** Lore-Sprachen (characters.languages) + Spiegel in sheet.proficiencies.languages */
+  function toggleCampaignLanguage(langId: string) {
+    if (!biographyCulture || readOnly) return;
+    biographyCulture.onToggleLanguage(langId);
+    if (!sheet) return;
+    const opts = biographyCulture.languageOptions;
+    const nextIds = biographyCulture.languages.includes(langId)
+      ? biographyCulture.languages.filter((id) => id !== langId)
+      : [...biographyCulture.languages, langId];
+    const names = nextIds
+      .map((id) => opts.find((l) => l.id === id)?.name)
+      .filter((n): n is string => Boolean(n?.trim()));
+    setSheet({
+      ...sheet,
+      proficiencies: { ...sheet.proficiencies, languages: names },
+    });
   }
 
   function handleEquipmentChange(
@@ -392,10 +501,31 @@ export function Dnd5eCharacterSheetPanel({
   function handleSave(silent = false) {
     if (!sheet || !payload) return;
     startTransition(async () => {
+      let sheetToSave = sheet;
+      if (biographyCulture?.languageOptions?.length) {
+        const names = biographyCulture.languages
+          .map((id) => biographyCulture.languageOptions.find((l) => l.id === id)?.name)
+          .filter((n): n is string => Boolean(n?.trim()));
+        sheetToSave = {
+          ...sheet,
+          proficiencies: { ...sheet.proficiencies, languages: names },
+        };
+      }
+      if (biographyCulture) {
+        const relNames = biographyCulture.religionIds
+          .map((id) => biographyCulture.religionOptions.find((r) => r.id === id)?.name)
+          .filter((n): n is string => Boolean(n?.trim()));
+        sheetToSave = setSheetCampaignLore(sheetToSave, {
+          ...getSheetCampaignLore(sheetToSave),
+          religionIds: biographyCulture.religionIds,
+          religionNames: relNames,
+        });
+      }
+      setSheet(sheetToSave);
       const result = await saveDnd5eCharacterSheet({
         campaignId,
         characterId,
-        sheet,
+        sheet: sheetToSave,
         overrides: payload.overrides,
         meta: {
           subclass: meta.subclass,
@@ -441,6 +571,81 @@ export function Dnd5eCharacterSheetPanel({
   }
 
   const resolvedClassId = resolveClassId(meta.className);
+
+  const sheetCulture = biographyCulture
+    ? biographyCulture.cultureOptions.find((c) => c.id === biographyCulture.cultureLoreId)
+    : null;
+  const sheetRacesForCulture = biographyCulture
+    ? filterRacesForCulture(biographyCulture.raceOptions, sheetCulture
+        ? {
+            id: sheetCulture.id,
+            name: sheetCulture.name,
+            race_ids: sheetCulture.race_ids ?? [],
+          }
+        : null)
+    : [];
+  const headerRaceOptions =
+    biographyCulture && sheetCulture && sheetRacesForCulture.length > 0
+      ? sheetRacesForCulture
+      : biographyCulture?.raceOptions ?? [];
+  const headerSelectedRace =
+    biographyCulture?.raceOptions.find((r) => r.name === meta.race) ?? null;
+  const headerRaceBonusLines = formatLoreRaceBonusesForDisplay(
+    resolveLoreRaceBonuses({
+      raceName: meta.race,
+      raceTraitsRaw: headerSelectedRace?.race_traits,
+    }),
+  );
+
+  function applyCultureFromHeader(cultureId: string) {
+    if (!biographyCulture || readOnly) return;
+    biographyCulture.onCultureChange(cultureId);
+    const cult = biographyCulture.cultureOptions.find((c) => c.id === cultureId);
+    if (!cult) {
+      biographyCulture.onLanguagesChange?.([]);
+      biographyCulture.onReligionIdsChange([]);
+      return;
+    }
+    const langIds = (cult.language_ids ?? []).filter((id) =>
+      biographyCulture.languageOptions.some((l) => l.id === id),
+    );
+    biographyCulture.onLanguagesChange?.(langIds);
+    const relIds = (cult.religion_ids ?? []).filter((id) =>
+      biographyCulture.religionOptions.some((r) => r.id === id),
+    );
+    biographyCulture.onReligionIdsChange(relIds);
+    const nextRaces = filterRacesForCulture(biographyCulture.raceOptions, {
+      id: cult.id,
+      name: cult.name,
+      race_ids: cult.race_ids ?? [],
+    });
+    if (meta.race && !nextRaces.some((r) => r.name === meta.race)) {
+      applyRaceFromHeader("");
+    }
+  }
+
+  function applyRaceFromHeader(raceName: string) {
+    if (!sheet || readOnly) return;
+    setMeta({ ...meta, race: raceName });
+    biographyCulture?.onRaceNameChange(raceName);
+    if (!raceName.trim()) return;
+    const raceOpt = biographyCulture?.raceOptions.find((r) => r.name === raceName);
+    const next = applyLoreRaceBonusesToSheet(sheet, {
+      raceName,
+      raceTraitsRaw: raceOpt?.race_traits,
+      raceLoreId: raceOpt?.id ?? null,
+      level: meta.level,
+      applyAbilityBonuses: true,
+    });
+    const withRel = setSheetCampaignLore(next, {
+      ...getSheetCampaignLore(next),
+      religionIds: biographyCulture?.religionIds ?? getSheetCampaignLore(next).religionIds,
+      religionNames: (biographyCulture?.religionIds ?? [])
+        .map((id) => biographyCulture?.religionOptions.find((r) => r.id === id)?.name)
+        .filter((n): n is string => Boolean(n)),
+    });
+    setSheet(withRel);
+  }
 
   const portraitSrc =
     biographyCulture?.avatarBlobUrl ||
@@ -574,6 +779,7 @@ export function Dnd5eCharacterSheetPanel({
           sheet={sheet}
           derived={displayDerived}
           characterClass={meta.className}
+          characterSubclass={meta.subclass}
           level={meta.level}
           readOnly={readOnly}
           onSheetChange={setSheet}
@@ -657,6 +863,7 @@ export function Dnd5eCharacterSheetPanel({
                           meta.className,
                           meta.level,
                           meta.subclass || null,
+                          locale,
                         ),
                       );
                       toast.success(t("classCatalog.synced"));
@@ -680,6 +887,7 @@ export function Dnd5eCharacterSheetPanel({
                             meta.className,
                             meta.level,
                             v || null,
+                            locale,
                           ),
                         );
                       }
@@ -698,15 +906,74 @@ export function Dnd5eCharacterSheetPanel({
                   onChange={(v) => setMeta({ ...meta, background: v })}
                 />
               </label>
+              {biographyCulture && biographyCulture.cultureOptions.length > 0 ? (
+                <label className="lg:col-span-3 space-y-1">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    {t("biography.culture")}
+                  </span>
+                  <select
+                    value={biographyCulture.cultureLoreId}
+                    disabled={readOnly}
+                    onChange={(e) => applyCultureFromHeader(e.target.value)}
+                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
+                  >
+                    <option value="">{t("biography.cultureNone")}</option>
+                    {biographyCulture.cultureOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <label className="lg:col-span-3 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.race")}
                 </span>
-                <TextInput
-                  value={meta.race}
-                  disabled={readOnly}
-                  onChange={(v) => setMeta({ ...meta, race: v })}
-                />
+                {biographyCulture && headerRaceOptions.length > 0 ? (
+                  <select
+                    value={
+                      headerRaceOptions.some((r) => r.name === meta.race)
+                        ? meta.race
+                        : meta.race
+                          ? meta.race
+                          : ""
+                    }
+                    disabled={readOnly}
+                    onChange={(e) => applyRaceFromHeader(e.target.value)}
+                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
+                  >
+                    <option value="">{t("biography.raceNone")}</option>
+                    {headerRaceOptions
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((r) => (
+                        <option key={r.id} value={r.name}>
+                          {r.name}
+                        </option>
+                      ))}
+                    {meta.race && !headerRaceOptions.some((r) => r.name === meta.race) ? (
+                      <option value={meta.race}>{meta.race}</option>
+                    ) : null}
+                  </select>
+                ) : (
+                  <TextInput
+                    value={meta.race}
+                    disabled={readOnly}
+                    onChange={(v) => {
+                      setMeta({ ...meta, race: v });
+                      biographyCulture?.onRaceNameChange(v);
+                    }}
+                  />
+                )}
+                {headerRaceBonusLines.length > 0 ? (
+                  <p className="font-libre text-[10px] text-accent-gold/90 leading-snug line-clamp-3">
+                    {headerRaceBonusLines[0]}
+                    {headerRaceBonusLines.length > 1
+                      ? ` · +${headerRaceBonusLines.length - 1} weitere`
+                      : ""}
+                  </p>
+                ) : null}
               </label>
               <label className="lg:col-span-3 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
@@ -1165,27 +1432,224 @@ export function Dnd5eCharacterSheetPanel({
               </section>
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
-                <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2">
-                  {t("proficiencies.title")}
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hero-dark pb-2">
+                  <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
+                    {t("proficiencies.title")}
+                  </h3>
+                  {!readOnly ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={syncClassProficiencies}
+                        className="font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
+                      >
+                        {t("proficiencies.syncClass")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={reconcileProficiencies}
+                        className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:text-white"
+                      >
+                        {t("proficiencies.reconcile")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
                 {(
                   [
-                    ["proficiencies.armor", sheet.proficiencies.armor],
-                    ["proficiencies.weapons", sheet.proficiencies.weapons],
-                    ["proficiencies.tools", sheet.proficiencies.tools],
-                    ["proficiencies.languages", sheet.proficiencies.languages],
-                  ] as const
-                ).map(([labelKey, items]) =>
-                  items.length > 0 ? (
-                    <div key={labelKey}>
-                      <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">{t(labelKey)}</p>
-                      <p className="font-libre text-xs text-gray-300">{items.join(", ")}</p>
+                    ["armor", "proficiencies.armor"] as const,
+                    ["weapons", "proficiencies.weapons"] as const,
+                    ["tools", "proficiencies.tools"] as const,
+                  ]
+                ).map(([category, labelKey]) => {
+                  const allCatalog = getProficienciesByCategory(category);
+                  const list = sheet.proficiencies[category];
+                  const customs = customProficiencyEntries(list, category);
+                  const classLabels =
+                    getClassProficiencyLabels(meta.className, locale)?.[category] ?? [];
+                  const classIds = new Set(
+                    classLabels
+                      .map((label) => matchProficiencyEntry(label, category)?.id)
+                      .filter(Boolean),
+                  );
+                  // Armor/tools: full catalog. Weapons: groups always; specifics if selected or class-granted.
+                  const catalogItems =
+                    category === "weapons"
+                      ? allCatalog.filter((def) => {
+                          if (
+                            def.id === "weapon-simple" ||
+                            def.id === "weapon-martial"
+                          ) {
+                            return true;
+                          }
+                          return (
+                            listHasProficiency(list, def) || classIds.has(def.id)
+                          );
+                        })
+                      : allCatalog;
+                  const selectedCatalog = allCatalog.filter((def) =>
+                    listHasProficiency(list, def),
+                  );
+
+                  if (readOnly) {
+                    const labels = [
+                      ...selectedCatalog.map((d) => proficiencyLabel(d, locale)),
+                      ...customs,
+                    ];
+                    if (labels.length === 0) return null;
+                    return (
+                      <div key={category}>
+                        <p className="font-barlow text-[10px] uppercase text-gray-500 mb-1">
+                          {t(labelKey)}
+                        </p>
+                        <p className="font-libre text-xs text-gray-300">
+                          {labels.join(", ")}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={category} className="space-y-2">
+                      <p className="font-barlow text-[10px] uppercase text-gray-500">
+                        {t(labelKey)}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {catalogItems.map((def) => {
+                          const checked = listHasProficiency(list, def);
+                          return (
+                            <label
+                              key={def.id}
+                              className={`flex items-center gap-1.5 rounded border px-2 py-1 font-libre text-[11px] text-gray-200 cursor-pointer ${
+                                checked
+                                  ? "border-hero-vibrant/60 bg-hero-vibrant/10"
+                                  : "border-hero-border/50 bg-hero-dark/30 hover:border-hero-vibrant/40"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCatalogProficiency(def)}
+                                className="rounded border-hero-dark"
+                              />
+                              {proficiencyLabel(def, locale)}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {customs.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="font-barlow text-[9px] uppercase text-gray-500">
+                            {t("proficiencies.custom")}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {customs.map((item) => (
+                              <span
+                                key={item}
+                                className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-hero-dark/40 px-2 py-0.5 font-libre text-[11px] text-gray-300"
+                              >
+                                {item}
+                                <button
+                                  type="button"
+                                  onClick={() => removeCustomProficiency(category, item)}
+                                  className="text-red-400 hover:text-red-300"
+                                  aria-label="×"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={customProfDraft[category]}
+                          onChange={(e) =>
+                            setCustomProfDraft((p) => ({
+                              ...p,
+                              [category]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomProficiency(category);
+                            }
+                          }}
+                          placeholder={t("proficiencies.customPlaceholder")}
+                          className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-xs text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addCustomProficiency(category)}
+                          className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:text-white shrink-0"
+                        >
+                          {t("proficiencies.addCustom")}
+                        </button>
+                      </div>
                     </div>
-                  ) : null,
-                )}
-                {sheet.proficiencies.armor.length === 0 &&
+                  );
+                })}
+
+                <div className="space-y-2 border-t border-hero-dark/60 pt-3">
+                  <p className="font-barlow text-[10px] uppercase text-gray-500">
+                    {t("proficiencies.languages")}
+                  </p>
+                  {biographyCulture ? (
+                    <>
+                      <p className="font-libre text-[10px] text-gray-500">
+                        {t("proficiencies.languagesHint")}
+                      </p>
+                      {biographyCulture.languageOptions.length === 0 ? (
+                        <p className="font-libre text-xs text-gray-500 italic">
+                          {t("proficiencies.languagesEmpty")}
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {biographyCulture.languageOptions.map((lang) => {
+                            const checked = biographyCulture.languages.includes(lang.id);
+                            return (
+                              <label
+                                key={lang.id}
+                                className={`flex items-center gap-1.5 rounded border px-2 py-1 font-libre text-[11px] text-gray-200 ${
+                                  readOnly
+                                    ? "opacity-80 border-hero-border/50 bg-hero-dark/30"
+                                    : checked
+                                      ? "cursor-pointer border-hero-vibrant/60 bg-hero-vibrant/10"
+                                      : "cursor-pointer border-hero-border/50 bg-hero-dark/30 hover:border-hero-vibrant/40"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={readOnly}
+                                  onChange={() => toggleCampaignLanguage(lang.id)}
+                                  className="rounded border-hero-dark"
+                                />
+                                {lang.name}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  ) : sheet.proficiencies.languages.length > 0 ? (
+                    <p className="font-libre text-xs text-gray-300">
+                      {sheet.proficiencies.languages.join(", ")}
+                    </p>
+                  ) : (
+                    <p className="font-libre text-xs text-gray-500">{t("proficiencies.empty")}</p>
+                  )}
+                </div>
+
+                {readOnly &&
+                sheet.proficiencies.armor.length === 0 &&
                 sheet.proficiencies.weapons.length === 0 &&
                 sheet.proficiencies.tools.length === 0 &&
+                !(biographyCulture?.languages?.length) &&
                 sheet.proficiencies.languages.length === 0 ? (
                   <p className="font-libre text-sm text-gray-500">{t("proficiencies.empty")}</p>
                 ) : null}

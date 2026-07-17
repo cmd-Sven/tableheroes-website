@@ -46,6 +46,7 @@ type Props = {
   sheet: Dnd5eSheetData;
   derived: Dnd5eDerivedSheet;
   characterClass: string | null;
+  characterSubclass?: string | null;
   level: number;
   readOnly: boolean;
   onSheetChange: (sheet: Dnd5eSheetData) => void;
@@ -265,12 +266,13 @@ export function Dnd5eSpellsFeaturesTab({
   sheet,
   derived,
   characterClass,
+  characterSubclass = null,
   level,
   readOnly,
   onSheetChange,
 }: Props) {
   const { t, abilityLabel } = useCharacterSheetLocale();
-  const prepStyle = getSpellPreparationStyle(characterClass);
+  const prepStyle = getSpellPreparationStyle(characterClass, characterSubclass);
   const spells = sheet.spells ?? [];
   const features = sheet.features ?? [];
   const slots = sheet.spellcasting?.slots;
@@ -561,6 +563,7 @@ export function Dnd5eSpellsFeaturesTab({
         <SpellCatalogPickerModal
           sheet={sheet}
           characterClass={characterClass}
+          characterSubclass={characterSubclass}
           level={level}
           onClose={() => setCatalogOpen(false)}
           onAdd={addFromCatalog}

@@ -1,0 +1,103 @@
+{
+  "features": [
+    {
+      "id": "spellcasting-arcane-trickster",
+      "level": 3,
+      "nameEn": "Spellcasting",
+      "nameDe": "Zauberwirken",
+      "descriptionEn": "When you reach 3rd level, you gain the ability to cast spells. Intelligence is your spellcasting ability for your wizard spells.\n\nCantrips: You learn the Mage Hand cantrip and two other cantrips of your choice from the wizard spell list. Mage Hand doesn't count against the two cantrips you choose.\n\nSpell Slots & Spells Known: You are a third-caster. You know a number of wizard spells and have spell slots as shown on the Arcane Trickster Spellcasting table (same progression as Eldritch Knight).\n\nSpells of 1st level and higher must be from the Illusion or Enchantment schools, except that at 3rd, 8th, 14th, and 20th level you may learn one wizard spell of any school.",
+      "descriptionDe": "Ab der 3. Stufe kannst du Zauber wirken. Deine Zauberfähigkeit ist Intelligenz.\n\nZaubertricks: Du lernst den Zaubertrick Magierhand (Mage Hand) plus zwei weitere Zaubertricks deiner Wahl aus der Magier-Zauberliste.\n\nZauberplätze & bekannte Zauber: Du bist ein Drittel-Zauberer. Bekannte Zauber und Zauberplätze folgen der Tabelle des Arkanen Tricksers (wie beim Mystischen Ritter).\n\nSchulen: Neue Magierzauber müssen fast immer aus den Schulen Illusion oder Verzauberung stammen. Ausnahme: Auf den Stufen 3, 8, 14 und 20 darfst du jeweils einen Zauber aus einer beliebigen Magieschule wählen.",
+      "subclass": "arcane-trickster",
+      "grantedSpellIds": ["mage-hand"]
+    },
+    {
+      "id": "mage-hand-legerdemain",
+      "level": 3,
+      "nameEn": "Mage Hand Legerdemain",
+      "nameDe": "Trickreiche Magierhand",
+      "descriptionEn": "Starting at 3rd level, when you cast Mage Hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:\n\n• You can stow one object the hand is holding in a container worn or carried by another creature.\n• You can retrieve an object in a container worn or carried by another creature.\n• You can use thieves' tools to pick locks and disarm traps at range.\n\nYou can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check.\n\nIn addition, you can use the bonus action granted by your Cunning Action to control the hand.",
+      "descriptionDe": "Ab der 3. Stufe kannst du beim Wirken von Magierhand die Hand unsichtbar machen. Zudem kannst du mit deiner Bonusaktion (über deine Gerissene Aktion / Cunning Action) folgende Diebes-Aktionen über die Hand ausführen:\n\n• Einen Gegenstand in einen Behälter stecken, den eine andere Kreatur trägt oder hält.\n• Einen Gegenstand aus einem Behälter einer anderen Kreatur stehlen.\n• Diebeswerkzeug benutzen, um Schlösser zu knacken oder Fallen zu entschärfen – aus sicherer Entfernung (bis zu 30 Fuß / 9 Meter).\n\nHeimlichkeit: Du kannst diese Aufgaben unbemerkt erledigen, wenn du einen Wurf auf Geschicklichkeit (Fingerfertigkeit) gegen die Weisheit (Wahrnehmung) der Kreatur gewinnst.",
+      "subclass": "arcane-trickster"
+    },
+    {
+      "id": "magical-ambusher",
+      "level": 9,
+      "nameEn": "Magical Ambusher",
+      "nameDe": "Magischer Hinterhalt",
+      "descriptionEn": "Starting at 9th level, if you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn.",
+      "descriptionDe": "Ab der 9. Stufe: Wenn du vor einer Kreatur versteckt bist (hidden), während du einen Zauber wirkst, der von ihr einen Rettungswurf verlangt, hat die Kreatur bei diesem Rettungswurf in diesem Zug Nachteil.",
+      "subclass": "arcane-trickster"
+    },
+    {
+      "id": "versatile-trickster",
+      "level": 13,
+      "nameEn": "Versatile Trickster",
+      "nameDe": "Vielseitiger Trickser",
+      "descriptionEn": "At 13th level, you gain the ability to distract targets with your Mage Hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by your Mage Hand feature. Doing so gives you advantage on attack rolls against that creature until the end of the turn.",
+      "descriptionDe": "Ab der 13. Stufe kannst du als Bonusaktion eine Kreatur im Umkreis von 5 Fuß (1,5 Meter) um deine Magierhand bestimmen. Bis zum Ende deines aktuellen Zuges hast du bei allen Angriffswürfen gegen diese Kreatur Vorteil.",
+      "subclass": "arcane-trickster"
+    },
+    {
+      "id": "spell-thief",
+      "level": 17,
+      "nameEn": "Spell Thief",
+      "nameDe": "Zauberdieb",
+      "descriptionEn": "At 17th level, you gain the ability to magically steal the knowledge of how to cast a spell from another spellcaster.\n\nImmediately after a creature casts a spell that targets you or includes you in its area of effect, you can use your reaction to force the creature to make a saving throw with its spellcasting ability modifier. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least 1st level and of a level you can cast. For the next 8 hours, you know the spell and can cast it using your spell slots. The creature can't cast that spell until the 8 hours have passed.\n\nOnce you successfully use this feature, you can't use it again until you finish a long rest.",
+      "descriptionDe": "Ab der 17. Stufe: Wenn eine Kreatur einen Zauber wirkt, der dich betrifft oder einschließt, kannst du deine Reaktion nutzen, um den Zauberer zu zwingen, einen Rettungswurf mit seinem Zauberattribut gegen deinen eigenen Zauberrettungswurf-SG zu machen.\n\nBei Erfolg des Diebstahls: Der Zauber hat für dich keinerlei Auswirkungen. Wenn der Zauber mindestens Grad 1 hat und von einem Grad ist, den du selbst wirken kannst, stiehlst du das Wissen über den Zauber. Für die nächsten 8 Stunden kennst du diesen Zauber und kannst ihn mit deinen eigenen Zauberplätzen wirken. Der ursprüngliche Zauberer verliert für diese 8 Stunden die Fähigkeit, diesen spezifischen Zauber zu wirken.\n\nSobald du diese Fähigkeit erfolgreich eingesetzt hast, kannst du sie erst nach einer langen Rast erneut nutzen.",
+      "subclass": "arcane-trickster"
+    }
+  ],
+  "subclass": {
+    "id": "arcane-trickster",
+    "nameEn": "Arcane Trickster",
+    "nameDe": "Arkaner Trickser",
+    "features": [
+      {
+        "id": "spellcasting-arcane-trickster",
+        "level": 3,
+        "nameEn": "Spellcasting",
+        "nameDe": "Zauberwirken",
+        "descriptionEn": "When you reach 3rd level, you gain the ability to cast spells. Intelligence is your spellcasting ability for your wizard spells.\n\nCantrips: You learn the Mage Hand cantrip and two other cantrips of your choice from the wizard spell list. Mage Hand doesn't count against the two cantrips you choose.\n\nSpell Slots & Spells Known: You are a third-caster. You know a number of wizard spells and have spell slots as shown on the Arcane Trickster Spellcasting table (same progression as Eldritch Knight).\n\nSpells of 1st level and higher must be from the Illusion or Enchantment schools, except that at 3rd, 8th, 14th, and 20th level you may learn one wizard spell of any school.",
+        "descriptionDe": "Ab der 3. Stufe kannst du Zauber wirken. Deine Zauberfähigkeit ist Intelligenz.\n\nZaubertricks: Du lernst den Zaubertrick Magierhand (Mage Hand) plus zwei weitere Zaubertricks deiner Wahl aus der Magier-Zauberliste.\n\nZauberplätze & bekannte Zauber: Du bist ein Drittel-Zauberer. Bekannte Zauber und Zauberplätze folgen der Tabelle des Arkanen Tricksers (wie beim Mystischen Ritter).\n\nSchulen: Neue Magierzauber müssen fast immer aus den Schulen Illusion oder Verzauberung stammen. Ausnahme: Auf den Stufen 3, 8, 14 und 20 darfst du jeweils einen Zauber aus einer beliebigen Magieschule wählen.",
+        "subclass": "arcane-trickster",
+        "grantedSpellIds": ["mage-hand"]
+      },
+      {
+        "id": "mage-hand-legerdemain",
+        "level": 3,
+        "nameEn": "Mage Hand Legerdemain",
+        "nameDe": "Trickreiche Magierhand",
+        "descriptionEn": "Starting at 3rd level, when you cast Mage Hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:\n\n• You can stow one object the hand is holding in a container worn or carried by another creature.\n• You can retrieve an object in a container worn or carried by another creature.\n• You can use thieves' tools to pick locks and disarm traps at range.\n\nYou can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check.\n\nIn addition, you can use the bonus action granted by your Cunning Action to control the hand.",
+        "descriptionDe": "Ab der 3. Stufe kannst du beim Wirken von Magierhand die Hand unsichtbar machen. Zudem kannst du mit deiner Bonusaktion (über deine Gerissene Aktion / Cunning Action) folgende Diebes-Aktionen über die Hand ausführen:\n\n• Einen Gegenstand in einen Behälter stecken, den eine andere Kreatur trägt oder hält.\n• Einen Gegenstand aus einem Behälter einer anderen Kreatur stehlen.\n• Diebeswerkzeug benutzen, um Schlösser zu knacken oder Fallen zu entschärfen – aus sicherer Entfernung (bis zu 30 Fuß / 9 Meter).\n\nHeimlichkeit: Du kannst diese Aufgaben unbemerkt erledigen, wenn du einen Wurf auf Geschicklichkeit (Fingerfertigkeit) gegen die Weisheit (Wahrnehmung) der Kreatur gewinnst.",
+        "subclass": "arcane-trickster"
+      },
+      {
+        "id": "magical-ambusher",
+        "level": 9,
+        "nameEn": "Magical Ambusher",
+        "nameDe": "Magischer Hinterhalt",
+        "descriptionEn": "Starting at 9th level, if you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn.",
+        "descriptionDe": "Ab der 9. Stufe: Wenn du vor einer Kreatur versteckt bist (hidden), während du einen Zauber wirkst, der von ihr einen Rettungswurf verlangt, hat die Kreatur bei diesem Rettungswurf in diesem Zug Nachteil.",
+        "subclass": "arcane-trickster"
+      },
+      {
+        "id": "versatile-trickster",
+        "level": 13,
+        "nameEn": "Versatile Trickster",
+        "nameDe": "Vielseitiger Trickser",
+        "descriptionEn": "At 13th level, you gain the ability to distract targets with your Mage Hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by your Mage Hand feature. Doing so gives you advantage on attack rolls against that creature until the end of the turn.",
+        "descriptionDe": "Ab der 13. Stufe kannst du als Bonusaktion eine Kreatur im Umkreis von 5 Fuß (1,5 Meter) um deine Magierhand bestimmen. Bis zum Ende deines aktuellen Zuges hast du bei allen Angriffswürfen gegen diese Kreatur Vorteil.",
+        "subclass": "arcane-trickster"
+      },
+      {
+        "id": "spell-thief",
+        "level": 17,
+        "nameEn": "Spell Thief",
+        "nameDe": "Zauberdieb",
+        "descriptionEn": "At 17th level, you gain the ability to magically steal the knowledge of how to cast a spell from another spellcaster.\n\nImmediately after a creature casts a spell that targets you or includes you in its area of effect, you can use your reaction to force the creature to make a saving throw with its spellcasting ability modifier. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least 1st level and of a level you can cast. For the next 8 hours, you know the spell and can cast it using your spell slots. The creature can't cast that spell until the 8 hours have passed.\n\nOnce you successfully use this feature, you can't use it again until you finish a long rest.",
+        "descriptionDe": "Ab der 17. Stufe: Wenn eine Kreatur einen Zauber wirkt, der dich betrifft oder einschließt, kannst du deine Reaktion nutzen, um den Zauberer zu zwingen, einen Rettungswurf mit seinem Zauberattribut gegen deinen eigenen Zauberrettungswurf-SG zu machen.\n\nBei Erfolg des Diebstahls: Der Zauber hat für dich keinerlei Auswirkungen. Wenn der Zauber mindestens Grad 1 hat und von einem Grad ist, den du selbst wirken kannst, stiehlst du das Wissen über den Zauber. Für die nächsten 8 Stunden kennst du diesen Zauber und kannst ihn mit deinen eigenen Zauberplätzen wirken. Der ursprüngliche Zauberer verliert für diese 8 Stunden die Fähigkeit, diesen spezifischen Zauber zu wirken.\n\nSobald du diese Fähigkeit erfolgreich eingesetzt hast, kannst du sie erst nach einer langen Rast erneut nutzen.",
+        "subclass": "arcane-trickster"
+      }
+    ]
+  }
+}

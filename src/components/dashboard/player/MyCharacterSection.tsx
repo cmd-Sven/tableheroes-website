@@ -36,8 +36,21 @@ import {
 } from "@/src/lib/characters/character-flaws";
 import { normalizeAlignmentValue } from "@/src/lib/characters/dnd5e-alignments";
 
-type Culture = { id: string; name: string };
+type Culture = {
+  id: string;
+  name: string;
+  race_ids?: string[];
+  language_ids?: string[];
+  religion_ids?: string[];
+};
+type RaceOption = {
+  id: string;
+  name: string;
+  culture_id?: string | null;
+  race_traits?: string | null;
+};
 type Language = { id: string; name: string };
+type Religion = { id: string; name: string };
 type Faction = { id: string; name: string };
 type Location = { id: string; name: string; type: string };
 type Relationship = {
@@ -97,7 +110,9 @@ type Props = {
     character_relationships?: Relationship[];
   };
   cultures: Culture[];
+  races?: RaceOption[];
   languages: Language[];
+  religions?: Religion[];
   factions: Faction[];
   locations: Location[];
   factionReputations?: Array<{ id: string; faction_id: string; faction_name: string; reputation: number; rank?: string | null }>;
@@ -113,7 +128,9 @@ export function MyCharacterSection({
   campaignId,
   character,
   cultures,
+  races = [],
   languages,
+  religions = [],
   factions,
   locations,
   factionReputations = [],
@@ -223,6 +240,20 @@ export function MyCharacterSection({
     return () => URL.revokeObjectURL(u);
   }, [tokenFile]);
 
+  const [religionIds, setReligionIds] = useState<string[]>(() => {
+    const cultId = character?.culture_lore_id ?? "";
+    const cult = cultures.find((c) => c.id === cultId);
+    return cult?.religion_ids ?? [];
+  });
+
+  useEffect(() => {
+    const cultId = form.culture_lore_id || character?.culture_lore_id || "";
+    const cult = cultures.find((c) => c.id === cultId);
+    if (cult?.religion_ids?.length) {
+      setReligionIds((prev) => (prev.length > 0 ? prev : cult.religion_ids ?? []));
+    }
+  }, [form.culture_lore_id, character?.culture_lore_id, cultures]);
+
   const cultureOptions = useMemo(() => {
     const cid = form.culture_lore_id || character?.culture_lore_id || "";
     const list = cultures.map((c) => ({ ...c }));
@@ -234,6 +265,41 @@ export function MyCharacterSection({
     }
     return list;
   }, [cultures, form.culture_lore_id, character?.culture_lore_id, character?.culture_name]);
+
+  const raceOptions = useMemo(() => {
+    const list = races.map((r) => ({ ...r }));
+    const rn = form.race.trim();
+    if (rn && !list.some((x) => x.name === rn)) {
+      list.push({ id: `custom:${rn}`, name: rn, culture_id: null, race_traits: null });
+    }
+    return list;
+  }, [races, form.race]);
+
+  const religionOptions = useMemo(() => {
+    const map = new Map(religions.map((r) => [r.id, r]));
+    for (const id of religionIds) {
+      if (!map.has(id)) map.set(id, { id, name: `Gespeichert (${id.slice(0, 8)}…)` });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [religions, religionIds]);
+
+  const handleCultureChange = (id: string) => {
+    const cult = cultures.find((c) => c.id === id);
+    if (!cult) {
+      setForm((p) => ({ ...p, culture_lore_id: id, languages: id ? p.languages : [] }));
+      setReligionIds([]);
+      return;
+    }
+    const langIds = (cult.language_ids ?? []).filter((lid) =>
+      languages.some((l) => l.id === lid),
+    );
+    setForm((p) => ({
+      ...p,
+      culture_lore_id: id,
+      languages: langIds.length > 0 ? langIds : p.languages,
+    }));
+    setReligionIds(cult.religion_ids ?? []);
+  };
 
   const factionOptions = useMemo(() => {
     const fid = form.faction_membership || character?.faction_membership || "";
@@ -580,11 +646,18 @@ export function MyCharacterSection({
                   characterFlaws,
                   onCharacterFlawsChange: setCharacterFlaws,
                   cultureLoreId: form.culture_lore_id,
-                  onCultureChange: (id) => setForm((p) => ({ ...p, culture_lore_id: id })),
+                  onCultureChange: handleCultureChange,
                   cultureOptions,
+                  raceName: form.race,
+                  onRaceNameChange: (name) => setForm((p) => ({ ...p, race: name })),
+                  raceOptions,
                   languages: form.languages,
                   onToggleLanguage: toggleLanguage,
+                  onLanguagesChange: (ids) => setForm((p) => ({ ...p, languages: ids })),
                   languageOptions,
+                  religionIds,
+                  onReligionIdsChange: setReligionIds,
+                  religionOptions,
                   currentLocationId: form.current_location_id,
                   onCurrentLocationChange: (id) =>
                     setForm((p) => ({ ...p, current_location_id: id })),

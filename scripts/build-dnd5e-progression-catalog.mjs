@@ -302,14 +302,14 @@ function buildFeats() {
     {
       id: "dual-wielder",
       nameEn: "Dual Wielder",
-      nameDe: "Zwei Waffen kämpfen",
+      nameDe: "Zwei-Waffen-Kämpfer",
       descriptionEn: "+1 AC while wielding a separate melee weapon in each hand; dual wield with non-light weapons; draw/stow two weapons when you'd normally draw one.",
       descriptionDe: "+1 RK mit je einer Nahkampfwaffe in jeder Hand; Zwei-Waffen-Kampf ohne Leicht; zwei Waffen ziehen/verstauen.",
     },
     {
       id: "durable",
       nameEn: "Durable",
-      nameDe: "Zäh",
+      nameDe: "Ausdauernd",
       descriptionEn: "Constitution +1 (max 20). When you roll a Hit Die to regain HP, minimum = 2 × Constitution modifier (min 2).",
       descriptionDe: "Konstitution +1 (max. 20). Bei Trefferwürfel-Heilung Minimum = 2 × KO-Modifikator (mind. 2).",
       abilityBonus: { con: 1 },
@@ -372,9 +372,10 @@ function buildFeats() {
     {
       id: "linguist",
       nameEn: "Linguist",
-      nameDe: "Linguist",
+      nameDe: "Sprachenkundiger",
       descriptionEn: "Intelligence +1 (max 20). Learn three languages; create written ciphers (DC = your Intelligence score + proficiency bonus).",
-      descriptionDe: "Intelligenz +1. Drei Sprachen; schriftliche Chiffren erstellen.",
+      descriptionDe:
+        "Intelligenz +1 (max. 20). Du erlernst drei Sprachen deiner Wahl und kannst schriftliche Chiffren erstellen (SG = dein Intelligenzwert + Übungsbonus).",
       abilityBonus: { int: 1 },
     },
     {
@@ -528,7 +529,7 @@ function buildFeats() {
     {
       id: "tough",
       nameEn: "Tough",
-      nameDe: "Zähflüssig",
+      nameDe: "Zäh",
       descriptionEn: "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Thereafter, +2 HP per level gained.",
       descriptionDe: "TP-Maximum +2 × Stufe (sofort), danach +2 TP je weitere Stufe.",
     },
@@ -606,6 +607,23 @@ async function main() {
       2,
     ),
   );
+
+  console.log("Applying German translations…");
+  const { spawnSync } = await import("node:child_process");
+  const apply = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "dnd5e-de/apply-from-foundry-lang-de.mjs")],
+    { stdio: "inherit", cwd: path.join(__dirname, "..") },
+  );
+  if (apply.status !== 0) {
+    console.warn("DE translation apply failed — catalog left with English nameDe/descriptionDe placeholders.");
+  }
+
+  // Non-SRD extensions (Grave Domain, Toll the Dead, …) — must run AFTER DE apply
+  console.log("Applying TableHeroes catalog patches…");
+  const { applyCatalogPatches } = await import("./dnd5e-patches/apply-catalog-patches.mjs");
+  const patchResult = await applyCatalogPatches();
+  console.log("  patches:", JSON.stringify(patchResult));
 
   console.log("Done →", OUT);
 }

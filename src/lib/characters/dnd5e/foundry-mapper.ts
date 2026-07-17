@@ -16,6 +16,7 @@ import { mapFoundryItemsToEquipment } from "./foundry-equipment-mapper";
 import { normalizeEquipmentState } from "./equipment";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 import { defaultSpellAbilityForClass } from "./spellcasting";
+import { normalizeProficiencyList } from "./progression/proficiencies-catalog";
 
 type FoundryAbilityBlock = {
   value?: number;
@@ -725,9 +726,21 @@ export function mapFoundryActorToDnd5eSheet(input: {
       deathSaveFailures: readNumber(attrs.death?.failure ?? attrs.death?.failures, 0),
     },
     proficiencies: {
-      armor: [...(sys.traits?.armorProf?.value ?? [])],
-      weapons: [...(sys.traits?.weaponProf?.value ?? [])],
-      tools: [...(sys.traits?.toolProf?.value ?? [])],
+      armor: normalizeProficiencyList(
+        [...(sys.traits?.armorProf?.value ?? [])],
+        "armor",
+        "de",
+      ),
+      weapons: normalizeProficiencyList(
+        [...(sys.traits?.weaponProf?.value ?? [])],
+        "weapons",
+        "de",
+      ),
+      tools: normalizeProficiencyList(
+        [...(sys.traits?.toolProf?.value ?? [])],
+        "tools",
+        "de",
+      ),
       languages: [...(sys.traits?.languages?.value ?? [])],
     },
     features: mapFoundryFeats(items),

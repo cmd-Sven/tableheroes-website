@@ -107,16 +107,72 @@ export function casterTypeForClass(classId: ClassId | null): CasterProgression {
   return "none";
 }
 
-/** Third-caster only when subclass is EK / AT */
+/**
+ * Third-caster only when subclass is Eldritch Knight / Arcane Trickster
+ * (EN + DE ids/names, hyphenated or spaced).
+ */
 export function isThirdCasterSubclass(subclass: string | null | undefined): boolean {
-  const s = (subclass ?? "").toLowerCase();
+  const s = (subclass ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return false;
+  // Compact key for id-style matches (arcane-trickster → arcanetrickster)
+  const compact = s.replace(/\s+/g, "");
   return (
-    s.includes("eldritch") ||
-    s.includes("mystischer") ||
+    s.includes("eldritch knight") ||
+    compact.includes("eldritchknight") ||
+    s.includes("mystischer ritter") ||
+    compact.includes("mystischerritter") ||
     s.includes("arcane trickster") ||
-    s.includes("arkaner") ||
-    s.includes("trickster")
+    compact.includes("arcanetrickster") ||
+    s.includes("arkaner trickser") ||
+    s.includes("arkaner trickster") ||
+    compact.includes("arkanertrickser") ||
+    compact.includes("arkanertrickster")
   );
+}
+
+/** PHB Eldritch Knight / Arcane Trickster — spells known by class level (index = level). */
+const THIRD_SPELLS_KNOWN: number[] = [
+  0, // unused (level 0)
+  0,
+  0,
+  3,
+  4,
+  4,
+  4,
+  5,
+  6,
+  6,
+  7,
+  8,
+  8,
+  9,
+  10,
+  10,
+  11,
+  11,
+  11,
+  12,
+  13,
+];
+
+/** Cantrips known for third-casters (Mage Hand + 2 from level 3). */
+export function cantripsKnownForThirdCaster(level: number): number | null {
+  const lvl = Math.min(20, Math.max(1, Math.floor(level)));
+  if (lvl < 3) return null;
+  return 3;
+}
+
+/** Spells known for third-casters (EK / AT table). */
+export function spellsKnownForThirdCaster(level: number): number | null {
+  const lvl = Math.min(20, Math.max(1, Math.floor(level)));
+  if (lvl < 3) return null;
+  return THIRD_SPELLS_KNOWN[lvl] ?? null;
 }
 
 export function slotsForCasterLevel(
@@ -150,6 +206,23 @@ export function slotsForClassLevel(
     caster = "third";
   }
   return slotsForCasterLevel(caster, level);
+}
+
+/**
+ * Spell list for pickers: Eldritch Knight / Arcane Trickster learn from the wizard list.
+ */
+export function spellListClassIdForSubclass(
+  classId: ClassId | null,
+  subclass?: string | null,
+): ClassId | null {
+  if (!classId) return null;
+  if (
+    (classId === "fighter" || classId === "rogue") &&
+    isThirdCasterSubclass(subclass)
+  ) {
+    return "wizard";
+  }
+  return classId;
 }
 
 /** Cantrips known by class level (PHD tables, approximate SRD) */

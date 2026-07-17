@@ -1,10 +1,13 @@
 import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSheetData, Dnd5eSpellEntry } from "../types";
 import { getFeatById, getSpells } from "./catalog";
-import { featuresForLevel } from "./engine";
+import { featuresForLevel, subclassFeaturesUpToLevel } from "./engine";
 import { matchSubclassOption } from "./class-ids";
+import { appendGrantedSpellsFromFeatures } from "./catalog-bridge";
+import { isThirdCasterSubclass } from "./spell-slots";
 import type { AbilityKeyShort, LevelUpDraft, SlotKey } from "./types";
 import { xpForLevel } from "../xp-table";
 import { parseHitDiceString } from "../rest";
+import { defaultSpellAbilityForClass } from "../spellcasting";
 
 function newId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -87,26 +90,41 @@ export function applyLevelUpDraft(
     next.combat.hitDice = `${toLevel}d${plan.hitDie}`;
   }
 
-  // Class features (plan + subclass features chosen mid-wizard)
-  const subclassFeatures =
-    draft.subclassId && plan.classId
-      ? featuresForLevel(plan.classId, toLevel, draft.subclassId).filter(
+  // Class features (plan) + catch-up subclass features when picking late
+  const subclassCatchUp =
+    draft.subclassId && plan.classId && plan.needsSubclass
+      ? subclassFeaturesUpToLevel(plan.classId, draft.subclassId, toLevel).filter(
           (f) => !plan.features.some((p) => p.id === f.id),
         )
-      : [];
-  const allClassFeatures = [...plan.features, ...subclassFeatures];
+      : draft.subclassId && plan.classId
+        ? featuresForLevel(plan.classId, toLevel, draft.subclassId).filter(
+            (f) => !plan.features.some((p) => p.id === f.id),
+          )
+        : [];
+  const allClassFeatures = [...plan.features, ...subclassCatchUp];
   const selectedIds =
     draft.selectedFeatureIds.length > 0
       ? new Set([
           ...draft.selectedFeatureIds,
-          // Auto-include newly revealed subclass features when picking subclass
-          ...subclassFeatures.map((f) => f.id),
+          // Auto-include catch-up / mid-wizard subclass features
+          ...subclassCatchUp.map((f) => f.id),
         ])
       : new Set(allClassFeatures.map((f) => f.id));
 
   for (const f of allClassFeatures) {
     if (!selectedIds.has(f.id)) continue;
-    if (next.features.some((x) => x.id === f.id || x.nameEn === f.nameEn)) continue;
+    if (
+      next.features.some(
+        (x) =>
+          x.id === f.id ||
+          x.nameEn === f.nameEn ||
+          x.nameDe === f.nameDe ||
+          x.name === f.nameDe ||
+          x.name === f.nameEn,
+      )
+    ) {
+      continue;
+    }
     next.features.push(
       featureFromProgression(
         f.id,
@@ -117,6 +135,10 @@ export function applyLevelUpDraft(
       ),
     );
   }
+
+  // Domain / subclass granted spells (always prepared) from newly applied features
+  const grantedFrom = allClassFeatures.filter((f) => selectedIds.has(f.id));
+  next.spells = appendGrantedSpellsFromFeatures(next, grantedFrom, "domain").spells;
 
   for (const f of plan.raceFeatures) {
     if (!draft.selectedRaceFeatureIds.includes(f.id)) continue;
@@ -190,7 +212,7 @@ export function applyLevelUpDraft(
     }
   }
 
-  // Spell slots
+  // Spell slots (+ ability for new third-casters)
   if (plan.spellcasting) {
     const slots = { ...(next.spellcasting?.slots ?? {}) };
     for (const [key, max] of Object.entries(plan.spellcasting.slotsMax) as Array<
@@ -202,14 +224,20 @@ export function applyLevelUpDraft(
         used: prev ? Math.min(prev.used, max) : 0,
       };
     }
+    const third =
+      plan.spellcasting.caster === "third" ||
+      isThirdCasterSubclass(draft.subclassId);
+    const ability =
+      next.spellcasting?.ability ??
+      (third ? "int" : defaultSpellAbilityForClass(plan.classId));
     next.spellcasting = {
       ...(next.spellcasting ?? { ability: "int" }),
-      ability: next.spellcasting?.ability ?? "int",
+      ability,
       slots,
     };
   }
 
-  // Spells from catalog
+  // Spells from catalog (known vs prepared vs always-cantrip)
   const catalog = getSpells();
   const existingIds = new Set(
     (next.spells ?? []).map((s) => s.id.toLowerCase()),
@@ -218,11 +246,13 @@ export function applyLevelUpDraft(
     (next.spells ?? []).map((s) => s.name.toLowerCase()),
   );
   next.spells = [...(next.spells ?? [])];
+  const leveledMode = plan.spellcasting?.preparedHint ? "prepared" : "known";
 
   for (const spellId of draft.newSpellIds) {
     const def = catalog.find((s) => s.id === spellId);
     if (!def) continue;
     if (existingIds.has(def.id) || existingNames.has(def.nameEn.toLowerCase())) continue;
+    const isCantrip = def.level <= 0;
     const entry: Dnd5eSpellEntry = {
       id: def.id,
       name: def.nameDe || def.nameEn,
@@ -232,8 +262,8 @@ export function applyLevelUpDraft(
       descriptionDe: def.descriptionDe ?? null,
       descriptionEn: def.descriptionEn ?? null,
       level: def.level,
-      preparationMode: def.level <= 0 ? "always" : "prepared",
-      prepared: def.level <= 0,
+      preparationMode: isCantrip ? "always" : leveledMode,
+      prepared: isCantrip || leveledMode === "known",
     };
     next.spells.push(entry);
     existingIds.add(def.id);
@@ -241,15 +271,17 @@ export function applyLevelUpDraft(
 
   for (const custom of draft.customSpells) {
     if (!custom.name.trim()) continue;
+    const lvl = Math.max(0, Math.floor(custom.level));
+    const isCantrip = lvl <= 0;
     next.spells.push({
       id: `custom-spell-${newId()}`,
       name: custom.name.trim(),
       nameDe: custom.name.trim(),
       nameEn: custom.name.trim(),
       description: custom.description ?? null,
-      level: Math.max(0, Math.floor(custom.level)),
-      preparationMode: custom.level <= 0 ? "always" : "prepared",
-      prepared: custom.level <= 0,
+      level: lvl,
+      preparationMode: isCantrip ? "always" : leveledMode,
+      prepared: isCantrip || leveledMode === "known",
     });
   }
 

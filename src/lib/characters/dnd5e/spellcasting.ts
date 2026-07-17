@@ -11,20 +11,29 @@ const KNOWN_CLASS_RE =
 const PACT_CLASS_RE = /hexer|warlock|hexenmeister/;
 const CASTER_CLASS_RE =
   /magier|wizard|zauberer|sorcerer|kleriker|cleric|paladin|barde|bard|hexer|warlock|druide|druid|waldläufer|waldlaeufer|ranger|artificer|inventor|hexenmeister/;
+const THIRD_CASTER_SUBCLASS_RE =
+  /arcane.?trickster|arkaner.?tricks[te]er|eldritch.?knight|mystischer.?ritter/;
 
-export function isCasterClass(className: string | null | undefined): boolean {
+export function isCasterClass(
+  className: string | null | undefined,
+  subclass?: string | null,
+): boolean {
   const c = (className ?? "").toLowerCase();
-  return c.length > 0 && CASTER_CLASS_RE.test(c);
+  if (c.length > 0 && CASTER_CLASS_RE.test(c)) return true;
+  const s = (subclass ?? "").toLowerCase();
+  return s.length > 0 && THIRD_CASTER_SUBCLASS_RE.test(s);
 }
 
 export function getSpellPreparationStyle(
   className: string | null | undefined,
+  subclass?: string | null,
 ): SpellPreparationStyle {
   const c = (className ?? "").toLowerCase();
-  if (!c) return "none";
+  if (!c && !subclass) return "none";
   if (PACT_CLASS_RE.test(c)) return "pact";
   if (PREPARED_CLASS_RE.test(c)) return "prepared";
   if (KNOWN_CLASS_RE.test(c)) return "known";
+  if (THIRD_CASTER_SUBCLASS_RE.test((subclass ?? "").toLowerCase())) return "known";
   return "none";
 }
 

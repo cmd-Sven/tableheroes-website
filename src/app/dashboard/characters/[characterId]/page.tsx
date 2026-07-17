@@ -54,7 +54,9 @@ export default async function PlayerCharacterDetailPage({ params }: Props) {
         campaignId={payload.campaignId}
         character={payload.character as any}
         cultures={payload.cultures}
+        races={payload.races}
         languages={payload.languages}
+        religions={payload.religions}
         factions={payload.factions}
         locations={payload.locations}
         factionReputations={payload.factionReputations}

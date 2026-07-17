@@ -43,6 +43,8 @@ export type ProgressionFeature = LocalizedText & {
   id: string;
   level: number;
   subclass?: string | null;
+  /** Auto-added to sheet.spells as always prepared (domain/oath spells, etc.) */
+  grantedSpellIds?: string[];
 };
 
 export type ClassLevelRow = {

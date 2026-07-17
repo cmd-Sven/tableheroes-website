@@ -4045,7 +4045,7 @@ export function LiveSessionBoard({
                           priority={false}
                           unoptimized
                         />
-                        <div className="absolute inset-x-3 bottom-12 top-8 z-10 flex flex-col items-center justify-end text-center">
+                        <div className="absolute inset-x-3 bottom-12 top-8 z-30 flex flex-col items-center justify-end text-center">
                           <LiveSessionCharacterAvatar
                             sessionId={sessionId}
                             campaignId={campaignId}
@@ -4055,10 +4055,10 @@ export function LiveSessionBoard({
                             fallbackAvatarUrl={pc.avatar_url}
                             avatarDisplay={pc.avatar_display}
                             isDummy={pc.isSessionDummy}
+                            isGm={isGM}
                             canInteract={
                               canInteractAvatar &&
-                              (pid === userId ||
-                                (isPrepMode && actualUserIsGM && !forcePlayerView))
+                              (pid === userId || isGM)
                             }
                             showDnd5eSheet={showDnd5eSheet}
                           />
@@ -4090,7 +4090,7 @@ export function LiveSessionBoard({
                           <button
                             type="button"
                             onClick={() => setInventoryCharacter(pc)}
-                            className="absolute -left-8 top-[70px] z-50 cursor-pointer transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
+                            className="absolute -left-8 top-[70px] z-20 cursor-pointer transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
                             title={`Rucksack von ${pc.name} öffnen`}
                             aria-label={`Rucksack von ${pc.name} öffnen`}
                           >
