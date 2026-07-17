@@ -556,7 +556,7 @@ function run() {
       wis: 12,
       cha: 10,
     },
-    skillKeys: ["arcana", "history"],
+    skillKeys: ["arc", "his"],
     spellIds: [],
   });
   assert.equal(wizBuilt.sheet.savingThrows.int?.proficient, true);
