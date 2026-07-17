@@ -146,7 +146,6 @@ type DiceSceneProps = {
   throwStrength?: number;
   isTap?: boolean;
   onAllSettled: () => void;
-  resultLabel?: string | null;
   showResult?: boolean;
 };
 
@@ -162,7 +161,6 @@ export function DiceRollScene({
   throwStrength,
   isTap,
   onAllSettled,
-  resultLabel,
   showResult = false,
 }: DiceSceneProps) {
   const settled = useRef<Set<number>>(new Set());
@@ -202,18 +200,13 @@ export function DiceRollScene({
       <ambientLight intensity={0.85} />
       <directionalLight position={[2, 10, 1]} intensity={1.1} castShadow />
       <pointLight position={[-2, 6, -1]} intensity={0.35} color="#cab926" />
-      <Html position={[aimX, 0.15, aimZ]} center style={{ pointerEvents: "none" }}>
-        <div className="flex flex-col items-center gap-1">
+      {!showResult ? (
+        <Html position={[aimX, 0.15, aimZ]} center style={{ pointerEvents: "none" }}>
           <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold drop-shadow">
             {faces.length > 1 ? `${faces.length}×W${sides}` : `W${sides}`}
           </p>
-          {showResult && resultLabel ? (
-            <p className="font-barlow text-2xl font-extrabold text-hero-vibrant drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              {resultLabel}
-            </p>
-          ) : null}
-        </div>
-      </Html>
+        </Html>
+      ) : null}
       {faces.map((face, i) => (
         <AnimatedDie
           key={`${seed}-${i}-${face}`}

@@ -8,7 +8,6 @@ import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-ac
 import {
   DICE_ANIMATION_DURATION_MS,
   dispatchDiceAnimComplete,
-  formatDiceResultLabel,
   isDiceAnimMeta,
   shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
@@ -28,7 +27,6 @@ import {
   SLINGSHOT_MAX_STRETCH_PX,
 } from "@/src/lib/session/dice-slingshot";
 import {
-  dieNatHighlight,
   rollMoodFromFaces,
   type DieNatHighlight,
 } from "@/src/lib/session/dice-nat-highlight";
@@ -49,7 +47,6 @@ type ActiveRoll = {
   seed: string;
   startAt: number;
   use3d: boolean;
-  resultLabel: string;
   dropNx: number;
   dropNy: number;
   aimX: number;
@@ -327,7 +324,6 @@ export function DiceRollOverlay({ logs }: Props) {
         seed: typeof meta.seed === "string" ? meta.seed : entry.id,
         startAt: performance.now(),
         use3d: webgl && supports3dDice(sides),
-        resultLabel: formatDiceResultLabel(meta),
         dropNx,
         dropNy,
         aimX,
@@ -380,17 +376,16 @@ export function DiceRollOverlay({ logs }: Props) {
     return () => window.clearTimeout(t);
   }, [activeId, finishActive]);
 
-  const fallbackLabel = useMemo(() => {
-    if (!active) return "";
-    if (showResult) return active.resultLabel;
-    if (active.faces.length === 1) return `W${active.sides}`;
-    return `${active.faces.length}×W${active.sides}`;
-  }, [active, showResult]);
-
   const rollMood = useMemo((): DieNatHighlight | null => {
     if (!active || !showResult) return null;
     return rollMoodFromFaces(active.faces, active.sides);
   }, [active, showResult]);
+
+  const fallbackDieLabel = useMemo(() => {
+    if (!active) return "";
+    if (active.faces.length === 1) return `W${active.sides}`;
+    return `${active.faces.length}×W${active.sides}`;
+  }, [active]);
 
   const fallbackStyle = useMemo(() => {
     if (!active) return undefined;
@@ -400,11 +395,6 @@ export function DiceRollOverlay({ logs }: Props) {
       transform: "translate(-50%, -50%)",
     } as const;
   }, [active]);
-
-  const fallbackNatHighlight = useMemo((): DieNatHighlight | null => {
-    if (!active || !showResult || active.faces.length !== 1) return null;
-    return dieNatHighlight(active.sides, active.faces[0] ?? 0);
-  }, [active, showResult]);
 
   return (
     <>
@@ -530,75 +520,37 @@ export function DiceRollOverlay({ logs }: Props) {
                   throwStrength={active.throwStrength}
                   isTap={active.isTap}
                   onSettled={handleAllSettled}
-                  resultLabel={active.resultLabel}
                   showResult={showResult}
                 />
               </div>
-            ) : (
+            ) : !showResult ? (
               <motion.div
-                className={`absolute flex flex-col items-center gap-3 rounded-md border px-8 py-6 shadow-2xl ${
-                  fallbackNatHighlight === "crit"
-                    ? "border-accent-gold bg-background-card/95"
-                    : fallbackNatHighlight === "fumble"
-                      ? "border-accent-blood bg-background-dark/95"
-                      : "border-hero-border bg-background-card/95"
-                }`}
-                style={{
-                  ...fallbackStyle,
-                  boxShadow:
-                    fallbackNatHighlight === "crit"
-                      ? "0 0 36px rgba(202,185,38,0.45), 0 12px 32px rgba(0,0,0,0.5)"
-                      : fallbackNatHighlight === "fumble"
-                        ? "0 0 28px rgba(88,24,13,0.5), 0 12px 32px rgba(0,0,0,0.55)"
-                        : undefined,
-                }}
+                className="absolute flex flex-col items-center gap-3 rounded-md border border-hero-border bg-background-card/95 px-8 py-6 shadow-2xl"
+                style={fallbackStyle}
                 initial={{ opacity: 0, scale: 0.92, y: 16 }}
-                animate={
-                  showResult && fallbackNatHighlight === "fumble"
-                    ? { opacity: 1, scale: 1, y: 0, x: [0, -5, 5, -3, 3, 0] }
-                    : showResult && fallbackNatHighlight === "crit"
-                      ? { opacity: 1, scale: [0.92, 1.06, 1], y: 0 }
-                      : { opacity: 1, scale: 1, y: 0 }
-                }
+                animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: -8 }}
-                transition={{
-                  duration: showResult && fallbackNatHighlight ? 0.45 : 0.35,
-                  ease: "easeOut",
-                }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
                 onAnimationComplete={() => {
-                  if (!showResult) {
-                    window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
-                  }
+                  window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
                 }}
               >
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
-                  {showResult ? "Ergebnis" : "Würfel rollen…"}
+                  Würfel rollen…
                 </p>
                 <motion.div
-                  className={`font-barlow text-5xl font-extrabold ${
-                    fallbackNatHighlight === "crit"
-                      ? "text-accent-gold"
-                      : fallbackNatHighlight === "fumble"
-                        ? "text-accent-blood"
-                        : "text-hero-vibrant"
-                  }`}
+                  className="font-barlow text-2xl font-extrabold text-hero-vibrant"
                   initial={{ rotate: -12, scale: 0.8 }}
-                  animate={
-                    showResult && fallbackNatHighlight === "crit"
-                      ? { rotate: 0, scale: [0.85, 1.12, 1.04] }
-                      : showResult
-                        ? { rotate: 0, scale: 1 }
-                        : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
-                  }
+                  animate={{ rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }}
                   transition={{
-                    duration: showResult ? 0.35 : DICE_ANIMATION_DURATION_MS / 1000,
+                    duration: DICE_ANIMATION_DURATION_MS / 1000,
                     ease: "easeOut",
                   }}
                 >
-                  {fallbackLabel}
+                  {fallbackDieLabel}
                 </motion.div>
               </motion.div>
-            )}
+            ) : null}
           </motion.div>
         ) : null}
       </AnimatePresence>

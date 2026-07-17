@@ -18,7 +18,6 @@ type Props = {
   throwStrength?: number;
   isTap?: boolean;
   onSettled: () => void;
-  resultLabel?: string | null;
   showResult?: boolean;
 };
 
@@ -62,7 +61,6 @@ export default function DiceRollCanvas({
   throwStrength,
   isTap,
   onSettled,
-  resultLabel,
   showResult,
 }: Props) {
   return (
@@ -92,7 +90,6 @@ export default function DiceRollCanvas({
         throwStrength={throwStrength}
         isTap={isTap}
         onAllSettled={onSettled}
-        resultLabel={resultLabel}
         showResult={showResult}
       />
     </Canvas>
