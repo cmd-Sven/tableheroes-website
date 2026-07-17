@@ -20,7 +20,9 @@ import {
   executeDiceRoll,
   parseRollCommand,
   type DiceRollMode,
+  type DiceRollOutcome,
 } from "@/src/lib/session/dice-roll";
+import { dispatchAvatarRollFx } from "@/src/lib/session/avatar-roll-fx";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 
 const ACTIVITY_TYPES = new Set([
@@ -112,6 +114,14 @@ export function LiveSessionActivityPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [activityLogs.length, open]);
 
+  function maybeTriggerAvatarRollFx(characterId: string, outcome: DiceRollOutcome) {
+    if (outcome.isCritical) {
+      dispatchAvatarRollFx({ characterId, kind: "crit" });
+    } else if (outcome.isFumble) {
+      dispatchAvatarRollFx({ characterId, kind: "fumble" });
+    }
+  }
+
   function postActivity(type: string, text: string, meta?: Record<string, unknown>) {
     startTransition(async () => {
       try {
@@ -135,6 +145,7 @@ export function LiveSessionActivityPanel({
       return;
     }
     const outcome = executeDiceRoll({ dice: 1, sides, modifier }, mode);
+    maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
     const prefix = label ? `${currentCharacter.name} würfelt ${label}` : `${currentCharacter.name} w${sides} gewürfelt`;
     postActivity("dice", `${prefix}: ${outcome.display}`, { ...outcome, label });
   }
@@ -147,6 +158,7 @@ export function LiveSessionActivityPanel({
     const parsed = parseRollCommand(trimmed);
     if (parsed) {
       const outcome = executeDiceRoll(parsed, rollMode);
+      maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
       postActivity("dice", `${currentCharacter.name}: ${outcome.formula} → ${outcome.display}`, outcome);
       setInput("");
       return;
@@ -168,6 +180,7 @@ export function LiveSessionActivityPanel({
     const bonus = primaryAttack?.attackBonus ?? 0;
     const weaponName = primaryAttack?.name ?? "Waffe";
     const outcome = executeDiceRoll({ dice: 1, sides: 20, modifier: bonus }, rollMode);
+    maybeTriggerAvatarRollFx(currentCharacter.id, outcome);
     const bonusLabel = bonus !== 0 ? ` (${formatSigned(bonus)})` : "";
     postActivity(
       "attack_pending",

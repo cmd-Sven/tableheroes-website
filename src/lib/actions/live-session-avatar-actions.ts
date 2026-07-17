@@ -50,6 +50,8 @@ export type LiveAvatarStatus = {
   displayAvatarUrl: string | null;
   /** Spieler-Gemüt (wird von GM-Zustand visuell überdeckt). */
   moodState: MoodStateKey | null;
+  /** URLs pro Gemütszustand (für Crit/Patzer-FX und Radial-Menü). */
+  moodTokenUrls: Partial<Record<MoodStateKey, string>>;
   /** Aktive SL-Zustände (Vorrang vor moodState). */
   activeConditions: CharacterConditionKey[];
   displaySource: "gm_condition" | "mood" | "base";
@@ -191,6 +193,12 @@ export async function getLiveSessionAvatarStatus(
   }));
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const moodState = normalizeMoodState(ch.mood_state);
+  const moodTokens = parseMoodTokensMap(ch.mood_tokens);
+  const moodTokenUrls: Partial<Record<MoodStateKey, string>> = {};
+  for (const [key, entry] of Object.entries(moodTokens)) {
+    const url = entry?.url?.trim();
+    if (url) moodTokenUrls[key as MoodStateKey] = url;
+  }
   const activeConditions = parseActiveConditions(ch.active_conditions);
   const display = resolveCharacterDisplayToken({
     baseTokenUrl: ch.token_url,
@@ -198,7 +206,7 @@ export async function getLiveSessionAvatarStatus(
     activeConditions: ch.active_conditions,
     conditionTokens: parseConditionTokensMap(ch.condition_tokens),
     moodState: ch.mood_state,
-    moodTokens: parseMoodTokensMap(ch.mood_tokens),
+    moodTokens,
   });
 
   const weaponLabels: string[] = [];
@@ -242,6 +250,7 @@ export async function getLiveSessionAvatarStatus(
     hpTemp: Math.max(0, Math.round(Number(sheet.combat?.hpTemp) || 0)),
     displayAvatarUrl: display.url || ch.avatar_url || null,
     moodState,
+    moodTokenUrls,
     activeConditions,
     displaySource: display.source,
     weaponLabels,

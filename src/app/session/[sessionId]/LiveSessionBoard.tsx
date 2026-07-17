@@ -86,6 +86,10 @@ import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInvento
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
 import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
+import {
+  dispatchAvatarRollFx,
+  rollFxKindFromMeta,
+} from "@/src/lib/session/avatar-roll-fx";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -1597,6 +1601,7 @@ export function LiveSessionBoard({
     (isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId));
   const systemLogs = liveState?.system_logs ?? [];
   const prevSystemLogCountRef = useRef(systemLogs.length);
+  const prevRollFxLogCountRef = useRef(systemLogs.length);
 
   useEffect(() => {
     if (!isGM || forcePlayerView) {
@@ -1619,6 +1624,32 @@ export function LiveSessionBoard({
       }
     }
   }, [systemLogs, isGM, forcePlayerView]);
+
+  /** Crit/Patzer-Avatar-FX für alle Clients (inkl. Remote nach Live-State-Sync). */
+  useEffect(() => {
+    if (systemLogs.length < prevRollFxLogCountRef.current) {
+      prevRollFxLogCountRef.current = systemLogs.length;
+      return;
+    }
+    if (systemLogs.length === prevRollFxLogCountRef.current) return;
+    const fresh = systemLogs.slice(prevRollFxLogCountRef.current);
+    prevRollFxLogCountRef.current = systemLogs.length;
+    for (const entry of fresh) {
+      if (entry.type !== "dice" && entry.type !== "attack_pending" && entry.type !== "skill_check") {
+        continue;
+      }
+      const characterId = entry.character_id?.trim();
+      if (!characterId) continue;
+      const kind = rollFxKindFromMeta(entry.meta);
+      if (!kind) continue;
+      dispatchAvatarRollFx({
+        characterId,
+        kind,
+        sourceId: entry.id,
+      });
+    }
+  }, [systemLogs]);
+
   const physicallyPresentIdSet = new Set(
     normalizePhysicallyPresentUserIds(liveState?.physically_present_user_ids),
   );

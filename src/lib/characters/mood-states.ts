@@ -7,6 +7,10 @@ export const MOOD_STATE_KEYS = [
   "shady",
   "exhausted",
   "sleeping",
+  "flirtend",
+  "ups-peinlich",
+  "zum-angriff",
+  "heroischer-moment",
 ] as const;
 
 export type MoodStateKey = (typeof MOOD_STATE_KEYS)[number];
@@ -69,6 +73,34 @@ export const MOOD_STATE_DEFINITIONS: MoodStateDefinition[] = [
     labelEn: "Sleeping",
     aiVisualHint:
       "Eyes peacefully closed, relaxed sleeping face, soft calm breathing expression.",
+  },
+  {
+    key: "flirtend",
+    labelDe: "Flirtend",
+    labelEn: "Flirty",
+    aiVisualHint:
+      "Playful coy smile, raised eyebrow, charming flirtatious gaze, soft inviting expression.",
+  },
+  {
+    key: "ups-peinlich",
+    labelDe: "Ups, peinlich!",
+    labelEn: "Oops, awkward!",
+    aiVisualHint:
+      "Embarrassed blushing cheeks, awkward grimace, sheepish eyes, cringe comic moment.",
+  },
+  {
+    key: "zum-angriff",
+    labelDe: "Zum Angriff!",
+    labelEn: "Charge!",
+    aiVisualHint:
+      "Battle-ready snarl, fierce battle cry expression, intense aggressive combat focus.",
+  },
+  {
+    key: "heroischer-moment",
+    labelDe: "Heroischer Moment",
+    labelEn: "Heroic Moment",
+    aiVisualHint:
+      "Triumphant heroic pose, glowing confident smile, epic victorious expression, dramatic lighting.",
   },
 ];
 

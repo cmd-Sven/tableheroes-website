@@ -37,6 +37,13 @@ import {
   MOOD_STATE_DEFINITIONS,
   type MoodStateKey,
 } from "@/src/lib/characters/mood-states";
+import {
+  AVATAR_ROLL_FX_DURATION_MS,
+  AVATAR_ROLL_FX_EVENT,
+  moodKeyForRollFx,
+  type AvatarRollFxDetail,
+  type AvatarRollFxKind,
+} from "@/src/lib/session/avatar-roll-fx";
 
 type RadialPanel =
   | "weapons"
@@ -128,13 +135,48 @@ export function LiveSessionCharacterAvatar({
   const [pending, startTransition] = useTransition();
   const [mounted, setMounted] = useState(false);
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
+  const [rollFx, setRollFx] = useState<{
+    kind: AvatarRollFxKind;
+    moodKey: MoodStateKey;
+    endsAt: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const rollFxTimerRef = useRef<number | null>(null);
+  const seenRollFxIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    function onRollFx(e: Event) {
+      const detail = (e as CustomEvent<AvatarRollFxDetail>).detail;
+      if (!detail || detail.characterId !== characterId) return;
+      if (detail.sourceId) {
+        if (seenRollFxIdsRef.current.has(detail.sourceId)) return;
+        seenRollFxIdsRef.current.add(detail.sourceId);
+        if (seenRollFxIdsRef.current.size > 40) {
+          const oldest = seenRollFxIdsRef.current.values().next().value;
+          if (oldest) seenRollFxIdsRef.current.delete(oldest);
+        }
+      }
+      const duration = detail.durationMs ?? AVATAR_ROLL_FX_DURATION_MS;
+      const moodKey = moodKeyForRollFx(detail.kind);
+      setRollFx({ kind: detail.kind, moodKey, endsAt: Date.now() + duration });
+      if (rollFxTimerRef.current != null) window.clearTimeout(rollFxTimerRef.current);
+      rollFxTimerRef.current = window.setTimeout(() => {
+        setRollFx(null);
+        rollFxTimerRef.current = null;
+      }, duration);
+    }
+    window.addEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
+    return () => {
+      window.removeEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
+      if (rollFxTimerRef.current != null) window.clearTimeout(rollFxTimerRef.current);
+    };
+  }, [characterId]);
 
   const reload = useCallback(async () => {
     if (isDummy) return;
@@ -202,7 +244,17 @@ export function LiveSessionCharacterAvatar({
     };
   }, [menuOpen]);
 
-  const avatarUrl = status?.displayAvatarUrl || fallbackAvatarUrl;
+  const avatarUrl = (() => {
+    if (rollFx) {
+      const fxUrl = status?.moodTokenUrls?.[rollFx.moodKey]?.trim();
+      if (fxUrl) return fxUrl;
+    }
+    return status?.displayAvatarUrl || fallbackAvatarUrl;
+  })();
+  const fxMoodLabel = rollFx
+    ? MOOD_STATE_DEFINITIONS.find((d) => d.key === rollFx.moodKey)?.labelDe ?? rollFx.moodKey
+    : null;
+  const isCritFx = rollFx?.kind === "crit";
   const hpCurrent = status?.hpCurrent ?? 0;
   const hpMax = Math.max(1, status?.hpMax ?? 1);
   const hpPct = Math.min(100, Math.round((hpCurrent / hpMax) * 100));
@@ -519,6 +571,7 @@ export function LiveSessionCharacterAvatar({
                       </button>
                       {MOOD_STATE_DEFINITIONS.map((def) => {
                         const selected = status?.moodState === def.key;
+                        const hasToken = Boolean(status?.moodTokenUrls?.[def.key]);
                         return (
                           <button
                             key={def.key}
@@ -533,6 +586,7 @@ export function LiveSessionCharacterAvatar({
                           >
                             {def.labelDe}
                             {selected ? " · Aktiv" : ""}
+                            {!hasToken ? " · ohne Bild" : ""}
                           </button>
                         );
                       })}
@@ -576,7 +630,7 @@ export function LiveSessionCharacterAvatar({
 
   return (
     <div ref={rootRef} className="relative flex h-full w-full flex-col items-center">
-      <button
+      <motion.button
         ref={avatarBtnRef}
         type="button"
         disabled={!canInteract || isDummy}
@@ -587,9 +641,14 @@ export function LiveSessionCharacterAvatar({
           requestAnimationFrame(() => updateAnchor());
           void reload();
         }}
-        className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl transition-transform ${
-          isDummy ? "border-dashed border-amber-600/90" : "border-amber-800/80"
-        } ${canInteract && !isDummy ? "cursor-pointer hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-accent-gold" : "cursor-default"}`}
+        animate={{
+          scale: isCritFx ? 1.28 : 1,
+          opacity: 1,
+        }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-hero-dark shadow-xl ${
+          isDummy ? "border-dashed border-amber-600/90" : isCritFx ? "border-accent-gold" : "border-amber-800/80"
+        } ${canInteract && !isDummy ? "cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-accent-gold" : "cursor-default"}`}
         title={canInteract && !isDummy ? `${characterName} — Aktionen` : characterName}
         aria-label={canInteract && !isDummy ? `Aktionen für ${characterName}` : characterName}
       >
@@ -607,7 +666,12 @@ export function LiveSessionCharacterAvatar({
             {characterName[0]?.toUpperCase()}
           </span>
         )}
-      </button>
+        {rollFx && !status?.moodTokenUrls?.[rollFx.moodKey] ? (
+          <span className="pointer-events-none absolute inset-x-1 bottom-2 z-10 rounded bg-black/75 px-1 py-0.5 text-center font-barlow text-[8px] font-bold uppercase leading-tight text-accent-gold">
+            {fxMoodLabel}
+          </span>
+        ) : null}
+      </motion.button>
 
       {!isDummy ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[-6px] z-20 flex flex-col items-center gap-1 px-2">
