@@ -222,6 +222,9 @@ export function InventoryGrid({
       case "edit":
         onEditItem(item);
         break;
+      case "assignCategory":
+        setAssignModal(item);
+        break;
       case "delete":
         setItemModal({ type: "delete", item });
         break;

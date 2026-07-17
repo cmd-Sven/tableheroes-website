@@ -12,6 +12,10 @@ import {
   createCharacterItem,
   updateCharacterItem,
 } from "@/src/lib/actions/character-inventory-actions";
+import {
+  isStandardCategory,
+  patchMetaFromDisplayCategory,
+} from "./inventory-categories";
 
 function cloneMeta(item: CharacterItem): Dnd5eItemMeta | null {
   return parseDnd5eMetaFromDescription(item.description);
@@ -69,12 +73,17 @@ export async function setItemInventoryCategory(
     quantity: 1,
   };
   meta.inventoryCategory = category;
+  if (isStandardCategory(category)) {
+    const patch = patchMetaFromDisplayCategory(category, Boolean(meta.isMagical));
+    meta.kind = patch.kind;
+    meta.isConsumable = patch.isConsumable;
+  }
   const description = buildDescriptionFromItem(item, meta);
   return updateCharacterItem({
     itemId: item.id,
     name: item.name,
     description,
-    category: item.category,
+    category: metaToInventoryCategory(meta),
     iconType: item.icon_type,
   });
 }

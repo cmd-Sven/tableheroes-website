@@ -1,10 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
+  Backpack,
   Crosshair,
   FlaskConical,
   HelpCircle,
   Package,
+  RectangleHorizontal,
   ScrollText,
   Shield,
   Swords,
@@ -27,6 +29,8 @@ export const STANDARD_INVENTORY_CATEGORIES: InventoryDisplayCategory[] = [
   "potions",
   "tools",
   "gear",
+  "gepaeck",
+  "guertel",
   "ingredients",
   "ammunition",
   "scrolls",
@@ -48,6 +52,8 @@ export const CATEGORY_ICONS: Record<InventoryDisplayCategory, LucideIcon> = {
   potions: FlaskConical,
   tools: Wrench,
   gear: Package,
+  gepaeck: Backpack,
+  guertel: RectangleHorizontal,
   ingredients: FlaskConical,
   ammunition: Crosshair,
   scrolls: ScrollText,
@@ -60,6 +66,8 @@ export const CATEGORY_COLORS: Record<InventoryDisplayCategory, string> = {
   potions: "border-purple-500/60 bg-purple-950/40 text-purple-300",
   tools: "border-amber-600/60 bg-amber-950/40 text-amber-300",
   gear: "border-hero-border/60 bg-hero-dark/50 text-gray-300",
+  gepaeck: "border-teal-500/60 bg-teal-950/40 text-teal-300",
+  guertel: "border-yellow-600/60 bg-yellow-950/40 text-yellow-200",
   ingredients: "border-lime-600/60 bg-lime-950/40 text-lime-300",
   ammunition: "border-orange-500/60 bg-orange-950/40 text-orange-300",
   scrolls: "border-indigo-400/60 bg-indigo-950/40 text-indigo-200",
@@ -99,6 +107,17 @@ export function inferInventoryCategory(item: CharacterItem): InventoryDisplayCat
   }
   if (stats.kind === "consumable" || item.category === "Consumable") {
     if (n.includes("ration") || n.includes("rationen")) return "gear";
+    // Foundry mappt Schmuck oft fälschlich als consumable — nicht unter Tränke
+    if (
+      n.includes("halskette") ||
+      n.includes("necklace") ||
+      n.includes("amulett") ||
+      n.includes("amulet") ||
+      n.includes("medaillon") ||
+      n.includes("ring")
+    ) {
+      return "gear";
+    }
     if (n.includes("trank") || n.includes("potion") || n.includes("elixier")) return "potions";
     return "potions";
   }
@@ -123,13 +142,32 @@ export function inferInventoryCategory(item: CharacterItem): InventoryDisplayCat
     return "ingredients";
   }
   if (
+    n.includes("gürtel") ||
+    n.includes("guertel") ||
+    n.includes("belt")
+  ) {
+    return "guertel";
+  }
+  if (
+    n.includes("rucksack") ||
+    n.includes("backpack") ||
+    n.includes("tasche der halt") ||
+    n.includes("bag of holding") ||
+    n.includes("bodenlose") ||
+    n.includes("portable hole") ||
+    n.includes("tragbares loch") ||
+    n.includes("gepaeck") ||
+    n.includes("gepäck") ||
+    n.includes("burglar")
+  ) {
+    return "gepaeck";
+  }
+  if (
     n.includes("seil") ||
     n.includes("rope") ||
     n.includes("eimer") ||
     n.includes("bucket") ||
-    n.includes("laterne") ||
-    n.includes("rucksack") ||
-    n.includes("backpack")
+    n.includes("laterne")
   ) {
     return "gear";
   }
@@ -224,6 +262,10 @@ export function displayCategoryToMetaKind(
     case "ingredients":
     case "ammunition":
       return "supply";
+    case "gepaeck":
+    case "guertel":
+    case "gear":
+      return "equipment";
     default:
       return "equipment";
   }

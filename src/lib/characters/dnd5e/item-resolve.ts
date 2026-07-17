@@ -102,7 +102,12 @@ function inferFromName(name: string): Partial<ResolvedItemStats> {
     if (found) return catalogToStats(found.entry, found.archetypeKey);
     return { ...stats, kind: "equipment", weightLb: 5 };
   }
-  if (n.includes("tasche der halt") || n.includes("bag of holding")) {
+  if (
+    n.includes("tasche der halt") ||
+    n.includes("bag of holding") ||
+    n.includes("bodenlose") ||
+    n.includes("portable hole")
+  ) {
     return { ...stats, kind: "magic", weightLb: 15, attunement: false, isMagical: true };
   }
   if (n.includes("schild") || n.includes("shield")) {
@@ -225,10 +230,17 @@ export function catalogTagForResolvedShopItem(item: ResolvedShopItem): string | 
 }
 
 export function isBackpackItem(item: CharacterItem): boolean {
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  if (meta?.inventoryCategory === "gepaeck") return true;
   const stats = resolveCharacterItemStats(item);
   if (stats.catalogId === "misc-backpack") return true;
   const n = item.name.toLowerCase();
-  return n.includes("rucksack") || n.includes("backpack");
+  return (
+    n.includes("rucksack") ||
+    n.includes("backpack") ||
+    n.includes("gepaeck") ||
+    n.includes("gepäck")
+  );
 }
 
 /** Bekannte Items mit festem RK-Bonus (Fallback ohne Re-Import). */
@@ -276,9 +288,27 @@ export function parseAdditiveAcFormula(formula: string | null | undefined): numb
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function nameHintsBagOfHolding(name: string): boolean {
+  const n = name.toLowerCase();
+  return (
+    n.includes("tasche der halt") ||
+    n.includes("bag of holding") ||
+    n.includes("bodenlose") ||
+    n.includes("portable hole") ||
+    n.includes("handy haversack") ||
+    n.includes("handlicher rucksack")
+  );
+}
+
 export function isBagOfHoldingItem(item: CharacterItem): boolean {
+  return nameHintsBagOfHolding(item.name);
+}
+
+export function isBeltWearableItem(item: CharacterItem): boolean {
+  const meta = parseDnd5eMetaFromDescription(item.description);
+  if (meta?.inventoryCategory === "guertel") return true;
   const n = item.name.toLowerCase();
-  return n.includes("tasche der halt") || n.includes("bag of holding");
+  return n.includes("gürtel") || n.includes("guertel") || n.includes("belt");
 }
 
 export function inferContainerKind(item: CharacterItem): "backpack" | "bag_of_holding" | null {

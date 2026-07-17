@@ -63,6 +63,10 @@ export function displayCategoryToMetaKind(
     case "ingredients":
     case "ammunition":
       return "supply";
+    case "gepaeck":
+    case "guertel":
+    case "gear":
+      return "equipment";
     default:
       return "equipment";
   }
@@ -153,6 +157,25 @@ export function inferLootInventoryCategory(
   ) {
     return "ingredients";
   }
+  if (
+    joined.includes("gürtel") ||
+    joined.includes("guertel") ||
+    joined.includes("belt")
+  ) {
+    return "guertel";
+  }
+  if (
+    joined.includes("rucksack") ||
+    joined.includes("backpack") ||
+    joined.includes("tasche der halt") ||
+    joined.includes("bag of holding") ||
+    joined.includes("bodenlose") ||
+    joined.includes("portable hole") ||
+    joined.includes("gepaeck") ||
+    joined.includes("gepäck")
+  ) {
+    return "gepaeck";
+  }
   if (isMagical) return "gear";
   return "gear";
 }
@@ -180,6 +203,10 @@ export function iconTypeForDisplayCategory(
       return "wrench";
     case "ammunition":
       return "crosshair";
+    case "gepaeck":
+      return "backpack";
+    case "guertel":
+      return "belt";
     default:
       return "gear";
   }

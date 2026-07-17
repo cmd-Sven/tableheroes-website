@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { CharacterItem } from "@/src/types/inventory";
 import type { InventoryCustomCategory } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
+  getItemDisplayCategory,
   STANDARD_INVENTORY_CATEGORIES,
   type InventoryDisplayCategory,
 } from "@/src/lib/characters/dnd5e/inventory-categories";
@@ -24,7 +25,13 @@ export function CategoryAssignModal({
   onClose,
 }: Props) {
   const { t } = useCharacterSheetLocale();
-  const [selected, setSelected] = useState<string>("unknown");
+  const [selected, setSelected] = useState<string>("gear");
+
+  useEffect(() => {
+    if (!item) return;
+    const current = getItemDisplayCategory(item, customCategories);
+    setSelected(current === "unknown" ? "gear" : current);
+  }, [item, customCategories]);
 
   if (!item) return null;
 

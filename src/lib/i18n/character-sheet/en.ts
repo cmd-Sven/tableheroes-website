@@ -94,6 +94,13 @@ export const characterSheetMessagesEn = {
   "xp.exact": "{current} / {next} XP",
   "xp.tooltip": "{current} XP total · Level {level}: {inLevel} / {needed} to next level",
 
+  "levelEdit.hint.subclassUnlock": "Subclass available from level {level}.",
+  "levelEdit.hint.subclassDue": "Subclass missing — expected from level {level}.",
+  "levelEdit.hint.asi": "Level {level}: Ability Score Improvement or feat (ASI).",
+  "levelEdit.hint.spellSlots": "Spell slots at this level: {slots}.",
+  "levelEdit.hint.wizardRecommend":
+    "Level increased — Level-Up wizard recommended (HP, features, ASI, spells).",
+
   "achievements.title": "Achievements",
   "achievements.empty": "No achievements unlocked for this character yet.",
   "achievements.accountHint": "Achievements belong to your player account and are shown on this character sheet.",
@@ -368,6 +375,8 @@ export const characterSheetMessagesEn = {
   "inventory.cat.potions": "Potions",
   "inventory.cat.tools": "Tools",
   "inventory.cat.gear": "Gear",
+  "inventory.cat.gepaeck": "Luggage",
+  "inventory.cat.guertel": "Belt",
   "inventory.cat.ingredients": "Ingredients",
   "inventory.cat.ammunition": "Ammunition",
   "inventory.cat.scrolls": "Spell scrolls",

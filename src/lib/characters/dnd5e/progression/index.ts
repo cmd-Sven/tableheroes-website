@@ -8,6 +8,11 @@ export {
 } from "./class-ids";
 export { asiLevelsForClass, levelGrantsAsi } from "./asi";
 export {
+  buildLevelEditHints,
+  type LevelEditHint,
+  type LevelEditHintId,
+} from "./level-edit-hints";
+export {
   slotsForClassLevel,
   casterTypeForClass,
   cantripsKnownForClass,

@@ -94,6 +94,13 @@ export const characterSheetMessagesDe = {
   "xp.exact": "{current} / {next} XP",
   "xp.tooltip": "{current} XP gesamt · Stufe {level}: {inLevel} / {needed} bis nächste Stufe",
 
+  "levelEdit.hint.subclassUnlock": "Unterklasse ab Stufe {level} wählbar.",
+  "levelEdit.hint.subclassDue": "Unterklasse fehlt — ab Stufe {level} vorgesehen.",
+  "levelEdit.hint.asi": "Stufe {level}: Attributsteigerung oder Talent (ASI).",
+  "levelEdit.hint.spellSlots": "Zauberplätze auf dieser Stufe: {slots}.",
+  "levelEdit.hint.wizardRecommend":
+    "Stufe erhöht — Level-Up-Assistent empfohlen (LP, Merkmale, ASI, Zauber).",
+
   "achievements.title": "Errungenschaften",
   "achievements.empty": "Noch keine Errungenschaften mit diesem Charakter freigeschaltet.",
   "achievements.accountHint": "Errungenschaften gelten für dein Spielerkonto und werden hier am Charakterblatt angezeigt.",
@@ -368,6 +375,8 @@ export const characterSheetMessagesDe = {
   "inventory.cat.potions": "Tränke",
   "inventory.cat.tools": "Werkzeug",
   "inventory.cat.gear": "Ausrüstung",
+  "inventory.cat.gepaeck": "Gepäck",
+  "inventory.cat.guertel": "Gürtel",
   "inventory.cat.ingredients": "Zutaten",
   "inventory.cat.ammunition": "Munition",
   "inventory.cat.scrolls": "Spruchrollen",

@@ -1,6 +1,7 @@
 import type { CharacterItem } from "@/src/types/inventory";
 import type { Dnd5eEquipmentSlot } from "./equipment-types";
-import { resolveCharacterItemStats } from "./item-resolve";
+import { isBeltWearableItem, resolveCharacterItemStats } from "./item-resolve";
+import { parseDnd5eMetaFromDescription } from "./item-meta";
 
 export type SlotValidationResult = {
   valid: boolean;
@@ -80,6 +81,7 @@ export function validateItemForSlot(
 ): SlotValidationResult {
   const stats = resolveCharacterItemStats(item);
   const n = item.name.toLowerCase();
+  const meta = parseDnd5eMetaFromDescription(item.description);
 
   if (stats.kind === "weapon" || item.category === "Weapon") {
     if (slot === "mainHand" || slot === "offHand") return { valid: true };
@@ -111,7 +113,7 @@ export function validateItemForSlot(
     if (slot === "neck") return { valid: true };
   }
 
-  if (nameHintsBelt(n)) {
+  if (isBeltWearableItem(item) || nameHintsBelt(n) || meta?.inventoryCategory === "guertel") {
     if (slot === "waist") return { valid: true };
   }
 
@@ -140,6 +142,10 @@ export function validateItemForSlot(
     stats.kind === "supply" ||
     stats.kind === "equipment"
   ) {
+    // Kategorie Gürtel: auch ohne kind=magic an die Taille
+    if (meta?.inventoryCategory === "guertel" && slot === "waist") {
+      return { valid: true };
+    }
     return { valid: false, reason: "not_equippable" };
   }
 

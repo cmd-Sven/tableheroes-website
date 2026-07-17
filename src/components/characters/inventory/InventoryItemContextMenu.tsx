@@ -7,6 +7,7 @@ import {
   Gift,
   Pencil,
   Scissors,
+  Tags,
   Trash2,
 } from "lucide-react";
 import type { InventoryStack } from "@/src/lib/characters/dnd5e/inventory-stacking";
@@ -18,7 +19,8 @@ export type ContextMenuAction =
   | "duplicate"
   | "split"
   | "move"
-  | "give";
+  | "give"
+  | "assignCategory";
 
 type Props = {
   stack: InventoryStack;
@@ -66,6 +68,7 @@ export function InventoryItemContextMenu({
     hidden?: boolean;
   }[] = [
     { action: "edit", label: t("equipment.edit"), icon: Pencil },
+    { action: "assignCategory", label: t("inventory.assignCategory"), icon: Tags },
     { action: "delete", label: t("equipment.delete"), icon: Trash2, danger: true },
     { action: "duplicate", label: t("inventory.duplicate"), icon: Copy },
     { action: "split", label: t("inventory.split"), icon: Scissors, hidden: !canSplit },

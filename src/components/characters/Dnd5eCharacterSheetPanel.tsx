@@ -49,6 +49,8 @@ import {
   matchSheetFeatureToFeat,
   featDefinitionToFeatureEntry,
 } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import { buildLevelEditHints } from "@/src/lib/characters/dnd5e/progression/level-edit-hints";
+import type { LevelEditHintId } from "@/src/lib/characters/dnd5e/progression/level-edit-hints";
 import {
   applyClassProficienciesFromCatalog,
   customProficiencyEntries,
@@ -87,6 +89,7 @@ import { applyClassChange } from "@/src/lib/characters/dnd5e/progression/apply-c
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
+  type CharacterSheetMessageKey,
 } from "@/src/lib/i18n/character-sheet/context";
 import {
   applyLoreRaceBonusesToSheet,
@@ -103,6 +106,14 @@ import {
 } from "@/src/lib/characters/dnd5e-alignments";
 
 type SheetTab = "attributes" | "equipment" | "spells" | "biography";
+
+const LEVEL_EDIT_HINT_KEYS: Record<LevelEditHintId, CharacterSheetMessageKey> = {
+  subclassUnlock: "levelEdit.hint.subclassUnlock",
+  subclassDue: "levelEdit.hint.subclassDue",
+  asi: "levelEdit.hint.asi",
+  spellSlots: "levelEdit.hint.spellSlots",
+  wizardRecommend: "levelEdit.hint.wizardRecommend",
+};
 
 function ToggleSwitch({
   checked,
@@ -687,11 +698,19 @@ export function Dnd5eCharacterSheetPanel({
   const resolvedClassId = resolveClassId(meta.className);
   const subclassOptions = listCatalogSubclassOptions(meta.className, locale);
   const subclassUnlockLevel = catalogSubclassLevel(meta.className);
+  // progressionLocked: nur Foundry-Sync-Hinweis — Stufe/XP/Klasse bleiben spieler-editierbar.
   const subclassSelectDisabled =
     readOnly ||
-    payload.progressionLocked ||
     subclassOptions.length === 0 ||
     (subclassUnlockLevel != null && meta.level < subclassUnlockLevel);
+  const levelEditHints = !readOnly
+    ? buildLevelEditHints({
+        className: meta.className,
+        subclass: meta.subclass,
+        level: meta.level,
+        savedLevel: payload.level,
+      })
+    : [];
   const matchedSubclassId =
     resolvedClassId && meta.subclass
       ? matchSubclassOption(
@@ -982,7 +1001,7 @@ export function Dnd5eCharacterSheetPanel({
                   {t("field.classLevel")}
                 </span>
                 <div className="flex gap-2">
-                  {readOnly || payload.progressionLocked ? (
+                  {readOnly ? (
                     <TextInput
                       value={[
                         meta.className,
@@ -1018,12 +1037,31 @@ export function Dnd5eCharacterSheetPanel({
                   <NumberInput
                     value={meta.level}
                     min={1}
-                    disabled={readOnly || payload.progressionLocked}
-                    onChange={(v) => setLevelWithCatalogSync(Math.max(1, v))}
+                    max={20}
+                    disabled={readOnly}
+                    onChange={(v) =>
+                      setLevelWithCatalogSync(Math.min(20, Math.max(1, v)))
+                    }
                     className="!w-16"
                   />
                 </div>
-                {!readOnly && !payload.progressionLocked && resolvedClassId ? (
+                {!readOnly && levelEditHints.length > 0 ? (
+                  <ul className="mt-1 space-y-0.5">
+                    {levelEditHints.map((hint) => (
+                      <li
+                        key={hint.id}
+                        className={`font-libre text-[10px] leading-snug ${
+                          hint.id === "wizardRecommend"
+                            ? "text-accent-gold"
+                            : "text-gray-400"
+                        }`}
+                      >
+                        {t(LEVEL_EDIT_HINT_KEYS[hint.id], hint.params)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {!readOnly && resolvedClassId ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1044,7 +1082,7 @@ export function Dnd5eCharacterSheetPanel({
                     {t("classCatalog.sync")}
                   </button>
                 ) : null}
-                {!readOnly && !payload.progressionLocked ? (
+                {!readOnly ? (
                   <div className="mt-1 space-y-1">
                     <select
                       value={matchedSubclassId}
@@ -1205,7 +1243,7 @@ export function Dnd5eCharacterSheetPanel({
                   currentXp={meta.experiencePoints}
                   level={meta.level}
                   editMode={editMode}
-                  readOnly={readOnly || payload.progressionLocked}
+                  readOnly={readOnly}
                   onChange={(v) => setMeta({ ...meta, experiencePoints: v })}
                 />
               </label>

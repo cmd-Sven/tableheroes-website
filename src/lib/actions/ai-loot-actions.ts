@@ -204,7 +204,7 @@ Regeln für Sprache und Inhalt:
 ${countRules}
 - rarity NUR als englischer Kleinbuch-String (für die App): common, uncommon, rare, very rare, legendary.
 - price: Goldwert in gp (ganze Zahl). Bei referenceId: Preis aus Konstanten übernehmen.
-- inventoryCategory: EXAKT einer dieser Werte: weapons, armor, potions, tools, gear, ingredients, ammunition.
+- inventoryCategory: EXAKT einer dieser Werte: weapons, armor, potions, tools, gear, gepaeck, guertel, ingredients, ammunition.
 - kind: weapon, armor, equipment, magic, consumable, tool, supply.
 - weightLb: Gewicht in Pfund — bei referenceId aus Konstanten, sonst schätzen.
 - referenceId: Wenn der Gegenstand einem Eintrag in KANONISCHE ITEM-KONSTANTEN entspricht (z. B. Langschwert, Lederrüstung, Heiltrank), setze die exakte refId (z. B. waffenmeister:wpn-longsword). Sonst leerer String "".

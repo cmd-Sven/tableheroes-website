@@ -8,6 +8,8 @@ export type InventoryDisplayCategory =
   | "potions"
   | "tools"
   | "gear"
+  | "gepaeck"
+  | "guertel"
   | "ingredients"
   | "ammunition"
   | "scrolls"

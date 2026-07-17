@@ -321,6 +321,9 @@ function mapFoundryItemToMeta(item: FoundryItemRow): Dnd5eItemMeta {
     (system.description as { value?: string } | undefined)?.value ??
     (system.description as string | undefined);
 
+  const itemName = String(item.name ?? "").toLowerCase();
+  const inventoryCategory = inferFoundryInventoryCategory(type, equipType, itemName);
+
   return {
     version: 1,
     kind,
@@ -342,7 +345,61 @@ function mapFoundryItemToMeta(item: FoundryItemRow): Dnd5eItemMeta {
     strRequirement: readNumber((system.strength as number | undefined) ?? system.str, 0) || null,
     rangeMeters,
     rarity: String((system.rarity as string | undefined) ?? "Gewöhnlich"),
+    inventoryCategory,
   };
+}
+
+function isJewelryOrAmuletName(name: string): boolean {
+  return (
+    name.includes("halskette") ||
+    name.includes("necklace") ||
+    name.includes("amulett") ||
+    name.includes("amulet") ||
+    name.includes("medaillon") ||
+    name.includes("ring")
+  );
+}
+
+function inferFoundryInventoryCategory(
+  type: string,
+  equipType: string,
+  name: string,
+): Dnd5eItemMeta["inventoryCategory"] {
+  if (
+    type === "container" ||
+    name.includes("rucksack") ||
+    name.includes("backpack") ||
+    name.includes("tasche der halt") ||
+    name.includes("bag of holding") ||
+    name.includes("bodenlose") ||
+    name.includes("portable hole") ||
+    name.includes("tragbares loch") ||
+    name.includes("handy haversack") ||
+    name.includes("burglar") ||
+    name.includes("einbrecher")
+  ) {
+    return "gepaeck";
+  }
+  if (
+    equipType.includes("belt") ||
+    equipType.includes("gürtel") ||
+    name.includes("gürtel") ||
+    name.includes("guertel") ||
+    name.includes("belt")
+  ) {
+    return "guertel";
+  }
+  if (type === "weapon") return "weapons";
+  // Schmuck/Halsketten sind in Foundry oft type=consumable — nicht als Trank
+  if (isJewelryOrAmuletName(name) || equipType.includes("trinket") || equipType.includes("amulet")) {
+    return "gear";
+  }
+  if (type === "consumable") return "potions";
+  if (type === "tool") return "tools";
+  if (type === "equipment" && (equipType.includes("armor") || equipType.includes("shield"))) {
+    return "armor";
+  }
+  return undefined;
 }
 
 function inferAcBonusFromItemName(name: string): number {
@@ -401,9 +458,21 @@ function inferSlotForFoundryItem(
     type === "container" ||
     equipType.includes("backpack") ||
     name.includes("rucksack") ||
-    name.includes("backpack")
+    name.includes("backpack") ||
+    name.includes("tasche der halt") ||
+    name.includes("bag of holding") ||
+    name.includes("bodenlose") ||
+    name.includes("portable hole") ||
+    name.includes("tragbares loch") ||
+    name.includes("handy haversack") ||
+    name.includes("burglar")
   ) {
     return null;
+  }
+  // Schmuck auch bei Foundry-type=consumable (z. B. „Halskette mit Ohren“)
+  if (isJewelryOrAmuletName(name) || equipType.includes("amulet") || equipType.includes("trinket")) {
+    if (name.includes("ring") || equipType.includes("ring")) return "ring1";
+    return "neck";
   }
   if (type === "equipment" || type === "loot") {
     if (equipType.includes("ring") || name.includes("ring")) return "ring1";
@@ -414,7 +483,15 @@ function inferSlotForFoundryItem(
     if (equipType.includes("amulet") || name.includes("amulett")) return "neck";
   }
   if (meta.kind === "armor" && meta.acFormula) return "chest";
-  if (equipType.includes("belt") || equipType.includes("gürtel") || name.includes("gürtel") || name.includes("belt")) {
+  if (
+    equipType.includes("belt") ||
+    equipType.includes("gürtel") ||
+    equipType.includes("guertel") ||
+    name.includes("gürtel") ||
+    name.includes("guertel") ||
+    name.includes("belt") ||
+    meta.inventoryCategory === "guertel"
+  ) {
     return "waist";
   }
   return null;
@@ -428,13 +505,26 @@ function isContainerItem(item: FoundryItemRow): boolean {
     name.includes("rucksack") ||
     name.includes("backpack") ||
     name.includes("tasche der halt") ||
-    name.includes("bag of holding")
+    name.includes("bag of holding") ||
+    name.includes("bodenlose") ||
+    name.includes("portable hole") ||
+    name.includes("tragbares loch") ||
+    name.includes("handy haversack") ||
+    name.includes("burglar") ||
+    name.includes("einbrecher")
   );
 }
 
 function containerKindFromItem(item: FoundryItemRow): Dnd5eEquipmentContainer["kind"] {
   const name = String(item.name ?? "").toLowerCase();
-  if (name.includes("tasche der halt") || name.includes("bag of holding")) {
+  if (
+    name.includes("tasche der halt") ||
+    name.includes("bag of holding") ||
+    name.includes("bodenlose") ||
+    name.includes("portable hole") ||
+    name.includes("tragbares loch") ||
+    name.includes("handy haversack")
+  ) {
     return "bag_of_holding";
   }
   return "backpack";
@@ -574,7 +664,13 @@ export function mapFoundryItemsToEquipment(
     const type = String(item.type ?? "").toLowerCase();
     if (type !== "consumable") continue;
     if (!isEquipped(item.system ?? {})) continue;
-    equipment.belt[beltIdx++] = readFoundryId(item);
+    const name = String(item.name ?? "").toLowerCase();
+    // Schmuck/Wearables gehören nicht auf den Gürtel (sonst im Grid unsichtbar)
+    if (isJewelryOrAmuletName(name)) continue;
+    // Bereits in Körper-Slot → nicht zusätzlich auf Gürtel
+    const fid = readFoundryId(item);
+    if (Object.values(equipment.slots).includes(fid)) continue;
+    equipment.belt[beltIdx++] = fid;
   }
 
   equipment.attunedItemIds = items
@@ -582,18 +678,61 @@ export function mapFoundryItemsToEquipment(
     .map((item) => readFoundryId(item))
     .slice(0, MAX_ATTUNEMENT);
 
-  if (defaultContainerId) {
-    const container = equipment.containers.find((c) => c.id === defaultContainerId);
+  // Alle nicht platzierten Inventar-Items in einen Behälter (auch „equipped“ ohne Slot)
+  const placedIds = new Set<string>();
+  for (const id of Object.values(equipment.slots)) {
+    if (id) placedIds.add(id);
+  }
+  for (const id of equipment.belt) {
+    if (id) placedIds.add(id);
+  }
+  for (const c of equipment.containers) {
+    if (c.linkedItemId) placedIds.add(c.linkedItemId);
+    for (const id of c.itemIds) placedIds.add(id);
+  }
+
+  const orphanIds: string[] = [];
+  for (const item of items) {
+    const type = String(item.type ?? "").toLowerCase();
+    if (["feat", "spell", "class", "race", "background", "subclass"].includes(type)) continue;
+    if (isContainerItem(item)) continue;
+    const fid = readFoundryId(item);
+    if (!fid || placedIds.has(fid)) continue;
+    orphanIds.push(fid);
+  }
+
+  // stowedItems zuerst (Reihenfolge), dann restliche Orphans
+  const toStow = new Set<string>([
+    ...stowedItems.map((i) => readFoundryId(i)),
+    ...orphanIds,
+  ]);
+
+  if (toStow.size > 0 && equipment.containers.length === 0) {
+    equipment.containers.push({
+      id: randomUUID(),
+      kind: "backpack",
+      label: "Rucksack (Foundry)",
+      linkedItemId: null,
+      itemIds: [],
+    });
+  }
+
+  const stowContainerId = equipment.containers[0]?.id ?? defaultContainerId;
+  if (stowContainerId) {
+    const container = equipment.containers.find((c) => c.id === stowContainerId);
     if (container) {
-      for (const item of stowedItems) {
-        const fid = readFoundryId(item);
-        const placed =
-          Object.values(equipment.slots).includes(fid) ||
-          equipment.belt.includes(fid) ||
-          equipment.attunedItemIds.includes(fid) ||
+      for (const fid of toStow) {
+        if (
+          placedIds.has(fid) ||
           container.linkedItemId === fid ||
-          equipment.containers.some((c) => c.linkedItemId === fid);
-        if (!placed) container.itemIds.push(fid);
+          equipment.containers.some((c) => c.linkedItemId === fid)
+        ) {
+          continue;
+        }
+        if (!container.itemIds.includes(fid)) {
+          container.itemIds.push(fid);
+          placedIds.add(fid);
+        }
       }
     }
   }
