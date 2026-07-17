@@ -7,9 +7,12 @@ import {
 } from "@/src/lib/session/dice-3d-math";
 import { slingshotSpeedFromStrength } from "@/src/lib/session/dice-slingshot";
 
-export const DICE_PHYSICS_DURATION_MS = 3000;
-/** Ab hier: nur Positions-Feinplatzierung (Orientierung endet bereits korrekt). */
-export const DICE_SETTLE_START = 0.84;
+/** Safety-Cap für Sim + Playback (kein fester Taktgeber für Roll-Dauer). */
+export const DICE_PHYSICS_MAX_MS = 5000;
+/** Mindest-Playback — auch bei sehr schwachem Wurf. */
+export const DICE_PHYSICS_MIN_MS = 550;
+/** @deprecated Nur noch Safety/Fallback-Alias — echte Dauer kommt aus der Trajektorie. */
+export const DICE_PHYSICS_DURATION_MS = DICE_PHYSICS_MAX_MS;
 
 const TABLE_Y = 0;
 /**
@@ -25,10 +28,13 @@ const BAUMGARTE = 0.22;
 const PENETRATION_SLOP = 0.01;
 /** Sleep erst bei wirklich langsamer Bewegung — sonst friert Travel zu früh ein. */
 const SLEEP_SPEED = 0.15;
-const SIM_STEPS = 150;
+/** Festes Sim-Δt (s) — Dauer entsteht aus Reibung + Slingshot-Impuls. */
+const SIM_DT = 1 / 120;
+const MAX_SIM_SEC = DICE_PHYSICS_MAX_MS / 1000;
+/** Weiche Positions-Feinplatzierung nach Sleep aller Würfel. */
+const SETTLE_LERP_SEC = 0.32;
+const SLEEP_FRAMES_REQUIRED = 3;
 const BOUND = 3.5;
-/** Geplanter Rest-Tumble ist bis hier auf 0 (weiches Ausrollen). */
-const TUMBLE_END_T = 0.9;
 /** Roll-Radius-Faktor: ω ≈ v / (radius × ROLL_RADIUS_FACTOR). */
 const ROLL_RADIUS_FACTOR = 0.72;
 /**
@@ -78,10 +84,17 @@ type DieSim = {
   rollQ: THREE.Quaternion;
   targetQ: THREE.Quaternion;
   resting: boolean;
+  /** Aufeinanderfolgende Frames unter SLEEP_SPEED. */
+  sleepFrames: number;
   restX: number;
   restZ: number;
   frames: DieKeyframe[];
   rng: () => number;
+};
+
+export type DiceTrajectoriesResult = {
+  trajectories: DieKeyframe[][];
+  durationMs: number;
 };
 
 function easeInOutCubic(t: number): number {
@@ -136,28 +149,29 @@ function nearestStableFaceUp(sides: number, q: THREE.Quaternion): THREE.Quaterni
 
 /**
  * Orientierung: Roll (gekoppelt an v) × Rest-Tumble × targetQ,
- * plus Face-Gravity zur nächsten flachen Fläche; Roll klingt aus → kein Late-Snap.
+ * plus Face-Gravity zur nächsten flachen Fläche; klingt mit v≈0 aus (kein Ghost-Tumble).
  */
-function writeOrientation(d: DieSim, t: number): {
+function writeOrientation(d: DieSim): {
   qx: number;
   qy: number;
   qz: number;
   qw: number;
 } {
-  const u = smoothstep(0, TUMBLE_END_T, t);
-  const plannedResidual = d.angle0 * (1 - easeOutCubic(u));
+  const rollTarget = Math.max(d.angle0, 1e-6);
+  const rollProgress = Math.min(1, d.rollAngle / rollTarget);
+  const plannedResidual = d.angle0 * (1 - easeOutCubic(rollProgress));
 
-  // Kein Spin-on-the-spot: Rest-Tumble nur bei Bewegung / früher Phase
   const moveWeight = smoothstep(SLEEP_SPEED * 0.4, SLEEP_SPEED * 3.2, d.lastSpeed);
-  const earlyWeight = 1 - smoothstep(DICE_SETTLE_START - 0.08, DICE_SETTLE_START + 0.02, t);
-  const residualScale = Math.max(moveWeight, earlyWeight * 0.5);
-  const bumpFade =
-    (1 - smoothstep(0.35, TUMBLE_END_T, t)) * Math.max(moveWeight, earlyWeight * 0.35);
+  const residualScale = d.resting ? 0 : moveWeight;
+  const bumpFade = (1 - rollProgress) * (d.resting ? 0 : moveWeight);
 
   const tumbleAng = plannedResidual * residualScale + d.bumpAngle * bumpFade;
 
-  // Roll klingt mit Ausrollen aus → Endlage ≈ targetQ (kein harter Last-Frame-Snap)
-  const rollFade = 1 - smoothstep(0.52, TUMBLE_END_T, t);
+  const rollFade = d.resting
+    ? 0
+    : d.lastSpeed > SLEEP_SPEED
+      ? 1
+      : smoothstep(SLEEP_SPEED * 0.15, SLEEP_SPEED, d.lastSpeed);
   const rollAng = d.rollAngle * rollFade;
 
   _outQuat.copy(d.targetQ);
@@ -172,9 +186,9 @@ function writeOrientation(d: DieSim, t: number): {
 
   // Face-Gravity: Schwerpunkt zieht zur nächsten stabilen Face (stärker bei langsamer Bewegung)
   const gravFromSpeed = 1 - smoothstep(SLEEP_SPEED * 0.6, SLEEP_SPEED * 4.5, d.lastSpeed);
-  const gravFromTime = smoothstep(0.12, 0.72, t);
+  const gravFromRoll = smoothstep(0.08, 0.72, rollProgress);
   const gravW =
-    gravFromSpeed * gravFromTime * (1 - smoothstep(TUMBLE_END_T - 0.06, TUMBLE_END_T, t));
+    gravFromSpeed * gravFromRoll * (1 - smoothstep(0.88, 1, rollProgress));
   if (gravW > 0.02) {
     const stable = nearestStableFaceUp(d.sides, _outQuat);
     _gravQuat.copy(_outQuat).slerp(stable, Math.min(0.72, gravW * 0.85));
@@ -204,10 +218,12 @@ export function buildDiceTrajectories(opts: {
   throwDirZ?: number;
   throwStrength?: number;
   isTap?: boolean;
-}): DieKeyframe[][] {
+}): DiceTrajectoriesResult {
   const { sides, faces, seed } = opts;
   const count = faces.length;
-  if (count === 0) return [];
+  if (count === 0) {
+    return { trajectories: [], durationMs: DICE_PHYSICS_MIN_MS };
+  }
 
   const aimX = Number.isFinite(opts.aimX) ? (opts.aimX as number) : 0;
   const aimZ = Number.isFinite(opts.aimZ) ? (opts.aimZ as number) : 0;
@@ -305,6 +321,7 @@ export function buildDiceTrajectories(opts: {
       rollQ: new THREE.Quaternion(),
       targetQ,
       resting: false,
+      sleepFrames: 0,
       restX: x,
       restZ: z,
       frames: [],
@@ -314,120 +331,129 @@ export function buildDiceTrajectories(opts: {
 
   softSeparate(dice, 16, LIVE_SEPARATION_SCALE);
 
-  const durationSec = DICE_PHYSICS_DURATION_MS / 1000;
-  const dt = durationSec / SIM_STEPS;
   const collRng = createSeededRng(`${seed}:coll`);
-  let settleCaptured = false;
+  const dt = SIM_DT;
 
-  for (let i = 0; i <= SIM_STEPS; i++) {
-    const t = i / SIM_STEPS;
+  const pushFrame = (elapsedSec: number, pxFn: (d: DieSim) => number, pzFn: (d: DieSim) => number) => {
+    for (const d of dice) {
+      const { qx, qy, qz, qw } = writeOrientation(d);
+      d.frames.push({
+        t: elapsedSec,
+        x: pxFn(d),
+        y: TABLE_Y + d.half,
+        z: pzFn(d),
+        qx,
+        qy,
+        qz,
+        qw,
+      });
+    }
+  };
 
-    if (i > 0) {
-      // Extra-Damping erst später → Travel bleibt sichtbar
-      const timeDamp = 1 - smoothstep(0.28, 0.78, t) * 0.07;
+  pushFrame(0, (d) => d.x, (d) => d.z);
 
-      for (const d of dice) {
-        if (d.resting) {
-          d.vx = 0;
-          d.vz = 0;
-          d.lastSpeed = 0;
-          d.bumpAngle *= 0.9;
-          d.x = d.restX;
-          d.z = d.restZ;
-          continue;
-        }
+  let elapsed = 0;
+  while (elapsed < MAX_SIM_SEC) {
+    elapsed += dt;
 
-        d.vx *= PLANE_FRICTION * timeDamp;
-        d.vz *= PLANE_FRICTION * timeDamp;
-        d.bumpAngle *= 0.97;
+    for (const d of dice) {
+      if (d.resting) {
+        d.vx = 0;
+        d.vz = 0;
+        d.lastSpeed = 0;
+        d.bumpAngle *= 0.9;
+        d.x = d.restX;
+        d.z = d.restZ;
+        continue;
+      }
 
-        const spd = speedOf(d);
-        d.lastSpeed = spd;
+      d.vx *= PLANE_FRICTION;
+      d.vz *= PLANE_FRICTION;
+      d.bumpAngle *= 0.97;
 
-        // Roll-Integral: ω ≈ v / r — Rotation gekoppelt an Translation
-        if (spd > 1e-4) {
-          rollAxisFromVelocity(d.vx, d.vz, d.rollAxis);
-          d.rollAngle += (spd * dt) / d.rollRadius;
-        }
+      const spd = speedOf(d);
+      d.lastSpeed = spd;
 
-        d.x += d.vx * dt;
-        d.z += d.vz * dt;
+      if (spd > 1e-4) {
+        rollAxisFromVelocity(d.vx, d.vz, d.rollAxis);
+        d.rollAngle += (spd * dt) / d.rollRadius;
+      }
 
-        // Weiche Wand-Kollision
-        const lim = BOUND - d.radius;
-        if (d.x > lim) {
-          d.x = lim;
-          if (d.vx > 0) d.vx *= -WALL_RESTITUTION;
-        } else if (d.x < -lim) {
-          d.x = -lim;
-          if (d.vx < 0) d.vx *= -WALL_RESTITUTION;
-        }
-        if (d.z > lim) {
-          d.z = lim;
-          if (d.vz > 0) d.vz *= -WALL_RESTITUTION;
-        } else if (d.z < -lim) {
-          d.z = -lim;
-          if (d.vz < 0) d.vz *= -WALL_RESTITUTION;
-        }
+      d.x += d.vx * dt;
+      d.z += d.vz * dt;
 
-        // Sleep erst nach ausreichend Travel-Zeit
-        if (speedOf(d) < SLEEP_SPEED && t > 0.48) {
+      const lim = BOUND - d.radius;
+      if (d.x > lim) {
+        d.x = lim;
+        if (d.vx > 0) d.vx *= -WALL_RESTITUTION;
+      } else if (d.x < -lim) {
+        d.x = -lim;
+        if (d.vx < 0) d.vx *= -WALL_RESTITUTION;
+      }
+      if (d.z > lim) {
+        d.z = lim;
+        if (d.vz > 0) d.vz *= -WALL_RESTITUTION;
+      } else if (d.z < -lim) {
+        d.z = -lim;
+        if (d.vz < 0) d.vz *= -WALL_RESTITUTION;
+      }
+
+      if (spd < SLEEP_SPEED) {
+        d.sleepFrames += 1;
+        if (d.sleepFrames >= SLEEP_FRAMES_REQUIRED) {
           d.resting = true;
           d.vx = 0;
           d.vz = 0;
           d.lastSpeed = 0;
-          d.restX = d.x;
-          d.restZ = d.z;
-        } else {
-          d.restX = d.x;
-          d.restZ = d.z;
         }
+      } else {
+        d.sleepFrames = 0;
       }
 
-      resolveCollisionsSoft(dice, collRng, dt);
-      // Laufendes Push-apart (auch ruhende Würfel) → kein Stapeln von oben
-      softSeparate(dice, 3, LIVE_SEPARATION_SCALE);
-      for (const d of dice) {
-        if (d.resting) {
-          d.restX = d.x;
-          d.restZ = d.z;
-        }
-      }
+      d.restX = d.x;
+      d.restZ = d.z;
     }
 
-    // Settle: nur Position trennen — Orientierung folgt geplanter Ease-Kurve
-    if (!settleCaptured && t >= DICE_SETTLE_START) {
-      for (const d of dice) {
-        d.resting = true;
-        d.vx = 0;
-        d.vz = 0;
-        d.lastSpeed = 0;
+    resolveCollisionsSoft(dice, collRng, dt);
+    softSeparate(dice, 3, LIVE_SEPARATION_SCALE);
+    for (const d of dice) {
+      if (d.resting) {
         d.restX = d.x;
         d.restZ = d.z;
       }
-      softSeparateRest(dice, 28, REST_SEPARATION_SCALE);
-      settleCaptured = true;
     }
 
-    const settleU = settleCaptured
-      ? easeInOutCubic(smoothstep(DICE_SETTLE_START, 0.98, t))
-      : 0;
+    pushFrame(elapsed, (d) => d.x, (d) => d.z);
 
-    for (const d of dice) {
-      const { qx, qy, qz, qw } = writeOrientation(d, t);
+    if (dice.every((d) => d.resting)) break;
+  }
 
-      const px = settleCaptured
-        ? THREE.MathUtils.lerp(d.x, d.restX, settleU)
-        : d.x;
-      const pz = settleCaptured
-        ? THREE.MathUtils.lerp(d.z, d.restZ, settleU)
-        : d.z;
+  for (const d of dice) {
+    d.resting = true;
+    d.vx = 0;
+    d.vz = 0;
+    d.lastSpeed = 0;
+    d.restX = d.x;
+    d.restZ = d.z;
+  }
 
+  const preSettleX = dice.map((d) => d.x);
+  const preSettleZ = dice.map((d) => d.z);
+  softSeparateRest(dice, 28, REST_SEPARATION_SCALE);
+
+  const physicsEnd = elapsed;
+  const settleSteps = Math.max(1, Math.ceil(SETTLE_LERP_SEC / dt));
+  for (let i = 1; i <= settleSteps; i++) {
+    const settleU = easeInOutCubic(i / settleSteps);
+    const tNow = physicsEnd + i * dt;
+    for (let di = 0; di < dice.length; di++) {
+      const d = dice[di]!;
+      const { qx, qy, qz, qw } = writeOrientation(d);
       d.frames.push({
-        t,
-        x: px,
+        t: tNow,
+        x: THREE.MathUtils.lerp(preSettleX[di]!, d.restX, settleU),
         y: TABLE_Y + d.half,
-        z: pz,
+        z: THREE.MathUtils.lerp(preSettleZ[di]!, d.restZ, settleU),
         qx,
         qy,
         qz,
@@ -436,9 +462,18 @@ export function buildDiceTrajectories(opts: {
     }
   }
 
-  // Finale Keyframes: exakte Ziel-Orientierung + Rest-Position (bereits nahe targetQ)
+  const totalSec = physicsEnd + SETTLE_LERP_SEC;
+  const durationMs = Math.min(
+    DICE_PHYSICS_MAX_MS,
+    Math.max(DICE_PHYSICS_MIN_MS, Math.round(totalSec * 1000)),
+  );
+
   for (const d of dice) {
+    for (const f of d.frames) {
+      f.t = f.t / totalSec;
+    }
     const last = d.frames[d.frames.length - 1]!;
+    last.t = 1;
     last.qx = d.targetQ.x;
     last.qy = d.targetQ.y;
     last.qz = d.targetQ.z;
@@ -448,7 +483,7 @@ export function buildDiceTrajectories(opts: {
     last.z = d.restZ;
   }
 
-  return dice.map((d) => d.frames);
+  return { trajectories: dice.map((d) => d.frames), durationMs };
 }
 
 /** Einzelwürfel-Kompatibilität. */
@@ -479,7 +514,7 @@ export function buildDieTrajectory(opts: {
     throwStrength: opts.throwStrength,
     isTap: opts.isTap,
   });
-  return all[opts.index] ?? all[0] ?? [];
+  return all.trajectories[opts.index] ?? all.trajectories[0] ?? [];
 }
 
 /** Weiche Positionstrennung (kein harter Snap). */

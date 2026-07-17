@@ -89,6 +89,15 @@ export function slingshotSpeedFromStrength(
   );
 }
 
+/** Grobe Roll-Dauer für 2D-Fallback (strength → Reibungs-Auslauf). */
+export function estimateRollDurationMs(
+  strength?: number,
+  isTap?: boolean,
+): number {
+  const speed = slingshotSpeedFromStrength(strength, isTap === true);
+  return Math.min(5000, Math.max(550, Math.round(350 + speed * 340)));
+}
+
 /** 0…1 für UI-Feedback (Dehnung relativ zu Max-Stretch). */
 export function slingshotStretchRatio(dragPx: number): number {
   return Math.min(1, Math.max(0, dragPx / SLINGSHOT_MAX_STRETCH_PX));

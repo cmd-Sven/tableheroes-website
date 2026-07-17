@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { dieScale } from "@/src/lib/session/dice-3d-math";
 import {
   buildDiceTrajectories,
-  DICE_PHYSICS_DURATION_MS,
+  DICE_PHYSICS_MAX_MS,
   sampleTrajectory,
   type DieKeyframe,
 } from "@/src/lib/session/dice-physics";
@@ -73,7 +73,7 @@ function AnimatedDie({
   startAt,
   aimX,
   aimZ,
-  durationMs = DICE_PHYSICS_DURATION_MS,
+  durationMs = DICE_PHYSICS_MAX_MS,
   showResult = false,
   natHighlight = null,
   onSettled,
@@ -167,7 +167,7 @@ export function DiceRollScene({
   const done = useRef(false);
   const expected = faces.length;
 
-  const trajectories = useMemo(
+  const { trajectories, durationMs } = useMemo(
     () =>
       buildDiceTrajectories({
         sides,
@@ -216,6 +216,7 @@ export function DiceRollScene({
           startAt={startAt}
           aimX={aimX}
           aimZ={aimZ}
+          durationMs={durationMs}
           showResult={showResult}
           natHighlight={dieNatHighlight(sides, face)}
           onSettled={handleSettled}

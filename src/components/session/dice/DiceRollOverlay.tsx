@@ -11,6 +11,7 @@ import {
   isDiceAnimMeta,
   shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
+import { estimateRollDurationMs } from "@/src/lib/session/dice-slingshot";
 import { supports3dDice } from "@/src/lib/session/dice-roll";
 import {
   cancelDiceDropPlacement,
@@ -387,6 +388,11 @@ export function DiceRollOverlay({ logs }: Props) {
     return `${active.faces.length}×W${active.sides}`;
   }, [active]);
 
+  const fallbackDurationMs = useMemo(() => {
+    if (!active) return DICE_ANIMATION_DURATION_MS;
+    return estimateRollDurationMs(active.throwStrength, active.isTap);
+  }, [active]);
+
   const fallbackStyle = useMemo(() => {
     if (!active) return undefined;
     return {
@@ -532,7 +538,7 @@ export function DiceRollOverlay({ logs }: Props) {
                 exit={{ opacity: 0, scale: 0.96, y: -8 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 onAnimationComplete={() => {
-                  window.setTimeout(handleAllSettled, DICE_ANIMATION_DURATION_MS);
+                  window.setTimeout(handleAllSettled, fallbackDurationMs);
                 }}
               >
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
@@ -543,7 +549,7 @@ export function DiceRollOverlay({ logs }: Props) {
                   initial={{ rotate: -12, scale: 0.8 }}
                   animate={{ rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }}
                   transition={{
-                    duration: DICE_ANIMATION_DURATION_MS / 1000,
+                    duration: fallbackDurationMs / 1000,
                     ease: "easeOut",
                   }}
                 >

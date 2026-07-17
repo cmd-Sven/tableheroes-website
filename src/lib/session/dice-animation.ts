@@ -1,10 +1,11 @@
-import { DICE_PHYSICS_DURATION_MS } from "@/src/lib/session/dice-physics";
+import { DICE_PHYSICS_MAX_MS } from "@/src/lib/session/dice-physics";
+import { estimateRollDurationMs } from "@/src/lib/session/dice-slingshot";
 
-/** Dauer der Top-down-2D-/Fallback-Animation (ms). */
-export const DICE_ANIMATION_DURATION_MS = DICE_PHYSICS_DURATION_MS;
+/** Safety-Cap / 2D-Fallback-Obergrenze (ms). */
+export const DICE_ANIMATION_DURATION_MS = DICE_PHYSICS_MAX_MS;
 
 /** Nach dieser Zeit gilt ein Wurf für Late-Joiner als bereits aufgelöst. */
-export const DICE_ANIMATION_STALE_MS = 6200;
+export const DICE_ANIMATION_STALE_MS = DICE_PHYSICS_MAX_MS + 1500;
 
 export const DICE_ANIM_COMPLETE_EVENT = "th:dice-anim-complete";
 
