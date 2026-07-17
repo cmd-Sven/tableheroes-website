@@ -7,18 +7,20 @@ export const DICE_PHYSICS_DURATION_MS = 3000;
 export const DICE_SETTLE_START = 0.84;
 
 const TABLE_Y = 0;
-/** Pro-Frame Velocity-Damping (XZ). */
-const PLANE_FRICTION = 0.978;
-const WALL_RESTITUTION = 0.38;
-const COLLISION_RESTITUTION = 0.42;
+/** Pro-Frame Velocity-Damping (XZ) — höher = mehr Reibung, weniger „Eis“. */
+const PLANE_FRICTION = 0.928;
+const WALL_RESTITUTION = 0.32;
+const COLLISION_RESTITUTION = 0.38;
 /** Baumgarte: nur Teil der Penetration korrigieren → kein Oscillation. */
 const BAUMGARTE = 0.18;
 const PENETRATION_SLOP = 0.012;
-const SLEEP_SPEED = 0.12;
+const SLEEP_SPEED = 0.28;
 const SIM_STEPS = 150;
 const BOUND = 3.5;
-/** Geplanter Tumble ist bis hier auf 0 (weiches Ausrollen). */
-const TUMBLE_END_T = 0.94;
+/** Geplanter Rest-Tumble ist bis hier auf 0 (weiches Ausrollen). */
+const TUMBLE_END_T = 0.88;
+/** Roll-Radius-Faktor: ω ≈ v / (radius × ROLL_RADIUS_FACTOR). */
+const ROLL_RADIUS_FACTOR = 0.68;
 const _tmpQuat = new THREE.Quaternion();
 const _outQuat = new THREE.Quaternion();
 
@@ -40,12 +42,21 @@ type DieSim = {
   vz: number;
   radius: number;
   half: number;
+  /** Effektiver Roll-Radius für ω ≈ v/r. */
+  rollRadius: number;
+  /** Achse senkrecht zur Bewegungsrichtung (Rollen ohne Rutschen). */
+  rollAxis: THREE.Vector3;
+  /** Pfad-integrierter Roll-Winkel (gekoppelt an Translation). */
+  rollAngle: number;
   spinAxis: THREE.Vector3;
-  /** Start-Tumble (rad); Ease → 0 endet exakt auf targetQ. */
+  /** Rest-Tumble (rad) für Face-Landing; Ease → 0 endet exakt auf targetQ. */
   angle0: number;
   /** Extra-Tumble durch Kollisionen (dämpft separat). */
   bumpAngle: number;
+  /** Letzte Sim-Geschwindigkeit (für Spin-on-the-spot-Unterdrückung). */
+  lastSpeed: number;
   tumbleQ: THREE.Quaternion;
+  rollQ: THREE.Quaternion;
   targetQ: THREE.Quaternion;
   resting: boolean;
   restX: number;
@@ -76,6 +87,18 @@ function speedOf(d: DieSim): number {
   return Math.hypot(d.vx, d.vz);
 }
 
+/** Roll-Achse: n × v (Y-up), leicht geneigt für Sichtbarkeit von oben. */
+function rollAxisFromVelocity(
+  vx: number,
+  vz: number,
+  out: THREE.Vector3,
+): boolean {
+  const len = Math.hypot(vx, vz);
+  if (len < 1e-4) return false;
+  out.set(vz / len, 0.14, -vx / len).normalize();
+  return true;
+}
+
 function clampToBounds(d: DieSim): void {
   const lim = BOUND - d.radius;
   d.x = THREE.MathUtils.clamp(d.x, -lim, lim);
@@ -83,33 +106,37 @@ function clampToBounds(d: DieSim): void {
 }
 
 /**
- * Sichtbarer Tumble: von Anfang an auf 0 geplant + kleine Kollisions-Bumps.
- * Bei t≥TUMBLE_END_T → Orientierung exakt targetQ (kein Slerp-Snap).
+ * Orientierung: Roll (gekoppelt an v) × Rest-Tumble × targetQ.
+ * Rest-Tumble dämpft mit Geschwindigkeit → kein Drehen auf der Stelle.
  */
-function displayAngle(d: DieSim, t: number): number {
-  const u = smoothstep(0, TUMBLE_END_T, t);
-  const planned = d.angle0 * (1 - easeOutCubic(u));
-  const bumpFade = 1 - smoothstep(0.45, TUMBLE_END_T, t);
-  return planned + d.bumpAngle * bumpFade;
-}
-
 function writeOrientation(d: DieSim, t: number): {
   qx: number;
   qy: number;
   qz: number;
   qw: number;
 } {
-  const ang = displayAngle(d, t);
-  if (ang < 1e-5) {
-    return {
-      qx: d.targetQ.x,
-      qy: d.targetQ.y,
-      qz: d.targetQ.z,
-      qw: d.targetQ.w,
-    };
+  const u = smoothstep(0, TUMBLE_END_T, t);
+  const plannedResidual = d.angle0 * (1 - easeOutCubic(u));
+
+  // Kein spürbares Spin-on-the-spot: Rest-Tumble nur bei Bewegung / früher Phase
+  const moveWeight = smoothstep(SLEEP_SPEED * 0.35, SLEEP_SPEED * 2.4, d.lastSpeed);
+  const earlyWeight = 1 - smoothstep(DICE_SETTLE_START - 0.06, DICE_SETTLE_START + 0.04, t);
+  const residualScale = Math.max(moveWeight, earlyWeight * 0.55);
+  const bumpFade =
+    (1 - smoothstep(0.4, TUMBLE_END_T, t)) * moveWeight;
+
+  const tumbleAng = plannedResidual * residualScale + d.bumpAngle * bumpFade;
+
+  _outQuat.copy(d.targetQ);
+  if (tumbleAng > 1e-5) {
+    d.tumbleQ.setFromAxisAngle(d.spinAxis, tumbleAng);
+    _outQuat.premultiply(d.tumbleQ);
   }
-  d.tumbleQ.setFromAxisAngle(d.spinAxis, ang);
-  _outQuat.copy(d.tumbleQ).multiply(d.targetQ);
+  if (d.rollAngle > 1e-5) {
+    d.rollQ.setFromAxisAngle(d.rollAxis, d.rollAngle);
+    _outQuat.premultiply(d.rollQ);
+  }
+
   return {
     qx: _outQuat.x,
     qy: _outQuat.y,
@@ -168,19 +195,23 @@ export function buildDiceTrajectories(opts: {
     const z =
       aimZ + dirZ * 0.04 + Math.sin(dirAngle + Math.PI / 2) * spawnSide;
 
-    const speed = 3.4 + u3 * 3.8 + (count > 1 ? 0.22 * index : 0);
-    const vx = dirX * speed + (u4 - 0.5) * 0.9;
-    const vz = dirZ * speed + (u5 - 0.5) * 0.9;
+    const speed = 1.55 + u3 * 2.15 + (count > 1 ? 0.12 * index : 0);
+    const vx = dirX * speed + (u4 - 0.5) * 0.45;
+    const vz = dirZ * speed + (u5 - 0.5) * 0.45;
 
-    // Spin-Achse weitgehend horizontal → sichtbares Drehen von oben
+    const rollRadius = radius * ROLL_RADIUS_FACTOR;
+    const rollAxis = new THREE.Vector3();
+    rollAxisFromVelocity(vx, vz, rollAxis);
+
+    // Leichte Zufallsachse nur für Rest-Tumble (Face-Landing)
     const spinAxis = new THREE.Vector3(
       u4 * 2 - 1,
-      0.15 + u2 * 0.25,
+      0.12 + u2 * 0.22,
       u6 * 2 - 1,
     ).normalize();
 
-    // Mehrere volle Umdrehungen, Ease-out auf 0 → landet auf targetQ
-    const turns = 2.6 + u7 * 2.4 + index * 0.12;
+    // Kleiner Rest-Tumble — Hauptrotation kommt vom Roll-Integral (ω ≈ v/r)
+    const turns = 0.65 + u7 * 1.05 + index * 0.06;
     const angle0 = turns * Math.PI * 2;
 
     return {
@@ -190,10 +221,15 @@ export function buildDiceTrajectories(opts: {
       vz,
       radius,
       half,
+      rollRadius,
+      rollAxis,
+      rollAngle: 0,
       spinAxis,
       angle0,
       bumpAngle: 0,
-      tumbleQ: new THREE.Quaternion().setFromAxisAngle(spinAxis, angle0),
+      lastSpeed: speed,
+      tumbleQ: new THREE.Quaternion(),
+      rollQ: new THREE.Quaternion(),
       targetQ,
       resting: false,
       restX: x,
@@ -214,14 +250,15 @@ export function buildDiceTrajectories(opts: {
     const t = i / SIM_STEPS;
 
     if (i > 0) {
-      // Zeitabhängiges Extra-Damping → weiches Ausrollen (Position)
-      const timeDamp = 1 - smoothstep(0.35, 0.78, t) * 0.045;
+      // Früheres, stärkeres Extra-Damping → Translation stoppt vor dem Settle
+      const timeDamp = 1 - smoothstep(0.12, 0.62, t) * 0.12;
 
       for (const d of dice) {
         if (d.resting) {
           d.vx = 0;
           d.vz = 0;
-          d.bumpAngle *= 0.92;
+          d.lastSpeed = 0;
+          d.bumpAngle *= 0.88;
           d.x = d.restX;
           d.z = d.restZ;
           continue;
@@ -229,7 +266,16 @@ export function buildDiceTrajectories(opts: {
 
         d.vx *= PLANE_FRICTION * timeDamp;
         d.vz *= PLANE_FRICTION * timeDamp;
-        d.bumpAngle *= 0.975;
+        d.bumpAngle *= 0.965;
+
+        const spd = speedOf(d);
+        d.lastSpeed = spd;
+
+        // Roll-Integral: ω ≈ v / r — Rotation gekoppelt an Translation
+        if (spd > 1e-4) {
+          rollAxisFromVelocity(d.vx, d.vz, d.rollAxis);
+          d.rollAngle += (spd * dt) / d.rollRadius;
+        }
 
         d.x += d.vx * dt;
         d.z += d.vz * dt;
@@ -251,10 +297,11 @@ export function buildDiceTrajectories(opts: {
           if (d.vz < 0) d.vz *= -WALL_RESTITUTION;
         }
 
-        if (speedOf(d) < SLEEP_SPEED && t > 0.5) {
+        if (speedOf(d) < SLEEP_SPEED && t > 0.26) {
           d.resting = true;
           d.vx = 0;
           d.vz = 0;
+          d.lastSpeed = 0;
           d.restX = d.x;
           d.restZ = d.z;
         } else {
@@ -272,6 +319,7 @@ export function buildDiceTrajectories(opts: {
         d.resting = true;
         d.vx = 0;
         d.vz = 0;
+        d.lastSpeed = 0;
         d.restX = d.x;
         d.restZ = d.z;
       }
@@ -502,7 +550,7 @@ function resolveCollisionsSoft(
       }
 
       // Sanfter Extra-Tumble auf derselben Achse (kein Achsen-Zucken)
-      const tumbleBoost = 0.2 + collRng() * 0.45;
+      const tumbleBoost = 0.08 + collRng() * 0.18;
       if (!da.resting) da.bumpAngle += tumbleBoost;
       if (!db.resting) db.bumpAngle += tumbleBoost;
     }
