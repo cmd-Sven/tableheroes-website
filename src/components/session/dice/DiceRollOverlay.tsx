@@ -18,6 +18,7 @@ import {
   confirmDiceDropPlacement,
   useDicePlacementPending,
 } from "@/src/lib/session/dice-placement-store";
+import { markDiceEntryRevealed } from "@/src/lib/session/dice-reveal-store";
 import {
   clientToDropNorm,
   dropNormToTablePoint,
@@ -333,13 +334,18 @@ export function DiceRollOverlay({ logs }: Props) {
     if (fresh.length > 0) {
       setQueue((q) => [...q, ...fresh]);
     }
-    // Reveal/Chat erst nach dem Effect — nie synchron während Queue-Update
     if (staleCompleteIds.length > 0) {
-      queueMicrotask(() => {
-        for (const id of staleCompleteIds) dispatchDiceAnimComplete(id);
-      });
+      for (const id of staleCompleteIds) {
+        markDiceEntryRevealed(id);
+        dispatchDiceAnimComplete(id);
+      }
     }
   }, [logs, webgl]);
+
+  const revealAndDispatch = useCallback((sourceId: string) => {
+    markDiceEntryRevealed(sourceId);
+    dispatchDiceAnimComplete(sourceId);
+  }, []);
 
   const finishActive = useCallback(() => {
     const current = activeRef.current;
@@ -348,9 +354,8 @@ export function DiceRollOverlay({ logs }: Props) {
     finishingRef.current = current.sourceId;
     const sourceId = current.sourceId;
     setQueue((q) => (q[0]?.sourceId === sourceId ? q.slice(1) : q));
-    // Store-Update (LiveSessionActivityPanel) nie im setState-Updater / Render-Pfad
-    queueMicrotask(() => dispatchDiceAnimComplete(sourceId));
-  }, []);
+    revealAndDispatch(sourceId);
+  }, [revealAndDispatch]);
 
   /** Erst wenn ALLE Würfel der Scene liegen (onAllSettled) → Result + Chat/Bubble. */
   const handleAllSettled = useCallback(() => {
@@ -358,9 +363,9 @@ export function DiceRollOverlay({ logs }: Props) {
     settledOnceRef.current = true;
     setShowResult(true);
     const sourceId = activeRef.current?.sourceId;
-    if (sourceId) dispatchDiceAnimComplete(sourceId);
+    if (sourceId) revealAndDispatch(sourceId);
     window.setTimeout(finishActive, RESULT_HOLD_MS);
-  }, [finishActive]);
+  }, [finishActive, revealAndDispatch]);
 
   const rollDurationEstimateMs = useMemo(() => {
     if (!active) return DICE_ANIMATION_DURATION_MS;

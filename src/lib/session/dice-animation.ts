@@ -39,14 +39,13 @@ export type DiceRollAnimMeta = {
 
 export function dispatchDiceAnimComplete(sourceId: string): void {
   if (typeof window === "undefined" || !sourceId) return;
-  // Listener (Reveal-Store) nie synchron im Render/setState-Pfad anderer Komponenten
-  queueMicrotask(() => {
-    window.dispatchEvent(
-      new CustomEvent(DICE_ANIM_COMPLETE_EVENT, {
-        detail: { sourceId } satisfies DiceAnimCompleteDetail,
-      }),
-    );
-  });
+  // Sync — handleAllSettled/setTimeout laufen außerhalb des React-Render-Pfads.
+  // queueMicrotask verzögerte Reveal/FX bis zur nächsten User-Interaktion.
+  window.dispatchEvent(
+    new CustomEvent(DICE_ANIM_COMPLETE_EVENT, {
+      detail: { sourceId } satisfies DiceAnimCompleteDetail,
+    }),
+  );
 }
 
 export function isDiceAnimMeta(meta: unknown): meta is DiceRollAnimMeta {

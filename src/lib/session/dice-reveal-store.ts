@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
   DICE_ANIM_COMPLETE_EVENT,
   DICE_ANIMATION_STALE_MS,
@@ -11,6 +11,8 @@ import {
 
 const revealed = new Set<string>();
 const listeners = new Set<() => void>();
+/** Monoton steigend — zuverlässiger als Set-Größe für useSyncExternalStore. */
+let revealVersion = 0;
 
 function emit() {
   for (const l of listeners) l();
@@ -24,21 +26,23 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot() {
-  return revealed.size;
+  return revealVersion;
 }
 
-function markRevealed(sourceId: string) {
+/** Chat-Reveal sofort (sync) — unabhängig vom Window-Event-Pfad. */
+export function markDiceEntryRevealed(sourceId: string): void {
   if (!sourceId || revealed.has(sourceId)) return;
   revealed.add(sourceId);
+  revealVersion += 1;
   emit();
 }
 
-/** Globaler Listener (einmal mounten): Animation-Complete → Reveal. */
+/** Globaler Listener (einmal mounten): Animation-Complete → Reveal (FX-Fallback). */
 export function useDiceRevealBridge() {
   useEffect(() => {
     function onComplete(ev: Event) {
       const detail = (ev as CustomEvent<DiceAnimCompleteDetail>).detail;
-      if (detail?.sourceId) markRevealed(detail.sourceId);
+      if (detail?.sourceId) markDiceEntryRevealed(detail.sourceId);
     }
     window.addEventListener(DICE_ANIM_COMPLETE_EVENT, onComplete);
     return () => window.removeEventListener(DICE_ANIM_COMPLETE_EVENT, onComplete);
@@ -67,23 +71,18 @@ export function useIsDiceEntryRevealed(
   entry: { id?: string | null; at?: string | null; meta?: unknown },
 ): boolean {
   useDiceRevealVersion();
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (isDiceEntryRevealed(entry)) return;
-    const t = window.setInterval(() => setTick((n) => n + 1), 400);
-    return () => window.clearInterval(t);
-  }, [entry]);
   return isDiceEntryRevealed(entry);
 }
 
 export function useOnDiceAnimComplete(handler: (sourceId: string) => void) {
-  const stable = useCallback(handler, [handler]);
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
   useEffect(() => {
     function onComplete(ev: Event) {
       const detail = (ev as CustomEvent<DiceAnimCompleteDetail>).detail;
-      if (detail?.sourceId) stable(detail.sourceId);
+      if (detail?.sourceId) handlerRef.current(detail.sourceId);
     }
     window.addEventListener(DICE_ANIM_COMPLETE_EVENT, onComplete);
     return () => window.removeEventListener(DICE_ANIM_COMPLETE_EVENT, onComplete);
-  }, [stable]);
+  }, []);
 }

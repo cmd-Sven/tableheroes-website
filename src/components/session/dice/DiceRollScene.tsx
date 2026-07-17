@@ -210,10 +210,10 @@ export function DiceRollScene({
       settled.current.add(index);
       if (settled.current.size >= expected) {
         done.current = true;
-        onAllSettled();
+        onAllSettledRef.current();
       }
     },
-    [expected, onAllSettled],
+    [expected],
   );
 
   return (
