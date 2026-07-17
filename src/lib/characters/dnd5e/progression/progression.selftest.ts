@@ -18,6 +18,7 @@ import {
   BACKGROUND_SOURCE,
 } from "./apply-background";
 import { applySubclassChange } from "./apply-subclass-change";
+import { applyClassChange } from "./apply-class-change";
 import { getBackgrounds } from "./catalog";
 
 function run() {
@@ -539,6 +540,39 @@ function run() {
     0,
     "third-caster slots cleared when leaving AT",
   );
+
+  // Class change: Wizard → Fighter clears subclass and swaps saves / hit die
+  const wizBuilt = buildLevel1Sheet({
+    classId: "wizard",
+    raceId: "human",
+    raceName: "Mensch",
+    subclassId: null,
+    applyRacialBonuses: false,
+    baseAbilities: {
+      str: 8,
+      dex: 14,
+      con: 13,
+      int: 15,
+      wis: 12,
+      cha: 10,
+    },
+    skillKeys: ["arcana", "history"],
+    spellIds: [],
+  });
+  assert.equal(wizBuilt.sheet.savingThrows.int?.proficient, true);
+  const toFighter = applyClassChange(wizBuilt.sheet, {
+    previousClassName: wizBuilt.meta.className,
+    nextClassName: "Kämpfer",
+    level: 1,
+    previousSubclass: wizBuilt.meta.subclass,
+    locale: "de",
+  });
+  assert.ok(/kämpfer|fighter/i.test(toFighter.classLabel));
+  assert.equal(toFighter.subclassLabel, null);
+  assert.equal(toFighter.sheet.savingThrows.str?.proficient, true);
+  assert.equal(toFighter.sheet.savingThrows.con?.proficient, true);
+  assert.equal(toFighter.sheet.savingThrows.int?.proficient, false);
+  assert.match(toFighter.sheet.combat.hitDice, /d10/i);
 
   console.log("progression.selftest: OK");
 }

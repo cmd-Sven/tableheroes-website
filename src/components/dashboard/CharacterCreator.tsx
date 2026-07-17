@@ -31,6 +31,12 @@ import {
   setSheetCampaignLore,
   getSheetCampaignLore,
 } from "@/src/lib/lore-race-bonuses";
+import {
+  DND5E_ALIGNMENTS,
+  getAlignmentLabel,
+  getAlignmentShortDescription,
+  normalizeAlignmentValue,
+} from "@/src/lib/characters/dnd5e-alignments";
 
 type Faction = {
   id: string;
@@ -149,6 +155,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
 
   // Step: Identität
   const [name, setName] = useState("");
+  const [alignment, setAlignment] = useState("");
   const [race, setRace] = useState("");
   const [raceCustom, setRaceCustom] = useState("");
   const [selectedCultureId, setSelectedCultureId] = useState("");
@@ -421,6 +428,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           subclass: built.meta.subclass,
           race: effectiveRace,
           level: 1,
+          alignment: normalizeAlignmentValue(alignment) || null,
           biography: biography || null,
           avatar_url: finalAvatarUrl,
           avatar_storage_path: finalAvatarPath,
@@ -544,6 +552,32 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                   className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
                   placeholder="z.B. Aria Mondlicht"
                 />
+              </div>
+              <div>
+                <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
+                  Gesinnung
+                </label>
+                <select
+                  value={alignment}
+                  onChange={(e) => setAlignment(e.target.value)}
+                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
+                >
+                  <option value="">— Gesinnung wählen —</option>
+                  {DND5E_ALIGNMENTS.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {getAlignmentLabel("de", a.value)}
+                    </option>
+                  ))}
+                </select>
+                {alignment ? (
+                  <p className="mt-2 font-libre text-sm text-gray-300 leading-relaxed rounded border border-hero-border/40 bg-hero-dark/30 p-3">
+                    {getAlignmentShortDescription("de", alignment)}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500 font-libre italic">
+                    Optional: Wähle eine der neun D&amp;D-5e-Gesinnungen.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">

@@ -69,6 +69,10 @@ export {
   listCatalogSubclassOptions,
   catalogSubclassLevel,
 } from "./apply-subclass-change";
+export {
+  applyClassChange,
+  classFeaturesUpToLevel,
+} from "./apply-class-change";
 export type { BackgroundDefinition } from "./types";
 export {
   getSubclassAvailability,

@@ -233,6 +233,11 @@ export type SaveDnd5eCharacterSheetInput = {
     level?: number;
     experiencePoints?: number;
   };
+  /** Kampagnen-Lore-Felder auf characters (Kultur + Sprachen-IDs) */
+  lore?: {
+    cultureLoreId?: string | null;
+    languages?: string[];
+  };
 };
 
 export async function saveDnd5eCharacterSheet(
@@ -268,13 +273,28 @@ export async function saveDnd5eCharacterSheet(
         updates.alignment = input.meta.alignment?.trim() || null;
       }
       if (input.meta.name?.trim()) updates.name = input.meta.name.trim();
-      if (input.meta.race?.trim()) updates.race = input.meta.race.trim();
-      if (input.meta.class?.trim()) updates.class = input.meta.class.trim();
+      if (input.meta.race !== undefined) {
+        updates.race = input.meta.race?.trim() || null;
+      }
+      if (input.meta.class !== undefined) {
+        updates.class = input.meta.class?.trim() || null;
+      }
       if (input.meta.level != null) {
         updates.level = Math.max(1, Math.floor(input.meta.level));
       }
       if (input.meta.experiencePoints != null) {
         updates.experience_points = Math.max(0, Math.floor(input.meta.experiencePoints));
+      }
+    }
+
+    if (input.lore) {
+      if (input.lore.cultureLoreId !== undefined) {
+        updates.culture_lore_id = input.lore.cultureLoreId?.trim() || null;
+      }
+      if (input.lore.languages !== undefined) {
+        updates.languages = Array.isArray(input.lore.languages)
+          ? input.lore.languages.map(String)
+          : [];
       }
     }
 

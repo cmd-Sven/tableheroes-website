@@ -268,6 +268,7 @@ export async function createCharacterWithRelations(data: {
   subclass?: string | null;
   race: string;
   level: number;
+  alignment?: string | null;
   biography?: string | null;
   avatar_url?: string | null;
   avatar_storage_path?: string | null;
@@ -378,6 +379,7 @@ export async function createCharacterWithRelations(data: {
         subclass: data.subclass || null,
         race: data.race,
         level: data.level || 1,
+        alignment: data.alignment?.trim() ? data.alignment.trim() : null,
         biography: data.biography || null,
         avatar_url: data.avatar_url || null,
         avatar_storage_path: data.avatar_storage_path || null,

@@ -224,30 +224,9 @@ export function CharacterSheetBiographyCultureTab({
     : religionOptions.filter((r) => religionIds.includes(r.id));
 
   const handleCultureSelect = (id: string) => {
+    // Side effects (Sprachen, Religion, Rassenfilter) liegen beim Parent
+    // (Dnd5eCharacterSheetPanel.applyCultureFromHeader / Creator).
     onCultureChange(id);
-    const cult = cultureOptions.find((c) => c.id === id);
-    if (!cult) {
-      onLanguagesChange?.([]);
-      onReligionIdsChange([]);
-      return;
-    }
-    const langIds = (cult.language_ids ?? []).filter((lid) =>
-      languageOptions.some((l) => l.id === lid),
-    );
-    onLanguagesChange?.(langIds);
-    const relIds = (cult.religion_ids ?? []).filter((rid) =>
-      religionOptions.some((r) => r.id === rid),
-    );
-    onReligionIdsChange(relIds);
-    // Rasse zurücksetzen wenn nicht mehr zur Kultur passt
-    const nextRaces = filterRacesForCulture(raceOptions, {
-      id: cult.id,
-      name: cult.name,
-      race_ids: cult.race_ids ?? [],
-    });
-    if (raceName && !nextRaces.some((r) => r.name === raceName)) {
-      onRaceNameChange("");
-    }
   };
 
   const textareaClass = `w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none ${
@@ -469,27 +448,41 @@ export function CharacterSheetBiographyCultureTab({
             {t("biography.alignmentFoundryHint")}
           </p>
         ) : null}
-        <select
-          value={selectedAlignment?.value ?? alignment}
-          disabled={readOnly}
-          onChange={(e) => onAlignmentChange(e.target.value)}
-          className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
-        >
-          <option value="">{t("biography.alignmentSelect")}</option>
-          {DND5E_ALIGNMENTS.map((a) => (
-            <option key={a.value} value={a.value}>
-              {alignmentLabel(a.value)}
-            </option>
-          ))}
-        </select>
-        {selectedAlignment ? (
-          <p className="font-libre text-sm text-gray-300 leading-relaxed rounded border border-hero-border/40 bg-hero-dark/30 p-3">
-            {alignmentShort(alignment)}
-          </p>
+        {readOnly ? (
+          <>
+            <p className="font-libre text-sm text-white">
+              {alignmentLabel(alignment)}
+            </p>
+            {selectedAlignment ? (
+              <p className="font-libre text-sm text-gray-300 leading-relaxed rounded border border-hero-border/40 bg-hero-dark/30 p-3">
+                {alignmentShort(alignment)}
+              </p>
+            ) : null}
+          </>
         ) : (
-          <p className="font-libre text-xs text-gray-500 italic">
-            {t("biography.alignmentHint")}
-          </p>
+          <>
+            <select
+              value={selectedAlignment?.value ?? ""}
+              onChange={(e) => onAlignmentChange(e.target.value)}
+              className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none"
+            >
+              <option value="">{t("biography.alignmentSelect")}</option>
+              {DND5E_ALIGNMENTS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {alignmentLabel(a.value)}
+                </option>
+              ))}
+            </select>
+            {selectedAlignment ? (
+              <p className="font-libre text-sm text-gray-300 leading-relaxed rounded border border-hero-border/40 bg-hero-dark/30 p-3">
+                {alignmentShort(alignment)}
+              </p>
+            ) : (
+              <p className="font-libre text-xs text-gray-500 italic">
+                {t("biography.alignmentHint")}
+              </p>
+            )}
+          </>
         )}
       </section>
 

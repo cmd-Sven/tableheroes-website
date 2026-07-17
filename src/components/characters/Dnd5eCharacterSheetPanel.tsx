@@ -83,6 +83,7 @@ import {
   catalogSubclassLevel,
   listCatalogSubclassOptions,
 } from "@/src/lib/characters/dnd5e/progression/apply-subclass-change";
+import { applyClassChange } from "@/src/lib/characters/dnd5e/progression/apply-class-change";
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
@@ -95,6 +96,11 @@ import {
   resolveLoreRaceBonuses,
   setSheetCampaignLore,
 } from "@/src/lib/lore-race-bonuses";
+import {
+  DND5E_ALIGNMENTS,
+  findAlignmentOption,
+  normalizeAlignmentValue,
+} from "@/src/lib/characters/dnd5e-alignments";
 
 type SheetTab = "attributes" | "equipment" | "spells" | "biography";
 
@@ -217,7 +223,15 @@ export function Dnd5eCharacterSheetPanel({
   liveSessionMode = false,
   onSaved,
 }: Props) {
-  const { t, abilityLabel, skillLabel, formatDateTime, hydrateLocale, locale } = useCharacterSheetLocale();
+  const {
+    t,
+    abilityLabel,
+    skillLabel,
+    formatDateTime,
+    hydrateLocale,
+    locale,
+    alignmentLabel,
+  } = useCharacterSheetLocale();
   const [payload, setPayload] = useState<CharacterSheetPayload | null>(null);
   const [sheet, setSheet] = useState<Dnd5eSheetData | null>(null);
   const [meta, setMeta] = useState({
@@ -259,7 +273,7 @@ export function Dnd5eCharacterSheetPanel({
       setMeta({
         subclass: data.subclass ?? "",
         background: data.background ?? "",
-        alignment: data.alignment ?? "",
+        alignment: normalizeAlignmentValue(data.alignment ?? ""),
         name: data.name,
         race: data.race ?? "",
         className: data.class ?? "",
@@ -393,17 +407,36 @@ export function Dnd5eCharacterSheetPanel({
       locale === "de" && prog
         ? prog.nameDe
         : prog?.nameEn ?? classId;
-    const nextMeta = { ...meta, className };
-    setMeta(nextMeta);
-    setSheet(
-      applyClassBasicsFromCatalog(
-        ensureClassResources(sheet, className),
-        className,
-        nextMeta.level,
-        nextMeta.subclass || null,
-        locale,
-      ),
-    );
+    const applied = applyClassChange(sheet, {
+      previousClassName: meta.className || null,
+      nextClassName: className,
+      level: meta.level,
+      previousSubclass: meta.subclass || null,
+      locale,
+    });
+    setMeta({
+      ...meta,
+      className: applied.classLabel,
+      subclass: applied.subclassLabel ?? "",
+    });
+    setSheet(applied.sheet);
+  }
+
+  function clearClassFromCatalog() {
+    if (!sheet) return;
+    const applied = applyClassChange(sheet, {
+      previousClassName: meta.className || null,
+      nextClassName: null,
+      level: meta.level,
+      previousSubclass: meta.subclass || null,
+      locale,
+    });
+    setMeta({
+      ...meta,
+      className: "",
+      subclass: "",
+    });
+    setSheet(applied.sheet);
   }
 
   function setLevelWithCatalogSync(level: number) {
@@ -605,13 +638,19 @@ export function Dnd5eCharacterSheetPanel({
         meta: {
           subclass: meta.subclass,
           background: meta.background,
-          alignment: meta.alignment,
+          alignment: normalizeAlignmentValue(meta.alignment) || null,
           name: meta.name,
           race: meta.race,
           class: meta.className,
           level: meta.level,
           experiencePoints: meta.experiencePoints,
         },
+        lore: biographyCulture
+          ? {
+              cultureLoreId: biographyCulture.cultureLoreId || null,
+              languages: biographyCulture.languages,
+            }
+          : undefined,
       });
       if (!result.success) {
         toast.error(result.error ?? t("sheet.saveError"));
@@ -694,15 +733,55 @@ export function Dnd5eCharacterSheetPanel({
     }),
   );
 
+  function syncLanguageNamesToSheet(
+    base: Dnd5eSheetData,
+    langIds: string[],
+  ): Dnd5eSheetData {
+    if (!biographyCulture?.languageOptions?.length) return base;
+    const names = langIds
+      .map((id) => biographyCulture.languageOptions.find((l) => l.id === id)?.name)
+      .filter((n): n is string => Boolean(n?.trim()));
+    return {
+      ...base,
+      proficiencies: { ...base.proficiencies, languages: names },
+    };
+  }
+
+  function applyRaceBonusesToSheetData(
+    base: Dnd5eSheetData,
+    raceName: string,
+  ): Dnd5eSheetData {
+    const raceOpt = biographyCulture?.raceOptions.find((r) => r.name === raceName);
+    const next = applyLoreRaceBonusesToSheet(base, {
+      raceName,
+      raceTraitsRaw: raceOpt?.race_traits,
+      raceLoreId: raceOpt?.id ?? null,
+      level: meta.level,
+      applyAbilityBonuses: true,
+    });
+    return setSheetCampaignLore(next, {
+      ...getSheetCampaignLore(next),
+      religionIds: biographyCulture?.religionIds ?? getSheetCampaignLore(next).religionIds,
+      religionNames: (biographyCulture?.religionIds ?? [])
+        .map((id) => biographyCulture?.religionOptions.find((r) => r.id === id)?.name)
+        .filter((n): n is string => Boolean(n)),
+    });
+  }
+
   function applyCultureFromHeader(cultureId: string) {
-    if (!biographyCulture || readOnly) return;
+    if (!biographyCulture || readOnly || !sheet) return;
     biographyCulture.onCultureChange(cultureId);
     const cult = biographyCulture.cultureOptions.find((c) => c.id === cultureId);
+    let nextSheet = sheet;
+
     if (!cult) {
       biographyCulture.onLanguagesChange?.([]);
       biographyCulture.onReligionIdsChange([]);
+      nextSheet = syncLanguageNamesToSheet(nextSheet, []);
+      setSheet(nextSheet);
       return;
     }
+
     const langIds = (cult.language_ids ?? []).filter((id) =>
       biographyCulture.languageOptions.some((l) => l.id === id),
     );
@@ -711,37 +790,32 @@ export function Dnd5eCharacterSheetPanel({
       biographyCulture.religionOptions.some((r) => r.id === id),
     );
     biographyCulture.onReligionIdsChange(relIds);
+    nextSheet = syncLanguageNamesToSheet(nextSheet, langIds);
+
     const nextRaces = filterRacesForCulture(biographyCulture.raceOptions, {
       id: cult.id,
       name: cult.name,
       race_ids: cult.race_ids ?? [],
     });
     if (meta.race && !nextRaces.some((r) => r.name === meta.race)) {
-      applyRaceFromHeader("");
+      setMeta({ ...meta, race: "" });
+      biographyCulture.onRaceNameChange("");
+      nextSheet = applyRaceBonusesToSheetData(nextSheet, "");
     }
+    setSheet(nextSheet);
   }
 
   function applyRaceFromHeader(raceName: string) {
     if (!sheet || readOnly) return;
     setMeta({ ...meta, race: raceName });
     biographyCulture?.onRaceNameChange(raceName);
-    if (!raceName.trim()) return;
-    const raceOpt = biographyCulture?.raceOptions.find((r) => r.name === raceName);
-    const next = applyLoreRaceBonusesToSheet(sheet, {
-      raceName,
-      raceTraitsRaw: raceOpt?.race_traits,
-      raceLoreId: raceOpt?.id ?? null,
-      level: meta.level,
-      applyAbilityBonuses: true,
-    });
-    const withRel = setSheetCampaignLore(next, {
-      ...getSheetCampaignLore(next),
-      religionIds: biographyCulture?.religionIds ?? getSheetCampaignLore(next).religionIds,
-      religionNames: (biographyCulture?.religionIds ?? [])
-        .map((id) => biographyCulture?.religionOptions.find((r) => r.id === id)?.name)
-        .filter((n): n is string => Boolean(n)),
-    });
-    setSheet(withRel);
+    setSheet(applyRaceBonusesToSheetData(sheet, raceName));
+  }
+
+  function setAlignmentSynced(value: string) {
+    const normalized = normalizeAlignmentValue(value);
+    setMeta({ ...meta, alignment: normalized });
+    biographyCulture?.onAlignmentChange(normalized);
   }
 
   const portraitSrc =
@@ -926,7 +1000,7 @@ export function Dnd5eCharacterSheetPanel({
                       onChange={(e) => {
                         const id = e.target.value;
                         if (!id) {
-                          setMeta({ ...meta, className: "" });
+                          clearClassFromCatalog();
                           return;
                         }
                         setClassFromCatalog(id);
@@ -1089,10 +1163,7 @@ export function Dnd5eCharacterSheetPanel({
                   <TextInput
                     value={meta.race}
                     disabled={readOnly}
-                    onChange={(v) => {
-                      setMeta({ ...meta, race: v });
-                      biographyCulture?.onRaceNameChange(v);
-                    }}
+                    onChange={(v) => applyRaceFromHeader(v)}
                   />
                 )}
                 {headerRaceBonusLines.length > 0 ? (
@@ -1108,11 +1179,26 @@ export function Dnd5eCharacterSheetPanel({
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.alignment")}
                 </span>
-                <TextInput
-                  value={meta.alignment}
-                  disabled={readOnly}
-                  onChange={(v) => setMeta({ ...meta, alignment: v })}
-                />
+                {readOnly ? (
+                  <TextInput
+                    value={alignmentLabel(meta.alignment)}
+                    disabled
+                    onChange={() => {}}
+                  />
+                ) : (
+                  <select
+                    value={findAlignmentOption(meta.alignment)?.value ?? ""}
+                    onChange={(e) => setAlignmentSynced(e.target.value)}
+                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-1.5 font-libre text-sm text-white outline-none focus:border-hero-vibrant"
+                  >
+                    <option value="">{t("biography.alignmentSelect")}</option>
+                    {DND5E_ALIGNMENTS.map((a) => (
+                      <option key={a.value} value={a.value}>
+                        {alignmentLabel(a.value)}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
               <label className="lg:col-span-3 space-y-1">
                 <XpProgressBar
@@ -1856,7 +1942,24 @@ export function Dnd5eCharacterSheetPanel({
       ) : null}
 
       {activeTab === "biography" && biographyCulture ? (
-        <CharacterSheetBiographyCultureTab {...biographyCulture} />
+        <CharacterSheetBiographyCultureTab
+          {...biographyCulture}
+          readOnly={readOnly || Boolean(biographyCulture.readOnly)}
+          alignment={meta.alignment}
+          onAlignmentChange={setAlignmentSynced}
+          raceName={meta.race}
+          onRaceNameChange={applyRaceFromHeader}
+          onCultureChange={applyCultureFromHeader}
+          onToggleLanguage={(id) => {
+            if (readOnly) return;
+            toggleCampaignLanguage(id);
+          }}
+          onLanguagesChange={(ids) => {
+            if (readOnly || !sheet) return;
+            biographyCulture.onLanguagesChange?.(ids);
+            setSheet(syncLanguageNamesToSheet(sheet, ids));
+          }}
+        />
       ) : null}
 
       {(activeTab === "equipment" || activeTab === "spells") && editMode && canEdit ? (
