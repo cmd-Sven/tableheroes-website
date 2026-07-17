@@ -357,8 +357,15 @@ export function DiceRollOverlay({ logs }: Props) {
     if (settledOnceRef.current) return;
     settledOnceRef.current = true;
     setShowResult(true);
+    const sourceId = activeRef.current?.sourceId;
+    if (sourceId) dispatchDiceAnimComplete(sourceId);
     window.setTimeout(finishActive, RESULT_HOLD_MS);
   }, [finishActive]);
+
+  const rollDurationEstimateMs = useMemo(() => {
+    if (!active) return DICE_ANIMATION_DURATION_MS;
+    return estimateRollDurationMs(active.throwStrength, active.isTap);
+  }, [active]);
 
   useEffect(() => {
     finishingRef.current = null;
@@ -367,13 +374,14 @@ export function DiceRollOverlay({ logs }: Props) {
 
   useEffect(() => {
     if (!activeId) return;
-    // Safety: nie vor voller Physik-Dauer + Hold; Chat erst via finishActive
+    // Safety: ab Playback-Start (Dynamic-Import-Puffer) + geschätzter Roll-Dauer + Hold
+    const canvasBootstrapMs = active?.use3d ? 1200 : 0;
     const t = window.setTimeout(
       finishActive,
-      DICE_ANIMATION_DURATION_MS + RESULT_HOLD_MS + 900,
+      canvasBootstrapMs + rollDurationEstimateMs + RESULT_HOLD_MS + 250,
     );
     return () => window.clearTimeout(t);
-  }, [activeId, finishActive]);
+  }, [activeId, active?.use3d, finishActive, rollDurationEstimateMs]);
 
   const rollMood = useMemo((): DieNatHighlight | null => {
     if (!active || !showResult) return null;
@@ -386,10 +394,7 @@ export function DiceRollOverlay({ logs }: Props) {
     return `${active.faces.length}×W${active.sides}`;
   }, [active]);
 
-  const fallbackDurationMs = useMemo(() => {
-    if (!active) return DICE_ANIMATION_DURATION_MS;
-    return estimateRollDurationMs(active.throwStrength, active.isTap);
-  }, [active]);
+  const fallbackDurationMs = rollDurationEstimateMs;
 
   const fallbackStyle = useMemo(() => {
     if (!active) return undefined;

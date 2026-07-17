@@ -168,6 +168,8 @@ export function DiceRollScene({
   const expected = faces.length;
   /** Playback-Start erst nach Trajektorie + Canvas-Mount — nicht beim Log-Enqueue. */
   const playbackStartRef = useRef(0);
+  const onAllSettledRef = useRef(onAllSettled);
+  onAllSettledRef.current = onAllSettled;
 
   const rollKey = `${seed}:${faces.join(",")}:${aimX}:${aimZ}:${throwDirX}:${throwDirZ}:${throwStrength}:${isTap}`;
 
@@ -191,6 +193,15 @@ export function DiceRollScene({
     playbackStartRef.current = performance.now();
     settled.current.clear();
     done.current = false;
+
+    // Wall-clock Fallback: Reveal darf nicht von useFrame/rAF abhängen (z. B. Tab-Throttle).
+    const timeout = window.setTimeout(() => {
+      if (done.current) return;
+      done.current = true;
+      onAllSettledRef.current();
+    }, durationMs + 80);
+
+    return () => window.clearTimeout(timeout);
   }, [rollKey, durationMs]);
 
   const handleSettled = useCallback(

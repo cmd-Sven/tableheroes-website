@@ -63,6 +63,7 @@ export default function DiceRollCanvas({
 }: Props) {
   return (
     <Canvas
+      frameloop="always"
       orthographic
       camera={{
         position: [...DICE_CAMERA.position],
