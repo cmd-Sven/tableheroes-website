@@ -105,11 +105,11 @@ import {
   useDiceRevealBridge,
   useOnDiceAnimComplete,
 } from "@/src/lib/session/dice-reveal-store";
+import { dismissSessionHand } from "@/src/lib/actions/session-hand-raise-actions";
 import {
-  dismissSessionHand,
   normalizeHandRaises,
   type SessionHandRaise,
-} from "@/src/lib/actions/session-hand-raise-actions";
+} from "@/src/lib/session/hand-raises";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {

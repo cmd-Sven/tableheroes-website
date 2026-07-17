@@ -13,8 +13,8 @@ import {
 import {
   lowerSessionHand,
   raiseSessionHand,
-  type SessionHandRaise,
 } from "@/src/lib/actions/session-hand-raise-actions";
+import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
 import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";

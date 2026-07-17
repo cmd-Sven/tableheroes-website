@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Hand, X } from "lucide-react";
-import type { SessionHandRaise } from "@/src/lib/actions/session-hand-raise-actions";
+import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 
 type Props = {
   raises: SessionHandRaise[];
