@@ -1,0 +1,239 @@
+[
+  {
+    "id": "acolyte",
+    "nameEn": "Acolyte",
+    "nameDe": "Akolyth",
+    "descriptionEn": "You have spent your life in service to a temple.",
+    "descriptionDe": "Du hast dein Leben im Dienst eines Tempels verbracht.",
+    "skillProficiencies": ["ins", "rel"],
+    "languageChoices": 2,
+    "feature": {
+      "id": "shelter-of-the-faithful",
+      "nameEn": "Shelter of the Faithful",
+      "nameDe": "Schutz der Gläubigen",
+      "descriptionEn": "As an acolyte, you command the respect of those who share your faith. You and your adventuring companions can expect free healing and care at a temple, shrine, or other established presence of your faith.",
+      "descriptionDe": "Als Akolyth genießt du den Respekt derjenigen, die deinen Glauben teilen. Du und deine Gefährten könnt in einem Tempel oder Schrein deines Glaubens kostenlose Heilung und Versorgung erwarten."
+    },
+    "equipmentHintEn": "A holy symbol, a prayer book or prayer wheel, 5 sticks of incense, vestments, common clothes, belt pouch with 15 gp.",
+    "equipmentHintDe": "Heiliges Symbol, Gebetbuch oder Gebetsrad, 5 Räucherstäbchen, Gewänder, einfache Kleidung, Gürtelbeutel mit 15 GM."
+  },
+  {
+    "id": "criminal",
+    "nameEn": "Criminal",
+    "nameDe": "Verbrecher",
+    "descriptionEn": "You are an experienced criminal with a history of breaking the law.",
+    "descriptionDe": "Du bist ein erfahrener Verbrecher mit einer Vergangenheit voller Gesetzesbrüche.",
+    "skillProficiencies": ["dec", "ste"],
+    "toolProficiencyIds": ["tool-thieves", "tool-gaming"],
+    "feature": {
+      "id": "criminal-contact",
+      "nameEn": "Criminal Contact",
+      "nameDe": "Verbrecherkontakt",
+      "descriptionEn": "You have a reliable contact who acts as your liaison to a network of other criminals. You know how to get messages to and from your contact, even over great distances.",
+      "descriptionDe": "Du hast einen zuverlässigen Kontakt als Verbindung zu einem Netz anderer Verbrecher. Du weißt, wie Nachrichten auch über große Entfernungen übermittelt werden."
+    },
+    "equipmentHintEn": "A crowbar, dark common clothes including a hood, belt pouch with 15 gp.",
+    "equipmentHintDe": "Brecheisen, dunkle einfache Kleidung mit Kapuze, Gürtelbeutel mit 15 GM."
+  },
+  {
+    "id": "folk-hero",
+    "nameEn": "Folk Hero",
+    "nameDe": "Volksheld",
+    "descriptionEn": "You come from a humble social rank, but you are destined for so much more.",
+    "descriptionDe": "Du stammst aus einfachen Verhältnissen, bist aber zu Größerem bestimmt.",
+    "skillProficiencies": ["ani", "surv"],
+    "toolProficiencyIds": ["tool-artisan", "tool-vehicles-land"],
+    "feature": {
+      "id": "rustic-hospitality",
+      "nameEn": "Rustic Hospitality",
+      "nameDe": "Ländliche Gastfreundschaft",
+      "descriptionEn": "Since you come from the ranks of the common folk, you fit in among them with ease. You can find a place to hide, rest, or recuperate among other commoners, unless you have shown yourself to be a danger to them.",
+      "descriptionDe": "Als einer der einfachen Leute findest du leicht Unterschlupf, Rast oder Erholung bei anderen Gemeinen — solange du dich nicht als Gefahr erwiesen hast."
+    },
+    "equipmentHintEn": "A set of artisan's tools, a shovel, an iron pot, common clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Handwerkszeug, Schaufel, eiserner Topf, einfache Kleidung, Gürtelbeutel mit 10 GM."
+  },
+  {
+    "id": "noble",
+    "nameEn": "Noble",
+    "nameDe": "Adliger",
+    "descriptionEn": "You understand wealth, power, and privilege.",
+    "descriptionDe": "Du verstehst Reichtum, Macht und Privilegien.",
+    "skillProficiencies": ["his", "per"],
+    "toolProficiencyIds": ["tool-gaming"],
+    "languageChoices": 1,
+    "feature": {
+      "id": "position-of-privilege",
+      "nameEn": "Position of Privilege",
+      "nameDe": "Privilegierte Stellung",
+      "descriptionEn": "Thanks to your noble birth, people are inclined to think the best of you. You are welcome in high society, and common folk make every effort to accommodate you.",
+      "descriptionDe": "Dank deiner adligen Herkunft denken die Leute das Beste von dir. Du bist in der High Society willkommen, und einfache Leute bemühen sich, dir entgegenzukommen."
+    },
+    "equipmentHintEn": "Fine clothes, a signet ring, a scroll of pedigree, purse with 25 gp.",
+    "equipmentHintDe": "Feine Kleidung, Siegelring, Stammbaumrolle, Geldbörse mit 25 GM."
+  },
+  {
+    "id": "sage",
+    "nameEn": "Sage",
+    "nameDe": "Gelehrter",
+    "descriptionEn": "You spent years learning the lore of the multiverse.",
+    "descriptionDe": "Du hast Jahre damit verbracht, das Wissen des Multiversums zu studieren.",
+    "skillProficiencies": ["arc", "his"],
+    "languageChoices": 2,
+    "feature": {
+      "id": "researcher",
+      "nameEn": "Researcher",
+      "nameDe": "Forscher",
+      "descriptionEn": "When you attempt to learn or recall a piece of lore, if you do not know that information, you often know where and from whom you can obtain it.",
+      "descriptionDe": "Wenn du versuchst, Wissen zu lernen oder abzurufen und es nicht kennst, weißt du oft, wo und von wem du es erhalten kannst."
+    },
+    "equipmentHintEn": "A bottle of ink, a quill, a small knife, a letter from a dead colleague posing a question, common clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Tintenflasche, Feder, kleines Messer, Brief eines toten Kollegen mit einer Frage, einfache Kleidung, Gürtelbeutel mit 10 GM."
+  },
+  {
+    "id": "soldier",
+    "nameEn": "Soldier",
+    "nameDe": "Soldat",
+    "descriptionEn": "War has been your life for as long as you care to remember.",
+    "descriptionDe": "Krieg war dein Leben, solange du dich erinnerst.",
+    "skillProficiencies": ["ath", "itm"],
+    "toolProficiencyIds": ["tool-gaming", "tool-vehicles-land"],
+    "feature": {
+      "id": "military-rank",
+      "nameEn": "Military Rank",
+      "nameDe": "Militärrang",
+      "descriptionEn": "You have a military rank from your career as a soldier. Soldiers loyal to your former organization still recognize your authority and influence.",
+      "descriptionDe": "Du hast einen Militärrang aus deiner Soldatenzeit. Soldaten deiner ehemaligen Organisation erkennen deine Autorität und deinen Einfluss an."
+    },
+    "equipmentHintEn": "An insignia of rank, a trophy from a fallen enemy, a set of bone dice or deck of cards, common clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Rangabzeichen, Trophäe eines gefallenen Feindes, Würfel oder Kartenspiel, einfache Kleidung, Gürtelbeutel mit 10 GM."
+  },
+  {
+    "id": "hermit",
+    "nameEn": "Hermit",
+    "nameDe": "Einsiedler",
+    "descriptionEn": "You lived in seclusion—either in a sheltered community such as a monastery, or entirely alone—for a formative part of your life.",
+    "descriptionDe": "Du hast einen prägenden Teil deines Lebens in Abgeschiedenheit verbracht — in einer Gemeinschaft wie einem Kloster oder ganz allein.",
+    "skillProficiencies": ["med", "rel"],
+    "toolProficiencyIds": ["tool-herbalism"],
+    "feature": {
+      "id": "discovery",
+      "nameEn": "Discovery",
+      "nameDe": "Entdeckung",
+      "descriptionEn": "The quiet seclusion of your extended hermitage gave you access to a unique and powerful discovery. Work with your GM to determine the details.",
+      "descriptionDe": "Die Stille deiner langen Einsiedelei gewährte dir Zugang zu einer einzigartigen, mächtigen Entdeckung. Details legst du mit dem Spielleiter fest."
+    },
+    "equipmentHintEn": "A scroll case stuffed with notes, a winter blanket, common clothes, herbalism kit, 5 gp.",
+    "equipmentHintDe": "Schriftrollenköcher mit Notizen, Winterdecke, einfache Kleidung, Kräuterkunde-Ausrüstung, 5 GM."
+  },
+  {
+    "id": "entertainer",
+    "nameEn": "Entertainer",
+    "nameDe": "Unterhaltungskünstler",
+    "descriptionEn": "You thrive in front of an audience.",
+    "descriptionDe": "Du blühst vor einem Publikum auf.",
+    "skillProficiencies": ["acr", "prf"],
+    "toolProficiencyIds": ["tool-disguise", "tool-musical"],
+    "feature": {
+      "id": "by-popular-demand",
+      "nameEn": "By Popular Demand",
+      "nameDe": "Auf populären Wunsch",
+      "descriptionEn": "You can always find a place to perform. You receive free lodging and food of a modest or comfortable standard at the establishment where you perform.",
+      "descriptionDe": "Du findest immer einen Ort zum Auftreten. Dort erhältst du kostenlose Unterkunft und Verpflegung von bescheidener oder angenehmer Qualität."
+    },
+    "equipmentHintEn": "A musical instrument, the favor of an admirer, a costume, belt pouch with 15 gp.",
+    "equipmentHintDe": "Musikinstrument, Gunst eines Bewunderers, Kostüm, Gürtelbeutel mit 15 GM."
+  },
+  {
+    "id": "guild-artisan",
+    "nameEn": "Guild Artisan",
+    "nameDe": "Zünftehandwerker",
+    "descriptionEn": "You are a member of an artisan's guild.",
+    "descriptionDe": "Du bist Mitglied einer Handwerkszunft.",
+    "skillProficiencies": ["ins", "per"],
+    "toolProficiencyIds": ["tool-artisan"],
+    "languageChoices": 1,
+    "feature": {
+      "id": "guild-membership",
+      "nameEn": "Guild Membership",
+      "nameDe": "Zunftmitgliedschaft",
+      "descriptionEn": "As an established member of a guild, you can rely on certain benefits. Your fellow guild members will provide you with lodging and food if necessary, and pay for your funeral if needed.",
+      "descriptionDe": "Als etabliertes Zunftmitglied kannst du mit bestimmten Vorteilen rechnen: Unterkunft und Verpflegung bei Bedarf, und bei Bedarf die Kosten für deine Bestattung."
+    },
+    "equipmentHintEn": "A set of artisan's tools, a letter of introduction from your guild, traveler's clothes, belt pouch with 15 gp.",
+    "equipmentHintDe": "Handwerkszeug, Empfehlungsschreiben der Zunft, Reisekleidung, Gürtelbeutel mit 15 GM."
+  },
+  {
+    "id": "outlander",
+    "nameEn": "Outlander",
+    "nameDe": "Wildnisbewohner",
+    "descriptionEn": "You grew up in the wilds, far from civilization.",
+    "descriptionDe": "Du bist in der Wildnis aufgewachsen, fern der Zivilisation.",
+    "skillProficiencies": ["ath", "surv"],
+    "toolProficiencyIds": ["tool-musical"],
+    "languageChoices": 1,
+    "feature": {
+      "id": "wanderer",
+      "nameEn": "Wanderer",
+      "nameDe": "Wanderer",
+      "descriptionEn": "You have an excellent memory for maps and geography, and you can always recall the general layout of terrain, settlements, and other features around you. In addition, you can find food and fresh water for yourself and up to five other people each day.",
+      "descriptionDe": "Du hast ein ausgezeichnetes Gedächtnis für Karten und Geografie und kannst dich immer an die grobe Lage von Gelände und Siedlungen erinnern. Außerdem findest du täglich Nahrung und Frischwasser für dich und bis zu fünf weitere Personen."
+    },
+    "equipmentHintEn": "A staff, a hunting trap, a trophy from an animal you killed, traveler's clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Stab, Tierfalle, Trophäe eines erlegten Tiers, Reisekleidung, Gürtelbeutel mit 10 GM."
+  },
+  {
+    "id": "sailor",
+    "nameEn": "Sailor",
+    "nameDe": "Seefahrer",
+    "descriptionEn": "You sailed on a seagoing vessel for years.",
+    "descriptionDe": "Du hast jahrelang auf einem seetüchtigen Schiff gesegelt.",
+    "skillProficiencies": ["ath", "prc"],
+    "toolProficiencyIds": ["tool-navigator", "tool-vehicles-water"],
+    "feature": {
+      "id": "ships-passage",
+      "nameEn": "Ship's Passage",
+      "nameDe": "Schiffsüberfahrt",
+      "descriptionEn": "When you need to, you can secure free passage on a sailing ship for yourself and your adventuring companions.",
+      "descriptionDe": "Bei Bedarf kannst du für dich und deine Gefährten eine kostenlose Überfahrt auf einem Segelschiff organisieren."
+    },
+    "equipmentHintEn": "A belaying pin (club), 50 feet of silk rope, a lucky charm, common clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Belegnagel (Keule), 15 m Seidenstrick, Glücksbringer, einfache Kleidung, Gürtelbeutel mit 10 GM."
+  },
+  {
+    "id": "charlatan",
+    "nameEn": "Charlatan",
+    "nameDe": "Scharlatan",
+    "descriptionEn": "You have always had a way with people.",
+    "descriptionDe": "Du hattest schon immer ein Händchen für Menschen.",
+    "skillProficiencies": ["dec", "slt"],
+    "toolProficiencyIds": ["tool-disguise", "tool-forgery"],
+    "feature": {
+      "id": "false-identity",
+      "nameEn": "False Identity",
+      "nameDe": "Falsche Identität",
+      "descriptionEn": "You have created a second identity that includes documentation, established acquaintances, and disguises that allow you to assume that persona.",
+      "descriptionDe": "Du hast eine zweite Identität geschaffen — mit Papieren, Bekannten und Verkleidungen, die dir erlauben, diese Persona anzunehmen."
+    },
+    "equipmentHintEn": "A set of fine clothes, a disguise kit, tools of the con of your choice, belt pouch with 15 gp.",
+    "equipmentHintDe": "Feine Kleidung, Verkleidungsset, Werkzeuge deines bevorzugten Schwindels, Gürtelbeutel mit 15 GM."
+  },
+  {
+    "id": "urchin",
+    "nameEn": "Urchin",
+    "nameDe": "Straßenkind",
+    "descriptionEn": "You grew up on the streets alone, orphaned, and poor.",
+    "descriptionDe": "Du bist allein, verwaist und arm auf der Straße aufgewachsen.",
+    "skillProficiencies": ["slt", "ste"],
+    "toolProficiencyIds": ["tool-disguise", "tool-thieves"],
+    "feature": {
+      "id": "city-secrets",
+      "nameEn": "City Secrets",
+      "nameDe": "Stadtgeheimnisse",
+      "descriptionEn": "You know the secret patterns and flow to cities and can find passages through the urban sprawl that others would miss. When not in combat, you (and companions you lead) can travel between any two locations in the city twice as fast as your speed would normally allow.",
+      "descriptionDe": "Du kennst die geheimen Muster und Flüsse der Städte und findest Wege, die andere übersehen. Außerhalb des Kampfes kannst du (mit Gefährten, die du führst) zwischen zwei Orten in der Stadt doppelt so schnell reisen."
+    },
+    "equipmentHintEn": "A small knife, a map of the city you grew up in, a pet mouse, a token to remember your parents by, common clothes, belt pouch with 10 gp.",
+    "equipmentHintDe": "Kleines Messer, Stadtplan deiner Heimatstadt, eine Maus als Haustier, Andenken an deine Eltern, einfache Kleidung, Gürtelbeutel mit 10 GM."
+  }
+]

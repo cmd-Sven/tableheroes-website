@@ -207,7 +207,20 @@ export function syncSpellSlotsFromClass(
   if (!classId) return sheet;
   const computed = slotsForClassLevel(classId, level, subclass);
   if (Object.keys(computed).length === 0 && classId !== "warlock") {
-    return sheet;
+    // Clear leftover slots (e.g. leaving Arcane Trickster / Eldritch Knight)
+    const prevSlots = sheet.spellcasting?.slots ?? {};
+    if (Object.keys(prevSlots).length === 0) return sheet;
+    return {
+      ...sheet,
+      spellcasting: {
+        ability:
+          sheet.spellcasting?.ability ?? defaultSpellAbilityForClass(className) ?? "int",
+        spellSaveDcOverride: sheet.spellcasting?.spellSaveDcOverride ?? null,
+        spellAttackBonusOverride:
+          sheet.spellcasting?.spellAttackBonusOverride ?? null,
+        slots: {},
+      },
+    };
   }
   const prev = sheet.spellcasting?.slots ?? {};
   const nextSlots: Dnd5eSpellSlots = { ...prev };

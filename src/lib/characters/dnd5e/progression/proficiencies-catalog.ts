@@ -303,6 +303,47 @@ export const PROFICIENCY_CATALOG: ProficiencyDefinition[] = [
     foundryKeys: ["vehicleWater", "water"],
     aliases: ["vehicles water", "water vehicles", "fahrzeuge wasser"],
   },
+  // Background / lifestyle tools
+  {
+    id: "tool-disguise",
+    category: "tools",
+    nameEn: "Disguise kit",
+    nameDe: "Verkleidungsset",
+    foundryKeys: ["disg"],
+    aliases: ["disguise", "disguise kit", "verkleidung", "verkleidungsset"],
+  },
+  {
+    id: "tool-forgery",
+    category: "tools",
+    nameEn: "Forgery kit",
+    nameDe: "Fälscherset",
+    foundryKeys: ["forge"],
+    aliases: ["forgery", "forgery kit", "falscherset", "faelscherset"],
+  },
+  {
+    id: "tool-gaming",
+    category: "tools",
+    nameEn: "Gaming set",
+    nameDe: "Spielset",
+    foundryKeys: ["play"],
+    aliases: ["gaming set", "dice", "cards", "spielset", "wuerfel", "karten"],
+  },
+  {
+    id: "tool-musical",
+    category: "tools",
+    nameEn: "Musical instrument",
+    nameDe: "Musikinstrument",
+    foundryKeys: ["music"],
+    aliases: ["musical instrument", "instrument", "musikinstrument"],
+  },
+  {
+    id: "tool-artisan",
+    category: "tools",
+    nameEn: "Artisan's tools",
+    nameDe: "Handwerkszeug",
+    foundryKeys: ["art"],
+    aliases: ["artisans tools", "artisan's tools", "handwerkszeug", "handwerkerwerkzeug"],
+  },
 ];
 
 const BY_ID = new Map(PROFICIENCY_CATALOG.map((p) => [p.id, p]));

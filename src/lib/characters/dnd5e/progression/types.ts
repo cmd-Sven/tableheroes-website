@@ -87,6 +87,44 @@ export type FeatDefinition = LocalizedText & {
   prerequisiteDe?: string;
 };
 
+/** Classic PHB / SRD-style backgrounds (mechanics for sheet grants). */
+export type BackgroundDefinition = LocalizedText & {
+  id: string;
+  /** Skill keys granted as proficient (not expertise). */
+  skillProficiencies: Array<
+    | "acr"
+    | "ani"
+    | "arc"
+    | "ath"
+    | "dec"
+    | "his"
+    | "ins"
+    | "itm"
+    | "inv"
+    | "med"
+    | "nat"
+    | "prc"
+    | "prf"
+    | "per"
+    | "rel"
+    | "slt"
+    | "ste"
+    | "surv"
+  >;
+  /** Entries from PROFICIENCY_CATALOG (tools). */
+  toolProficiencyIds?: string[];
+  /** Free-text tool labels when no catalog id exists. */
+  toolLabelsEn?: string[];
+  toolLabelsDe?: string[];
+  /** How many languages the player may choose (not auto-applied). */
+  languageChoices?: number;
+  feature: LocalizedText & { id: string };
+  equipmentHintEn?: string;
+  equipmentHintDe?: string;
+  /** Rare — classic PHB backgrounds have none. */
+  abilityBonus?: Partial<Record<AbilityKeyShort, number>>;
+};
+
 export type SpellDefinition = LocalizedText & {
   id: string;
   level: number;

@@ -1,0 +1,309 @@
+/**
+ * Apply / remove SRD-style background grants on a character sheet.
+ * Only reverses tags with source `srd-background` and skill/tool grants
+ * from the previous catalog background (expertise / manual tools kept).
+ */
+import type {
+  AbilityKey,
+  Dnd5eFeatureEntry,
+  Dnd5eSheetData,
+  Dnd5eSkillKey,
+} from "../types";
+import type { AbilityKeyShort, BackgroundDefinition } from "./types";
+import {
+  findBackgroundByName,
+  getBackgroundById,
+  getBackgrounds,
+} from "./catalog";
+import {
+  getProficiencyById,
+  proficiencyLabel,
+} from "./proficiencies-catalog";
+
+export const BACKGROUND_SOURCE = "srd-background";
+
+function normalizeMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function featureIdForBackground(bg: BackgroundDefinition): string {
+  return `bg-${bg.id}-feature`;
+}
+
+function equipmentFeatureId(bg: BackgroundDefinition): string {
+  return `bg-${bg.id}-equipment`;
+}
+
+function toolLabelsForBackground(
+  bg: BackgroundDefinition,
+  locale: "de" | "en",
+): string[] {
+  const fromIds = (bg.toolProficiencyIds ?? [])
+    .map((id) => getProficiencyById(id))
+    .filter(Boolean)
+    .map((d) => proficiencyLabel(d!, locale));
+  const free =
+    locale === "de"
+      ? (bg.toolLabelsDe ?? bg.toolLabelsEn ?? [])
+      : (bg.toolLabelsEn ?? bg.toolLabelsDe ?? []);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const label of [...fromIds, ...free]) {
+    const key = normalizeMatch(label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
+function applyAbilityDelta(
+  sheet: Dnd5eSheetData,
+  ability: AbilityKeyShort,
+  delta: number,
+): void {
+  const key = ability as AbilityKey;
+  const current = sheet.abilities[key]?.score ?? 10;
+  sheet.abilities[key] = {
+    ...sheet.abilities[key],
+    score: Math.min(20, Math.max(1, current + delta)),
+  };
+}
+
+function removeMatchingLabels(list: string[], toRemove: string[]): string[] {
+  const removeKeys = new Set(toRemove.map(normalizeMatch).filter(Boolean));
+  if (removeKeys.size === 0) return list;
+  return list.filter((x) => !removeKeys.has(normalizeMatch(x)));
+}
+
+function mergeLabels(existing: string[], add: string[]): string[] {
+  const seen = new Set(existing.map(normalizeMatch).filter(Boolean));
+  const out = [...existing];
+  for (const label of add) {
+    const key = normalizeMatch(label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
+/** Detect currently applied catalog background from features or meta name. */
+export function resolveAppliedBackgroundId(
+  sheet: Dnd5eSheetData,
+  backgroundMeta?: string | null,
+): string | null {
+  for (const f of sheet.features ?? []) {
+    if (f.source !== BACKGROUND_SOURCE) continue;
+    const m = /^bg-([a-z0-9-]+)-feature$/i.exec(f.id);
+    if (m?.[1] && getBackgroundById(m[1])) return m[1];
+  }
+  if (backgroundMeta?.trim()) {
+    return findBackgroundByName(backgroundMeta)?.id ?? null;
+  }
+  return null;
+}
+
+export function removeBackgroundGrants(
+  sheet: Dnd5eSheetData,
+  backgroundIdOrMeta?: string | null,
+  locale: "de" | "en" = "de",
+): Dnd5eSheetData {
+  const next: Dnd5eSheetData = structuredClone(sheet);
+  const bgId =
+    (backgroundIdOrMeta && getBackgroundById(backgroundIdOrMeta)?.id) ||
+    (backgroundIdOrMeta ? findBackgroundByName(backgroundIdOrMeta)?.id : null) ||
+    resolveAppliedBackgroundId(next, backgroundIdOrMeta);
+
+  const bg = bgId ? getBackgroundById(bgId) : null;
+
+  next.features = (next.features ?? []).filter((f) => {
+    if (f.source === BACKGROUND_SOURCE) return false;
+    if (bg && (f.id === featureIdForBackground(bg) || f.id === equipmentFeatureId(bg))) {
+      return false;
+    }
+    return true;
+  });
+
+  if (bg) {
+    for (const skill of bg.skillProficiencies) {
+      const entry = next.skills[skill as Dnd5eSkillKey];
+      if (!entry) continue;
+      // Preserve expertise / half (player or class upgrades)
+      if (entry.proficient === "proficient") {
+        next.skills[skill as Dnd5eSkillKey] = {
+          ...entry,
+          proficient: "none",
+        };
+      }
+    }
+
+    const tools = toolLabelsForBackground(bg, locale);
+    next.proficiencies = {
+      ...next.proficiencies,
+      tools: removeMatchingLabels(next.proficiencies.tools, tools),
+    };
+
+    if (bg.abilityBonus) {
+      for (const [ab, delta] of Object.entries(bg.abilityBonus)) {
+        if (delta) applyAbilityDelta(next, ab as AbilityKeyShort, -delta);
+      }
+    }
+  }
+
+  return next;
+}
+
+export function applyBackgroundGrants(
+  sheet: Dnd5eSheetData,
+  backgroundId: string,
+  locale: "de" | "en" = "de",
+): Dnd5eSheetData {
+  const bg = getBackgroundById(backgroundId);
+  if (!bg) return sheet;
+
+  const next: Dnd5eSheetData = structuredClone(sheet);
+
+  for (const skill of bg.skillProficiencies) {
+    const key = skill as Dnd5eSkillKey;
+    const entry = next.skills[key] ?? { proficient: "none" as const };
+    if (entry.proficient === "none" || entry.proficient === "half") {
+      next.skills[key] = { ...entry, proficient: "proficient" };
+    }
+  }
+
+  const tools = toolLabelsForBackground(bg, locale);
+  next.proficiencies = {
+    ...next.proficiencies,
+    tools: mergeLabels(next.proficiencies.tools, tools),
+  };
+
+  if (bg.abilityBonus) {
+    for (const [ab, delta] of Object.entries(bg.abilityBonus)) {
+      if (delta) applyAbilityDelta(next, ab as AbilityKeyShort, delta);
+    }
+  }
+
+  const featureName = locale === "de" ? bg.feature.nameDe || bg.feature.nameEn : bg.feature.nameEn;
+  const featureDesc =
+    locale === "de"
+      ? bg.feature.descriptionDe || bg.feature.descriptionEn
+      : bg.feature.descriptionEn || bg.feature.descriptionDe;
+
+  const langNote =
+    bg.languageChoices && bg.languageChoices > 0
+      ? locale === "de"
+        ? `\n\n(Sprachwahl: ${bg.languageChoices} Sprache(n) — manuell im Sprachen-Bereich wählen.)`
+        : `\n\n(Language choice: pick ${bg.languageChoices} language(s) manually.)`
+      : "";
+
+  const mainFeature: Dnd5eFeatureEntry = {
+    id: featureIdForBackground(bg),
+    name: featureName,
+    nameDe: bg.feature.nameDe,
+    nameEn: bg.feature.nameEn,
+    description: (featureDesc || null) ? `${featureDesc || ""}${langNote}` : langNote || null,
+    descriptionDe: bg.feature.descriptionDe
+      ? `${bg.feature.descriptionDe}${
+          bg.languageChoices
+            ? `\n\n(Sprachwahl: ${bg.languageChoices} Sprache(n) — manuell wählen.)`
+            : ""
+        }`
+      : null,
+    descriptionEn: bg.feature.descriptionEn
+      ? `${bg.feature.descriptionEn}${
+          bg.languageChoices
+            ? `\n\n(Language choice: pick ${bg.languageChoices} language(s) manually.)`
+            : ""
+        }`
+      : null,
+    source: BACKGROUND_SOURCE,
+  };
+
+  if (!next.features.some((f) => f.id === mainFeature.id)) {
+    next.features.push(mainFeature);
+  }
+
+  const equipHint =
+    locale === "de"
+      ? bg.equipmentHintDe || bg.equipmentHintEn
+      : bg.equipmentHintEn || bg.equipmentHintDe;
+  if (equipHint) {
+    const equipFeature: Dnd5eFeatureEntry = {
+      id: equipmentFeatureId(bg),
+      name:
+        locale === "de"
+          ? `Ausrüstungshinweis: ${bg.nameDe}`
+          : `Equipment hint: ${bg.nameEn}`,
+      nameDe: `Ausrüstungshinweis: ${bg.nameDe}`,
+      nameEn: `Equipment hint: ${bg.nameEn}`,
+      description: equipHint,
+      descriptionDe: bg.equipmentHintDe ?? null,
+      descriptionEn: bg.equipmentHintEn ?? null,
+      source: BACKGROUND_SOURCE,
+    };
+    if (!next.features.some((f) => f.id === equipFeature.id)) {
+      next.features.push(equipFeature);
+    }
+  }
+
+  return next;
+}
+
+export type AppliedBackground = {
+  sheet: Dnd5eSheetData;
+  /** Display name for characters.background / meta */
+  backgroundLabel: string | null;
+  backgroundId: string | null;
+};
+
+/**
+ * Replace previous background grants with the new catalog background (or clear).
+ */
+export function setCharacterBackground(
+  sheet: Dnd5eSheetData,
+  nextBackgroundId: string | null,
+  options?: {
+    previousBackgroundMeta?: string | null;
+    locale?: "de" | "en";
+  },
+): AppliedBackground {
+  const locale = options?.locale ?? "de";
+  let next = removeBackgroundGrants(
+    sheet,
+    options?.previousBackgroundMeta ?? resolveAppliedBackgroundId(sheet, options?.previousBackgroundMeta),
+    locale,
+  );
+
+  if (!nextBackgroundId) {
+    return { sheet: next, backgroundLabel: null, backgroundId: null };
+  }
+
+  const bg = getBackgroundById(nextBackgroundId);
+  if (!bg) {
+    return { sheet: next, backgroundLabel: null, backgroundId: null };
+  }
+
+  next = applyBackgroundGrants(next, bg.id, locale);
+  return {
+    sheet: next,
+    backgroundLabel: locale === "de" ? bg.nameDe || bg.nameEn : bg.nameEn,
+    backgroundId: bg.id,
+  };
+}
+
+export function listBackgroundOptions(locale: "de" | "en" = "de"): Array<{
+  id: string;
+  label: string;
+}> {
+  return getBackgrounds()
+    .map((b) => ({
+      id: b.id,
+      label: locale === "de" ? b.nameDe || b.nameEn : b.nameEn,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale));
+}

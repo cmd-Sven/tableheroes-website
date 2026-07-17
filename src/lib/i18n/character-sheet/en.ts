@@ -42,6 +42,17 @@ export const characterSheetMessagesEn = {
   "field.descriptionPlaceholder": "Description…",
   "field.newFeat": "New Feature",
 
+  "backgroundCatalog.none": "No background",
+  "backgroundCatalog.custom": "Custom / free text",
+  "backgroundCatalog.customPlaceholder": "Custom background…",
+  "backgroundCatalog.applied": "Background applied: {name}",
+  "backgroundCatalog.cleared": "Background grants removed.",
+
+  "subclassCatalog.none": "No subclasses in the catalog for this class.",
+  "subclassCatalog.lockedUntil": "Subclass available from level {level}.",
+  "subclassCatalog.applied": "Subclass applied: {name}",
+  "subclassCatalog.cleared": "Subclass cleared.",
+
   "combat.savingThrows": "Saving Throws",
   "combat.skills": "Skills",
   "combat.passivePerception": "Passive Perception",

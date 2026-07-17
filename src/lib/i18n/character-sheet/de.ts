@@ -42,6 +42,17 @@ export const characterSheetMessagesDe = {
   "field.descriptionPlaceholder": "Beschreibung…",
   "field.newFeat": "Neues Talent",
 
+  "backgroundCatalog.none": "Kein Hintergrund",
+  "backgroundCatalog.custom": "Freitext / Sonstiges",
+  "backgroundCatalog.customPlaceholder": "Eigener Hintergrund…",
+  "backgroundCatalog.applied": "Hintergrund übernommen: {name}",
+  "backgroundCatalog.cleared": "Hintergrund-Grants entfernt.",
+
+  "subclassCatalog.none": "Für diese Klasse sind im Katalog keine Unterklassen hinterlegt.",
+  "subclassCatalog.lockedUntil": "Unterklasse ab Stufe {level} wählbar.",
+  "subclassCatalog.applied": "Unterklasse übernommen: {name}",
+  "subclassCatalog.cleared": "Unterklasse entfernt.",
+
   "combat.savingThrows": "Rettungswürfe",
   "combat.skills": "Fertigkeiten",
   "combat.passivePerception": "Passive Wahrnehmung",

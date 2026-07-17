@@ -13,6 +13,12 @@ import { buildLevel1Sheet, planLevel1Creation, STANDARD_ARRAY } from "./characte
 import { getSubclassAvailability } from "./subclass-availability";
 import { createEmptyDnd5eSheet } from "../defaults";
 import type { AbilityKeyShort, ClassId, LevelUpDraft } from "./types";
+import {
+  setCharacterBackground,
+  BACKGROUND_SOURCE,
+} from "./apply-background";
+import { applySubclassChange } from "./apply-subclass-change";
+import { getBackgrounds } from "./catalog";
 
 function run() {
   assert.deepEqual(asiLevelsForClass("wizard"), [4, 8, 12, 16, 19]);
@@ -430,6 +436,109 @@ function run() {
   assert.ok(clericAvail.entries.some((e) => e.id === "life" && e.inSystem));
   assert.ok(clericAvail.entries.some((e) => e.id === "grave" && e.inSystem));
   assert.ok(clericAvail.entries.some((e) => e.id === "light" && !e.inSystem));
+
+  // --- Background apply / remove / replace ---
+  assert.ok(getBackgrounds().length >= 13, "PHB-style backgrounds catalog");
+  assert.ok(getBackgrounds().some((b) => b.id === "acolyte"));
+
+  let bgSheet = createEmptyDnd5eSheet(1);
+  const acolyte = setCharacterBackground(bgSheet, "acolyte", { locale: "de" });
+  assert.equal(acolyte.backgroundLabel, "Akolyth");
+  assert.equal(acolyte.sheet.skills.ins.proficient, "proficient");
+  assert.equal(acolyte.sheet.skills.rel.proficient, "proficient");
+  assert.ok(
+    acolyte.sheet.features.some(
+      (f) => f.source === BACKGROUND_SOURCE && f.id === "bg-acolyte-feature",
+    ),
+  );
+
+  // Expertise override should survive remove
+  acolyte.sheet.skills.ins.proficient = "expertise";
+  const criminal = setCharacterBackground(acolyte.sheet, "criminal", {
+    previousBackgroundMeta: "Akolyth",
+    locale: "de",
+  });
+  assert.equal(criminal.backgroundLabel, "Verbrecher");
+  assert.equal(criminal.sheet.skills.ins.proficient, "expertise", "expertise preserved");
+  assert.equal(criminal.sheet.skills.rel.proficient, "none", "old skill removed");
+  assert.equal(criminal.sheet.skills.dec.proficient, "proficient");
+  assert.equal(criminal.sheet.skills.ste.proficient, "proficient");
+  assert.ok(
+    !criminal.sheet.features.some((f) => f.id === "bg-acolyte-feature"),
+    "old background feature removed",
+  );
+  assert.ok(criminal.sheet.features.some((f) => f.id === "bg-criminal-feature"));
+  assert.ok(
+    criminal.sheet.proficiencies.tools.some((t) => /diebes|thieves/i.test(t)),
+  );
+
+  const clearedBg = setCharacterBackground(criminal.sheet, null, {
+    previousBackgroundMeta: "Verbrecher",
+    locale: "de",
+  });
+  assert.equal(clearedBg.backgroundId, null);
+  assert.ok(!clearedBg.sheet.features.some((f) => f.source === BACKGROUND_SOURCE));
+
+  // --- Subclass change: Cleric Life → Grave ---
+  const lifeBuilt = buildLevel1Sheet({
+    classId: "cleric",
+    subclassId: "life",
+    raceName: "Mensch",
+    raceId: "human",
+    baseAbilities: {
+      str: 10,
+      dex: 10,
+      con: 14,
+      int: 10,
+      wis: 15,
+      cha: 8,
+    },
+    applyRacialBonuses: true,
+    spellIds: [],
+    skillKeys: [],
+  });
+  const toGrave = applySubclassChange(lifeBuilt.sheet, {
+    className: lifeBuilt.meta.className,
+    level: 1,
+    previousSubclass: lifeBuilt.meta.subclass,
+    nextSubclassId: "grave",
+    locale: "de",
+  });
+  assert.ok(/grab/i.test(toGrave.subclassLabel ?? ""));
+  assert.ok(toGrave.sheet.features.some((f) => f.id === "circle-of-mortality"));
+  assert.ok(
+    !toGrave.sheet.features.some((f) => /disciple-of-life|disciple of life/i.test(f.id + f.name)),
+    "Life domain features removed",
+  );
+
+  // Rogue Thief → Arcane Trickster at level 3 (slots appear)
+  const rogueBase = createEmptyDnd5eSheet(3);
+  const toAt = applySubclassChange(rogueBase, {
+    className: "Schurke",
+    level: 3,
+    previousSubclass: "Dieb",
+    nextSubclassId: "arcane-trickster",
+    locale: "de",
+  });
+  assert.ok(/trickser|trickster/i.test(toAt.subclassLabel ?? ""));
+  assert.ok((toAt.sheet.spellcasting?.slots?.["1"]?.max ?? 0) >= 2);
+  assert.ok(
+    toAt.sheet.features.some((f) => f.id === "mage-hand-legerdemain" || /mage.?hand/i.test(f.id)),
+  );
+
+  const backToThief = applySubclassChange(toAt.sheet, {
+    className: "Schurke",
+    level: 3,
+    previousSubclass: toAt.subclassLabel,
+    nextSubclassId: "thief",
+    locale: "de",
+  });
+  assert.ok(/dieb|thief/i.test(backToThief.subclassLabel ?? ""));
+  assert.equal(
+    Object.keys(backToThief.sheet.spellcasting?.slots ?? {}).length,
+    0,
+    "third-caster slots cleared when leaving AT",
+  );
 
   console.log("progression.selftest: OK");
 }

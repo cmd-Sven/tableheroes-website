@@ -63,9 +63,26 @@ import {
   type ProficiencyCategory,
   type ProficiencyDefinition,
 } from "@/src/lib/characters/dnd5e/progression/proficiencies-catalog";
-import { CLASS_IDS, resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
+import {
+  CLASS_IDS,
+  matchSubclassOption,
+  resolveClassId,
+} from "@/src/lib/characters/dnd5e/progression/class-ids";
 import { CLASS_NAME_DE } from "@/src/lib/characters/dnd5e/progression/labels-de";
-import { getClassProgression } from "@/src/lib/characters/dnd5e/progression/catalog";
+import {
+  findBackgroundByName,
+  getClassProgression,
+} from "@/src/lib/characters/dnd5e/progression/catalog";
+import {
+  listBackgroundOptions,
+  resolveAppliedBackgroundId,
+  setCharacterBackground,
+} from "@/src/lib/characters/dnd5e/progression/apply-background";
+import {
+  applySubclassChange,
+  catalogSubclassLevel,
+  listCatalogSubclassOptions,
+} from "@/src/lib/characters/dnd5e/progression/apply-subclass-change";
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
@@ -224,6 +241,8 @@ export function Dnd5eCharacterSheetPanel({
     weapons: string;
     tools: string;
   }>({ armor: "", weapons: "", tools: "" });
+  /** Freitext-Hintergrund (nicht aus Katalog) */
+  const [backgroundCustomMode, setBackgroundCustomMode] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -247,6 +266,10 @@ export function Dnd5eCharacterSheetPanel({
         level: data.level,
         experiencePoints: data.experiencePoints,
       });
+      const bgName = data.background ?? "";
+      setBackgroundCustomMode(
+        Boolean(bgName.trim()) && !findBackgroundByName(bgName),
+      );
       hydrateLocale(data.sheetLocale);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : t("sheet.loadError"));
@@ -396,6 +419,58 @@ export function Dnd5eCharacterSheetPanel({
         locale,
       ),
     );
+  }
+
+  function setSubclassFromCatalog(subclassId: string) {
+    if (!sheet) return;
+    const applied = applySubclassChange(sheet, {
+      className: meta.className,
+      level: meta.level,
+      previousSubclass: meta.subclass || null,
+      nextSubclassId: subclassId || null,
+      locale,
+    });
+    setMeta({ ...meta, subclass: applied.subclassLabel ?? "" });
+    setSheet(applied.sheet);
+    if (applied.subclassLabel) {
+      toast.success(t("subclassCatalog.applied", { name: applied.subclassLabel }));
+    } else {
+      toast.success(t("subclassCatalog.cleared"));
+    }
+  }
+
+  function setBackgroundFromCatalog(backgroundId: string) {
+    if (!sheet) return;
+    if (backgroundId === "__custom__") {
+      const cleared = setCharacterBackground(sheet, null, {
+        previousBackgroundMeta: meta.background || null,
+        locale,
+      });
+      setSheet(cleared.sheet);
+      setBackgroundCustomMode(true);
+      return;
+    }
+    if (!backgroundId) {
+      const cleared = setCharacterBackground(sheet, null, {
+        previousBackgroundMeta: meta.background || null,
+        locale,
+      });
+      setMeta({ ...meta, background: "" });
+      setSheet(cleared.sheet);
+      setBackgroundCustomMode(false);
+      toast.success(t("backgroundCatalog.cleared"));
+      return;
+    }
+    const applied = setCharacterBackground(sheet, backgroundId, {
+      previousBackgroundMeta: meta.background || null,
+      locale,
+    });
+    setMeta({ ...meta, background: applied.backgroundLabel ?? "" });
+    setSheet(applied.sheet);
+    setBackgroundCustomMode(false);
+    if (applied.backgroundLabel) {
+      toast.success(t("backgroundCatalog.applied", { name: applied.backgroundLabel }));
+    }
   }
 
   function removeFeature(index: number) {
@@ -571,6 +646,28 @@ export function Dnd5eCharacterSheetPanel({
   }
 
   const resolvedClassId = resolveClassId(meta.className);
+  const subclassOptions = listCatalogSubclassOptions(meta.className, locale);
+  const subclassUnlockLevel = catalogSubclassLevel(meta.className);
+  const subclassSelectDisabled =
+    readOnly ||
+    payload.progressionLocked ||
+    subclassOptions.length === 0 ||
+    (subclassUnlockLevel != null && meta.level < subclassUnlockLevel);
+  const matchedSubclassId =
+    resolvedClassId && meta.subclass
+      ? matchSubclassOption(
+          meta.subclass,
+          getClassProgression(resolvedClassId)?.subclasses ?? [],
+        )?.id ?? ""
+      : "";
+  const backgroundOptions = listBackgroundOptions(locale);
+  const matchedBackgroundId =
+    resolveAppliedBackgroundId(sheet, meta.background) ??
+    findBackgroundByName(meta.background)?.id ??
+    "";
+  const backgroundSelectValue = backgroundCustomMode
+    ? "__custom__"
+    : matchedBackgroundId;
 
   const sheetCulture = biographyCulture
     ? biographyCulture.cultureOptions.find((c) => c.id === biographyCulture.cultureLoreId)
@@ -874,37 +971,69 @@ export function Dnd5eCharacterSheetPanel({
                   </button>
                 ) : null}
                 {!readOnly && !payload.progressionLocked ? (
-                  <TextInput
-                    value={meta.subclass}
-                    disabled={readOnly}
-                    placeholder={t("field.subclassPlaceholder")}
-                    onChange={(v) => {
-                      setMeta({ ...meta, subclass: v });
-                      if (sheet) {
-                        setSheet(
-                          applyClassBasicsFromCatalog(
-                            sheet,
-                            meta.className,
-                            meta.level,
-                            v || null,
-                            locale,
-                          ),
-                        );
-                      }
-                    }}
-                    className="mt-1 !text-xs"
-                  />
+                  <div className="mt-1 space-y-1">
+                    <select
+                      value={matchedSubclassId}
+                      disabled={subclassSelectDisabled}
+                      onChange={(e) => setSubclassFromCatalog(e.target.value)}
+                      className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white outline-none focus:border-hero-vibrant disabled:opacity-60"
+                    >
+                      <option value="">{t("field.subclassPlaceholder")}</option>
+                      {subclassOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {subclassOptions.length === 0 ? (
+                      <p className="font-libre text-[10px] text-gray-500">
+                        {t("subclassCatalog.none")}
+                      </p>
+                    ) : subclassUnlockLevel != null && meta.level < subclassUnlockLevel ? (
+                      <p className="font-libre text-[10px] text-gray-500">
+                        {t("subclassCatalog.lockedUntil", { level: subclassUnlockLevel })}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : meta.subclass ? (
+                  <p className="mt-1 font-libre text-xs text-gray-300">{meta.subclass}</p>
                 ) : null}
               </label>
               <label className="lg:col-span-2 space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.background")}
                 </span>
-                <TextInput
-                  value={meta.background}
-                  disabled={readOnly}
-                  onChange={(v) => setMeta({ ...meta, background: v })}
-                />
+                {readOnly ? (
+                  <TextInput value={meta.background} disabled onChange={() => {}} />
+                ) : (
+                  <div className="space-y-1">
+                    <select
+                      value={backgroundSelectValue}
+                      disabled={payload.progressionLocked}
+                      onChange={(e) => setBackgroundFromCatalog(e.target.value)}
+                      className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white outline-none focus:border-hero-vibrant disabled:opacity-60"
+                    >
+                      <option value="">{t("backgroundCatalog.none")}</option>
+                      {backgroundOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                      <option value="__custom__">{t("backgroundCatalog.custom")}</option>
+                    </select>
+                    {backgroundCustomMode || !matchedBackgroundId ? (
+                      <TextInput
+                        value={meta.background}
+                        disabled={payload.progressionLocked}
+                        placeholder={t("backgroundCatalog.customPlaceholder")}
+                        onChange={(v) => {
+                          setBackgroundCustomMode(true);
+                          setMeta({ ...meta, background: v });
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                )}
               </label>
               {biographyCulture && biographyCulture.cultureOptions.length > 0 ? (
                 <label className="lg:col-span-3 space-y-1">

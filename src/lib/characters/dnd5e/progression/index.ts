@@ -40,6 +40,9 @@ export {
   getSpells,
   getSpellsForClass,
   getRaceProgression,
+  getBackgrounds,
+  getBackgroundById,
+  findBackgroundByName,
   SRD_ATTRIBUTION,
 } from "./catalog";
 export {
@@ -53,6 +56,20 @@ export {
   enrichItemDescriptionFromCatalog,
   matchSheetFeatureToFeat,
 } from "./catalog-bridge";
+export {
+  setCharacterBackground,
+  applyBackgroundGrants,
+  removeBackgroundGrants,
+  resolveAppliedBackgroundId,
+  listBackgroundOptions,
+  BACKGROUND_SOURCE,
+} from "./apply-background";
+export {
+  applySubclassChange,
+  listCatalogSubclassOptions,
+  catalogSubclassLevel,
+} from "./apply-subclass-change";
+export type { BackgroundDefinition } from "./types";
 export {
   getSubclassAvailability,
   SUBCLASS_AVAILABILITY,

@@ -1,4 +1,10 @@
-import type { ClassProgression, FeatDefinition, RaceProgression, SpellDefinition } from "./types";
+import type {
+  BackgroundDefinition,
+  ClassProgression,
+  FeatDefinition,
+  RaceProgression,
+  SpellDefinition,
+} from "./types";
 import type { ClassId, RaceId } from "./types";
 import { isValidClassId } from "./labels-de";
 
@@ -16,6 +22,7 @@ import warlock from "./data/classes/warlock.json";
 import wizard from "./data/classes/wizard.json";
 import featsJson from "./data/feats.json";
 import spellsJson from "./data/spells.json";
+import backgroundsJson from "./data/backgrounds.json";
 
 import dragonborn from "./data/races/dragonborn.json";
 import dwarf from "./data/races/dwarf.json";
@@ -86,6 +93,39 @@ export function getSpellsForClass(classId: ClassId, maxLevel?: number): SpellDef
     if (maxLevel != null && s.level > maxLevel) return false;
     return true;
   });
+}
+
+function normalizeBgMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+export function getBackgrounds(): BackgroundDefinition[] {
+  return backgroundsJson as BackgroundDefinition[];
+}
+
+export function getBackgroundById(id: string): BackgroundDefinition | null {
+  const bare = id.replace(/^bg[-_]/i, "").trim();
+  return getBackgrounds().find((b) => b.id === bare || b.id === id) ?? null;
+}
+
+export function findBackgroundByName(name: string): BackgroundDefinition | null {
+  const bare = normalizeBgMatch(name);
+  if (!bare) return null;
+  const list = getBackgrounds();
+  for (const b of list) {
+    if (
+      normalizeBgMatch(b.id) === bare ||
+      normalizeBgMatch(b.nameEn) === bare ||
+      normalizeBgMatch(b.nameDe) === bare
+    ) {
+      return b;
+    }
+  }
+  return null;
 }
 
 export const SRD_ATTRIBUTION =
