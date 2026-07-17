@@ -23,6 +23,10 @@ import {
   dropNormToTablePoint,
 } from "@/src/lib/session/dice-screen-project";
 import {
+  computeSlingshotThrow,
+  slingshotStretchRatio,
+} from "@/src/lib/session/dice-slingshot";
+import {
   dieNatHighlight,
   rollMoodFromFaces,
   type DieNatHighlight,
@@ -49,6 +53,10 @@ type ActiveRoll = {
   dropNy: number;
   aimX: number;
   aimZ: number;
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
 };
 
 type Props = {
@@ -65,6 +73,28 @@ function detectWebGL(): boolean {
   } catch {
     return false;
   }
+}
+
+function readThrowMeta(meta: Record<string, unknown>): {
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
+} {
+  const throwDirX =
+    typeof meta.throwDirX === "number" && Number.isFinite(meta.throwDirX)
+      ? meta.throwDirX
+      : undefined;
+  const throwDirZ =
+    typeof meta.throwDirZ === "number" && Number.isFinite(meta.throwDirZ)
+      ? meta.throwDirZ
+      : undefined;
+  const throwStrength =
+    typeof meta.throwStrength === "number" && Number.isFinite(meta.throwStrength)
+      ? Math.min(1, Math.max(0, meta.throwStrength))
+      : undefined;
+  const isTap = meta.isTap === true;
+  return { throwDirX, throwDirZ, throwStrength, isTap };
 }
 
 function readDropNorm(meta: Record<string, unknown>): { dropNx: number; dropNy: number } {
@@ -89,6 +119,12 @@ export function DiceRollOverlay({ logs }: Props) {
   const settledOnceRef = useRef(false);
   const activeRef = useRef<ActiveRoll | null>(null);
   const cursorElRef = useRef<HTMLDivElement>(null);
+  const originIconRef = useRef<HTMLDivElement>(null);
+  const bandLineRef = useRef<SVGLineElement>(null);
+  const stretchFillRef = useRef<HTMLDivElement>(null);
+  const hintRef = useRef<HTMLSpanElement>(null);
+  const aimingRef = useRef(false);
+  const originRef = useRef({ x: 0, y: 0 });
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
   const [webgl, setWebgl] = useState(true);
   const [showResult, setShowResult] = useState(false);
@@ -106,18 +142,24 @@ export function DiceRollOverlay({ logs }: Props) {
     setShowResult(false);
   }, [activeId]);
 
-  // Cursor: DOM via ref — kein setState bei mousemove (verhindert Update-Depth-Loop)
+  // Cursor: DOM via ref — kein setState bei pointermove (verhindert Update-Depth-Loop)
   useEffect(() => {
-    if (!placementId) return;
+    if (!placementId) {
+      aimingRef.current = false;
+      return;
+    }
     const el = cursorElRef.current;
+    const originEl = originIconRef.current;
     const setPos = (x: number, y: number) => {
-      if (!el) return;
+      if (!el || aimingRef.current) return;
       el.style.left = `${x}px`;
       el.style.top = `${y}px`;
     };
+    if (originEl) originEl.style.opacity = "0";
     setPos(window.innerWidth * 0.5, window.innerHeight * 0.42);
 
     const onMove = (e: PointerEvent) => {
+      if (aimingRef.current) return;
       setPos(e.clientX, e.clientY);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -128,18 +170,104 @@ export function DiceRollOverlay({ logs }: Props) {
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("keydown", onKey);
+      aimingRef.current = false;
     };
   }, [placementId]);
 
-  const handlePlacementPointer = useCallback(
-    (e: React.PointerEvent) => {
+  const updateAimVisual = useCallback((x: number, y: number) => {
+    const ox = originRef.current.x;
+    const oy = originRef.current.y;
+    const line = bandLineRef.current;
+    if (line) {
+      line.setAttribute("x1", String(ox));
+      line.setAttribute("y1", String(oy));
+      line.setAttribute("x2", String(x));
+      line.setAttribute("y2", String(y));
+    }
+    const dragPx = Math.hypot(x - ox, y - oy);
+    const ratio = slingshotStretchRatio(dragPx);
+    if (stretchFillRef.current) {
+      stretchFillRef.current.style.transform = `scaleX(${ratio})`;
+    }
+    if (hintRef.current) {
+      hintRef.current.textContent =
+        ratio < 0.05
+          ? "Loslassen zum Werfen"
+          : `${Math.round(ratio * 100)}% Kraft`;
+    }
+    const ghost = cursorElRef.current;
+    if (ghost) {
+      ghost.style.left = `${x}px`;
+      ghost.style.top = `${y}px`;
+    }
+  }, []);
+
+  const finishAim = useCallback(
+    (clientX: number, clientY: number) => {
       if (!placement) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const { dropNx, dropNy } = clientToDropNorm(e.clientX, e.clientY);
-      confirmDiceDropPlacement({ dropNx, dropNy });
+      const aspect =
+        window.innerWidth / Math.max(1, window.innerHeight);
+      const throwParams = computeSlingshotThrow(
+        originRef.current.x,
+        originRef.current.y,
+        clientX,
+        clientY,
+        aspect,
+      );
+      const { dropNx, dropNy } = clientToDropNorm(
+        originRef.current.x,
+        originRef.current.y,
+      );
+      confirmDiceDropPlacement({
+        dropNx,
+        dropNy,
+        ...throwParams,
+      });
+      aimingRef.current = false;
     },
     [placement],
+  );
+
+  const handlePlacementPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!placement || e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      aimingRef.current = true;
+      originRef.current = { x: e.clientX, y: e.clientY };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const originEl = originIconRef.current;
+      if (originEl) {
+        originEl.style.left = `${e.clientX}px`;
+        originEl.style.top = `${e.clientY}px`;
+        originEl.style.opacity = "1";
+      }
+      updateAimVisual(e.clientX, e.clientY);
+    },
+    [placement, updateAimVisual],
+  );
+
+  const handlePlacementPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!placement || !aimingRef.current) return;
+      e.preventDefault();
+      updateAimVisual(e.clientX, e.clientY);
+    },
+    [placement, updateAimVisual],
+  );
+
+  const handlePlacementPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!placement || !aimingRef.current) return;
+      e.preventDefault();
+      finishAim(e.clientX, e.clientY);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [placement, finishAim],
   );
 
   useEffect(() => {
@@ -165,6 +293,7 @@ export function DiceRollOverlay({ logs }: Props) {
       if (faces.length === 0) continue;
       seenRef.current.add(entry.id);
       const { dropNx, dropNy } = readDropNorm(meta as Record<string, unknown>);
+      const throwMeta = readThrowMeta(meta as Record<string, unknown>);
       const { x: aimX, z: aimZ } = dropNormToTablePoint(dropNx, dropNy, aspect);
       fresh.push({
         sourceId: entry.id,
@@ -178,6 +307,7 @@ export function DiceRollOverlay({ logs }: Props) {
         dropNy,
         aimX,
         aimZ,
+        ...throwMeta,
       });
     }
     if (fresh.length > 0) {
@@ -255,27 +385,68 @@ export function DiceRollOverlay({ logs }: Props) {
     <>
       {placement ? (
         <div
-          className="fixed inset-0 z-[70] cursor-none"
+          className="fixed inset-0 z-[70] cursor-none touch-none"
           style={{ background: "transparent" }}
-          onPointerDown={handlePlacementPointer}
+          onPointerDown={handlePlacementPointerDown}
+          onPointerMove={handlePlacementPointerMove}
+          onPointerUp={handlePlacementPointerUp}
+          onPointerCancel={handlePlacementPointerUp}
           role="presentation"
         >
+          <svg
+            className="pointer-events-none fixed inset-0 z-[70] h-full w-full"
+            aria-hidden
+          >
+            <line
+              ref={bandLineRef}
+              x1={0}
+              y1={0}
+              x2={0}
+              y2={0}
+              stroke="#cab926"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeDasharray="6 4"
+              opacity={0.85}
+            />
+          </svg>
+
+          <div
+            ref={originIconRef}
+            className="pointer-events-none fixed z-[71] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 opacity-0"
+            style={{ willChange: "left, top, opacity" }}
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border-2 border-hero-vibrant bg-background-card/95 text-accent-gold shadow-lg ring-2 ring-hero-vibrant/30">
+              <Dices className="h-7 w-7" strokeWidth={2.25} />
+            </div>
+          </div>
+
           <div
             ref={cursorElRef}
             className="pointer-events-none fixed z-[71] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
             style={{
               left: "50%",
               top: "42%",
-              willChange: "left, top",
+              willChange: "left, top, transform",
             }}
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-hero-border bg-background-card/90 text-accent-gold shadow-lg">
-              <Dices className="h-7 w-7" strokeWidth={2.25} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-hero-border/80 bg-background-card/75 text-accent-gold/90 shadow-md">
+              <Dices className="h-6 w-6" strokeWidth={2} />
             </div>
-            <span className="font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold drop-shadow">
+            <div className="h-1 w-16 overflow-hidden rounded-full bg-background-dark/80">
+              <div
+                ref={stretchFillRef}
+                className="h-full w-full origin-left bg-accent-gold/80"
+                style={{ transform: "scaleX(0)" }}
+              />
+            </div>
+            <span
+              ref={hintRef}
+              className="font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold drop-shadow"
+            >
               {placement.count > 1
-                ? `${placement.count}×W${placement.sides} · Klick zum Ablegen`
-                : `W${placement.sides} · Klick zum Ablegen`}
+                ? `${placement.count}×W${placement.sides} · Halten & ziehen`
+                : `W${placement.sides} · Halten & ziehen`}
             </span>
           </div>
         </div>
@@ -302,6 +473,10 @@ export function DiceRollOverlay({ logs }: Props) {
                   startAt={active.startAt}
                   aimX={active.aimX}
                   aimZ={active.aimZ}
+                  throwDirX={active.throwDirX}
+                  throwDirZ={active.throwDirZ}
+                  throwStrength={active.throwStrength}
+                  isTap={active.isTap}
                   onSettled={handleAllSettled}
                   resultLabel={active.resultLabel}
                   showResult={showResult}

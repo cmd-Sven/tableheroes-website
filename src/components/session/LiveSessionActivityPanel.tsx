@@ -221,6 +221,10 @@ export function LiveSessionActivityPanel({
       try {
         let dropNx: number | undefined;
         let dropNy: number | undefined;
+        let throwDirX: number | undefined;
+        let throwDirZ: number | undefined;
+        let throwStrength: number | undefined;
+        let isTap: boolean | undefined;
         try {
           const drop = await requestDiceDropPlacement({
             sides: input.sides,
@@ -228,6 +232,10 @@ export function LiveSessionActivityPanel({
           });
           dropNx = drop.dropNx;
           dropNy = drop.dropNy;
+          throwDirX = drop.throwDirX;
+          throwDirZ = drop.throwDirZ;
+          throwStrength = drop.throwStrength;
+          isTap = drop.isTap;
         } catch {
           // Escape / abgebrochen — kein Wurf
           return;
@@ -239,6 +247,10 @@ export function LiveSessionActivityPanel({
           ...input,
           dropNx,
           dropNy,
+          throwDirX,
+          throwDirZ,
+          throwStrength,
+          isTap,
         });
         onActivityPosted?.(entry);
         // Crit/Fumble-FX + Sprechblase erst nach 3D-Animation (LiveSessionBoard).

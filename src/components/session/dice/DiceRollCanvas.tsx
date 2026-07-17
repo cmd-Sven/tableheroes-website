@@ -13,6 +13,10 @@ type Props = {
   startAt: number;
   aimX: number;
   aimZ: number;
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
   onSettled: () => void;
   resultLabel?: string | null;
   showResult?: boolean;
@@ -53,6 +57,10 @@ export default function DiceRollCanvas({
   startAt,
   aimX,
   aimZ,
+  throwDirX,
+  throwDirZ,
+  throwStrength,
+  isTap,
   onSettled,
   resultLabel,
   showResult,
@@ -79,6 +87,10 @@ export default function DiceRollCanvas({
         startAt={startAt}
         aimX={aimX}
         aimZ={aimZ}
+        throwDirX={throwDirX}
+        throwDirZ={throwDirZ}
+        throwStrength={throwStrength}
+        isTap={isTap}
         onAllSettled={onSettled}
         resultLabel={resultLabel}
         showResult={showResult}

@@ -7,6 +7,13 @@ export type DiceDropPoint = {
   dropNx: number;
   /** Viewport-normalisiert 0…1 (oben→unten). */
   dropNy: number;
+  /** Einheitsvektor Wurf-Richtung (Tisch XZ), entgegen Drag. */
+  throwDirX?: number;
+  throwDirZ?: number;
+  /** 0…1 Impuls-Stärke. */
+  throwStrength?: number;
+  /** Kurzer Tap ohne Zug → Default-Wurf. */
+  isTap?: boolean;
 };
 
 export type DicePlacementRequest = {

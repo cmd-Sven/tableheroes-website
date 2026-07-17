@@ -141,6 +141,10 @@ type DiceSceneProps = {
   startAt: number;
   aimX: number;
   aimZ: number;
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
   onAllSettled: () => void;
   resultLabel?: string | null;
   showResult?: boolean;
@@ -153,6 +157,10 @@ export function DiceRollScene({
   startAt,
   aimX,
   aimZ,
+  throwDirX,
+  throwDirZ,
+  throwStrength,
+  isTap,
   onAllSettled,
   resultLabel,
   showResult = false,
@@ -162,8 +170,19 @@ export function DiceRollScene({
   const expected = faces.length;
 
   const trajectories = useMemo(
-    () => buildDiceTrajectories({ sides, faces, seed, aimX, aimZ }),
-    [sides, faces, seed, aimX, aimZ],
+    () =>
+      buildDiceTrajectories({
+        sides,
+        faces,
+        seed,
+        aimX,
+        aimZ,
+        throwDirX,
+        throwDirZ,
+        throwStrength,
+        isTap,
+      }),
+    [sides, faces, seed, aimX, aimZ, throwDirX, throwDirZ, throwStrength, isTap],
   );
 
   const handleSettled = useCallback(

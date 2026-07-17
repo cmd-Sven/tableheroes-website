@@ -5,6 +5,7 @@ import {
   faceValueMostAligned,
   quaternionForFaceUp,
 } from "@/src/lib/session/dice-3d-math";
+import { slingshotSpeedFromStrength } from "@/src/lib/session/dice-slingshot";
 
 export const DICE_PHYSICS_DURATION_MS = 3000;
 /** Ab hier: nur Positions-Feinplatzierung (Orientierung endet bereits korrekt). */
@@ -199,6 +200,10 @@ export function buildDiceTrajectories(opts: {
   seed: string;
   aimX?: number;
   aimZ?: number;
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
 }): DieKeyframe[][] {
   const { sides, faces, seed } = opts;
   const count = faces.length;
@@ -206,6 +211,18 @@ export function buildDiceTrajectories(opts: {
 
   const aimX = Number.isFinite(opts.aimX) ? (opts.aimX as number) : 0;
   const aimZ = Number.isFinite(opts.aimZ) ? (opts.aimZ as number) : 0;
+  const throwStrength =
+    typeof opts.throwStrength === "number" && Number.isFinite(opts.throwStrength)
+      ? Math.min(1, Math.max(0, opts.throwStrength))
+      : undefined;
+  const isTap = opts.isTap === true;
+  const hasSlingshotDir =
+    !isTap &&
+    typeof opts.throwDirX === "number" &&
+    typeof opts.throwDirZ === "number" &&
+    Number.isFinite(opts.throwDirX) &&
+    Number.isFinite(opts.throwDirZ) &&
+    Math.hypot(opts.throwDirX, opts.throwDirZ) > 1e-4;
 
   const dice: DieSim[] = faces.map((face, index) => {
     const rng = createSeededRng(`${seed}:traj:${index}`);
@@ -225,22 +242,32 @@ export function buildDiceTrajectories(opts: {
     void r(); // u8 — RNG-Stream stabil halten
 
     const dirAngle = u1 * Math.PI * 2;
-    const dirX = Math.cos(dirAngle);
-    const dirZ = Math.sin(dirAngle);
+    let dirX = Math.cos(dirAngle);
+    let dirZ = Math.sin(dirAngle);
+
+    if (hasSlingshotDir) {
+      const len = Math.hypot(opts.throwDirX!, opts.throwDirZ!);
+      dirX = opts.throwDirX! / len;
+      dirZ = opts.throwDirZ! / len;
+    }
+
     // Breiterer Spawn-Spread → weniger Start-Überlappung bei Multi-Dice
+    const perpX = -dirZ;
+    const perpZ = dirX;
     const spawnSpread = Math.max(
       radius * 2.55,
       Math.min(0.85, 1.35 / Math.max(1, count)),
     );
     const spawnSide = (index - (count - 1) / 2) * spawnSpread;
 
-    const x =
-      aimX + dirX * 0.04 + Math.cos(dirAngle + Math.PI / 2) * spawnSide;
-    const z =
-      aimZ + dirZ * 0.04 + Math.sin(dirAngle + Math.PI / 2) * spawnSide;
+    const x = aimX + dirX * 0.04 + perpX * spawnSide;
+    const z = aimZ + dirZ * 0.04 + perpZ * spawnSide;
 
-    // Sichtbarer Travel vom Drop-Punkt, ohne Eis-Rutschen
-    const speed = 2.55 + u3 * 2.85 + (count > 1 ? 0.18 * index : 0);
+    const useSlingshotImpulse = hasSlingshotDir || isTap || throwStrength !== undefined;
+    const speed = useSlingshotImpulse
+      ? slingshotSpeedFromStrength(throwStrength, isTap, u3 - 0.5) +
+        (count > 1 ? 0.18 * index : 0)
+      : 2.55 + u3 * 2.85 + (count > 1 ? 0.18 * index : 0);
     const vx = dirX * speed + (u4 - 0.5) * 0.7;
     const vz = dirZ * speed + (u5 - 0.5) * 0.7;
 
@@ -433,6 +460,10 @@ export function buildDieTrajectory(opts: {
   count: number;
   aimX?: number;
   aimZ?: number;
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
 }): DieKeyframe[] {
   const faces = Array.from({ length: Math.max(1, opts.count) }, (_, i) =>
     i === opts.index ? opts.face : 1,
@@ -443,6 +474,10 @@ export function buildDieTrajectory(opts: {
     seed: opts.seed,
     aimX: opts.aimX,
     aimZ: opts.aimZ,
+    throwDirX: opts.throwDirX,
+    throwDirZ: opts.throwDirZ,
+    throwStrength: opts.throwStrength,
+    isTap: opts.isTap,
   });
   return all[opts.index] ?? all[0] ?? [];
 }

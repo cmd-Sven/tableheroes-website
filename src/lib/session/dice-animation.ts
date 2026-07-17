@@ -29,6 +29,11 @@ export type DiceRollAnimMeta = {
   /** Initiator-Drop: Viewport-Norm 0…1 (Sync für alle Clients). */
   dropNx?: number;
   dropNy?: number;
+  /** Slingshot-Wurf (Tisch XZ), Sync für alle Clients. */
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
 };
 
 export function dispatchDiceAnimComplete(sourceId: string): void {

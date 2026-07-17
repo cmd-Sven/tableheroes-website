@@ -40,6 +40,11 @@ export type RequestLiveDiceRollInput = {
   /** Initiator-Drop-Punkt (Viewport 0…1) für Sync der 3D-Animation. */
   dropNx?: number;
   dropNy?: number;
+  /** Slingshot-Wurf (Tisch XZ) — Sync für alle Clients. */
+  throwDirX?: number;
+  throwDirZ?: number;
+  throwStrength?: number;
+  isTap?: boolean;
 };
 
 function buildActivityText(
@@ -163,6 +168,22 @@ export async function requestLiveDiceRoll(
   };
   if (dropNx !== undefined) meta.dropNx = dropNx;
   if (dropNy !== undefined) meta.dropNy = dropNy;
+  if (
+    typeof input.throwDirX === "number" &&
+    Number.isFinite(input.throwDirX) &&
+    typeof input.throwDirZ === "number" &&
+    Number.isFinite(input.throwDirZ)
+  ) {
+    meta.throwDirX = input.throwDirX;
+    meta.throwDirZ = input.throwDirZ;
+  }
+  if (
+    typeof input.throwStrength === "number" &&
+    Number.isFinite(input.throwStrength)
+  ) {
+    meta.throwStrength = Math.min(1, Math.max(0, input.throwStrength));
+  }
+  if (input.isTap === true) meta.isTap = true;
 
   if (input.kind === "attack") {
     meta.pending = true;
