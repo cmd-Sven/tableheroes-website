@@ -43,6 +43,8 @@ const ROLL_RADIUS_FACTOR = 0.72;
  */
 const LIVE_SEPARATION_SCALE = 1.32;
 const REST_SEPARATION_SCALE = 1.5;
+/** Ab t≥0.65: progressive Slerp von Physik-Tumble → targetQ (letzte 35 %). */
+const BLEND_START_T = 0.65;
 const _tmpQuat = new THREE.Quaternion();
 const _gravQuat = new THREE.Quaternion();
 const _outQuat = new THREE.Quaternion();
@@ -463,14 +465,27 @@ export function buildDiceTrajectories(opts: {
   }
 
   const totalSec = physicsEnd + SETTLE_LERP_SEC;
+  const safeTotalSec = Math.max(1e-6, totalSec);
+  const blendDuration = 1 - BLEND_START_T;
   const durationMs = Math.min(
     DICE_PHYSICS_MAX_MS,
-    Math.max(DICE_PHYSICS_MIN_MS, Math.round(totalSec * 1000)),
+    Math.max(DICE_PHYSICS_MIN_MS, Math.round(safeTotalSec * 1000)),
   );
 
   for (const d of dice) {
     for (const f of d.frames) {
-      f.t = f.t / totalSec;
+      f.t = f.t / safeTotalSec;
+    }
+    for (const f of d.frames) {
+      if (f.t < BLEND_START_T) continue;
+      const blendAlpha = Math.min(1, (f.t - BLEND_START_T) / blendDuration);
+      const eased = easeOutCubic(blendAlpha);
+      _tmpQuat.set(f.qx, f.qy, f.qz, f.qw);
+      _outQuat.copy(_tmpQuat).slerp(d.targetQ, eased);
+      f.qx = _outQuat.x;
+      f.qy = _outQuat.y;
+      f.qz = _outQuat.z;
+      f.qw = _outQuat.w;
     }
     const last = d.frames[d.frames.length - 1]!;
     last.t = 1;
