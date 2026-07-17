@@ -49,6 +49,7 @@ import {
   Shield,
   Skull,
   Handshake,
+  Hand,
   Minus,
   StickyNote,
 } from "lucide-react";
@@ -87,6 +88,10 @@ import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/
 import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
 import {
+  LiveSessionHandRaiseQueue,
+  LiveSessionUrgentHandBanner,
+} from "@/src/components/session/LiveSessionHandRaiseUI";
+import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
 } from "@/src/lib/session/avatar-roll-fx";
@@ -94,6 +99,11 @@ import {
   dispatchAvatarSpeechBubble,
   speechBubbleFromActivityEntry,
 } from "@/src/lib/session/avatar-speech-bubble";
+import {
+  dismissSessionHand,
+  normalizeHandRaises,
+  type SessionHandRaise,
+} from "@/src/lib/actions/session-hand-raise-actions";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
@@ -171,6 +181,7 @@ type LiveState = {
   physically_present_user_ids?: string[] | null;
   scribe_id: string | null;
   system_logs?: SystemLogEntry[] | null;
+  hand_raises?: SessionHandRaise[] | null;
   visible_npc_ids: string[] | null;
   visible_faction_ids?: string[] | null;
   visible_creature_ids?: string[] | null;
@@ -270,6 +281,7 @@ function normalizeLiveRow(row: unknown): LiveState {
     physically_present_user_ids: normalizePhysicallyPresentUserIds(
       r.physically_present_user_ids,
     ),
+    hand_raises: normalizeHandRaises(r.hand_raises),
     dummy_player_count: Math.min(
       3,
       Math.max(0, Math.round(Number(r.dummy_player_count ?? 0)) || 0),
@@ -1604,6 +1616,9 @@ export function LiveSessionBoard({
     !forcePlayerView &&
     (isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId));
   const systemLogs = liveState?.system_logs ?? [];
+  const handRaises = liveState?.hand_raises ?? [];
+  const urgentHandRaise =
+    isGM && !forcePlayerView ? handRaises.find((r) => r.urgent) ?? null : null;
   const prevSystemLogCountRef = useRef(systemLogs.length);
   const prevRollFxLogCountRef = useRef(systemLogs.length);
 
@@ -4053,6 +4068,12 @@ export function LiveSessionBoard({
                     activeCombatParticipant?.type === "player" &&
                     activeCombatParticipant.name === pc.name &&
                     !pc.isSessionDummy;
+                  const handRaise =
+                    handRaises.find(
+                      (r) =>
+                        (pid && r.userId === pid) ||
+                        (r.characterId != null && r.characterId === pc.id),
+                    ) ?? null;
                   return (
                     <motion.div
                       key={pc.id}
@@ -4105,6 +4126,21 @@ export function LiveSessionBoard({
                             showDnd5eSheet={showDnd5eSheet}
                           />
                         </div>
+                        {handRaise ? (
+                          <span
+                            title={handRaise.urgent ? "Dringend gemeldet" : "Meldet sich"}
+                            className={`absolute left-1/2 top-4 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border px-2 py-1 shadow-lg ${
+                              handRaise.urgent
+                                ? "border-accent-gold bg-accent-blood/90 text-accent-gold"
+                                : "border-hero-vibrant bg-background-dark/90 text-hero-vibrant"
+                            }`}
+                          >
+                            <Hand className="h-4 w-4" />
+                            {handRaise.urgent ? (
+                              <span className="font-barlow text-[10px] font-bold">!</span>
+                            ) : null}
+                          </span>
+                        ) : null}
                         {isScribe && (
                           <span
                             title="Chronist"
@@ -4378,7 +4414,75 @@ export function LiveSessionBoard({
               return next;
             });
           }}
+          handRaises={handRaises}
+          currentUserId={userId}
+          onHandRaisesChanged={(next) => {
+            if (next === "refresh") {
+              void refreshLiveState();
+              return;
+            }
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const updated = {
+                ...prev,
+                hand_raises: next,
+              };
+              liveStateRef.current = updated;
+              return updated;
+            });
+          }}
         />
+      ) : null}
+
+      {isGM && !forcePlayerView ? (
+        <>
+          <LiveSessionHandRaiseQueue
+            raises={handRaises}
+            pending={isUpdating}
+            onDismiss={(raiseId) => {
+              startTransition(async () => {
+                try {
+                  await dismissSessionHand(sessionId, raiseId);
+                  setLiveState((prev) => {
+                    if (!prev) return prev;
+                    const next = {
+                      ...prev,
+                      hand_raises: (prev.hand_raises ?? []).filter((r) => r.id !== raiseId),
+                    };
+                    liveStateRef.current = next;
+                    return next;
+                  });
+                } catch (err) {
+                  console.error("[LiveSessionBoard] dismissSessionHand", err);
+                  alert(err instanceof Error ? err.message : "Meldung konnte nicht entfernt werden.");
+                }
+              });
+            }}
+          />
+          <LiveSessionUrgentHandBanner
+            raise={urgentHandRaise}
+            pending={isUpdating}
+            onDismiss={(raiseId) => {
+              startTransition(async () => {
+                try {
+                  await dismissSessionHand(sessionId, raiseId);
+                  setLiveState((prev) => {
+                    if (!prev) return prev;
+                    const next = {
+                      ...prev,
+                      hand_raises: (prev.hand_raises ?? []).filter((r) => r.id !== raiseId),
+                    };
+                    liveStateRef.current = next;
+                    return next;
+                  });
+                } catch (err) {
+                  console.error("[LiveSessionBoard] dismissSessionHand urgent", err);
+                  alert(err instanceof Error ? err.message : "Meldung konnte nicht entfernt werden.");
+                }
+              });
+            }}
+          />
+        </>
       ) : null}
 
       <button

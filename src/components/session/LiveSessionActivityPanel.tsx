@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Dices, Eraser, MessageSquare, Send, Swords, Trash2, X } from "lucide-react";
+import { AlertTriangle, Dices, Eraser, Hand, MessageSquare, Send, Swords, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   appendSessionActivity,
@@ -10,6 +10,11 @@ import {
   resolveCombatRequest,
   type SessionActivityEntry,
 } from "@/src/lib/actions/session-activity-actions";
+import {
+  lowerSessionHand,
+  raiseSessionHand,
+  type SessionHandRaise,
+} from "@/src/lib/actions/session-hand-raise-actions";
 import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
 import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
@@ -58,6 +63,10 @@ type Props = {
   onActivityPosted?: (entry: SessionActivityEntry) => void;
   onActivityCleared?: () => void;
   onActivityDeleted?: (entryId: string) => void;
+  /** Aktive Meldungen (für eigenen Status + Badge). */
+  handRaises?: SessionHandRaise[];
+  currentUserId?: string | null;
+  onHandRaisesChanged?: (raises: SessionHandRaise[] | "refresh") => void;
 };
 
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
@@ -77,6 +86,9 @@ export function LiveSessionActivityPanel({
   onActivityPosted,
   onActivityCleared,
   onActivityDeleted,
+  handRaises = [],
+  currentUserId = null,
+  onHandRaisesChanged,
 }: Props) {
   const [input, setInput] = useState("");
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
@@ -85,6 +97,11 @@ export function LiveSessionActivityPanel({
   const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const myHandRaise = useMemo(
+    () => (currentUserId ? handRaises.find((r) => r.userId === currentUserId) ?? null : null),
+    [handRaises, currentUserId],
+  );
 
   const activityLogs = useMemo(
     () =>
@@ -191,6 +208,53 @@ export function LiveSessionActivityPanel({
         onActivityDeleted?.(entryId);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Nachricht konnte nicht gelöscht werden.");
+      }
+    });
+  }
+
+  function handleRaiseHand(urgent: boolean) {
+    if (!currentCharacter && !isGM) {
+      toast.error("Kein Charakter ausgewählt.");
+      return;
+    }
+    const name = currentCharacter?.name ?? "Spielleiter";
+    startTransition(async () => {
+      try {
+        const entry = await raiseSessionHand({
+          sessionId,
+          urgent,
+          displayName: name,
+          characterId: currentCharacter?.id,
+        });
+        onHandRaisesChanged?.([
+          ...handRaises.filter((r) => r.userId !== entry.userId),
+          entry,
+        ].sort((a, b) => a.at.localeCompare(b.at)));
+        if (currentCharacter?.id) {
+          dispatchAvatarSpeechBubble({
+            characterId: currentCharacter.id,
+            kind: "chat",
+            text: urgent ? "✋ Dringend!" : "✋ Meldet sich",
+            sourceId: `hand-${entry.id}`,
+          });
+        }
+        toast.success(urgent ? "Dringend gemeldet." : "Hand gehoben.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Meldung fehlgeschlagen.");
+      }
+    });
+  }
+
+  function handleLowerHand() {
+    startTransition(async () => {
+      try {
+        await lowerSessionHand(sessionId);
+        onHandRaisesChanged?.(
+          currentUserId ? handRaises.filter((r) => r.userId !== currentUserId) : handRaises,
+        );
+        toast.success("Meldung zurückgenommen.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Zurücknehmen fehlgeschlagen.");
       }
     });
   }
@@ -323,6 +387,12 @@ export function LiveSessionActivityPanel({
       >
         <MessageSquare className="mx-auto mb-1 h-4 w-4" />
         {open ? "Chat zu" : "Chat"}
+        {handRaises.length > 0 ? (
+          <span className="mt-1 flex items-center justify-center gap-0.5 font-barlow text-[9px] text-accent-gold">
+            <Hand className="h-3 w-3" />
+            {handRaises.length}
+          </span>
+        ) : null}
       </button>
 
       {open ? (
@@ -561,6 +631,48 @@ export function LiveSessionActivityPanel({
               Angriff würfeln
               {primaryAttack ? ` (${formatSigned(primaryAttack.attackBonus)})` : ""}
             </button>
+
+            <div className="flex gap-1">
+              {myHandRaise ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={handleLowerHand}
+                  className={`flex flex-1 items-center justify-center gap-1 rounded border px-2 py-1.5 font-barlow text-[10px] font-bold uppercase disabled:opacity-40 ${
+                    myHandRaise.urgent
+                      ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                      : "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
+                  }`}
+                >
+                  <Hand className="h-3.5 w-3.5" />
+                  Zurücknehmen
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={pending || (!currentCharacter && !isGM)}
+                    onClick={() => handleRaiseHand(false)}
+                    title="Hand heben"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-hero-border/60 bg-hero-dark/50 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-200 hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40"
+                  >
+                    <Hand className="h-3.5 w-3.5" />
+                    Melden
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending || (!currentCharacter && !isGM)}
+                    onClick={() => handleRaiseHand(true)}
+                    title="Dringend melden"
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-accent-blood/60 bg-accent-blood/15 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-blood/25 disabled:opacity-40"
+                  >
+                    <Hand className="h-3.5 w-3.5" />
+                    <AlertTriangle className="h-3 w-3" />
+                    Dringend
+                  </button>
+                </>
+              )}
+            </div>
 
             <form onSubmit={handleSubmit} className="flex gap-1">
               <input
