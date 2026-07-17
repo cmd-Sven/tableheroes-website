@@ -2,25 +2,25 @@ import * as THREE from "three";
 import { createSeededRng } from "@/src/lib/session/dice-roll";
 import { dieScale, quaternionForFaceUp } from "@/src/lib/session/dice-3d-math";
 
-export const DICE_PHYSICS_DURATION_MS = 2800;
-/** Ab hier: weiche Orientierungs-Settle-Phase (kein Zucken). */
-export const DICE_SETTLE_START = 0.72;
+export const DICE_PHYSICS_DURATION_MS = 3000;
+/** Ab hier: nur Positions-Feinplatzierung (Orientierung endet bereits korrekt). */
+export const DICE_SETTLE_START = 0.84;
 
 const TABLE_Y = 0;
 /** Pro-Frame Velocity-Damping (XZ). */
 const PLANE_FRICTION = 0.978;
-const SPIN_DAMP = 0.988;
 const WALL_RESTITUTION = 0.38;
 const COLLISION_RESTITUTION = 0.42;
 /** Baumgarte: nur Teil der Penetration korrigieren → kein Oscillation. */
 const BAUMGARTE = 0.18;
 const PENETRATION_SLOP = 0.012;
 const SLEEP_SPEED = 0.12;
-const SLEEP_SPIN = 0.35;
-const SIM_STEPS = 140;
+const SIM_STEPS = 150;
 const BOUND = 3.5;
+/** Geplanter Tumble ist bis hier auf 0 (weiches Ausrollen). */
+const TUMBLE_END_T = 0.94;
 const _tmpQuat = new THREE.Quaternion();
-const _blendQuat = new THREE.Quaternion();
+const _outQuat = new THREE.Quaternion();
 
 export type DieKeyframe = {
   t: number;
@@ -41,11 +41,11 @@ type DieSim = {
   radius: number;
   half: number;
   spinAxis: THREE.Vector3;
-  spinSpeed: number;
-  angle: number;
+  /** Start-Tumble (rad); Ease → 0 endet exakt auf targetQ. */
+  angle0: number;
+  /** Extra-Tumble durch Kollisionen (dämpft separat). */
+  bumpAngle: number;
   tumbleQ: THREE.Quaternion;
-  /** Quaternion am Beginn der Settle-Phase (frozen tumble). */
-  settleFromQ: THREE.Quaternion;
   targetQ: THREE.Quaternion;
   resting: boolean;
   restX: number;
@@ -56,6 +56,11 @@ type DieSim = {
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+/** Ease-out: schneller Start, weiches Landen (kein Turbo am Ende). */
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -78,8 +83,45 @@ function clampToBounds(d: DieSim): void {
 }
 
 /**
+ * Sichtbarer Tumble: von Anfang an auf 0 geplant + kleine Kollisions-Bumps.
+ * Bei t≥TUMBLE_END_T → Orientierung exakt targetQ (kein Slerp-Snap).
+ */
+function displayAngle(d: DieSim, t: number): number {
+  const u = smoothstep(0, TUMBLE_END_T, t);
+  const planned = d.angle0 * (1 - easeOutCubic(u));
+  const bumpFade = 1 - smoothstep(0.45, TUMBLE_END_T, t);
+  return planned + d.bumpAngle * bumpFade;
+}
+
+function writeOrientation(d: DieSim, t: number): {
+  qx: number;
+  qy: number;
+  qz: number;
+  qw: number;
+} {
+  const ang = displayAngle(d, t);
+  if (ang < 1e-5) {
+    return {
+      qx: d.targetQ.x,
+      qy: d.targetQ.y,
+      qz: d.targetQ.z,
+      qw: d.targetQ.w,
+    };
+  }
+  d.tumbleQ.setFromAxisAngle(d.spinAxis, ang);
+  _outQuat.copy(d.tumbleQ).multiply(d.targetQ);
+  return {
+    qx: _outQuat.x,
+    qy: _outQuat.y,
+    qz: _outQuat.z,
+    qw: _outQuat.w,
+  };
+}
+
+/**
  * Deterministische 2D-Trajektorien (XZ) mit weicher Kollision.
- * Seeded Sync; Endlagen mit Mindestabstand; ruhige Orientierungs-Settle-Phase.
+ * Seeded Sync; Endlagen mit Mindestabstand.
+ * Orientierung: geplanter Tumble × Server-Face — endet ohne späte Korrektur.
  */
 export function buildDiceTrajectories(opts: {
   sides: number;
@@ -110,7 +152,7 @@ export function buildDiceTrajectories(opts: {
     const u5 = r();
     const u6 = r();
     const u7 = r();
-    const u8 = r();
+    void r(); // u8 — RNG-Stream stabil halten
 
     const dirAngle = u1 * Math.PI * 2;
     const dirX = Math.cos(dirAngle);
@@ -130,14 +172,16 @@ export function buildDiceTrajectories(opts: {
     const vx = dirX * speed + (u4 - 0.5) * 0.9;
     const vz = dirZ * speed + (u5 - 0.5) * 0.9;
 
-    // Spin-Achse weitgehend horizontal → sichtbares Drehen von oben, ohne Zucken
+    // Spin-Achse weitgehend horizontal → sichtbares Drehen von oben
     const spinAxis = new THREE.Vector3(
       u4 * 2 - 1,
       0.15 + u2 * 0.25,
       u6 * 2 - 1,
     ).normalize();
-    const spinSpeed = 11 + u7 * 9 + index * 0.7;
-    const angle = u8 * Math.PI * 2;
+
+    // Mehrere volle Umdrehungen, Ease-out auf 0 → landet auf targetQ
+    const turns = 2.6 + u7 * 2.4 + index * 0.12;
+    const angle0 = turns * Math.PI * 2;
 
     return {
       x,
@@ -147,10 +191,9 @@ export function buildDiceTrajectories(opts: {
       radius,
       half,
       spinAxis,
-      spinSpeed,
-      angle,
-      tumbleQ: new THREE.Quaternion().setFromAxisAngle(spinAxis, angle),
-      settleFromQ: new THREE.Quaternion(),
+      angle0,
+      bumpAngle: 0,
+      tumbleQ: new THREE.Quaternion().setFromAxisAngle(spinAxis, angle0),
       targetQ,
       resting: false,
       restX: x,
@@ -171,15 +214,14 @@ export function buildDiceTrajectories(opts: {
     const t = i / SIM_STEPS;
 
     if (i > 0) {
-      // Zeitabhängiges Extra-Damping → weiches Ausrollen
+      // Zeitabhängiges Extra-Damping → weiches Ausrollen (Position)
       const timeDamp = 1 - smoothstep(0.35, 0.78, t) * 0.045;
-      const spinTimeDamp = 1 - smoothstep(0.4, 0.82, t) * 0.06;
 
       for (const d of dice) {
         if (d.resting) {
           d.vx = 0;
           d.vz = 0;
-          d.spinSpeed = 0;
+          d.bumpAngle *= 0.92;
           d.x = d.restX;
           d.z = d.restZ;
           continue;
@@ -187,12 +229,10 @@ export function buildDiceTrajectories(opts: {
 
         d.vx *= PLANE_FRICTION * timeDamp;
         d.vz *= PLANE_FRICTION * timeDamp;
-        d.spinSpeed *= SPIN_DAMP * spinTimeDamp;
+        d.bumpAngle *= 0.975;
 
         d.x += d.vx * dt;
         d.z += d.vz * dt;
-        d.angle += d.spinSpeed * dt;
-        d.tumbleQ.setFromAxisAngle(d.spinAxis, d.angle);
 
         // Weiche Wand-Kollision
         const lim = BOUND - d.radius;
@@ -211,11 +251,10 @@ export function buildDiceTrajectories(opts: {
           if (d.vz < 0) d.vz *= -WALL_RESTITUTION;
         }
 
-        if (speedOf(d) < SLEEP_SPEED && Math.abs(d.spinSpeed) < SLEEP_SPIN && t > 0.4) {
+        if (speedOf(d) < SLEEP_SPEED && t > 0.5) {
           d.resting = true;
           d.vx = 0;
           d.vz = 0;
-          d.spinSpeed = 0;
           d.restX = d.x;
           d.restZ = d.z;
         } else {
@@ -227,14 +266,12 @@ export function buildDiceTrajectories(opts: {
       resolveCollisionsSoft(dice, collRng, dt);
     }
 
-    // Settle-Start: einmal Tumble einfrieren für weiches Slerp → Ziel
+    // Settle: nur Position trennen — Orientierung folgt geplanter Ease-Kurve
     if (!settleCaptured && t >= DICE_SETTLE_START) {
       for (const d of dice) {
-        d.settleFromQ.copy(d.tumbleQ);
         d.resting = true;
         d.vx = 0;
         d.vz = 0;
-        d.spinSpeed = 0;
         d.restX = d.x;
         d.restZ = d.z;
       }
@@ -247,22 +284,7 @@ export function buildDiceTrajectories(opts: {
       : 0;
 
     for (const d of dice) {
-      let qx: number;
-      let qy: number;
-      let qz: number;
-      let qw: number;
-      if (settleU <= 0) {
-        qx = d.tumbleQ.x;
-        qy = d.tumbleQ.y;
-        qz = d.tumbleQ.z;
-        qw = d.tumbleQ.w;
-      } else {
-        _blendQuat.copy(d.settleFromQ).slerp(d.targetQ, settleU);
-        qx = _blendQuat.x;
-        qy = _blendQuat.y;
-        qz = _blendQuat.z;
-        qw = _blendQuat.w;
-      }
+      const { qx, qy, qz, qw } = writeOrientation(d, t);
 
       const px = settleCaptured
         ? THREE.MathUtils.lerp(d.x, d.restX, settleU)
@@ -473,18 +495,16 @@ function resolveCollisionsSoft(
       if (!da.resting) {
         da.vx -= dampJ * nx;
         da.vz -= dampJ * nz;
-        da.spinSpeed *= 0.96;
       }
       if (!db.resting) {
         db.vx += dampJ * nx;
         db.vz += dampJ * nz;
-        db.spinSpeed *= 0.96;
       }
 
-      // Sanfter Spin-Boost ohne Achsen-Zucken
-      const spinBoost = 0.4 + collRng() * 0.8;
-      if (!da.resting) da.spinSpeed += spinBoost;
-      if (!db.resting) db.spinSpeed += spinBoost;
+      // Sanfter Extra-Tumble auf derselben Achse (kein Achsen-Zucken)
+      const tumbleBoost = 0.2 + collRng() * 0.45;
+      if (!da.resting) da.bumpAngle += tumbleBoost;
+      if (!db.resting) db.bumpAngle += tumbleBoost;
     }
   }
 }
