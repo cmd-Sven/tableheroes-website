@@ -1,28 +1,45 @@
 import * as THREE from "three";
 import { createSeededRng } from "@/src/lib/session/dice-roll";
-import { dieScale, quaternionForFaceUp } from "@/src/lib/session/dice-3d-math";
+import {
+  dieScale,
+  faceValueMostAligned,
+  quaternionForFaceUp,
+} from "@/src/lib/session/dice-3d-math";
 
 export const DICE_PHYSICS_DURATION_MS = 3000;
 /** Ab hier: nur Positions-Feinplatzierung (Orientierung endet bereits korrekt). */
 export const DICE_SETTLE_START = 0.84;
 
 const TABLE_Y = 0;
-/** Pro-Frame Velocity-Damping (XZ) — höher = mehr Reibung, weniger „Eis“. */
-const PLANE_FRICTION = 0.928;
-const WALL_RESTITUTION = 0.32;
-const COLLISION_RESTITUTION = 0.38;
+/**
+ * Pro-Frame Velocity-Damping (XZ).
+ * 0.928 war zu aggressiv (Travel starb ~t=0.26 → Spin in place).
+ * 0.978 war zu „eisig“. Mittelweg behält Travel + Roll-Kopplung.
+ */
+const PLANE_FRICTION = 0.958;
+const WALL_RESTITUTION = 0.34;
+const COLLISION_RESTITUTION = 0.4;
 /** Baumgarte: nur Teil der Penetration korrigieren → kein Oscillation. */
-const BAUMGARTE = 0.18;
-const PENETRATION_SLOP = 0.012;
-const SLEEP_SPEED = 0.28;
+const BAUMGARTE = 0.22;
+const PENETRATION_SLOP = 0.01;
+/** Sleep erst bei wirklich langsamer Bewegung — sonst friert Travel zu früh ein. */
+const SLEEP_SPEED = 0.15;
 const SIM_STEPS = 150;
 const BOUND = 3.5;
 /** Geplanter Rest-Tumble ist bis hier auf 0 (weiches Ausrollen). */
-const TUMBLE_END_T = 0.88;
+const TUMBLE_END_T = 0.9;
 /** Roll-Radius-Faktor: ω ≈ v / (radius × ROLL_RADIUS_FACTOR). */
-const ROLL_RADIUS_FACTOR = 0.68;
+const ROLL_RADIUS_FACTOR = 0.72;
+/**
+ * Mindestabstand-Faktor (Zentrum–Zentrum = (r_a+r_b) × scale).
+ * >1 → klarer Gap über dem Durchmesser, Faces von oben lesbar.
+ */
+const LIVE_SEPARATION_SCALE = 1.32;
+const REST_SEPARATION_SCALE = 1.5;
 const _tmpQuat = new THREE.Quaternion();
+const _gravQuat = new THREE.Quaternion();
 const _outQuat = new THREE.Quaternion();
+const _nearestQ = new THREE.Quaternion();
 
 export type DieKeyframe = {
   t: number;
@@ -36,6 +53,7 @@ export type DieKeyframe = {
 };
 
 type DieSim = {
+  sides: number;
   x: number;
   z: number;
   vx: number;
@@ -87,7 +105,9 @@ function speedOf(d: DieSim): number {
   return Math.hypot(d.vx, d.vz);
 }
 
-/** Roll-Achse: n × v (Y-up), leicht geneigt für Sichtbarkeit von oben. */
+/**
+ * Roll-Achse: n × v (Y-up). Fast horizontal → Tisch-Bezug / kein „Schweben“.
+ */
 function rollAxisFromVelocity(
   vx: number,
   vz: number,
@@ -95,7 +115,7 @@ function rollAxisFromVelocity(
 ): boolean {
   const len = Math.hypot(vx, vz);
   if (len < 1e-4) return false;
-  out.set(vz / len, 0.14, -vx / len).normalize();
+  out.set(vz / len, 0.03, -vx / len).normalize();
   return true;
 }
 
@@ -106,8 +126,16 @@ function clampToBounds(d: DieSim): void {
 }
 
 /**
- * Orientierung: Roll (gekoppelt an v) × Rest-Tumble × targetQ.
- * Rest-Tumble dämpft mit Geschwindigkeit → kein Drehen auf der Stelle.
+ * Nächste stabile Face-up-Orientierung (Schwerpunkt / Face-Gravity).
+ */
+function nearestStableFaceUp(sides: number, q: THREE.Quaternion): THREE.Quaternion {
+  const face = faceValueMostAligned(sides, q);
+  return _nearestQ.copy(quaternionForFaceUp(sides, face));
+}
+
+/**
+ * Orientierung: Roll (gekoppelt an v) × Rest-Tumble × targetQ,
+ * plus Face-Gravity zur nächsten flachen Fläche; Roll klingt aus → kein Late-Snap.
  */
 function writeOrientation(d: DieSim, t: number): {
   qx: number;
@@ -118,23 +146,38 @@ function writeOrientation(d: DieSim, t: number): {
   const u = smoothstep(0, TUMBLE_END_T, t);
   const plannedResidual = d.angle0 * (1 - easeOutCubic(u));
 
-  // Kein spürbares Spin-on-the-spot: Rest-Tumble nur bei Bewegung / früher Phase
-  const moveWeight = smoothstep(SLEEP_SPEED * 0.35, SLEEP_SPEED * 2.4, d.lastSpeed);
-  const earlyWeight = 1 - smoothstep(DICE_SETTLE_START - 0.06, DICE_SETTLE_START + 0.04, t);
-  const residualScale = Math.max(moveWeight, earlyWeight * 0.55);
+  // Kein Spin-on-the-spot: Rest-Tumble nur bei Bewegung / früher Phase
+  const moveWeight = smoothstep(SLEEP_SPEED * 0.4, SLEEP_SPEED * 3.2, d.lastSpeed);
+  const earlyWeight = 1 - smoothstep(DICE_SETTLE_START - 0.08, DICE_SETTLE_START + 0.02, t);
+  const residualScale = Math.max(moveWeight, earlyWeight * 0.5);
   const bumpFade =
-    (1 - smoothstep(0.4, TUMBLE_END_T, t)) * moveWeight;
+    (1 - smoothstep(0.35, TUMBLE_END_T, t)) * Math.max(moveWeight, earlyWeight * 0.35);
 
   const tumbleAng = plannedResidual * residualScale + d.bumpAngle * bumpFade;
+
+  // Roll klingt mit Ausrollen aus → Endlage ≈ targetQ (kein harter Last-Frame-Snap)
+  const rollFade = 1 - smoothstep(0.52, TUMBLE_END_T, t);
+  const rollAng = d.rollAngle * rollFade;
 
   _outQuat.copy(d.targetQ);
   if (tumbleAng > 1e-5) {
     d.tumbleQ.setFromAxisAngle(d.spinAxis, tumbleAng);
     _outQuat.premultiply(d.tumbleQ);
   }
-  if (d.rollAngle > 1e-5) {
-    d.rollQ.setFromAxisAngle(d.rollAxis, d.rollAngle);
+  if (rollAng > 1e-5) {
+    d.rollQ.setFromAxisAngle(d.rollAxis, rollAng);
     _outQuat.premultiply(d.rollQ);
+  }
+
+  // Face-Gravity: Schwerpunkt zieht zur nächsten stabilen Face (stärker bei langsamer Bewegung)
+  const gravFromSpeed = 1 - smoothstep(SLEEP_SPEED * 0.6, SLEEP_SPEED * 4.5, d.lastSpeed);
+  const gravFromTime = smoothstep(0.12, 0.72, t);
+  const gravW =
+    gravFromSpeed * gravFromTime * (1 - smoothstep(TUMBLE_END_T - 0.06, TUMBLE_END_T, t));
+  if (gravW > 0.02) {
+    const stable = nearestStableFaceUp(d.sides, _outQuat);
+    _gravQuat.copy(_outQuat).slerp(stable, Math.min(0.72, gravW * 0.85));
+    _outQuat.copy(_gravQuat);
   }
 
   return {
@@ -148,7 +191,7 @@ function writeOrientation(d: DieSim, t: number): {
 /**
  * Deterministische 2D-Trajektorien (XZ) mit weicher Kollision.
  * Seeded Sync; Endlagen mit Mindestabstand.
- * Orientierung: geplanter Tumble × Server-Face — endet ohne späte Korrektur.
+ * Orientierung: Roll × Face-Gravity × Server-Face — endet ohne späte Korrektur.
  */
 export function buildDiceTrajectories(opts: {
   sides: number;
@@ -184,9 +227,10 @@ export function buildDiceTrajectories(opts: {
     const dirAngle = u1 * Math.PI * 2;
     const dirX = Math.cos(dirAngle);
     const dirZ = Math.sin(dirAngle);
+    // Breiterer Spawn-Spread → weniger Start-Überlappung bei Multi-Dice
     const spawnSpread = Math.max(
-      radius * 2.15,
-      Math.min(0.58, 1.05 / Math.max(1, count)),
+      radius * 2.55,
+      Math.min(0.85, 1.35 / Math.max(1, count)),
     );
     const spawnSide = (index - (count - 1) / 2) * spawnSpread;
 
@@ -195,26 +239,28 @@ export function buildDiceTrajectories(opts: {
     const z =
       aimZ + dirZ * 0.04 + Math.sin(dirAngle + Math.PI / 2) * spawnSide;
 
-    const speed = 1.55 + u3 * 2.15 + (count > 1 ? 0.12 * index : 0);
-    const vx = dirX * speed + (u4 - 0.5) * 0.45;
-    const vz = dirZ * speed + (u5 - 0.5) * 0.45;
+    // Sichtbarer Travel vom Drop-Punkt, ohne Eis-Rutschen
+    const speed = 2.55 + u3 * 2.85 + (count > 1 ? 0.18 * index : 0);
+    const vx = dirX * speed + (u4 - 0.5) * 0.7;
+    const vz = dirZ * speed + (u5 - 0.5) * 0.7;
 
     const rollRadius = radius * ROLL_RADIUS_FACTOR;
     const rollAxis = new THREE.Vector3();
     rollAxisFromVelocity(vx, vz, rollAxis);
 
-    // Leichte Zufallsachse nur für Rest-Tumble (Face-Landing)
+    // Rest-Tumble-Achse: weitgehend horizontal (Tisch-Bezug)
     const spinAxis = new THREE.Vector3(
       u4 * 2 - 1,
-      0.12 + u2 * 0.22,
+      0.05 + u2 * 0.1,
       u6 * 2 - 1,
     ).normalize();
 
-    // Kleiner Rest-Tumble — Hauptrotation kommt vom Roll-Integral (ω ≈ v/r)
-    const turns = 0.65 + u7 * 1.05 + index * 0.06;
+    // Rest-Tumble — Hauptrotation vom Roll-Integral (ω ≈ v/r)
+    const turns = 0.85 + u7 * 1.15 + index * 0.07;
     const angle0 = turns * Math.PI * 2;
 
     return {
+      sides,
       x,
       z,
       vx,
@@ -239,7 +285,7 @@ export function buildDiceTrajectories(opts: {
     };
   });
 
-  softSeparate(dice, 12, 1.0);
+  softSeparate(dice, 16, LIVE_SEPARATION_SCALE);
 
   const durationSec = DICE_PHYSICS_DURATION_MS / 1000;
   const dt = durationSec / SIM_STEPS;
@@ -250,15 +296,15 @@ export function buildDiceTrajectories(opts: {
     const t = i / SIM_STEPS;
 
     if (i > 0) {
-      // Früheres, stärkeres Extra-Damping → Translation stoppt vor dem Settle
-      const timeDamp = 1 - smoothstep(0.12, 0.62, t) * 0.12;
+      // Extra-Damping erst später → Travel bleibt sichtbar
+      const timeDamp = 1 - smoothstep(0.28, 0.78, t) * 0.07;
 
       for (const d of dice) {
         if (d.resting) {
           d.vx = 0;
           d.vz = 0;
           d.lastSpeed = 0;
-          d.bumpAngle *= 0.88;
+          d.bumpAngle *= 0.9;
           d.x = d.restX;
           d.z = d.restZ;
           continue;
@@ -266,7 +312,7 @@ export function buildDiceTrajectories(opts: {
 
         d.vx *= PLANE_FRICTION * timeDamp;
         d.vz *= PLANE_FRICTION * timeDamp;
-        d.bumpAngle *= 0.965;
+        d.bumpAngle *= 0.97;
 
         const spd = speedOf(d);
         d.lastSpeed = spd;
@@ -297,7 +343,8 @@ export function buildDiceTrajectories(opts: {
           if (d.vz < 0) d.vz *= -WALL_RESTITUTION;
         }
 
-        if (speedOf(d) < SLEEP_SPEED && t > 0.26) {
+        // Sleep erst nach ausreichend Travel-Zeit
+        if (speedOf(d) < SLEEP_SPEED && t > 0.48) {
           d.resting = true;
           d.vx = 0;
           d.vz = 0;
@@ -311,6 +358,14 @@ export function buildDiceTrajectories(opts: {
       }
 
       resolveCollisionsSoft(dice, collRng, dt);
+      // Laufendes Push-apart (auch ruhende Würfel) → kein Stapeln von oben
+      softSeparate(dice, 3, LIVE_SEPARATION_SCALE);
+      for (const d of dice) {
+        if (d.resting) {
+          d.restX = d.x;
+          d.restZ = d.z;
+        }
+      }
     }
 
     // Settle: nur Position trennen — Orientierung folgt geplanter Ease-Kurve
@@ -323,7 +378,7 @@ export function buildDiceTrajectories(opts: {
         d.restX = d.x;
         d.restZ = d.z;
       }
-      softSeparateRest(dice, 20, 1.06);
+      softSeparateRest(dice, 28, REST_SEPARATION_SCALE);
       settleCaptured = true;
     }
 
@@ -354,7 +409,7 @@ export function buildDiceTrajectories(opts: {
     }
   }
 
-  // Finale Keyframes: exakte Ziel-Orientierung + Rest-Position
+  // Finale Keyframes: exakte Ziel-Orientierung + Rest-Position (bereits nahe targetQ)
   for (const d of dice) {
     const last = d.frames[d.frames.length - 1]!;
     last.qx = d.targetQ.x;
@@ -413,7 +468,7 @@ function softSeparate(dice: DieSim[], iterations: number, scale: number): void {
           continue;
         }
         if (dist >= minDist) continue;
-        const overlap = (minDist - dist) * 0.5 * BAUMGARTE * 2.2;
+        const overlap = (minDist - dist) * 0.5 * BAUMGARTE * 2.4;
         const nx = dx / dist;
         const nz = dz / dist;
         da.x -= nx * overlap;
@@ -454,7 +509,7 @@ function softSeparateRest(
           continue;
         }
         if (dist >= minDist) continue;
-        const overlap = (minDist - dist) * 0.5 * 0.55;
+        const overlap = (minDist - dist) * 0.5 * 0.72;
         const nx = dx / dist;
         const nz = dz / dist;
         da.restX -= nx * overlap;
@@ -491,7 +546,7 @@ function resolveCollisionsSoft(
       const dx = db.x - da.x;
       const dz = db.z - da.z;
       let dist = Math.hypot(dx, dz);
-      const minDist = da.radius + db.radius;
+      const minDist = (da.radius + db.radius) * LIVE_SEPARATION_SCALE;
 
       if (dist < 1e-6) {
         const ang = collRng() * Math.PI * 2;
@@ -550,7 +605,7 @@ function resolveCollisionsSoft(
       }
 
       // Sanfter Extra-Tumble auf derselben Achse (kein Achsen-Zucken)
-      const tumbleBoost = 0.08 + collRng() * 0.18;
+      const tumbleBoost = 0.1 + collRng() * 0.22;
       if (!da.resting) da.bumpAngle += tumbleBoost;
       if (!db.resting) db.bumpAngle += tumbleBoost;
     }
