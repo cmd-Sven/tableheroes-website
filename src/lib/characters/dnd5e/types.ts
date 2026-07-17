@@ -224,4 +224,6 @@ export type CharacterSheetPayload = {
   sheetLocale: CharacterSheetLocale;
   /** Vom Spieler errungene Achievements (Konto des Charakterbesitzers) */
   achievements?: Dnd5eCharacterAchievement[];
+  /** Makel für Anzeige-/Wurf-Modifikatoren (optional, wenn geladen). */
+  characterFlaws?: Array<{ flawId: string; story: string; grantedNote?: string }>;
 };

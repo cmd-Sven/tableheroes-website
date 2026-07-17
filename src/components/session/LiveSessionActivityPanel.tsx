@@ -40,6 +40,15 @@ import {
   isDiceAnimMeta,
 } from "@/src/lib/session/dice-animation";
 import { isDiceEntryRevealed, useDiceRevealVersion } from "@/src/lib/session/dice-reveal-store";
+import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
+import type { CharacterSheetPayload } from "@/src/lib/characters/dnd5e/types";
+import type { Dnd5eSkillKey } from "@/src/lib/characters/dnd5e/types";
+
+function sheetDerivedForRolls(payload: CharacterSheetPayload) {
+  const base = computeDerivedDnd5eSheet(payload.sheet, payload.level);
+  const flaws = payload.characterFlaws ?? [];
+  return applyFlawModifiersToDerived(base, payload.sheet.combat.speed, flaws).derived;
+}
 
 const ACTIVITY_TYPES = new Set([
   "dice",
@@ -134,7 +143,7 @@ export function LiveSessionActivityPanel({
       getCharacterEquipmentPayload(currentCharacter.id),
     ]).then(([payload, equip]) => {
       if (!payload) return;
-      const derived = computeDerivedDnd5eSheet(payload.sheet, payload.level);
+      const derived = sheetDerivedForRolls(payload);
       const attacks = computeEquippedWeaponAttacks(
         payload.sheet,
         derived,
@@ -144,7 +153,7 @@ export function LiveSessionActivityPanel({
       );
       setPrimaryAttack(attacks[0] ?? null);
       if (selectedSkill) {
-        setSkillBonus(derived.skills[selectedSkill as keyof typeof derived.skills]?.total ?? 0);
+        setSkillBonus(derived.skills[selectedSkill as Dnd5eSkillKey]?.total ?? 0);
       }
       if (selectedSave) {
         setSaveBonus(derived.savingThrows[selectedSave]?.total ?? 0);
@@ -337,6 +346,7 @@ export function LiveSessionActivityPanel({
       modifier: skillBonus,
       mode: rollMode,
       label,
+      skillKey: selectedSkill,
     });
   }
 
@@ -350,6 +360,7 @@ export function LiveSessionActivityPanel({
       modifier: saveBonus,
       mode: rollMode,
       label: `${abilityLabel}-Rettungswurf`,
+      saveAbility: selectedSave,
     });
   }
 
@@ -646,8 +657,8 @@ export function LiveSessionActivityPanel({
                   }
                   void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
                     if (!payload) return;
-                    const derived = computeDerivedDnd5eSheet(payload.sheet, payload.level);
-                    const key = e.target.value as keyof typeof derived.skills;
+                    const derived = sheetDerivedForRolls(payload);
+                    const key = e.target.value as Dnd5eSkillKey;
                     setSkillBonus(derived.skills[key]?.total ?? 0);
                   });
                 }}
@@ -686,7 +697,7 @@ export function LiveSessionActivityPanel({
                   }
                   void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
                     if (!payload) return;
-                    const derived = computeDerivedDnd5eSheet(payload.sheet, payload.level);
+                    const derived = sheetDerivedForRolls(payload);
                     setSaveBonus(derived.savingThrows[key]?.total ?? 0);
                   });
                 }}

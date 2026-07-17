@@ -8,23 +8,36 @@ type Props = {
   faces: number[];
   seed: string;
   startAt: number;
-  onComplete: () => void;
+  onSettled: () => void;
+  resultLabel?: string | null;
+  showResult?: boolean;
 };
 
-export default function DiceRollCanvas({ sides, faces, seed, startAt, onComplete }: Props) {
+export default function DiceRollCanvas({
+  sides,
+  faces,
+  seed,
+  startAt,
+  onSettled,
+  resultLabel,
+  showResult,
+}: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 3.2, 5.2], fov: 42 }}
+      camera={{ position: [0, 4.1, 5.6], fov: 40 }}
       dpr={[1, 1.75]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       style={{ width: "100%", height: "100%", background: "transparent" }}
+      shadows
     >
       <DiceRollScene
         sides={sides}
         faces={faces}
         seed={seed}
         startAt={startAt}
-        onAllSettled={onComplete}
+        onAllSettled={onSettled}
+        resultLabel={resultLabel}
+        showResult={showResult}
       />
     </Canvas>
   );

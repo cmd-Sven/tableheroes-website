@@ -11,8 +11,12 @@ import {
   type DiceRollMode,
 } from "@/src/lib/session/dice-roll";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
+import {
+  resolveLiveDiceSheetModifier,
+  type LiveDiceRollKind,
+} from "@/src/lib/session/resolve-live-dice-modifier";
 
-export type LiveDiceRollKind = "dice" | "attack" | "skill" | "save" | "damage";
+export type { LiveDiceRollKind };
 
 export type RequestLiveDiceRollInput = {
   sessionId: string;
@@ -27,10 +31,14 @@ export type RequestLiveDiceRollInput = {
   weaponName?: string;
   damage?: string | null;
   attackBonus?: number;
-  /** Schaden: kritische Treffer verdoppeln Würfelanzahl (Client übergibt bereits verdoppelt oder flag). */
+  /** Schaden: kritische Treffer verdoppeln Würfelanzahl. */
   critical?: boolean;
   requestId?: string;
   damageFormula?: string;
+  /** Fertigkeits-Key (acr, ath, …) — Server liest Bonus aus dem Bogen. */
+  skillKey?: string;
+  /** Attribut-Key für Rettungswurf — Server liest Bonus aus dem Bogen. */
+  saveAbility?: string;
 };
 
 function buildActivityText(
@@ -46,7 +54,7 @@ function buildActivityText(
 ): { type: string; text: string } {
   if (kind === "attack") {
     const weaponName = extras.weaponName ?? "Waffe";
-    const bonus = extras.attackBonus ?? 0;
+    const bonus = extras.attackBonus ?? outcome.modifier;
     const bonusLabel = bonus !== 0 ? ` (${formatSigned(bonus)})` : "";
     return {
       type: "attack_pending",
@@ -89,6 +97,7 @@ function buildActivityText(
 
 /**
  * Serverseitig deterministisch würfeln (Seed + Faces), dann Activity broadcasten.
+ * Modifikatoren für Fertigkeit/Rettung/Angriff kommen aus dem Charakterbogen (+ Makel).
  * Client animiert auf diese Faces — Endwert kommt nicht vom Client.
  */
 export async function requestLiveDiceRoll(
@@ -102,17 +111,32 @@ export async function requestLiveDiceRoll(
 
   const dice = Math.max(1, Math.min(20, Math.round(input.dice)));
   const sides = Math.max(2, Math.min(100, Math.round(input.sides)));
-  const modifier = Number.isFinite(input.modifier) ? Math.round(input.modifier!) : 0;
   const mode: DiceRollMode = input.mode ?? "normal";
+
+  const sheetMod = await resolveLiveDiceSheetModifier({
+    characterId,
+    kind: input.kind,
+    clientModifier: input.modifier,
+    skillKey: input.skillKey,
+    saveAbility: input.saveAbility,
+    label: input.label,
+    weaponName: input.weaponName,
+  });
+
+  const modifier = sheetMod.modifier;
+  const label = sheetMod.label ?? input.label;
+  const weaponName = sheetMod.weaponName ?? input.weaponName;
+  const attackBonus = sheetMod.attackBonus ?? input.attackBonus ?? modifier;
+  const damage = sheetMod.damage ?? input.damage ?? null;
 
   const seed = randomBytes(16).toString("hex");
   const rng = createSeededRng(seed);
   const outcome = executeDiceRoll({ dice, sides, modifier }, mode, rng, seed);
 
   const { type, text } = buildActivityText(input.kind, characterName, outcome, {
-    label: input.label,
-    weaponName: input.weaponName,
-    attackBonus: input.attackBonus,
+    label,
+    weaponName,
+    attackBonus,
     critical: input.critical,
   });
 
@@ -121,14 +145,18 @@ export async function requestLiveDiceRoll(
     animate: true,
     faces: outcome.faces,
     seed,
-    label: input.label,
+    label,
+    modifier,
+    usedRoll: outcome.usedRoll,
+    total: outcome.total,
+    display: outcome.display,
   };
 
   if (input.kind === "attack") {
     meta.pending = true;
-    meta.weaponName = input.weaponName ?? "Waffe";
-    meta.damage = input.damage ?? null;
-    meta.attackBonus = input.attackBonus ?? 0;
+    meta.weaponName = weaponName ?? "Waffe";
+    meta.damage = damage;
+    meta.attackBonus = attackBonus;
   }
 
   if (input.kind === "damage") {
@@ -136,12 +164,15 @@ export async function requestLiveDiceRoll(
     meta.critical = Boolean(input.critical);
     meta.damageFormula = input.damageFormula;
     meta.label = "Schaden";
-    meta.weaponName = input.weaponName;
+    meta.weaponName = weaponName;
   }
 
-  if ((input.kind === "skill" || input.kind === "save") && input.label) {
-    meta.label = input.label;
+  if ((input.kind === "skill" || input.kind === "save") && label) {
+    meta.label = label;
   }
+
+  if (input.skillKey) meta.skillKey = input.skillKey;
+  if (input.saveAbility) meta.saveAbility = input.saveAbility;
 
   const entry = await appendSessionActivity({
     sessionId: input.sessionId,

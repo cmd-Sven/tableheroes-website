@@ -1,8 +1,10 @@
+import { DICE_PHYSICS_DURATION_MS } from "@/src/lib/session/dice-physics";
+
 /** Dauer der 3D-/Fallback-Animation (ms). */
-export const DICE_ANIMATION_DURATION_MS = 2200;
+export const DICE_ANIMATION_DURATION_MS = DICE_PHYSICS_DURATION_MS;
 
 /** Nach dieser Zeit gilt ein Wurf für Late-Joiner als bereits aufgelöst. */
-export const DICE_ANIMATION_STALE_MS = 5000;
+export const DICE_ANIMATION_STALE_MS = 5500;
 
 export const DICE_ANIM_COMPLETE_EVENT = "th:dice-anim-complete";
 
@@ -18,6 +20,8 @@ export type DiceRollAnimMeta = {
   display?: string;
   formula?: string;
   total?: number;
+  usedRoll?: number;
+  modifier?: number;
   isCritical?: boolean;
   isFumble?: boolean;
   label?: string;
@@ -60,4 +64,22 @@ export function formatPendingDiceChatText(
     (typeof meta.formula === "string" && meta.formula.trim()) ||
     (typeof meta.sides === "number" ? `W${meta.sides}` : "Würfel");
   return `${characterName} würfelt ${label}…`;
+}
+
+/** Overlay nach Landung: Rohwürfel + Mods → Total. */
+export function formatDiceResultLabel(meta: DiceRollAnimMeta): string {
+  if (typeof meta.display === "string" && meta.display.trim()) {
+    return meta.display.trim();
+  }
+  const used =
+    typeof meta.usedRoll === "number"
+      ? meta.usedRoll
+      : Array.isArray(meta.faces)
+        ? meta.faces.reduce((a, b) => a + (Number(b) || 0), 0)
+        : 0;
+  const mod = typeof meta.modifier === "number" ? meta.modifier : 0;
+  const total = typeof meta.total === "number" ? meta.total : used + mod;
+  if (mod === 0) return String(total);
+  const modStr = mod > 0 ? ` + ${mod}` : ` − ${Math.abs(mod)}`;
+  return `${used}${modStr} = ${total}`;
 }

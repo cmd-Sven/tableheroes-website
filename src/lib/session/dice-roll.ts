@@ -13,8 +13,9 @@ export type DiceRollOutcome = {
   modifier: number;
   /** Alle geworfenen Augenzahlen (inkl. VOR/NACH-Zweitwurf). */
   rolls: number[];
-  /** Faces die als 3D-Würfel sichtbar gerollt werden (ohne Advantage-Zweitwürfel wenn dice>1…). */
+  /** Faces die als 3D-Würfel sichtbar gerollt werden. */
   faces: number[];
+  /** Summe der genutzten Würfel (ohne Mod), bei VOR/NACH der gewählte Einzelwurf. */
   usedRoll: number;
   total: number;
   isCritical: boolean;
@@ -38,7 +39,8 @@ export function parseRollCommand(input: string): ParsedRollCommand | null {
     return { dice, sides, modifier: Number.isFinite(modifier) ? modifier : 0 };
   }
 
-  const damageM = trimmed.match(/^(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?$/i);
+  // Schaden: „2d6+3“ / „1d8Feuer+3“ (nach Whitespace-Strip) / „1d8 − 1“
+  const damageM = trimmed.match(/(\d+)d(\d+)(?:[^\d+-]*([+-])\s*(\d+))?/i);
   if (damageM) {
     const dice = Math.max(1, parseInt(damageM[1], 10));
     const sides = Math.max(2, parseInt(damageM[2], 10));
@@ -71,6 +73,39 @@ export function rollOnce(sides: number, rng: () => number = Math.random): number
   return Math.floor(rng() * s) + 1;
 }
 
+function formatModPart(modifier: number): string {
+  if (modifier === 0) return "";
+  return modifier > 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`;
+}
+
+/** Chat-/Overlay-Breakdown: „14 + 3 = 17“ bzw. „[4 + 6] + 2 = 12“. */
+export function formatDiceBreakdown(
+  rolls: number[],
+  usedRoll: number,
+  modifier: number,
+  opts?: { mode?: DiceRollMode; dice?: number },
+): string {
+  const modStr = formatModPart(modifier);
+  const mode = opts?.mode ?? "normal";
+  const dice = opts?.dice ?? rolls.length;
+
+  if (mode === "advantage" || mode === "disadvantage") {
+    const tag = mode === "advantage" ? "VOR" : "NACH";
+    const parts = rolls.map((r) => String(r));
+    const pick = `${usedRoll}${modStr} = ${usedRoll + modifier}`;
+    return `${tag}: [${parts.join(" / ")}] → ${pick}`;
+  }
+
+  if (dice > 1 || rolls.length > 1) {
+    const sum = rolls.reduce((a, b) => a + b, 0);
+    if (modifier === 0) return `[${rolls.join(" + ")}] = ${sum}`;
+    return `[${rolls.join(" + ")}]${modStr} = ${sum + modifier}`;
+  }
+
+  if (modifier === 0) return `${usedRoll}`;
+  return `${usedRoll}${modStr} = ${usedRoll + modifier}`;
+}
+
 export function executeDiceRoll(
   parsed: ParsedRollCommand,
   mode: DiceRollMode = "normal",
@@ -83,22 +118,32 @@ export function executeDiceRoll(
     rolls.push(rollOnce(sides, rng));
   }
 
-  let usedRoll = rolls[0] ?? 0;
+  let usedRoll: number;
+  let faces: number[];
+
   if (mode === "advantage" && dice === 1) {
     const second = rollOnce(sides, rng);
     rolls.push(second);
-    usedRoll = Math.max(rolls[0], second);
+    usedRoll = Math.max(rolls[0]!, second);
+    faces = [...rolls];
   } else if (mode === "disadvantage" && dice === 1) {
     const second = rollOnce(sides, rng);
     rolls.push(second);
-    usedRoll = Math.min(rolls[0], second);
+    usedRoll = Math.min(rolls[0]!, second);
+    faces = [...rolls];
+  } else if (dice > 1) {
+    usedRoll = rolls.reduce((a, b) => a + b, 0);
+    faces = [...rolls];
+  } else {
+    usedRoll = rolls[0] ?? 0;
+    faces = [...rolls];
   }
 
   const total = usedRoll + modifier;
   const isCritical = dice === 1 && sides === 20 && usedRoll === 20;
   const isFumble = dice === 1 && sides === 20 && usedRoll === 1;
 
-  const modStr = modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`;
+  const modStr = formatModPart(modifier);
   const formula =
     mode === "advantage"
       ? `VOR w${sides}${modStr}`
@@ -108,23 +153,14 @@ export function executeDiceRoll(
           ? `${dice}d${sides}${modStr}`
           : `w${sides}${modStr}`;
 
-  let display: string;
-  if (mode === "advantage" || mode === "disadvantage") {
-    const tag = mode === "advantage" ? "VOR" : "NACH";
-    const parts = rolls.map((r) => `${r}${modifier >= 0 ? `+${modifier}` : modifier}`);
-    display = `${tag}: [${parts.join(" / ")}] → ${total}`;
-  } else if (dice > 1) {
-    display = `[${rolls.join(" + ")}]${modStr} = ${total}`;
-  } else {
-    display = `${usedRoll}${modStr} = ${total}`;
-  }
+  const display = formatDiceBreakdown(rolls, usedRoll, modifier, { mode, dice });
 
   return {
     mode,
     sides,
     modifier,
     rolls,
-    faces: [...rolls],
+    faces,
     usedRoll,
     total,
     isCritical,

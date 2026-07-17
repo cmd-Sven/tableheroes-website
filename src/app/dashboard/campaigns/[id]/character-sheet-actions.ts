@@ -26,9 +26,10 @@ import {
 } from "@/src/lib/foundry-sync/progression-lock-server";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
+import { parseCharacterFlaws } from "@/src/lib/characters/character-flaws";
 
 const SHEET_SELECT =
-  "id, campaign_id, user_id, name, class, subclass, race, background, alignment, level, experience_points, sheet_data, sheet_overrides, sheet_source, sheet_synced_at, sheet_locale";
+  "id, campaign_id, user_id, name, class, subclass, race, background, alignment, level, experience_points, sheet_data, sheet_overrides, sheet_source, sheet_synced_at, sheet_locale, character_flaws";
 
 type CharacterRow = {
   id: string;
@@ -47,6 +48,7 @@ type CharacterRow = {
   sheet_source: string | null;
   sheet_synced_at: string | null;
   sheet_locale?: string | null;
+  character_flaws?: unknown;
 };
 
 async function loadCharacterAccess(
@@ -135,6 +137,7 @@ function buildSheetPayload(
     progressionLockMessage,
     sheetLocale: normalizeCharacterSheetLocale(character.sheet_locale),
     achievements,
+    characterFlaws: parseCharacterFlaws(character.character_flaws),
   };
 }
 

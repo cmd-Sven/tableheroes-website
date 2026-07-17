@@ -7,6 +7,7 @@ import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-ac
 import {
   DICE_ANIMATION_DURATION_MS,
   dispatchDiceAnimComplete,
+  formatDiceResultLabel,
   isDiceAnimMeta,
   shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
@@ -17,6 +18,9 @@ const DiceCanvas = dynamic(() => import("./DiceRollCanvas"), {
   loading: () => null,
 });
 
+/** Kurz nach Landung Total anzeigen, bevor Overlay schließt. */
+const RESULT_HOLD_MS = 900;
+
 type ActiveRoll = {
   sourceId: string;
   sides: number;
@@ -24,6 +28,7 @@ type ActiveRoll = {
   seed: string;
   startAt: number;
   use3d: boolean;
+  resultLabel: string;
 };
 
 type Props = {
@@ -51,11 +56,16 @@ export function DiceRollOverlay({ logs }: Props) {
   const finishingRef = useRef<string | null>(null);
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
   const [webgl, setWebgl] = useState(true);
+  const [showResult, setShowResult] = useState(false);
   const active = queue[0] ?? null;
 
   useEffect(() => {
     setWebgl(detectWebGL());
   }, []);
+
+  useEffect(() => {
+    setShowResult(false);
+  }, [active?.sourceId]);
 
   useEffect(() => {
     const now = Date.now();
@@ -81,6 +91,7 @@ export function DiceRollOverlay({ logs }: Props) {
         seed: typeof meta.seed === "string" ? meta.seed : entry.id,
         startAt: performance.now(),
         use3d: webgl && supports3dDice(sides),
+        resultLabel: formatDiceResultLabel(meta),
       });
     }
     if (fresh.length > 0) {
@@ -99,21 +110,30 @@ export function DiceRollOverlay({ logs }: Props) {
     });
   }, []);
 
+  const handleSettled = useCallback(() => {
+    setShowResult(true);
+    window.setTimeout(finishActive, RESULT_HOLD_MS);
+  }, [finishActive]);
+
   useEffect(() => {
     finishingRef.current = null;
   }, [active?.sourceId]);
 
   useEffect(() => {
     if (!active) return;
-    const t = window.setTimeout(finishActive, DICE_ANIMATION_DURATION_MS + 600);
+    const t = window.setTimeout(
+      finishActive,
+      DICE_ANIMATION_DURATION_MS + RESULT_HOLD_MS + 700,
+    );
     return () => window.clearTimeout(t);
   }, [active, finishActive]);
 
   const fallbackLabel = useMemo(() => {
     if (!active) return "";
-    if (active.faces.length === 1) return `W${active.sides} → ${active.faces[0]}`;
-    return `${active.faces.length}×W${active.sides}: ${active.faces.join(", ")}`;
-  }, [active]);
+    if (showResult) return active.resultLabel;
+    if (active.faces.length === 1) return `W${active.sides}`;
+    return `${active.faces.length}×W${active.sides}`;
+  }, [active, showResult]);
 
   return (
     <AnimatePresence>
@@ -128,13 +148,15 @@ export function DiceRollOverlay({ logs }: Props) {
         >
           <div className="absolute inset-0 bg-background-dark/35" />
           {active.use3d ? (
-            <div className="relative h-[min(52vh,420px)] w-[min(92vw,560px)]">
+            <div className="relative h-[min(56vh,460px)] w-[min(94vw,600px)]">
               <DiceCanvas
                 sides={active.sides}
                 faces={active.faces}
                 seed={active.seed}
                 startAt={active.startAt}
-                onComplete={finishActive}
+                onSettled={handleSettled}
+                resultLabel={active.resultLabel}
+                showResult={showResult}
               />
             </div>
           ) : (
@@ -144,15 +166,25 @@ export function DiceRollOverlay({ logs }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: -8 }}
               transition={{ duration: 0.35 }}
+              onAnimationComplete={() => {
+                window.setTimeout(handleSettled, DICE_ANIMATION_DURATION_MS);
+              }}
             >
               <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
-                Würfel rollen…
+                {showResult ? "Ergebnis" : "Würfel rollen…"}
               </p>
               <motion.div
                 className="font-barlow text-5xl font-extrabold text-hero-vibrant"
                 initial={{ rotate: -12, scale: 0.8 }}
-                animate={{ rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }}
-                transition={{ duration: DICE_ANIMATION_DURATION_MS / 1000, ease: "easeOut" }}
+                animate={
+                  showResult
+                    ? { rotate: 0, scale: 1 }
+                    : { rotate: [0, 18, -14, 10, 0], scale: [0.85, 1.08, 1] }
+                }
+                transition={{
+                  duration: showResult ? 0.25 : DICE_ANIMATION_DURATION_MS / 1000,
+                  ease: "easeOut",
+                }}
               >
                 {fallbackLabel}
               </motion.div>
