@@ -18,13 +18,8 @@ function run() {
   const reading = diceReadingDirection(new THREE.Vector3());
   assert.ok(reading.length() > 0.99, "reading direction normalized");
 
-  // Lesrichtung muss zur Kamera zeigen (nicht reines +Y)
-  const toCam = new THREE.Vector3(
-    DICE_CAMERA.position[0],
-    DICE_CAMERA.position[1] - 0.35,
-    DICE_CAMERA.position[2],
-  ).normalize();
-  assert.ok(reading.dot(toCam) > 0.999, "reading matches DICE_CAMERA");
+  // Top-down: Lesrichtung = +Y (Kamera über dem Tisch)
+  assert.ok(reading.dot(new THREE.Vector3(0, 1, 0)) > 0.999, "reading is +Y");
 
   for (const sides of SIDES) {
     for (let face = 1; face <= sides; face++) {
@@ -36,7 +31,6 @@ function run() {
         `W${sides}: target ${face} but most-aligned is ${aligned}`,
       );
 
-      // Ziel-Normal nach Rotation ≈ Lesrichtung
       const world = faceNormal(sides, face, new THREE.Vector3()).applyQuaternion(q);
       assert.ok(
         world.dot(reading) > 0.999,
@@ -45,9 +39,9 @@ function run() {
     }
   }
 
-  // Kamera-Sichtbarkeit: Ergebnis-Face muss dominant sein (besonders d20)
+  // Kamera-Sichtbarkeit von oben
   const camPos = new THREE.Vector3(...DICE_CAMERA.position);
-  const lookAt = new THREE.Vector3(0, 0.35, 0);
+  const lookAt = new THREE.Vector3(...DICE_CAMERA.lookAt);
   const towardCam = lookAt.clone().sub(camPos).normalize().negate();
 
   for (const sides of [6, 20] as const) {

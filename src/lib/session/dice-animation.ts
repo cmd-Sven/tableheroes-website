@@ -1,6 +1,6 @@
 import { DICE_PHYSICS_DURATION_MS } from "@/src/lib/session/dice-physics";
 
-/** Dauer der 3D-/Fallback-Animation (ms). */
+/** Dauer der Top-down-2D-/Fallback-Animation (ms). */
 export const DICE_ANIMATION_DURATION_MS = DICE_PHYSICS_DURATION_MS;
 
 /** Nach dieser Zeit gilt ein Wurf für Late-Joiner als bereits aufgelöst. */

@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { DICE_CAMERA } from "@/src/lib/session/dice-screen-project";
 
 type Vec3 = readonly [number, number, number];
 
@@ -109,17 +108,11 @@ function normalsForSides(sides: number): Vec3[] | null {
 }
 
 /**
- * Lesrichtung der Ergebnis-Face: vom Tisch zur Kamera.
- * Reine +Y lässt Nachbarflächen aus Kamerawinkel dominieren (besonders d20).
+ * Lesrichtung der Ergebnis-Face: vom Tisch zur Kamera (Top-Down → +Y).
  */
 export function diceReadingDirection(out = _reading): THREE.Vector3 {
-  return out
-    .set(
-      DICE_CAMERA.position[0],
-      DICE_CAMERA.position[1] - 0.35,
-      DICE_CAMERA.position[2],
-    )
-    .normalize();
+  // Orthographic top-down: Kamera steht auf +Y und schaut auf Y=0
+  return out.set(0, 1, 0);
 }
 
 /** Face-Normal (lokal) — muss zu `quaternionForFaceUp` und Face-Textur-Matching passen. */

@@ -6,18 +6,17 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { dieScale } from "@/src/lib/session/dice-3d-math";
 import {
-  buildDieTrajectory,
+  buildDiceTrajectories,
   DICE_PHYSICS_DURATION_MS,
   sampleTrajectory,
+  type DieKeyframe,
 } from "@/src/lib/session/dice-physics";
 import { DieFaceMesh } from "./DieFaceMesh";
 
 type DieMeshProps = {
   sides: number;
-  face: number;
-  seed: string;
+  frames: DieKeyframe[];
   index: number;
-  count: number;
   startAt: number;
   aimX: number;
   aimZ: number;
@@ -25,12 +24,10 @@ type DieMeshProps = {
   onSettled?: (index: number) => void;
 };
 
-export function AnimatedDie({
+function AnimatedDie({
   sides,
-  face,
-  seed,
+  frames,
   index,
-  count,
   startAt,
   aimX,
   aimZ,
@@ -42,11 +39,6 @@ export function AnimatedDie({
   const pos = useRef(new THREE.Vector3());
   const quat = useRef(new THREE.Quaternion());
   const scale = dieScale(sides);
-
-  const frames = useMemo(
-    () => buildDieTrajectory({ sides, face, seed, index, count, aimX, aimZ }),
-    [sides, face, seed, index, count, aimX, aimZ],
-  );
 
   useFrame(() => {
     const g = group.current;
@@ -65,7 +57,7 @@ export function AnimatedDie({
   });
 
   return (
-    <group ref={group} position={[aimX, 2.2, aimZ]}>
+    <group ref={group} position={[aimX, 0.5, aimZ]}>
       <DieFaceMesh sides={sides} />
     </group>
   );
@@ -79,7 +71,6 @@ type DiceSceneProps = {
   aimX: number;
   aimZ: number;
   onAllSettled: () => void;
-  /** Nach Landung: Total-Zeile (z. B. „17 + 3 = 20“). */
   resultLabel?: string | null;
   showResult?: boolean;
 };
@@ -99,6 +90,11 @@ export function DiceRollScene({
   const done = useRef(false);
   const expected = faces.length;
 
+  const trajectories = useMemo(
+    () => buildDiceTrajectories({ sides, faces, seed, aimX, aimZ }),
+    [sides, faces, seed, aimX, aimZ],
+  );
+
   const handleSettled = useCallback(
     (index: number) => {
       if (done.current) return;
@@ -113,10 +109,10 @@ export function DiceRollScene({
 
   return (
     <>
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[4, 9, 3]} intensity={1.25} castShadow />
-      <pointLight position={[-3, 4, -2]} intensity={0.4} color="#cab926" />
-      <Html position={[aimX, 2.5, aimZ]} center style={{ pointerEvents: "none" }}>
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[2, 10, 1]} intensity={1.1} castShadow />
+      <pointLight position={[-2, 6, -1]} intensity={0.35} color="#cab926" />
+      <Html position={[aimX, 0.15, aimZ]} center style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1">
           <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold drop-shadow">
             {faces.length > 1 ? `${faces.length}×W${sides}` : `W${sides}`}
@@ -132,20 +128,17 @@ export function DiceRollScene({
         <AnimatedDie
           key={`${seed}-${i}-${face}`}
           sides={sides}
-          face={face}
-          seed={seed}
+          frames={trajectories[i] ?? []}
           index={i}
-          count={faces.length}
           startAt={startAt}
           aimX={aimX}
           aimZ={aimZ}
           onSettled={handleSettled}
         />
       ))}
-      {/* Unsichtbare Empfangsfläche — Tisch bleibt sichtbar darunter */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[9, 7]} />
-        <shadowMaterial opacity={0.18} />
+        <shadowMaterial opacity={0.14} />
       </mesh>
     </>
   );
