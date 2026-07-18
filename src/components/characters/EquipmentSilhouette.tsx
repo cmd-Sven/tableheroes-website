@@ -164,17 +164,15 @@ export function EquipmentSilhouette({
         aria-label={t("silhouette.aria")}
       >
         <div className="relative aspect-[2/3] w-full min-h-[480px] overflow-visible bg-black/70">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
-            <div className="absolute -inset-[18%] opacity-40">
-              <Image
-                src={BG_SRC}
-                alt=""
-                fill
-                className="object-contain object-center select-none"
-                sizes="(max-width: 560px) 100vw, 560px"
-                priority
-              />
-            </div>
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <Image
+              src={BG_SRC}
+              alt=""
+              fill
+              className="object-cover object-center select-none opacity-40"
+              sizes="(max-width: 560px) 100vw, 560px"
+              priority
+            />
           </div>
 
           {EQUIPMENT_UI_SLOTS.map(({ key, labelKey, top, left, width, anchor }) => {

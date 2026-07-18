@@ -97,15 +97,18 @@ export function BackpackTabs({
                         })
                       : container.label
                   }
-                  className={`flex h-9 w-9 flex-col items-center justify-center gap-0 rounded-md border-2 transition-colors ${
+                  className={`relative flex h-9 w-9 flex-col items-center justify-center gap-0 rounded-md border-2 transition-all ${
                     overweight
                       ? "border-red-500/80 bg-red-950/30 text-red-300"
                       : active
-                        ? "border-hero-vibrant bg-hero-vibrant/15 text-hero-vibrant shadow-[0_0_8px_rgba(55,152,6,0.2)]"
+                        ? "border-hero-vibrant bg-hero-vibrant/25 text-hero-vibrant shadow-[0_0_14px_rgba(55,152,6,0.5)] ring-2 ring-hero-vibrant/50 ring-offset-1 ring-offset-background-card scale-105"
                         : "border-hero-border/50 bg-hero-dark/40 text-gray-400 hover:border-hero-border hover:text-gray-200"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {active && !overweight ? (
+                    <span className="absolute -bottom-0.5 left-1/2 h-1 w-4 -translate-x-1/2 rounded-full bg-accent-gold/90" />
+                  ) : null}
                 </button>
                 {!readOnly && onManage ? (
                   <button

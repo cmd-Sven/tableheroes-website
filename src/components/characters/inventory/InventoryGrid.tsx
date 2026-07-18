@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Scale } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Scale } from "lucide-react";
 import type { CharacterItem } from "@/src/types/inventory";
 import type {
   Dnd5eEquipmentContainer,
@@ -82,6 +82,11 @@ type Props = {
   onAddCustomCategory: (label: string) => void;
   /** Gepäck-Item als Behälter-Tab ausrüsten (nur leeres Gepäck) */
   onEquipAsContainer?: (item: CharacterItem) => void;
+  onOpenCatalog?: () => void;
+  onCreateItem?: () => void;
+  onReconcileCatalog?: () => void;
+  reconciling?: boolean;
+  canReconcile?: boolean;
   variant?: "sheet" | "session";
   /** Kontrollierter aktiver Behälter (für Ablegen aus Ausrüstungsslots) */
   activeContainerId?: string | null;
@@ -113,6 +118,11 @@ export function InventoryGrid({
   onUpdateContainer,
   onAddCustomCategory,
   onEquipAsContainer,
+  onOpenCatalog,
+  onCreateItem,
+  onReconcileCatalog,
+  reconciling = false,
+  canReconcile = true,
   variant = "sheet",
   activeContainerId: controlledActiveId,
   onActiveContainerIdChange,
@@ -476,6 +486,43 @@ export function InventoryGrid({
         onDragOver={handleInventoryDragOver}
         onDrop={handleInventoryDrop}
       >
+        {!isSession && (onOpenCatalog || onCreateItem || onReconcileCatalog) ? (
+          <div className="mb-1.5 flex flex-wrap gap-1">
+            {onOpenCatalog ? (
+              <button
+                type="button"
+                onClick={onOpenCatalog}
+                className="inline-flex items-center rounded border border-accent-gold/50 bg-accent-gold/10 px-1.5 py-0.5 font-barlow text-[8px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+              >
+                Katalog
+              </button>
+            ) : null}
+            {onCreateItem ? (
+              <button
+                type="button"
+                onClick={onCreateItem}
+                className="inline-flex items-center rounded border border-hero-border px-1.5 py-0.5 font-barlow text-[8px] font-bold uppercase text-gray-400 hover:text-white"
+              >
+                Item +
+              </button>
+            ) : null}
+            {onReconcileCatalog ? (
+              <button
+                type="button"
+                disabled={reconciling || !canReconcile}
+                onClick={onReconcileCatalog}
+                className="inline-flex items-center gap-0.5 rounded border border-hero-vibrant/50 px-1.5 py-0.5 font-barlow text-[8px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/10 disabled:opacity-40"
+              >
+                {reconciling ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-2.5 w-2.5" />
+                )}
+                Abgleichen
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div
           className="grid"
           style={{

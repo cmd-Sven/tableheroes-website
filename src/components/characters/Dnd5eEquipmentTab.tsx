@@ -216,7 +216,7 @@ export function Dnd5eEquipmentTab({
 
   // Nach Inventar-Laden / Ausrüstungswechsel: Blatt-RK an Ausrüstung angleichen
   useEffect(() => {
-    if (loading || items.length === 0) return;
+    if (loading || readOnly || items.length === 0) return;
     if (sheet.combat.acOverride != null) return;
     const synced = withSyncedArmorClass(sheet, items, equipment, level);
     if (synced.combat.ac !== sheet.combat.ac) {
@@ -224,7 +224,7 @@ export function Dnd5eEquipmentTab({
     }
     // Nur bei Items/Equipment-Änderungen nachziehen, nicht bei jedem Sheet-Render
     // eslint-disable-next-line react-hooks/exhaustive-deps -- absichtlich an Inventar/Ausrüstung gebunden
-  }, [loading, items, equipment, level]);
+  }, [loading, readOnly, items, equipment, level]);
 
   function updateContainer(container: Dnd5eEquipmentContainer) {
     update({
@@ -267,7 +267,7 @@ export function Dnd5eEquipmentTab({
         : equipment.containers[0]?.id ?? null;
 
     if (!prefer && equipment.containers.length === 0) {
-      // Item existiert, erscheint unter „Noch nicht verteilt“
+      // Item existiert in der DB, erscheint unter „Noch nicht verteilt“
       setActiveInventoryContainerId("__unassigned__");
       return;
     }
@@ -478,37 +478,6 @@ export function Dnd5eEquipmentTab({
         </section>
 
         <div className="space-y-2">
-          {!readOnly ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setCatalogPickerOpen(true)}
-                className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
-              >
-                {t("itemCatalog.open")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setItemEditor("new")}
-                className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow text-[9px] font-bold uppercase text-gray-400 hover:text-white"
-              >
-                {t("equipment.customItem")}
-              </button>
-              <button
-                type="button"
-                disabled={reconciling || items.length === 0}
-                onClick={() => void reconcileInventoryWithCatalog()}
-                className="inline-flex items-center gap-1 rounded border border-hero-vibrant/50 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/10 disabled:opacity-40"
-              >
-                {reconciling ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3" />
-                )}
-                {t("itemCatalog.reconcile")}
-              </button>
-            </div>
-          ) : null}
           <InventoryGrid
             items={items}
             equipment={equipment}
@@ -530,6 +499,8 @@ export function Dnd5eEquipmentTab({
               await placeNewItemInInventory(result.split);
             }}
             onAssignCategory={async (item, category) => {
+              // Kategorie/Meta sofort in der Item-DB; Custom-Kategorie-Definitionen
+              // am Sheet laufen über onAddCustomCategory → update() → dirty.
               await setItemInventoryCategory(item, category);
               await reloadInventory();
             }}
@@ -538,6 +509,13 @@ export function Dnd5eEquipmentTab({
             onUpdateContainer={updateContainer}
             onAddCustomCategory={addCustomCategory}
             onEquipAsContainer={(item) => addBackpackFromItem(item.id)}
+            onOpenCatalog={readOnly ? undefined : () => setCatalogPickerOpen(true)}
+            onCreateItem={readOnly ? undefined : () => setItemEditor("new")}
+            onReconcileCatalog={
+              readOnly ? undefined : () => void reconcileInventoryWithCatalog()
+            }
+            reconciling={reconciling}
+            canReconcile={items.length > 0}
           />
         </div>
 
