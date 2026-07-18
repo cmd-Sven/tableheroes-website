@@ -50,6 +50,8 @@ export type Dnd5eSkillEntry = {
   proficient: SkillProficiency;
   /** Manueller Gesamtbonus-Override (z. B. durch Feat) */
   bonusOverride?: number | null;
+  /** Flat-Bonus (z. B. Lore-Rassenboni) — addiert zum berechneten Modifikator */
+  flatBonus?: number;
 };
 
 export type Dnd5eAttackEntry = {

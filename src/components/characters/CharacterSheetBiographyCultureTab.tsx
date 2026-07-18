@@ -40,6 +40,7 @@ import {
   filterRacesForCulture,
   formatLoreRaceBonusesForDisplay,
   resolveLoreRaceBonuses,
+  resolveLoreRaceDisplayText,
 } from "@/src/lib/lore-race-bonuses";
 
 type LanguageOption = { id: string; name: string };
@@ -219,6 +220,7 @@ export function CharacterSheetBiographyCultureTab({
       raceTraitsRaw: selectedRace?.race_traits,
     }),
   );
+  const raceTraitsDescription = resolveLoreRaceDisplayText(selectedRace?.race_traits);
   const religionsForCulture = selectedCulture?.religion_ids?.length
     ? religionOptions.filter((r) => selectedCulture.religion_ids!.includes(r.id))
     : religionOptions.filter((r) => religionIds.includes(r.id));
@@ -591,6 +593,11 @@ export function CharacterSheetBiographyCultureTab({
                 placeholder={t("biography.raceCustomPlaceholder")}
                 className="mt-2 w-full rounded border border-hero-border bg-hero-dark/60 px-3 py-2 font-libre text-sm text-white focus:border-hero-vibrant outline-none"
               />
+            ) : null}
+            {raceTraitsDescription ? (
+              <p className="mt-2 rounded border border-hero-border bg-hero-dark/40 p-3 font-libre text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
+                {raceTraitsDescription}
+              </p>
             ) : null}
             {raceBonusLines.length > 0 ? (
               <ul className="mt-2 space-y-1 rounded border border-accent-gold/30 bg-accent-gold/5 p-3 font-libre text-xs text-gray-200 leading-relaxed list-disc pl-5">

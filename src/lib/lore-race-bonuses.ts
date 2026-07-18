@@ -2,8 +2,9 @@
  * Parsebare Rassenboni aus Kampagnen-Lore (`world_lore.race_traits`)
  * + Katalog für bekannte Kassadras-Rassen.
  */
-import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
+import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSheetData, Dnd5eSkillKey, SkillProficiency } from "@/src/lib/characters/dnd5e/types";
 import type { AbilityKeyShort } from "@/src/lib/characters/dnd5e/progression/types";
+import { DND5E_SKILL_BY_KEY } from "@/src/lib/characters/dnd5e/skills";
 
 export const RACE_BONUSES_MARKER_START = "<<<RACE_BONUSES";
 export const RACE_BONUSES_MARKER_END = ">>>";
@@ -11,12 +12,24 @@ export const LORE_RACE_FEATURE_SOURCE = "lore-race";
 
 export type LoreRaceAbilityBonuses = Partial<Record<AbilityKeyShort, number>>;
 
+export type LoreRaceFeatureType = "skill" | "other";
+
+export type LoreRaceFeatureEntry = {
+  id?: string;
+  name: string;
+  description: string;
+  /** skill = Fertigkeitsbonus; other = Freitext-Besonderheit */
+  type?: LoreRaceFeatureType;
+  skillKey?: Dnd5eSkillKey;
+  skillBonus?: number;
+};
+
 export type LoreRaceBonusSpec = {
   v: 1;
   /** Kurzüberblick für UI */
   summary?: string;
   abilityBonuses?: LoreRaceAbilityBonuses;
-  features?: Array<{ id?: string; name: string; description: string }>;
+  features?: LoreRaceFeatureEntry[];
   toolProficiencies?: string[];
   weaponProficiencies?: string[];
   armorProficiencies?: string[];
@@ -40,6 +53,8 @@ export type SheetCampaignLoreState = {
   appliedRaceKey?: string | null;
   appliedTools?: string[];
   appliedWeapons?: string[];
+  appliedSkills?: Partial<Record<Dnd5eSkillKey, SkillProficiency>>;
+  appliedSkillBonuses?: Partial<Record<Dnd5eSkillKey, number>>;
   appliedHpBonus?: number;
 };
 
@@ -87,9 +102,35 @@ export function serializeRaceTraits(
   bonuses: LoreRaceBonusSpec | null,
 ): string {
   const text = displayText.trim();
-  if (!bonuses) return text;
+  if (!bonuses || !hasLoreRaceBonusContent(bonuses)) return text;
   const block = `${RACE_BONUSES_MARKER_START}\n${JSON.stringify(bonuses, null, 2)}\n${RACE_BONUSES_MARKER_END}`;
   return text ? `${text}\n\n${block}` : block;
+}
+
+export function hasLoreRaceBonusContent(spec: LoreRaceBonusSpec): boolean {
+  if (spec.summary?.trim()) return true;
+  if (spec.abilityBonuses && Object.values(spec.abilityBonuses).some((v) => (v ?? 0) !== 0)) {
+    return true;
+  }
+  if ((spec.features ?? []).length > 0) return true;
+  if (spec.toolProficiencies?.length) return true;
+  if (spec.weaponProficiencies?.length) return true;
+  if (spec.armorProficiencies?.length) return true;
+  if (spec.skillProficiencies?.length) return true;
+  if (spec.hpBonusPerLevel) return true;
+  return false;
+}
+
+function normalizeFeatureEntry(raw: LoreRaceFeatureEntry): LoreRaceFeatureEntry {
+  const type = raw.type ?? (raw.skillKey ? "skill" : "other");
+  return { ...raw, type };
+}
+
+function normalizeBonusSpec(raw: LoreRaceBonusSpec): LoreRaceBonusSpec {
+  return {
+    ...raw,
+    features: (raw.features ?? []).map(normalizeFeatureEntry),
+  };
 }
 
 export function parseRaceTraits(raw: string | null | undefined): ParsedRaceTraits {
@@ -106,7 +147,7 @@ export function parseRaceTraits(raw: string | null | undefined): ParsedRaceTrait
       try {
         const parsed = JSON.parse(jsonStr) as LoreRaceBonusSpec;
         if (parsed && parsed.v === 1) {
-          return { displayText, bonuses: parsed };
+          return { displayText, bonuses: normalizeBonusSpec(parsed) };
         }
       } catch {
         /* fall through */
@@ -120,7 +161,7 @@ export function parseRaceTraits(raw: string | null | undefined): ParsedRaceTrait
       if (parsed && parsed.v === 1) {
         return {
           displayText: parsed.summary?.trim() ?? "",
-          bonuses: parsed,
+          bonuses: normalizeBonusSpec(parsed),
         };
       }
     } catch {
@@ -325,6 +366,10 @@ export function resolveLoreRaceBonuses(input: {
   return null;
 }
 
+export function resolveLoreRaceDisplayText(raceTraitsRaw?: string | null): string {
+  return parseRaceTraits(raceTraitsRaw).displayText.trim();
+}
+
 export function formatAbilityBonusesDe(bonuses: LoreRaceAbilityBonuses | undefined): string {
   if (!bonuses) return "";
   return ABILITY_KEYS.filter((k) => (bonuses[k] ?? 0) !== 0)
@@ -341,13 +386,35 @@ export function formatLoreRaceBonusesForDisplay(spec: LoreRaceBonusSpec | null):
     lines.push(`TP-Maximum: +${spec.hpBonusPerLevel} pro Stufe`);
   }
   for (const f of spec.features ?? []) {
-    lines.push(`${f.name}: ${f.description}`);
+    const feature = normalizeFeatureEntry(f);
+    if (feature.type === "skill" && feature.skillKey && (feature.skillBonus ?? 0) !== 0) {
+      const label = DND5E_SKILL_BY_KEY[feature.skillKey]?.labelDe ?? feature.skillKey;
+      const bonusLabel = feature.skillBonus! > 0 ? `+${feature.skillBonus}` : String(feature.skillBonus);
+      const name = feature.name?.trim() || label;
+      const desc = feature.description?.trim();
+      lines.push(
+        desc
+          ? `${name} (${label} ${bonusLabel}): ${desc}`
+          : `${name}: ${label} ${bonusLabel}`,
+      );
+      continue;
+    }
+    if (feature.name?.trim() || feature.description?.trim()) {
+      lines.push(
+        feature.description?.trim()
+          ? `${feature.name || "Besonderheit"}: ${feature.description}`
+          : feature.name,
+      );
+    }
   }
   if (spec.toolProficiencies?.length) {
     lines.push(`Werkzeuge: ${spec.toolProficiencies.join(", ")}`);
   }
   if (spec.weaponProficiencies?.length) {
     lines.push(`Waffen: ${spec.weaponProficiencies.join(", ")}`);
+  }
+  if (spec.skillProficiencies?.length) {
+    lines.push(`Fertigkeiten (Übung): ${spec.skillProficiencies.join(", ")}`);
   }
   if (spec.summary && lines.length === 0) lines.push(spec.summary);
   return lines;
@@ -409,6 +476,102 @@ function mergeUnique(list: string[], add: string[] | undefined): string[] {
   return out;
 }
 
+function resolveSkillKey(raw: string): Dnd5eSkillKey | null {
+  const key = raw.trim().toLowerCase();
+  if (key in DND5E_SKILL_BY_KEY) return key as Dnd5eSkillKey;
+  const byLabel = Object.values(DND5E_SKILL_BY_KEY).find(
+    (s) => s.labelDe.toLowerCase() === key || s.labelEn.toLowerCase() === key,
+  );
+  return byLabel?.key ?? null;
+}
+
+function revertSkillBonuses(
+  sheet: Dnd5eSheetData,
+  applied: Partial<Record<Dnd5eSkillKey, number>> | undefined,
+): Dnd5eSheetData {
+  if (!applied || Object.keys(applied).length === 0) return sheet;
+  const skills = { ...sheet.skills };
+  for (const [rawKey, bonus] of Object.entries(applied)) {
+    const key = rawKey as Dnd5eSkillKey;
+    const entry = skills[key] ?? { proficient: "none" };
+    const nextFlat = (entry.flatBonus ?? 0) - bonus;
+    if (nextFlat === 0) {
+      const { flatBonus: _drop, ...rest } = entry;
+      skills[key] = rest;
+    } else {
+      skills[key] = { ...entry, flatBonus: nextFlat };
+    }
+  }
+  return { ...sheet, skills };
+}
+
+function applySkillBonuses(
+  sheet: Dnd5eSheetData,
+  bonuses: Partial<Record<Dnd5eSkillKey, number>>,
+): Dnd5eSheetData {
+  if (Object.keys(bonuses).length === 0) return sheet;
+  const skills = { ...sheet.skills };
+  for (const [rawKey, bonus] of Object.entries(bonuses)) {
+    if (!bonus) continue;
+    const key = rawKey as Dnd5eSkillKey;
+    const entry = skills[key] ?? { proficient: "none" };
+    skills[key] = { ...entry, flatBonus: (entry.flatBonus ?? 0) + bonus };
+  }
+  return { ...sheet, skills };
+}
+
+function revertSkillProficiencies(
+  sheet: Dnd5eSheetData,
+  applied: Partial<Record<Dnd5eSkillKey, SkillProficiency>> | undefined,
+): Dnd5eSheetData {
+  if (!applied || Object.keys(applied).length === 0) return sheet;
+  const skills = { ...sheet.skills };
+  for (const [rawKey, previous] of Object.entries(applied)) {
+    const key = rawKey as Dnd5eSkillKey;
+    const entry = skills[key] ?? { proficient: "none" };
+    skills[key] = { ...entry, proficient: previous };
+  }
+  return { ...sheet, skills };
+}
+
+function applySkillProficiencies(
+  sheet: Dnd5eSheetData,
+  keys: Dnd5eSkillKey[],
+): { sheet: Dnd5eSheetData; applied: Partial<Record<Dnd5eSkillKey, SkillProficiency>> } {
+  if (!keys.length) return { sheet, applied: {} };
+  const skills = { ...sheet.skills };
+  const applied: Partial<Record<Dnd5eSkillKey, SkillProficiency>> = {};
+  for (const key of keys) {
+    const entry = skills[key] ?? { proficient: "none" };
+    if (entry.proficient === "none" || entry.proficient === "half") {
+      applied[key] = entry.proficient;
+      skills[key] = { ...entry, proficient: "proficient" };
+    }
+  }
+  return { sheet: { ...sheet, skills }, applied };
+}
+
+function collectSkillBonusesFromSpec(
+  spec: LoreRaceBonusSpec,
+): Partial<Record<Dnd5eSkillKey, number>> {
+  const out: Partial<Record<Dnd5eSkillKey, number>> = {};
+  for (const raw of spec.features ?? []) {
+    const f = normalizeFeatureEntry(raw);
+    if (f.type !== "skill" || !f.skillKey || !(f.skillBonus ?? 0)) continue;
+    out[f.skillKey] = (out[f.skillKey] ?? 0) + f.skillBonus!;
+  }
+  return out;
+}
+
+function collectSkillProficienciesFromSpec(spec: LoreRaceBonusSpec): Dnd5eSkillKey[] {
+  const keys: Dnd5eSkillKey[] = [];
+  for (const raw of spec.skillProficiencies ?? []) {
+    const key = resolveSkillKey(raw);
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
 /**
  * Entfernt zuvor angewandte Lore-Rassenboni und wendet neue an.
  * SRD-Volksboni (character-create) bleiben unberührt, sofern source !== lore-race.
@@ -467,6 +630,9 @@ export function applyLoreRaceBonusesToSheet(
     };
   }
 
+  next = revertSkillBonuses(next, prevLore.appliedSkillBonuses);
+  next = revertSkillProficiencies(next, prevLore.appliedSkills);
+
   const spec = resolveLoreRaceBonuses({
     raceName: opts.raceName,
     raceTraitsRaw: opts.raceTraitsRaw,
@@ -480,6 +646,8 @@ export function applyLoreRaceBonusesToSheet(
       appliedRaceKey: null,
       appliedTools: undefined,
       appliedWeapons: undefined,
+      appliedSkills: undefined,
+      appliedSkillBonuses: undefined,
       appliedHpBonus: undefined,
     });
   }
@@ -493,14 +661,29 @@ export function applyLoreRaceBonusesToSheet(
     }
   }
 
-  const featureEntries: Dnd5eFeatureEntry[] = (spec.features ?? []).map((f, i) => ({
-    id: f.id ? (f.id.startsWith("lore-race:") ? f.id : `lore-race:${f.id}`) : slugFeatureId(f.name, String(i)),
-    name: f.name,
-    nameDe: f.name,
-    description: f.description,
-    descriptionDe: f.description,
-    source: LORE_RACE_FEATURE_SOURCE,
-  }));
+  const featureEntries: Dnd5eFeatureEntry[] = (spec.features ?? [])
+    .map((f, i) => normalizeFeatureEntry(f))
+    .filter((f) => f.type !== "skill" || !f.skillKey || !(f.skillBonus ?? 0))
+    .map((f, i) => ({
+      id: f.id
+        ? f.id.startsWith("lore-race:")
+          ? f.id
+          : `lore-race:${f.id}`
+        : slugFeatureId(f.name || `feature-${i}`, String(i)),
+      name: f.name || (f.skillKey ? DND5E_SKILL_BY_KEY[f.skillKey]?.labelDe ?? f.skillKey : "Besonderheit"),
+      nameDe: f.name || (f.skillKey ? DND5E_SKILL_BY_KEY[f.skillKey]?.labelDe ?? f.skillKey : "Besonderheit"),
+      description: f.description,
+      descriptionDe: f.description,
+      source: LORE_RACE_FEATURE_SOURCE,
+    }));
+
+  const appliedSkillBonuses = collectSkillBonusesFromSpec(spec);
+  const skillProficiencyKeys = collectSkillProficienciesFromSpec(spec);
+  const skillProficiencyResult = applySkillProficiencies(next, skillProficiencyKeys);
+  next = skillProficiencyResult.sheet;
+  const appliedSkillProficiencies = skillProficiencyResult.applied;
+
+  next = applySkillBonuses(next, appliedSkillBonuses);
 
   next = {
     ...next,
@@ -533,6 +716,12 @@ export function applyLoreRaceBonusesToSheet(
     appliedRaceKey: raceKey,
     appliedTools: spec.toolProficiencies ?? [],
     appliedWeapons: spec.weaponProficiencies ?? [],
+    appliedSkills:
+      Object.keys(appliedSkillProficiencies).length > 0
+        ? appliedSkillProficiencies
+        : undefined,
+    appliedSkillBonuses:
+      Object.keys(appliedSkillBonuses).length > 0 ? appliedSkillBonuses : undefined,
     appliedHpBonus: appliedHp || undefined,
   });
 }
@@ -555,12 +744,19 @@ export function loreRaceFeaturesToSheetEntries(
   spec: LoreRaceBonusSpec | null,
 ): Dnd5eFeatureEntry[] {
   if (!spec?.features?.length) return [];
-  return spec.features.map((f, i) => ({
-    id: f.id ? (f.id.startsWith("lore-race:") ? f.id : `lore-race:${f.id}`) : slugFeatureId(f.name, String(i)),
-    name: f.name,
-    nameDe: f.name,
-    description: f.description,
-    descriptionDe: f.description,
-    source: LORE_RACE_FEATURE_SOURCE,
-  }));
+  return spec.features
+    .map((f, i) => normalizeFeatureEntry(f))
+    .filter((f) => f.type !== "skill" || !f.skillKey || !(f.skillBonus ?? 0))
+    .map((f, i) => ({
+      id: f.id
+        ? f.id.startsWith("lore-race:")
+          ? f.id
+          : `lore-race:${f.id}`
+        : slugFeatureId(f.name || `feature-${i}`, String(i)),
+      name: f.name,
+      nameDe: f.name,
+      description: f.description,
+      descriptionDe: f.description,
+      source: LORE_RACE_FEATURE_SOURCE,
+    }));
 }

@@ -29,7 +29,7 @@ export function skillTotalModifier(
   if (entry.bonusOverride != null && !Number.isNaN(entry.bonusOverride)) {
     return Math.round(entry.bonusOverride);
   }
-  return abilityMod + skillProficiencyBonus(entry.proficient, pb);
+  return abilityMod + skillProficiencyBonus(entry.proficient, pb) + (entry.flatBonus ?? 0);
 }
 
 export function savingThrowTotal(

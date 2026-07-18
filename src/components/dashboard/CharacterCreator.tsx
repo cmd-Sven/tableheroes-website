@@ -28,6 +28,7 @@ import {
   filterRacesForCulture,
   formatLoreRaceBonusesForDisplay,
   resolveLoreRaceBonuses,
+  resolveLoreRaceDisplayText,
   setSheetCampaignLore,
   getSheetCampaignLore,
 } from "@/src/lib/lore-race-bonuses";
@@ -274,6 +275,11 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
     });
     return formatLoreRaceBonusesForDisplay(spec);
   }, [race, raceCustom, selectedRaceLore?.race_traits]);
+
+  const loreRaceDescription = useMemo(
+    () => resolveLoreRaceDisplayText(selectedRaceLore?.race_traits),
+    [selectedRaceLore?.race_traits],
+  );
 
   // Sprachen der gewählten Kultur
   const languagesForCulture = selectedCulture
@@ -779,6 +785,11 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                         placeholder="Rasse eingeben..."
                       />
                     )}
+                    {loreRaceDescription ? (
+                      <p className="mt-3 rounded border border-hero-border bg-slate-900/50 p-3 font-libre text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
+                        {loreRaceDescription}
+                      </p>
+                    ) : null}
                     {loreRaceBonusLines.length > 0 ? (
                       <div className="mt-3 rounded border border-accent-gold/40 bg-accent-gold/5 p-3 space-y-1.5">
                         <p className="font-barlow text-xs font-bold uppercase text-accent-gold">

@@ -17,6 +17,12 @@ import {
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { uploadLoreImage } from "@/src/lib/profile-media";
 import { LoreMainImageField } from "./LoreMainImageField";
+import {
+  LoreRaceBonusEditor,
+  parseRaceTraitsFormState,
+  serializeRaceTraitsFormState,
+} from "./LoreRaceBonusEditor";
+import type { LoreRaceBonusSpec } from "@/src/lib/lore-race-bonuses";
 import { getDeitiesByWorld, saveDeityFromLore, type DeityRelationshipInput } from "@/src/app/dashboard/worlds/deity-actions";
 import { saveReligionFromLore, type ReligionHolidayInput, type ReligionImportantFigureInput } from "@/src/app/dashboard/worlds/religion-actions";
 import { markChronicleInboxItemImported } from "@/src/app/dashboard/campaigns/[id]/chronicle-inbox-actions";
@@ -130,6 +136,8 @@ export function LoreForm({
   const [selectedRaceIds, setSelectedRaceIds] = useState<string[]>([]);
   const [selectedCultureId, setSelectedCultureId] = useState<string | null>(null);
   const [selectedDeityId, setSelectedDeityId] = useState<string | null>(null);
+  const [raceTraitsDisplay, setRaceTraitsDisplay] = useState("");
+  const [raceBonusSpec, setRaceBonusSpec] = useState<LoreRaceBonusSpec | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [urlRightsConfirmed, setUrlRightsConfirmed] = useState(false);
@@ -184,6 +192,9 @@ export function LoreForm({
       setSelectedLanguageIds(initialData.language_ids || []);
       setSelectedRaceIds(initialData.race_ids || []);
       setSelectedCultureId(initialData.culture_id || null);
+      const parsedRaceTraits = parseRaceTraitsFormState(initialData.race_traits);
+      setRaceTraitsDisplay(parsedRaceTraits.displayText);
+      setRaceBonusSpec(parsedRaceTraits.bonusSpec);
       setImageFile(null);
       setUploadRightsConfirmed(false);
       setUrlRightsConfirmed(initialData.image_upload_rights_confirmed === true);
@@ -221,6 +232,8 @@ export function LoreForm({
       setSelectedRaceIds([]);
       setSelectedCultureId(null);
       setSelectedDeityId(null);
+      setRaceTraitsDisplay("");
+      setRaceBonusSpec(null);
       setImageFile(null);
       setUploadRightsConfirmed(false);
       setUrlRightsConfirmed(false);
@@ -399,7 +412,10 @@ export function LoreForm({
           description: formData.description || undefined,
           gm_notes: formData.gm_notes || undefined,
           race_subtypes: formData.race_subtypes || undefined,
-          race_traits: formData.race_traits || undefined,
+          race_traits:
+            formData.type === "Rasse"
+              ? serializeRaceTraitsFormState(raceTraitsDisplay, raceBonusSpec) || undefined
+              : formData.race_traits || undefined,
         };
         if (isLocation && formData.stories_and_legends.length > 0) {
           payload.stories_and_legends = formData.stories_and_legends;
@@ -849,13 +865,13 @@ export function LoreForm({
               Rassen‑Details
             </h2>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-4">
               <div>
                 <label className="mb-1 block font-barlow font-bold text-xs uppercase text-gray-300">
                   Unterarten / Unterrassen
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   value={formData.race_subtypes}
                   onChange={(e) =>
                     setFormData({ ...formData, race_subtypes: e.target.value })
@@ -864,25 +880,12 @@ export function LoreForm({
                   placeholder="Liste von Unterarten oder Unterrassen, z.B. Waldelf, Dunkelelf, Hochelf..."
                 />
               </div>
-              <div>
-                <label className="mb-1 block font-barlow font-bold text-xs uppercase text-gray-300">
-                  Besondere Merkmale
-                </label>
-                <textarea
-                  rows={4}
-                  value={formData.race_traits}
-                  onChange={(e) =>
-                    setFormData({ ...formData, race_traits: e.target.value })
-                  }
-                  className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-xs text-white outline-none transition-all focus:border-accent-gold resize-none"
-                  placeholder="Physische/kulturelle Merkmale. Optional am Ende: <<<RACE_BONUSES {JSON} >>> für Attribute/Features."
-                />
-                <p className="mt-1 text-[10px] text-gray-500 font-libre">
-                  Mechanische Boni: JSON-Block mit <code className="text-accent-gold">v:1</code>,{" "}
-                  <code className="text-accent-gold">abilityBonuses</code>,{" "}
-                  <code className="text-accent-gold">features</code>, Proficiencies — wird am Charakterblatt angewendet.
-                </p>
-              </div>
+              <LoreRaceBonusEditor
+                displayText={raceTraitsDisplay}
+                bonusSpec={raceBonusSpec}
+                onDisplayTextChange={setRaceTraitsDisplay}
+                onBonusSpecChange={setRaceBonusSpec}
+              />
             </div>
 
             {/* Kultur-Zuordnung für Rassen – Sprachen werden serverseitig aus der Kultur übernommen */}
