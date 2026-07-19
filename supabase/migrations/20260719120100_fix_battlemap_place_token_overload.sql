@@ -1,30 +1,7 @@
--- Battlemap Phase 2.5: Bewegungsreichweite aus Charakterbogen, Dash-Aktion, Chebyshev-Distanz.
+-- Fix: place_battlemap_character_token hatte zwei Overloads (5- und 6-Parameter),
+-- weil 20260719120000 CREATE OR REPLACE eine neue Signatur angelegt hat.
+-- Bereinigt beide Signaturen und legt die kanonische 6-Parameter-Version an.
 
-CREATE OR REPLACE FUNCTION public.character_movement_speed_ft(p_character_id uuid)
-RETURNS integer
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT COALESCE(
-    GREATEST(
-      0,
-      NULLIF(trim(ch.sheet_data->'combat'->>'speed'), '')::integer
-    ),
-    30
-  )
-  FROM public.characters ch
-  WHERE ch.id = p_character_id;
-$$;
-
-COMMENT ON FUNCTION public.character_movement_speed_ft IS
-  'Bewegungsreichweite in ft aus D&D-5e-Charakterbogen (sheet_data.combat.speed), Fallback 30.';
-
--- ---------------------------------------------------------------------------
--- RPC: Spieler-Token — Pause, Erstplatzierung frei, Verschieben mit Speed + optional Dash
--- CREATE OR REPLACE mit neuer Signatur erzeugt ein Overload — alte Signatur explizit droppen.
--- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.place_battlemap_character_token(uuid, uuid, uuid, integer, integer);
 DROP FUNCTION IF EXISTS public.place_battlemap_character_token(uuid, uuid, uuid, integer, integer, boolean);
 
