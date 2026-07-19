@@ -318,6 +318,35 @@ export async function uploadLoreImage(
   return { path, publicUrl: data.publicUrl };
 }
 
+/** Battlemap: `{userId}/battlemaps/{sessionId}/{id|new-…}/image-{ts}.webp` */
+export async function uploadBattlemapImage(
+  file: File,
+  options: { sessionId: string; battlemapId?: string | null },
+): Promise<{ path: string; publicUrl: string } | { error: string }> {
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
+
+  const sessionId = options.sessionId?.trim();
+  if (!sessionId) return { error: "Session-ID fehlt für den Upload." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Nicht angemeldet." };
+
+  const segment = options.battlemapId?.trim()
+    ? options.battlemapId.trim()
+    : `new-${crypto.randomUUID()}`;
+  const path = `${user.id}/battlemaps/${sessionId}/${segment}/image-${Date.now()}.webp`;
+
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}
+
 /** Szenenbild Mediathek: `{userId}/scene-media/{campaignId}/{id|new-…}/image-{ts}.ext` */
 export async function uploadSceneMediaImage(
   file: File,

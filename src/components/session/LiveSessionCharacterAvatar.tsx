@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
+  MapPin,
   Package,
   ScrollText,
   Shield,
@@ -92,10 +93,13 @@ type Props = {
   /** SL darf Zustände setzen (überlagert Spieler-Gemüt). */
   isGm?: boolean;
   showDnd5eSheet: boolean;
+  /** Battlemap aktiv — Rad-Menü „Token setzen“. */
+  battlemapActive?: boolean;
+  onStartTokenPlacement?: () => void;
 };
 
 const RADIAL_ITEMS: {
-  id: Exclude<RadialPanel, null> | "sheet";
+  id: Exclude<RadialPanel, null> | "sheet" | "token";
   label: string;
   Icon: typeof Swords;
   angle: number;
@@ -103,6 +107,7 @@ const RADIAL_ITEMS: {
   abilitiesOnly?: boolean;
   moodOnly?: boolean;
   gmOnly?: boolean;
+  tokenOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
   { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
@@ -112,6 +117,7 @@ const RADIAL_ITEMS: {
   { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
   { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 165, abilitiesOnly: true },
   { id: "belt", label: "Gürtel", Icon: Package, angle: 210 },
+  { id: "token", label: "Token setzen", Icon: MapPin, angle: 255, tokenOnly: true },
 ];
 
 const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
@@ -138,6 +144,8 @@ export function LiveSessionCharacterAvatar({
   canInteract,
   isGm = false,
   showDnd5eSheet,
+  battlemapActive = false,
+  onStartTokenPlacement,
 }: Props) {
   const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -306,6 +314,7 @@ export function LiveSessionCharacterAvatar({
       if (item.id === "sheet") return showDnd5eSheet;
       if (item.moodOnly) return true;
       if (item.gmOnly) return isGm;
+      if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
       if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
       if (item.abilitiesOnly) {
         if ((status?.classResources?.length ?? 0) > 0) return true;
@@ -319,7 +328,7 @@ export function LiveSessionCharacterAvatar({
       ...item,
       angle: -90 + (360 / count) * index,
     }));
-  }, [status, className, showDnd5eSheet, isGm]);
+  }, [status, className, showDnd5eSheet, isGm, battlemapActive, onStartTokenPlacement]);
 
   function openSheetTab() {
     window.open(
@@ -334,6 +343,12 @@ export function LiveSessionCharacterAvatar({
   function handleRadialClick(id: (typeof RADIAL_ITEMS)[number]["id"]) {
     if (id === "sheet") {
       openSheetTab();
+      return;
+    }
+    if (id === "token") {
+      onStartTokenPlacement?.();
+      setMenuOpen(false);
+      setPanel(null);
       return;
     }
     setPanel((prev) => (prev === id ? null : id));

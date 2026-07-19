@@ -173,6 +173,16 @@ import {
   imageDisplayObjectStyle,
   normalizeImageDisplay,
 } from "@/src/lib/image-display";
+import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
+import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
+import {
+  getSessionBattlemaps,
+  placeBattlemapCharacterToken,
+} from "@/src/lib/actions/battlemap-actions";
+import type {
+  SessionBattlemap,
+  SessionBattlemapToken,
+} from "@/src/lib/session/battlemap-types";
 
 type LiveState = {
   id: string;
@@ -196,6 +206,7 @@ type LiveState = {
   visible_faction_ids?: string[] | null;
   visible_creature_ids?: string[] | null;
   active_scene_media_id?: string | null;
+  active_battlemap_id?: string | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
   is_combat_mode?: boolean | null;
@@ -243,6 +254,8 @@ function normalizeLiveRow(row: unknown): LiveState {
     visible_creature_ids: Array.isArray(creatureRaw) ? creatureRaw.map(String) : [],
     active_scene_media_id:
       r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
+    active_battlemap_id:
+      r.active_battlemap_id != null ? String(r.active_battlemap_id) : null,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
           .filter((entry): entry is Record<string, unknown> =>
@@ -1262,6 +1275,12 @@ export function LiveSessionBoard({
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
   const [lootGmModalOpen, setLootGmModalOpen] = useState(false);
+  const [sessionBattlemaps, setSessionBattlemaps] = useState<SessionBattlemap[]>([]);
+  const [battlemapTokens, setBattlemapTokens] = useState<SessionBattlemapToken[]>([]);
+  const [tokenPlacement, setTokenPlacement] = useState<{
+    characterId: string;
+    characterName: string;
+  } | null>(null);
   const [activeTranscriptionMode, setActiveTranscriptionMode] = useState<
     TranscriptionMode | null
   >(transcriptionMode);
@@ -1286,6 +1305,86 @@ export function LiveSessionBoard({
   );
 
   const campaignCreatures = useMemo(() => allCampaignCreatures, [allCampaignCreatures]);
+
+  const activeBattlemapId = liveState?.active_battlemap_id ?? null;
+  const activeBattlemap = useMemo(
+    () => sessionBattlemaps.find((m) => m.id === activeBattlemapId) ?? null,
+    [sessionBattlemaps, activeBattlemapId],
+  );
+  const battlemapActive = Boolean(activeBattlemap);
+
+  useEffect(() => {
+    if (isGuest) return;
+    let cancelled = false;
+    void getSessionBattlemaps(sessionId)
+      .then((maps) => {
+        if (!cancelled) setSessionBattlemaps(maps);
+      })
+      .catch(() => {
+        /* optional: maps not migrated yet */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, isGuest]);
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
+      setBattlemapTokens([]);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadTokens() {
+      const { data, error } = await (supabase as any)
+        .from("session_battlemap_tokens")
+        .select("*")
+        .eq("battlemap_id", activeBattlemapId)
+        .order("created_at", { ascending: true });
+      if (!cancelled && !error) {
+        setBattlemapTokens(
+          (data ?? []).map((row: Record<string, unknown>) => ({
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            character_id: row.character_id != null ? String(row.character_id) : null,
+            npc_id: row.npc_id != null ? String(row.npc_id) : null,
+            creature_id: row.creature_id != null ? String(row.creature_id) : null,
+            grid_x: Number(row.grid_x ?? 0),
+            grid_y: Number(row.grid_y ?? 0),
+            label: row.label != null ? String(row.label) : null,
+            image_url: row.image_url != null ? String(row.image_url) : null,
+            size_cells: Math.max(1, Number(row.size_cells ?? 1)),
+            is_visible_to_players: row.is_visible_to_players !== false,
+            token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
+          })),
+        );
+      }
+    }
+
+    void loadTokens();
+
+    const channel = supabase
+      .channel(`session_battlemap_tokens_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_tokens",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        () => {
+          void loadTokens();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, isGuest, supabase]);
 
   useEffect(() => {
     setActiveTranscriptionMode(transcriptionMode);
@@ -1380,6 +1479,29 @@ export function LiveSessionBoard({
   }, [sessionId, supabase]);
 
   const [isUpdating, startTransition] = useTransition();
+
+  const handleBattlemapCellClick = useCallback(
+    (gridX: number, gridY: number) => {
+      if (!tokenPlacement || !activeBattlemapId) return;
+      startTransition(async () => {
+        try {
+          await placeBattlemapCharacterToken({
+            sessionId,
+            battlemapId: activeBattlemapId,
+            characterId: tokenPlacement.characterId,
+            gridX,
+            gridY,
+          });
+          toast.success(`Token für ${tokenPlacement.characterName} gesetzt.`);
+          setTokenPlacement(null);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
+        }
+      });
+    },
+    [activeBattlemapId, sessionId, tokenPlacement, startTransition],
+  );
+
   const [isStageManagerOpen, setIsStageManagerOpen] = useState(false);
   const [stageSearch, setStageSearch] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(
@@ -3563,7 +3685,11 @@ export function LiveSessionBoard({
                   ? "ring-2 ring-accent-gold ring-inset"
                   : ""
               }`}
-              style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined}
+              style={
+                !battlemapActive && backgroundUrl
+                  ? { backgroundImage: `url(${backgroundUrl})` }
+                  : undefined
+              }
               onDragOver={(e) => {
                 if (!isGM) return;
                 e.preventDefault();
@@ -3591,6 +3717,31 @@ export function LiveSessionBoard({
                 }
               }}
             >
+            {activeBattlemap ? (
+              <BattlemapStage
+                battlemap={activeBattlemap}
+                tokens={battlemapTokens}
+                placementMode={tokenPlacement}
+                onCancelPlacement={() => setTokenPlacement(null)}
+                onCellClick={handleBattlemapCellClick}
+              />
+            ) : null}
+            {isGM ? (
+              <BattlemapGmToolbar
+                sessionId={sessionId}
+                battlemaps={sessionBattlemaps}
+                activeBattlemapId={activeBattlemapId}
+                onActiveChange={(id) => {
+                  setLiveState((prev) => {
+                    if (!prev) return prev;
+                    const next = normalizeLiveRow({ ...prev, active_battlemap_id: id });
+                    liveStateRef.current = next;
+                    return next;
+                  });
+                  if (!id) setTokenPlacement(null);
+                }}
+              />
+            ) : null}
             {isGM ? (
               <div className="pointer-events-none absolute bottom-0 right-0 z-[28] flex flex-col items-end gap-2 p-3 md:p-5">
                 <button
@@ -4177,6 +4328,16 @@ export function LiveSessionBoard({
                               (pid === userId || isGM)
                             }
                             showDnd5eSheet={showDnd5eSheet}
+                            battlemapActive={battlemapActive}
+                            onStartTokenPlacement={
+                              battlemapActive && !pc.isSessionDummy
+                                ? () =>
+                                    setTokenPlacement({
+                                      characterId: pc.id,
+                                      characterName: pc.name,
+                                    })
+                                : undefined
+                            }
                           />
                         </div>
                         {handRaise ? (

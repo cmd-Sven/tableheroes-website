@@ -8,7 +8,9 @@ import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
 import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
 import { StagePrepSceneMedia } from "@/src/components/session/StagePrepSceneMedia";
+import { StagePrepBattlemaps } from "@/src/components/session/battlemap/StagePrepBattlemaps";
 import type { CampaignSceneMedia } from "@/src/lib/scene-media-types";
+import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 
 type CampaignNpc = {
@@ -45,6 +47,7 @@ type Props = {
   initialTranscriptionMode: TranscriptionMode | null;
   sceneMediaItems: CampaignSceneMedia[];
   stageDeckSceneMediaIds: string[] | null;
+  initialBattlemaps: SessionBattlemap[];
 };
 
 const marblePanelStyle: CSSProperties = {
@@ -79,6 +82,7 @@ export function StagePrepClient({
   initialTranscriptionMode,
   sceneMediaItems,
   stageDeckSceneMediaIds,
+  initialBattlemaps,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -565,6 +569,15 @@ export function StagePrepClient({
             sessionId={sessionId}
             initialItems={sceneMediaItems}
             stageDeckSceneMediaIds={stageDeckSceneMediaIds}
+            onRefresh={() => router.refresh()}
+          />
+        </div>
+
+        <div id="battlemaps" className="scroll-mt-24">
+          <StagePrepBattlemaps
+            sessionId={sessionId}
+            campaignId={campaignId}
+            initialBattlemaps={initialBattlemaps}
             onRefresh={() => router.refresh()}
           />
         </div>

@@ -7,6 +7,7 @@ import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/s
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { StagePrepClient } from "./StagePrepClient";
 import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
+import { getSessionBattlemaps } from "@/src/lib/actions/battlemap-actions";
 import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
 
 type Props = {
@@ -140,6 +141,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       : null;
 
   const sceneMediaItems = await getCampaignSceneMedia(campaignId).catch(() => []);
+  const initialBattlemaps = await getSessionBattlemaps(sessionId).catch(() => []);
 
   return (
     <StagePrepClient
@@ -175,6 +177,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       stageDeckCreatureIds={
         stageDeckCreatureIds != null ? serializeForClient(stageDeckCreatureIds) : null
       }
+      initialBattlemaps={serializeForClient(initialBattlemaps)}
     />
   );
 }
