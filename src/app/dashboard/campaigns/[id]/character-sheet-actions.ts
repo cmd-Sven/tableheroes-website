@@ -9,7 +9,9 @@ import {
   parseSheetData,
 } from "@/src/lib/characters/dnd5e/defaults";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
+import { withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
+import { loadCharacterItemsForSheetSync } from "@/src/lib/actions/character-inventory-actions";
 import type {
   CharacterSheetPayload,
   Dnd5eSheetData,
@@ -256,7 +258,18 @@ export async function saveDnd5eCharacterSheet(
       return { success: false, error: "Diese Kampagne nutzt kein D&D-5e-System." };
     }
 
-    const mergedSheet = mergeSheetWithDefaults(input.sheet);
+    const saveLevel =
+      input.meta?.level != null
+        ? Math.max(1, Math.floor(input.meta.level))
+        : Math.max(1, Math.floor(Number(character.level) || 1));
+    let mergedSheet = mergeSheetWithDefaults(input.sheet);
+    const inventoryItems = await loadCharacterItemsForSheetSync(supabase, character.id);
+    mergedSheet = withSyncedArmorClass(
+      mergedSheet,
+      inventoryItems,
+      mergedSheet.equipment,
+      saveLevel,
+    );
     const overrides = input.overrides ?? {};
 
     let updates: Record<string, unknown> = {

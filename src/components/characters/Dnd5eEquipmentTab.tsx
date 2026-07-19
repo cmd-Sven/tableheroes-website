@@ -83,6 +83,10 @@ type Props = {
   derived: Dnd5eDerivedSheet;
   level: number;
   readOnly: boolean;
+  /** Vorgeladenes Inventar vom Panel — vermeidet doppeltes Laden & hält RK synchron */
+  inventoryItems?: CharacterItem[];
+  onInventoryReload?: () => Promise<void>;
+  acPreview?: { ac: number; breakdown: string } | null;
   onEquipmentChange: (
     equipment: Dnd5eEquipmentState,
     extras?: { combatAc?: number },
@@ -95,6 +99,9 @@ export function Dnd5eEquipmentTab({
   derived,
   level,
   readOnly,
+  inventoryItems: sharedInventoryItems,
+  onInventoryReload,
+  acPreview: sharedAcPreview,
   onEquipmentChange,
 }: Props) {
   const { t } = useCharacterSheetLocale();
@@ -116,15 +123,20 @@ export function Dnd5eEquipmentTab({
     try {
       const data = await getCharacterInventory(characterId);
       setInventory(data);
+      await onInventoryReload?.();
       return data;
     } finally {
       if (!opts?.quiet) setLoading(false);
     }
-  }, [characterId]);
+  }, [characterId, onInventoryReload]);
 
   useEffect(() => {
+    if (sharedInventoryItems != null) {
+      setLoading(false);
+      return;
+    }
     void reloadInventory();
-  }, [reloadInventory]);
+  }, [reloadInventory, sharedInventoryItems]);
 
   useEffect(() => {
     void (async () => {
@@ -138,10 +150,12 @@ export function Dnd5eEquipmentTab({
     })();
   }, [characterId]);
 
-  const items = useMemo(
-    () => (inventory?.items ?? []).filter((i) => !i.is_deleted),
-    [inventory?.items],
-  );
+  const items = useMemo(() => {
+    if (sharedInventoryItems != null) {
+      return sharedInventoryItems.filter((i) => !i.is_deleted);
+    }
+    return (inventory?.items ?? []).filter((i) => !i.is_deleted);
+  }, [sharedInventoryItems, inventory?.items]);
 
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
@@ -202,7 +216,9 @@ export function Dnd5eEquipmentTab({
   }, [loading, items, equipment.containers.length, unassigned.length]);
 
   const weaponAttacks = computeEquippedWeaponAttacks(sheet, derived, items, equipment, level);
-  const acPreview = computeArmorClassPreview(sheet, derived, items, equipment);
+  const acPreview =
+    sharedAcPreview ??
+    computeArmorClassPreview(sheet, derived, items, equipment);
 
   function update(next: Dnd5eEquipmentState) {
     const normalized = normalizeEquipmentState(next);
@@ -354,7 +370,7 @@ export function Dnd5eEquipmentTab({
     }
   }
 
-  if (loading) {
+  if (loading && sharedInventoryItems == null) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-gray-400">
         <Loader2 className="h-5 w-5 animate-spin" />

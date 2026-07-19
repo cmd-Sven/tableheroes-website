@@ -72,6 +72,23 @@ function mapCharacterItemRow(item: Record<string, unknown>): CharacterItem {
 const CHARACTER_ITEM_SELECT =
   "id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap, created_at";
 
+/** Server-side Inventarliste für RK-Sync beim Blatt-Speichern (ohne Auth-Guard — nur intern). */
+export async function loadCharacterItemsForSheetSync(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  characterId: string,
+): Promise<CharacterItem[]> {
+  const { data: items, error } = await ((supabase as any).from("character_items") as any)
+    .select(CHARACTER_ITEM_SELECT)
+    .eq("character_id", characterId)
+    .eq("is_deleted", false);
+
+  if (error) {
+    throw new Error(error.message || "Inventar konnte nicht geladen werden.");
+  }
+
+  return ((items ?? []) as Record<string, unknown>[]).map(mapCharacterItemRow);
+}
+
 function normalizeCurrency(value: unknown): number {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n)) return 0;

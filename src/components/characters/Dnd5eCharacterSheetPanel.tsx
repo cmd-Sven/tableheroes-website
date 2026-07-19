@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen, Wand2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -31,7 +31,16 @@ import { CharacterFlawPicker } from "@/src/components/characters/CharacterFlawPi
 import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
 import type { CharacterFlawEntry } from "@/src/lib/characters/character-flaws";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
-import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import {
+  computeArmorClassPreview,
+  normalizeEquipmentState,
+  withSyncedArmorClass,
+} from "@/src/lib/characters/dnd5e/equipment";
+import {
+  getCharacterInventory,
+  saveCharacterEquipment,
+} from "@/src/lib/actions/character-inventory-actions";
+import type { CharacterItem } from "@/src/types/inventory";
 import { CharacterSheetLanguageToggle } from "@/src/components/characters/CharacterSheetLanguageToggle";
 import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPanel";
 import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
@@ -268,6 +277,17 @@ export function Dnd5eCharacterSheetPanel({
   }>({ armor: "", weapons: "", tools: "" });
   /** Freitext-Hintergrund (nicht aus Katalog) */
   const [backgroundCustomMode, setBackgroundCustomMode] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<CharacterItem[]>([]);
+  const equipmentPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reloadInventoryItems = useCallback(async () => {
+    try {
+      const data = await getCharacterInventory(characterId);
+      setInventoryItems((data.items ?? []).filter((item) => !item.is_deleted));
+    } catch {
+      setInventoryItems([]);
+    }
+  }, [characterId]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -305,7 +325,8 @@ export function Dnd5eCharacterSheetPanel({
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+    void reloadInventoryItems();
+  }, [reload, reloadInventoryItems]);
 
   const derived = useMemo(() => {
     if (!sheet) return null;
@@ -320,6 +341,22 @@ export function Dnd5eCharacterSheetPanel({
   }, [derived, sheet, characterFlaws]);
 
   const displayDerived = flawAdjusted?.derived ?? derived;
+
+  /** RK aus Ausrüstung — eine Quelle für Attribute- und Ausrüstungs-Tab */
+  const equipmentAcPreview = useMemo(() => {
+    if (!sheet || !displayDerived || inventoryItems.length === 0) return null;
+    return computeArmorClassPreview(
+      sheet,
+      displayDerived,
+      inventoryItems,
+      normalizeEquipmentState(sheet.equipment),
+    );
+  }, [sheet, displayDerived, inventoryItems]);
+
+  const displayAc =
+    sheet?.combat.acOverride != null
+      ? displayDerived?.ac ?? 10
+      : (equipmentAcPreview?.ac ?? displayDerived?.ac ?? 10);
 
   const canEdit = payload?.canEdit ?? false;
   const readOnly = !editMode || !canEdit;
@@ -606,21 +643,63 @@ export function Dnd5eCharacterSheetPanel({
     equipment: Dnd5eEquipmentState,
     extras?: { combatAc?: number },
   ) {
-    if (!sheet) return;
-    setSheet({
-      ...sheet,
-      equipment: normalizeEquipmentState(equipment),
-      combat:
-        extras?.combatAc != null
-          ? { ...sheet.combat, ac: extras.combatAc }
-          : sheet.combat,
+    setSheet((prev) => {
+      if (!prev) return prev;
+      const normalized = normalizeEquipmentState(equipment);
+      let next: Dnd5eSheetData = {
+        ...prev,
+        equipment: normalized,
+        combat:
+          extras?.combatAc != null
+            ? { ...prev.combat, ac: extras.combatAc }
+            : prev.combat,
+      };
+      if (inventoryItems.length > 0 && next.combat.acOverride == null) {
+        next = withSyncedArmorClass(next, inventoryItems, normalized, meta.level);
+      }
+      return next;
     });
+
+    if (readOnly) return;
+
+    const normalized = normalizeEquipmentState(equipment);
+    if (equipmentPersistTimerRef.current) {
+      clearTimeout(equipmentPersistTimerRef.current);
+    }
+    equipmentPersistTimerRef.current = setTimeout(() => {
+      startTransition(async () => {
+        try {
+          await saveCharacterEquipment(characterId, normalized);
+          onSaved?.();
+        } catch (e: unknown) {
+          toast.error(
+            e instanceof Error ? e.message : t("sheet.saveError"),
+          );
+        }
+      });
+    }, 350);
   }
+
+  useEffect(() => {
+    return () => {
+      if (equipmentPersistTimerRef.current) {
+        clearTimeout(equipmentPersistTimerRef.current);
+      }
+    };
+  }, []);
 
   function handleSave(silent = false) {
     if (!sheet || !payload) return;
     startTransition(async () => {
       let sheetToSave = sheet;
+      if (inventoryItems.length > 0) {
+        sheetToSave = withSyncedArmorClass(
+          sheetToSave,
+          inventoryItems,
+          sheetToSave.equipment,
+          meta.level,
+        );
+      }
       if (biographyCulture?.languageOptions?.length) {
         const names = biographyCulture.languages
           .map((id) => biographyCulture.languageOptions.find((l) => l.id === id)?.name)
@@ -673,6 +752,7 @@ export function Dnd5eCharacterSheetPanel({
       }
       onSaved?.();
       await reload();
+      await reloadInventoryItems();
     });
   }
 
@@ -957,9 +1037,12 @@ export function Dnd5eCharacterSheetPanel({
         <Dnd5eEquipmentTab
           characterId={characterId}
           sheet={sheet}
-          derived={derived}
+          derived={displayDerived}
           level={meta.level}
           readOnly={readOnly}
+          inventoryItems={inventoryItems}
+          onInventoryReload={reloadInventoryItems}
+          acPreview={equipmentAcPreview}
           onEquipmentChange={handleEquipmentChange}
         />
       ) : null}
@@ -1426,7 +1509,7 @@ export function Dnd5eCharacterSheetPanel({
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.ac")}</p>
-                    <p className="font-barlow text-4xl font-bold text-white mt-1">{derived.ac}</p>
+                    <p className="font-barlow text-4xl font-bold text-white mt-1">{displayAc}</p>
                     <p className="mt-1 font-libre text-[9px] text-gray-500 leading-tight">
                       {sheet.combat.acOverride != null
                         ? t("combat.acOverrideHint")
