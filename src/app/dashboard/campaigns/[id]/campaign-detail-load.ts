@@ -38,6 +38,7 @@ import {
   getCampaignPollsForGm,
   getActivePollsForCampaignPlayer,
 } from "@/src/lib/queries/poll-queries";
+import { logPostgrestError } from "@/src/lib/supabase/format-postgrest-error";
 
 export type CampaignDetailPageData = Awaited<
   ReturnType<typeof loadCampaignDetailPageData>
@@ -93,7 +94,7 @@ export async function loadCampaignDetailPageData(
   const [worldResult, membershipResult, sessionsResult] = await Promise.all([
     campaignWorldId
       ? (supabase.from("worlds") as any)
-          .select("id, name, description, gm_id, blueprint, banner_url, image_url")
+          .select("id, name, description, gm_id, blueprint")
           .eq("id", campaignWorldId)
           .single()
       : Promise.resolve({ data: null, error: null }),
@@ -111,8 +112,13 @@ export async function loadCampaignDetailPageData(
   ]);
 
   let world: any = null;
-  if (worldResult.error && worldResult.error.code !== "PGRST116") {
-    console.error("Error fetching world:", worldResult.error);
+  if (worldResult.error) {
+    if (worldResult.error.code === "PGRST116") {
+      // Verwaiste world_id auf der Kampagne — Seite bleibt nutzbar
+      world = null;
+    } else {
+      logPostgrestError("[CampaignPage] Error fetching world:", worldResult.error);
+    }
   } else {
     world = worldResult.data;
   }

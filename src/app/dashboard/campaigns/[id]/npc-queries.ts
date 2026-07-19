@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { logPostgrestError } from "@/src/lib/supabase/format-postgrest-error";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 
 /**
@@ -29,8 +30,7 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Fetch NPCs Error:", error);
-    console.error("Fehlerinhalt:", JSON.stringify(error, null, 2));
+    logPostgrestError("Fetch NPCs Error:", error);
     return [];
   }
 
@@ -41,7 +41,7 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
   }));
 
   if (!isGM) {
-    npcs = npcs.filter((npc: any) => npc.is_revealed || npc.user_id === userId);
+    npcs = npcs.filter((npc: any) => npc.is_revealed === true);
   }
 
   const { data: favorites } = await (supabase.from("npc_favorites") as any)
@@ -86,12 +86,12 @@ export async function getNpcSessionOptions(
   if (!resolvedWorldId) return [];
 
   const { data: npcsRaw, error } = await (supabase.from("npcs") as any)
-    .select("id, name, title, user_id")
+    .select("id, name, title")
     .eq("world_id", resolvedWorldId)
     .order("name", { ascending: true });
 
   if (error) {
-    console.error("Fetch NPC session options error:", error);
+    logPostgrestError("Fetch NPC session options error:", error);
     return [];
   }
 
@@ -99,6 +99,6 @@ export async function getNpcSessionOptions(
 
   const visibility = await getVisibilityForCampaign(campaignId, "npc");
   return ((npcsRaw as any[]) || []).filter(
-    (npc) => visibility[npc.id] === true || npc.user_id === userId,
+    (npc) => visibility[npc.id] === true,
   );
 }
