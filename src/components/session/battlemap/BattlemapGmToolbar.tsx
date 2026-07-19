@@ -1,23 +1,30 @@
 "use client";
 
 import { useTransition } from "react";
-import { Loader2, Map, MapPinOff } from "lucide-react";
+import { Loader2, Map, MapPinOff, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
-import { setActiveBattlemap } from "@/src/lib/actions/battlemap-actions";
+import {
+  setActiveBattlemap,
+  setBattlemapMovementPaused,
+} from "@/src/lib/actions/battlemap-actions";
 import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
 
 type Props = {
   sessionId: string;
   battlemaps: SessionBattlemap[];
   activeBattlemapId: string | null;
+  movementPaused?: boolean;
   onActiveChange?: (id: string | null) => void;
+  onMovementPausedChange?: (paused: boolean) => void;
 };
 
 export function BattlemapGmToolbar({
   sessionId,
   battlemaps,
   activeBattlemapId,
+  movementPaused = false,
   onActiveChange,
+  onMovementPausedChange,
 }: Props) {
   const [pending, startTransition] = useTransition();
 
@@ -33,6 +40,23 @@ export function BattlemapGmToolbar({
         );
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Fehler beim Umschalten.");
+      }
+    });
+  }
+
+  function togglePause() {
+    const next = !movementPaused;
+    startTransition(async () => {
+      try {
+        await setBattlemapMovementPaused(sessionId, next);
+        onMovementPausedChange?.(next);
+        toast.success(
+          next
+            ? "Spieler-Bewegung pausiert."
+            : "Spieler dürfen Token wieder bewegen.",
+        );
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Pause konnte nicht gesetzt werden.");
       }
     });
   }
@@ -60,15 +84,34 @@ export function BattlemapGmToolbar({
         ))}
       </select>
       {activeBattlemapId ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => activate(null)}
-          className="inline-flex items-center justify-center gap-1.5 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-400 hover:border-accent-blood hover:text-accent-blood disabled:opacity-50"
-        >
-          <MapPinOff className="h-3.5 w-3.5" />
-          Map beenden
-        </button>
+        <>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={togglePause}
+            className={`inline-flex items-center justify-center gap-1.5 rounded border px-2 py-1 font-barlow text-[10px] font-bold uppercase disabled:opacity-50 ${
+              movementPaused
+                ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
+                : "border-hero-border/50 text-gray-400 hover:border-hero-vibrant hover:text-hero-vibrant"
+            }`}
+          >
+            {movementPaused ? (
+              <Play className="h-3.5 w-3.5" />
+            ) : (
+              <Pause className="h-3.5 w-3.5" />
+            )}
+            {movementPaused ? "Bewegung freigeben" : "Spieler pausieren"}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => activate(null)}
+            className="inline-flex items-center justify-center gap-1.5 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-400 hover:border-accent-blood hover:text-accent-blood disabled:opacity-50"
+          >
+            <MapPinOff className="h-3.5 w-3.5" />
+            Map beenden
+          </button>
+        </>
       ) : null}
     </div>
   );
