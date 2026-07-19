@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AlertTriangle, Dices, Eraser, Hand, MessageSquare, Send, Shield, Swords, Trash2, X } from "lucide-react";
+import { AlertTriangle, Eraser, Hand, MessageSquare, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   appendSessionActivity,
@@ -18,41 +18,16 @@ import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 import {
   FALLBACK_PLAYER_COLOR,
 } from "@/src/lib/session/class-player-color";
-import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
-import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
-import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
-import {
-  ABILITY_KEYS,
-  ABILITY_LABELS_DE,
-  type AbilityKey,
-} from "@/src/lib/characters/dnd5e/types";
-import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
-import {
-  computeEquippedWeaponAttacks,
-  type WeaponAttackPreview,
-} from "@/src/lib/characters/dnd5e/equipment";
-import { parseRollCommand, type DiceRollMode } from "@/src/lib/session/dice-roll";
-import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
-import { requestDiceDropPlacement } from "@/src/lib/session/dice-placement-store";
 import {
   dispatchAvatarSpeechBubble,
   truncateSpeechBubbleText,
 } from "@/src/lib/session/avatar-speech-bubble";
-import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import {
   formatPendingDiceChatText,
   isDiceAnimMeta,
 } from "@/src/lib/session/dice-animation";
 import { isDiceEntryRevealed, useDiceRevealVersion } from "@/src/lib/session/dice-reveal-store";
-import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
-import type { CharacterSheetPayload } from "@/src/lib/characters/dnd5e/types";
-import type { Dnd5eSkillKey } from "@/src/lib/characters/dnd5e/types";
-
-function sheetDerivedForRolls(payload: CharacterSheetPayload) {
-  const base = computeDerivedDnd5eSheet(payload.sheet, payload.level);
-  const flaws = payload.characterFlaws ?? [];
-  return applyFlawModifiersToDerived(base, payload.sheet.combat.speed, flaws).derived;
-}
+import { useLiveSessionDiceRoll } from "@/src/components/session/useLiveSessionDiceRoll";
 
 const ACTIVITY_TYPES = new Set([
   "dice",
@@ -77,19 +52,14 @@ type Props = {
   prepTestCharacters?: { id: string; name: string }[];
   prepTestCharacterId?: string | null;
   onPrepTestCharacterChange?: (id: string) => void;
-  /** Sofortige lokale Sync nach erfolgreichem Insert (vor Realtime). */
   onActivityPosted?: (entry: SessionActivityEntry) => void;
   onActivityCleared?: () => void;
   onActivityDeleted?: (entryId: string) => void;
-  /** Aktive Meldungen (für eigenen Status + Badge). */
   handRaises?: SessionHandRaise[];
   currentUserId?: string | null;
-  /** Klassen-Spielfarben der Charaktere (characterId → Hex). */
   playerColorByCharacterId?: Record<string, string>;
   onHandRaisesChanged?: (raises: SessionHandRaise[] | "refresh") => void;
 };
-
-const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
 
 export function LiveSessionActivityPanel({
   sessionId,
@@ -112,15 +82,17 @@ export function LiveSessionActivityPanel({
   onHandRaisesChanged,
 }: Props) {
   const [input, setInput] = useState("");
-  const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
-  const [selectedSkill, setSelectedSkill] = useState("");
-  const [skillBonus, setSkillBonus] = useState(0);
-  const [selectedSave, setSelectedSave] = useState<AbilityKey | "">("");
-  const [saveBonus, setSaveBonus] = useState(0);
-  const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   useDiceRevealVersion();
+
+  const { rollFromCommand, handleDamageRoll } = useLiveSessionDiceRoll({
+    sessionId,
+    campaignId,
+    currentCharacter,
+    active: open,
+    onActivityPosted,
+  });
 
   const myHandRaise = useMemo(
     () => (currentUserId ? handRaises.find((r) => r.userId === currentUserId) ?? null : null),
@@ -142,31 +114,6 @@ export function LiveSessionActivityPanel({
     }
     return set;
   }, [activityLogs]);
-
-  useEffect(() => {
-    if (!open || !currentCharacter) return;
-    void Promise.all([
-      loadDnd5eCharacterSheet(campaignId, currentCharacter.id),
-      getCharacterEquipmentPayload(currentCharacter.id),
-    ]).then(([payload, equip]) => {
-      if (!payload) return;
-      const derived = sheetDerivedForRolls(payload);
-      const attacks = computeEquippedWeaponAttacks(
-        payload.sheet,
-        derived,
-        equip.items.filter((i) => !i.is_deleted),
-        equip.equipment,
-        payload.level,
-      );
-      setPrimaryAttack(attacks[0] ?? null);
-      if (selectedSkill) {
-        setSkillBonus(derived.skills[selectedSkill as Dnd5eSkillKey]?.total ?? 0);
-      }
-      if (selectedSave) {
-        setSaveBonus(derived.savingThrows[selectedSave]?.total ?? 0);
-      }
-    });
-  }, [campaignId, currentCharacter, open, selectedSkill, selectedSave]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -201,61 +148,6 @@ export function LiveSessionActivityPanel({
         }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Eintrag fehlgeschlagen.");
-      }
-    });
-  }
-
-  function postLiveDiceRoll(
-    input: Omit<
-      Parameters<typeof requestLiveDiceRoll>[0],
-      "sessionId" | "characterId" | "characterName"
-    >,
-  ) {
-    if (!currentCharacter) {
-      toast.error("Kein Charakter ausgewählt.");
-      return;
-    }
-    const characterId = currentCharacter.id;
-    const characterName = currentCharacter.name;
-    startTransition(async () => {
-      try {
-        let dropNx: number | undefined;
-        let dropNy: number | undefined;
-        let throwDirX: number | undefined;
-        let throwDirZ: number | undefined;
-        let throwStrength: number | undefined;
-        let isTap: boolean | undefined;
-        try {
-          const drop = await requestDiceDropPlacement({
-            sides: input.sides,
-            count: input.dice,
-          });
-          dropNx = drop.dropNx;
-          dropNy = drop.dropNy;
-          throwDirX = drop.throwDirX;
-          throwDirZ = drop.throwDirZ;
-          throwStrength = drop.throwStrength;
-          isTap = drop.isTap;
-        } catch {
-          // Escape / abgebrochen — kein Wurf
-          return;
-        }
-        const entry = await requestLiveDiceRoll({
-          sessionId,
-          characterId,
-          characterName,
-          ...input,
-          dropNx,
-          dropNy,
-          throwDirX,
-          throwDirZ,
-          throwStrength,
-          isTap,
-        });
-        onActivityPosted?.(entry);
-        // Crit/Fumble-FX + Sprechblase erst nach 3D-Animation (LiveSessionBoard).
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Wurf fehlgeschlagen.");
       }
     });
   }
@@ -333,31 +225,12 @@ export function LiveSessionActivityPanel({
     });
   }
 
-  function rollDice(sides: number, mode: DiceRollMode = rollMode, modifier = 0) {
-    postLiveDiceRoll({
-      kind: "dice",
-      dice: 1,
-      sides,
-      modifier,
-      mode,
-    });
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || !currentCharacter) return;
 
-    const parsed = parseRollCommand(trimmed);
-    if (parsed) {
-      postLiveDiceRoll({
-        kind: "dice",
-        dice: parsed.dice,
-        sides: parsed.sides,
-        modifier: parsed.modifier,
-        mode: rollMode,
-        label: parsed.dice > 1 ? `${parsed.dice}d${parsed.sides}` : undefined,
-      });
+    if (rollFromCommand(trimmed)) {
       setInput("");
       return;
     }
@@ -367,80 +240,6 @@ export function LiveSessionActivityPanel({
       speechText: truncateSpeechBubbleText(trimmed),
     });
     setInput("");
-  }
-
-  function handleSkillCheck() {
-    if (!currentCharacter || !selectedSkill) return;
-    const def = DND5E_SKILLS.find((s) => s.key === selectedSkill);
-    const label = def?.labelDe ?? selectedSkill;
-    postLiveDiceRoll({
-      kind: "skill",
-      dice: 1,
-      sides: 20,
-      modifier: skillBonus,
-      mode: rollMode,
-      label,
-      skillKey: selectedSkill,
-    });
-  }
-
-  function handleSavingThrow() {
-    if (!currentCharacter || !selectedSave) return;
-    const abilityLabel = ABILITY_LABELS_DE[selectedSave];
-    postLiveDiceRoll({
-      kind: "save",
-      dice: 1,
-      sides: 20,
-      modifier: saveBonus,
-      mode: rollMode,
-      label: `${abilityLabel}-Rettungswurf`,
-      saveAbility: selectedSave,
-    });
-  }
-
-  function handleAttackRoll() {
-    if (!currentCharacter) return;
-    const bonus = primaryAttack?.attackBonus ?? 0;
-    const weaponName = primaryAttack?.name ?? "Waffe";
-    postLiveDiceRoll({
-      kind: "attack",
-      dice: 1,
-      sides: 20,
-      modifier: bonus,
-      mode: rollMode,
-      weaponName,
-      damage: primaryAttack?.damage ?? null,
-      attackBonus: bonus,
-    });
-  }
-
-  function handleDamageRoll(
-    damageFormula: string | null | undefined,
-    critical: boolean,
-    requestId?: string,
-    weaponName?: string,
-  ) {
-    if (!currentCharacter || !damageFormula) {
-      toast.error("Kein Schadenswert für diese Waffe hinterlegt.");
-      return;
-    }
-    const parsed = parseRollCommand(damageFormula.replace(/\s+/g, ""));
-    if (!parsed) {
-      toast.error(`Schaden „${damageFormula}" konnte nicht gelesen werden.`);
-      return;
-    }
-    const diceCount = critical ? parsed.dice * 2 : parsed.dice;
-    postLiveDiceRoll({
-      kind: "damage",
-      dice: diceCount,
-      sides: parsed.sides,
-      modifier: parsed.modifier,
-      mode: "normal",
-      critical,
-      requestId,
-      damageFormula,
-      weaponName,
-    });
   }
 
   function resolveAttack(requestId: string, hit: boolean, critical = false) {
@@ -476,7 +275,7 @@ export function LiveSessionActivityPanel({
             <div className="min-w-0 flex-1">
               <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">Session-Chat</h2>
               <p className="font-libre text-[10px] text-gray-500">
-                {isPrepMode ? "Vorbereitung · Würfe & Aktionen testen" : "Würfe & Aktionen"}
+                {isPrepMode ? "Vorbereitung · Chat & Aktionen" : "Chat & Kampfprotokoll"}
               </p>
               {prepTestCharacters && prepTestCharacters.length > 0 ? (
                 <select
@@ -666,135 +465,6 @@ export function LiveSessionActivityPanel({
           </div>
 
           <div className="shrink-0 border-t border-amber-900/50 p-3 space-y-2">
-            {primaryAttack ? (
-              <p className="font-libre text-[9px] text-gray-500">
-                Waffe: <span className="text-gray-300">{primaryAttack.name}</span> · Angriff{" "}
-                {formatSigned(primaryAttack.attackBonus)} · Schaden {primaryAttack.damage}
-              </p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-1">
-              {DICE_SIDES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={!currentCharacter || pending}
-                  onClick={() => rollDice(s)}
-                  className="rounded border border-hero-border/50 bg-hero-dark/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40"
-                >
-                  w{s}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-1">
-              {(["normal", "advantage", "disadvantage"] as DiceRollMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setRollMode(mode)}
-                  className={`flex-1 rounded border px-1 py-1 font-barlow text-[9px] font-bold uppercase ${
-                    rollMode === mode
-                      ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
-                      : "border-hero-border/40 text-gray-500"
-                  }`}
-                >
-                  {mode === "advantage" ? "VOR" : mode === "disadvantage" ? "NACH" : "—"}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-1">
-              <select
-                value={selectedSkill}
-                onChange={(e) => {
-                  setSelectedSkill(e.target.value);
-                  if (!currentCharacter || !e.target.value) {
-                    setSkillBonus(0);
-                    return;
-                  }
-                  void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
-                    if (!payload) return;
-                    const derived = sheetDerivedForRolls(payload);
-                    const key = e.target.value as Dnd5eSkillKey;
-                    setSkillBonus(derived.skills[key]?.total ?? 0);
-                  });
-                }}
-                className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
-              >
-                <option value="">Fertigkeit…</option>
-                {DND5E_SKILLS.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.labelDe}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!selectedSkill || !currentCharacter || pending}
-                onClick={handleSkillCheck}
-                title="Fertigkeit würfeln"
-                className="rounded border border-hero-vibrant px-2 py-1 font-barlow text-[9px] font-bold uppercase text-hero-vibrant disabled:opacity-40"
-              >
-                <Dices className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {selectedSkill ? (
-              <p className="font-barlow text-[9px] text-gray-500">Fertigkeit: {formatSigned(skillBonus)}</p>
-            ) : null}
-
-            <div className="flex gap-1">
-              <select
-                value={selectedSave}
-                onChange={(e) => {
-                  const key = e.target.value as AbilityKey | "";
-                  setSelectedSave(key);
-                  if (!currentCharacter || !key) {
-                    setSaveBonus(0);
-                    return;
-                  }
-                  void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
-                    if (!payload) return;
-                    const derived = sheetDerivedForRolls(payload);
-                    setSaveBonus(derived.savingThrows[key]?.total ?? 0);
-                  });
-                }}
-                className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
-              >
-                <option value="">Rettungswurf…</option>
-                {ABILITY_KEYS.map((key) => (
-                  <option key={key} value={key}>
-                    {ABILITY_LABELS_DE[key]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!selectedSave || !currentCharacter || pending}
-                onClick={handleSavingThrow}
-                title="Rettungswurf würfeln"
-                className="rounded border border-accent-gold/70 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-gold disabled:opacity-40"
-              >
-                <Shield className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {selectedSave ? (
-              <p className="font-barlow text-[9px] text-gray-500">
-                Rettung: {formatSigned(saveBonus)}
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              disabled={!currentCharacter || pending}
-              onClick={handleAttackRoll}
-              className="flex w-full items-center justify-center gap-1 rounded border border-accent-blood/50 bg-accent-blood/10 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
-            >
-              <Swords className="h-3.5 w-3.5" />
-              Angriff würfeln
-              {primaryAttack ? ` (${formatSigned(primaryAttack.attackBonus)})` : ""}
-            </button>
-
             <div className="flex gap-1">
               {myHandRaise ? (
                 <button
@@ -841,7 +511,7 @@ export function LiveSessionActivityPanel({
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="2d6+3 / w20 +4"
+                placeholder="Nachricht oder 2d6+3"
                 className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white"
               />
               <button

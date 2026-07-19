@@ -86,6 +86,7 @@ import {
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
 import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
+import { LiveSessionDicePanel } from "@/src/components/session/LiveSessionDicePanel";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
 import {
   LiveSessionHandRaiseQueue,
@@ -1783,7 +1784,8 @@ export function LiveSessionBoard({
   const [showQuests, setShowQuests] = useState(false);
   const [downtimePlayerDismissed, setDowntimePlayerDismissed] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isDiceOpen, setIsDiceOpen] = useState(false);
   /** GM in Vorbereitung: Charakter zum Testen von Würfeln/Aktionen */
   const [prepTestCharacterId, setPrepTestCharacterId] = useState<string | null>(null);
   const [isEnding, startEndTransition] = useTransition();
@@ -5013,76 +5015,109 @@ export function LiveSessionBoard({
       />
 
       {!isGuest ? (
-        <LiveSessionActivityPanel
-          sessionId={sessionId}
-          campaignId={campaignId}
-          isGM={isGM && !forcePlayerView}
-          isPrepMode={isPrepMode}
-          open={isActivityOpen}
-          onToggle={() => setIsActivityOpen((v) => !v)}
-          logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
-          currentCharacter={activityCharacter}
-          prepTestCharacters={
-            isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
-              ? partyCharacters
-                  .filter((pc) => !pc.isSessionDummy)
-                  .map((pc) => ({ id: pc.id, name: pc.name }))
-              : undefined
-          }
-          prepTestCharacterId={prepTestCharacterId}
-          onPrepTestCharacterChange={setPrepTestCharacterId}
-          onActivityPosted={(entry) => {
-            setLiveState((prev) => {
-              if (!prev) return prev;
-              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
-              if (logs.some((l) => l.id === entry.id)) return prev;
-              const next = {
-                ...prev,
-                system_logs: [...logs, entry].slice(-120),
-              };
-              liveStateRef.current = next;
-              return next;
-            });
-          }}
-          onActivityCleared={() => {
-            setLiveState((prev) => {
-              if (!prev) return prev;
-              const next = { ...prev, system_logs: [] };
-              liveStateRef.current = next;
-              return next;
-            });
-          }}
-          onActivityDeleted={(entryId) => {
-            setLiveState((prev) => {
-              if (!prev) return prev;
-              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
-              const next = {
-                ...prev,
-                system_logs: logs.filter((l) => l.id !== entryId),
-              };
-              liveStateRef.current = next;
-              return next;
-            });
-          }}
-          handRaises={handRaises}
-          currentUserId={userId}
-          playerColorByCharacterId={playerColorByCharacterId}
-          onHandRaisesChanged={(next) => {
-            if (next === "refresh") {
-              void refreshLiveState();
-              return;
+        <>
+          <LiveSessionActivityPanel
+            sessionId={sessionId}
+            campaignId={campaignId}
+            isGM={isGM && !forcePlayerView}
+            isPrepMode={isPrepMode}
+            open={isChatOpen}
+            onToggle={() => setIsChatOpen((v) => !v)}
+            logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
+            currentCharacter={activityCharacter}
+            prepTestCharacters={
+              isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
+                ? partyCharacters
+                    .filter((pc) => !pc.isSessionDummy)
+                    .map((pc) => ({ id: pc.id, name: pc.name }))
+                : undefined
             }
-            setLiveState((prev) => {
-              if (!prev) return prev;
-              const updated = {
-                ...prev,
-                hand_raises: next,
-              };
-              liveStateRef.current = updated;
-              return updated;
-            });
-          }}
-        />
+            prepTestCharacterId={prepTestCharacterId}
+            onPrepTestCharacterChange={setPrepTestCharacterId}
+            onActivityPosted={(entry) => {
+              setLiveState((prev) => {
+                if (!prev) return prev;
+                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+                if (logs.some((l) => l.id === entry.id)) return prev;
+                const next = {
+                  ...prev,
+                  system_logs: [...logs, entry].slice(-120),
+                };
+                liveStateRef.current = next;
+                return next;
+              });
+            }}
+            onActivityCleared={() => {
+              setLiveState((prev) => {
+                if (!prev) return prev;
+                const next = { ...prev, system_logs: [] };
+                liveStateRef.current = next;
+                return next;
+              });
+            }}
+            onActivityDeleted={(entryId) => {
+              setLiveState((prev) => {
+                if (!prev) return prev;
+                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+                const next = {
+                  ...prev,
+                  system_logs: logs.filter((l) => l.id !== entryId),
+                };
+                liveStateRef.current = next;
+                return next;
+              });
+            }}
+            handRaises={handRaises}
+            currentUserId={userId}
+            playerColorByCharacterId={playerColorByCharacterId}
+            onHandRaisesChanged={(next) => {
+              if (next === "refresh") {
+                void refreshLiveState();
+                return;
+              }
+              setLiveState((prev) => {
+                if (!prev) return prev;
+                const updated = {
+                  ...prev,
+                  hand_raises: next,
+                };
+                liveStateRef.current = updated;
+                return updated;
+              });
+            }}
+          />
+          <LiveSessionDicePanel
+            sessionId={sessionId}
+            campaignId={campaignId}
+            open={isDiceOpen}
+            onToggle={() => setIsDiceOpen((v) => !v)}
+            chatOpen={isChatOpen}
+            currentCharacter={activityCharacter}
+            isPrepMode={isPrepMode}
+            prepTestCharacters={
+              isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
+                ? partyCharacters
+                    .filter((pc) => !pc.isSessionDummy)
+                    .map((pc) => ({ id: pc.id, name: pc.name }))
+                : undefined
+            }
+            prepTestCharacterId={prepTestCharacterId}
+            onPrepTestCharacterChange={setPrepTestCharacterId}
+            onActivityPosted={(entry) => {
+              setLiveState((prev) => {
+                if (!prev) return prev;
+                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+                if (logs.some((l) => l.id === entry.id)) return prev;
+                const next = {
+                  ...prev,
+                  system_logs: [...logs, entry].slice(-120),
+                };
+                liveStateRef.current = next;
+                return next;
+              });
+            }}
+          />
+        </>
       ) : null}
 
       {isGM && !forcePlayerView ? (
