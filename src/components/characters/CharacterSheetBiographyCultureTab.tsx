@@ -488,8 +488,6 @@ export function CharacterSheetBiographyCultureTab({
         )}
       </section>
 
-      <CharacterFlawSummary characterFlaws={characterFlaws} />
-
       <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-5">
         <h3 className="font-barlow text-sm font-bold uppercase text-accent-gold flex items-center gap-2 border-b border-hero-dark pb-2">
           <Globe className="h-4 w-4" />
@@ -742,6 +740,10 @@ export function CharacterSheetBiographyCultureTab({
         canManage={canManageConditionTokens}
         isGm={isGmViewer}
       />
+
+      <div className="mx-auto w-full max-w-2xl">
+        <CharacterFlawSummary characterFlaws={characterFlaws} />
+      </div>
     </div>
   );
 }
