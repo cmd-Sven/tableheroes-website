@@ -5,6 +5,11 @@ import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseGridConfig } from "@/src/lib/session/battlemap-grid";
 import {
+  feetToMovementCells,
+  movementCellsForBurst,
+} from "@/src/lib/session/battlemap-movement";
+import { parseSheetData } from "@/src/lib/characters/dnd5e/defaults";
+import {
   DEFAULT_BATTLEMAP_GRID,
   type BattlemapGridConfig,
   type BattlemapTokenSide,
@@ -226,12 +231,65 @@ export async function getBattlemapTokens(
   return (data ?? []).map((row: Record<string, unknown>) => normalizeToken(row));
 }
 
+export type CharacterMovementRange = {
+  speedFt: number;
+  baseCells: number;
+  maxCells: number;
+  maxCellsWithDash: number;
+};
+
+export async function getCharacterMovementRange(
+  characterId: string,
+): Promise<CharacterMovementRange> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data, error } = await (supabase.from("characters") as any)
+    .select("sheet_data, user_id, campaign_id")
+    .eq("id", characterId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Charakter nicht gefunden.");
+
+  const row = data as { sheet_data?: unknown; user_id?: string | null };
+  if (row.user_id !== user.id) {
+    const { data: gmCheck } = await (supabase.from("characters") as any)
+      .select("campaign_id")
+      .eq("id", characterId)
+      .maybeSingle();
+    const campaignId = (gmCheck as { campaign_id?: string } | null)?.campaign_id;
+    if (campaignId) {
+      const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+        .select("gm_id, owner_id")
+        .eq("id", campaignId)
+        .maybeSingle();
+      if (!isCampaignGm(campaignRaw as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+        throw new Error("Keine Berechtigung für diesen Charakter.");
+      }
+    }
+  }
+
+  const sheet = parseSheetData(row.sheet_data);
+  const speedFt = sheet?.combat.speed ?? 30;
+  const baseCells = feetToMovementCells(speedFt);
+  return {
+    speedFt,
+    baseCells,
+    maxCells: movementCellsForBurst(baseCells, false),
+    maxCellsWithDash: movementCellsForBurst(baseCells, true),
+  };
+}
+
 export async function placeBattlemapCharacterToken(input: {
   sessionId: string;
   battlemapId: string;
   characterId: string;
   gridX: number;
   gridY: number;
+  useDash?: boolean;
 }): Promise<SessionBattlemapToken> {
   const supabase = await createClient();
   const {
@@ -245,6 +303,7 @@ export async function placeBattlemapCharacterToken(input: {
     p_character_id: input.characterId,
     p_grid_x: input.gridX,
     p_grid_y: input.gridY,
+    p_use_dash: input.useDash === true,
   });
 
   if (error) throw new Error(error.message || "Token konnte nicht gesetzt werden.");

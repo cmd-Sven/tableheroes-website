@@ -1,4 +1,32 @@
+/**
+ * Battlemap-Roadmap (kurz):
+ * - Phase 3: Fog (`BattlemapFogState`), Mood-Badges, Initiative-Jump
+ * - Kein Follow-SL-Viewport (Zoom/Pan bleibt lokal)
+ * @see BATTLEMAP.md
+ */
+
 export type BattlemapTokenSide = "party" | "friendly" | "neutral" | "hostile";
+
+/** Phase 3 Stub — Fog-of-War-Zellenmaske */
+export type BattlemapFogState = {
+  battlemapId: string;
+  /** TODO Phase 3: sichtbare Zellen pro Client/SL */
+  revealedCells: Array<{ gridX: number; gridY: number }>;
+};
+
+export type CharacterTokenPlacement = {
+  characterId: string;
+  characterName: string;
+  /** Bewegung in ft aus Charakterbogen (serverseitig geladen) */
+  speedFt: number;
+  /** floor(speedFt / 5) */
+  baseCells: number;
+  useDash: boolean;
+  /** Erstplatzierung auf dieser Map — kein Distanzlimit */
+  isFirstPlacement: boolean;
+  originGridX?: number;
+  originGridY?: number;
+};
 
 export type BattlemapGridConfig = {
   cellSizePx: number;

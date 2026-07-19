@@ -75,6 +75,7 @@ export function BattlemapGmToolbar({
         disabled={pending}
         onChange={(e) => activate(e.target.value || null)}
         className="w-full rounded border border-hero-border bg-slate-900/90 px-2 py-1.5 text-xs text-white"
+        title="Alle Spieler sehen die gewählte Karte — Zoom bleibt lokal."
       >
         <option value="">Narrative Bühne (keine Map)</option>
         {battlemaps.map((m) => (
@@ -83,6 +84,9 @@ export function BattlemapGmToolbar({
           </option>
         ))}
       </select>
+      <p className="px-1 font-libre text-[9px] leading-snug text-gray-500">
+        Aktive Karte für alle · Zoom/Pan pro Spieler
+      </p>
       {activeBattlemapId ? (
         <>
           <button

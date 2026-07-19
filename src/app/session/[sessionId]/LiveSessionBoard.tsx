@@ -178,6 +178,7 @@ import { BattlemapGmToolbar } from "@/src/components/session/battlemap/Battlemap
 import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import {
   createBattlemapProp,
+  getCharacterMovementRange,
   getSessionBattlemaps,
   placeBattlemapCharacterToken,
   placeBattlemapGmToken,
@@ -187,12 +188,18 @@ import {
   updateBattlemapProp,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
+  CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
   SessionBattlemapProp,
   SessionBattlemapToken,
 } from "@/src/lib/session/battlemap-types";
+import {
+  isWithinMovementRange,
+  movementCellsForBurst,
+} from "@/src/lib/session/battlemap-movement";
+import { isCellBlockedByTokens } from "@/src/lib/session/battlemap-grid";
 
 type LiveState = {
   id: string;
@@ -1290,10 +1297,7 @@ export function LiveSessionBoard({
   const [sessionBattlemaps, setSessionBattlemaps] = useState<SessionBattlemap[]>([]);
   const [battlemapTokens, setBattlemapTokens] = useState<SessionBattlemapToken[]>([]);
   const [battlemapProps, setBattlemapProps] = useState<SessionBattlemapProp[]>([]);
-  const [tokenPlacement, setTokenPlacement] = useState<{
-    characterId: string;
-    characterName: string;
-  } | null>(null);
+  const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);
   const [gmTokenPlacement, setGmTokenPlacement] = useState<GmTokenPlacementDraft | null>(null);
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
   const [selectedBattlemapTokenId, setSelectedBattlemapTokenId] = useState<string | null>(null);
@@ -1557,6 +1561,37 @@ export function LiveSessionBoard({
 
   const [isUpdating, startTransition] = useTransition();
 
+  const startCharacterTokenPlacement = useCallback(
+    (characterId: string, characterName: string) => {
+      if (!activeBattlemapId) return;
+      const existing = battlemapTokens.find((t) => t.character_id === characterId);
+      startTransition(async () => {
+        try {
+          const range = await getCharacterMovementRange(characterId);
+          setTokenPlacement({
+            characterId,
+            characterName,
+            speedFt: range.speedFt,
+            baseCells: range.baseCells,
+            useDash: false,
+            isFirstPlacement: !existing,
+            originGridX: existing?.grid_x,
+            originGridY: existing?.grid_y,
+          });
+          setGmTokenPlacement(null);
+          setGmMoveTokenId(null);
+          setSelectedBattlemapTokenId(null);
+          setSelectedBattlemapPropId(null);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Bewegungsreichweite konnte nicht geladen werden.",
+          );
+        }
+      });
+    },
+    [activeBattlemapId, battlemapTokens, startTransition],
+  );
+
   const handleBattlemapCellClick = useCallback(
     (gridX: number, gridY: number) => {
       if (!activeBattlemapId) return;
@@ -1604,6 +1639,47 @@ export function LiveSessionBoard({
         toast.error("Bewegung ist pausiert — warte auf den Spielleiter.");
         return;
       }
+
+      const existingToken = battlemapTokens.find(
+        (t) => t.character_id === tokenPlacement.characterId,
+      );
+      if (
+        !tokenPlacement.isFirstPlacement &&
+        !isGM &&
+        tokenPlacement.originGridX != null &&
+        tokenPlacement.originGridY != null
+      ) {
+        const maxCells = movementCellsForBurst(
+          tokenPlacement.baseCells,
+          tokenPlacement.useDash,
+        );
+        if (
+          !isWithinMovementRange(
+            tokenPlacement.originGridX,
+            tokenPlacement.originGridY,
+            gridX,
+            gridY,
+            maxCells,
+          )
+        ) {
+          toast.error(
+            `Zu weit (${maxCells} Zellen erlaubt${tokenPlacement.useDash ? ", inkl. Dash" : ""}).`,
+          );
+          return;
+        }
+      }
+      if (
+        isCellBlockedByTokens(
+          battlemapTokens,
+          gridX,
+          gridY,
+          existingToken?.id,
+        )
+      ) {
+        toast.error("Zelle ist blockiert.");
+        return;
+      }
+
       startTransition(async () => {
         try {
           await placeBattlemapCharacterToken({
@@ -1612,8 +1688,13 @@ export function LiveSessionBoard({
             characterId: tokenPlacement.characterId,
             gridX,
             gridY,
+            useDash: tokenPlacement.useDash,
           });
-          toast.success(`Token für ${tokenPlacement.characterName} gesetzt.`);
+          toast.success(
+            tokenPlacement.isFirstPlacement
+              ? `Token für ${tokenPlacement.characterName} gesetzt.`
+              : `Token für ${tokenPlacement.characterName} bewegt.`,
+          );
           setTokenPlacement(null);
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
@@ -3937,6 +4018,11 @@ export function LiveSessionBoard({
                   setGmTokenPlacement(null);
                   setGmMoveTokenId(null);
                 }}
+                onToggleDash={() => {
+                  setTokenPlacement((prev) =>
+                    prev ? { ...prev, useDash: !prev.useDash } : prev,
+                  );
+                }}
                 onCellClick={handleBattlemapCellClick}
                 onSelectToken={(id) => {
                   setSelectedBattlemapTokenId(id);
@@ -4672,11 +4758,7 @@ export function LiveSessionBoard({
                               battlemapActive &&
                               !pc.isSessionDummy &&
                               (isGM || !liveState?.battlemap_movement_paused)
-                                ? () =>
-                                    setTokenPlacement({
-                                      characterId: pc.id,
-                                      characterName: pc.name,
-                                    })
+                                ? () => startCharacterTokenPlacement(pc.id, pc.name)
                                 : undefined
                             }
                           />
