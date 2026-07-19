@@ -46,7 +46,10 @@ type Props = {
   isGM: boolean;
   isPrepMode?: boolean;
   open: boolean;
-  onToggle: () => void;
+  /** Legacy: freistehender Toggle-Button. Side-Rail nutzt `embedded` + `onClose`. */
+  onToggle?: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
   logs: SessionActivityEntry[];
   currentCharacter: { id: string; name: string } | null;
   prepTestCharacters?: { id: string; name: string }[];
@@ -68,6 +71,8 @@ export function LiveSessionActivityPanel({
   isPrepMode = false,
   open,
   onToggle,
+  embedded = false,
+  onClose,
   logs,
   currentCharacter,
   prepTestCharacters,
@@ -252,25 +257,35 @@ export function LiveSessionActivityPanel({
     });
   }
 
+  const handleClose = onClose ?? onToggle;
+
   return (
     <>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="fixed right-0 top-[38%] z-40 -translate-y-1/2 rounded-l-lg border border-r-0 border-amber-800/70 bg-background-card/95 px-3 py-4 font-barlow text-xs font-bold uppercase tracking-wide text-hero-vibrant shadow-2xl transition-colors hover:bg-emerald-950"
-      >
-        <MessageSquare className="mx-auto mb-1 h-4 w-4" />
-        {open ? "Chat zu" : "Chat"}
-        {handRaises.length > 0 ? (
-          <span className="mt-1 flex items-center justify-center gap-0.5 font-barlow text-[9px] text-accent-gold">
-            <Hand className="h-3 w-3" />
-            {handRaises.length}
-          </span>
-        ) : null}
-      </button>
+      {!embedded ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="fixed right-0 top-[38%] z-40 -translate-y-1/2 rounded-l-lg border border-r-0 border-amber-800/70 bg-background-card/95 px-3 py-4 font-barlow text-xs font-bold uppercase tracking-wide text-hero-vibrant shadow-2xl transition-colors hover:bg-emerald-950"
+        >
+          <MessageSquare className="mx-auto mb-1 h-4 w-4" />
+          {open ? "Chat zu" : "Chat"}
+          {handRaises.length > 0 ? (
+            <span className="mt-1 flex items-center justify-center gap-0.5 font-barlow text-[9px] text-accent-gold">
+              <Hand className="h-3 w-3" />
+              {handRaises.length}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
 
       {open ? (
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md">
+        <div
+          className={`${
+            embedded
+              ? "flex h-full min-h-0 flex-col"
+              : "fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col"
+          } border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md`}
+        >
           <div className="flex items-center justify-between border-b border-amber-900/50 px-3 py-2">
             <div className="min-w-0 flex-1">
               <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">Session-Chat</h2>
@@ -306,7 +321,12 @@ export function LiveSessionActivityPanel({
                   <Eraser className="h-4 w-4" />
                 </button>
               ) : null}
-              <button type="button" onClick={onToggle} className="rounded p-1 text-gray-400 hover:text-white">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded p-1 text-gray-400 hover:text-white"
+                aria-label="Chat schließen"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>

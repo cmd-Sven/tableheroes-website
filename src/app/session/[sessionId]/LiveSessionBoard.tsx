@@ -85,8 +85,8 @@ import {
 } from "@/src/lib/session-weather";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
-import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
-import { LiveSessionDicePanel } from "@/src/components/session/LiveSessionDicePanel";
+import { LiveSessionSidePanels } from "@/src/components/session/LiveSessionSidePanels";
+import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
 import {
   LiveSessionHandRaiseQueue,
@@ -124,8 +124,6 @@ import {
 import { updateNpcMerchantAssignment } from "@/src/app/dashboard/campaigns/[id]/shop-actions";
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
-import { TravelDowntimeGmModal } from "@/src/components/session/TravelDowntimeGmModal";
-import { LootGmModal } from "@/src/components/session/LootGmModal";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
@@ -1291,10 +1289,8 @@ export function LiveSessionBoard({
   const [fateGmSettingsOpen, setFateGmSettingsOpen] = useState(false);
   const [weatherGmSettingsOpen, setWeatherGmSettingsOpen] = useState(false);
   const [tempGmSettingsOpen, setTempGmSettingsOpen] = useState(false);
-  const [travelGmModalOpen, setTravelGmModalOpen] = useState(false);
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
-  const [lootGmModalOpen, setLootGmModalOpen] = useState(false);
   const [sessionBattlemaps, setSessionBattlemaps] = useState<SessionBattlemap[]>([]);
   const [battlemapTokens, setBattlemapTokens] = useState<SessionBattlemapToken[]>([]);
   const [battlemapProps, setBattlemapProps] = useState<SessionBattlemapProp[]>([]);
@@ -1783,8 +1779,7 @@ export function LiveSessionBoard({
   );
   const [showQuests, setShowQuests] = useState(false);
   const [downtimePlayerDismissed, setDowntimePlayerDismissed] = useState(false);
-  const [isJournalOpen, setIsJournalOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [mainSidePanel, setMainSidePanel] = useState<MainSidePanelId | null>(null);
   const [isDiceOpen, setIsDiceOpen] = useState(false);
   /** GM in Vorbereitung: Charakter zum Testen von Würfeln/Aktionen */
   const [prepTestCharacterId, setPrepTestCharacterId] = useState<string | null>(null);
@@ -2179,6 +2174,14 @@ export function LiveSessionBoard({
     prepTestCharacterId,
     partyCharacters,
   ]);
+
+  const toggleMainSidePanel = useCallback((id: MainSidePanelId) => {
+    setMainSidePanel((prev) => (prev === id ? null : id));
+  }, []);
+
+  const closeMainSidePanel = useCallback(() => {
+    setMainSidePanel(null);
+  }, []);
 
   useEffect(() => {
     if (!isPrepMode || !isGM || forcePlayerView || currentPlayerCharacter) return;
@@ -3827,7 +3830,7 @@ export function LiveSessionBoard({
                 <div className="space-y-3">
                   <button
                     type="button"
-                    onClick={() => setTravelGmModalOpen(true)}
+                    onClick={() => toggleMainSidePanel("travel")}
                     className="flex w-full min-h-[4.5rem] items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-left backdrop-blur-md transition-colors hover:border-accent-gold/40 hover:bg-white/[0.12]"
                   >
                     <Map className="h-10 w-10 shrink-0 text-accent-gold" aria-hidden />
@@ -4167,42 +4170,6 @@ export function LiveSessionBoard({
                     });
                   }}
                 />
-              </div>
-            ) : null}
-            {isGM ? (
-              <div className="pointer-events-none absolute bottom-0 right-0 z-[28] flex flex-col items-end gap-2 p-3 md:p-5">
-                <button
-                  type="button"
-                  onClick={() => setTravelGmModalOpen(true)}
-                  className="pointer-events-auto flex items-center gap-2 rounded-xl border border-amber-700/60 bg-background-card/95 px-3 py-2 font-barlow text-[10px] font-extrabold uppercase tracking-wide text-amber-100 shadow-lg backdrop-blur-md transition-colors hover:bg-amber-950/50 sm:px-4 sm:py-2.5 sm:text-xs"
-                >
-                  <Map className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden />
-                  <span className="hidden min-[380px]:inline">{"Reise & FAP"}</span>
-                  <span className="min-[380px]:hidden">Reise</span>
-                  {liveState?.downtime_active ? (
-                    <span
-                      className="ml-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400 ring-2 ring-amber-400/40"
-                      title="Reise aktiv"
-                      aria-hidden
-                    />
-                  ) : null}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLootGmModalOpen(true)}
-                  className="pointer-events-auto flex items-center gap-2 rounded-xl border border-accent-gold/60 bg-background-card/95 px-3 py-2 font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold shadow-lg backdrop-blur-md transition-colors hover:bg-accent-gold/15 sm:px-4 sm:py-2.5 sm:text-xs"
-                >
-                  <Gift className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden />
-                  <span className="hidden min-[380px]:inline">Loot-Gun</span>
-                  <span className="min-[380px]:hidden">Loot</span>
-                  {liveState?.current_loot_id ? (
-                    <span
-                      className="ml-0.5 h-2 w-2 shrink-0 rounded-full bg-hero-vibrant ring-2 ring-hero-vibrant/40"
-                      title="Truhe auf der Bühne aktiv"
-                      aria-hidden
-                    />
-                  ) : null}
-                </button>
               </div>
             ) : null}
             <div className="pointer-events-none absolute inset-0 bg-radial-[ellipse_at_center] from-black/10 via-black/30 to-black/70" />
@@ -4881,42 +4848,6 @@ export function LiveSessionBoard({
       </div>
 
       {isGM ? (
-        <LootGmModal
-          open={lootGmModalOpen}
-          onClose={() => setLootGmModalOpen(false)}
-          sessionId={sessionId}
-          campaignId={campaignId}
-          activeLootId={liveState?.current_loot_id ?? null}
-          onClearStageLoot={() => {
-            updateLiveState({ current_loot_id: null, loot_hide_npcs: false });
-            writeSystemLog("loot_clear", "Die Beute-Truhe verschwindet von der Bühne.");
-          }}
-          onPublished={async () => {
-            await refreshLiveState();
-            router.refresh();
-            setLootGmModalOpen(false);
-          }}
-        />
-      ) : null}
-
-      {isGM ? (
-        <TravelDowntimeGmModal
-          open={travelGmModalOpen}
-          onClose={() => setTravelGmModalOpen(false)}
-          sessionId={sessionId}
-          partyCharacters={partyCharacters}
-          downtimeActive={!!liveState?.downtime_active}
-          downtimeCurrentDay={liveState?.downtime_current_day ?? 1}
-          downtimeTotalDays={liveState?.downtime_total_days ?? 1}
-          fapAllocations={liveState?.fap_allocations ?? {}}
-          onReload={async () => {
-            await refreshLiveState();
-            router.refresh();
-          }}
-        />
-      ) : null}
-
-      {isGM ? (
         <GmNpcSearchModal
           open={npcSearchModalOpen}
           onClose={() => setNpcSearchModalOpen(false)}
@@ -5015,109 +4946,140 @@ export function LiveSessionBoard({
       />
 
       {!isGuest ? (
-        <>
-          <LiveSessionActivityPanel
-            sessionId={sessionId}
-            campaignId={campaignId}
-            isGM={isGM && !forcePlayerView}
-            isPrepMode={isPrepMode}
-            open={isChatOpen}
-            onToggle={() => setIsChatOpen((v) => !v)}
-            logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
-            currentCharacter={activityCharacter}
-            prepTestCharacters={
-              isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
-                ? partyCharacters
-                    .filter((pc) => !pc.isSessionDummy)
-                    .map((pc) => ({ id: pc.id, name: pc.name }))
-                : undefined
+        <LiveSessionSidePanels
+          sessionId={sessionId}
+          campaignId={campaignId}
+          isGM={isGM && !forcePlayerView}
+          isPrepMode={isPrepMode}
+          mainPanel={mainSidePanel}
+          diceOpen={isDiceOpen}
+          onToggleMain={toggleMainSidePanel}
+          onToggleDice={() => setIsDiceOpen((v) => !v)}
+          onCloseMain={closeMainSidePanel}
+          handRaises={handRaises}
+          downtimeActive={!!liveState?.downtime_active}
+          lootActive={Boolean(liveState?.current_loot_id)}
+          logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
+          currentCharacter={activityCharacter}
+          prepTestCharacters={
+            isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
+              ? partyCharacters
+                  .filter((pc) => !pc.isSessionDummy)
+                  .map((pc) => ({ id: pc.id, name: pc.name }))
+              : undefined
+          }
+          prepTestCharacterId={prepTestCharacterId}
+          onPrepTestCharacterChange={setPrepTestCharacterId}
+          onActivityPosted={(entry) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+              if (logs.some((l) => l.id === entry.id)) return prev;
+              const next = {
+                ...prev,
+                system_logs: [...logs, entry].slice(-120),
+              };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          onActivityCleared={() => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, system_logs: [] };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          onActivityDeleted={(entryId) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+              const next = {
+                ...prev,
+                system_logs: logs.filter((l) => l.id !== entryId),
+              };
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          currentUserId={userId}
+          playerColorByCharacterId={playerColorByCharacterId}
+          onHandRaisesChanged={(next) => {
+            if (next === "refresh") {
+              void refreshLiveState();
+              return;
             }
-            prepTestCharacterId={prepTestCharacterId}
-            onPrepTestCharacterChange={setPrepTestCharacterId}
-            onActivityPosted={(entry) => {
-              setLiveState((prev) => {
-                if (!prev) return prev;
-                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
-                if (logs.some((l) => l.id === entry.id)) return prev;
-                const next = {
-                  ...prev,
-                  system_logs: [...logs, entry].slice(-120),
-                };
-                liveStateRef.current = next;
-                return next;
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const updated = {
+                ...prev,
+                hand_raises: next,
+              };
+              liveStateRef.current = updated;
+              return updated;
+            });
+          }}
+          systemLogs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
+          journalText={liveState?.journal_text ?? null}
+          canEditJournal={canEditJournal}
+          scribeId={liveState?.scribe_id ?? null}
+          onJournalChange={(text) => updateLiveState({ journal_text: text })}
+          scenes={allSceneMedia}
+          activeSceneId={liveState?.active_scene_media_id ?? null}
+          onShowScene={(id) => placeOnStage("scene", id)}
+          onRemoveScene={
+            isGM && !forcePlayerView
+              ? (id) => removeFromStage("scene", id)
+              : undefined
+          }
+          battlemaps={sessionBattlemaps}
+          activeBattlemapId={activeBattlemapId}
+          battlemapMovementPaused={liveState?.battlemap_movement_paused === true}
+          onBattlemapActiveChange={(id) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = normalizeLiveRow({ ...prev, active_battlemap_id: id });
+              liveStateRef.current = next;
+              return next;
+            });
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }}
+          onBattlemapMovementPausedChange={(paused) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = normalizeLiveRow({
+                ...prev,
+                battlemap_movement_paused: paused,
               });
-            }}
-            onActivityCleared={() => {
-              setLiveState((prev) => {
-                if (!prev) return prev;
-                const next = { ...prev, system_logs: [] };
-                liveStateRef.current = next;
-                return next;
-              });
-            }}
-            onActivityDeleted={(entryId) => {
-              setLiveState((prev) => {
-                if (!prev) return prev;
-                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
-                const next = {
-                  ...prev,
-                  system_logs: logs.filter((l) => l.id !== entryId),
-                };
-                liveStateRef.current = next;
-                return next;
-              });
-            }}
-            handRaises={handRaises}
-            currentUserId={userId}
-            playerColorByCharacterId={playerColorByCharacterId}
-            onHandRaisesChanged={(next) => {
-              if (next === "refresh") {
-                void refreshLiveState();
-                return;
-              }
-              setLiveState((prev) => {
-                if (!prev) return prev;
-                const updated = {
-                  ...prev,
-                  hand_raises: next,
-                };
-                liveStateRef.current = updated;
-                return updated;
-              });
-            }}
-          />
-          <LiveSessionDicePanel
-            sessionId={sessionId}
-            campaignId={campaignId}
-            open={isDiceOpen}
-            onToggle={() => setIsDiceOpen((v) => !v)}
-            chatOpen={isChatOpen}
-            currentCharacter={activityCharacter}
-            isPrepMode={isPrepMode}
-            prepTestCharacters={
-              isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
-                ? partyCharacters
-                    .filter((pc) => !pc.isSessionDummy)
-                    .map((pc) => ({ id: pc.id, name: pc.name }))
-                : undefined
-            }
-            prepTestCharacterId={prepTestCharacterId}
-            onPrepTestCharacterChange={setPrepTestCharacterId}
-            onActivityPosted={(entry) => {
-              setLiveState((prev) => {
-                if (!prev) return prev;
-                const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
-                if (logs.some((l) => l.id === entry.id)) return prev;
-                const next = {
-                  ...prev,
-                  system_logs: [...logs, entry].slice(-120),
-                };
-                liveStateRef.current = next;
-                return next;
-              });
-            }}
-          />
-        </>
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
+          partyCharacters={partyCharacters.map((pc) => ({
+            id: pc.id,
+            name: pc.name,
+            rations_count: pc.rations_count ?? 0,
+            starvation_days: pc.starvation_days ?? 0,
+          }))}
+          downtimeCurrentDay={liveState?.downtime_current_day ?? 1}
+          downtimeTotalDays={liveState?.downtime_total_days ?? 1}
+          fapAllocations={liveState?.fap_allocations ?? {}}
+          onTravelReload={async () => {
+            await refreshLiveState();
+            router.refresh();
+          }}
+          activeLootId={liveState?.current_loot_id ?? null}
+          onClearStageLoot={() => {
+            updateLiveState({ current_loot_id: null, loot_hide_npcs: false });
+            writeSystemLog("loot_clear", "Die Beute-Truhe verschwindet von der Bühne.");
+          }}
+          onLootPublished={async () => {
+            await refreshLiveState();
+            router.refresh();
+          }}
+        />
       ) : null}
 
       {isGM && !forcePlayerView ? (
@@ -5174,118 +5136,6 @@ export function LiveSessionBoard({
           />
         </>
       ) : null}
-
-      <button
-        type="button"
-        onClick={() => setIsJournalOpen((prev) => !prev)}
-        className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-lg border border-r-0 border-amber-800/70 bg-background-card/95 px-3 py-4 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold shadow-2xl transition-colors hover:bg-emerald-950"
-      >
-        📜 {isJournalOpen ? "Chronik schließen" : "Chronik öffnen"}
-      </button>
-
-      <AnimatePresence>
-        {isJournalOpen ? (
-          <motion.div
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-amber-900/60 bg-linear-to-b from-background-card/95 via-emerald-950/95 to-background-dark/95 shadow-2xl backdrop-blur-md"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            role="dialog"
-            aria-label="Chronik der Session"
-          >
-        <div className="flex items-center justify-between border-b border-amber-900/50 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-accent-gold" />
-            <div>
-              <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">
-                Chronik der Session
-              </h2>
-              <p className="font-libre text-[10px] text-gray-500">
-                System-Logs und Notizen des Chronisten
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsJournalOpen(false)}
-            className="rounded p-1 text-gray-400 hover:bg-background-dark hover:text-white transition-colors"
-            aria-label="Chronik schließen"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-          <section className="max-h-56 overflow-y-auto rounded border border-amber-900/50 bg-background-dark/80 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                System-Logs
-              </h3>
-              <span className="font-libre text-[10px] text-gray-500">
-                vorbereitet für Auto-Events
-              </span>
-            </div>
-            {systemLogs.length > 0 ? (
-              <ul className="space-y-2">
-                {systemLogs.map((log) => (
-                  <li
-                    key={log.id}
-                    className="rounded border border-accent-gold/30 bg-accent-gold/10 px-3 py-2 italic"
-                  >
-                    <p className="font-libre text-xs text-gray-200">{log.text}</p>
-                    {log.at && (
-                      <p className="mt-1 font-barlow text-[9px] uppercase text-gray-500">
-                        {log.at}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="font-libre text-xs italic text-gray-500">
-                Noch keine System-Logs. Später erscheinen hier automatisch Ereignisse wie
-                Ortswechsel, NPC-Reaktionen oder Szenenwechsel.
-              </p>
-            )}
-          </section>
-
-          <section className="flex min-h-0 flex-1 flex-col rounded border border-hero-border/30 bg-background-dark/80 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="font-barlow text-xs font-bold uppercase text-gray-200">
-                Manuelle Notizen
-              </h3>
-              {canEditJournal ? (
-                <span className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-hero-dark/60 px-2 py-0.5 font-barlow text-[10px] uppercase text-hero-vibrant">
-                  <PenSquare className="h-3 w-3" />
-                  Schreibrecht
-                </span>
-              ) : (
-                <span className="font-libre text-[10px] text-gray-500">
-                  Nur GM / Chronist kann bearbeiten
-                </span>
-              )}
-            </div>
-            <textarea
-              key={`${sessionId}-${liveState?.scribe_id ?? "none"}-${canEditJournal ? "edit" : "read"}`}
-              defaultValue={liveState?.journal_text || ""}
-              readOnly={!canEditJournal}
-              onBlur={(e) => {
-                if (!canEditJournal) return;
-                updateLiveState({ journal_text: e.target.value || null });
-              }}
-              placeholder="Notizen zur aktuellen Szene, wichtige Ereignisse, Zitate..."
-              className={`min-h-72 flex-1 resize-none rounded border border-hero-dark p-3 font-libre text-sm leading-relaxed outline-none ${
-                canEditJournal
-                  ? "bg-slate-900 text-white focus:border-hero-vibrant"
-                  : "bg-slate-900/50 text-gray-300"
-              }`}
-            />
-          </section>
-        </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
 
       {/* Stage Manager: Schnellzugriff (breit, ein Scrollbereich) */}
       {isGM && isStageManagerOpen && (

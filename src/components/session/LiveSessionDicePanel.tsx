@@ -13,9 +13,9 @@ type Props = {
   sessionId: string;
   campaignId: string;
   open: boolean;
-  onToggle: () => void;
-  /** Chat-Panel offen → Würfel-Panel daneben stapeln. */
-  chatOpen?: boolean;
+  onToggle?: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
   currentCharacter: { id: string; name: string } | null;
   isPrepMode?: boolean;
   prepTestCharacters?: { id: string; name: string }[];
@@ -29,7 +29,8 @@ export function LiveSessionDicePanel({
   campaignId,
   open,
   onToggle,
-  chatOpen = false,
+  embedded = false,
+  onClose,
   currentCharacter,
   isPrepMode = false,
   prepTestCharacters,
@@ -45,22 +46,28 @@ export function LiveSessionDicePanel({
     onActivityPosted,
   });
 
-  const offsetClass = chatOpen ? "right-80 max-sm:right-0" : "right-0";
+  const handleClose = onClose ?? onToggle;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`fixed ${offsetClass} top-[52%] z-40 -translate-y-1/2 rounded-l-lg border border-r-0 border-amber-800/70 bg-background-card/95 px-3 py-4 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold shadow-2xl transition-[right,background-color] hover:bg-emerald-950`}
-      >
-        <Dices className="mx-auto mb-1 h-4 w-4" />
-        {open ? "Würfel zu" : "Würfel"}
-      </button>
+      {!embedded ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="fixed right-0 top-[52%] z-40 -translate-y-1/2 rounded-l-lg border border-r-0 border-amber-800/70 bg-background-card/95 px-3 py-4 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold shadow-2xl transition-colors hover:bg-emerald-950"
+        >
+          <Dices className="mx-auto mb-1 h-4 w-4" />
+          {open ? "Würfel zu" : "Würfel"}
+        </button>
+      ) : null}
 
       {open ? (
         <div
-          className={`fixed inset-y-0 ${offsetClass} z-[49] flex w-full max-w-xs flex-col border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md transition-[right]`}
+          className={`${
+            embedded
+              ? "flex h-full min-h-0 flex-col"
+              : "fixed inset-y-0 right-0 z-[49] flex w-full max-w-sm flex-col"
+          } border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md`}
         >
           <div className="flex items-center justify-between border-b border-amber-900/50 px-3 py-2">
             <div className="min-w-0 flex-1">
@@ -84,7 +91,12 @@ export function LiveSessionDicePanel({
                 <p className="mt-0.5 truncate font-libre text-[10px] text-gray-400">{currentCharacter.name}</p>
               ) : null}
             </div>
-            <button type="button" onClick={onToggle} className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:text-white">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:text-white"
+              aria-label="Würfelfenster schließen"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
