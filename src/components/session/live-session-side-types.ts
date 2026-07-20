@@ -6,8 +6,9 @@ export type MainSidePanelId =
   | "travel"
   | "loot";
 
-/** Breite wie bisheriges Chat-Panel (`max-w-sm`). */
-export const LIVE_SESSION_SIDE_PANEL_WIDTH_CLASS = "w-full max-w-sm";
+/** Feste Breite wie bisheriges Chat-Panel — kein `w-full` (kollabiert in shrink-wrap Flex). */
+export const LIVE_SESSION_SIDE_PANEL_WIDTH_CLASS =
+  "w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0";
 
 /** Quadratische Icon-Leiste am rechten Rand. */
 export const LIVE_SESSION_SIDE_RAIL_WIDTH_CLASS = "w-11 shrink-0";

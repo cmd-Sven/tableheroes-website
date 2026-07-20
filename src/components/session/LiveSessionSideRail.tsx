@@ -99,29 +99,32 @@ export function LiveSessionSideRail({
       onClick: () => onToggleMain("chat"),
       badge: handRaiseCount,
     },
-    {
-      id: "chronicle",
-      label: "Chronik",
-      icon: BookOpen,
-      active: mainPanel === "chronicle",
-      onClick: () => onToggleMain("chronicle"),
-    },
-    {
-      id: "scenes",
-      label: "Szenen",
-      icon: ImageIcon,
-      active: mainPanel === "scenes",
-      onClick: () => onToggleMain("scenes"),
-    },
-    {
-      id: "battlemaps",
-      label: "Battlemaps",
-      icon: Map,
-      active: mainPanel === "battlemaps",
-      onClick: () => onToggleMain("battlemaps"),
-    },
     ...(isGM
       ? ([
+          {
+            id: "chronicle",
+            label: "Chronik",
+            icon: BookOpen,
+            active: mainPanel === "chronicle",
+            onClick: () => onToggleMain("chronicle"),
+            gmOnly: true,
+          },
+          {
+            id: "scenes",
+            label: "Szenen",
+            icon: ImageIcon,
+            active: mainPanel === "scenes",
+            onClick: () => onToggleMain("scenes"),
+            gmOnly: true,
+          },
+          {
+            id: "battlemaps",
+            label: "Battlemaps",
+            icon: Map,
+            active: mainPanel === "battlemaps",
+            onClick: () => onToggleMain("battlemaps"),
+            gmOnly: true,
+          },
           {
             id: "travel",
             label: "Reise & FAP",
