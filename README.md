@@ -112,6 +112,8 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 Details zur Battlemap: [`BATTLEMAP.md`](./BATTLEMAP.md). Weitere Fach-Docs: `FACTIONS_SYSTEM_README.md`, `WORLD_LORE_SYSTEM.md`, `PLAYER_VIEW_UPDATE.md`, `PROJECT_STRUCTURE.md`.
 
+**Roadmap auf GitHub:** Milestone [VTT-Alternative (Roll20 / Foundry)](https://github.com/cmd-Sven/tableheroes-website/milestone/1) — bestehende Features als geschlossene Issues (`status:done`), geplante VTT-Meilensteine als offene Issues (`status:planned`).
+
 ---
 
 ## Projektstruktur (Kurz)
