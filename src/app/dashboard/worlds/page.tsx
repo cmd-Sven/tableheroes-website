@@ -58,9 +58,9 @@ export default async function WorldsPage() {
     );
   }
 
-  // Kein blueprint in der Liste — nur Meta für Cards.
+  // Schlanke Liste: Genre/Tech aus genre_style + blueprint->vibes (kein volles Blueprint).
   const { data: worldsRaw } = await (supabase.from("worlds") as any)
-    .select("id, name, description, created_at")
+    .select("id, name, description, created_at, genre_style, vibes:blueprint->vibes")
     .eq("gm_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -70,6 +70,8 @@ export default async function WorldsPage() {
       name: string;
       description: string | null;
       created_at: string;
+      genre_style?: string | null;
+      vibes?: { genre?: string; tech_level?: string } | null;
     }[]) || [];
   const worldIds = worldList.map((w) => w.id);
 
@@ -166,6 +168,10 @@ export default async function WorldsPage() {
 
   const worlds = worldList.map((w) => {
     const images = imagesByWorld[w.id] ?? [];
+    const vibes =
+      w.vibes && typeof w.vibes === "object"
+        ? (w.vibes as { genre?: string; tech_level?: string })
+        : null;
     return {
       ...w,
       entries_count:
@@ -178,8 +184,8 @@ export default async function WorldsPage() {
       faction_count: factionCountByWorld[w.id] ?? 0,
       campaigns_count: campaignsByWorld[w.id] ?? 0,
       images,
-      genre: null as string | null,
-      tech_level: null as string | null,
+      genre: (w.genre_style?.trim() || vibes?.genre?.trim() || null) as string | null,
+      tech_level: (vibes?.tech_level?.trim() || null) as string | null,
     };
   });
 
