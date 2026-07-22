@@ -22,22 +22,22 @@ import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import type { LayoutItem } from "@/src/lib/utils/layout-engine";
 import { InboxCard } from "@/src/components/dashboard/InboxCard";
-import {
-  HeroSlider,
-  type HeroSliderCharacter,
-} from "@/src/components/dashboard/HeroSlider";
-import { PointsCard } from "@/src/components/dashboard/PointsCard";
+import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
 import { AchievementsCard } from "@/src/components/dashboard/AchievementsCard";
 import { MyCampaignsCard } from "@/src/components/dashboard/MyCampaignsCard";
-import { OpenCampaignsCard } from "@/src/components/dashboard/OpenCampaignsCard";
 import { LoreSnippetCard } from "@/src/components/dashboard/LoreSnippetCard";
 import { DailyComicCard } from "@/src/components/dashboard/DailyComicCard";
 import { NewsInfoCard } from "@/src/components/dashboard/NewsInfoCard";
 import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 import { SupportCard } from "@/src/components/dashboard/SupportCard";
-import { AchievementCongratulationsModal } from "@/src/components/dashboard/AchievementCongratulationsModal";
 import { AcceptanceNotification } from "@/src/app/dashboard/AcceptanceNotification";
-import { PlayerDashboardTutorial } from "@/src/components/dashboard/PlayerDashboardTutorial";
+import {
+  AchievementCongratulationsModal,
+  HeroSlider,
+  OpenCampaignsCard,
+  PlayerDashboardTutorial,
+  PointsCard,
+} from "@/src/components/dashboard/dashboard-dynamic";
 import type { PlayerMessage } from "@/src/lib/actions/message-actions";
 import type { DashboardLoreEntry, UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
