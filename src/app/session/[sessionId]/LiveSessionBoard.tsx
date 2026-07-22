@@ -1545,7 +1545,10 @@ export function LiveSessionBoard({
   const refreshLiveState = useCallback(async () => {
     const { data, error } = await supabase
       .from("session_live_states")
-      .select("*")
+      .select(
+        // Keep in sync with src/lib/session/live-state-columns.ts
+        "session_id, weather, weather_preset, weather_intensity, weather_temperature, temperature, temperature_value, current_location, current_location_id, current_location_lore_id, current_time, in_game_date, in_game_time, journal_text, physically_present_user_ids, scribe_id, system_logs, hand_raises, visible_npc_ids, visible_faction_ids, visible_creature_ids, active_scene_media_id, active_battlemap_id, battlemap_movement_paused, background_url, is_background_manual_override, is_combat_mode, current_turn_index, combat_round, active_shop_id, active_merchant_npc_id, current_loot_id, loot_hide_npcs, fate_coins, destroyed_fate_coins, dummy_player_count, guest_slots, downtime_active, downtime_type, downtime_current_day, downtime_total_days, fap_allocations, updated_at",
+      )
       .eq("session_id", sessionId)
       .maybeSingle();
     if (!error && data) {

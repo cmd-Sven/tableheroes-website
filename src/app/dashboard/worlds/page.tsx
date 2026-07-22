@@ -3,6 +3,23 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Globe, ArrowLeft } from "lucide-react";
 import { WorldsListClient } from "./WorldsListClient";
+import { LOCATION_TYPES } from "@/src/lib/lore-types";
+
+const THUMBS_PER_WORLD = 4;
+
+function pushThumb(
+  imagesByWorld: Record<string, Array<{ url: string; description: string }>>,
+  worldId: string,
+  url: string | null | undefined,
+  description: string,
+) {
+  const trimmed = url?.trim();
+  if (!trimmed) return;
+  const list = imagesByWorld[worldId];
+  if (!list || list.length >= THUMBS_PER_WORLD) return;
+  if (list.some((img) => img.url === trimmed)) return;
+  list.push({ url: trimmed, description });
+}
 
 export default async function WorldsPage() {
   const supabase = await createClient();
@@ -41,12 +58,19 @@ export default async function WorldsPage() {
     );
   }
 
+  // Kein blueprint in der Liste — nur Meta für Cards.
   const { data: worldsRaw } = await (supabase.from("worlds") as any)
-    .select("id, name, description, created_at, blueprint")
+    .select("id, name, description, created_at")
     .eq("gm_id", user.id)
     .order("created_at", { ascending: false });
 
-  const worldList = (worldsRaw as { id: string; name: string; description: string | null; created_at: string; blueprint?: unknown }[]) || [];
+  const worldList =
+    (worldsRaw as {
+      id: string;
+      name: string;
+      description: string | null;
+      created_at: string;
+    }[]) || [];
   const worldIds = worldList.map((w) => w.id);
 
   const npcCountByWorld: Record<string, number> = {};
@@ -66,64 +90,96 @@ export default async function WorldsPage() {
       imagesByWorld[id] = [];
     });
 
-    const [npcsRes, loreRes, factionsRes, campaignsRes] = await Promise.all([
-      (supabase.from("npcs") as any).select("world_id, image_url").in("world_id", worldIds),
-      (supabase.from("world_lore") as any).select("world_id, image_url, additional_images, name, type").in("world_id", worldIds),
-      (supabase.from("factions") as any).select("world_id, image_url, banner_url").in("world_id", worldIds),
+    // Counts: nur world_id (+ type für Orte). Thumbnails: begrenzte Rows mit URL.
+    const [
+      npcCountRes,
+      loreCountRes,
+      factionCountRes,
+      campaignsRes,
+      npcThumbsRes,
+      loreThumbsRes,
+      factionThumbsRes,
+    ] = await Promise.all([
+      (supabase.from("npcs") as any).select("world_id").in("world_id", worldIds),
+      (supabase.from("world_lore") as any)
+        .select("world_id, type")
+        .in("world_id", worldIds),
+      (supabase.from("factions") as any).select("world_id").in("world_id", worldIds),
       (supabase.from("campaigns") as any).select("world_id").in("world_id", worldIds),
+      (supabase.from("npcs") as any)
+        .select("world_id, image_url")
+        .in("world_id", worldIds)
+        .not("image_url", "is", null)
+        .limit(Math.max(worldIds.length * THUMBS_PER_WORLD, THUMBS_PER_WORLD)),
+      (supabase.from("world_lore") as any)
+        .select("world_id, image_url, name")
+        .in("world_id", worldIds)
+        .not("image_url", "is", null)
+        .limit(Math.max(worldIds.length * THUMBS_PER_WORLD, THUMBS_PER_WORLD)),
+      (supabase.from("factions") as any)
+        .select("world_id, image_url, banner_url")
+        .in("world_id", worldIds)
+        .or("image_url.not.is.null,banner_url.not.is.null")
+        .limit(Math.max(worldIds.length * THUMBS_PER_WORLD, THUMBS_PER_WORLD)),
     ]);
 
-    (npcsRes.data || []).forEach((r: { world_id: string; image_url?: string | null }) => {
-      if (r.world_id) {
-        npcCountByWorld[r.world_id] = (npcCountByWorld[r.world_id] ?? 0) + 1;
-        if (r.image_url?.trim()) {
-          imagesByWorld[r.world_id]!.push({ url: r.image_url.trim(), description: "NPC" });
-        }
+    (npcCountRes.data || []).forEach((r: { world_id: string }) => {
+      if (r.world_id) npcCountByWorld[r.world_id] = (npcCountByWorld[r.world_id] ?? 0) + 1;
+    });
+    (loreCountRes.data || []).forEach((r: { world_id: string; type?: string }) => {
+      if (!r.world_id) return;
+      loreCountByWorld[r.world_id] = (loreCountByWorld[r.world_id] ?? 0) + 1;
+      if ((LOCATION_TYPES as readonly string[]).includes(r.type ?? "")) {
+        locationCountByWorld[r.world_id] = (locationCountByWorld[r.world_id] ?? 0) + 1;
       }
     });
-    (loreRes.data || []).forEach((r: { world_id: string; image_url?: string | null; additional_images?: unknown; name?: string; type?: string }) => {
-      if (r.world_id) {
-        loreCountByWorld[r.world_id] = (loreCountByWorld[r.world_id] ?? 0) + 1;
-        const isLocation = ["Stadt", "Region", "Insel", "Gebäude", "Tempel", "Dorf", "Ort"].includes(r.type ?? "");
-        if (isLocation) locationCountByWorld[r.world_id] = (locationCountByWorld[r.world_id] ?? 0) + 1;
-        if (r.image_url?.trim()) {
-          imagesByWorld[r.world_id]!.push({ url: r.image_url.trim(), description: r.name || r.type || "Lore" });
-        }
-        if (r.additional_images && Array.isArray(r.additional_images)) {
-          (r.additional_images as Array<{ url?: string; description?: string }>).forEach((img) => {
-            if (img?.url?.trim()) {
-              imagesByWorld[r.world_id]!.push({ url: img.url.trim(), description: img.description || r.name || "Bild" });
-            }
-          });
-        }
-      }
-    });
-    (factionsRes.data || []).forEach((r: { world_id: string; image_url?: string | null; banner_url?: string | null }) => {
+    (factionCountRes.data || []).forEach((r: { world_id: string }) => {
       if (r.world_id) {
         factionCountByWorld[r.world_id] = (factionCountByWorld[r.world_id] ?? 0) + 1;
-        if (r.image_url?.trim()) imagesByWorld[r.world_id]!.push({ url: r.image_url!.trim(), description: "Fraktion" });
-        if (r.banner_url?.trim()) imagesByWorld[r.world_id]!.push({ url: r.banner_url!.trim(), description: "Banner" });
       }
     });
     (campaignsRes.data || []).forEach((r: { world_id: string }) => {
       if (r.world_id) campaignsByWorld[r.world_id] = (campaignsByWorld[r.world_id] ?? 0) + 1;
     });
+
+    (npcThumbsRes.data || []).forEach(
+      (r: { world_id: string; image_url?: string | null }) => {
+        pushThumb(imagesByWorld, r.world_id, r.image_url, "NPC");
+      },
+    );
+    (loreThumbsRes.data || []).forEach(
+      (r: { world_id: string; image_url?: string | null; name?: string }) => {
+        pushThumb(imagesByWorld, r.world_id, r.image_url, r.name || "Lore");
+      },
+    );
+    (factionThumbsRes.data || []).forEach(
+      (r: {
+        world_id: string;
+        image_url?: string | null;
+        banner_url?: string | null;
+      }) => {
+        pushThumb(imagesByWorld, r.world_id, r.image_url, "Fraktion");
+        pushThumb(imagesByWorld, r.world_id, r.banner_url, "Banner");
+      },
+    );
   }
 
   const worlds = worldList.map((w) => {
     const images = imagesByWorld[w.id] ?? [];
-    const bp = w.blueprint as { vibes?: { genre?: string; tech_level?: string; magic_prevalence?: string } } | null;
     return {
       ...w,
-      entries_count: (npcCountByWorld[w.id] ?? 0) + (loreCountByWorld[w.id] ?? 0) + (factionCountByWorld[w.id] ?? 0),
+      entries_count:
+        (npcCountByWorld[w.id] ?? 0) +
+        (loreCountByWorld[w.id] ?? 0) +
+        (factionCountByWorld[w.id] ?? 0),
       npc_count: npcCountByWorld[w.id] ?? 0,
       lore_count: loreCountByWorld[w.id] ?? 0,
       location_count: locationCountByWorld[w.id] ?? 0,
       faction_count: factionCountByWorld[w.id] ?? 0,
       campaigns_count: campaignsByWorld[w.id] ?? 0,
-      images: images,
-      genre: bp?.vibes?.genre ?? null,
-      tech_level: bp?.vibes?.tech_level ?? null,
+      images,
+      genre: null as string | null,
+      tech_level: null as string | null,
     };
   });
 

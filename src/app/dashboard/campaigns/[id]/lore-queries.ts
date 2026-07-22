@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { LORE_LIST_SELECT } from "@/src/lib/queries/entity-list-columns";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 
@@ -34,7 +35,7 @@ export async function getLoreEntries(campaignId: string) {
   }
 
   const { data: lore, error } = await (supabase.from("world_lore") as any)
-    .select("*")
+    .select(LORE_LIST_SELECT)
     .eq("world_id", campaign.world_id)
     .order("created_at", { ascending: true });
 
@@ -159,7 +160,7 @@ export async function getLoreLocationOptions(campaignId: string) {
   }
 
   const { data: lore, error } = await (supabase.from("world_lore") as any)
-    .select("id, name, type")
+    .select("id, name, type, image_url, default_image_url")
     .eq("world_id", campaign.world_id)
     .order("name", { ascending: true });
 
@@ -170,12 +171,15 @@ export async function getLoreLocationOptions(campaignId: string) {
 
   const visibility = await getVisibilityForCampaign(campaignId, "lore");
 
-  return ((lore as { id: string; name: string; type: string }[]) || [])
+  return ((lore as { id: string; name: string; type: string; image_url?: string | null; default_image_url?: string | null }[]) || [])
     .filter((entry) => isLocationType(entry.type))
     .filter((entry) => isGM || visibility[entry.id] === true)
     .map((entry) => ({
       id: String(entry.id),
       name: String(entry.name),
       type: String(entry.type),
+      image_url: entry.image_url != null ? String(entry.image_url) : null,
+      default_image_url:
+        entry.default_image_url != null ? String(entry.default_image_url) : null,
     }));
 }

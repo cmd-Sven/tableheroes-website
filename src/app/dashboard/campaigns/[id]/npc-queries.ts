@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/src/lib/supabase/server";
 import { logPostgrestError } from "@/src/lib/supabase/format-postgrest-error";
+import { NPC_LIST_SELECT } from "@/src/lib/queries/entity-list-columns";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 
 /**
@@ -25,7 +26,7 @@ export async function getNPCs(campaignId: string, userId: string, isGM: boolean 
   if (!campaign || !campaign.world_id) return [];
 
   const { data: npcsRaw, error } = await (supabase.from("npcs") as any)
-    .select("*")
+    .select(NPC_LIST_SELECT)
     .eq("world_id", campaign.world_id)
     .order("created_at", { ascending: false });
 
