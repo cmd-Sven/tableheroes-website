@@ -63,8 +63,6 @@ import {
   type CombatConditionId,
   type CombatParticipantSide,
 } from "@/src/lib/combat-initiative";
-import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
-import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import {
   getCampaignNote,
@@ -83,8 +81,29 @@ import {
   WEATHER_PRESETS,
   type WeatherPresetId,
 } from "@/src/lib/session-weather";
-import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
-import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
+import {
+  BattlemapGmToolbar,
+  BattlemapStage,
+  BattlemapTokenTray,
+  BeastDefeatLootModal,
+  ChronicleInboxFeed,
+  ChronicleLiveMarkerBar,
+  ChronicleMicMonitor,
+  ChronicleMicTestPanel,
+  ChronicleRecorderPanel,
+  ChronicleRecordingNoticeModal,
+  ChronicleRecordingReminderBanner,
+  ChronicleRecordingTopBar,
+  CombatInitiativeBar,
+  DiceRollOverlay,
+  Dnd5eCharacterSheetModalWithLocale,
+  DowntimePlayerOverlay,
+  GmBeastSearchModal,
+  GmNpcSearchModal,
+  LiveStageShopOverlay,
+  PrivateInventoryModal,
+  SessionEndWrapUpModal,
+} from "./live-session-dynamic";
 import { LiveSessionSidePanels } from "@/src/components/session/LiveSessionSidePanels";
 import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
@@ -100,7 +119,6 @@ import {
   dispatchAvatarSpeechBubble,
   speechBubbleFromActivityEntry,
 } from "@/src/lib/session/avatar-speech-bubble";
-import { DiceRollOverlay } from "@/src/components/session/dice/DiceRollOverlay";
 import { shouldAnimateDiceEntry } from "@/src/lib/session/dice-animation";
 import {
   useDiceRevealBridge,
@@ -116,7 +134,6 @@ import {
   type SessionHandRaise,
 } from "@/src/lib/session/hand-raises";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
-import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
   StageNpcShopControls,
   type LiveCampaignShopOption,
@@ -125,29 +142,15 @@ import { updateNpcMerchantAssignment } from "@/src/app/dashboard/campaigns/[id]/
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
-import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
-import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
-import { GmBeastSearchModal } from "@/src/components/session/GmBeastSearchModal";
 import { StageBeastCard } from "@/src/components/session/StageBeastCard";
-import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootModal";
 import {
   setCreatureDefeated,
   setCreatureDiscovery,
   type CampaignCreatureStateRow,
 } from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
 import type { BeastDiscoveryKey } from "@/src/lib/beast-check-results";
-import { ChronicleRecorderPanel } from "@/src/components/session/ChronicleRecorderPanel";
-import { ChronicleInboxFeed } from "@/src/components/chronicle/ChronicleInboxFeed";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
-import { ChronicleMicTestPanel } from "@/src/components/session/ChronicleMicTestPanel";
-import { ChronicleRecordingTopBar } from "@/src/components/session/ChronicleRecordingTopBar";
-import {
-  ChronicleLiveMarkerBar,
-} from "@/src/components/session/ChronicleLiveMarkerBar";
-import { ChronicleRecordingNoticeModal } from "@/src/components/session/ChronicleRecordingNoticeModal";
-import { ChronicleRecordingReminderBanner } from "@/src/components/session/ChronicleRecordingReminderBanner";
-import { ChronicleMicMonitor } from "@/src/components/session/ChronicleMicMonitor";
 import { useSessionChronicleRecorder } from "@/src/hooks/useSessionChronicleRecorder";
 import { useSessionTranscriptionStatus } from "@/src/hooks/useSessionTranscriptionStatus";
 import { useMicMonitor } from "@/src/hooks/useMicMonitor";
@@ -172,9 +175,6 @@ import {
   imageDisplayObjectStyle,
   normalizeImageDisplay,
 } from "@/src/lib/image-display";
-import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
-import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
-import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import {
   createBattlemapProp,
   getCharacterMovementRange,
@@ -4850,7 +4850,7 @@ export function LiveSessionBoard({
         )}
       </div>
 
-      {isGM ? (
+      {isGM && npcSearchModalOpen ? (
         <GmNpcSearchModal
           open={npcSearchModalOpen}
           onClose={() => setNpcSearchModalOpen(false)}
@@ -4864,7 +4864,7 @@ export function LiveSessionBoard({
         />
       ) : null}
 
-      {isGM ? (
+      {isGM && beastSearchModalOpen ? (
         <GmBeastSearchModal
           open={beastSearchModalOpen}
           onClose={() => setBeastSearchModalOpen(false)}
@@ -5558,25 +5558,27 @@ export function LiveSessionBoard({
         <ChronicleLiveMarkerBar recorder={chronicleRecorder} />
       ) : null}
 
-      <SessionEndWrapUpModal
-        open={wrapUpOpen}
-        onClose={() => setWrapUpOpen(false)}
-        sessionId={sessionId}
-        campaignId={campaignId}
-        isRecordingActive={
-          chronicleRecorder.phase === "recording" ||
-          chronicleRecorder.phase === "paused" ||
-          liveTranscriptionStatus === "recording" ||
-          liveTranscriptionStatus === "paused"
-        }
-        onStopRecording={() => chronicleRecorder.stopRecording()}
-        onComplete={(path) => {
-          setWrapUpOpen(false);
-          startEndTransition(() => {
-            router.push(path);
-          });
-        }}
-      />
+      {wrapUpOpen ? (
+        <SessionEndWrapUpModal
+          open={wrapUpOpen}
+          onClose={() => setWrapUpOpen(false)}
+          sessionId={sessionId}
+          campaignId={campaignId}
+          isRecordingActive={
+            chronicleRecorder.phase === "recording" ||
+            chronicleRecorder.phase === "paused" ||
+            liveTranscriptionStatus === "recording" ||
+            liveTranscriptionStatus === "paused"
+          }
+          onStopRecording={() => chronicleRecorder.stopRecording()}
+          onComplete={(path) => {
+            setWrapUpOpen(false);
+            startEndTransition(() => {
+              router.push(path);
+            });
+          }}
+        />
+      ) : null}
       <style>{`
         @keyframes npc-reaction-float {
           0% {
