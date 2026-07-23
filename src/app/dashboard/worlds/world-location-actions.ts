@@ -5,7 +5,11 @@ import { createClient } from "@/src/lib/supabase/server";
 import type { WorldBlueprint } from "@/src/types/world";
 import { buildBlueprintContext } from "./world-npc-actions";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY ist nicht konfiguriert.");
+  return new OpenAI({ apiKey });
+}
 
 export type GeneratedLocationResult = {
   name: string;
@@ -93,7 +97,7 @@ Antworte NUR mit einem JSON-Objekt: { "name": "string", "description": "string",
     ? options.briefing.trim()
     : `Beschreibe einen ${options.type} in der Welt ${world.name}.`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [

@@ -12,7 +12,13 @@ import { compressImageBufferToWebp } from "@/src/lib/image-compress-server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY ist nicht konfiguriert.");
+  }
+  return new OpenAI({ apiKey });
+}
 
 const NPC_ALIGNMENT_VALUES = [
   "Lawful Good",
@@ -245,7 +251,7 @@ Zusätzlich MUSS das Objekt das Feld "suggested_secret" enthalten: ein Geheimnis
 
   const userMessage = (prompt && String(prompt).trim()) ? String(prompt).trim() : "Erstelle einen passenden NPC für diese Welt.";
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -358,7 +364,7 @@ Antworte NUR mit einem JSON-Objekt mit genau einem Feld: "${section}" (String, D
 
   const userMessage = (prompt && String(prompt).trim()) ? String(prompt).trim() : `Generiere nur die Sektion "${section}".`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -407,7 +413,7 @@ Antworte NUR mit einem JSON-Objekt mit genau zwei Feldern (Deutsch):
 - "relationType": Kurzer Beziehungstyp (z.B. "Ehemalige Rivalen", "Verbündete", "Meister und Schüler")
 - "description": 2–3 Sätze, die die Beziehung erklären und optional in den Hauptkonflikt der Welt einbinden (z.B. "Ehemalige Rivalen während des Krieges um X").`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -458,7 +464,7 @@ Antworte NUR mit einem JSON-Objekt mit genau zwei Feldern (Deutsch):
 - "relationType": Kurzer Beziehungstyp (z.B. "Geheimes Mitglied der Diebesgilde", "Gesuchter Ketzer")
 - "description": 2–3 Sätze, die erklären, wie der NPC und die Fraktion zueinander stehen und idealerweise den Hauptkonflikt der Welt einbinden.`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -561,7 +567,7 @@ Antworte NUR mit einem JSON-Objekt mit genau drei Feldern (Deutsch wo sinnvoll):
 - "new_entities": Array von { "type": "location"|"faction"|"npc", "proposed_name": "Vorschlag", "description": "1-2 Sätze" }. Nur Entitäten, die noch nicht in der Welt existieren. Den Haupt-NPC des Briefings (den gerade erstellten Charakter) NIEMALS hier aufnehmen. Und NIEMALS einen NPC vorschlagen, der bereits in der NPC-Liste existiert!
 - "summary": Ein kurzer Absatz (2-3 Sätze), der zusammenfasst, welche Verbindungen erkannt wurden und welche neuen Entitäten angelegt werden könnten.`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -675,7 +681,7 @@ export async function generateNPCPortrait(
     styleOverride: input.styleOverride?.trim(),
   });
 
-  const response = await openai.images.generate({
+  const response = await getOpenAI().images.generate({
     model: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
     prompt,
     n: 1,

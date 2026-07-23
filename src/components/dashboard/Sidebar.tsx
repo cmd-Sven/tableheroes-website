@@ -41,6 +41,7 @@ import {
   BarChart3,
   PawPrint,
   Scale,
+  Globe2,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -385,6 +386,12 @@ export function Sidebar({
           href: `/dashboard/campaigns/${campaignId}/bestarium`,
           label: "Bestarium",
           icon: PawPrint,
+          tab: undefined,
+        },
+        {
+          href: `/dashboard/campaigns/${campaignId}/maps`,
+          label: "Weltkarten",
+          icon: Globe2,
           tab: undefined,
         },
         {

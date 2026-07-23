@@ -111,6 +111,14 @@ import {
   LiveSessionHandRaiseQueue,
   LiveSessionUrgentHandBanner,
 } from "@/src/components/session/LiveSessionHandRaiseUI";
+import { LiveWorldMapOverlay } from "@/src/components/world-maps/LiveWorldMapOverlay";
+import { SessionWorldMapsPanel } from "@/src/components/world-maps/SessionWorldMapsPanel";
+import {
+  getSessionWorldMaps,
+  getWorldMaps,
+  setActiveWorldMap,
+} from "@/src/lib/actions/world-map-actions";
+import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
@@ -223,6 +231,7 @@ type LiveState = {
   visible_creature_ids?: string[] | null;
   active_scene_media_id?: string | null;
   active_battlemap_id?: string | null;
+  active_world_map_id?: string | null;
   battlemap_movement_paused?: boolean | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
@@ -273,6 +282,8 @@ function normalizeLiveRow(row: unknown): LiveState {
       r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
     active_battlemap_id:
       r.active_battlemap_id != null ? String(r.active_battlemap_id) : null,
+    active_world_map_id:
+      r.active_world_map_id != null ? String(r.active_world_map_id) : null,
     battlemap_movement_paused: r.battlemap_movement_paused === true,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
@@ -1325,11 +1336,14 @@ export function LiveSessionBoard({
   const campaignCreatures = useMemo(() => allCampaignCreatures, [allCampaignCreatures]);
 
   const activeBattlemapId = liveState?.active_battlemap_id ?? null;
+  const activeWorldMapId = liveState?.active_world_map_id ?? null;
   const activeBattlemap = useMemo(
     () => sessionBattlemaps.find((m) => m.id === activeBattlemapId) ?? null,
     [sessionBattlemaps, activeBattlemapId],
   );
   const battlemapActive = Boolean(activeBattlemap);
+  const [availableWorldMaps, setAvailableWorldMaps] = useState<WorldMap[]>([]);
+  const [sessionWorldMapLinks, setSessionWorldMapLinks] = useState<SessionWorldMap[]>([]);
 
   useEffect(() => {
     if (isGuest) return;
@@ -1345,6 +1359,22 @@ export function LiveSessionBoard({
       cancelled = true;
     };
   }, [sessionId, isGuest]);
+
+  useEffect(() => {
+    if (isGuest || !worldId) return;
+    let cancelled = false;
+    void Promise.all([
+      getWorldMaps(worldId).catch(() => [] as WorldMap[]),
+      getSessionWorldMaps(sessionId).catch(() => [] as SessionWorldMap[]),
+    ]).then(([maps, links]) => {
+      if (cancelled) return;
+      setAvailableWorldMaps(maps);
+      setSessionWorldMapLinks(links);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, worldId, isGuest]);
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
@@ -1547,7 +1577,7 @@ export function LiveSessionBoard({
       .from("session_live_states")
       .select(
         // Keep in sync with src/lib/session/live-state-columns.ts
-        "session_id, weather, weather_preset, weather_intensity, weather_temperature, temperature, temperature_value, current_location, current_location_id, current_location_lore_id, current_time, in_game_date, in_game_time, journal_text, physically_present_user_ids, scribe_id, system_logs, hand_raises, visible_npc_ids, visible_faction_ids, visible_creature_ids, active_scene_media_id, active_battlemap_id, battlemap_movement_paused, background_url, is_background_manual_override, is_combat_mode, current_turn_index, combat_round, active_shop_id, active_merchant_npc_id, current_loot_id, loot_hide_npcs, fate_coins, destroyed_fate_coins, dummy_player_count, guest_slots, downtime_active, downtime_type, downtime_current_day, downtime_total_days, fap_allocations, updated_at",
+        "session_id, weather, weather_preset, weather_intensity, weather_temperature, temperature, temperature_value, current_location, current_location_id, current_location_lore_id, current_time, in_game_date, in_game_time, journal_text, physically_present_user_ids, scribe_id, system_logs, hand_raises, visible_npc_ids, visible_faction_ids, visible_creature_ids, active_scene_media_id, active_battlemap_id, active_world_map_id, battlemap_movement_paused, background_url, is_background_manual_override, is_combat_mode, current_turn_index, combat_round, active_shop_id, active_merchant_npc_id, current_loot_id, loot_hide_npcs, fate_coins, destroyed_fate_coins, dummy_player_count, guest_slots, downtime_active, downtime_type, downtime_current_day, downtime_total_days, fap_allocations, updated_at",
       )
       .eq("session_id", sessionId)
       .maybeSingle();
@@ -4135,6 +4165,64 @@ export function LiveSessionBoard({
                     return next;
                   });
                 }}
+              />
+            ) : null}
+            {isGM && worldId && availableWorldMaps.length > 0 ? (
+              <div className="absolute left-3 top-14 z-[36] max-w-sm rounded border border-hero-border/40 bg-black/80 p-3">
+                <SessionWorldMapsPanel
+                  sessionId={sessionId}
+                  availableMaps={availableWorldMaps}
+                  attached={sessionWorldMapLinks}
+                  activeWorldMapId={activeWorldMapId}
+                  onActiveChange={(id) => {
+                    setLiveState((prev) => {
+                      if (!prev) return prev;
+                      const next = normalizeLiveRow({
+                        ...prev,
+                        active_world_map_id: id,
+                      });
+                      liveStateRef.current = next;
+                      return next;
+                    });
+                    void getSessionWorldMaps(sessionId)
+                      .then(setSessionWorldMapLinks)
+                      .catch(() => {});
+                  }}
+                />
+              </div>
+            ) : null}
+            {activeWorldMapId && worldId ? (
+              <LiveWorldMapOverlay
+                worldMapId={activeWorldMapId}
+                worldId={worldId}
+                campaignId={campaignId}
+                isGm={isGM}
+                onClose={
+                  isGM
+                    ? () => {
+                        startTransition(async () => {
+                          try {
+                            await setActiveWorldMap(sessionId, null);
+                            setLiveState((prev) => {
+                              if (!prev) return prev;
+                              const next = normalizeLiveRow({
+                                ...prev,
+                                active_world_map_id: null,
+                              });
+                              liveStateRef.current = next;
+                              return next;
+                            });
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "Weltkarte konnte nicht geschlossen werden.",
+                            );
+                          }
+                        });
+                      }
+                    : undefined
+                }
               />
             ) : null}
             {isGM && battlemapActive ? (

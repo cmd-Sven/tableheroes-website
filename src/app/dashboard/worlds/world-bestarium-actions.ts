@@ -11,7 +11,11 @@ import {
 } from "@/src/lib/beast-check-results";
 import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY ist nicht konfiguriert.");
+  return new OpenAI({ apiKey });
+}
 
 export type BestariumAttack = {
   name: string;
@@ -532,7 +536,7 @@ check_results (Array wie oben beschrieben)`;
       ? `Zusätzliche Wünsche / Ideen des GMs:\n${briefing}`
       : "Erfinde eine passende Kreatur, die sich aus dem VORKOMMEN und dem Weltenkontext ergibt.";
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [

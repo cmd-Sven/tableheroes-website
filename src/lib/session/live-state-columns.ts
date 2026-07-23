@@ -26,6 +26,7 @@ export const SESSION_LIVE_STATE_SELECT = [
   "visible_creature_ids",
   "active_scene_media_id",
   "active_battlemap_id",
+  "active_world_map_id",
   "battlemap_movement_paused",
   "background_url",
   "is_background_manual_override",

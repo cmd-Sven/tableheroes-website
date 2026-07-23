@@ -11,7 +11,9 @@ import { StagePrepSceneMedia } from "@/src/components/session/StagePrepSceneMedi
 import { StagePrepBattlemaps } from "@/src/components/session/battlemap/StagePrepBattlemaps";
 import type { CampaignSceneMedia } from "@/src/lib/scene-media-types";
 import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
+import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
+import { SessionWorldMapsPanel } from "@/src/components/world-maps/SessionWorldMapsPanel";
 
 type CampaignNpc = {
   id: string;
@@ -48,6 +50,8 @@ type Props = {
   sceneMediaItems: CampaignSceneMedia[];
   stageDeckSceneMediaIds: string[] | null;
   initialBattlemaps: SessionBattlemap[];
+  availableWorldMaps: WorldMap[];
+  sessionWorldMaps: SessionWorldMap[];
 };
 
 const marblePanelStyle: CSSProperties = {
@@ -83,6 +87,8 @@ export function StagePrepClient({
   sceneMediaItems,
   stageDeckSceneMediaIds,
   initialBattlemaps,
+  availableWorldMaps = [],
+  sessionWorldMaps = [],
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -579,6 +585,24 @@ export function StagePrepClient({
             campaignId={campaignId}
             initialBattlemaps={initialBattlemaps}
             onRefresh={() => router.refresh()}
+          />
+        </div>
+
+        <div
+          id="weltkarten"
+          className="scroll-mt-24 rounded-lg border border-hero-dark bg-background-card/80 p-6"
+        >
+          <h2 className="mb-3 font-barlow text-lg font-bold uppercase text-hero-vibrant">
+            Weltkarten für diese Session
+          </h2>
+          <p className="mb-4 font-libre text-sm text-gray-400">
+            Karten aus der Welt anhängen. In der Live-Session kannst du alle Spieler auf eine
+            Kartenansicht schieben.
+          </p>
+          <SessionWorldMapsPanel
+            sessionId={sessionId}
+            availableMaps={availableWorldMaps}
+            attached={sessionWorldMaps}
           />
         </div>
 

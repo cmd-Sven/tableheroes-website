@@ -248,14 +248,16 @@ export async function loadSessionStageCatalog(opts: {
   let sceneRows: any[] = [];
   if (sceneNeed.mode === "subset") {
     if (sceneNeed.ids.length > 0) {
-      const { data } = await (supabase.from("campaign_scene_media") as any)
+      const { data } = await (supabase as any)
+        .from("campaign_scene_media")
         .select(SCENE_MEDIA_SESSION_SELECT)
         .eq("campaign_id", campaignId)
         .in("id", sceneNeed.ids);
       sceneRows = (data as any[]) || [];
     }
   } else {
-    const { data } = await (supabase.from("campaign_scene_media") as any)
+    const { data } = await (supabase as any)
+      .from("campaign_scene_media")
       .select(SCENE_MEDIA_SESSION_SELECT)
       .eq("campaign_id", campaignId)
       .order("sort_order", { ascending: true });
