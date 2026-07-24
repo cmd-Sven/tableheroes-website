@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { FACTION_LIST_SELECT } from "@/src/lib/queries/entity-list-columns";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 
 const PLAYER_MEMBER_STATUSES = [
@@ -37,7 +38,7 @@ export async function getFactionsWithMembers(campaignId: string) {
   }
 
   const { data: factions, error: factionsError } = await (supabase.from("factions") as any)
-    .select("*")
+    .select(FACTION_LIST_SELECT)
     .eq("world_id", campaign.world_id)
     .order("created_at", { ascending: false });
 

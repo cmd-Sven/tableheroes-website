@@ -12,10 +12,10 @@ import {
 import Link from "next/link";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { CampaignCard } from "@/src/components/dashboard/CampaignCard";
-import { GMCommunicationHub } from "@/src/components/dashboard/GMCommunicationHub";
 import { UpcomingSessionsCard } from "@/src/components/dashboard/UpcomingSessionsCard";
 import { NewsInfoCard } from "@/src/components/dashboard/NewsInfoCard";
 import { DailyComicCard } from "@/src/components/dashboard/DailyComicCard";
+import { GMCommunicationHub } from "@/src/components/dashboard/dashboard-dynamic";
 import type { UpcomingSession } from "@/src/lib/types/dashboard-widgets";
 import type { NewsPost } from "@/src/lib/constants/news";
 import type {

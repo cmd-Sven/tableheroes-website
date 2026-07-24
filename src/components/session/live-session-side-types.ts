@@ -2,6 +2,7 @@ export type MainSidePanelId =
   | "chat"
   | "chronicle"
   | "scenes"
+  | "monsters"
   | "battlemaps"
   | "travel"
   | "loot";

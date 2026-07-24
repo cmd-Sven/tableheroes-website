@@ -29,11 +29,13 @@ export async function getCampaignGalleryImages(campaignId: string): Promise<Gall
   ]);
 
   const galleryImages: GalleryImage[] = [];
+  const GALLERY_FETCH_LIMIT = 40;
 
   const { data: loreEntriesRaw } = await (supabase.from("world_lore") as any)
     .select("id, name, image_url")
     .eq("world_id", campaign.world_id)
-    .not("image_url", "is", null);
+    .not("image_url", "is", null)
+    .limit(GALLERY_FETCH_LIMIT);
   const loreEntries = (loreEntriesRaw || []) as { id: string; name: string; image_url: string }[];
   loreEntries.forEach((entry) => {
     if (entry.image_url && loreVisibility[entry.id]) {
@@ -49,7 +51,8 @@ export async function getCampaignGalleryImages(campaignId: string): Promise<Gall
   const { data: npcsRaw } = await (supabase.from("npcs") as any)
     .select("id, name, image_url")
     .eq("world_id", campaign.world_id)
-    .not("image_url", "is", null);
+    .not("image_url", "is", null)
+    .limit(GALLERY_FETCH_LIMIT);
   const npcs = (npcsRaw || []) as { id: string; name: string; image_url: string }[];
   npcs.forEach((npc) => {
     if (npc.image_url && npcVisibility[npc.id]) {
@@ -64,8 +67,9 @@ export async function getCampaignGalleryImages(campaignId: string): Promise<Gall
 
   const { data: factionsRaw } = await (supabase.from("factions") as any)
     .select("id, name, image_url")
-    .eq("campaign_id", campaignId)
-    .not("image_url", "is", null);
+    .eq("world_id", campaign.world_id)
+    .not("image_url", "is", null)
+    .limit(GALLERY_FETCH_LIMIT);
   const factions = (factionsRaw || []) as { id: string; name: string; image_url: string }[];
   factions.forEach((faction) => {
     if (faction.image_url && factionVisibility[faction.id]) {

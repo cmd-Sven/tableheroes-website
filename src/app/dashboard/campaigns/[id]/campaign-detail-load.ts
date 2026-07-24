@@ -789,53 +789,76 @@ export async function loadCampaignDetailPageData(
   const myCharacterId = myCharacter?.id ?? membership?.character_id ?? null;
 
   if (loadPlan.needsPlayerOverviewExtras) {
-    const loreItems: DiscoveryItem[] = (loreEntries || []).slice(0, 8).map((e: any) => ({
-      id: String(e.id),
-      name: String(e.name ?? ""),
-      kind: "lore" as const,
-      description: e.description != null ? String(e.description) : null,
-      image_url: e.image_url != null ? String(e.image_url) : null,
-      type: String(e.type ?? ""),
-      created_at: e.created_at != null ? String(e.created_at) : "",
-    }));
-    const factionItems: DiscoveryItem[] = (factions || []).slice(0, 8).map((e: any) => ({
-      id: String(e.id),
-      name: String(e.name ?? ""),
-      kind: "faction" as const,
-      description: e.description != null ? String(e.description) : null,
-      image_url:
-        e.image_url != null
-          ? String(e.image_url)
-          : e.banner_url != null
-            ? String(e.banner_url)
-            : e.portrait_url != null
-              ? String(e.portrait_url)
+    // Schlanke Discoveries: kein Full-World-Bundle, nur jüngste revealed Snippets.
+    if (campaignWorldId) {
+      const DISCOVERY_FETCH = 24;
+      const [loreVis, npcVis, facVis, loreSnips, npcSnips, factionSnips] =
+        await Promise.all([
+          getVisibilityForCampaign(id, "lore"),
+          getVisibilityForCampaign(id, "npc"),
+          getVisibilityForCampaign(id, "faction"),
+          (supabase.from("world_lore") as any)
+            .select("id, name, description, image_url, type, created_at")
+            .eq("world_id", campaignWorldId)
+            .order("created_at", { ascending: false })
+            .limit(DISCOVERY_FETCH),
+          (supabase.from("npcs") as any)
+            .select("id, name, description, image_url, title, created_at")
+            .eq("world_id", campaignWorldId)
+            .order("created_at", { ascending: false })
+            .limit(DISCOVERY_FETCH),
+          (supabase.from("factions") as any)
+            .select("id, name, description, image_url, banner_url, type, created_at")
+            .eq("world_id", campaignWorldId)
+            .order("created_at", { ascending: false })
+            .limit(DISCOVERY_FETCH),
+        ]);
+
+      const loreItems: DiscoveryItem[] = (
+        ((loreSnips.data as any[]) || []).filter((e) => loreVis[e.id] === true)
+      ).map((e: any) => ({
+        id: String(e.id),
+        name: String(e.name ?? ""),
+        kind: "lore" as const,
+        description: e.description != null ? String(e.description) : null,
+        image_url: e.image_url != null ? String(e.image_url) : null,
+        type: String(e.type ?? ""),
+        created_at: e.created_at != null ? String(e.created_at) : "",
+      }));
+      const factionItems: DiscoveryItem[] = (
+        ((factionSnips.data as any[]) || []).filter((e) => facVis[e.id] === true)
+      ).map((e: any) => ({
+        id: String(e.id),
+        name: String(e.name ?? ""),
+        kind: "faction" as const,
+        description: e.description != null ? String(e.description) : null,
+        image_url:
+          e.image_url != null
+            ? String(e.image_url)
+            : e.banner_url != null
+              ? String(e.banner_url)
               : null,
-      type: String(e.type ?? ""),
-      created_at: e.created_at != null ? String(e.created_at) : "",
-    }));
-    const npcItems: DiscoveryItem[] = (npcs || []).slice(0, 8).map((e: any) => ({
-      id: String(e.id),
-      name: String(e.name ?? ""),
-      kind: "npc" as const,
-      description: e.description != null ? String(e.description) : null,
-      image_url:
-        e.image_url != null
-          ? String(e.image_url)
-          : e.portrait_url != null
-            ? String(e.portrait_url)
-            : e.avatar_url != null
-              ? String(e.avatar_url)
-              : null,
-      type: e.title != null ? String(e.title) : undefined,
-      created_at: e.created_at != null ? String(e.created_at) : "",
-    }));
-    allDiscoveries = [...loreItems, ...factionItems, ...npcItems]
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
-      .slice(0, 8);
+        type: String(e.type ?? ""),
+        created_at: e.created_at != null ? String(e.created_at) : "",
+      }));
+      const npcItems: DiscoveryItem[] = (
+        ((npcSnips.data as any[]) || []).filter((e) => npcVis[e.id] === true)
+      ).map((e: any) => ({
+        id: String(e.id),
+        name: String(e.name ?? ""),
+        kind: "npc" as const,
+        description: e.description != null ? String(e.description) : null,
+        image_url: e.image_url != null ? String(e.image_url) : null,
+        type: e.title != null ? String(e.title) : undefined,
+        created_at: e.created_at != null ? String(e.created_at) : "",
+      }));
+      allDiscoveries = [...loreItems, ...factionItems, ...npcItems]
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, 8);
+    }
 
     let partyQuery = (supabase.from("characters") as any)
       .select("id, name, class, race, level, culture_lore_id, avatar_url, user_id")
@@ -1001,10 +1024,9 @@ export async function loadCampaignDetailPageData(
       wizardFactions = factions;
       wizardLocations = (loreEntries || []).filter((e: any) => typeMatchesGeographic(e.type));
     } else if (campaignWorldId) {
-    // Fraktionen: select("*") um PostgREST Schema-Cache-Probleme zu vermeiden,
-    // dann im Code nach allow_pc_join_on_creation filtern.
+    // Wizard-Optionen: enge Selects + Filter allow_pc_* / Visibility
     const { data: allWorldFactions, error: pcFErr } = await (supabase.from("factions") as any)
-      .select("*")
+      .select("id, name, type, allow_pc_join_on_creation, image_url")
       .eq("world_id", campaignWorldId);
     if (pcFErr) console.error("❌ wizardFactions query error:", JSON.stringify(pcFErr));
     wizardFactions = ((allWorldFactions || []) as any[]).filter(
@@ -1012,9 +1034,8 @@ export async function loadCampaignDetailPageData(
     );
     console.log("✅ wizardFactions:", wizardFactions.length, wizardFactions.map((f: any) => f.name));
 
-    // Orte: select("*") und im Code nach allow_pc_origin filtern
     const { data: allWorldLore, error: pcLErr } = await (supabase.from("world_lore") as any)
-      .select("*")
+      .select("id, name, type, allow_pc_origin, image_url")
       .eq("world_id", campaignWorldId);
     if (pcLErr) {
       const errMsg = (pcLErr as { message?: string })?.message ?? String(pcLErr);

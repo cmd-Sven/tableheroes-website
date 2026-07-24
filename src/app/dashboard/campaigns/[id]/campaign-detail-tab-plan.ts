@@ -30,6 +30,7 @@ export function normalizeCampaignDetailTab(tab?: string | null): CampaignDetailT
 
 export type CampaignDetailLoadPlan = {
   tab: CampaignDetailTab;
+  /** Volle NPC/Lore/Fraktion/Quest-Listen — nur Content-Tabs + Settings. */
   needsFullWorldBundle: boolean;
   needsSessionsLightData: boolean;
   needsGmMembers: boolean;
@@ -38,8 +39,10 @@ export type CampaignDetailLoadPlan = {
   needsSessionArchivesFull: boolean;
   needsPlayerCharacter: boolean;
   needsPlayerOverviewExtras: boolean;
+  /** Charakter-Editor / Wizard — nicht Overview. */
   needsWizardData: boolean;
   needsPolls: boolean;
+  /** Header-Galerie nur auf Overview (sonst leeres Array). */
   needsGallery: boolean;
 };
 
@@ -50,12 +53,12 @@ export function buildCampaignDetailLoadPlan(
 ): CampaignDetailLoadPlan {
   const playerWithAccess = !isGM && hasAccess;
 
+  // Overview bewusst ohne Full-Bundle: Discoveries laden separat & schlank.
   const needsFullWorldBundle =
     tab === "npcs" ||
     tab === "lore" ||
     tab === "quests" ||
-    tab === "settings" ||
-    (playerWithAccess && tab === "overview");
+    tab === "settings";
 
   const needsSessionsLightData = tab === "sessions" && hasAccess;
 
@@ -71,10 +74,11 @@ export function buildCampaignDetailLoadPlan(
 
   const needsPlayerOverviewExtras = playerWithAccess && tab === "overview";
 
-  const needsWizardData =
-    playerWithAccess && (tab === "character" || tab === "overview");
+  const needsWizardData = playerWithAccess && tab === "character";
 
   const needsPolls = tab === "polls";
+
+  const needsGallery = tab === "overview";
 
   return {
     tab,
@@ -88,6 +92,6 @@ export function buildCampaignDetailLoadPlan(
     needsPlayerOverviewExtras,
     needsWizardData,
     needsPolls,
-    needsGallery: true,
+    needsGallery,
   };
 }

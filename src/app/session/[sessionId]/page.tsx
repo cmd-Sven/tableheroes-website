@@ -1,27 +1,19 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
-import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
-import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
-import { getLoreEntries } from "@/src/app/dashboard/campaigns/[id]/lore-queries";
 import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
-import { isLocationType } from "@/src/lib/lore-types";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-avatar-display-map";
-import { getCampaignShops } from "@/src/app/dashboard/campaigns/[id]/shop-queries";
-import type { LiveCampaignShopOption } from "./StageNpcShopControls";
 import { readGuestSessionCookie } from "@/src/lib/session-guest-auth";
 import {
   loadGuestSessionContext,
   serializeGuestSessionPayload,
 } from "@/src/app/session/load-guest-session";
 import { absoluteUrl } from "@/src/lib/site-url";
-import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
-import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
-import { getCampaignCreatureStates } from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
-import { resolveBestariumImageUrl } from "@/src/lib/bestarium-image";
+import { SESSION_LIVE_STATE_SELECT } from "@/src/lib/session/live-state-columns";
+import { loadSessionStageCatalog } from "@/src/app/session/load-session-stage-catalog";
 
 function normalizeQuestRelation(
   v: unknown,
@@ -60,6 +52,12 @@ function normalizeActiveQuests(rows: unknown[]) {
   });
 }
 
+function asDeckIds(value: unknown): string[] | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return null;
+  return value.map(String);
+}
+
 type Props = {
   params: Promise<{ sessionId: string }>;
   searchParams?: Promise<{ mode?: string | string[] }>;
@@ -72,7 +70,6 @@ export default async function SessionPage({ params, searchParams }: Props) {
     ? resolvedSearchParams.mode[0]
     : resolvedSearchParams.mode;
 
-  // Basic UUID validation (if you use UUIDs for sessions)
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(sessionId)) {
@@ -105,7 +102,6 @@ export default async function SessionPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  // 1. Load Session
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
     .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, guest_join_token")
     .eq("id", sessionId)
@@ -127,10 +123,9 @@ export default async function SessionPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  // 2. Load Campaign to determine GM
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
     .select("gm_id, owner_id, world_id, system")
-    .eq("id", (session as any).campaign_id)
+    .eq("id", session.campaign_id)
     .single();
 
   const campaign = campaignRaw as {
@@ -144,25 +139,22 @@ export default async function SessionPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  // Beendete oder abgesagte Sessions können nicht mehr betreten werden
   if (["Completed", "Cancelled"].includes(session.status)) {
-    redirect(`/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&ended=1`);
+    redirect(`/dashboard/campaigns/${session.campaign_id}?tab=sessions&ended=1`);
   }
 
   const isGM = isCampaignGm(campaign, user.id);
   const forcePlayerView = modeParam === "player" && isGM;
   const viewAsGM = isGM && !forcePlayerView;
 
-  /** Geplant: nur GM darf die Session-Oberfläche öffnen (Vorbereitung ohne Spieler). */
   if (session.status === "Scheduled" && !isGM) {
     redirect(
-      `/dashboard/campaigns/${(session as any).campaign_id}?tab=sessions&scheduled=1`,
+      `/dashboard/campaigns/${session.campaign_id}?tab=sessions&scheduled=1`,
     );
   }
 
-  // 3. Live state; für GM bei Scheduled ggf. Entwurfszeile anlegen
   let { data: liveState } = await (supabase.from("session_live_states") as any)
-    .select("*")
+    .select(SESSION_LIVE_STATE_SELECT)
     .eq("session_id", sessionId)
     .maybeSingle();
 
@@ -181,8 +173,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     }
   }
 
-  // 4. Party: Tray-RPC → Members-RPC → Fallback (Survival-Felder in RPCs / einer Query)
-  const campaignId = (session as { campaign_id: string }).campaign_id;
+  const campaignId = session.campaign_id;
 
   function survivalFromPartyRow(c: Record<string, unknown>): {
     rations_count: number;
@@ -238,13 +229,12 @@ export default async function SessionPage({ params, searchParams }: Props) {
         c.member_user_id != null ? String(c.member_user_id) : null,
       ...survivalFromPartyRow(c as Record<string, unknown>),
     }));
-  }
+  } else {
+    // Nur Fallback wenn Tray-RPC fehlt/fehlschlägt — kein doppelter Roundtrip.
+    const rpcRes = await (supabase as any).rpc("get_session_party_members", {
+      p_session_id: sessionId,
+    });
 
-  const rpcRes = await (supabase as any).rpc("get_session_party_members", {
-    p_session_id: sessionId,
-  });
-
-  if (!trayOk) {
     if (!rpcRes.error && Array.isArray(rpcRes.data)) {
       partyCharacters = (rpcRes.data as Record<string, unknown>[]).map(
         (c) => ({
@@ -262,63 +252,63 @@ export default async function SessionPage({ params, searchParams }: Props) {
         }),
       );
     }
-  }
 
-  if (!trayOk && partyCharacters.length === 0) {
-    const { data: memberPartyRows } = await (supabase.from("campaign_members") as any)
-      .select("character_id, user_id")
-      .eq("campaign_id", campaignId)
-      .in("status", ["Approved", "Active"])
-      .not("character_id", "is", null);
+    if (partyCharacters.length === 0) {
+      const { data: memberPartyRows } = await (supabase.from("campaign_members") as any)
+        .select("character_id, user_id")
+        .eq("campaign_id", campaignId)
+        .in("status", ["Approved", "Active"])
+        .not("character_id", "is", null);
 
-    const characterIds = [
-      ...new Set(
-        ((memberPartyRows as { character_id?: string | null }[] | null) || [])
-          .map((r) => r.character_id)
-          .filter((id): id is string => !!id),
-      ),
-    ];
+      const characterIds = [
+        ...new Set(
+          ((memberPartyRows as { character_id?: string | null }[] | null) || [])
+            .map((r) => r.character_id)
+            .filter((id): id is string => !!id),
+        ),
+      ];
 
-    if (characterIds.length > 0) {
-      const { data: charRows } = await (supabase.from("characters") as any)
-        .select("id, name, class, race, level, avatar_url, rations_count, starvation_days")
-        .in("id", characterIds)
-        .eq("campaign_id", campaignId);
+      if (characterIds.length > 0) {
+        const { data: charRows } = await (supabase.from("characters") as any)
+          .select("id, name, class, race, level, avatar_url, rations_count, starvation_days")
+          .in("id", characterIds)
+          .eq("campaign_id", campaignId);
 
-      const byId = new Map(
-        ((charRows as Record<string, unknown>[] | null) || []).map((c) => [
-          String(c.id),
-          c,
-        ]),
-      );
+        const byId = new Map(
+          ((charRows as Record<string, unknown>[] | null) || []).map((c) => [
+            String(c.id),
+            c,
+          ]),
+        );
 
-      const charToPlayer = new Map<string, string>();
-      for (const r of (memberPartyRows as { character_id?: string | null; user_id?: string | null }[] | null) || []) {
-        if (r.character_id && r.user_id) {
-          charToPlayer.set(String(r.character_id), String(r.user_id));
+        const charToPlayer = new Map<string, string>();
+        for (const r of (memberPartyRows as { character_id?: string | null; user_id?: string | null }[] | null) || []) {
+          if (r.character_id && r.user_id) {
+            charToPlayer.set(String(r.character_id), String(r.user_id));
+          }
         }
-      }
 
-      partyCharacters = characterIds
-        .map((cid) => byId.get(cid))
-        .filter(
-          (c): c is Record<string, unknown> =>
-            c != null && typeof c === "object",
-        )
-        .map((c) => ({
-          id: String(c.id),
-          name: String(c.name ?? ""),
-          class: c.class != null ? String(c.class) : null,
-          race: c.race != null ? String(c.race) : null,
-          level:
-            typeof c.level === "number" && Number.isFinite(c.level)
-              ? c.level
-              : null,
-          avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
-          avatar_display: null,
-          playerUserId: charToPlayer.get(String(c.id)) ?? null,
-          ...survivalFromPartyRow(c as Record<string, unknown>),
-        }));
+        partyCharacters = characterIds
+          .map((cid) => byId.get(cid))
+          .filter(
+            (c): c is Record<string, unknown> =>
+              c != null && typeof c === "object",
+          )
+          .map((c) => ({
+            id: String(c.id),
+            name: String(c.name ?? ""),
+            class: c.class != null ? String(c.class) : null,
+            race: c.race != null ? String(c.race) : null,
+            level:
+              typeof c.level === "number" && Number.isFinite(c.level)
+                ? c.level
+                : null,
+            avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+            avatar_display: null,
+            playerUserId: charToPlayer.get(String(c.id)) ?? null,
+            ...survivalFromPartyRow(c as Record<string, unknown>),
+          }));
+      }
     }
   }
 
@@ -334,118 +324,21 @@ export default async function SessionPage({ params, searchParams }: Props) {
     }));
   }
 
-  // 5. Load campaign NPCs (Sichtbarkeit aus campaign_visibility)
-  const npcsFromCampaign = await getNPCs(
-    (session as any).campaign_id,
-    user.id,
-    viewAsGM
-  );
-  const allCampaignNpcs = npcsFromCampaign.map((npc: any) => ({
-    id: String(npc.id),
-    name: String(npc.name ?? ""),
-    title: npc.title != null ? String(npc.title) : null,
-    description: npc.description != null ? String(npc.description) : null,
-    image_url: npc.image_url != null ? String(npc.image_url) : null,
-    is_revealed: !!npc.is_revealed,
-    is_merchant: !!npc.is_merchant,
-    shop_id: npc.shop_id != null ? String(npc.shop_id) : null,
-    faction_id: npc.faction_id != null ? String(npc.faction_id) : null,
-    current_location_id:
-      npc.current_location_id != null ? String(npc.current_location_id) : null,
-    home_location_id:
-      npc.home_location_id != null ? String(npc.home_location_id) : null,
-  }));
+  const stageDeckNpcIds = asDeckIds(session.stage_deck_npc_ids);
+  const stageDeckFactionIds = asDeckIds(session.stage_deck_faction_ids);
+  const stageDeckSceneMediaIds = asDeckIds(session.stage_deck_scene_media_ids);
+  const stageDeckCreatureIds = asDeckIds(session.stage_deck_creature_ids);
 
-  const factionsRaw = await getFactionsWithMembers((session as any).campaign_id);
-  let allCampaignFactions = (factionsRaw || []).map((f: any) => ({
-    id: String(f.id),
-    name: String(f.name ?? "Fraktion"),
-    image_url: f.image_url ?? null,
-    image_display: f.image_display ?? null,
-    banner_url: f.banner_url ?? null,
-    banner_display: f.banner_display ?? null,
-    type: f.type != null ? String(f.type) : null,
-    description: f.description != null ? String(f.description) : null,
-    current_status: f.current_status != null ? String(f.current_status) : null,
-    is_revealed: f.is_revealed ?? false,
-  }));
-  if (!viewAsGM) {
-    allCampaignFactions = allCampaignFactions.filter((f: { is_revealed: boolean }) => f.is_revealed);
-  }
-
-  const stageDeckNpcIds =
-    session?.stage_deck_npc_ids != null && Array.isArray(session.stage_deck_npc_ids)
-      ? session.stage_deck_npc_ids.map(String)
-      : null;
-  const stageDeckFactionIds =
-    session?.stage_deck_faction_ids != null && Array.isArray(session.stage_deck_faction_ids)
-      ? session.stage_deck_faction_ids.map(String)
-      : null;
-  const stageDeckSceneMediaIds =
-    session?.stage_deck_scene_media_ids != null &&
-    Array.isArray(session.stage_deck_scene_media_ids)
-      ? session.stage_deck_scene_media_ids.map(String)
-      : null;
-  const stageDeckCreatureIds =
-    session?.stage_deck_creature_ids != null &&
-    Array.isArray(session.stage_deck_creature_ids)
-      ? session.stage_deck_creature_ids.map(String)
-      : null;
-
-  const bestariumPayload = viewAsGM
-    ? await getBestariumCreaturesForCampaign((session as any).campaign_id, true)
-    : { gm: [], player: [] };
-  const creatureStates = await getCampaignCreatureStates((session as any).campaign_id);
-
-  let allCampaignCreatures = (bestariumPayload.gm || []).map((c: any) => ({
-    id: String(c.id),
-    name: String(c.name ?? ""),
-    creature_type: c.creature_type != null ? String(c.creature_type) : null,
-    image_url: c.image_url != null ? resolveBestariumImageUrl(String(c.image_url)) : null,
-    physical_description:
-      c.physical_description != null ? String(c.physical_description) : null,
-    challenge_rating:
-      typeof c.challenge_rating === "number" ? c.challenge_rating : null,
-    known_loot: c.known_loot != null ? String(c.known_loot) : null,
-    is_revealed: !!c.is_revealed,
-  }));
-  if (!viewAsGM) {
-    allCampaignCreatures = allCampaignCreatures.filter((c) => c.is_revealed);
-  }
-
-  const sceneMediaRows = await getCampaignSceneMedia((session as any).campaign_id).catch(
-    () => [],
-  );
-  const allSceneMedia = sceneMediaRows.map((s) => ({
-    id: String(s.id),
-    title: String(s.title),
-    image_url: String(s.image_url),
-    category: String(s.category),
-    player_notes: s.player_notes,
-    image_is_ai_generated: s.image_is_ai_generated === true,
-  }));
-
-  const loreLocationOptions = viewAsGM
-    ? (await getLoreEntries((session as any).campaign_id))
-        .filter((e: { type?: string | null }) => isLocationType(String(e.type ?? "")))
-        .map((e: {
-          id: string;
-          name?: string | null;
-          type?: string | null;
-          image_url?: string | null;
-          default_image_url?: string | null;
-        }) => ({
-          id: String(e.id),
-          name: String(e.name ?? "Ort"),
-          type: e.type != null ? String(e.type) : null,
-          image_url: e.image_url != null ? String(e.image_url) : null,
-          default_image_url:
-            e.default_image_url != null ? String(e.default_image_url) : null,
-        }))
-        .sort((a: { name: string }, b: { name: string }) =>
-          a.name.localeCompare(b.name, "de"),
-        )
-    : [];
+  const catalog = await loadSessionStageCatalog({
+    campaignId,
+    worldId: campaign.world_id ?? null,
+    viewAsGM,
+    liveState: (liveState as Record<string, unknown> | null) ?? null,
+    stageDeckNpcIds,
+    stageDeckFactionIds,
+    stageDeckSceneMediaIds,
+    stageDeckCreatureIds,
+  });
 
   const locLoreRaw = (liveState as { current_location_lore_id?: string | null } | null)
     ?.current_location_lore_id;
@@ -457,15 +350,11 @@ export default async function SessionPage({ params, searchParams }: Props) {
     if (viewAsGM) {
       sessionLocationLoreReadable = true;
     } else {
-      const loreVis = await getVisibilityForCampaign(
-        (session as any).campaign_id,
-        "lore",
-      );
+      const loreVis = await getVisibilityForCampaign(campaignId, "lore");
       sessionLocationLoreReadable = loreVis[locLoreId] === true;
     }
   }
 
-  // 6. Load Active, Revealed Quests for this campaign
   const { data: activeQuests } = await (supabase.from("quests") as any)
     .select(
       `
@@ -484,22 +373,11 @@ export default async function SessionPage({ params, searchParams }: Props) {
         )
       `,
     )
-    .eq("campaign_id", (session as any).campaign_id)
+    .eq("campaign_id", campaignId)
     .eq("status", "Active")
     .eq("is_revealed", true);
 
   const normalizedQuests = normalizeActiveQuests(activeQuests ?? []);
-
-  let campaignShopsForLive: LiveCampaignShopOption[] = [];
-  if (viewAsGM) {
-    const { shops } = await getCampaignShops((session as any).campaign_id);
-    campaignShopsForLive = shops.map((shop) => ({
-      id: shop.id,
-      name: shop.name,
-      shop_mode: shop.shop_mode,
-      archetype_key: shop.archetype_key,
-    }));
-  }
 
   const guestJoinUrl =
     viewAsGM && session.status === "Live" && session.guest_join_token
@@ -509,7 +387,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
   return (
     <LiveSessionBoard
       sessionId={sessionId}
-      campaignId={(session as any).campaign_id as string}
+      campaignId={campaignId}
       worldId={campaign.world_id ?? null}
       sessionStatus={session.status}
       isGM={isGM}
@@ -524,9 +402,9 @@ export default async function SessionPage({ params, searchParams }: Props) {
           : null
       }
       partyCharacters={serializeForClient(partyCharacters)}
-      allCampaignNpcs={serializeForClient(allCampaignNpcs || [])}
-      allCampaignCreatures={serializeForClient(allCampaignCreatures)}
-      allCampaignFactions={serializeForClient(allCampaignFactions)}
+      allCampaignNpcs={serializeForClient(catalog.allCampaignNpcs)}
+      allCampaignCreatures={serializeForClient(catalog.allCampaignCreatures)}
+      allCampaignFactions={serializeForClient(catalog.allCampaignFactions)}
       stageDeckNpcIds={
         stageDeckNpcIds != null ? serializeForClient(stageDeckNpcIds) : null
       }
@@ -535,7 +413,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
           ? serializeForClient(stageDeckFactionIds)
           : null
       }
-      allSceneMedia={serializeForClient(allSceneMedia)}
+      allSceneMedia={serializeForClient(catalog.allSceneMedia)}
       stageDeckSceneMediaIds={
         stageDeckSceneMediaIds != null
           ? serializeForClient(stageDeckSceneMediaIds)
@@ -544,11 +422,11 @@ export default async function SessionPage({ params, searchParams }: Props) {
       stageDeckCreatureIds={
         stageDeckCreatureIds != null ? serializeForClient(stageDeckCreatureIds) : null
       }
-      initialCreatureStates={serializeForClient(creatureStates)}
+      initialCreatureStates={serializeForClient(catalog.initialCreatureStates)}
       activeQuests={serializeForClient(normalizedQuests)}
-      loreLocationOptions={serializeForClient(loreLocationOptions)}
+      loreLocationOptions={serializeForClient(catalog.loreLocationOptions)}
       sessionLocationLoreReadable={sessionLocationLoreReadable}
-      campaignShops={serializeForClient(campaignShopsForLive)}
+      campaignShops={serializeForClient(catalog.campaignShops)}
       transcriptionMode={
         session.transcription_mode === "jitsi"
           ? "jitsi"
@@ -561,4 +439,3 @@ export default async function SessionPage({ params, searchParams }: Props) {
     />
   );
 }
-

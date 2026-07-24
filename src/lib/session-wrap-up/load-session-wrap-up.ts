@@ -76,7 +76,9 @@ export async function loadSessionWrapUpPreview(
   }
 
   const { data: liveRaw } = await (supabase.from("session_live_states") as any)
-    .select("*")
+    .select(
+      "visible_npc_ids, current_location_lore_id, current_location, current_time, weather, weather_preset, temperature, temperature_value",
+    )
     .eq("session_id", sessionId)
     .maybeSingle();
 

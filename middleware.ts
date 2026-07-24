@@ -2,6 +2,22 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // ------------------------------------------------------------
+  // Auth nur für geschützte App-Pfade (Dashboard + Onboarding).
+  // Marketing/Public/Session/API: Early-Return ohne getUser().
+  // Session-Auth läuft page-seitig (inkl. Guest-Join).
+  // ------------------------------------------------------------
+  const needsAuthGate =
+    path.startsWith("/dashboard") ||
+    path === "/onboarding" ||
+    path.startsWith("/onboarding/");
+
+  if (!needsAuthGate) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -58,42 +74,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
+  const isOnboarding =
+    path === "/onboarding" || path.startsWith("/onboarding/");
 
   // ------------------------------------------------------------
-  // Öffentliche Routen (immer erlauben)
-  // ------------------------------------------------------------
-  const isRoot = path === "/";
-  const isLogin =
-    path === "/login" || path === "/register" || path === "/signup";
-  const isNextAsset = path.startsWith("/_next");
-  const isImagesAsset = path.startsWith("/images");
-  const isFavicon = path === "/favicon.ico";
-  const isApi = path.startsWith("/api");
-  const isOnboarding = path === "/onboarding";
-  const isKodex = path === "/kodex";
-  const isMarketingPublic =
-    path === "/impressum" ||
-    path === "/datenschutz" ||
-    path.startsWith("/campaigns/") ||
-    path === "/support";
-
-  if (
-    isRoot ||
-    isLogin ||
-    isMarketingPublic ||
-    isNextAsset ||
-    isImagesAsset ||
-    isFavicon ||
-    isApi ||
-    isKodex
-  ) {
-    return response;
-  }
-
-  // ------------------------------------------------------------
-  // Onboarding: Eingeloggte User ohne codex_agreed → /onboarding
-  // /onboarding selbst immer erlauben für eingeloggte User
+  // Onboarding: Eingeloggte User ohne Freigabe → /onboarding
   // ------------------------------------------------------------
   if (user && !isOnboarding && path.startsWith("/dashboard")) {
     try {
@@ -109,7 +94,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/onboarding", request.url));
       }
 
-      // Onboarding abgeschlossen aber noch nicht freigegeben → /onboarding (Pending-Hinweis)
+      // Onboarding abgeschlossen aber noch nicht freigegeben → /onboarding
       if (codexAgreed && userStatus !== "approved") {
         return NextResponse.redirect(new URL("/onboarding", request.url));
       }
@@ -127,7 +112,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ------------------------------------------------------------
-  // Dashboard: Auth + Wartungsmodus (nur Admin bei Wartung)
+  // Dashboard: Auth erforderlich
   // ------------------------------------------------------------
   if (path.startsWith("/dashboard")) {
     if (!user) {
@@ -139,7 +124,6 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Alle anderen Routen: durchlassen (z. B. weitere App-Routen)
   return response;
 }
 

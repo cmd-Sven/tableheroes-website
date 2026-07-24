@@ -8,18 +8,9 @@ import { cookies } from "next/headers";
 import { SidebarWidthProvider } from "@/src/components/dashboard/SidebarWidthProvider";
 import { getPendingApplicationsCount } from "@/src/lib/queries/application-queries";
 import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
+import { getDashboardProfile } from "@/src/lib/dashboard/get-dashboard-profile";
 
 export const dynamic = "force-dynamic";
-
-type DashboardProfile = {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  primary_role: string | null;
-  status?: string | null;
-  display_name?: string | null;
-  role?: string | null;
-};
 
 export default async function DashboardLayout({
   children,
@@ -36,22 +27,12 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Profil explizit anhand der Auth-User-ID laden (kein Cache, alle benötigten Felder)
-  const { data: profileRaw, error: profileError } = await (
-    supabase.from("users") as any
-  )
-    .select(
-      "id, username, display_name, role, primary_role, avatar_url, status"
-    )
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const profile = profileRaw as unknown as DashboardProfile | null;
+  // Gleicher Cache wie /dashboard — kein zweiter users-Fetch im gleichen Request
+  const profile = await getDashboardProfile(user.id);
 
   const status = profile?.status ?? "approved";
   const isPendingOrRejected = status === "pending" || status === "rejected";
 
-  // userData 1:1 aus Profil + Auth (kein Mapping, das Felder weglässt)
   const userData = {
     id: profile?.id ?? user.id,
     username: profile?.username ?? null,
@@ -62,7 +43,6 @@ export default async function DashboardLayout({
     role: profile?.role ?? null,
   };
 
-  // Nutzer mit Status pending/rejected: nur Pending-Seite anzeigen (kein Sidebar/App)
   if (isPendingOrRejected) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background-dark p-6">
@@ -98,7 +78,6 @@ export default async function DashboardLayout({
     maintenanceMode = await getMaintenanceStatus();
   }
 
-  // Read sidebar collapsed state from cookie
   const cookieStore = await cookies();
   const sidebarCollapsed =
     cookieStore.get("sidebar-collapsed")?.value === "true";
@@ -107,7 +86,6 @@ export default async function DashboardLayout({
   return (
     <SidebarWidthProvider initialCollapsed={sidebarCollapsed}>
       <div className="flex h-screen overflow-hidden bg-background-dark">
-        {/* useSearchParams() in Sidebar: Suspense verhindert RSC-/Prerender-Abbrüche (Next 16). */}
         <Suspense
           fallback={
             <aside
@@ -125,16 +103,12 @@ export default async function DashboardLayout({
           />
         </Suspense>
 
-        {/* Main Content Area (Flexible) */}
         <main
           className="flex-1 flex flex-col overflow-hidden transition-all duration-200"
           style={{ marginLeft: "var(--sidebar-width, " + sidebarWidth + ")" }}
         >
-          {/* Scrollable Content Area */}
           <div className="flex-1 overflow-y-auto">
             <div className="p-6 md:p-10">{children}</div>
-
-            {/* Footer inside scrollable area */}
             <Footer />
           </div>
         </main>

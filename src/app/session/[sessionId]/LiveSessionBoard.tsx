@@ -63,8 +63,6 @@ import {
   type CombatConditionId,
   type CombatParticipantSide,
 } from "@/src/lib/combat-initiative";
-import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
-import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import {
   getCampaignNote,
@@ -83,8 +81,29 @@ import {
   WEATHER_PRESETS,
   type WeatherPresetId,
 } from "@/src/lib/session-weather";
-import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
-import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
+import {
+  BattlemapGmToolbar,
+  BattlemapStage,
+  BattlemapTokenTray,
+  BeastDefeatLootModal,
+  ChronicleInboxFeed,
+  ChronicleLiveMarkerBar,
+  ChronicleMicMonitor,
+  ChronicleMicTestPanel,
+  ChronicleRecorderPanel,
+  ChronicleRecordingNoticeModal,
+  ChronicleRecordingReminderBanner,
+  ChronicleRecordingTopBar,
+  CombatInitiativeBar,
+  DiceRollOverlay,
+  Dnd5eCharacterSheetModalWithLocale,
+  DowntimePlayerOverlay,
+  GmBeastSearchModal,
+  GmNpcSearchModal,
+  LiveStageShopOverlay,
+  PrivateInventoryModal,
+  SessionEndWrapUpModal,
+} from "./live-session-dynamic";
 import { LiveSessionSidePanels } from "@/src/components/session/LiveSessionSidePanels";
 import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
@@ -92,6 +111,14 @@ import {
   LiveSessionHandRaiseQueue,
   LiveSessionUrgentHandBanner,
 } from "@/src/components/session/LiveSessionHandRaiseUI";
+import { LiveWorldMapOverlay } from "@/src/components/world-maps/LiveWorldMapOverlay";
+import { SessionWorldMapsPanel } from "@/src/components/world-maps/SessionWorldMapsPanel";
+import {
+  getSessionWorldMaps,
+  getWorldMaps,
+  setActiveWorldMap,
+} from "@/src/lib/actions/world-map-actions";
+import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
@@ -100,7 +127,6 @@ import {
   dispatchAvatarSpeechBubble,
   speechBubbleFromActivityEntry,
 } from "@/src/lib/session/avatar-speech-bubble";
-import { DiceRollOverlay } from "@/src/components/session/dice/DiceRollOverlay";
 import { shouldAnimateDiceEntry } from "@/src/lib/session/dice-animation";
 import {
   useDiceRevealBridge,
@@ -116,7 +142,6 @@ import {
   type SessionHandRaise,
 } from "@/src/lib/session/hand-raises";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
-import { LiveStageShopOverlay } from "./LiveStageShopOverlay";
 import {
   StageNpcShopControls,
   type LiveCampaignShopOption,
@@ -125,29 +150,15 @@ import { updateNpcMerchantAssignment } from "@/src/app/dashboard/campaigns/[id]/
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
 import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
-import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
-import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
-import { GmBeastSearchModal } from "@/src/components/session/GmBeastSearchModal";
 import { StageBeastCard } from "@/src/components/session/StageBeastCard";
-import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootModal";
 import {
   setCreatureDefeated,
   setCreatureDiscovery,
   type CampaignCreatureStateRow,
 } from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
 import type { BeastDiscoveryKey } from "@/src/lib/beast-check-results";
-import { ChronicleRecorderPanel } from "@/src/components/session/ChronicleRecorderPanel";
-import { ChronicleInboxFeed } from "@/src/components/chronicle/ChronicleInboxFeed";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
-import { ChronicleMicTestPanel } from "@/src/components/session/ChronicleMicTestPanel";
-import { ChronicleRecordingTopBar } from "@/src/components/session/ChronicleRecordingTopBar";
-import {
-  ChronicleLiveMarkerBar,
-} from "@/src/components/session/ChronicleLiveMarkerBar";
-import { ChronicleRecordingNoticeModal } from "@/src/components/session/ChronicleRecordingNoticeModal";
-import { ChronicleRecordingReminderBanner } from "@/src/components/session/ChronicleRecordingReminderBanner";
-import { ChronicleMicMonitor } from "@/src/components/session/ChronicleMicMonitor";
 import { useSessionChronicleRecorder } from "@/src/hooks/useSessionChronicleRecorder";
 import { useSessionTranscriptionStatus } from "@/src/hooks/useSessionTranscriptionStatus";
 import { useMicMonitor } from "@/src/hooks/useMicMonitor";
@@ -172,9 +183,6 @@ import {
   imageDisplayObjectStyle,
   normalizeImageDisplay,
 } from "@/src/lib/image-display";
-import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
-import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
-import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import {
   createBattlemapProp,
   getCharacterMovementRange,
@@ -223,6 +231,7 @@ type LiveState = {
   visible_creature_ids?: string[] | null;
   active_scene_media_id?: string | null;
   active_battlemap_id?: string | null;
+  active_world_map_id?: string | null;
   battlemap_movement_paused?: boolean | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
@@ -273,6 +282,8 @@ function normalizeLiveRow(row: unknown): LiveState {
       r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
     active_battlemap_id:
       r.active_battlemap_id != null ? String(r.active_battlemap_id) : null,
+    active_world_map_id:
+      r.active_world_map_id != null ? String(r.active_world_map_id) : null,
     battlemap_movement_paused: r.battlemap_movement_paused === true,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
@@ -1325,11 +1336,14 @@ export function LiveSessionBoard({
   const campaignCreatures = useMemo(() => allCampaignCreatures, [allCampaignCreatures]);
 
   const activeBattlemapId = liveState?.active_battlemap_id ?? null;
+  const activeWorldMapId = liveState?.active_world_map_id ?? null;
   const activeBattlemap = useMemo(
     () => sessionBattlemaps.find((m) => m.id === activeBattlemapId) ?? null,
     [sessionBattlemaps, activeBattlemapId],
   );
   const battlemapActive = Boolean(activeBattlemap);
+  const [availableWorldMaps, setAvailableWorldMaps] = useState<WorldMap[]>([]);
+  const [sessionWorldMapLinks, setSessionWorldMapLinks] = useState<SessionWorldMap[]>([]);
 
   useEffect(() => {
     if (isGuest) return;
@@ -1345,6 +1359,22 @@ export function LiveSessionBoard({
       cancelled = true;
     };
   }, [sessionId, isGuest]);
+
+  useEffect(() => {
+    if (isGuest || !worldId) return;
+    let cancelled = false;
+    void Promise.all([
+      getWorldMaps(worldId).catch(() => [] as WorldMap[]),
+      getSessionWorldMaps(sessionId).catch(() => [] as SessionWorldMap[]),
+    ]).then(([maps, links]) => {
+      if (cancelled) return;
+      setAvailableWorldMaps(maps);
+      setSessionWorldMapLinks(links);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, worldId, isGuest]);
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
@@ -1545,7 +1575,10 @@ export function LiveSessionBoard({
   const refreshLiveState = useCallback(async () => {
     const { data, error } = await supabase
       .from("session_live_states")
-      .select("*")
+      .select(
+        // Keep in sync with src/lib/session/live-state-columns.ts
+        "session_id, weather, weather_preset, weather_intensity, weather_temperature, temperature, temperature_value, current_location, current_location_id, current_location_lore_id, current_time, in_game_date, in_game_time, journal_text, physically_present_user_ids, scribe_id, system_logs, hand_raises, visible_npc_ids, visible_faction_ids, visible_creature_ids, active_scene_media_id, active_battlemap_id, active_world_map_id, battlemap_movement_paused, background_url, is_background_manual_override, is_combat_mode, current_turn_index, combat_round, active_shop_id, active_merchant_npc_id, current_loot_id, loot_hide_npcs, fate_coins, destroyed_fate_coins, dummy_player_count, guest_slots, downtime_active, downtime_type, downtime_current_day, downtime_total_days, fap_allocations, updated_at",
+      )
       .eq("session_id", sessionId)
       .maybeSingle();
     if (!error && data) {
@@ -2590,6 +2623,7 @@ export function LiveSessionBoard({
   const stageHasDeckContent =
     sortedActiveNpcs.length > 0 ||
     activeFactions.length > 0 ||
+    activeCreatures.length > 0 ||
     Boolean(liveState?.current_loot_id);
 
   const sortedCombatParticipants = useMemo(
@@ -2681,9 +2715,7 @@ export function LiveSessionBoard({
     [factionStagePool, activeFactionIds],
   );
 
-  const battlemapTrayNpcs = useMemo(() => inHandNpcs, [inHandNpcs]);
-
-  const battlemapTrayCreatures = useMemo(
+  const inHandCreatures = useMemo(
     () =>
       creatureStagePool.filter(
         (c) => !(liveState?.visible_creature_ids ?? []).map(String).includes(String(c.id)),
@@ -2691,6 +2723,8 @@ export function LiveSessionBoard({
     [creatureStagePool, liveState?.visible_creature_ids],
   );
 
+  const battlemapTrayNpcs = useMemo(() => inHandNpcs, [inHandNpcs]);
+  const battlemapTrayCreatures = useMemo(() => inHandCreatures, [inHandCreatures]);
   const battlemapTrayScenes = useMemo(() => inHandScenes, [inHandScenes]);
 
   const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
@@ -4001,6 +4035,7 @@ export function LiveSessionBoard({
                   const data = JSON.parse(raw) as { kind?: string; id?: string };
                   if (data.kind === "npc" && data.id) placeOnStage("npc", data.id);
                   if (data.kind === "faction" && data.id) placeOnStage("faction", data.id);
+                  if (data.kind === "creature" && data.id) placeOnStage("creature", data.id);
                   if (data.kind === "scene" && data.id) placeOnStage("scene", data.id);
                 } catch {
                   /* ignore invalid payload */
@@ -4132,6 +4167,64 @@ export function LiveSessionBoard({
                     return next;
                   });
                 }}
+              />
+            ) : null}
+            {isGM && worldId && availableWorldMaps.length > 0 ? (
+              <div className="absolute left-3 top-14 z-[36] max-w-sm rounded border border-hero-border/40 bg-black/80 p-3">
+                <SessionWorldMapsPanel
+                  sessionId={sessionId}
+                  availableMaps={availableWorldMaps}
+                  attached={sessionWorldMapLinks}
+                  activeWorldMapId={activeWorldMapId}
+                  onActiveChange={(id) => {
+                    setLiveState((prev) => {
+                      if (!prev) return prev;
+                      const next = normalizeLiveRow({
+                        ...prev,
+                        active_world_map_id: id,
+                      });
+                      liveStateRef.current = next;
+                      return next;
+                    });
+                    void getSessionWorldMaps(sessionId)
+                      .then(setSessionWorldMapLinks)
+                      .catch(() => {});
+                  }}
+                />
+              </div>
+            ) : null}
+            {activeWorldMapId && worldId ? (
+              <LiveWorldMapOverlay
+                worldMapId={activeWorldMapId}
+                worldId={worldId}
+                campaignId={campaignId}
+                isGm={isGM}
+                onClose={
+                  isGM
+                    ? () => {
+                        startTransition(async () => {
+                          try {
+                            await setActiveWorldMap(sessionId, null);
+                            setLiveState((prev) => {
+                              if (!prev) return prev;
+                              const next = normalizeLiveRow({
+                                ...prev,
+                                active_world_map_id: null,
+                              });
+                              liveStateRef.current = next;
+                              return next;
+                            });
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "Weltkarte konnte nicht geschlossen werden.",
+                            );
+                          }
+                        });
+                      }
+                    : undefined
+                }
               />
             ) : null}
             {isGM && battlemapActive ? (
@@ -4837,17 +4930,20 @@ export function LiveSessionBoard({
           </div>
         </div>
 
-        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0 || inHandScenes.length > 0) && (
+        {isGM &&
+          (inHandNpcs.length > 0 ||
+            inHandFactions.length > 0 ||
+            inHandCreatures.length > 0) && (
           <StageDeckHand
             npcs={inHandNpcs}
             factions={inHandFactions}
-            scenes={inHandScenes}
+            creatures={inHandCreatures}
             onPlace={placeOnStage}
           />
         )}
       </div>
 
-      {isGM ? (
+      {isGM && npcSearchModalOpen ? (
         <GmNpcSearchModal
           open={npcSearchModalOpen}
           onClose={() => setNpcSearchModalOpen(false)}
@@ -4861,7 +4957,7 @@ export function LiveSessionBoard({
         />
       ) : null}
 
-      {isGM ? (
+      {isGM && beastSearchModalOpen ? (
         <GmBeastSearchModal
           open={beastSearchModalOpen}
           onClose={() => setBeastSearchModalOpen(false)}
@@ -5031,6 +5127,20 @@ export function LiveSessionBoard({
           onRemoveScene={
             isGM && !forcePlayerView
               ? (id) => removeFromStage("scene", id)
+              : undefined
+          }
+          creatures={creatureStagePool.map((c) => ({
+            id: String(c.id),
+            name: c.name,
+            creature_type: c.creature_type,
+            image_url: c.image_url,
+            is_revealed: c.is_revealed,
+          }))}
+          activeCreatureIds={activeCreatureIds}
+          onPlaceCreature={(id) => placeOnStage("creature", id)}
+          onRemoveCreature={
+            isGM && !forcePlayerView
+              ? (id) => removeFromStage("creature", id)
               : undefined
           }
           battlemaps={sessionBattlemaps}
@@ -5555,25 +5665,27 @@ export function LiveSessionBoard({
         <ChronicleLiveMarkerBar recorder={chronicleRecorder} />
       ) : null}
 
-      <SessionEndWrapUpModal
-        open={wrapUpOpen}
-        onClose={() => setWrapUpOpen(false)}
-        sessionId={sessionId}
-        campaignId={campaignId}
-        isRecordingActive={
-          chronicleRecorder.phase === "recording" ||
-          chronicleRecorder.phase === "paused" ||
-          liveTranscriptionStatus === "recording" ||
-          liveTranscriptionStatus === "paused"
-        }
-        onStopRecording={() => chronicleRecorder.stopRecording()}
-        onComplete={(path) => {
-          setWrapUpOpen(false);
-          startEndTransition(() => {
-            router.push(path);
-          });
-        }}
-      />
+      {wrapUpOpen ? (
+        <SessionEndWrapUpModal
+          open={wrapUpOpen}
+          onClose={() => setWrapUpOpen(false)}
+          sessionId={sessionId}
+          campaignId={campaignId}
+          isRecordingActive={
+            chronicleRecorder.phase === "recording" ||
+            chronicleRecorder.phase === "paused" ||
+            liveTranscriptionStatus === "recording" ||
+            liveTranscriptionStatus === "paused"
+          }
+          onStopRecording={() => chronicleRecorder.stopRecording()}
+          onComplete={(path) => {
+            setWrapUpOpen(false);
+            startEndTransition(() => {
+              router.push(path);
+            });
+          }}
+        />
+      ) : null}
       <style>{`
         @keyframes npc-reaction-float {
           0% {
