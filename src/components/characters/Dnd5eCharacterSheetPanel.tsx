@@ -1638,6 +1638,40 @@ export function Dnd5eCharacterSheetPanel({
                 </div>
               </section>
 
+              {biographyCulture ? (
+                <>
+                  <CharacterFlawPicker
+                    characterFlaws={characterFlaws}
+                    onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
+                    readOnly={readOnly}
+                    compact
+                  />
+
+                  {hasFlawAdjustments || flawNotes.length > 0 ? (
+                    <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
+                      <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
+                        {t("flaws.effectsTitle")}
+                      </h3>
+                      {hasFlawAdjustments ? (
+                        <p className="font-libre text-xs text-gray-400">
+                          {t("flaws.effectsHint")}
+                        </p>
+                      ) : null}
+                      {flawNotes.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {flawNotes.map((note) => (
+                            <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
+                              <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
+                              {note.text}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </>
+              ) : null}
+
               {sheet ? (
                 <CharacterRestPanel
                   sheet={sheet}
@@ -2049,40 +2083,6 @@ export function Dnd5eCharacterSheetPanel({
                 )}
               </section>
             </div>
-
-            {biographyCulture ? (
-              <div className="xl:col-span-8 xl:col-start-3 space-y-4">
-                <CharacterFlawPicker
-                  characterFlaws={characterFlaws}
-                  onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
-                  readOnly={readOnly}
-                  compact
-                />
-
-                {hasFlawAdjustments || flawNotes.length > 0 ? (
-                  <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
-                    <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
-                      {t("flaws.effectsTitle")}
-                    </h3>
-                    {hasFlawAdjustments ? (
-                      <p className="font-libre text-xs text-gray-400">
-                        {t("flaws.effectsHint")}
-                      </p>
-                    ) : null}
-                    {flawNotes.length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {flawNotes.map((note) => (
-                          <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
-                            <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
-                            {note.text}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </section>
-                ) : null}
-              </div>
-            ) : null}
           </div>
 
         </>
