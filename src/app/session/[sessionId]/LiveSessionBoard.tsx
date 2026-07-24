@@ -2623,6 +2623,7 @@ export function LiveSessionBoard({
   const stageHasDeckContent =
     sortedActiveNpcs.length > 0 ||
     activeFactions.length > 0 ||
+    activeCreatures.length > 0 ||
     Boolean(liveState?.current_loot_id);
 
   const sortedCombatParticipants = useMemo(
@@ -2714,9 +2715,7 @@ export function LiveSessionBoard({
     [factionStagePool, activeFactionIds],
   );
 
-  const battlemapTrayNpcs = useMemo(() => inHandNpcs, [inHandNpcs]);
-
-  const battlemapTrayCreatures = useMemo(
+  const inHandCreatures = useMemo(
     () =>
       creatureStagePool.filter(
         (c) => !(liveState?.visible_creature_ids ?? []).map(String).includes(String(c.id)),
@@ -2724,6 +2723,8 @@ export function LiveSessionBoard({
     [creatureStagePool, liveState?.visible_creature_ids],
   );
 
+  const battlemapTrayNpcs = useMemo(() => inHandNpcs, [inHandNpcs]);
+  const battlemapTrayCreatures = useMemo(() => inHandCreatures, [inHandCreatures]);
   const battlemapTrayScenes = useMemo(() => inHandScenes, [inHandScenes]);
 
   const stagePrepHref = `/dashboard/campaigns/${campaignId}/sessions/${sessionId}/stage-prep`;
@@ -4034,6 +4035,7 @@ export function LiveSessionBoard({
                   const data = JSON.parse(raw) as { kind?: string; id?: string };
                   if (data.kind === "npc" && data.id) placeOnStage("npc", data.id);
                   if (data.kind === "faction" && data.id) placeOnStage("faction", data.id);
+                  if (data.kind === "creature" && data.id) placeOnStage("creature", data.id);
                   if (data.kind === "scene" && data.id) placeOnStage("scene", data.id);
                 } catch {
                   /* ignore invalid payload */
@@ -4928,10 +4930,15 @@ export function LiveSessionBoard({
           </div>
         </div>
 
-        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0 || inHandScenes.length > 0) && (
+        {isGM &&
+          (inHandNpcs.length > 0 ||
+            inHandFactions.length > 0 ||
+            inHandCreatures.length > 0 ||
+            inHandScenes.length > 0) && (
           <StageDeckHand
             npcs={inHandNpcs}
             factions={inHandFactions}
+            creatures={inHandCreatures}
             scenes={inHandScenes}
             onPlace={placeOnStage}
           />
