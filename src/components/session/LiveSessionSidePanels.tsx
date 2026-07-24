@@ -13,6 +13,10 @@ import {
   LIVE_SESSION_MAIN_PANEL_HEIGHT_CLASS,
   LIVE_SESSION_SIDE_PANEL_WIDTH_CLASS,
 } from "@/src/components/session/live-session-side-types";
+import {
+  LiveSessionMonstersPanel,
+  type LiveSessionMonsterItem,
+} from "@/src/components/session/LiveSessionMonstersPanel";
 import { LiveSessionScenesPanel } from "@/src/components/session/LiveSessionScenesPanel";
 import { LiveSessionSideRail } from "@/src/components/session/LiveSessionSideRail";
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
@@ -69,6 +73,10 @@ type Props = {
   activeSceneId: string | null;
   onShowScene: (id: string) => void;
   onRemoveScene?: (id: string) => void;
+  creatures?: LiveSessionMonsterItem[];
+  activeCreatureIds?: Set<string>;
+  onPlaceCreature?: (id: string) => void;
+  onRemoveCreature?: (id: string) => void;
   battlemaps: SessionBattlemap[];
   activeBattlemapId: string | null;
   battlemapMovementPaused?: boolean;
@@ -117,6 +125,10 @@ export function LiveSessionSidePanels({
   activeSceneId,
   onShowScene,
   onRemoveScene,
+  creatures = [],
+  activeCreatureIds,
+  onPlaceCreature,
+  onRemoveCreature,
   battlemaps,
   activeBattlemapId,
   battlemapMovementPaused,
@@ -201,6 +213,17 @@ export function LiveSessionSidePanels({
                       isGM={isGM}
                       onShowScene={onShowScene}
                       onRemoveScene={onRemoveScene}
+                    />
+                  ) : null}
+
+                  {mainPanel === "monsters" ? (
+                    <LiveSessionMonstersPanel
+                      onClose={onCloseMain}
+                      creatures={creatures}
+                      activeCreatureIds={activeCreatureIds ?? new Set()}
+                      isGM={isGM}
+                      onPlaceCreature={onPlaceCreature ?? (() => undefined)}
+                      onRemoveCreature={onRemoveCreature}
                     />
                   ) : null}
 

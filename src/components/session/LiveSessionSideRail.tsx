@@ -9,6 +9,7 @@ import {
   Map,
   MessageSquare,
   Route,
+  Skull,
 } from "lucide-react";
 import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import {
@@ -115,6 +116,14 @@ export function LiveSessionSideRail({
             icon: ImageIcon,
             active: mainPanel === "scenes",
             onClick: () => onToggleMain("scenes"),
+            gmOnly: true,
+          },
+          {
+            id: "monsters",
+            label: "Monster & Gegner",
+            icon: Skull,
+            active: mainPanel === "monsters",
+            onClick: () => onToggleMain("monsters"),
             gmOnly: true,
           },
           {

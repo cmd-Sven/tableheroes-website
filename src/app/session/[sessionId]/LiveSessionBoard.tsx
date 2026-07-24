@@ -4933,13 +4933,11 @@ export function LiveSessionBoard({
         {isGM &&
           (inHandNpcs.length > 0 ||
             inHandFactions.length > 0 ||
-            inHandCreatures.length > 0 ||
-            inHandScenes.length > 0) && (
+            inHandCreatures.length > 0) && (
           <StageDeckHand
             npcs={inHandNpcs}
             factions={inHandFactions}
             creatures={inHandCreatures}
-            scenes={inHandScenes}
             onPlace={placeOnStage}
           />
         )}
@@ -5129,6 +5127,20 @@ export function LiveSessionBoard({
           onRemoveScene={
             isGM && !forcePlayerView
               ? (id) => removeFromStage("scene", id)
+              : undefined
+          }
+          creatures={creatureStagePool.map((c) => ({
+            id: String(c.id),
+            name: c.name,
+            creature_type: c.creature_type,
+            image_url: c.image_url,
+            is_revealed: c.is_revealed,
+          }))}
+          activeCreatureIds={activeCreatureIds}
+          onPlaceCreature={(id) => placeOnStage("creature", id)}
+          onRemoveCreature={
+            isGM && !forcePlayerView
+              ? (id) => removeFromStage("creature", id)
               : undefined
           }
           battlemaps={sessionBattlemaps}
