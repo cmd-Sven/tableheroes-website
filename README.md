@@ -27,9 +27,11 @@ Heute verbindet Table Heroes drei Dinge:
 | Framework | **Next.js 16** (App Router), **React 19**, **TypeScript** |
 | Styling / UI | **Tailwind CSS 4**, Lucide Icons, Framer Motion, Sonner |
 | Backend / Auth / DB | **Supabase** (`@supabase/ssr`, `@supabase/supabase-js`), Postgres-Migrationen unter `supabase/migrations/` |
+| Realtime | Supabase Realtime (`postgres_changes` + Session-**Broadcast**-Snapshots) |
 | Editor | **TipTap** (Rich Text / Markdown) |
 | 3D-Würfel | **Three.js** + **React Three Fiber** / Drei |
-| Battlemap | Canvas/Stage + **react-zoom-pan-pinch** |
+| Battlemap | Stage + **react-zoom-pan-pinch**, Overlay-Navigation (Pan/Zoom %) |
+| Markdown | **react-markdown** (u. a. KI-/News-Text) |
 | KI | **OpenAI** (u. a. Lore/NPC-Hilfe, Bildmodelle, Session-Chronik) |
 | E-Mail | **Resend** (Cron: tägliche Notification-Mails via Vercel) |
 | Deploy | **Vercel** (`vercel.json` mit Cron) |
@@ -42,7 +44,7 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 ## Bereits umgesetzte Features (aus dem Code)
 
 ### Öffentlich / Community
-- Marketing-Landingpage (Hero, Features, Termine, FAQ, Gamification, Systeme)
+- Marketing-Landingpage (Hero, Features, Termine, FAQ, Gamification, Systeme, News)
 - News & freigegebene Lore auf der Startseite
 - Community-Events / Spielplanung
 - Öffentliche Kampagnen-Seiten, Datenschutz, Impressum
@@ -64,7 +66,7 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 ### Welten & Content
 - **Welten**-Bereich inkl. Wizard / Erstellung
-- **NPCs** (inkl. KI-Unterstützung, Portraits, Reveal für Spieler)
+- **NPCs** inkl. Portrait, optionalem **Kampf-Token** (Crop/Rahmen), **Kampfwerten**/Sheet, KI-Hilfe, Reveal für Spieler
 - **Fraktionen** (Banner, Wizard, Reveal)
 - **Hierarchische Lore** (Parent/Child, Typen, Reveal)
 - **Orte / Locations**
@@ -76,15 +78,21 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 ### Charaktere
 - Charakterverwaltung und Detailseiten
 - DnD5e-Charakterbogen / Sheet-Daten (Progression-Katalog, DE-Patches)
-- Bedingungen / Mood / Biography & Flaws
+- Bedingungen / Mood-Zustände / Biography & Flaws
 - Ausrüstung, Gold/XP, Token-Generierung (inkl. KI-Bild)
 - Spieler-Edit-Alerts
 
 ### Live-Session (Session Board) — Kern des VTT-Pfads
 - Live-Session-Seite `/session/[sessionId]` und Gast-Join `/session/join/[token]`
-- Side-Rail mit Panels (u. a. Aktivität, Szenen, Battlemaps, Chronik, Würfel)
-- **Battlemap** (Session-Maps, Grid, Tokens Charakter/NSC/Kreatur, Props, Zoom/Pan lokal, Bewegungsreichweite inkl. Dash) — siehe auch `BATTLEMAP.md`
-- Fog-of-War-Layer-Komponente vorhanden; laut Roadmap-Doku Phase 3 noch nicht fertig ausgebaut
+- Rechte **Side-Rail** mit Panels: Aktivität/Chat, Szenen, Battlemaps, Tokens, Chronik, Würfel (eigenes Toggle)
+- **Battlemap** (Stand siehe [`BATTLEMAP.md`](./BATTLEMAP.md)):
+  - Session-Maps, Grid, Charakter-/NSC-/Kreatur-Tokens, Props
+  - Overlay-Navigation (Pfeile / Zoom % / Einpassen)
+  - Bewegung inkl. Dash & Pause; Token-Einstellungen (HP-Balken oben am Token, Größe, Sichtbarkeit)
+  - Spieler-Token: gleiches Radialmenü wie Avatar (Gemüt, SL-Zustand, Waffen, …)
+  - Zustands-Badge + Tooltip; Live-Bild nach Gemüt/Zustand
+  - **Just-in-Time-Sync** für Bewegung, Einstellungen und Zustände (Broadcast-Snapshots + Realtime)
+- Fog-of-War-Layer-Komponente vorhanden; laut Roadmap Phase 3 noch nicht fertig ausgebaut
 - Combat / Initiative-Leiste, Conditions
 - 3D-Würfel-Overlay (R3F)
 - Handheben (Hand Raise)
@@ -106,8 +114,8 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 | Status | Themen |
 |--------|--------|
-| **Done / in Arbeit** | Session Board, Battlemap Phase 1–2.5 (Maps, Tokens, Bewegung), Combat-UI, Würfel, Medien/Szenen, Chronist, Foundry-Bridge |
-| **Geplant (VTT)** | Fog of War ausbauen, Mood-Badges am Token, Initiative-Fokus, weitere Tisch-Features Richtung vollwertigem VTT |
+| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), Combat-UI, Würfel, Side-Rail, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
+| **Geplant (VTT)** | Fog of War ausbauen, Initiative-Fokus auf dem Tisch, weitere Tisch-Features Richtung vollwertigem VTT |
 | **Bewusst nicht** (aktuell laut `BATTLEMAP.md`) | Sync des SL-Viewports (Zoom/Pan bleibt lokal pro Client) |
 
 Details zur Battlemap: [`BATTLEMAP.md`](./BATTLEMAP.md). Weitere Fach-Docs: `FACTIONS_SYSTEM_README.md`, `WORLD_LORE_SYSTEM.md`, `PLAYER_VIEW_UPDATE.md`, `PROJECT_STRUCTURE.md`.
@@ -122,12 +130,13 @@ Details zur Battlemap: [`BATTLEMAP.md`](./BATTLEMAP.md). Weitere Fach-Docs: `FAC
 tableheroes-website/
 ├── src/
 │   ├── app/                 # Next.js App Router (Marketing, Auth, Dashboard, Session, API)
-│   ├── components/          # UI (session, worlds, characters, landing, …)
-│   └── lib/                 # Supabase, Queries, DnD5e, Session, Foundry-Sync, …
-├── supabase/migrations/     # Schema-Evolution
+│   ├── components/          # UI (session/battlemap, worlds, characters, landing, …)
+│   └── lib/                 # Supabase, Queries, DnD5e, Session, NPCs, Foundry-Sync, …
+├── supabase/migrations/     # Schema-Evolution (inkl. Battlemap / Realtime)
 ├── foundry-module/          # Table Heroes Bridge für Foundry
 ├── scripts/                 # Katalog-Builds u. a.
 ├── public/                  # Statische Assets
+├── BATTLEMAP.md             # Battlemap-Stand & Roadmap
 ├── vercel.json              # Cron-Jobs
 └── package.json
 ```
@@ -177,11 +186,10 @@ npm run lint
 
 Weitere Scripts: `catalog:dnd5e`, `test:progression`, `test:dice-faces` — siehe `package.json`.
 
-Migrationen liegen unter `supabase/migrations/` (per Supabase CLI / Dashboard anwenden).
+Migrationen liegen unter `supabase/migrations/` (per Supabase CLI / SQL-Editor im Dashboard anwenden). Für Live-Sync der Battlemap u. a. `characters` in der Realtime-Publikation (siehe `20260810130412_battlemap_character_realtime_sync.sql`).
 
 ---
 
 ## Lizenz / Status
 
 Privates Entwicklungsprojekt (`"private": true` in `package.json`), Version `0.1.0`. Fokus: Ausbau zum browserbasierten VTT bei gleichzeitig starkem Kampagnen- und Community-Tooling.
-```
