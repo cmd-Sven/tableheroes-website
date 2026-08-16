@@ -21,6 +21,7 @@ import {
   Plus,
   SlidersHorizontal,
   Send,
+  Swords,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -36,6 +37,13 @@ import { uploadNpcPortrait } from "@/src/lib/profile-media";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
 import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
+import { NpcCombatStatsEditor } from "@/src/components/dashboard/campaigns/npcs/NpcCombatStatsEditor";
+import {
+  mergeNpcSheetWithDefaults,
+  parseNpcSheetData,
+  type NpcSheetData,
+} from "@/src/lib/npcs/npc-sheet-types";
+import { generateNpcCombatSheet } from "@/src/app/dashboard/worlds/world-npc-actions";
 import {
   updateNPC,
   updateNPCNotes,
@@ -272,8 +280,11 @@ export function NPCDetailPage({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
-    "description" | "appearance" | "personality"
+    "description" | "appearance" | "personality" | "combat"
   >("description");
+  const [combatDraft, setCombatDraft] = useState<NpcSheetData | null>(() =>
+    parseNpcSheetData((initialNpc as { sheet_data?: unknown }).sheet_data),
+  );
 
   // Editing states
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -1285,6 +1296,19 @@ export function NPCDetailPage({
                 <Heart className="h-5 w-5" />
                 Persönlichkeit
               </button>
+              {isGM ? (
+                <button
+                  onClick={() => setActiveTab("combat")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 font-barlow font-semibold uppercase transition-colors ${
+                    activeTab === "combat"
+                      ? "bg-background-card text-hero-vibrant border-b-2 border-hero-vibrant"
+                      : "text-gray-400 hover:text-gray-300 hover:bg-hero-dark/50"
+                  }`}
+                >
+                  <Swords className="h-5 w-5" />
+                  Kampfwerte
+                </button>
+              ) : null}
             </div>
 
             {/* Tab Content */}
@@ -1408,6 +1432,72 @@ export function NPCDetailPage({
                 </InlineEditField>
               </GothicSpotlightDescription>
             )}
+
+            {isGM && activeTab === "combat" ? (
+              <div className="relative z-10 p-6 space-y-4">
+                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                  Kampfwerte (nur SL)
+                </h2>
+                <p className="font-libre text-sm text-gray-400">
+                  D&amp;D-5e-Statblock für Battlemap und Live-Session. Spieler sehen diesen Reiter
+                  nicht.
+                </p>
+                <NpcCombatStatsEditor
+                  sheet={combatDraft}
+                  onChange={setCombatDraft}
+                  disabled={isPending}
+                  onGenerateAi={
+                    npcWorldId
+                      ? async ({ classHint, powerTier }) =>
+                          generateNpcCombatSheet(npcWorldId, {
+                            name: npc.name,
+                            role: npc.role,
+                            race: npc.race,
+                            appearance: npc.appearance,
+                            description: npc.description,
+                            alignment: npc.alignment,
+                            classHint,
+                            powerTier,
+                          })
+                      : undefined
+                  }
+                />
+                <button
+                  type="button"
+                  disabled={isPending || !combatDraft}
+                  onClick={() => {
+                    startTransition(async () => {
+                      try {
+                        const payload = mergeNpcSheetWithDefaults(combatDraft);
+                        await updateNPC(npc.id, {
+                          sheet_data: payload,
+                          sheet_source: "manual",
+                          token_size_category: payload.sizeCategory ?? "medium",
+                        });
+                        setNpc((prev: typeof npc) => ({
+                          ...prev,
+                          sheet_data: payload,
+                          token_size_category: payload.sizeCategory ?? "medium",
+                        }));
+                        toast.success("Kampfwerte gespeichert.");
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Speichern fehlgeschlagen.",
+                        );
+                      }
+                    });
+                  }}
+                  className="inline-flex items-center gap-2 rounded border border-hero-vibrant px-4 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Kampfwerte speichern
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* Narrative Hooks - Story Opportunities (nur GM) */}

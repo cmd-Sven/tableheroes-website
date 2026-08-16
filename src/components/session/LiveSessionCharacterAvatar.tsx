@@ -5,9 +5,11 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
+  Heart,
   MapPin,
   Package,
   ScrollText,
+  Settings2,
   Shield,
   ShieldAlert,
   Smile,
@@ -26,6 +28,7 @@ import {
   useLiveSessionClassAbility,
   type LiveAvatarStatus,
 } from "@/src/lib/actions/live-session-avatar-actions";
+import { updateBattlemapTokenSettings } from "@/src/lib/actions/battlemap-actions";
 import {
   setCharacterMoodState,
   toggleCharacterActiveCondition,
@@ -38,6 +41,13 @@ import {
   MOOD_STATE_DEFINITIONS,
   type MoodStateKey,
 } from "@/src/lib/characters/mood-states";
+import {
+  NPC_SIZE_CELLS,
+  NPC_SIZE_LABELS_DE,
+  parseNpcTokenSizeCategory,
+  type NpcTokenSizeCategory,
+} from "@/src/lib/npcs/npc-sheet-types";
+import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
 import {
   AVATAR_ROLL_FX_DURATION_MS,
   AVATAR_ROLL_FX_EVENT,
@@ -55,6 +65,12 @@ import {
   getPlayerColorForClass,
   playerColorAlpha,
 } from "@/src/lib/session/class-player-color";
+import {
+  CHARACTER_DISPLAY_CHANGED_EVENT,
+  dispatchCharacterDisplayChanged,
+  OPEN_CHARACTER_RADIAL_EVENT,
+  type OpenCharacterRadialDetail,
+} from "@/src/lib/session/character-radial-bridge";
 
 type RadialPanel =
   | "weapons"
@@ -64,6 +80,7 @@ type RadialPanel =
   | "belt"
   | "mood"
   | "gm_state"
+  | "token_settings"
   | null;
 
 function isCasterHeuristic(className: string | null): boolean {
@@ -78,6 +95,13 @@ function hasClassAbilitiesHeuristic(className: string | null): boolean {
   return /barbar|barbarian|kämpfer|fighter|mönch|monk|kleriker|cleric|paladin|barde|bard|hexer|warlock|zauberer|sorcerer|druide|druid/.test(
     c,
   );
+}
+
+function sizeCategoryFromCells(sizeCells: number): NpcTokenSizeCategory {
+  const fromCells = (Object.entries(NPC_SIZE_CELLS) as [NpcTokenSizeCategory, number][]).find(
+    ([, cells]) => cells === sizeCells,
+  )?.[0];
+  return fromCells ?? "medium";
 }
 
 type Props = {
@@ -96,6 +120,13 @@ type Props = {
   /** Battlemap aktiv — Rad-Menü „Token setzen“. */
   battlemapActive?: boolean;
   onStartTokenPlacement?: () => void;
+  /** Platziertes Map-Token dieses Charakters (für Token-Einstellungen). */
+  battlemapToken?: {
+    id: string;
+    showHpBar: boolean;
+    sizeCells: number;
+  } | null;
+  onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
 };
 
 const RADIAL_ITEMS: {
@@ -108,10 +139,18 @@ const RADIAL_ITEMS: {
   moodOnly?: boolean;
   gmOnly?: boolean;
   tokenOnly?: boolean;
+  tokenSettingsOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
   { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
   { id: "gm_state", label: "Zustand (SL)", Icon: ShieldAlert, angle: -15, gmOnly: true },
+  {
+    id: "token_settings",
+    label: "Token-Einstellungen",
+    Icon: Settings2,
+    angle: 0,
+    tokenSettingsOnly: true,
+  },
   { id: "weapons", label: "Waffenset", Icon: Swords, angle: 30 },
   { id: "loadouts", label: "Ausrüstungsset", Icon: Shield, angle: 75 },
   { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
@@ -128,6 +167,7 @@ const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
   belt: "Gürtel",
   mood: "Gemütszustand auswählen",
   gm_state: "Zustand zuweisen (SL)",
+  token_settings: "Token-Einstellungen",
 };
 
 type AnchorRect = { cx: number; cy: number; top: number; width: number; height: number };
@@ -146,6 +186,8 @@ export function LiveSessionCharacterAvatar({
   showDnd5eSheet,
   battlemapActive = false,
   onStartTokenPlacement,
+  battlemapToken = null,
+  onBattlemapTokenSaved,
 }: Props) {
   const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,6 +195,10 @@ export function LiveSessionCharacterAvatar({
   const [pending, startTransition] = useTransition();
   const [mounted, setMounted] = useState(false);
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
+  const [tokenShowHpBar, setTokenShowHpBar] = useState(false);
+  const [tokenSizeCategory, setTokenSizeCategory] =
+    useState<NpcTokenSizeCategory>("medium");
+  const [activeBattlemapTokenId, setActiveBattlemapTokenId] = useState<string | null>(null);
   const [rollFx, setRollFx] = useState<{
     kind: AvatarRollFxKind;
     moodKey: MoodStateKey;
@@ -166,6 +212,7 @@ export function LiveSessionCharacterAvatar({
   const rootRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const openedFromMapRef = useRef(false);
   const rollFxTimerRef = useRef<number | null>(null);
   const speechBubbleTimerRef = useRef<number | null>(null);
   const seenRollFxIdsRef = useRef<Set<string>>(new Set());
@@ -225,15 +272,37 @@ export function LiveSessionCharacterAvatar({
     };
   }, [characterId]);
 
-  const reload = useCallback(async () => {
-    if (isDummy) return;
+  const reload = useCallback(async (): Promise<LiveAvatarStatus | null> => {
+    if (isDummy) return null;
     try {
       const next = await getLiveSessionAvatarStatus(characterId);
       setStatus(next);
+      return next;
     } catch {
-      /* Anzeige fällt auf Fallback zurück */
+      return null;
     }
   }, [characterId, isDummy]);
+
+  function broadcastDisplaySnapshot(next: LiveAvatarStatus | null) {
+    if (!next) {
+      dispatchCharacterDisplayChanged({ characterId });
+      return;
+    }
+    const moodTokenUrls: Record<string, string> = {};
+    for (const [k, v] of Object.entries(next.moodTokenUrls ?? {})) {
+      if (v?.trim()) moodTokenUrls[k] = v.trim();
+    }
+    dispatchCharacterDisplayChanged({
+      characterId,
+      snapshot: {
+        url: next.displayAvatarUrl,
+        activeConditions: next.activeConditions ?? [],
+        hpCurrent: next.hpCurrent,
+        hpMax: next.hpMax,
+        moodTokenUrls,
+      },
+    });
+  }
 
   const updateAnchor = useCallback(() => {
     const el = avatarBtnRef.current;
@@ -255,9 +324,73 @@ export function LiveSessionCharacterAvatar({
   }, [reload]);
 
   useEffect(() => {
+    function applyTokenDraft(token: {
+      tokenId: string;
+      showHpBar: boolean;
+      sizeCells: number;
+    }) {
+      setActiveBattlemapTokenId(token.tokenId);
+      setTokenShowHpBar(token.showHpBar);
+      setTokenSizeCategory(sizeCategoryFromCells(token.sizeCells));
+    }
+
+    function onOpenRadial(e: Event) {
+      const detail = (e as CustomEvent<OpenCharacterRadialDetail>).detail;
+      if (!detail || detail.characterId !== characterId) return;
+      if (!canInteract || isDummy) return;
+      openedFromMapRef.current = true;
+      if (detail.battlemapToken) {
+        applyTokenDraft(detail.battlemapToken);
+      } else if (battlemapToken) {
+        applyTokenDraft({
+          tokenId: battlemapToken.id,
+          showHpBar: battlemapToken.showHpBar,
+          sizeCells: battlemapToken.sizeCells,
+        });
+      }
+      setMenuOpen(true);
+      setPanel(null);
+      setAnchor({
+        cx: detail.clientX,
+        cy: detail.clientY,
+        top: detail.clientY,
+        width: 0,
+        height: 0,
+      });
+      void reload();
+    }
+    function onDisplayChanged(e: Event) {
+      const detail = (e as CustomEvent<{ characterId: string }>).detail;
+      if (!detail || detail.characterId !== characterId) return;
+      void reload();
+    }
+    window.addEventListener(OPEN_CHARACTER_RADIAL_EVENT, onOpenRadial);
+    window.addEventListener(CHARACTER_DISPLAY_CHANGED_EVENT, onDisplayChanged);
+    return () => {
+      window.removeEventListener(OPEN_CHARACTER_RADIAL_EVENT, onOpenRadial);
+      window.removeEventListener(CHARACTER_DISPLAY_CHANGED_EVENT, onDisplayChanged);
+    };
+  }, [battlemapToken, canInteract, characterId, isDummy, reload]);
+
+  useEffect(() => {
+    if (!battlemapToken) {
+      setActiveBattlemapTokenId(null);
+      return;
+    }
+    setActiveBattlemapTokenId(battlemapToken.id);
+    if (panel !== "token_settings") {
+      setTokenShowHpBar(battlemapToken.showHpBar);
+      setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
+    }
+  }, [battlemapToken, panel]);
+
+  useEffect(() => {
     if (!menuOpen) return;
-    updateAnchor();
+    if (!openedFromMapRef.current) {
+      updateAnchor();
+    }
     function onScrollOrResize() {
+      if (openedFromMapRef.current) return;
       updateAnchor();
     }
     window.addEventListener("resize", onScrollOrResize);
@@ -309,11 +442,14 @@ export function LiveSessionCharacterAvatar({
     status?.weaponLabels?.length ? status.weaponLabels.join(" · ") : "Keine Waffe";
   const playerColor = getPlayerColorForClass(className);
 
+  const hasBattlemapToken = Boolean(activeBattlemapTokenId || battlemapToken?.id);
+
   const visibleRadial = useMemo(() => {
     const filtered = RADIAL_ITEMS.filter((item) => {
       if (item.id === "sheet") return showDnd5eSheet;
       if (item.moodOnly) return true;
       if (item.gmOnly) return isGm;
+      if (item.tokenSettingsOnly) return hasBattlemapToken;
       if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
       if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
       if (item.abilitiesOnly) {
@@ -328,7 +464,15 @@ export function LiveSessionCharacterAvatar({
       ...item,
       angle: -90 + (360 / count) * index,
     }));
-  }, [status, className, showDnd5eSheet, isGm, battlemapActive, onStartTokenPlacement]);
+  }, [
+    status,
+    className,
+    showDnd5eSheet,
+    isGm,
+    battlemapActive,
+    onStartTokenPlacement,
+    hasBattlemapToken,
+  ]);
 
   function openSheetTab() {
     window.open(
@@ -351,7 +495,38 @@ export function LiveSessionCharacterAvatar({
       setPanel(null);
       return;
     }
+    if (id === "token_settings") {
+      const tokenId = activeBattlemapTokenId ?? battlemapToken?.id ?? null;
+      if (tokenId && battlemapToken && battlemapToken.id === tokenId) {
+        setTokenShowHpBar(battlemapToken.showHpBar);
+        setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
+      }
+      setPanel((prev) => (prev === id ? null : id));
+      return;
+    }
     setPanel((prev) => (prev === id ? null : id));
+  }
+
+  function saveTokenSettings() {
+    const tokenId = activeBattlemapTokenId ?? battlemapToken?.id ?? null;
+    if (!tokenId) return;
+    startTransition(async () => {
+      try {
+        const updated = await updateBattlemapTokenSettings({
+          tokenId,
+          sessionId,
+          showHpBar: tokenShowHpBar,
+          sizeCells: NPC_SIZE_CELLS[tokenSizeCategory],
+        });
+        onBattlemapTokenSaved?.(updated);
+        toast.success("Token-Einstellungen gespeichert.");
+        setPanel(null);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Token-Einstellungen fehlgeschlagen.",
+        );
+      }
+    });
   }
 
   function runAction(fn: () => Promise<LiveAvatarStatus | void>) {
@@ -378,7 +553,8 @@ export function LiveSessionCharacterAvatar({
           toast.error(result.error ?? "Gemütszustand konnte nicht gespeichert werden.");
           return;
         }
-        await reload();
+        const next = await reload();
+        broadcastDisplaySnapshot(next);
         toast.success(
           moodKey
             ? `Gemüt: ${MOOD_STATE_DEFINITIONS.find((d) => d.key === moodKey)?.labelDe ?? moodKey}`
@@ -403,7 +579,8 @@ export function LiveSessionCharacterAvatar({
           toast.error(result.error ?? "Zustand konnte nicht gesetzt werden.");
           return;
         }
-        await reload();
+        const next = await reload();
+        broadcastDisplaySnapshot(next);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Zustand fehlgeschlagen.");
       }
@@ -675,6 +852,56 @@ export function LiveSessionCharacterAvatar({
                       })}
                     </div>
                   ) : null}
+
+                  {panel === "token_settings" ? (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-200">
+                        <input
+                          type="checkbox"
+                          checked={tokenShowHpBar}
+                          onChange={(e) => setTokenShowHpBar(e.target.checked)}
+                          disabled={pending}
+                        />
+                        <Heart className="h-3.5 w-3.5 text-red-400" />
+                        Lebensbalken am Token
+                      </label>
+                      {tokenShowHpBar ? (
+                        <p className="font-libre text-[10px] text-gray-500">
+                          Aktuell: {hpCurrent} / {hpMax} TP
+                        </p>
+                      ) : null}
+                      <label className="block">
+                        <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                          Größe (D&amp;D 5e)
+                        </span>
+                        <select
+                          value={tokenSizeCategory}
+                          onChange={(e) =>
+                            setTokenSizeCategory(parseNpcTokenSizeCategory(e.target.value))
+                          }
+                          disabled={pending}
+                          className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
+                        >
+                          {(Object.keys(NPC_SIZE_LABELS_DE) as NpcTokenSizeCategory[]).map(
+                            (k) => (
+                              <option key={k} value={k}>
+                                {NPC_SIZE_LABELS_DE[k]} ({NPC_SIZE_CELLS[k]} Feld
+                                {NPC_SIZE_CELLS[k] > 1 ? "er" : ""})
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={pending || !hasBattlemapToken}
+                        onClick={saveTokenSettings}
+                        className="w-full rounded border border-hero-vibrant bg-hero-vibrant/15 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant disabled:opacity-40"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                  ) : null}
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -736,6 +963,12 @@ export function LiveSessionCharacterAvatar({
         disabled={!canInteract || isDummy}
         onClick={() => {
           if (!canInteract || isDummy) return;
+          openedFromMapRef.current = false;
+          if (battlemapToken) {
+            setActiveBattlemapTokenId(battlemapToken.id);
+            setTokenShowHpBar(battlemapToken.showHpBar);
+            setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
+          }
           setMenuOpen((v) => !v);
           setPanel(null);
           requestAnimationFrame(() => updateAnchor());

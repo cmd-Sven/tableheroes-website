@@ -24,6 +24,56 @@ type Props = {
   onRefresh: () => void;
 };
 
+type GridSliderKey = "cellSizePx" | "originX" | "originY" | "columns" | "rows";
+
+function GridSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+          {label}
+        </span>
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (!Number.isFinite(v)) return;
+            onChange(Math.min(max, Math.max(min, Math.round(v))));
+          }}
+          className="w-16 rounded border border-hero-border bg-slate-900/80 px-1.5 py-0.5 text-right text-xs text-white"
+        />
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-hero-dark accent-hero-vibrant"
+      />
+    </label>
+  );
+}
+
 export function StagePrepBattlemaps({
   sessionId,
   campaignId,
@@ -53,10 +103,61 @@ export function StagePrepBattlemaps({
   const [gridDraft, setGridDraft] = useState<BattlemapGridConfig>(
     selected?.grid_config ?? DEFAULT_BATTLEMAP_GRID,
   );
+  const [previewSize, setPreviewSize] = useState({ width: 1200, height: 800 });
 
   useEffect(() => {
     if (selected) setGridDraft(selected.grid_config);
   }, [selected?.id, selected?.grid_config]);
+
+  // Beim Bildwechsel Default-Größe zurücksetzen, bis onLoad die echten Maße liefert
+  useEffect(() => {
+    setPreviewSize({ width: 1200, height: 800 });
+  }, [selected?.id, selected?.image_url]);
+
+  const sliderDefs = useMemo(() => {
+    const maxOriginX = Math.max(0, previewSize.width - 8);
+    const maxOriginY = Math.max(0, previewSize.height - 8);
+    const maxCell = Math.max(
+      8,
+      Math.min(200, Math.floor(Math.min(previewSize.width, previewSize.height) / 2)),
+    );
+    return [
+      {
+        key: "cellSizePx" as GridSliderKey,
+        label: "Zellengröße (px)",
+        min: 8,
+        max: maxCell,
+      },
+      {
+        key: "originX" as GridSliderKey,
+        label: "Versatz X (links)",
+        min: 0,
+        max: maxOriginX,
+      },
+      {
+        key: "originY" as GridSliderKey,
+        label: "Versatz Y (oben)",
+        min: 0,
+        max: maxOriginY,
+      },
+      {
+        key: "columns" as GridSliderKey,
+        label: "Spalten",
+        min: 1,
+        max: 120,
+      },
+      {
+        key: "rows" as GridSliderKey,
+        label: "Zeilen",
+        min: 1,
+        max: 120,
+      },
+    ];
+  }, [previewSize.height, previewSize.width]);
+
+  function updateGridKey(key: GridSliderKey, value: number) {
+    setGridDraft((prev) => ({ ...prev, [key]: value }));
+  }
 
   function resetNewForm() {
     setNewTitle("");
@@ -137,6 +238,9 @@ export function StagePrepBattlemaps({
     });
   }
 
+  /** Vorschau so skalieren, dass sie in den Container passt, Raster bleibt pixelgenau. */
+  const previewDisplayScale = Math.min(1, 720 / Math.max(previewSize.width, 1));
+
   return (
     <section
       className="rounded-xl border border-hero-border p-5 space-y-5"
@@ -191,7 +295,7 @@ export function StagePrepBattlemaps({
           Noch keine Battlemaps — lade eine Karte hoch, um das Raster zu kalibrieren.
         </p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
           <div className="space-y-2">
             <p className="font-barlow text-xs font-bold uppercase text-gray-500">Vorhandene Maps</p>
             <ul className="space-y-2">
@@ -238,54 +342,71 @@ export function StagePrepBattlemaps({
 
           {selected ? (
             <div className="space-y-4">
-              <p className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                Raster kalibrieren — {selected.title}
-              </p>
-              <div className="relative max-h-[420px] overflow-auto rounded-lg border border-hero-border bg-black">
-                <div className="relative inline-block min-w-full">
-                  <Image
-                    src={selected.image_url}
-                    alt={selected.title}
-                    width={1200}
-                    height={800}
-                    unoptimized
-                    className="block h-auto max-w-none"
-                  />
-                  <BattlemapGridOverlay
-                    config={gridDraft}
-                    mapWidth={1200}
-                    mapHeight={800}
-                  />
+              <div>
+                <p className="font-barlow text-xs font-bold uppercase text-accent-gold">
+                  Raster kalibrieren — {selected.title}
+                </p>
+                <p className="mt-1 font-libre text-xs text-gray-400">
+                  Schieberegler bewegen — das Raster aktualisiert sich live auf der Vorschau.
+                  Bild: {previewSize.width}×{previewSize.height}px
+                </p>
+              </div>
+
+              <div className="overflow-auto rounded-lg border border-hero-border bg-black p-2">
+                <div
+                  className="relative mx-auto origin-top"
+                  style={{
+                    width: previewSize.width * previewDisplayScale,
+                    height: previewSize.height * previewDisplayScale,
+                  }}
+                >
+                  <div
+                    className="absolute left-0 top-0"
+                    style={{
+                      width: previewSize.width,
+                      height: previewSize.height,
+                      transform: `scale(${previewDisplayScale})`,
+                      transformOrigin: "top left",
+                    }}
+                  >
+                    <Image
+                      src={selected.image_url}
+                      alt={selected.title}
+                      width={previewSize.width}
+                      height={previewSize.height}
+                      unoptimized
+                      className="block max-h-none max-w-none select-none"
+                      style={{ width: previewSize.width, height: previewSize.height }}
+                      onLoad={(e) => {
+                        const img = e.currentTarget;
+                        const width = img.naturalWidth || 1200;
+                        const height = img.naturalHeight || 800;
+                        setPreviewSize((prev) =>
+                          prev.width === width && prev.height === height
+                            ? prev
+                            : { width, height },
+                        );
+                      }}
+                    />
+                    <BattlemapGridOverlay
+                      config={gridDraft}
+                      mapWidth={previewSize.width}
+                      mapHeight={previewSize.height}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {(
-                  [
-                    ["cellSizePx", "Zellengröße (px)", 8, 200],
-                    ["originX", "Origin X", 0, 2000],
-                    ["originY", "Origin Y", 0, 2000],
-                    ["columns", "Spalten", 1, 200],
-                    ["rows", "Zeilen", 1, 200],
-                  ] as const
-                ).map(([key, label, min, max]) => (
-                  <label key={key} className="block text-xs text-gray-400">
-                    <span className="font-barlow font-bold uppercase text-[10px]">{label}</span>
-                    <input
-                      type="number"
-                      min={min}
-                      max={max}
-                      value={gridDraft[key]}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        setGridDraft((prev) => ({
-                          ...prev,
-                          [key]: Number.isFinite(v) ? v : prev[key],
-                        }));
-                      }}
-                      className="mt-1 w-full rounded border border-hero-border bg-slate-900/80 px-2 py-1.5 text-sm text-white"
-                    />
-                  </label>
+              <div className="space-y-3 rounded-lg border border-hero-border/50 bg-black/30 p-3">
+                {sliderDefs.map((def) => (
+                  <GridSlider
+                    key={def.key}
+                    label={def.label}
+                    value={gridDraft[def.key]}
+                    min={def.min}
+                    max={def.max}
+                    onChange={(v) => updateGridKey(def.key, v)}
+                  />
                 ))}
               </div>
 

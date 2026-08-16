@@ -4,6 +4,8 @@ import { ImageIcon, Loader2, RefreshCw, SkipForward, Sparkles } from "lucide-rea
 import { normalizeImageDisplay, type ImageDisplaySettings } from "@/src/lib/image-display";
 import { NpcPortraitUploadField } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitUploadField";
 import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
+import { NpcTokenCropEditor } from "@/src/components/dashboard/campaigns/npcs/NpcTokenCropEditor";
+import type { NpcTokenBorder } from "@/src/lib/npcs/npc-sheet-types";
 
 type Props = {
   npcName: string;
@@ -23,6 +25,14 @@ type Props = {
   onGenerate: () => void;
   onSkip: () => void;
   onClearSkip: () => void;
+  /** Optionaler Token-Crop aus dem Portrait */
+  tokenCrop?: {
+    enabled: boolean;
+    onEnabledChange: (v: boolean) => void;
+    border: NpcTokenBorder;
+    onBorderChange: (b: NpcTokenBorder) => void;
+    onTokenBlobChange: (file: File | null) => void;
+  };
 };
 
 export function NpcPortraitStep({
@@ -43,6 +53,7 @@ export function NpcPortraitStep({
   onGenerate,
   onSkip,
   onClearSkip,
+  tokenCrop,
 }: Props) {
   return (
     <div className="space-y-6">
@@ -152,6 +163,17 @@ export function NpcPortraitStep({
           </p>
         ) : null}
       </div>
+
+      {imageUrl && !portraitSkipped && tokenCrop ? (
+        <NpcTokenCropEditor
+          imageUrl={imageUrl}
+          enabled={tokenCrop.enabled}
+          onEnabledChange={tokenCrop.onEnabledChange}
+          border={tokenCrop.border}
+          onBorderChange={tokenCrop.onBorderChange}
+          onTokenBlobChange={tokenCrop.onTokenBlobChange}
+        />
+      ) : null}
     </div>
   );
 }

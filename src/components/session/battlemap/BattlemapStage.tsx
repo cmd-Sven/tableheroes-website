@@ -2,8 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
-import { Crosshair, Eye, EyeOff, Minus, Plus, Trash2, X, Zap } from "lucide-react";
+import {
+  TransformWrapper,
+  TransformComponent,
+  type ReactZoomPanPinchRef,
+} from "react-zoom-pan-pinch";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Crosshair,
+  Eye,
+  EyeOff,
+  Maximize2,
+  Minus,
+  Plus,
+  Trash2,
+  X,
+  Zap,
+} from "lucide-react";
 import type {
   BattlemapGridConfig,
   CharacterTokenPlacement,
@@ -13,6 +31,7 @@ import type {
   SessionBattlemapProp,
   SessionBattlemapToken,
 } from "@/src/lib/session/battlemap-types";
+import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import {
   isCellBlockedByTokens,
   pixelToGrid,
@@ -47,7 +66,48 @@ type Props = {
   onTogglePropVisibility?: (propId: string, visible: boolean) => void;
   onRemoveToken?: (tokenId: string) => void;
   onRemoveProp?: (propId: string) => void;
+  hpByRef?: Record<string, { current: number; max: number }>;
+  ownCharacterId?: string | null;
+  /** characterId → Gemüt-/Zustands-Anzeige-URL */
+  characterDisplayUrlById?: Record<string, string | null | undefined>;
+  /** characterId → aktive SL-Zustände */
+  characterConditionsById?: Record<string, CharacterConditionKey[] | undefined>;
+  onTokenContextMenu?: (
+    token: SessionBattlemapToken,
+    clientX: number,
+    clientY: number,
+  ) => void;
 };
+
+/** Bildschirmkoordinaten → Bildpixel (Zoom/Pan der TransformWrapper berücksichtigen). */
+function clientToMapPixels(
+  clientX: number,
+  clientY: number,
+  el: HTMLElement,
+  mapWidth: number,
+  mapHeight: number,
+): { px: number; py: number } | null {
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  return {
+    px: ((clientX - rect.left) / rect.width) * mapWidth,
+    py: ((clientY - rect.top) / rect.height) * mapHeight,
+  };
+}
+
+function fitScaleFor(
+  mapWidth: number,
+  mapHeight: number,
+  viewWidth: number,
+  viewHeight: number,
+): number {
+  if (mapWidth <= 0 || mapHeight <= 0 || viewWidth <= 0 || viewHeight <= 0) {
+    return 1;
+  }
+  // Etwas Luft am Rand, damit die Karte nicht bündig am Viewport klebt
+  const padding = 0.92;
+  return Math.min(viewWidth / mapWidth, viewHeight / mapHeight) * padding;
+}
 
 export function BattlemapStage({
   battlemap,
@@ -70,11 +130,19 @@ export function BattlemapStage({
   onTogglePropVisibility,
   onRemoveToken,
   onRemoveProp,
+  hpByRef,
+  ownCharacterId,
+  characterDisplayUrlById,
+  characterConditionsById,
+  onTokenContextMenu,
 }: Props) {
   const config = battlemap.grid_config;
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapSize, setMapSize] = useState({ width: 1200, height: 800 });
+  const [fitScale, setFitScale] = useState(1);
+  const [viewScale, setViewScale] = useState(1);
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
   const [propDropHighlight, setPropDropHighlight] = useState(false);
   const [spacePanHeld, setSpacePanHeld] = useState(false);
@@ -101,6 +169,81 @@ export function BattlemapStage({
       : gmTokenPlacement
         ? `${gmTokenPlacement.name} platzieren`
         : null;
+
+  const computeFitScale = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage || mapSize.width <= 0 || mapSize.height <= 0) return 1;
+    return fitScaleFor(
+      mapSize.width,
+      mapSize.height,
+      stage.clientWidth,
+      stage.clientHeight,
+    );
+  }, [mapSize.height, mapSize.width]);
+
+  const applyFitView = useCallback(() => {
+    const nextFit = computeFitScale();
+    setFitScale(nextFit);
+    setViewScale(nextFit);
+    requestAnimationFrame(() => {
+      transformRef.current?.centerView(nextFit, 200);
+    });
+  }, [computeFitScale]);
+
+  const panBy = useCallback((dx: number, dy: number) => {
+    const api = transformRef.current;
+    if (!api) return;
+    const state = api.state ?? api.instance?.state;
+    if (!state) return;
+    api.setTransform(state.positionX + dx, state.positionY + dy, state.scale, 180);
+  }, []);
+
+  const zoomByFactor = useCallback((factor: number) => {
+    const api = transformRef.current;
+    if (!api) return;
+    const state = api.state ?? api.instance?.state;
+    if (!state) return;
+    const lo = Math.max(0.05, fitScale * 0.35);
+    const hi = Math.max(4, fitScale * 8);
+    const next = Math.min(hi, Math.max(lo, state.scale * factor));
+    api.setTransform(state.positionX, state.positionY, next, 180);
+    setViewScale(next);
+  }, [fitScale]);
+
+  // Beim Map-Wechsel / Bildgröße: Fit-Scale neu berechnen (TransformWrapper remountet über key)
+  useEffect(() => {
+    setFitScale(computeFitScale());
+  }, [computeFitScale, battlemap.id]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const ro = new ResizeObserver(() => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      // Nur Fit-Scale für min/max aktualisieren — Zoom nicht hart zurücksetzen
+      resizeTimer = setTimeout(() => {
+        setFitScale(computeFitScale());
+      }, 120);
+    });
+    ro.observe(stage);
+    return () => {
+      ro.disconnect();
+      if (resizeTimer) clearTimeout(resizeTimer);
+    };
+  }, [computeFitScale]);
+
+  // Mausrad über der Karte: Seiten-Scroll blockieren (Capture + non-passive).
+  // Ohne preventDefault scrollt der äußere Live-Board-Container (overflow-y-auto).
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+    };
+    stage.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    return () => stage.removeEventListener("wheel", onWheel, { capture: true });
+  }, []);
 
   useEffect(() => {
     if (!placementActive) return;
@@ -180,10 +323,15 @@ export function BattlemapStage({
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!placementActive || !onCellClick) return;
       if (e.button !== 0) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-      const cell = pixelToGrid(px, py, config);
+      const coords = clientToMapPixels(
+        e.clientX,
+        e.clientY,
+        e.currentTarget,
+        mapSize.width,
+        mapSize.height,
+      );
+      if (!coords) return;
+      const cell = pixelToGrid(coords.px, coords.py, config);
       if (!cell) return;
       const size = characterPlacement ? 1 : gmPlacementSize;
       if (!isCellReachable(cell.gridX, cell.gridY, size)) return;
@@ -194,6 +342,8 @@ export function BattlemapStage({
       characterPlacement,
       gmPlacementSize,
       isCellReachable,
+      mapSize.height,
+      mapSize.width,
       onCellClick,
       placementActive,
     ],
@@ -205,13 +355,21 @@ export function BattlemapStage({
         setHoverCell(null);
         return;
       }
-      const rect = e.currentTarget.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-      const cell = pixelToGrid(px, py, config);
+      const coords = clientToMapPixels(
+        e.clientX,
+        e.clientY,
+        e.currentTarget,
+        mapSize.width,
+        mapSize.height,
+      );
+      if (!coords) {
+        setHoverCell(null);
+        return;
+      }
+      const cell = pixelToGrid(coords.px, coords.py, config);
       setHoverCell(cell ? { x: cell.gridX, y: cell.gridY } : null);
     },
-    [config, placementActive],
+    [config, mapSize.height, mapSize.width, placementActive],
   );
 
   const handlePropDragOver = useCallback(
@@ -234,11 +392,22 @@ export function BattlemapStage({
         const raw = e.dataTransfer.getData("application/x-battlemap-prop");
         if (!raw) return;
         const draft = JSON.parse(raw) as GmPropPlacementDraft;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        const posX = Math.max(0, Math.min(1 - draft.width, px / mapSize.width));
-        const posY = Math.max(0, Math.min(1 - draft.height, py / mapSize.height));
+        const coords = clientToMapPixels(
+          e.clientX,
+          e.clientY,
+          e.currentTarget,
+          mapSize.width,
+          mapSize.height,
+        );
+        if (!coords) return;
+        const posX = Math.max(
+          0,
+          Math.min(1 - draft.width, coords.px / mapSize.width),
+        );
+        const posY = Math.max(
+          0,
+          Math.min(1 - draft.height, coords.py / mapSize.height),
+        );
         onPropDrop(draft, posX, posY);
       } catch {
         /* ignore */
@@ -264,9 +433,11 @@ export function BattlemapStage({
       : false;
 
   const hoverSize = characterPlacement ? 1 : gmPlacementSize;
+  const minScale = Math.max(0.05, fitScale * 0.35);
+  const maxScale = Math.max(4, fitScale * 8);
 
   return (
-    <div className="absolute inset-0 z-[2] overflow-hidden bg-black">
+    <div ref={stageRef} className="absolute inset-0 z-[2] overflow-hidden overscroll-contain bg-black">
       {placementLabel ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col items-center gap-1 bg-accent-blood/90 px-4 py-2 text-center shadow-lg">
           <div className="flex items-center justify-center gap-3">
@@ -286,7 +457,7 @@ export function BattlemapStage({
             ) : null}
           </div>
           <p className="font-libre text-[10px] text-gray-200">
-            Esc abbricht · Leertaste + Ziehen oder Mittel-/Rechtsklick zum Verschieben der Karte
+            Esc abbricht · Navigation unten links (Pfeile / Zoom)
           </p>
           {characterPlacement && !characterPlacement.isFirstPlacement && movementMaxCells != null ? (
             <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2">
@@ -311,11 +482,86 @@ export function BattlemapStage({
             </div>
           ) : null}
         </div>
-      ) : (
-        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-20 text-center font-libre text-[10px] text-gray-500/90">
-          Jeder zoomt lokal · Der SL wechselt die aktive Karte
-        </p>
-      )}
+      ) : null}
+
+      {/* Karten-Navigation (Google-Maps-Stil): Pfeile + Zoom % */}
+      <div className="pointer-events-auto absolute bottom-3 left-3 z-40 flex flex-col gap-2">
+        {/* Pan-Pad */}
+        <div className="rounded-xl border border-hero-border/70 bg-background-card/95 p-1 shadow-xl backdrop-blur-md">
+          <div className="grid grid-cols-3 gap-0.5">
+            <span className="h-9 w-9" aria-hidden />
+            <button
+              type="button"
+              title="Nach oben"
+              onClick={() => panBy(0, 120)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-hero-border/40 text-gray-200 hover:border-hero-vibrant hover:text-hero-vibrant"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <span className="h-9 w-9" aria-hidden />
+            <button
+              type="button"
+              title="Nach links"
+              onClick={() => panBy(120, 0)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-hero-border/40 text-gray-200 hover:border-hero-vibrant hover:text-hero-vibrant"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Einpassen"
+              onClick={() => applyFitView()}
+              className="grid h-9 w-9 place-items-center rounded-md border border-accent-gold/40 text-accent-gold hover:bg-accent-gold/10"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Nach rechts"
+              onClick={() => panBy(-120, 0)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-hero-border/40 text-gray-200 hover:border-hero-vibrant hover:text-hero-vibrant"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span className="h-9 w-9" aria-hidden />
+            <button
+              type="button"
+              title="Nach unten"
+              onClick={() => panBy(0, -120)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-hero-border/40 text-gray-200 hover:border-hero-vibrant hover:text-hero-vibrant"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            <span className="h-9 w-9" aria-hidden />
+          </div>
+        </div>
+
+        {/* Zoom ± mit Prozent */}
+        <div className="flex flex-col overflow-hidden rounded-xl border border-hero-border/70 bg-background-card/95 shadow-xl backdrop-blur-md">
+          <button
+            type="button"
+            title="Vergrößern"
+            onClick={() => zoomByFactor(1.25)}
+            className="grid h-9 w-full place-items-center border-b border-hero-border/40 text-gray-200 hover:bg-hero-vibrant/10 hover:text-hero-vibrant"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <div
+            className="px-2 py-1.5 text-center font-barlow text-[11px] font-bold tabular-nums text-accent-gold"
+            title="Zoom relativ zur Einpassung (100 % = ganze Karte sichtbar)"
+          >
+            {Math.max(1, Math.round((viewScale / Math.max(fitScale, 0.0001)) * 100))}%
+          </div>
+          <button
+            type="button"
+            title="Verkleinern"
+            onClick={() => zoomByFactor(1 / 1.25)}
+            className="grid h-9 w-full place-items-center border-t border-hero-border/40 text-gray-200 hover:bg-hero-vibrant/10 hover:text-hero-vibrant"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
       {isGm && (selectedToken || selectedProp) ? (
         <div className="pointer-events-auto absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-hero-border/70 bg-background-card/95 px-3 py-2 shadow-xl backdrop-blur-md">
@@ -406,23 +652,38 @@ export function BattlemapStage({
       ) : null}
 
       <TransformWrapper
+        key={`${battlemap.id}-${mapSize.width}x${mapSize.height}`}
         ref={transformRef}
-        initialScale={1}
-        minScale={0.25}
-        maxScale={4}
+        initialScale={fitScale}
+        minScale={minScale}
+        maxScale={maxScale}
         centerOnInit
-        wheel={{ step: 0.08 }}
+        limitToBounds={false}
+        wheel={{
+          wheelDisabled: true,
+        }}
         panning={{
           disabled: false,
-          allowLeftClickPan: placementActive ? spacePanHeld : true,
+          velocityDisabled: true,
+          // Primär: Pfeil-Buttons; Ziehen nur Mittel-/Rechtsklick (kein Konflikt mit Token-Klick)
+          allowLeftClickPan: placementActive ? spacePanHeld : false,
           allowMiddleClickPan: true,
           allowRightClickPan: true,
         }}
         doubleClick={{ disabled: true }}
+        onInit={(ref) => {
+          const nextFit = computeFitScale();
+          setFitScale(nextFit);
+          setViewScale(nextFit);
+          ref.centerView(nextFit, 0);
+        }}
+        onTransformed={(_ref, state) => {
+          setViewScale(state.scale);
+        }}
       >
         <TransformComponent
           wrapperClass="!h-full !w-full"
-          contentClass="!h-full !w-full flex items-center justify-center"
+          contentClass="!flex !h-full !w-full !items-center !justify-center"
         >
           <div
             ref={mapRef}
@@ -447,10 +708,13 @@ export function BattlemapStage({
               draggable={false}
               onLoad={(e) => {
                 const img = e.currentTarget;
-                setMapSize({
-                  width: img.naturalWidth || 1200,
-                  height: img.naturalHeight || 800,
-                });
+                const width = img.naturalWidth || 1200;
+                const height = img.naturalHeight || 800;
+                setMapSize((prev) =>
+                  prev.width === width && prev.height === height
+                    ? prev
+                    : { width, height },
+                );
               }}
               style={{ width: mapSize.width, height: mapSize.height }}
             />
@@ -479,7 +743,12 @@ export function BattlemapStage({
               highlightCharacterId={characterPlacement?.characterId}
               isGm={isGm}
               selectedTokenId={selectedTokenId}
+              hpByRef={hpByRef}
+              ownCharacterId={ownCharacterId}
+              characterDisplayUrlById={characterDisplayUrlById}
+              characterConditionsById={characterConditionsById}
               onSelectToken={onSelectToken}
+              onTokenContextMenu={onTokenContextMenu}
             />
             {hoverCell && placementActive ? (
               <div

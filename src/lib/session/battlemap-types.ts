@@ -64,6 +64,7 @@ export type SessionBattlemapToken = {
   size_cells: number;
   is_visible_to_players: boolean;
   token_side: BattlemapTokenSide;
+  show_hp_bar?: boolean;
   created_at?: string;
   updated_at?: string;
 };

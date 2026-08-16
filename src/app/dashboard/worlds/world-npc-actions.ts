@@ -755,3 +755,86 @@ export async function getWorldNPCsForRelations(
     current_location_id: n.current_location_id ?? null,
   }));
 }
+
+/**
+ * D&D 5e NPC-Kampfwerte per KI (Attribute, AC/HP, Angriffe, Zauber).
+ * Basiert auf Klasse/Archetyp + Stärke-Tier und narrativem Kontext.
+ */
+export async function generateNpcCombatSheet(
+  worldId: string,
+  input: {
+    name: string;
+    role?: string | null;
+    race?: string | null;
+    appearance?: string | null;
+    description?: string | null;
+    alignment?: string | null;
+    classHint: string;
+    powerTier?: "minion" | "standard" | "elite" | "boss";
+  },
+): Promise<import("@/src/lib/npcs/npc-sheet-types").NpcSheetData> {
+  await loadWorldAndAuth(worldId);
+
+  const powerTier = input.powerTier ?? "standard";
+  const systemPrompt = `Du bist ein erfahrener Dungeon Master und erstellst D&D 5e NPC-Statblöcke (Monster Manual / DMG NPC-Regeln), NICHT Spielercharaktere.
+
+Antworte NUR mit validem JSON in diesem Schema:
+{
+  "version": 1,
+  "classHint": string,
+  "challengeRating": string (z.B. "1/2", "2", "5"),
+  "powerTier": "minion"|"standard"|"elite"|"boss",
+  "sizeCategory": "tiny"|"small"|"medium"|"large"|"huge"|"gargantuan",
+  "creatureType": string,
+  "abilities": {
+    "str": {"score": number}, "dex": {"score": number}, "con": {"score": number},
+    "int": {"score": number}, "wis": {"score": number}, "cha": {"score": number}
+  },
+  "combat": {
+    "ac": number, "hpMax": number, "hpCurrent": number, "speed": number, "proficiencyBonus": number
+  },
+  "attacks": [{"id": string, "name": string, "attackBonus": number, "damage": string, "notes": string|null}],
+  "spells": [{"id": string, "name": string, "level": number, "school": string|null, "notes": string|null}],
+  "features": [{"id": string, "name": string, "description": string|null}],
+  "notes": string|null
+}
+
+Regeln:
+- Werte müssen zum powerTier und classHint passen (minion schwach, boss gefährlich).
+- Zauber nur wenn der Archetyp zaubert (Zauberer, Kleriker, Kampfmagier …); sonst leeres Array.
+- 1–3 sinnvolle Angriffe. IDs als kurze UUID-ähnliche Strings.
+- Sprache für Namen/Notes: Deutsch wo sinnvoll (Zauber können englische PHB-Namen behalten).`;
+
+  const userMessage = `NPC: ${input.name}
+Rolle: ${input.role ?? "unbekannt"}
+Rasse: ${input.race ?? "unbekannt"}
+Alignment: ${input.alignment ?? "unbekannt"}
+Klasse/Archetyp: ${input.classHint}
+Stärke: ${powerTier}
+Beschreibung: ${(input.description ?? "").slice(0, 600)}
+Aussehen: ${(input.appearance ?? "").slice(0, 400)}
+
+Erstelle passende D&D 5e NPC-Kampfwerte.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const content = completion.choices[0].message.content;
+  if (!content) throw new Error("Keine Antwort von der KI erhalten.");
+  const raw = JSON.parse(content) as Record<string, unknown>;
+  const {
+    mergeNpcSheetWithDefaults,
+  } = await import("@/src/lib/npcs/npc-sheet-types");
+  return mergeNpcSheetWithDefaults({
+    ...(raw as object),
+    version: 1,
+    classHint: input.classHint,
+    powerTier,
+  } as Parameters<typeof mergeNpcSheetWithDefaults>[0]);
+}

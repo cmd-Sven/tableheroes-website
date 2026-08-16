@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ImageIcon,
   Palette,
+  Swords,
 } from "lucide-react";
 import { processBriefing, type ProcessBriefingResult, type BriefingNewEntity } from "@/src/app/dashboard/worlds/world-npc-actions";
 import { generateNPC, regenerateNPCSection, generateNPCPortrait, type GeneratedNPCResult, type RerollSection } from "@/src/app/dashboard/worlds/world-npc-actions";
@@ -28,13 +29,21 @@ import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-i
 import type { WorldBlueprint } from "@/src/types/world";
 import { NpcAppearanceConfirmStep } from "@/src/components/worlds/npc-wizard/NpcAppearanceConfirmStep";
 import { NpcPortraitStep } from "@/src/components/worlds/npc-wizard/NpcPortraitStep";
+import { NpcCombatStatsEditor } from "@/src/components/dashboard/campaigns/npcs/NpcCombatStatsEditor";
 import {
   DEFAULT_IMAGE_DISPLAY,
   normalizeImageDisplay,
   type ImageDisplaySettings,
 } from "@/src/lib/image-display";
-import { uploadNpcPortrait } from "@/src/lib/profile-media";
+import { uploadNpcPortrait, uploadNpcToken } from "@/src/lib/profile-media";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
+import {
+  DEFAULT_NPC_TOKEN_BORDER,
+  mergeNpcSheetWithDefaults,
+  type NpcSheetData,
+  type NpcTokenBorder,
+} from "@/src/lib/npcs/npc-sheet-types";
+import { generateNpcCombatSheet } from "@/src/app/dashboard/worlds/world-npc-actions";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -71,7 +80,7 @@ type Props = {
 };
 
 const stepTransition = { type: "tween" as const, duration: 0.3 };
-type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
+type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export function NarrativeNPCWizard({
   worldId,
@@ -118,12 +127,29 @@ export function NarrativeNPCWizard({
     ...DEFAULT_IMAGE_DISPLAY,
   });
   const [portraitSkipped, setPortraitSkipped] = useState(false);
+  const [tokenEnabled, setTokenEnabled] = useState(false);
+  const [tokenBorder, setTokenBorder] = useState<NpcTokenBorder>({
+    ...DEFAULT_NPC_TOKEN_BORDER,
+  });
+  const [tokenFile, setTokenFile] = useState<File | null>(null);
+  const [combatSheet, setCombatSheet] = useState<NpcSheetData | null>(null);
+  const [portraitObjectUrl, setPortraitObjectUrl] = useState<string | null>(null);
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(linkFactionId ?? null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(initialLocationId ?? null);
   const [linkedNpcId, setLinkedNpcId] = useState<string | null>(null);
   const [linkedNpcRelationType, setLinkedNpcRelationType] = useState<string>("Andere");
   const [worldNPCs, setWorldNPCs] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    if (!portraitFile) {
+      setPortraitObjectUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(portraitFile);
+    setPortraitObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [portraitFile]);
 
   useEffect(() => {
     if (persona?.appearance && !confirmedAppearance) {
@@ -250,7 +276,7 @@ export function NarrativeNPCWizard({
     });
   };
 
-  const handleStep6Manifest = () => {
+  const handleStep7Manifest = () => {
     if (!persona) return;
     startTransition(async () => {
       try {
@@ -286,6 +312,19 @@ export function NarrativeNPCWizard({
           }
         }
 
+        let tokenUrl: string | null = null;
+        let tokenStoragePath: string | null = null;
+        if (tokenEnabled && tokenFile) {
+          const tokenUpload = await uploadNpcToken(tokenFile, { worldId });
+          if ("error" in tokenUpload) throw new Error(tokenUpload.error);
+          tokenUrl = tokenUpload.publicUrl;
+          tokenStoragePath = tokenUpload.path;
+        }
+
+        const sheetPayload = combatSheet
+          ? mergeNpcSheetWithDefaults(combatSheet)
+          : null;
+
         const npc = await createNPC({
           world_id: worldId,
           name: step1Name.trim() || persona.name,
@@ -310,6 +349,12 @@ export function NarrativeNPCWizard({
           faction_id: selectedFactionId ?? undefined,
           current_location_id: selectedLocationId ?? undefined,
           home_location_id: homeLocationId ?? undefined,
+          token_url: tokenUrl,
+          token_storage_path: tokenStoragePath,
+          token_border: tokenEnabled ? tokenBorder : null,
+          token_size_category: sheetPayload?.sizeCategory ?? "medium",
+          sheet_data: sheetPayload,
+          sheet_source: sheetPayload ? "ai_wizard" : null,
         });
 
         const createdName = (step1Name.trim() || persona?.name || "").toLowerCase();
@@ -358,6 +403,7 @@ export function NarrativeNPCWizard({
     });
   };
 
+  const effectivePortraitUrl = portraitUrl || portraitObjectUrl;
   const newEntities = briefingResult?.new_entities ?? [];
   const canGoStep2 = !!briefingResult;
   const canGoStep3 = !!persona;
@@ -368,6 +414,7 @@ export function NarrativeNPCWizard({
     (!!portraitUrl || !!portraitFile || portraitSkipped) &&
     (!portraitFile || uploadRightsConfirmed);
   const canGoStep6 = !!persona;
+  const canGoStep7 = !!persona;
   const displayName = step1Name.trim() || persona?.name || "NPC";
 
   return (
@@ -377,7 +424,7 @@ export function NarrativeNPCWizard({
           Narrativer NPC-Architekt
         </h1>
         <span className="font-barlow font-bold text-sm uppercase text-gray-400">
-          Schritt {step} von 6
+          Schritt {step} von 7
         </span>
       </div>
 
@@ -777,7 +824,7 @@ export function NarrativeNPCWizard({
             <NpcPortraitStep
               npcName={displayName}
               appearancePreview={confirmedAppearance}
-              imageUrl={portraitUrl}
+              imageUrl={effectivePortraitUrl}
               portraitFile={portraitFile}
               onPortraitFileChange={(file) => {
                 setPortraitFile(file);
@@ -803,13 +850,59 @@ export function NarrativeNPCWizard({
               onGenerate={handleGeneratePortrait}
               onSkip={() => setPortraitSkipped(true)}
               onClearSkip={() => setPortraitSkipped(false)}
+              tokenCrop={
+                effectivePortraitUrl
+                  ? {
+                      enabled: tokenEnabled,
+                      onEnabledChange: setTokenEnabled,
+                      border: tokenBorder,
+                      onBorderChange: setTokenBorder,
+                      onTokenBlobChange: setTokenFile,
+                    }
+                  : undefined
+              }
             />
           </motion.div>
         )}
 
-        {step === 5 && (
+        {step === 5 && persona && (
           <motion.div
-            key="step5"
+            key="step5-combat"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={stepTransition}
+          >
+            <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+              <Swords className="h-5 w-5" />
+              Schritt 5: Kampfwerte (optional)
+            </h2>
+            <p className="font-libre text-sm text-gray-300 mb-4">
+              Optional: D&amp;D-5e-Werte für die Battlemap. Du kannst überspringen — Werte lassen
+              sich später im SL-Reiter nachtragen.
+            </p>
+            <NpcCombatStatsEditor
+              sheet={combatSheet}
+              onChange={setCombatSheet}
+              onGenerateAi={async ({ classHint, powerTier }) =>
+                generateNpcCombatSheet(worldId, {
+                  name: displayName,
+                  role: persona.role,
+                  race: race.trim() || persona.race,
+                  appearance: confirmedAppearance || persona.appearance,
+                  description: persona.description,
+                  alignment: persona.alignment,
+                  classHint,
+                  powerTier,
+                })
+              }
+            />
+          </motion.div>
+        )}
+
+        {step === 6 && (
+          <motion.div
+            key="step6"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
@@ -817,7 +910,7 @@ export function NarrativeNPCWizard({
           >
             <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Schritt 5: Soziale Verwebung & To-Do
+              Schritt 6: Soziale Verwebung & To-Do
             </h2>
             <p className="font-libre text-gray-200 mb-4">
               Zusammenfassung der Beziehungen und Zugehörigkeiten. Neue Entitäten werden nach dem Speichern als Aufgaben angelegt.
@@ -886,9 +979,9 @@ export function NarrativeNPCWizard({
           </motion.div>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <motion.div
-            key="step6"
+            key="step7"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
@@ -896,7 +989,7 @@ export function NarrativeNPCWizard({
           >
             <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              Schritt 6: Manifestation
+              Schritt 7: Manifestation
             </h2>
             <p className="font-libre text-gray-200 mb-4">
               NPC wird in der Welt gespeichert. Alle neuen Entitäten aus dem Briefing werden als offene Aufgaben (World Tasks) angelegt.
@@ -906,11 +999,21 @@ export function NarrativeNPCWizard({
                 <p className="font-libre text-gray-300 mb-2">
                   <strong className="text-hero-vibrant">{persona.name}</strong> wird angelegt.
                 </p>
-                {portraitUrl && (
+                {effectivePortraitUrl && (
                   <p className="font-libre text-sm text-accent-gold mb-2">
                     Charakterportrait wird mit gespeichert.
                   </p>
                 )}
+                {tokenEnabled && tokenFile ? (
+                  <p className="font-libre text-sm text-accent-gold mb-2">
+                    Battlemap-Token wird mit gespeichert.
+                  </p>
+                ) : null}
+                {combatSheet ? (
+                  <p className="font-libre text-sm text-accent-gold mb-2">
+                    Kampfwerte (SL) werden mit gespeichert.
+                  </p>
+                ) : null}
                 {newEntities.length > 0 && (
                   <p className="font-libre text-sm text-gray-400">
                     {newEntities.length} Aufgabe(n) werden in der Welt-Übersicht erscheinen.
@@ -918,7 +1021,7 @@ export function NarrativeNPCWizard({
                 )}
                 <button
                   type="button"
-                  onClick={handleStep6Manifest}
+                  onClick={handleStep7Manifest}
                   disabled={isPending}
                   className="mt-4 inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold text-sm uppercase text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-50"
                 >
@@ -941,16 +1044,17 @@ export function NarrativeNPCWizard({
           <ArrowLeft className="h-4 w-4" />
           Zurück
         </button>
-        {step < 6 && (
+        {step < 7 && (
           <button
             type="button"
-            onClick={() => setStep((s) => (s < 6 ? ((s + 1) as WizardStep) : 6))}
+            onClick={() => setStep((s) => (s < 7 ? ((s + 1) as WizardStep) : 7))}
             disabled={
               (step === 1 && !canGoStep2) ||
               (step === 2 && !canGoStep3) ||
               (step === 3 && !canGoStep4) ||
               (step === 4 && !canGoStep5) ||
-              (step === 5 && !canGoStep6)
+              (step === 5 && !canGoStep6) ||
+              (step === 6 && !canGoStep7)
             }
             className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow font-bold text-sm uppercase text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-40 disabled:cursor-not-allowed"
           >

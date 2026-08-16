@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  CircleDot,
   Dices,
   Gift,
   ImageIcon,
@@ -98,6 +99,13 @@ export function LiveSessionSideRail({
       active: mainPanel === "chat",
       onClick: () => onToggleMain("chat"),
       badge: handRaiseCount,
+    },
+    {
+      id: "tokens",
+      label: "Tokens",
+      icon: CircleDot,
+      active: mainPanel === "tokens",
+      onClick: () => onToggleMain("tokens"),
     },
     ...(isGM
       ? ([

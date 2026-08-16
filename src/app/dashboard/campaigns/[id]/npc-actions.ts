@@ -59,6 +59,12 @@ export async function createNPC(formData: {
   image_display?: unknown;
   image_is_ai_generated?: boolean;
   image_upload_rights_confirmed?: boolean | null;
+  token_url?: string | null;
+  token_storage_path?: string | null;
+  token_border?: { thicknessPx: number; color: string } | null;
+  token_size_category?: string | null;
+  sheet_data?: unknown | null;
+  sheet_source?: string | null;
 }) {
   const supabase = await createClient();
 
@@ -275,6 +281,19 @@ export async function createNPC(formData: {
     religions: formData.religions && formData.religions.length > 0 ? formData.religions : null,
     deities: formData.deities && formData.deities.length > 0 ? formData.deities : null,
     languages: formData.languages && formData.languages.length > 0 ? formData.languages : null,
+    token_url: formData.token_url?.trim() ? formData.token_url.trim() : null,
+    token_storage_path: formData.token_storage_path?.trim()
+      ? formData.token_storage_path.trim()
+      : null,
+    token_border: formData.token_border ?? null,
+    token_size_category: formData.token_size_category?.trim()
+      ? formData.token_size_category.trim()
+      : "medium",
+    sheet_data: formData.sheet_data ?? null,
+    sheet_source: formData.sheet_data
+      ? formData.sheet_source?.trim() || "manual"
+      : null,
+    sheet_synced_at: formData.sheet_data ? new Date().toISOString() : null,
   };
 
   console.log("🔍 [createNPC] Insert payload:", {
@@ -500,6 +519,12 @@ export async function updateNPC(
     image_display?: unknown | null;
     image_is_ai_generated?: boolean;
     image_upload_rights_confirmed?: boolean | null;
+    token_url?: string | null;
+    token_storage_path?: string | null;
+    token_border?: { thicknessPx: number; color: string } | null;
+    token_size_category?: string | null;
+    sheet_data?: unknown | null;
+    sheet_source?: string | null;
   }
 ) {
   const supabase = await createClient();
@@ -567,6 +592,22 @@ export async function updateNPC(
       raw == null
         ? null
         : imageDisplayToJson(normalizeImageDisplay(raw));
+  }
+
+  if (updates.sheet_data !== undefined) {
+    normalizedUpdates.sheet_data = updates.sheet_data;
+    normalizedUpdates.sheet_synced_at = updates.sheet_data
+      ? new Date().toISOString()
+      : null;
+    if (updates.sheet_source !== undefined) {
+      normalizedUpdates.sheet_source = updates.sheet_source;
+    } else if (updates.sheet_data) {
+      normalizedUpdates.sheet_source = "manual";
+    }
+  }
+
+  if (updates.token_border !== undefined) {
+    normalizedUpdates.token_border = updates.token_border;
   }
 
   if (

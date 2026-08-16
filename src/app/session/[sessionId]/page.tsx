@@ -346,6 +346,10 @@ export default async function SessionPage({ params, searchParams }: Props) {
     title: npc.title != null ? String(npc.title) : null,
     description: npc.description != null ? String(npc.description) : null,
     image_url: npc.image_url != null ? String(npc.image_url) : null,
+    token_url: npc.token_url != null ? String(npc.token_url) : null,
+    token_size_category:
+      npc.token_size_category != null ? String(npc.token_size_category) : "medium",
+    sheet_data: npc.sheet_data ?? null,
     is_revealed: !!npc.is_revealed,
     is_merchant: !!npc.is_merchant,
     shop_id: npc.shop_id != null ? String(npc.shop_id) : null,

@@ -49,6 +49,7 @@ function normalizeToken(row: Record<string, unknown>): SessionBattlemapToken {
     size_cells: Math.max(1, Number(row.size_cells ?? 1)),
     is_visible_to_players: row.is_visible_to_players !== false,
     token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
+    show_hp_bar: row.show_hp_bar === true,
   };
 }
 
@@ -325,6 +326,7 @@ export async function placeBattlemapGmToken(input: {
   isVisibleToPlayers?: boolean;
   label?: string | null;
   imageUrl?: string | null;
+  showHpBar?: boolean;
 }): Promise<SessionBattlemapToken> {
   const supabase = await createClient();
   const {
@@ -346,12 +348,71 @@ export async function placeBattlemapGmToken(input: {
     p_is_visible_to_players: input.isVisibleToPlayers !== false,
     p_label: input.label ?? null,
     p_image_url: input.imageUrl ?? null,
+    p_show_hp_bar: input.showHpBar === true,
   });
 
   if (error) throw new Error(error.message || "SL-Token konnte nicht gesetzt werden.");
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error("SL-Token konnte nicht gesetzt werden.");
   return normalizeToken(row as Record<string, unknown>);
+}
+
+export async function updateBattlemapTokenSettings(input: {
+  tokenId: string;
+  sessionId: string;
+  showHpBar?: boolean;
+  sizeCells?: number;
+}): Promise<SessionBattlemapToken> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: tokenRaw, error: loadErr } = await (supabase as any)
+    .from("session_battlemap_tokens")
+    .select("*")
+    .eq("id", input.tokenId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (loadErr || !tokenRaw) throw new Error("Token nicht gefunden.");
+
+  const token = normalizeToken(tokenRaw as Record<string, unknown>);
+  let allowed = false;
+  try {
+    await assertSessionGm(input.sessionId, user.id);
+    allowed = true;
+  } catch {
+    if (token.character_id) {
+      const { data: ch } = await (supabase as any)
+        .from("characters")
+        .select("user_id")
+        .eq("id", token.character_id)
+        .maybeSingle();
+      if (ch && String((ch as { user_id?: string }).user_id) === user.id) {
+        allowed = true;
+      }
+    }
+  }
+  if (!allowed) throw new Error("Keine Berechtigung für diese Token-Einstellungen.");
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.showHpBar !== undefined) updates.show_hp_bar = input.showHpBar;
+  if (input.sizeCells !== undefined) {
+    updates.size_cells = Math.max(1, Math.min(4, Math.round(input.sizeCells)));
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_tokens")
+    .update(updates)
+    .eq("id", input.tokenId)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message || "Einstellungen konnten nicht gespeichert werden.");
+  return normalizeToken(data as Record<string, unknown>);
 }
 
 export async function removeBattlemapToken(

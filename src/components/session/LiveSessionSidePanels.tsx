@@ -15,6 +15,12 @@ import {
 } from "@/src/components/session/live-session-side-types";
 import { LiveSessionScenesPanel } from "@/src/components/session/LiveSessionScenesPanel";
 import { LiveSessionSideRail } from "@/src/components/session/LiveSessionSideRail";
+import {
+  LiveSessionTokensPanel,
+  type TokensPanelCreature,
+  type TokensPanelNpc,
+  type TokensPanelPlayer,
+} from "@/src/components/session/LiveSessionTokensPanel";
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import { TravelDowntimeGmPanel } from "@/src/components/session/TravelDowntimeGmPanel";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
@@ -74,6 +80,14 @@ type Props = {
   battlemapMovementPaused?: boolean;
   onBattlemapActiveChange?: (id: string | null) => void;
   onBattlemapMovementPausedChange?: (paused: boolean) => void;
+  /** Tokens-Panel */
+  battlemapActive?: boolean;
+  tokenPlayers?: TokensPanelPlayer[];
+  tokenNpcs?: TokensPanelNpc[];
+  tokenCreatures?: TokensPanelCreature[];
+  onStartPlayerTokenPlacement?: (player: TokensPanelPlayer) => void;
+  onStartNpcTokenPlacement?: (npc: TokensPanelNpc) => void;
+  onStartCreatureTokenPlacement?: (creature: TokensPanelCreature) => void;
   partyCharacters: PartyCharacter[];
   downtimeCurrentDay: number;
   downtimeTotalDays: number;
@@ -122,6 +136,13 @@ export function LiveSessionSidePanels({
   battlemapMovementPaused,
   onBattlemapActiveChange,
   onBattlemapMovementPausedChange,
+  battlemapActive = false,
+  tokenPlayers = [],
+  tokenNpcs = [],
+  tokenCreatures = [],
+  onStartPlayerTokenPlacement,
+  onStartNpcTokenPlacement,
+  onStartCreatureTokenPlacement,
   partyCharacters,
   downtimeCurrentDay,
   downtimeTotalDays,
@@ -214,6 +235,26 @@ export function LiveSessionSidePanels({
                       movementPaused={battlemapMovementPaused}
                       onActiveChange={onBattlemapActiveChange}
                       onMovementPausedChange={onBattlemapMovementPausedChange}
+                    />
+                  ) : null}
+
+                  {mainPanel === "tokens" ? (
+                    <LiveSessionTokensPanel
+                      onClose={onCloseMain}
+                      isGM={isGM}
+                      battlemapActive={battlemapActive}
+                      players={tokenPlayers}
+                      npcs={tokenNpcs}
+                      creatures={tokenCreatures}
+                      onStartPlayerPlacement={(p) =>
+                        onStartPlayerTokenPlacement?.(p)
+                      }
+                      onStartNpcPlacement={(n) => {
+                        onStartNpcTokenPlacement?.(n);
+                      }}
+                      onStartCreaturePlacement={(c) => {
+                        onStartCreatureTokenPlacement?.(c);
+                      }}
                     />
                   ) : null}
 

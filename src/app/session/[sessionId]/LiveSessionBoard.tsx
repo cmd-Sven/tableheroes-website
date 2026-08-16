@@ -175,6 +175,22 @@ import {
 import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
 import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
 import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
+import { BattlemapTokenRadialMenu } from "@/src/components/session/battlemap/BattlemapTokenRadialMenu";
+import { useBattlemapCharacterDisplays } from "@/src/components/session/battlemap/useBattlemapCharacterDisplays";
+import {
+  BATTLEMAP_TOKENS_CHANGED_BROADCAST,
+  CHARACTER_DISPLAY_CHANGED_BROADCAST,
+  CHARACTER_DISPLAY_CHANGED_EVENT,
+  dispatchCharacterDisplayChanged,
+  dispatchOpenCharacterRadial,
+  type BattlemapTokensChangedDetail,
+  type CharacterDisplayChangedDetail,
+  type CharacterDisplaySnapshot,
+} from "@/src/lib/session/character-radial-bridge";
+import {
+  creaturePlacementDraft,
+  npcPlacementDraft,
+} from "@/src/components/session/LiveSessionTokensPanel";
 import {
   createBattlemapProp,
   getCharacterMovementRange,
@@ -185,6 +201,7 @@ import {
   removeBattlemapToken,
   toggleBattlemapTokenVisibility,
   updateBattlemapProp,
+  updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
   CharacterTokenPlacement,
@@ -199,6 +216,7 @@ import {
   movementCellsForBurst,
 } from "@/src/lib/session/battlemap-movement";
 import { isCellBlockedByTokens } from "@/src/lib/session/battlemap-grid";
+import { parseNpcSheetData } from "@/src/lib/npcs/npc-sheet-types";
 
 type LiveState = {
   id: string;
@@ -517,6 +535,9 @@ type CampaignNpc = {
   title: string | null;
   description: string | null;
   image_url: string | null;
+  token_url?: string | null;
+  token_size_category?: string | null;
+  sheet_data?: unknown | null;
   is_revealed?: boolean | null;
   is_merchant?: boolean | null;
   shop_id?: string | null;
@@ -1299,6 +1320,11 @@ export function LiveSessionBoard({
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
   const [selectedBattlemapTokenId, setSelectedBattlemapTokenId] = useState<string | null>(null);
   const [selectedBattlemapPropId, setSelectedBattlemapPropId] = useState<string | null>(null);
+  const [tokenRadial, setTokenRadial] = useState<{
+    token: SessionBattlemapToken;
+    x: number;
+    y: number;
+  } | null>(null);
   const [activeTranscriptionMode, setActiveTranscriptionMode] = useState<
     TranscriptionMode | null
   >(transcriptionMode);
@@ -1353,6 +1379,25 @@ export function LiveSessionBoard({
     }
     let cancelled = false;
 
+    function mapTokenRow(row: Record<string, unknown>): SessionBattlemapToken {
+      return {
+        id: String(row.id),
+        battlemap_id: String(row.battlemap_id),
+        session_id: String(row.session_id),
+        character_id: row.character_id != null ? String(row.character_id) : null,
+        npc_id: row.npc_id != null ? String(row.npc_id) : null,
+        creature_id: row.creature_id != null ? String(row.creature_id) : null,
+        grid_x: Number(row.grid_x ?? 0),
+        grid_y: Number(row.grid_y ?? 0),
+        label: row.label != null ? String(row.label) : null,
+        image_url: row.image_url != null ? String(row.image_url) : null,
+        size_cells: Math.max(1, Number(row.size_cells ?? 1)),
+        is_visible_to_players: row.is_visible_to_players !== false,
+        token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
+        show_hp_bar: row.show_hp_bar === true,
+      };
+    }
+
     async function loadTokens() {
       const { data, error } = await (supabase as any)
         .from("session_battlemap_tokens")
@@ -1360,23 +1405,7 @@ export function LiveSessionBoard({
         .eq("battlemap_id", activeBattlemapId)
         .order("created_at", { ascending: true });
       if (!cancelled && !error) {
-        setBattlemapTokens(
-          (data ?? []).map((row: Record<string, unknown>) => ({
-            id: String(row.id),
-            battlemap_id: String(row.battlemap_id),
-            session_id: String(row.session_id),
-            character_id: row.character_id != null ? String(row.character_id) : null,
-            npc_id: row.npc_id != null ? String(row.npc_id) : null,
-            creature_id: row.creature_id != null ? String(row.creature_id) : null,
-            grid_x: Number(row.grid_x ?? 0),
-            grid_y: Number(row.grid_y ?? 0),
-            label: row.label != null ? String(row.label) : null,
-            image_url: row.image_url != null ? String(row.image_url) : null,
-            size_cells: Math.max(1, Number(row.size_cells ?? 1)),
-            is_visible_to_players: row.is_visible_to_players !== false,
-            token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
-          })),
-        );
+        setBattlemapTokens((data ?? []).map((row: Record<string, unknown>) => mapTokenRow(row)));
       }
     }
 
@@ -1392,8 +1421,33 @@ export function LiveSessionBoard({
           table: "session_battlemap_tokens",
           filter: `battlemap_id=eq.${activeBattlemapId}`,
         },
-        () => {
-          void loadTokens();
+        (payload) => {
+          if (cancelled) return;
+          if (payload.eventType === "DELETE") {
+            const oldId =
+              payload.old && typeof payload.old === "object" && "id" in payload.old
+                ? String((payload.old as { id: unknown }).id)
+                : "";
+            if (oldId) {
+              setBattlemapTokens((prev) => prev.filter((t) => t.id !== oldId));
+            } else {
+              void loadTokens();
+            }
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row?.id) {
+            void loadTokens();
+            return;
+          }
+          const token = mapTokenRow(row);
+          setBattlemapTokens((prev) => {
+            const idx = prev.findIndex((t) => t.id === token.id);
+            if (idx < 0) return [...prev, token];
+            const next = [...prev];
+            next[idx] = token;
+            return next;
+          });
         },
       )
       .subscribe();
@@ -1403,6 +1457,58 @@ export function LiveSessionBoard({
       supabase.removeChannel(channel);
     };
   }, [activeBattlemapId, isGuest, supabase]);
+
+  // Sofort-Sync über Session-Broadcast (Tokens + Charakter-Zustände)
+  useEffect(() => {
+    if (isGuest) return;
+    function onLocalCharacterDisplay(e: Event) {
+      const detail = (e as CustomEvent<CharacterDisplayChangedDetail>).detail;
+      if (!detail?.characterId || detail.remote) return;
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: CHARACTER_DISPLAY_CHANGED_BROADCAST,
+        payload: {
+          characterId: detail.characterId,
+          snapshot: detail.snapshot ?? null,
+          senderId: userId,
+        },
+      });
+    }
+    window.addEventListener(CHARACTER_DISPLAY_CHANGED_EVENT, onLocalCharacterDisplay);
+    return () => {
+      window.removeEventListener(
+        CHARACTER_DISPLAY_CHANGED_EVENT,
+        onLocalCharacterDisplay,
+      );
+    };
+  }, [isGuest, userId]);
+
+  const notifyBattlemapTokensChanged = useCallback(
+    (detail?: {
+      op?: BattlemapTokensChangedDetail["op"];
+      token?: SessionBattlemapToken | null;
+      tokenId?: string | null;
+    }) => {
+      if (!activeBattlemapId) return;
+      const op =
+        detail?.op ??
+        (detail?.token ? "upsert" : detail?.tokenId ? "delete" : "refresh");
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: BATTLEMAP_TOKENS_CHANGED_BROADCAST,
+        payload: {
+          battlemapId: activeBattlemapId,
+          op,
+          token: detail?.token
+            ? ({ ...detail.token } as unknown as Record<string, unknown>)
+            : null,
+          tokenId: detail?.tokenId ?? detail?.token?.id ?? null,
+          senderId: userId,
+        } satisfies BattlemapTokensChangedDetail,
+      });
+    },
+    [activeBattlemapId, userId],
+  );
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
@@ -1600,7 +1706,7 @@ export function LiveSessionBoard({
           : null;
         startTransition(async () => {
           try {
-            await placeBattlemapGmToken({
+            const placed = await placeBattlemapGmToken({
               sessionId,
               battlemapId: activeBattlemapId,
               gridX,
@@ -1618,6 +1724,14 @@ export function LiveSessionBoard({
               label: gmTokenPlacement?.name ?? movingToken?.label ?? null,
               imageUrl: gmTokenPlacement?.imageUrl ?? movingToken?.image_url ?? null,
             });
+            setBattlemapTokens((prev) => {
+              const idx = prev.findIndex((t) => t.id === placed.id);
+              if (idx < 0) return [...prev, placed];
+              const next = [...prev];
+              next[idx] = placed;
+              return next;
+            });
+            notifyBattlemapTokensChanged({ op: "upsert", token: placed });
             toast.success(
               gmMoveTokenId ? "SL-Token verschoben." : `${gmTokenPlacement?.name ?? "Token"} platziert.`,
             );
@@ -1679,7 +1793,7 @@ export function LiveSessionBoard({
 
       startTransition(async () => {
         try {
-          await placeBattlemapCharacterToken({
+          const placed = await placeBattlemapCharacterToken({
             sessionId,
             battlemapId: activeBattlemapId,
             characterId: tokenPlacement.characterId,
@@ -1687,6 +1801,14 @@ export function LiveSessionBoard({
             gridY,
             useDash: tokenPlacement.useDash,
           });
+          setBattlemapTokens((prev) => {
+            const idx = prev.findIndex((t) => t.id === placed.id);
+            if (idx < 0) return [...prev, placed];
+            const next = [...prev];
+            next[idx] = placed;
+            return next;
+          });
+          notifyBattlemapTokensChanged({ op: "upsert", token: placed });
           toast.success(
             tokenPlacement.isFirstPlacement
               ? `Token für ${tokenPlacement.characterName} gesetzt.`
@@ -1705,6 +1827,7 @@ export function LiveSessionBoard({
       gmTokenPlacement,
       isGM,
       liveState?.battlemap_movement_paused,
+      notifyBattlemapTokensChanged,
       sessionId,
       startTransition,
       tokenPlacement,
@@ -1765,6 +1888,70 @@ export function LiveSessionBoard({
         : battlemapTokens.filter((t) => t.is_visible_to_players),
     [battlemapTokens, isGM],
   );
+
+  const battlemapNpcHpByRef = useMemo(() => {
+    const map: Record<string, { current: number; max: number }> = {};
+    for (const npc of campaignNpcs) {
+      const sheet = parseNpcSheetData(npc.sheet_data);
+      if (sheet?.combat?.hpMax) {
+        map[`npc:${npc.id}`] = {
+          current: sheet.combat.hpCurrent ?? sheet.combat.hpMax,
+          max: sheet.combat.hpMax,
+        };
+      }
+    }
+    return map;
+  }, [campaignNpcs]);
+
+  const battlemapCharacterIds = useMemo(
+    () =>
+      visibleBattlemapTokens
+        .map((t) => t.character_id)
+        .filter((id): id is string => Boolean(id)),
+    [visibleBattlemapTokens],
+  );
+  const { displays: battlemapCharDisplays, rollFxUrlByCharacterId } =
+    useBattlemapCharacterDisplays(battlemapCharacterIds, {
+      campaignId,
+      enabled: battlemapActive,
+    });
+  const characterDisplayUrlById = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const id of battlemapCharacterIds) {
+      map[id] =
+        rollFxUrlByCharacterId[id] ??
+        battlemapCharDisplays[id]?.url ??
+        null;
+    }
+    return map;
+  }, [
+    battlemapCharacterIds,
+    battlemapCharDisplays,
+    rollFxUrlByCharacterId,
+  ]);
+  const characterConditionsById = useMemo(() => {
+    const map: Record<
+      string,
+      NonNullable<(typeof battlemapCharDisplays)[string]>["activeConditions"]
+    > = {};
+    for (const id of battlemapCharacterIds) {
+      map[id] = battlemapCharDisplays[id]?.activeConditions ?? [];
+    }
+    return map;
+  }, [battlemapCharacterIds, battlemapCharDisplays]);
+
+  const battlemapTokenHpByRef = useMemo(() => {
+    const map: Record<string, { current: number; max: number }> = {
+      ...battlemapNpcHpByRef,
+    };
+    for (const id of battlemapCharacterIds) {
+      const d = battlemapCharDisplays[id];
+      if (d && d.hpMax > 0) {
+        map[`char:${id}`] = { current: d.hpCurrent, max: d.hpMax };
+      }
+    }
+    return map;
+  }, [battlemapCharacterIds, battlemapCharDisplays, battlemapNpcHpByRef]);
 
   const visibleBattlemapProps = useMemo(
     () =>
@@ -2318,6 +2505,94 @@ export function LiveSessionBoard({
           );
         }
       })
+      .on("broadcast", { event: CHARACTER_DISPLAY_CHANGED_BROADCAST }, (payload) => {
+        const raw = payload.payload as {
+          characterId?: unknown;
+          snapshot?: CharacterDisplaySnapshot | null;
+          senderId?: unknown;
+        } | null;
+        const characterId = raw?.characterId != null ? String(raw.characterId) : "";
+        if (!characterId) return;
+        if (raw?.senderId != null && String(raw.senderId) === userId) return;
+        dispatchCharacterDisplayChanged({
+          characterId,
+          remote: true,
+          snapshot: raw?.snapshot ?? undefined,
+        });
+      })
+      .on("broadcast", { event: BATTLEMAP_TOKENS_CHANGED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as BattlemapTokensChangedDetail;
+        const battlemapId = raw.battlemapId != null ? String(raw.battlemapId) : "";
+        const currentId = liveStateRef.current?.active_battlemap_id ?? null;
+        if (!battlemapId || !currentId || battlemapId !== currentId) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+
+        const op = raw.op ?? "refresh";
+        if (op === "delete") {
+          const tokenId = raw.tokenId != null ? String(raw.tokenId) : "";
+          if (tokenId) {
+            setBattlemapTokens((prev) => prev.filter((t) => t.id !== tokenId));
+          }
+          return;
+        }
+
+        if (op === "upsert" && raw.token && typeof raw.token === "object") {
+          const row = raw.token as Record<string, unknown>;
+          const token: SessionBattlemapToken = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            character_id: row.character_id != null ? String(row.character_id) : null,
+            npc_id: row.npc_id != null ? String(row.npc_id) : null,
+            creature_id: row.creature_id != null ? String(row.creature_id) : null,
+            grid_x: Number(row.grid_x ?? 0),
+            grid_y: Number(row.grid_y ?? 0),
+            label: row.label != null ? String(row.label) : null,
+            image_url: row.image_url != null ? String(row.image_url) : null,
+            size_cells: Math.max(1, Number(row.size_cells ?? 1)),
+            is_visible_to_players: row.is_visible_to_players !== false,
+            token_side:
+              (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
+            show_hp_bar: row.show_hp_bar === true,
+          };
+          setBattlemapTokens((prev) => {
+            const idx = prev.findIndex((t) => t.id === token.id);
+            if (idx < 0) return [...prev, token];
+            const next = [...prev];
+            next[idx] = token;
+            return next;
+          });
+          return;
+        }
+
+        void (async () => {
+          const { data, error } = await (supabase as any)
+            .from("session_battlemap_tokens")
+            .select("*")
+            .eq("battlemap_id", battlemapId)
+            .order("created_at", { ascending: true });
+          if (error || !data) return;
+          setBattlemapTokens(
+            (data as Record<string, unknown>[]).map((row) => ({
+              id: String(row.id),
+              battlemap_id: String(row.battlemap_id),
+              session_id: String(row.session_id),
+              character_id: row.character_id != null ? String(row.character_id) : null,
+              npc_id: row.npc_id != null ? String(row.npc_id) : null,
+              creature_id: row.creature_id != null ? String(row.creature_id) : null,
+              grid_x: Number(row.grid_x ?? 0),
+              grid_y: Number(row.grid_y ?? 0),
+              label: row.label != null ? String(row.label) : null,
+              image_url: row.image_url != null ? String(row.image_url) : null,
+              size_cells: Math.max(1, Number(row.size_cells ?? 1)),
+              is_visible_to_players: row.is_visible_to_players !== false,
+              token_side:
+                (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
+              show_hp_bar: row.show_hp_bar === true,
+            })),
+          );
+        })();
+      })
       .on("presence", { event: "sync" }, () => {
         const st = channel.presenceState();
         const ids = new Set(Object.keys(st));
@@ -2681,15 +2956,9 @@ export function LiveSessionBoard({
     [factionStagePool, activeFactionIds],
   );
 
-  const battlemapTrayNpcs = useMemo(() => inHandNpcs, [inHandNpcs]);
+  const battlemapTrayNpcs = useMemo(() => npcStagePool, [npcStagePool]);
 
-  const battlemapTrayCreatures = useMemo(
-    () =>
-      creatureStagePool.filter(
-        (c) => !(liveState?.visible_creature_ids ?? []).map(String).includes(String(c.id)),
-      ),
-    [creatureStagePool, liveState?.visible_creature_ids],
-  );
+  const battlemapTrayCreatures = useMemo(() => creatureStagePool, [creatureStagePool]);
 
   const battlemapTrayScenes = useMemo(() => inHandScenes, [inHandScenes]);
 
@@ -3970,7 +4239,9 @@ export function LiveSessionBoard({
             </aside>
 
             <div
-              className={`relative min-h-[calc(48vh+120px)] overflow-x-hidden overflow-y-auto bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
+              className={`relative min-h-[calc(48vh+120px)] overflow-x-hidden bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
+                battlemapActive ? "overflow-hidden" : "overflow-y-auto"
+              } ${
                 stageDropHighlight
                   ? "ring-2 ring-accent-gold ring-inset"
                   : ""
@@ -4054,7 +4325,15 @@ export function LiveSessionBoard({
                 onToggleTokenVisibility={(tokenId, visible) => {
                   startTransition(async () => {
                     try {
-                      await toggleBattlemapTokenVisibility(tokenId, sessionId, visible);
+                      const updated = await toggleBattlemapTokenVisibility(
+                        tokenId,
+                        sessionId,
+                        visible,
+                      );
+                      setBattlemapTokens((prev) =>
+                        prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+                      );
+                      notifyBattlemapTokensChanged({ op: "upsert", token: updated });
                       toast.success(visible ? "Token sichtbar." : "Token verborgen.");
                     } catch (e) {
                       toast.error(e instanceof Error ? e.message : "Sichtbarkeit konnte nicht geändert werden.");
@@ -4079,8 +4358,10 @@ export function LiveSessionBoard({
                   startTransition(async () => {
                     try {
                       await removeBattlemapToken(tokenId, sessionId);
+                      setBattlemapTokens((prev) => prev.filter((t) => t.id !== tokenId));
                       setSelectedBattlemapTokenId(null);
                       setGmMoveTokenId(null);
+                      notifyBattlemapTokensChanged({ op: "delete", tokenId });
                       toast.success("Token entfernt.");
                     } catch (e) {
                       toast.error(e instanceof Error ? e.message : "Token konnte nicht entfernt werden.");
@@ -4097,6 +4378,28 @@ export function LiveSessionBoard({
                       toast.error(e instanceof Error ? e.message : "Prop konnte nicht entfernt werden.");
                     }
                   });
+                }}
+                hpByRef={battlemapTokenHpByRef}
+                ownCharacterId={currentPlayerCharacter?.id ?? null}
+                characterDisplayUrlById={characterDisplayUrlById}
+                characterConditionsById={characterConditionsById}
+                onTokenContextMenu={(token, clientX, clientY) => {
+                  setSelectedBattlemapTokenId(token.id);
+                  if (token.character_id) {
+                    setTokenRadial(null);
+                    dispatchOpenCharacterRadial({
+                      characterId: token.character_id,
+                      clientX,
+                      clientY,
+                      battlemapToken: {
+                        tokenId: token.id,
+                        showHpBar: token.show_hp_bar === true,
+                        sizeCells: token.size_cells,
+                      },
+                    });
+                    return;
+                  }
+                  setTokenRadial({ token, x: clientX, y: clientY });
                 }}
               />
             ) : null}
@@ -4137,16 +4440,10 @@ export function LiveSessionBoard({
             {isGM && battlemapActive ? (
               <div className="pointer-events-none absolute bottom-3 right-3 z-[35] max-w-[min(100%-1.5rem,28rem)]">
                 <BattlemapTokenTray
-                  npcs={battlemapTrayNpcs}
-                  creatures={battlemapTrayCreatures}
+                  npcs={[]}
+                  creatures={[]}
                   scenes={battlemapTrayScenes}
-                  onStartTokenPlacement={(draft) => {
-                    setGmTokenPlacement(draft);
-                    setGmMoveTokenId(null);
-                    setTokenPlacement(null);
-                    setSelectedBattlemapTokenId(null);
-                    setSelectedBattlemapPropId(null);
-                  }}
+                  onStartTokenPlacement={() => undefined}
                   onStartPropDrag={(draft) => {
                     if (!activeBattlemapId) return;
                     startTransition(async () => {
@@ -4730,6 +5027,25 @@ export function LiveSessionBoard({
                                 ? () => startCharacterTokenPlacement(pc.id, pc.name)
                                 : undefined
                             }
+                            battlemapToken={(() => {
+                              const t = battlemapTokens.find(
+                                (tok) => tok.character_id === pc.id,
+                              );
+                              if (!t) return null;
+                              return {
+                                id: t.id,
+                                showHpBar: t.show_hp_bar === true,
+                                sizeCells: t.size_cells,
+                              };
+                            })()}
+                            onBattlemapTokenSaved={(updated) => {
+                              setBattlemapTokens((prev) =>
+                                prev.map((tok) =>
+                                  tok.id === updated.id ? { ...tok, ...updated } : tok,
+                                ),
+                              );
+                              notifyBattlemapTokensChanged({ op: "upsert", token: updated });
+                            }}
                           />
                         </div>
                         {handRaise ? (
@@ -4945,6 +5261,110 @@ export function LiveSessionBoard({
         logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
       />
 
+      {tokenRadial && !tokenRadial.token.character_id ? (
+        <BattlemapTokenRadialMenu
+          token={tokenRadial.token}
+          anchor={{ x: tokenRadial.x, y: tokenRadial.y }}
+          isGm={isGM}
+          hpCurrent={
+            tokenRadial.token.character_id
+              ? battlemapTokenHpByRef[`char:${tokenRadial.token.character_id}`]?.current
+              : tokenRadial.token.npc_id
+                ? battlemapTokenHpByRef[`npc:${tokenRadial.token.npc_id}`]?.current
+                : null
+          }
+          hpMax={
+            tokenRadial.token.character_id
+              ? battlemapTokenHpByRef[`char:${tokenRadial.token.character_id}`]?.max
+              : tokenRadial.token.npc_id
+                ? battlemapTokenHpByRef[`npc:${tokenRadial.token.npc_id}`]?.max
+                : null
+          }
+          onClose={() => setTokenRadial(null)}
+          onMove={
+            isGM && !tokenRadial.token.character_id
+              ? () => {
+                  setGmMoveTokenId(tokenRadial.token.id);
+                  setGmTokenPlacement(null);
+                  setTokenPlacement(null);
+                }
+              : isGM && tokenRadial.token.character_id
+                ? () => {
+                    const ch = partyCharacters.find(
+                      (p) => p.id === tokenRadial.token.character_id,
+                    );
+                    if (ch) startCharacterTokenPlacement(ch.id, ch.name);
+                  }
+                : undefined
+          }
+          onToggleVisibility={
+            isGM
+              ? (visible) => {
+                  startTransition(async () => {
+                    try {
+                      const updated = await toggleBattlemapTokenVisibility(
+                        tokenRadial.token.id,
+                        sessionId,
+                        visible,
+                      );
+                      setBattlemapTokens((prev) =>
+                        prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+                      );
+                      notifyBattlemapTokensChanged({ op: "upsert", token: updated });
+                      toast.success(visible ? "Token sichtbar." : "Token verborgen.");
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Sichtbarkeit fehlgeschlagen.",
+                      );
+                    }
+                  });
+                }
+              : undefined
+          }
+          onRemove={
+            isGM
+              ? () => {
+                  startTransition(async () => {
+                    try {
+                      const tokenId = tokenRadial.token.id;
+                      await removeBattlemapToken(tokenId, sessionId);
+                      setBattlemapTokens((prev) => prev.filter((t) => t.id !== tokenId));
+                      setSelectedBattlemapTokenId(null);
+                      notifyBattlemapTokensChanged({ op: "delete", tokenId });
+                      toast.success("Token entfernt.");
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Entfernen fehlgeschlagen.",
+                      );
+                    }
+                  });
+                }
+              : undefined
+          }
+          onSaveSettings={(settings) => {
+            startTransition(async () => {
+              try {
+                const updated = await updateBattlemapTokenSettings({
+                  tokenId: tokenRadial.token.id,
+                  sessionId,
+                  showHpBar: settings.showHpBar,
+                  sizeCells: settings.sizeCells,
+                });
+                setBattlemapTokens((prev) =>
+                  prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+                );
+                notifyBattlemapTokensChanged({ op: "upsert", token: updated });
+                toast.success("Token-Einstellungen gespeichert.");
+              } catch (e) {
+                toast.error(
+                  e instanceof Error ? e.message : "Einstellungen fehlgeschlagen.",
+                );
+              }
+            });
+          }}
+        />
+      ) : null}
+
       {!isGuest ? (
         <LiveSessionSidePanels
           sessionId={sessionId}
@@ -5056,6 +5476,58 @@ export function LiveSessionBoard({
               liveStateRef.current = next;
               return next;
             });
+          }}
+          battlemapActive={battlemapActive}
+          tokenPlayers={displayPartyCharacters
+            .filter((pc) => !pc.isSessionDummy)
+            .map((pc) => ({
+              id: pc.id,
+              name: pc.name,
+              imageUrl: pc.avatar_url,
+              tokenUrl: null,
+              canPlace:
+                isGM ||
+                (!!currentPlayerCharacter && currentPlayerCharacter.id === pc.id),
+            }))}
+          tokenNpcs={battlemapTrayNpcs.map((n) => ({
+            id: String(n.id),
+            name: n.name,
+            title: n.title ?? null,
+            imageUrl: n.image_url,
+            tokenUrl: n.token_url ?? null,
+            sizeCategory: n.token_size_category ?? "medium",
+          }))}
+          tokenCreatures={battlemapTrayCreatures.map((c) => ({
+            id: String(c.id),
+            name: c.name,
+            creatureType: c.creature_type,
+            imageUrl: c.image_url,
+          }))}
+          onStartPlayerTokenPlacement={(player) => {
+            if (!battlemapActive) {
+              toast.error("Zuerst eine Battlemap aktivieren.");
+              return;
+            }
+            startCharacterTokenPlacement(player.id, player.name);
+            closeMainSidePanel();
+          }}
+          onStartNpcTokenPlacement={(npc) => {
+            if (!isGM || !battlemapActive) return;
+            setGmTokenPlacement(npcPlacementDraft(npc));
+            setGmMoveTokenId(null);
+            setTokenPlacement(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+            closeMainSidePanel();
+          }}
+          onStartCreatureTokenPlacement={(creature) => {
+            if (!isGM || !battlemapActive) return;
+            setGmTokenPlacement(creaturePlacementDraft(creature));
+            setGmMoveTokenId(null);
+            setTokenPlacement(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+            closeMainSidePanel();
           }}
           partyCharacters={partyCharacters.map((pc) => ({
             id: pc.id,
