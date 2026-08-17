@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Book, Map, PawPrint, User, Users } from "lucide-react";
+import { Book, Globe2, Map, PawPrint, User, Users } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { getWorldTasks } from "@/src/app/dashboard/worlds/world-tasks-actions";
 import { getWorldDashboardData } from "@/src/app/dashboard/worlds/world-dashboard-actions";
@@ -130,6 +130,13 @@ export async function WorldDashboard({
                     }
                   : null
               }
+            />
+            <WorldDashboardCard
+              title="Weltkarten"
+              icon={Globe2}
+              createHref={`/dashboard/worlds/${worldId}/maps`}
+              createLabel="Karte anlegen"
+              lastItem={null}
             />
           </div>
 

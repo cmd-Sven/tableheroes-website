@@ -2,7 +2,7 @@
 
 Live-Tisch-Karten im Session Board (`/session/[sessionId]`). Zoom/Pan bleibt **lokal pro Client**; Token-Positionen, Einstellungen und Charakter-Anzeige syncen für alle.
 
-## Umgesetzt (Phase 1–2.5+)
+## Umgesetzt (Phase 1–3 Fog)
 
 ### Maps & Navigation
 - Session-Maps, Grid-Kalibrierung (Prep), aktive Map über `active_battlemap_id`
@@ -25,24 +25,29 @@ Live-Tisch-Karten im Session Board (`/session/[sessionId]`). Zoom/Pan bleibt **l
 - HP-Balken als schmaler Balken **oberhalb** des Tokens
 
 ### Sync (Just-in-Time)
-- `session_battlemap_tokens` + `characters` in Supabase Realtime
-- Session-Broadcast mit **Token-/Display-Snapshot** (Bewegung, HP-Balken, Größe, Zustände) — ohne Warten auf DB-Reload
+- `session_battlemap_tokens` + `characters` + `session_battlemap_fog_shapes` in Supabase Realtime
+- Session-Broadcast mit **Token-/Display-/Fog-Snapshot** — ohne Warten auf DB-Reload
 - Postgres-Realtime als Absicherung
 
 ### Props & SL-Tools
 - Tisch-Props (NSC-Karte, Szenen-Bild) — blockieren keine Rasterzellen
 - SL-Toolbar (aktive Map, Bewegungspause)
 
-## Phase 3 (geplant)
-- **Fog of War** — `BattlemapFogLayer`, Zellen-Maske pro Map
+### Fog of War (manuell)
+- Linke SL-Werkzeugleiste: Auswählen/Verschieben, Rechteck, Kreis, Löschen
+- Ziehen auf dem Grid → schwarze Flächen (Größe = Drag)
+- SL sieht halbtransparent + Goldrahmen; Spieler sehen deckend schwarz
+- Flächen einzeln verschiebbar/löschbar; Persistenz über `campaign_battlemap_fog_presets` (Kampagne + Map-Bild) in die nächste Session
+
+## Phase 4 (geplant)
 - **Initiative-Sprung** — Fokus auf aktiven Zug
 
 ## Bewusst nicht geplant
 - Follow-SL-Viewport (Zoom/Pan bleibt lokal)
 
 ## Relevante Pfade
-- UI: `src/components/session/battlemap/`
+- UI: `src/components/session/battlemap/` (`BattlemapFogLayer`, `BattlemapFogToolbar`)
 - Board: `src/app/session/[sessionId]/LiveSessionBoard.tsx`
 - Actions: `src/lib/actions/battlemap-actions.ts`
 - Bridge/Sync: `src/lib/session/character-radial-bridge.ts`
-- Migrationen u. a.: `20260719100000_session_battlemaps.sql`, `20260810083815_fix_battlemap_gm_token_world_npc.sql`, `20260810130412_battlemap_character_realtime_sync.sql`
+- Migrationen u. a.: `20260719100000_session_battlemaps.sql`, `20260810083815_fix_battlemap_gm_token_world_npc.sql`, `20260810130412_battlemap_character_realtime_sync.sql`, `20260816140944_battlemap_manual_fog_of_war.sql`

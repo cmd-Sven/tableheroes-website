@@ -1,18 +1,34 @@
 /**
  * Battlemap-Roadmap (kurz):
- * - Phase 3: Fog (`BattlemapFogState`), Mood-Badges, Initiative-Jump
+ * - Fog: manuelle Rect/Circle-Shapes (SL), JIT-Sync, Preset → nächste Session
  * - Kein Follow-SL-Viewport (Zoom/Pan bleibt lokal)
  * @see BATTLEMAP.md
  */
 
 export type BattlemapTokenSide = "party" | "friendly" | "neutral" | "hostile";
 
-/** Phase 3 Stub — Fog-of-War-Zellenmaske */
-export type BattlemapFogState = {
-  battlemapId: string;
-  /** TODO Phase 3: sichtbare Zellen pro Client/SL */
-  revealedCells: Array<{ gridX: number; gridY: number }>;
+export type BattlemapFogShapeKind = "rect" | "circle";
+
+/** Manuelle Fog-of-War-Fläche, am Grid ausgerichtet. */
+export type SessionBattlemapFogShape = {
+  id: string;
+  battlemap_id: string;
+  session_id: string;
+  campaign_id: string;
+  shape: BattlemapFogShapeKind;
+  /** Rect: oben links; Circle: Zentrumszelle */
+  grid_x: number;
+  grid_y: number;
+  /** Rect: Breite in Zellen; Circle: Radius in Zellen */
+  grid_w: number;
+  /** Rect: Höhe in Zellen; Circle: = grid_w */
+  grid_h: number;
+  z_index: number;
+  created_at?: string;
+  updated_at?: string;
 };
+
+export type BattlemapFogTool = "select" | "rect" | "circle" | null;
 
 export type CharacterTokenPlacement = {
   characterId: string;

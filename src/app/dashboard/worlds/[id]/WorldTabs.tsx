@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Map, PawPrint, User, Users, LayoutDashboard } from "lucide-react";
+import { Book, Globe2, Map, PawPrint, User, Users, LayoutDashboard } from "lucide-react";
 
 type Props = {
   worldId: string;
@@ -15,6 +15,7 @@ const TABS: { key: string; label: string; href: (worldId: string) => string; ico
   { key: "lore", label: "Lore", href: (id) => `/dashboard/worlds/${id}/lore`, icon: Book },
   { key: "factions", label: "Fraktionen", href: (id) => `/dashboard/worlds/${id}/factions`, icon: Users },
   { key: "bestarium", label: "Bestarium", href: (id) => `/dashboard/worlds/${id}/bestarium`, icon: PawPrint },
+  { key: "maps", label: "Weltkarten", href: (id) => `/dashboard/worlds/${id}/maps`, icon: Globe2 },
 ];
 
 export function WorldTabs({ worldId }: Props) {

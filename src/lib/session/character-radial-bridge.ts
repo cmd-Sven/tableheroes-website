@@ -7,6 +7,7 @@ export const CHARACTER_DISPLAY_CHANGED_EVENT = "th:character-display-changed";
 /** Session-Broadcast-Event (alle Clients in session_live_*). */
 export const CHARACTER_DISPLAY_CHANGED_BROADCAST = "character_display_changed";
 export const BATTLEMAP_TOKENS_CHANGED_BROADCAST = "battlemap_tokens_changed";
+export const BATTLEMAP_FOG_CHANGED_BROADCAST = "battlemap_fog_changed";
 
 export type OpenCharacterRadialDetail = {
   characterId: string;
@@ -45,6 +46,16 @@ export type BattlemapTokensChangedDetail = {
   token?: Record<string, unknown> | null;
   tokenId?: string | null;
   /** Absender — Empfänger mit gleicher userId können lokal überspringen */
+  senderId?: string | null;
+};
+
+export type BattlemapFogSyncOp = "upsert" | "delete" | "refresh";
+
+export type BattlemapFogChangedDetail = {
+  battlemapId: string;
+  op?: BattlemapFogSyncOp;
+  shape?: Record<string, unknown> | null;
+  shapeId?: string | null;
   senderId?: string | null;
 };
 

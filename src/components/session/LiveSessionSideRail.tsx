@@ -6,6 +6,7 @@ import {
   CircleDot,
   Dices,
   Gift,
+  Globe2,
   ImageIcon,
   Map,
   MessageSquare,
@@ -131,6 +132,14 @@ export function LiveSessionSideRail({
             icon: Map,
             active: mainPanel === "battlemaps",
             onClick: () => onToggleMain("battlemaps"),
+            gmOnly: true,
+          },
+          {
+            id: "worldmaps",
+            label: "Weltkarten",
+            icon: Globe2,
+            active: mainPanel === "worldmaps",
+            onClick: () => onToggleMain("worldmaps"),
             gmOnly: true,
           },
           {

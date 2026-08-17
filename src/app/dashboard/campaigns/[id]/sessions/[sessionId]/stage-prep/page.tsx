@@ -8,6 +8,10 @@ import { serializeForClient } from "@/src/lib/serialize-for-flight";
 import { StagePrepClient } from "./StagePrepClient";
 import { getCampaignSceneMedia } from "@/src/app/dashboard/campaigns/[id]/scene-media-actions";
 import { getSessionBattlemaps } from "@/src/lib/actions/battlemap-actions";
+import {
+  getSessionWorldMaps,
+  getWorldMaps,
+} from "@/src/lib/actions/world-map-actions";
 import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
 
 type Props = {
@@ -58,16 +62,18 @@ export default async function SessionStagePrepPage({ params }: Props) {
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id")
+    .select("gm_id, owner_id, world_id")
     .eq("id", campaignId)
     .single();
   const campaign = campaignRaw as {
     gm_id?: string | null;
     owner_id?: string | null;
+    world_id?: string | null;
   } | null;
   if (!isCampaignGm(campaign, user.id)) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
+  const worldId = campaign?.world_id ? String(campaign.world_id) : null;
 
   if (["Completed", "Cancelled"].includes(session.status)) {
     redirect(`/dashboard/campaigns/${campaignId}?tab=sessions&ended=1`);
@@ -178,6 +184,12 @@ export default async function SessionStagePrepPage({ params }: Props) {
         stageDeckCreatureIds != null ? serializeForClient(stageDeckCreatureIds) : null
       }
       initialBattlemaps={serializeForClient(initialBattlemaps)}
+      availableWorldMaps={serializeForClient(
+        worldId ? await getWorldMaps(worldId).catch(() => []) : [],
+      )}
+      sessionWorldMaps={serializeForClient(
+        await getSessionWorldMaps(sessionId).catch(() => []),
+      )}
     />
   );
 }

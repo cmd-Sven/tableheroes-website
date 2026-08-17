@@ -23,10 +23,12 @@ import {
 } from "@/src/components/session/LiveSessionTokensPanel";
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import { TravelDowntimeGmPanel } from "@/src/components/session/TravelDowntimeGmPanel";
+import { LiveSessionWorldMapsPanel } from "@/src/components/session/LiveSessionWorldMapsPanel";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
 import type { FapAllocationsMap } from "@/src/lib/downtime-fap-types";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
+import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 
 const PANEL_SLIDE = {
   initial: { opacity: 0, x: 48 },
@@ -80,6 +82,10 @@ type Props = {
   battlemapMovementPaused?: boolean;
   onBattlemapActiveChange?: (id: string | null) => void;
   onBattlemapMovementPausedChange?: (paused: boolean) => void;
+  availableWorldMaps?: WorldMap[];
+  sessionWorldMaps?: SessionWorldMap[];
+  activeWorldMapId?: string | null;
+  onWorldMapActiveChange?: (id: string | null) => void;
   /** Tokens-Panel */
   battlemapActive?: boolean;
   tokenPlayers?: TokensPanelPlayer[];
@@ -136,6 +142,10 @@ export function LiveSessionSidePanels({
   battlemapMovementPaused,
   onBattlemapActiveChange,
   onBattlemapMovementPausedChange,
+  availableWorldMaps = [],
+  sessionWorldMaps = [],
+  activeWorldMapId = null,
+  onWorldMapActiveChange,
   battlemapActive = false,
   tokenPlayers = [],
   tokenNpcs = [],
@@ -235,6 +245,17 @@ export function LiveSessionSidePanels({
                       movementPaused={battlemapMovementPaused}
                       onActiveChange={onBattlemapActiveChange}
                       onMovementPausedChange={onBattlemapMovementPausedChange}
+                    />
+                  ) : null}
+
+                  {mainPanel === "worldmaps" && isGM ? (
+                    <LiveSessionWorldMapsPanel
+                      onClose={onCloseMain}
+                      sessionId={sessionId}
+                      availableMaps={availableWorldMaps}
+                      attached={sessionWorldMaps}
+                      activeWorldMapId={activeWorldMapId}
+                      onActiveChange={onWorldMapActiveChange}
                     />
                   ) : null}
 

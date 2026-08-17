@@ -23,11 +23,12 @@ import {
   Zap,
 } from "lucide-react";
 import type {
-  BattlemapGridConfig,
+  BattlemapFogTool,
   CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapFogShape,
   SessionBattlemapProp,
   SessionBattlemapToken,
 } from "@/src/lib/session/battlemap-types";
@@ -43,23 +44,39 @@ import {
 import { BattlemapGridOverlay } from "./BattlemapGridOverlay";
 import { BattlemapTokenLayer } from "./BattlemapTokenLayer";
 import { BattlemapPropsLayer } from "./BattlemapPropsLayer";
-import { BattlemapFogLayer } from "./BattlemapFogLayer";
+import {
+  BattlemapFogLayer,
+  normalizeFogCircle,
+  normalizeFogRect,
+} from "./BattlemapFogLayer";
 
 type Props = {
   battlemap: SessionBattlemap;
   tokens: SessionBattlemapToken[];
   props: SessionBattlemapProp[];
+  fogShapes?: SessionBattlemapFogShape[];
   isGm?: boolean;
   characterPlacement?: CharacterTokenPlacement | null;
   gmTokenPlacement?: GmTokenPlacementDraft | null;
   gmMoveTokenId?: string | null;
   selectedTokenId?: string | null;
   selectedPropId?: string | null;
+  selectedFogShapeId?: string | null;
+  fogTool?: BattlemapFogTool;
   onCancelPlacement?: () => void;
   onToggleDash?: () => void;
   onCellClick?: (gridX: number, gridY: number) => void;
   onSelectToken?: (tokenId: string | null) => void;
   onSelectProp?: (propId: string | null) => void;
+  onSelectFogShape?: (shapeId: string | null) => void;
+  onFogShapeCreate?: (input: {
+    shape: "rect" | "circle";
+    gridX: number;
+    gridY: number;
+    gridW: number;
+    gridH: number;
+  }) => void;
+  onFogShapeMove?: (shapeId: string, gridX: number, gridY: number) => void;
   onPropDrop?: (draft: GmPropPlacementDraft, posX: number, posY: number) => void;
   onPropResize?: (propId: string, delta: number) => void;
   onToggleTokenVisibility?: (tokenId: string, visible: boolean) => void;
@@ -113,17 +130,23 @@ export function BattlemapStage({
   battlemap,
   tokens,
   props,
+  fogShapes = [],
   isGm = false,
   characterPlacement,
   gmTokenPlacement,
   gmMoveTokenId,
   selectedTokenId,
   selectedPropId,
+  selectedFogShapeId = null,
+  fogTool = null,
   onCancelPlacement,
   onToggleDash,
   onCellClick,
   onSelectToken,
   onSelectProp,
+  onSelectFogShape,
+  onFogShapeCreate,
+  onFogShapeMove,
   onPropDrop,
   onPropResize,
   onToggleTokenVisibility,
@@ -146,8 +169,31 @@ export function BattlemapStage({
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
   const [propDropHighlight, setPropDropHighlight] = useState(false);
   const [spacePanHeld, setSpacePanHeld] = useState(false);
+  const [fogDraft, setFogDraft] = useState<{
+    shape: "rect" | "circle";
+    gridX: number;
+    gridY: number;
+    gridW: number;
+    gridH: number;
+  } | null>(null);
+  const fogDrawOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const fogMovePreviewRef = useRef<{
+    shapeId: string;
+    gridX: number;
+    gridY: number;
+  } | null>(null);
+  const [fogMovePreview, setFogMovePreview] = useState<{
+    shapeId: string;
+    gridX: number;
+    gridY: number;
+  } | null>(null);
 
+  const fogDrawActive = Boolean(
+    isGm && (fogTool === "rect" || fogTool === "circle") && onFogShapeCreate,
+  );
+  const fogSelectActive = Boolean(isGm && fogTool === "select");
   const placementActive = Boolean(characterPlacement || gmTokenPlacement || gmMoveTokenId);
+  const mapInteractionLocked = placementActive || fogDrawActive;
 
   const movingGmToken = gmMoveTokenId
     ? tokens.find((t) => t.id === gmMoveTokenId) ?? null
@@ -168,7 +214,11 @@ export function BattlemapStage({
       ? "SL-Token verschieben — Zielzelle wählen"
       : gmTokenPlacement
         ? `${gmTokenPlacement.name} platzieren`
-        : null;
+        : fogDrawActive
+          ? fogTool === "circle"
+            ? "Fog: Kreis ziehen"
+            : "Fog: Rechteck ziehen"
+          : null;
 
   const computeFitScale = useCallback(() => {
     const stage = stageRef.current;
@@ -246,10 +296,15 @@ export function BattlemapStage({
   }, []);
 
   useEffect(() => {
-    if (!placementActive) return;
+    if (!placementActive && !fogDrawActive) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
+        if (fogDrawActive) {
+          setFogDraft(null);
+          fogDrawOriginRef.current = null;
+          return;
+        }
         onCancelPlacement?.();
         return;
       }
@@ -270,7 +325,102 @@ export function BattlemapStage({
       window.removeEventListener("keyup", onKeyUp);
       setSpacePanHeld(false);
     };
-  }, [placementActive, onCancelPlacement]);
+  }, [placementActive, fogDrawActive, onCancelPlacement]);
+
+  const cellFromClient = useCallback(
+    (clientX: number, clientY: number, el: HTMLElement) => {
+      const coords = clientToMapPixels(
+        clientX,
+        clientY,
+        el,
+        mapSize.width,
+        mapSize.height,
+      );
+      if (!coords) return null;
+      return pixelToGrid(coords.px, coords.py, config);
+    },
+    [config, mapSize.height, mapSize.width],
+  );
+
+  const handleFogPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!fogDrawActive || !fogTool || fogTool === "select") return;
+      if (e.button !== 0) return;
+      const cell = cellFromClient(e.clientX, e.clientY, e.currentTarget);
+      if (!cell) return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      fogDrawOriginRef.current = { x: cell.gridX, y: cell.gridY };
+      if (fogTool === "circle") {
+        setFogDraft({
+          shape: "circle",
+          ...normalizeFogCircle(cell.gridX, cell.gridY, cell.gridX, cell.gridY),
+        });
+      } else {
+        setFogDraft({
+          shape: "rect",
+          ...normalizeFogRect(cell.gridX, cell.gridY, cell.gridX, cell.gridY),
+        });
+      }
+    },
+    [cellFromClient, fogDrawActive, fogTool],
+  );
+
+  const handleFogPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!fogDrawActive || !fogDrawOriginRef.current || !fogTool) return;
+      const cell = cellFromClient(e.clientX, e.clientY, e.currentTarget);
+      if (!cell) return;
+      const origin = fogDrawOriginRef.current;
+      if (fogTool === "circle") {
+        setFogDraft({
+          shape: "circle",
+          ...normalizeFogCircle(origin.x, origin.y, cell.gridX, cell.gridY),
+        });
+      } else {
+        setFogDraft({
+          shape: "rect",
+          ...normalizeFogRect(origin.x, origin.y, cell.gridX, cell.gridY),
+        });
+      }
+    },
+    [cellFromClient, fogDrawActive, fogTool],
+  );
+
+  const handleFogPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!fogDrawActive || !fogDrawOriginRef.current || !fogTool || !onFogShapeCreate) {
+        return;
+      }
+      const origin = fogDrawOriginRef.current;
+      const cell =
+        cellFromClient(e.clientX, e.clientY, e.currentTarget) ?? {
+          gridX: origin.x,
+          gridY: origin.y,
+        };
+      const normalized =
+        fogTool === "circle"
+          ? { shape: "circle" as const, ...normalizeFogCircle(origin.x, origin.y, cell.gridX, cell.gridY) }
+          : { shape: "rect" as const, ...normalizeFogRect(origin.x, origin.y, cell.gridX, cell.gridY) };
+      fogDrawOriginRef.current = null;
+      setFogDraft(null);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      onFogShapeCreate(normalized);
+    },
+    [cellFromClient, fogDrawActive, fogTool, onFogShapeCreate],
+  );
+
+  const displayFogShapes = fogMovePreview
+    ? fogShapes.map((s) =>
+        s.id === fogMovePreview.shapeId
+          ? { ...s, grid_x: fogMovePreview.gridX, grid_y: fogMovePreview.gridY }
+          : s,
+      )
+    : fogShapes;
 
   const isCellReachable = useCallback(
     (gridX: number, gridY: number, sizeCells = 1): boolean => {
@@ -321,6 +471,10 @@ export function BattlemapStage({
 
   const handleContentClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      if (fogDrawActive) return;
+      if (fogSelectActive && e.target === e.currentTarget) {
+        onSelectFogShape?.(null);
+      }
       if (!placementActive || !onCellClick) return;
       if (e.button !== 0) return;
       const coords = clientToMapPixels(
@@ -340,11 +494,14 @@ export function BattlemapStage({
     [
       config,
       characterPlacement,
+      fogDrawActive,
+      fogSelectActive,
       gmPlacementSize,
       isCellReachable,
       mapSize.height,
       mapSize.width,
       onCellClick,
+      onSelectFogShape,
       placementActive,
     ],
   );
@@ -666,7 +823,7 @@ export function BattlemapStage({
           disabled: false,
           velocityDisabled: true,
           // Primär: Pfeil-Buttons; Ziehen nur Mittel-/Rechtsklick (kein Konflikt mit Token-Klick)
-          allowLeftClickPan: placementActive ? spacePanHeld : false,
+          allowLeftClickPan: mapInteractionLocked ? spacePanHeld : false,
           allowMiddleClickPan: true,
           allowRightClickPan: true,
         }}
@@ -687,16 +844,27 @@ export function BattlemapStage({
         >
           <div
             ref={mapRef}
-            className={`relative ${placementActive ? "cursor-crosshair" : ""} ${
+            className={`relative ${mapInteractionLocked ? "cursor-crosshair" : ""} ${
               propDropHighlight ? "ring-2 ring-accent-gold ring-inset" : ""
             }`}
             onClick={handleContentClick}
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setHoverCell(null)}
+            onPointerDown={fogDrawActive ? handleFogPointerDown : undefined}
+            onPointerMove={fogDrawActive ? handleFogPointerMove : undefined}
+            onPointerUp={fogDrawActive ? handleFogPointerUp : undefined}
+            onPointerCancel={
+              fogDrawActive
+                ? () => {
+                    fogDrawOriginRef.current = null;
+                    setFogDraft(null);
+                  }
+                : undefined
+            }
             onDragOver={handlePropDragOver}
             onDragLeave={() => setPropDropHighlight(false)}
             onDrop={handlePropDrop}
-            onContextMenu={placementActive ? (e) => e.preventDefault() : undefined}
+            onContextMenu={mapInteractionLocked ? (e) => e.preventDefault() : undefined}
           >
             <Image
               src={battlemap.image_url}
@@ -723,19 +891,17 @@ export function BattlemapStage({
               mapWidth={mapSize.width}
               mapHeight={mapSize.height}
             />
-            <BattlemapFogLayer
-              fogState={null}
-              isGm={isGm}
-              mapWidth={mapSize.width}
-              mapHeight={mapSize.height}
-            />
             <BattlemapPropsLayer
               props={props}
               mapWidth={mapSize.width}
               mapHeight={mapSize.height}
               isGm={isGm}
               selectedPropId={selectedPropId}
-              onSelectProp={onSelectProp}
+              onSelectProp={
+                fogDrawActive || fogSelectActive
+                  ? undefined
+                  : onSelectProp
+              }
             />
             <BattlemapTokenLayer
               tokens={tokens}
@@ -747,8 +913,36 @@ export function BattlemapStage({
               ownCharacterId={ownCharacterId}
               characterDisplayUrlById={characterDisplayUrlById}
               characterConditionsById={characterConditionsById}
-              onSelectToken={onSelectToken}
-              onTokenContextMenu={onTokenContextMenu}
+              onSelectToken={
+                fogDrawActive || fogSelectActive ? undefined : onSelectToken
+              }
+              onTokenContextMenu={
+                fogDrawActive || fogSelectActive ? undefined : onTokenContextMenu
+              }
+            />
+            <BattlemapFogLayer
+              shapes={displayFogShapes}
+              config={config}
+              isGm={isGm}
+              interactive={fogSelectActive && !placementActive}
+              interactionScale={viewScale}
+              selectedShapeId={selectedFogShapeId}
+              draft={fogDraft}
+              onSelectShape={(id) => {
+                onSelectFogShape?.(id);
+                onSelectToken?.(null);
+                onSelectProp?.(null);
+              }}
+              onShapeDragMove={(shapeId, gridX, gridY) => {
+                const next = { shapeId, gridX, gridY };
+                fogMovePreviewRef.current = next;
+                setFogMovePreview(next);
+              }}
+              onShapeDragEnd={(shapeId, gridX, gridY) => {
+                fogMovePreviewRef.current = null;
+                setFogMovePreview(null);
+                onFogShapeMove?.(shapeId, gridX, gridY);
+              }}
             />
             {hoverCell && placementActive ? (
               <div

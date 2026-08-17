@@ -41,6 +41,7 @@ import {
   BarChart3,
   PawPrint,
   Scale,
+  Globe2,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -388,6 +389,12 @@ export function Sidebar({
           tab: undefined,
         },
         {
+          href: `/dashboard/campaigns/${campaignId}/maps`,
+          label: "Weltkarten",
+          icon: Globe2,
+          tab: undefined,
+        },
+        {
           href: `/dashboard/campaigns/${campaignId}?tab=quests`,
           label: "Quests",
           icon: ScrollText,
@@ -466,6 +473,7 @@ export function Sidebar({
         { href: `/dashboard/worlds/${worldId}/lore`, label: "Lore", icon: Book },
         { href: `/dashboard/worlds/${worldId}/factions`, label: "Fraktionen", icon: Shield },
         { href: `/dashboard/worlds/${worldId}/bestarium`, label: "Bestarium", icon: PawPrint },
+        { href: `/dashboard/worlds/${worldId}/maps`, label: "Weltkarten", icon: Globe2 },
       ]
     : [];
 
@@ -786,6 +794,7 @@ export function Sidebar({
                       (item.href?.includes("/gm-inbox") && pathname.includes("/gm-inbox")) ||
                       (item.href?.includes("/chronist") && pathname.includes("/chronist")) ||
                       (!!pathname && item.href.endsWith("/bestarium") && pathname.startsWith(item.href)) ||
+                      (!!pathname && item.href.endsWith("/maps") && pathname.startsWith(item.href)) ||
                       (!!pathname && item.href.endsWith("/regelsystem") && pathname.startsWith(item.href))
                     }
                     badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}

@@ -3,6 +3,7 @@ export type MainSidePanelId =
   | "chronicle"
   | "scenes"
   | "battlemaps"
+  | "worldmaps"
   | "tokens"
   | "travel"
   | "loot";

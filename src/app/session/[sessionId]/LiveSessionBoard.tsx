@@ -174,15 +174,25 @@ import {
 } from "@/src/lib/image-display";
 import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
 import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
+import { BattlemapFogToolbar } from "@/src/components/session/battlemap/BattlemapFogToolbar";
 import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import { BattlemapTokenRadialMenu } from "@/src/components/session/battlemap/BattlemapTokenRadialMenu";
 import { useBattlemapCharacterDisplays } from "@/src/components/session/battlemap/useBattlemapCharacterDisplays";
+import { LiveWorldMapOverlay } from "@/src/components/world-maps/LiveWorldMapOverlay";
 import {
+  getSessionWorldMaps,
+  getWorldMaps,
+  setActiveWorldMap,
+} from "@/src/lib/actions/world-map-actions";
+import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
+import {
+  BATTLEMAP_FOG_CHANGED_BROADCAST,
   BATTLEMAP_TOKENS_CHANGED_BROADCAST,
   CHARACTER_DISPLAY_CHANGED_BROADCAST,
   CHARACTER_DISPLAY_CHANGED_EVENT,
   dispatchCharacterDisplayChanged,
   dispatchOpenCharacterRadial,
+  type BattlemapFogChangedDetail,
   type BattlemapTokensChangedDetail,
   type CharacterDisplayChangedDetail,
   type CharacterDisplaySnapshot,
@@ -192,22 +202,28 @@ import {
   npcPlacementDraft,
 } from "@/src/components/session/LiveSessionTokensPanel";
 import {
+  createBattlemapFogShape,
   createBattlemapProp,
   getCharacterMovementRange,
   getSessionBattlemaps,
+  listBattlemapFogShapes,
   placeBattlemapCharacterToken,
   placeBattlemapGmToken,
+  removeBattlemapFogShape,
   removeBattlemapProp,
   removeBattlemapToken,
   toggleBattlemapTokenVisibility,
+  updateBattlemapFogShape,
   updateBattlemapProp,
   updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
+  BattlemapFogTool,
   CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapFogShape,
   SessionBattlemapProp,
   SessionBattlemapToken,
 } from "@/src/lib/session/battlemap-types";
@@ -241,6 +257,7 @@ type LiveState = {
   visible_creature_ids?: string[] | null;
   active_scene_media_id?: string | null;
   active_battlemap_id?: string | null;
+  active_world_map_id?: string | null;
   battlemap_movement_paused?: boolean | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
@@ -291,6 +308,8 @@ function normalizeLiveRow(row: unknown): LiveState {
       r.active_scene_media_id != null ? String(r.active_scene_media_id) : null,
     active_battlemap_id:
       r.active_battlemap_id != null ? String(r.active_battlemap_id) : null,
+    active_world_map_id:
+      r.active_world_map_id != null ? String(r.active_world_map_id) : null,
     battlemap_movement_paused: r.battlemap_movement_paused === true,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
@@ -1313,8 +1332,13 @@ export function LiveSessionBoard({
   const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
     useState(false);
   const [sessionBattlemaps, setSessionBattlemaps] = useState<SessionBattlemap[]>([]);
+  const [availableWorldMaps, setAvailableWorldMaps] = useState<WorldMap[]>([]);
+  const [sessionWorldMapLinks, setSessionWorldMapLinks] = useState<SessionWorldMap[]>([]);
   const [battlemapTokens, setBattlemapTokens] = useState<SessionBattlemapToken[]>([]);
   const [battlemapProps, setBattlemapProps] = useState<SessionBattlemapProp[]>([]);
+  const [battlemapFogShapes, setBattlemapFogShapes] = useState<SessionBattlemapFogShape[]>([]);
+  const [fogTool, setFogTool] = useState<BattlemapFogTool>(null);
+  const [selectedFogShapeId, setSelectedFogShapeId] = useState<string | null>(null);
   const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);
   const [gmTokenPlacement, setGmTokenPlacement] = useState<GmTokenPlacementDraft | null>(null);
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
@@ -1351,6 +1375,7 @@ export function LiveSessionBoard({
   const campaignCreatures = useMemo(() => allCampaignCreatures, [allCampaignCreatures]);
 
   const activeBattlemapId = liveState?.active_battlemap_id ?? null;
+  const activeWorldMapId = liveState?.active_world_map_id ?? null;
   const activeBattlemap = useMemo(
     () => sessionBattlemaps.find((m) => m.id === activeBattlemapId) ?? null,
     [sessionBattlemaps, activeBattlemapId],
@@ -1371,6 +1396,26 @@ export function LiveSessionBoard({
       cancelled = true;
     };
   }, [sessionId, isGuest]);
+
+  useEffect(() => {
+    if (isGuest || !worldId) {
+      setAvailableWorldMaps([]);
+      setSessionWorldMapLinks([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([
+      getWorldMaps(worldId).catch(() => [] as WorldMap[]),
+      getSessionWorldMaps(sessionId).catch(() => [] as SessionWorldMap[]),
+    ]).then(([maps, links]) => {
+      if (cancelled) return;
+      setAvailableWorldMaps(maps);
+      setSessionWorldMapLinks(links);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, worldId, isGuest]);
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
@@ -1509,6 +1554,109 @@ export function LiveSessionBoard({
     },
     [activeBattlemapId, userId],
   );
+
+  const notifyBattlemapFogChanged = useCallback(
+    (detail?: {
+      op?: BattlemapFogChangedDetail["op"];
+      shape?: SessionBattlemapFogShape | null;
+      shapeId?: string | null;
+    }) => {
+      if (!activeBattlemapId) return;
+      const op =
+        detail?.op ??
+        (detail?.shape ? "upsert" : detail?.shapeId ? "delete" : "refresh");
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: BATTLEMAP_FOG_CHANGED_BROADCAST,
+        payload: {
+          battlemapId: activeBattlemapId,
+          op,
+          shape: detail?.shape
+            ? ({ ...detail.shape } as unknown as Record<string, unknown>)
+            : null,
+          shapeId: detail?.shapeId ?? detail?.shape?.id ?? null,
+          senderId: userId,
+        } satisfies BattlemapFogChangedDetail,
+      });
+    },
+    [activeBattlemapId, userId],
+  );
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
+      setBattlemapFogShapes([]);
+      setSelectedFogShapeId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadFog() {
+      try {
+        const shapes = await listBattlemapFogShapes(activeBattlemapId!, sessionId);
+        if (!cancelled) setBattlemapFogShapes(shapes);
+      } catch {
+        if (!cancelled) setBattlemapFogShapes([]);
+      }
+    }
+
+    void loadFog();
+
+    const channel = supabase
+      .channel(`session_battlemap_fog_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_fog_shapes",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+          if (eventType === "DELETE") {
+            const oldId =
+              payload.old && typeof payload.old === "object" && "id" in payload.old
+                ? String((payload.old as { id: unknown }).id)
+                : "";
+            if (oldId) {
+              setBattlemapFogShapes((prev) => prev.filter((s) => s.id !== oldId));
+              setSelectedFogShapeId((prev) => (prev === oldId ? null : prev));
+            }
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row?.id) {
+            void loadFog();
+            return;
+          }
+          const shape: SessionBattlemapFogShape = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            campaign_id: String(row.campaign_id),
+            shape: row.shape === "circle" ? "circle" : "rect",
+            grid_x: Math.round(Number(row.grid_x ?? 0)),
+            grid_y: Math.round(Number(row.grid_y ?? 0)),
+            grid_w: Math.max(1, Math.round(Number(row.grid_w ?? 1))),
+            grid_h: Math.max(1, Math.round(Number(row.grid_h ?? 1))),
+            z_index: Math.round(Number(row.z_index ?? 0)),
+          };
+          setBattlemapFogShapes((prev) => {
+            const idx = prev.findIndex((s) => s.id === shape.id);
+            if (idx < 0) return [...prev, shape];
+            const next = [...prev];
+            next[idx] = shape;
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, isGuest, sessionId, supabase]);
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
@@ -2592,6 +2740,51 @@ export function LiveSessionBoard({
             })),
           );
         })();
+      })
+      .on("broadcast", { event: BATTLEMAP_FOG_CHANGED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as BattlemapFogChangedDetail;
+        const battlemapId = raw.battlemapId != null ? String(raw.battlemapId) : "";
+        const currentId = liveStateRef.current?.active_battlemap_id ?? null;
+        if (!battlemapId || !currentId || battlemapId !== currentId) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+
+        const op = raw.op ?? "refresh";
+        if (op === "delete") {
+          const shapeId = raw.shapeId != null ? String(raw.shapeId) : "";
+          if (shapeId) {
+            setBattlemapFogShapes((prev) => prev.filter((s) => s.id !== shapeId));
+            setSelectedFogShapeId((prev) => (prev === shapeId ? null : prev));
+          }
+          return;
+        }
+
+        if (op === "upsert" && raw.shape && typeof raw.shape === "object") {
+          const row = raw.shape as Record<string, unknown>;
+          const shape: SessionBattlemapFogShape = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            campaign_id: String(row.campaign_id),
+            shape: row.shape === "circle" ? "circle" : "rect",
+            grid_x: Math.round(Number(row.grid_x ?? 0)),
+            grid_y: Math.round(Number(row.grid_y ?? 0)),
+            grid_w: Math.max(1, Math.round(Number(row.grid_w ?? 1))),
+            grid_h: Math.max(1, Math.round(Number(row.grid_h ?? 1))),
+            z_index: Math.round(Number(row.z_index ?? 0)),
+          };
+          setBattlemapFogShapes((prev) => {
+            const idx = prev.findIndex((s) => s.id === shape.id);
+            if (idx < 0) return [...prev, shape];
+            const next = [...prev];
+            next[idx] = shape;
+            return next;
+          });
+          return;
+        }
+
+        void listBattlemapFogShapes(battlemapId, sessionId)
+          .then((shapes) => setBattlemapFogShapes(shapes))
+          .catch(() => undefined);
       })
       .on("presence", { event: "sync" }, () => {
         const st = channel.presenceState();
@@ -4283,12 +4476,15 @@ export function LiveSessionBoard({
                 battlemap={activeBattlemap}
                 tokens={visibleBattlemapTokens}
                 props={visibleBattlemapProps}
+                fogShapes={battlemapFogShapes}
                 isGm={isGM}
                 characterPlacement={tokenPlacement}
                 gmTokenPlacement={gmTokenPlacement}
                 gmMoveTokenId={gmMoveTokenId}
                 selectedTokenId={selectedBattlemapTokenId}
                 selectedPropId={selectedBattlemapPropId}
+                selectedFogShapeId={selectedFogShapeId}
+                fogTool={isGM ? fogTool : null}
                 onCancelPlacement={() => {
                   setTokenPlacement(null);
                   setGmTokenPlacement(null);
@@ -4303,6 +4499,7 @@ export function LiveSessionBoard({
                 onSelectToken={(id) => {
                   setSelectedBattlemapTokenId(id);
                   setSelectedBattlemapPropId(null);
+                  setSelectedFogShapeId(null);
                   if (id && isGM) {
                     const token = battlemapTokens.find((t) => t.id === id);
                     if (token && !token.character_id) {
@@ -4317,8 +4514,74 @@ export function LiveSessionBoard({
                 onSelectProp={(id) => {
                   setSelectedBattlemapPropId(id);
                   setSelectedBattlemapTokenId(null);
+                  setSelectedFogShapeId(null);
                   setGmMoveTokenId(null);
                   setGmTokenPlacement(null);
+                }}
+                onSelectFogShape={(id) => {
+                  setSelectedFogShapeId(id);
+                  setSelectedBattlemapTokenId(null);
+                  setSelectedBattlemapPropId(null);
+                  setGmMoveTokenId(null);
+                }}
+                onFogShapeCreate={(input) => {
+                  if (!activeBattlemapId || !isGM) return;
+                  startTransition(async () => {
+                    try {
+                      const created = await createBattlemapFogShape({
+                        sessionId,
+                        battlemapId: activeBattlemapId,
+                        shape: input.shape,
+                        gridX: input.gridX,
+                        gridY: input.gridY,
+                        gridW: input.gridW,
+                        gridH: input.gridH,
+                      });
+                      setBattlemapFogShapes((prev) => {
+                        if (prev.some((s) => s.id === created.id)) return prev;
+                        return [...prev, created];
+                      });
+                      setSelectedFogShapeId(created.id);
+                      notifyBattlemapFogChanged({ op: "upsert", shape: created });
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Fog-Fläche konnte nicht erstellt werden.",
+                      );
+                    }
+                  });
+                }}
+                onFogShapeMove={(shapeId, gridX, gridY) => {
+                  if (!isGM) return;
+                  const prev = battlemapFogShapes.find((s) => s.id === shapeId);
+                  if (!prev || (prev.grid_x === gridX && prev.grid_y === gridY)) return;
+                  setBattlemapFogShapes((list) =>
+                    list.map((s) =>
+                      s.id === shapeId ? { ...s, grid_x: gridX, grid_y: gridY } : s,
+                    ),
+                  );
+                  startTransition(async () => {
+                    try {
+                      const updated = await updateBattlemapFogShape({
+                        sessionId,
+                        shapeId,
+                        gridX,
+                        gridY,
+                      });
+                      setBattlemapFogShapes((list) =>
+                        list.map((s) => (s.id === updated.id ? updated : s)),
+                      );
+                      notifyBattlemapFogChanged({ op: "upsert", shape: updated });
+                    } catch (e) {
+                      if (prev) {
+                        setBattlemapFogShapes((list) =>
+                          list.map((s) => (s.id === shapeId ? prev : s)),
+                        );
+                      }
+                      toast.error(
+                        e instanceof Error ? e.message : "Fog-Fläche konnte nicht verschoben werden.",
+                      );
+                    }
+                  });
                 }}
                 onPropDrop={handleBattlemapPropDrop}
                 onPropResize={handleBattlemapPropResize}
@@ -4403,6 +4666,74 @@ export function LiveSessionBoard({
                 }}
               />
             ) : null}
+            {activeWorldMapId && worldId ? (
+              <LiveWorldMapOverlay
+                worldMapId={activeWorldMapId}
+                worldId={worldId}
+                campaignId={campaignId}
+                isGm={isGM}
+                onClose={
+                  isGM
+                    ? () => {
+                        startTransition(async () => {
+                          try {
+                            await setActiveWorldMap(sessionId, null);
+                            setLiveState((prev) => {
+                              if (!prev) return prev;
+                              const next = normalizeLiveRow({
+                                ...prev,
+                                active_world_map_id: null,
+                              });
+                              liveStateRef.current = next;
+                              return next;
+                            });
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "Weltkarte konnte nicht geschlossen werden.",
+                            );
+                          }
+                        });
+                      }
+                    : undefined
+                }
+              />
+            ) : null}
+            {isGM && battlemapActive ? (
+              <BattlemapFogToolbar
+                tool={fogTool}
+                selectedShapeId={selectedFogShapeId}
+                onToolChange={(tool) => {
+                  setFogTool(tool);
+                  if (tool) {
+                    setTokenPlacement(null);
+                    setGmTokenPlacement(null);
+                    setGmMoveTokenId(null);
+                    setSelectedBattlemapTokenId(null);
+                    setSelectedBattlemapPropId(null);
+                  }
+                  if (tool !== "select") setSelectedFogShapeId(null);
+                }}
+                onDeleteSelected={() => {
+                  if (!selectedFogShapeId) return;
+                  const shapeId = selectedFogShapeId;
+                  startTransition(async () => {
+                    try {
+                      await removeBattlemapFogShape(shapeId, sessionId);
+                      setBattlemapFogShapes((prev) => prev.filter((s) => s.id !== shapeId));
+                      setSelectedFogShapeId(null);
+                      notifyBattlemapFogChanged({ op: "delete", shapeId });
+                      toast.success("Fog-Fläche entfernt.");
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Fog-Fläche konnte nicht gelöscht werden.",
+                      );
+                    }
+                  });
+                }}
+              />
+            ) : null}
             {isGM ? (
               <BattlemapGmToolbar
                 sessionId={sessionId}
@@ -4422,6 +4753,8 @@ export function LiveSessionBoard({
                     setGmMoveTokenId(null);
                     setSelectedBattlemapTokenId(null);
                     setSelectedBattlemapPropId(null);
+                    setSelectedFogShapeId(null);
+                    setFogTool(null);
                   }
                 }}
                 onMovementPausedChange={(paused) => {
@@ -5476,6 +5809,23 @@ export function LiveSessionBoard({
               liveStateRef.current = next;
               return next;
             });
+          }}
+          availableWorldMaps={availableWorldMaps}
+          sessionWorldMaps={sessionWorldMapLinks}
+          activeWorldMapId={activeWorldMapId}
+          onWorldMapActiveChange={(id) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = normalizeLiveRow({
+                ...prev,
+                active_world_map_id: id,
+              });
+              liveStateRef.current = next;
+              return next;
+            });
+            void getSessionWorldMaps(sessionId)
+              .then(setSessionWorldMapLinks)
+              .catch(() => undefined);
           }}
           battlemapActive={battlemapActive}
           tokenPlayers={displayPartyCharacters
