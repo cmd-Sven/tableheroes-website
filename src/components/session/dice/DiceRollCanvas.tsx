@@ -9,6 +9,7 @@ import { DICE_CAMERA } from "@/src/lib/session/dice-screen-project";
 type Props = {
   sides: number;
   faces: number[];
+  dieSides?: number[];
   seed: string;
   aimX: number;
   aimZ: number;
@@ -51,6 +52,7 @@ function TopDownOrthoCamera() {
 export default function DiceRollCanvas({
   sides,
   faces,
+  dieSides,
   seed,
   aimX,
   aimZ,
@@ -80,6 +82,7 @@ export default function DiceRollCanvas({
       <DiceRollScene
         sides={sides}
         faces={faces}
+        dieSides={dieSides}
         seed={seed}
         aimX={aimX}
         aimZ={aimZ}

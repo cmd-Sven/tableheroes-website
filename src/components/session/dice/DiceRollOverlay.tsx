@@ -11,6 +11,7 @@ import {
   isDiceAnimMeta,
   shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
+import { DICE_PHYSICS_MAX_MS } from "@/src/lib/session/dice-physics";
 import { estimateRollDurationMs } from "@/src/lib/session/dice-slingshot";
 import { supports3dDice } from "@/src/lib/session/dice-roll";
 import {
@@ -33,6 +34,7 @@ import {
   type DieNatHighlight,
 } from "@/src/lib/session/dice-nat-highlight";
 import { DiceRollMoodFx } from "./DiceRollMoodFx";
+import { playDiceRollSound } from "@/src/lib/session/dice-nat-sounds";
 
 const DiceCanvas = dynamic(() => import("./DiceRollCanvas"), {
   ssr: false,
@@ -46,6 +48,7 @@ type ActiveRoll = {
   sourceId: string;
   sides: number;
   faces: number[];
+  dieSides?: number[];
   seed: string;
   use3d: boolean;
   dropNx: number;
@@ -313,17 +316,26 @@ export function DiceRollOverlay({ logs }: Props) {
       const meta = entry.meta!;
       const faces = (meta.faces as number[]).filter((n) => Number.isFinite(n));
       const sides = Math.round(Number(meta.sides) || 20);
-      if (faces.length === 0) continue;
+      const rawDieSides = Array.isArray(meta.dieSides)
+        ? (meta.dieSides as unknown[]).map((n) => Math.round(Number(n)))
+        : undefined;
+      const clippedFaces = faces.slice(0, 12);
+      const dieSides = rawDieSides
+        ?.filter((n) => Number.isFinite(n) && n >= 2)
+        .slice(0, clippedFaces.length);
+      if (clippedFaces.length === 0) continue;
       seenRef.current.add(entry.id);
       const { dropNx, dropNy } = readDropNorm(meta as Record<string, unknown>);
       const throwMeta = readThrowMeta(meta as Record<string, unknown>);
       const { x: aimX, z: aimZ } = dropNormToTablePoint(dropNx, dropNy, aspect);
+      const all3d = (dieSides ?? [sides]).every((s) => supports3dDice(s));
       fresh.push({
         sourceId: entry.id,
         sides,
-        faces: faces.slice(0, 12),
+        faces: clippedFaces,
+        dieSides,
         seed: typeof meta.seed === "string" ? meta.seed : entry.id,
-        use3d: webgl && supports3dDice(sides),
+        use3d: webgl && all3d,
         dropNx,
         dropNy,
         aimX,
@@ -347,17 +359,23 @@ export function DiceRollOverlay({ logs }: Props) {
     dispatchDiceAnimComplete(sourceId);
   }, []);
 
+  /** Overlay schließen — Ergebnis-Reveal passiert nur in handleAllSettled. */
   const finishActive = useCallback(() => {
     const current = activeRef.current;
     if (!current) return;
     if (finishingRef.current === current.sourceId) return;
     finishingRef.current = current.sourceId;
     const sourceId = current.sourceId;
+    // Falls Physik nie „settled“ gemeldet hat: trotzdem einmal freigeben.
+    if (!settledOnceRef.current) {
+      settledOnceRef.current = true;
+      setShowResult(true);
+      revealAndDispatch(sourceId);
+    }
     setQueue((q) => (q[0]?.sourceId === sourceId ? q.slice(1) : q));
-    revealAndDispatch(sourceId);
   }, [revealAndDispatch]);
 
-  /** Erst wenn ALLE Würfel der Scene liegen (onAllSettled) → Result + Chat/Bubble. */
+  /** Erst wenn ALLE Würfel der Scene liegen → Chat/Sprechblase freigeben. */
   const handleAllSettled = useCallback(() => {
     if (settledOnceRef.current) return;
     settledOnceRef.current = true;
@@ -378,15 +396,24 @@ export function DiceRollOverlay({ logs }: Props) {
   }, [activeId]);
 
   useEffect(() => {
-    if (!activeId) return;
-    // Safety: ab Playback-Start (Dynamic-Import-Puffer) + geschätzter Roll-Dauer + Hold
-    const canvasBootstrapMs = active?.use3d ? 1200 : 0;
-    const t = window.setTimeout(
-      finishActive,
-      canvasBootstrapMs + rollDurationEstimateMs + RESULT_HOLD_MS + 250,
-    );
+    if (!activeId || !active) return;
+    // 3D-Canvas braucht kurz zum Laden — Sound erst mit sichtbarem Wurf.
+    const delayMs = active.use3d ? 450 : 0;
+    const t = window.setTimeout(() => {
+      playDiceRollSound(activeId, rollDurationEstimateMs);
+    }, delayMs);
     return () => window.clearTimeout(t);
-  }, [activeId, active?.use3d, finishActive, rollDurationEstimateMs]);
+  }, [activeId, active, rollDurationEstimateMs]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    // Safety: nur force-settle — nie vor der max. Physikdauer + Canvas-Puffer.
+    const canvasBootstrapMs = active?.use3d ? 1600 : 0;
+    const t = window.setTimeout(() => {
+      handleAllSettled();
+    }, canvasBootstrapMs + DICE_PHYSICS_MAX_MS + 200);
+    return () => window.clearTimeout(t);
+  }, [activeId, active?.use3d, handleAllSettled]);
 
   const rollMood = useMemo((): DieNatHighlight | null => {
     if (!active || !showResult) return null;
@@ -396,7 +423,9 @@ export function DiceRollOverlay({ logs }: Props) {
   const fallbackDieLabel = useMemo(() => {
     if (!active) return "";
     if (active.faces.length === 1) return `W${active.sides}`;
-    return `${active.faces.length}×W${active.sides}`;
+    const unique = [...new Set(active.dieSides ?? [active.sides])];
+    if (unique.length === 1) return `${active.faces.length}×W${unique[0]}`;
+    return unique.map((s) => `W${s}`).join("+");
   }, [active]);
 
   const fallbackDurationMs = rollDurationEstimateMs;
@@ -525,6 +554,7 @@ export function DiceRollOverlay({ logs }: Props) {
                 <DiceCanvas
                   sides={active.sides}
                   faces={active.faces}
+                  dieSides={active.dieSides}
                   seed={active.seed}
                   aimX={active.aimX}
                   aimZ={active.aimZ}

@@ -13,7 +13,7 @@ import {
   Trophy,
 } from "lucide-react";
 
-export type HeroSlideId = "updates" | "features" | "membership";
+type HeroSlideId = "updates" | "features" | "membership";
 
 const SLIDES: { id: HeroSlideId; label: string }[] = [
   { id: "updates", label: "Updates" },

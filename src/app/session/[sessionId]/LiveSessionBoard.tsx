@@ -20,18 +20,13 @@ import { normalizeGuestSlots } from "@/src/lib/session-guest-slots";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient as createBrowserSupabase } from "@/src/lib/supabase/client";
 import {
-  LogOut,
-  MapPin,
   Map,
-  Clock,
   Users,
   BookOpen,
   PenSquare,
   Feather,
   Search,
   X,
-  Power,
-  Monitor,
   Flag,
   Cloud,
   CloudLightning,
@@ -44,7 +39,7 @@ import {
   Sun,
   Swords,
   Gift,
-  Armchair,
+  Mic,
   UserRound,
   Shield,
   Skull,
@@ -52,18 +47,33 @@ import {
   Hand,
   Minus,
   StickyNote,
+  Minimize2,
+  Maximize2,
+  EyeOff,
 } from "lucide-react";
 import {
   ensureSessionPrepLiveState,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import {
+  compareCombatHudOrder,
   compareCombatInitiative,
+  hasRolledCombatInitiative,
+  isCreatureActiveCombatTurn,
+  isNpcActiveCombatTurn,
   normalizeCombatConditions,
   normalizeCombatParticipantSide,
+  parseInitiativeLabel,
+  resolveActiveCombatTurnHighlight,
   type CombatConditionId,
   type CombatParticipantSide,
 } from "@/src/lib/combat-initiative";
-import { CombatInitiativeBar } from "@/src/components/session/CombatInitiativeBar";
+import { CombatInitiativeHud } from "@/src/components/session/CombatInitiativeHud";
+import { CombatStartVideoModal } from "@/src/components/session/CombatStartVideoModal";
+import {
+  advanceCombatTurn,
+  rollCombatInitiative,
+  setCombatInitiative,
+} from "@/src/lib/actions/combat-initiative-actions";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { adjustNpcReputation } from "@/src/lib/actions/npc-reputation-actions";
 import {
@@ -86,7 +96,17 @@ import {
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
 import { Dnd5eCharacterSheetModalWithLocale } from "@/src/components/characters/Dnd5eCharacterSheetModal";
 import { LiveSessionSidePanels } from "@/src/components/session/LiveSessionSidePanels";
-import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
+import { LiveSessionLeftDock } from "@/src/components/session/LiveSessionLeftDock";
+import { LiveSessionDicePanel } from "@/src/components/session/LiveSessionDicePanel";
+import { LiveSessionTopToolbar } from "@/src/components/session/LiveSessionTopToolbar";
+import { LiveSessionLoadingScreen } from "@/src/components/session/LiveSessionLoadingScreen";
+import { usePreloadSessionAssets } from "@/src/hooks/usePreloadSessionAssets";
+import { StageRosterCollapse } from "@/src/components/session/StageRosterCollapse";
+import type {
+  LeftPanelId,
+  MainSidePanelId,
+  TopToolbarPanelId,
+} from "@/src/components/session/live-session-side-types";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
 import {
   LiveSessionHandRaiseQueue,
@@ -96,6 +116,8 @@ import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
 } from "@/src/lib/session/avatar-roll-fx";
+import { playDiceNatSound, primeDiceNatSounds } from "@/src/lib/session/dice-nat-sounds";
+import { useCombatStartFx } from "@/src/hooks/useCombatStartFx";
 import {
   dispatchAvatarSpeechBubble,
   speechBubbleFromActivityEntry,
@@ -123,10 +145,9 @@ import {
 } from "./StageNpcShopControls";
 import { updateNpcMerchantAssignment } from "@/src/app/dashboard/campaigns/[id]/shop-actions";
 import { FateCoinsPool, type FateCoin } from "@/src/components/session/FateCoinsPool";
-import { GmSlideSettingsPanel } from "@/src/components/session/GmSlideSettingsPanel";
+import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { DowntimePlayerOverlay } from "@/src/components/session/DowntimePlayerOverlay";
-import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
 import { GmNpcSearchModal } from "@/src/components/session/GmNpcSearchModal";
 import { GmBeastSearchModal } from "@/src/components/session/GmBeastSearchModal";
 import { StageBeastCard } from "@/src/components/session/StageBeastCard";
@@ -173,8 +194,6 @@ import {
   normalizeImageDisplay,
 } from "@/src/lib/image-display";
 import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
-import { BattlemapGmToolbar } from "@/src/components/session/battlemap/BattlemapGmToolbar";
-import { BattlemapFogToolbar } from "@/src/components/session/battlemap/BattlemapFogToolbar";
 import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import { BattlemapTokenRadialMenu } from "@/src/components/session/battlemap/BattlemapTokenRadialMenu";
 import { useBattlemapCharacterDisplays } from "@/src/components/session/battlemap/useBattlemapCharacterDisplays";
@@ -186,12 +205,14 @@ import {
 } from "@/src/lib/actions/world-map-actions";
 import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import {
+  BATTLEMAP_EFFECT_CHANGED_BROADCAST,
   BATTLEMAP_FOG_CHANGED_BROADCAST,
   BATTLEMAP_TOKENS_CHANGED_BROADCAST,
   CHARACTER_DISPLAY_CHANGED_BROADCAST,
   CHARACTER_DISPLAY_CHANGED_EVENT,
   dispatchCharacterDisplayChanged,
   dispatchOpenCharacterRadial,
+  type BattlemapEffectChangedDetail,
   type BattlemapFogChangedDetail,
   type BattlemapTokensChangedDetail,
   type CharacterDisplayChangedDetail,
@@ -202,27 +223,33 @@ import {
   npcPlacementDraft,
 } from "@/src/components/session/LiveSessionTokensPanel";
 import {
+  createBattlemapEffectTemplate,
   createBattlemapFogShape,
   createBattlemapProp,
   getCharacterMovementRange,
   getSessionBattlemaps,
+  listBattlemapEffectTemplates,
   listBattlemapFogShapes,
   placeBattlemapCharacterToken,
   placeBattlemapGmToken,
+  removeBattlemapEffectTemplate,
   removeBattlemapFogShape,
   removeBattlemapProp,
   removeBattlemapToken,
   toggleBattlemapTokenVisibility,
+  updateBattlemapEffectTemplate,
   updateBattlemapFogShape,
   updateBattlemapProp,
   updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
+  BattlemapEffectTool,
   BattlemapFogTool,
   CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
   SessionBattlemapProp,
   SessionBattlemapToken,
@@ -262,6 +289,8 @@ type LiveState = {
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
   is_combat_mode?: boolean | null;
+  /** false = Initiative-Setup; true = Runden laufen */
+  combat_started?: boolean | null;
   current_turn_index?: number | null;
   combat_round?: number | null;
   active_shop_id?: string | null;
@@ -803,6 +832,7 @@ function StageNpcCard({
   isGM,
   isCombatMode,
   isInInitiative,
+  isActiveTurn = false,
   isUpdating,
   reputationScore,
   reactions,
@@ -822,6 +852,7 @@ function StageNpcCard({
   isGM: boolean;
   isCombatMode: boolean;
   isInInitiative: boolean;
+  isActiveTurn?: boolean;
   isUpdating: boolean;
   reputationScore: number;
   reactions: ActiveNpcReaction[];
@@ -855,6 +886,10 @@ function StageNpcCard({
       } ${npc.image_url ? "cursor-zoom-in" : "cursor-default"} ${
         canDragToInitiative ? "cursor-grab active:cursor-grabbing" : ""
       } ${isInInitiative ? "ring-2 ring-accent-gold/50" : ""} ${
+        isActiveTurn
+          ? "ring-4 ring-accent-gold shadow-[0_0_28px_rgba(202,185,38,0.75)]"
+          : ""
+      } ${
         linkedToStageFaction ? "ring-2 ring-accent-gold/70" : ""
       }`}
       initial={{ opacity: 0, scale: 1.5, y: 200, rotateZ: -15 }}
@@ -911,6 +946,14 @@ function StageNpcCard({
             </div>
           )}
         </button>
+
+        {isActiveTurn ? (
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center">
+            <span className="rounded-full border border-accent-gold bg-accent-gold/25 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold shadow-[0_0_16px_rgba(202,185,38,0.65)] backdrop-blur-sm">
+              Am Zug
+            </span>
+          </div>
+        ) : null}
 
         {reactions.map((reaction) => (
           <div
@@ -1327,18 +1370,23 @@ export function LiveSessionBoard({
   const [sheetCharacter, setSheetCharacter] = useState<PartyCharacter | null>(null);
   const showDnd5eSheet = isDnd5eCampaignSystem(campaignSystem);
   const [fateGmSettingsOpen, setFateGmSettingsOpen] = useState(false);
-  const [weatherGmSettingsOpen, setWeatherGmSettingsOpen] = useState(false);
-  const [tempGmSettingsOpen, setTempGmSettingsOpen] = useState(false);
-  const [tablePresenceGmSettingsOpen, setTablePresenceGmSettingsOpen] =
-    useState(false);
+  const [leftPanel, setLeftPanel] = useState<LeftPanelId | null>(null);
+  const [topPanel, setTopPanel] = useState<TopToolbarPanelId | null>(null);
+  const [stageRosterOpen, setStageRosterOpen] = useState(true);
+  const [stageDeckHandOpen, setStageDeckHandOpen] = useState(true);
   const [sessionBattlemaps, setSessionBattlemaps] = useState<SessionBattlemap[]>([]);
   const [availableWorldMaps, setAvailableWorldMaps] = useState<WorldMap[]>([]);
   const [sessionWorldMapLinks, setSessionWorldMapLinks] = useState<SessionWorldMap[]>([]);
   const [battlemapTokens, setBattlemapTokens] = useState<SessionBattlemapToken[]>([]);
   const [battlemapProps, setBattlemapProps] = useState<SessionBattlemapProp[]>([]);
   const [battlemapFogShapes, setBattlemapFogShapes] = useState<SessionBattlemapFogShape[]>([]);
+  const [battlemapEffectTemplates, setBattlemapEffectTemplates] = useState<
+    SessionBattlemapEffectTemplate[]
+  >([]);
   const [fogTool, setFogTool] = useState<BattlemapFogTool>(null);
+  const [effectTool, setEffectTool] = useState<BattlemapEffectTool>(null);
   const [selectedFogShapeId, setSelectedFogShapeId] = useState<string | null>(null);
+  const [selectedEffectTemplateId, setSelectedEffectTemplateId] = useState<string | null>(null);
   const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);
   const [gmTokenPlacement, setGmTokenPlacement] = useState<GmTokenPlacementDraft | null>(null);
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
@@ -1381,6 +1429,39 @@ export function LiveSessionBoard({
     [sessionBattlemaps, activeBattlemapId],
   );
   const battlemapActive = Boolean(activeBattlemap);
+
+  // --- Preload assets when joining (show loading screen until done) ---
+  const preloadManifest = useMemo(() => {
+    if (!liveState) return null;
+    return {
+      backgroundUrl: liveState.background_url || null,
+      battlemapUrl: activeBattlemap?.image_url || null,
+      npcPortraits: (liveState.visible_npc_ids ?? [])
+        .map((id: string) => allCampaignNpcs.find((n) => String(n.id) === id)?.image_url)
+        .filter(Boolean) as string[],
+      characterPortraits: partyCharacters
+        .map((c) => c.avatar_url)
+        .filter(Boolean) as string[],
+      weatherIcons: true,
+    };
+  }, [liveState, activeBattlemap, allCampaignNpcs, partyCharacters]);
+
+  const preload = usePreloadSessionAssets(preloadManifest);
+  const [preloadDismissed, setPreloadDismissed] = useState(false);
+  const showLoadingScreen =
+    !preloadDismissed && !preload.done && preloadManifest !== null;
+
+  useEffect(() => {
+    if (preload.done && !preloadDismissed) {
+      const t = window.setTimeout(() => setPreloadDismissed(true), 400);
+      return () => clearTimeout(t);
+    }
+  }, [preload.done, preloadDismissed]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPreloadDismissed(true), 3500);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (isGuest) return;
@@ -1582,6 +1663,33 @@ export function LiveSessionBoard({
     [activeBattlemapId, userId],
   );
 
+  const notifyBattlemapEffectChanged = useCallback(
+    (detail?: {
+      op?: BattlemapEffectChangedDetail["op"];
+      template?: SessionBattlemapEffectTemplate | null;
+      templateId?: string | null;
+    }) => {
+      if (!activeBattlemapId) return;
+      const op =
+        detail?.op ??
+        (detail?.template ? "upsert" : detail?.templateId ? "delete" : "refresh");
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: BATTLEMAP_EFFECT_CHANGED_BROADCAST,
+        payload: {
+          battlemapId: activeBattlemapId,
+          op,
+          template: detail?.template
+            ? ({ ...detail.template } as unknown as Record<string, unknown>)
+            : null,
+          templateId: detail?.templateId ?? detail?.template?.id ?? null,
+          senderId: userId,
+        } satisfies BattlemapEffectChangedDetail,
+      });
+    },
+    [activeBattlemapId, userId],
+  );
+
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
       setBattlemapFogShapes([]);
@@ -1646,6 +1754,84 @@ export function LiveSessionBoard({
             if (idx < 0) return [...prev, shape];
             const next = [...prev];
             next[idx] = shape;
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, isGuest, sessionId, supabase]);
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
+      setBattlemapEffectTemplates([]);
+      setSelectedEffectTemplateId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadEffects() {
+      try {
+        const templates = await listBattlemapEffectTemplates(activeBattlemapId!, sessionId);
+        if (!cancelled) setBattlemapEffectTemplates(templates);
+      } catch {
+        if (!cancelled) setBattlemapEffectTemplates([]);
+      }
+    }
+
+    void loadEffects();
+
+    const channel = supabase
+      .channel(`session_battlemap_effects_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_effect_templates",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+          if (eventType === "DELETE") {
+            const oldId =
+              payload.old && typeof payload.old === "object" && "id" in payload.old
+                ? String((payload.old as { id: unknown }).id)
+                : "";
+            if (oldId) {
+              setBattlemapEffectTemplates((prev) => prev.filter((t) => t.id !== oldId));
+              setSelectedEffectTemplateId((prev) => (prev === oldId ? null : prev));
+            }
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row?.id) {
+            void loadEffects();
+            return;
+          }
+          const shapeRaw = String(row.shape ?? "rect");
+          const template: SessionBattlemapEffectTemplate = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            campaign_id: String(row.campaign_id),
+            shape: shapeRaw === "circle" ? "circle" : shapeRaw === "cone" ? "cone" : "rect",
+            grid_x: Math.round(Number(row.grid_x ?? 0)),
+            grid_y: Math.round(Number(row.grid_y ?? 0)),
+            grid_w: Math.max(1, Math.round(Number(row.grid_w ?? 1))),
+            grid_h: Math.max(1, Math.round(Number(row.grid_h ?? 1))),
+            direction_deg: Math.round(Number(row.direction_deg ?? 0)) % 360,
+            z_index: Math.round(Number(row.z_index ?? 0)),
+          };
+          setBattlemapEffectTemplates((prev) => {
+            const idx = prev.findIndex((t) => t.id === template.id);
+            if (idx < 0) return [...prev, template];
+            const next = [...prev];
+            next[idx] = template;
             return next;
           });
         },
@@ -1982,6 +2168,134 @@ export function LiveSessionBoard({
     ],
   );
 
+  const handleBattlemapTokenMove = useCallback(
+    (token: SessionBattlemapToken, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      if (token.grid_x === gridX && token.grid_y === gridY) return;
+
+      const originGrid = { grid_x: token.grid_x, grid_y: token.grid_y };
+      const applyLocalMove = (gx: number, gy: number) => {
+        setBattlemapTokens((prev) =>
+          prev.map((t) => (t.id === token.id ? { ...t, grid_x: gx, grid_y: gy } : t)),
+        );
+      };
+
+      if (token.character_id) {
+        if (!isGM && liveState?.battlemap_movement_paused) {
+          toast.error("Bewegung ist pausiert — warte auf den Spielleiter.");
+          return;
+        }
+        const characterId = token.character_id;
+        const characterName = token.label ?? "Charakter";
+        applyLocalMove(gridX, gridY);
+        startTransition(async () => {
+          try {
+            const placed = await placeBattlemapCharacterToken({
+              sessionId,
+              battlemapId: activeBattlemapId,
+              characterId,
+              gridX,
+              gridY,
+              useDash: false,
+            });
+            setBattlemapTokens((prev) => {
+              const idx = prev.findIndex((t) => t.id === placed.id);
+              if (idx < 0) return [...prev, placed];
+              const next = [...prev];
+              next[idx] = placed;
+              return next;
+            });
+            notifyBattlemapTokensChanged({ op: "upsert", token: placed });
+            toast.success(`Token für ${characterName} bewegt.`);
+          } catch (e) {
+            applyLocalMove(originGrid.grid_x, originGrid.grid_y);
+            toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
+          }
+        });
+        return;
+      }
+
+      if (!isGM) return;
+      applyLocalMove(gridX, gridY);
+      startTransition(async () => {
+        try {
+          const placed = await placeBattlemapGmToken({
+            sessionId,
+            battlemapId: activeBattlemapId,
+            gridX,
+            gridY,
+            tokenId: token.id,
+            npcId: token.npc_id ?? undefined,
+            creatureId: token.creature_id ?? undefined,
+            tokenSide: token.token_side,
+            sizeCells: token.size_cells,
+            isVisibleToPlayers: token.is_visible_to_players,
+            label: token.label,
+            imageUrl: token.image_url,
+          });
+          setBattlemapTokens((prev) => {
+            const idx = prev.findIndex((t) => t.id === placed.id);
+            if (idx < 0) return [...prev, placed];
+            const next = [...prev];
+            next[idx] = placed;
+            return next;
+          });
+          notifyBattlemapTokensChanged({ op: "upsert", token: placed });
+          toast.success("Token verschoben.");
+        } catch (e) {
+          applyLocalMove(originGrid.grid_x, originGrid.grid_y);
+          toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
+        }
+      });
+    },
+    [
+      activeBattlemapId,
+      isGM,
+      liveState?.battlemap_movement_paused,
+      notifyBattlemapTokensChanged,
+      sessionId,
+      startTransition,
+    ],
+  );
+
+  const handleFogShapeDelete = useCallback(
+    (shapeId: string) => {
+      startTransition(async () => {
+        try {
+          await removeBattlemapFogShape(shapeId, sessionId);
+          setBattlemapFogShapes((prev) => prev.filter((s) => s.id !== shapeId));
+          setSelectedFogShapeId((prev) => (prev === shapeId ? null : prev));
+          notifyBattlemapFogChanged({ op: "delete", shapeId });
+          toast.success("Fog-Fläche entfernt.");
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Fog-Fläche konnte nicht gelöscht werden.",
+          );
+        }
+      });
+    },
+    [notifyBattlemapFogChanged, sessionId, startTransition],
+  );
+
+  const handleEffectTemplateDelete = useCallback(
+    (templateId: string) => {
+      startTransition(async () => {
+        try {
+          await removeBattlemapEffectTemplate(templateId, sessionId);
+          setBattlemapEffectTemplates((prev) => prev.filter((t) => t.id !== templateId));
+          setSelectedEffectTemplateId((prev) => (prev === templateId ? null : prev));
+          notifyBattlemapEffectChanged({ op: "delete", templateId });
+          toast.success("Effekt-Schablone entfernt.");
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Effekt-Schablone konnte nicht gelöscht werden.",
+          );
+        }
+      });
+    },
+    [notifyBattlemapEffectChanged, sessionId, startTransition],
+  );
+
   const handleBattlemapPropDrop = useCallback(
     (draft: GmPropPlacementDraft, posX: number, posY: number) => {
       if (!isGM || !activeBattlemapId) return;
@@ -2134,6 +2448,7 @@ export function LiveSessionBoard({
   const [npcReactions, setNpcReactions] = useState<ActiveNpcReaction[]>([]);
   const [npcReputationScores, setNpcReputationScores] = useState<Record<string, number>>({});
   const [combatParticipants, setCombatParticipants] = useState<CombatParticipant[]>([]);
+  const [rollingInitiativeId, setRollingInitiativeId] = useState<string | null>(null);
   const [lightningPulseKey, setLightningPulseKey] = useState(0);
   const [locationDraft, setLocationDraft] = useState(
     () =>
@@ -2150,9 +2465,31 @@ export function LiveSessionBoard({
     () => new Set(),
   );
   const [chronistPanelOpen, setChronistPanelOpen] = useState(true);
+  const [partyTrayMode, setPartyTrayMode] = useState<"full" | "compact" | "hidden">(
+    "full",
+  );
   const chronistStartFlowRef = useRef<(() => void) | null>(null);
   const chronistStopFlowRef = useRef<(() => void) | null>(null);
   const chronistSettingsFlowRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("th:party-tray-mode");
+      if (raw === "full" || raw === "compact" || raw === "hidden") {
+        setPartyTrayMode(raw);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("th:party-tray-mode", partyTrayMode);
+    } catch {
+      /* ignore */
+    }
+  }, [partyTrayMode]);
 
   const isPrepMode = sessionStatus === "Scheduled";
   const chronistTableMode =
@@ -2353,6 +2690,11 @@ export function LiveSessionBoard({
     !forcePlayerView &&
     (isGM || (liveState?.scribe_id != null && liveState.scribe_id === userId));
   const systemLogs = liveState?.system_logs ?? [];
+  const {
+    active: combatStartFxActive,
+    fxKey: combatStartFxKey,
+    dismiss: dismissCombatStartFx,
+  } = useCombatStartFx(liveState?.is_combat_mode && liveState?.combat_started);
   const handRaises = liveState?.hand_raises ?? [];
   const urgentHandRaise =
     isGM && !forcePlayerView ? handRaises.find((r) => r.urgent) ?? null : null;
@@ -2385,6 +2727,22 @@ export function LiveSessionBoard({
   const pendingDiceFxRef = useRef<globalThis.Map<string, (typeof systemLogs)[number]>>(
     new globalThis.Map(),
   );
+  const pendingInitiativeToastRef = useRef<{
+    participantId: string;
+    display: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const prime = () => {
+      primeDiceNatSounds();
+    };
+    window.addEventListener("pointerdown", prime, { once: true, passive: true });
+    window.addEventListener("keydown", prime, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", prime);
+      window.removeEventListener("keydown", prime);
+    };
+  }, []);
 
   function applyDiceResolveFx(entry: (typeof systemLogs)[number]) {
     const characterId = entry.character_id?.trim();
@@ -2398,6 +2756,7 @@ export function LiveSessionBoard({
       ) {
         const kind = rollFxKindFromMeta(entry.meta);
         if (kind) {
+          playDiceNatSound(kind, entry.id);
           dispatchAvatarRollFx({
             characterId,
             kind,
@@ -2431,9 +2790,25 @@ export function LiveSessionBoard({
 
   useOnDiceAnimComplete((sourceId) => {
     const entry = pendingDiceFxRef.current.get(sourceId);
-    if (!entry) return;
-    pendingDiceFxRef.current.delete(sourceId);
-    applyDiceResolveFx(entry);
+    if (entry) {
+      pendingDiceFxRef.current.delete(sourceId);
+      applyDiceResolveFx(entry);
+    }
+    const pendingInit = pendingInitiativeToastRef.current;
+    if (!pendingInit || !entry) return;
+    const meta =
+      entry.meta && typeof entry.meta === "object"
+        ? (entry.meta as Record<string, unknown>)
+        : null;
+    const isInitiative =
+      meta?.kind === "initiative" ||
+      (typeof meta?.label === "string" && meta.label.trim() === "Initiative");
+    if (!isInitiative) return;
+    pendingInitiativeToastRef.current = null;
+    toast.success(`Initiative: ${pendingInit.display}`);
+    setRollingInitiativeId((cur) =>
+      cur === pendingInit.participantId ? null : cur,
+    );
   });
 
   const physicallyPresentIdSet = new Set(
@@ -2512,10 +2887,34 @@ export function LiveSessionBoard({
 
   const toggleMainSidePanel = useCallback((id: MainSidePanelId) => {
     setMainSidePanel((prev) => (prev === id ? null : id));
+    setLeftPanel(null);
+    setTopPanel(null);
   }, []);
 
   const closeMainSidePanel = useCallback(() => {
     setMainSidePanel(null);
+  }, []);
+
+  const toggleLeftPanel = useCallback((id: LeftPanelId) => {
+    setLeftPanel((prev) => (prev === id ? null : id));
+    setMainSidePanel(null);
+    setTopPanel(null);
+    setIsDiceOpen(false);
+  }, []);
+
+  const closeLeftPanel = useCallback(() => {
+    setLeftPanel(null);
+  }, []);
+
+  const toggleTopPanel = useCallback((id: TopToolbarPanelId) => {
+    setTopPanel((prev) => (prev === id ? null : id));
+    setLeftPanel(null);
+    setMainSidePanel(null);
+    setIsDiceOpen(false);
+  }, []);
+
+  const closeTopPanel = useCallback(() => {
+    setTopPanel(null);
   }, []);
 
   useEffect(() => {
@@ -2784,6 +3183,53 @@ export function LiveSessionBoard({
 
         void listBattlemapFogShapes(battlemapId, sessionId)
           .then((shapes) => setBattlemapFogShapes(shapes))
+          .catch(() => undefined);
+      })
+      .on("broadcast", { event: BATTLEMAP_EFFECT_CHANGED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as BattlemapEffectChangedDetail;
+        const battlemapId = raw.battlemapId != null ? String(raw.battlemapId) : "";
+        const currentId = liveStateRef.current?.active_battlemap_id ?? null;
+        if (!battlemapId || !currentId || battlemapId !== currentId) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+
+        const op = raw.op ?? "refresh";
+        if (op === "delete") {
+          const templateId = raw.templateId != null ? String(raw.templateId) : "";
+          if (templateId) {
+            setBattlemapEffectTemplates((prev) => prev.filter((t) => t.id !== templateId));
+            setSelectedEffectTemplateId((prev) => (prev === templateId ? null : prev));
+          }
+          return;
+        }
+
+        if (op === "upsert" && raw.template && typeof raw.template === "object") {
+          const row = raw.template as Record<string, unknown>;
+          const shapeRaw = String(row.shape ?? "rect");
+          const template: SessionBattlemapEffectTemplate = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            campaign_id: String(row.campaign_id),
+            shape: shapeRaw === "circle" ? "circle" : shapeRaw === "cone" ? "cone" : "rect",
+            grid_x: Math.round(Number(row.grid_x ?? 0)),
+            grid_y: Math.round(Number(row.grid_y ?? 0)),
+            grid_w: Math.max(1, Math.round(Number(row.grid_w ?? 1))),
+            grid_h: Math.max(1, Math.round(Number(row.grid_h ?? 1))),
+            direction_deg: Math.round(Number(row.direction_deg ?? 0)) % 360,
+            z_index: Math.round(Number(row.z_index ?? 0)),
+          };
+          setBattlemapEffectTemplates((prev) => {
+            const idx = prev.findIndex((t) => t.id === template.id);
+            if (idx < 0) return [...prev, template];
+            const next = [...prev];
+            next[idx] = template;
+            return next;
+          });
+          return;
+        }
+
+        void listBattlemapEffectTemplates(battlemapId, sessionId)
+          .then((templates) => setBattlemapEffectTemplates(templates))
           .catch(() => undefined);
       })
       .on("presence", { event: "sync" }, () => {
@@ -3055,6 +3501,32 @@ export function LiveSessionBoard({
     [allCampaignFactions, activeFactionIds],
   );
 
+  const stageRosterPreview = useMemo(() => {
+    const npcs = liveState?.loot_hide_npcs
+      ? []
+      : sortedActiveNpcs.map((n) => ({
+          id: `npc-${n.id}`,
+          name: n.name,
+          imageUrl: n.image_url,
+        }));
+    const creatures = activeCreatures.map((c) => ({
+      id: `creature-${c.id}`,
+      name: c.name,
+      imageUrl: c.image_url,
+    }));
+    const factions = activeFactions.map((f) => ({
+      id: `faction-${f.id}`,
+      name: f.name,
+      imageUrl: f.image_url ?? f.banner_url ?? null,
+    }));
+    return [...npcs, ...creatures, ...factions];
+  }, [
+    liveState?.loot_hide_npcs,
+    sortedActiveNpcs,
+    activeCreatures,
+    activeFactions,
+  ]);
+
   const stageHasDeckContent =
     sortedActiveNpcs.length > 0 ||
     activeFactions.length > 0 ||
@@ -3064,11 +3536,12 @@ export function LiveSessionBoard({
     () =>
       [...combatParticipants]
         .filter((participant) => participant.is_active)
-        .sort(compareCombatInitiative),
+        .sort(compareCombatHudOrder),
     [combatParticipants],
   );
+  const combatStarted = Boolean(liveState?.is_combat_mode && liveState?.combat_started);
   const activeCombatParticipant =
-    sortedCombatParticipants.length > 0
+    combatStarted && sortedCombatParticipants.length > 0
       ? sortedCombatParticipants[
           Math.min(
             Math.max(0, Number(liveState?.current_turn_index ?? 0) || 0),
@@ -3076,6 +3549,22 @@ export function LiveSessionBoard({
           )
         ]
       : null;
+  const activeTurnHighlight = useMemo(
+    () =>
+      combatStarted
+        ? resolveActiveCombatTurnHighlight(
+            activeCombatParticipant,
+            partyCharacters,
+            battlemapTokens,
+          )
+        : null,
+    [
+      combatStarted,
+      activeCombatParticipant,
+      partyCharacters,
+      battlemapTokens,
+    ],
+  );
   const combatParticipantNames = useMemo(
     () => new Set(combatParticipants.filter((p) => p.is_active).map((p) => p.name)),
     [combatParticipants],
@@ -3148,6 +3637,10 @@ export function LiveSessionBoard({
     () => factionStagePool.filter((f) => !activeFactionIds.has(String(f.id))),
     [factionStagePool, activeFactionIds],
   );
+
+  const showGmDeckHand =
+    isGM &&
+    (inHandNpcs.length > 0 || inHandFactions.length > 0 || inHandScenes.length > 0);
 
   const battlemapTrayNpcs = useMemo(() => npcStagePool, [npcStagePool]);
 
@@ -3538,14 +4031,95 @@ export function LiveSessionBoard({
       type: token.type,
       npc_id: token.npc_id ?? null,
       side: token.side ?? null,
-      initiative_value: 10,
-      initiative_label: "10",
+      initiative_value: 0,
+      initiative_label: null,
       sort_order: combatParticipants.length,
       image_url: token.image_url,
       is_active: true,
       conditions: [],
     });
-    if (error) alert(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${token.name} nimmt am Kampf teil.`);
+  }
+
+  function battlemapTokenToCombatPayload(
+    token: SessionBattlemapToken,
+  ): CombatTokenPayload | null {
+    if (token.character_id) {
+      const pc = partyCharacters.find((c) => c.id === token.character_id);
+      if (!pc || pc.isSessionDummy) return null;
+      return {
+        type: "player",
+        name: pc.name,
+        image_url: token.image_url || pc.avatar_url,
+      };
+    }
+    if (token.npc_id) {
+      const npc =
+        campaignNpcs.find((n) => String(n.id) === String(token.npc_id)) ?? null;
+      return {
+        type: "npc",
+        name: token.label || npc?.name || "NPC",
+        image_url: token.image_url || npc?.image_url || null,
+        npc_id: String(token.npc_id),
+        side: token.token_side === "hostile" ? "nemesis" : token.token_side === "friendly" || token.token_side === "party" ? "friend" : null,
+      };
+    }
+    const label = (token.label || "Kreatur").trim();
+    if (!label) return null;
+    return {
+      type: "monster",
+      name: label,
+      image_url: token.image_url,
+      side: token.token_side === "hostile" ? "nemesis" : null,
+    };
+  }
+
+  async function seedCombatParticipantsFromBattlemap() {
+    if (!isGM) return;
+
+    // Vorherige Runde zurücksetzen — frische Initiative
+    await ((supabase as any).from("combat_participants") as any)
+      .update({ is_active: false })
+      .eq("session_id", sessionId);
+
+    const payloads: CombatTokenPayload[] = [];
+    const seenNames = new Set<string>();
+    const seenNpcIds = new Set<string>();
+
+    for (const token of battlemapTokens) {
+      const payload = battlemapTokenToCombatPayload(token);
+      if (!payload) continue;
+      if (isCombatTokenUsed(payload, seenNames, seenNpcIds)) continue;
+      payloads.push(payload);
+      if (payload.type === "npc" && payload.npc_id) seenNpcIds.add(payload.npc_id);
+      else seenNames.add(payload.name);
+    }
+
+    setCombatParticipants([]);
+    if (payloads.length === 0) return;
+
+    const rows = payloads.map((token, index) => ({
+      session_id: sessionId,
+      name: token.name,
+      type: token.type,
+      npc_id: token.npc_id ?? null,
+      side: token.side ?? null,
+      initiative_value: 0,
+      initiative_label: null,
+      sort_order: index,
+      image_url: token.image_url,
+      is_active: true,
+      conditions: [],
+    }));
+
+    const { error } = await ((supabase as any).from("combat_participants") as any).insert(
+      rows,
+    );
+    if (error) toast.error(error.message);
   }
 
   function dragCombatToken(e: DragEvent<HTMLElement>, token: CombatTokenPayload) {
@@ -3587,7 +4161,68 @@ export function LiveSessionBoard({
     const { error } = await ((supabase as any).from("combat_participants") as any)
       .update(patch)
       .eq("id", participantId);
-    if (error) alert(error.message);
+    if (error) toast.error(error.message);
+  }
+
+  async function handleRollInitiative(participantId: string) {
+    setRollingInitiativeId(participantId);
+    try {
+      const result = await rollCombatInitiative({ sessionId, participantId });
+      setCombatParticipants((prev) =>
+        prev.map((p) =>
+          p.id === participantId
+            ? {
+                ...p,
+                initiative_value: result.total,
+                initiative_label: result.display,
+              }
+            : p,
+        ),
+      );
+      // Toast + HUD-Freigabe erst wenn der Würfel liegt.
+      pendingInitiativeToastRef.current = {
+        participantId,
+        display: result.display,
+      };
+      // Fallback falls keine Animation (z. B. ohne Faces)
+      window.setTimeout(() => {
+        const pending = pendingInitiativeToastRef.current;
+        if (!pending || pending.participantId !== participantId) return;
+        pendingInitiativeToastRef.current = null;
+        toast.success(`Initiative: ${pending.display}`);
+        setRollingInitiativeId((cur) => (cur === participantId ? null : cur));
+      }, 7000);
+    } catch (e) {
+      setRollingInitiativeId((cur) => (cur === participantId ? null : cur));
+      toast.error(e instanceof Error ? e.message : "Initiative-Wurf fehlgeschlagen.");
+    }
+  }
+
+  function beginCombatEncounter() {
+    if (!isGM) return;
+    const allRolled =
+      sortedCombatParticipants.length > 0 &&
+      sortedCombatParticipants.every((p) => hasRolledCombatInitiative(p));
+    if (!allRolled) {
+      toast.error("Alle Teilnehmer müssen zuerst Initiative würfeln.");
+      return;
+    }
+    updateLiveState({
+      combat_started: true,
+      current_turn_index: 0,
+      combat_round: 1,
+    });
+    writeSystemLog("combat_start", "Der Kampf beginnt — Initiative steht.");
+  }
+
+  function endCombatEncounter() {
+    if (!isGM) return;
+    updateLiveState({
+      is_combat_mode: false,
+      combat_started: false,
+      current_turn_index: 0,
+    });
+    writeSystemLog("combat_end", "Der Kampfmodus wird beendet.");
   }
 
   function nextCombatTurn() {
@@ -3603,199 +4238,65 @@ export function LiveSessionBoard({
     updateLiveState(patch);
   }
 
+  function prevCombatTurn() {
+    if (!isGM || sortedCombatParticipants.length === 0) return;
+    const current = Math.max(0, Number(liveStateRef.current?.current_turn_index ?? 0) || 0);
+    const length = sortedCombatParticipants.length;
+    const prevIndex = (current - 1 + length) % length;
+    const patch: Partial<LiveState> = { current_turn_index: prevIndex };
+    if (current === 0 && prevIndex === length - 1) {
+      patch.combat_round = Math.max(
+        1,
+        Math.max(1, Number(liveStateRef.current?.combat_round ?? 1) || 1) - 1,
+      );
+    }
+    updateLiveState(patch);
+  }
+
+  async function handlePlayerEndTurn() {
+    try {
+      const result = await advanceCombatTurn({
+        sessionId,
+        expectedParticipantId: activeCombatParticipant?.id,
+      });
+      setLiveState((prev) => {
+        if (!prev) return prev;
+        const next = {
+          ...prev,
+          current_turn_index: result.current_turn_index,
+          combat_round: result.combat_round,
+        };
+        liveStateRef.current = next;
+        return next;
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Zug konnte nicht beendet werden.");
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // UI
   // ---------------------------------------------------------------------------
   return (
-    <div className="relative isolate flex min-h-screen min-h-0 flex-col overflow-x-hidden bg-background-dark text-white">
+    <div
+      className={`relative flex min-h-screen min-h-0 flex-col bg-background-dark text-white ${
+        isGM && !forcePlayerView ? "pl-11" : "pl-20"
+      } ${isGuest ? "" : "pr-11"}`}
+    >
+      {showLoadingScreen ? (
+        <LiveSessionLoadingScreen
+          steps={preload.steps}
+          progress={preload.progress}
+          message={isGM ? "Spielwelt wird vorbereitet…" : "Der Spielleiter bereitet die Welt vor…"}
+        />
+      ) : null}
+      <AnimatePresence>
+        {combatStartFxActive && !showLoadingScreen ? (
+          <CombatStartVideoModal key={combatStartFxKey} onComplete={dismissCombatStartFx} />
+        ) : null}
+      </AnimatePresence>
       {/* Dark overlay for readability */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-linear-to-b from-background-dark via-emerald-950/90 to-black" />
-      {/* Top Bar: Exit Button */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/85 to-background-dark/95 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-        <div className="flex flex-col gap-1">
-          <div className="font-barlow text-sm uppercase text-gray-400">
-            {isGuest
-              ? `Gast · ${guestDisplayName ?? "Zuschauer"}`
-              : forcePlayerView
-                ? "Spieler-Monitor"
-                : isPrepMode
-                  ? "Session – Vorbereitung"
-                  : "Live Session Dashboard"}
-          </div>
-          {isGuest ? (
-            <p className="font-libre text-xs text-gray-400 max-w-xl">
-              Du nimmst als Gast teil (Platzhalter-Slot {guestSlotIndex ?? "—"}) — nur Anschauen, kein
-              Inventar und kein Handel.
-            </p>
-          ) : null}
-          {isPrepMode && (
-            <p className="font-libre text-xs text-accent-gold/90 max-w-xl">
-              Du gestaltest und testest den Tisch vor dem Start. Spieler sehen diese Ansicht erst,
-              wenn die Session live geht – unabhängig von Zu- oder Absagen.
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {!isGM && sessionStatus === "Live" && chronistTableMode ? (
-            <ChronicleRecordingTopBar
-              role="player"
-              transcriptionStatus={topBarTranscriptionStatus}
-            />
-          ) : null}
-          {isGM && chronistTableMode && (sessionStatus === "Live" || isPrepMode) ? (
-            <ChronicleRecordingTopBar
-              role="gm"
-              transcriptionStatus={topBarTranscriptionStatus}
-              showWhenIdle
-              onStartRecording={
-                sessionStatus === "Live"
-                  ? () => chronistStartFlowRef.current?.()
-                  : undefined
-              }
-              onStopRecording={
-                sessionStatus === "Live"
-                  ? () => chronistStopFlowRef.current?.()
-                  : undefined
-              }
-              onTogglePause={
-                sessionStatus === "Live"
-                  ? () => void chronicleRecorder.togglePause()
-                  : undefined
-              }
-              micActive={gmMicActive}
-              waveformLevels={
-                chronicleRecorder.localCaptureActive
-                  ? chronicleRecorder.waveformLevels
-                  : prepMicTest.waveformLevels
-              }
-              hasSignal={
-                chronicleRecorder.localCaptureActive
-                  ? chronicleRecorder.hasSignal
-                  : prepMicTest.hasSignal
-              }
-              peakLevel={
-                chronicleRecorder.localCaptureActive
-                  ? chronicleRecorder.peakLevel
-                  : prepMicTest.peakLevel
-              }
-              deviceLabel={
-                chronicleRecorder.localCaptureActive
-                  ? chronicleRecorder.deviceLabel
-                  : prepMicTest.deviceLabel
-              }
-              serverUploadedChunkCount={chronicleRecorder.serverUploadedChunkCount}
-              captureHealth={chronicleRecorder.captureHealth}
-            />
-          ) : null}
-          {isGM ? (
-            <button
-              type="button"
-              onClick={() => {
-                const starting = !liveState?.is_combat_mode;
-                updateLiveState({
-                  is_combat_mode: starting,
-                  current_turn_index: 0,
-                  combat_round: starting ? 1 : liveState?.combat_round ?? 1,
-                });
-                writeSystemLog(
-                  starting ? "combat_start" : "combat_end",
-                  starting
-                    ? "Der Spielleiter leitet einen Kampf ein."
-                    : "Der Kampfmodus wird beendet.",
-                );
-              }}
-              className={`inline-flex items-center gap-2 rounded-lg border-2 px-4 py-2 font-barlow text-xs font-extrabold uppercase tracking-wide transition-colors ${
-                liveState?.is_combat_mode
-                  ? "border-red-600 bg-red-950/70 text-red-100 shadow-[0_0_20px_rgba(127,29,29,0.45)] hover:bg-red-900/80"
-                  : "border-hero-vibrant/80 bg-emerald-950/90 text-hero-vibrant shadow-[0_0_18px_rgba(55,152,6,0.25)] hover:bg-emerald-900/95"
-              }`}
-            >
-              <Swords className="h-5 w-5 shrink-0" />
-              {liveState?.is_combat_mode ? "Combat beenden" : "Combat starten"}
-            </button>
-          ) : null}
-          {actualUserIsGM && !forcePlayerView && guestJoinUrl ? (
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard?.writeText(guestJoinUrl);
-                window.open(guestJoinUrl, "_blank", "noopener,noreferrer");
-              }}
-              className="inline-flex items-center gap-1 rounded border border-hero-border/60 bg-hero-vibrant/20 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-hero-vibrant hover:bg-hero-vibrant/30 transition-colors"
-              title="Gäste-Link kopieren und in neuem Tab öffnen (Foundry-Spieler ohne TH-Account)"
-            >
-              <Monitor className="h-4 w-4" />
-              Gäste-Link
-            </button>
-          ) : null}
-          {actualUserIsGM && !forcePlayerView && (
-            <button
-              type="button"
-              onClick={() =>
-                window.open(`${window.location.pathname}?mode=player`, "_blank")
-              }
-              className="inline-flex items-center gap-1 rounded border border-accent-gold/60 bg-accent-gold/15 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/25 transition-colors"
-            >
-              <Monitor className="h-4 w-4" />
-              Spieler-Monitor öffnen
-            </button>
-          )}
-          <a
-            href={`/dashboard/campaigns/${campaignId}?tab=lore`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded border border-amber-900/60 bg-background-dark px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-accent-gold hover:text-accent-gold transition-colors"
-          >
-            <ScrollText className="h-4 w-4" />
-            Lore
-            <ExternalLink className="h-3 w-3 opacity-60" />
-          </a>
-          {/* Quest Journal Toggle */}
-          {activeQuests.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowQuests((prev) => !prev)}
-              className={`hidden sm:inline-flex items-center gap-1 rounded border px-3 py-1.5 font-barlow font-bold uppercase text-[10px] transition-colors ${
-                showQuests
-                  ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
-                  : "border-amber-900/60 bg-background-dark text-gray-200 hover:border-accent-gold hover:text-accent-gold"
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              Quests
-            </button>
-          )}
-
-          {/* Session beenden (GM Only, nicht in Vorbereitung) */}
-          {isGM && !isPrepMode && (
-            <button
-              type="button"
-              onClick={() => setWrapUpOpen(true)}
-              disabled={isEnding}
-              className="inline-flex items-center gap-1 rounded border border-red-700 bg-red-900/60 px-3 py-1.5 font-barlow font-bold uppercase text-[10px] text-red-200 hover:bg-red-800/80 transition-colors disabled:opacity-50"
-            >
-              <Power className="h-4 w-4" />
-              Session beenden
-            </button>
-          )}
-
-          {/* Exit Button */}
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                isPrepMode
-                  ? `/dashboard/campaigns/${campaignId}?tab=sessions`
-                  : "/dashboard",
-              )
-            }
-            className="inline-flex items-center gap-2 rounded border border-red-700 bg-red-900/40 px-3 py-1.5 font-barlow font-bold uppercase text-xs text-red-200 hover:bg-red-800/70 transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            {isPrepMode ? "Zur Kampagne" : "Session verlassen"}
-          </button>
-        </div>
-      </div>
 
       {showChronistHealthBanner && chronistHealthBannerVariant ? (
         <ChronicleRecordingReminderBanner
@@ -3830,26 +4331,6 @@ export function LiveSessionBoard({
         />
       ) : null}
 
-      {isPrepMode && isGM && (
-        <div className="relative z-10 border-b border-accent-gold/30 bg-accent-gold/10 px-6 py-2">
-          <div className="flex flex-wrap items-center gap-2 font-libre text-xs text-accent-gold">
-            <span className="rounded border border-accent-gold/40 bg-background-dark/70 px-2 py-0.5 font-barlow font-bold uppercase tracking-wide">
-              Vorbereitungs-Modus
-            </span>
-            <span>Spieler haben noch keinen Zugriff. Wetter, Bühne, Journal, Inventar, Charakterblatt und Session-Chat kannst du hier bereits testen.</span>
-            <Link
-              href={`/session/${sessionId}?mode=player`}
-              className="rounded border border-accent-gold/50 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/15"
-            >
-              Spieleransicht testen
-            </Link>
-            {isLiveStateInitializing && (
-              <span className="text-gray-300">Session-Zustand wird initialisiert...</span>
-            )}
-          </div>
-        </div>
-      )}
-
       {liveStateLoadError && (
         <div className="relative z-10 border-b border-red-800/60 bg-red-950/45 px-6 py-2">
           <div className="flex flex-wrap items-center gap-2 font-libre text-xs text-red-200">
@@ -3868,571 +4349,197 @@ export function LiveSessionBoard({
       )}
 
       {/* Picture Frame Layout */}
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden p-3 md:p-5">
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-visible rounded-2xl border border-amber-900/60 bg-linear-to-b from-background-card/95 via-emerald-950/90 to-background-dark/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm">
-          <div className="border-b border-amber-900/50 bg-linear-to-r from-background-card/90 via-emerald-950/80 to-background-dark/90 px-4 py-3">
-            <div className="grid gap-3 xl:grid-cols-[minmax(260px,1.2fr)_minmax(160px,0.5fr)_minmax(280px,1.1fr)_auto] xl:items-start">
-              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:gap-4">
-                <div className="flex min-w-0 flex-1 gap-2">
-                  <MapPin className="mt-1 h-4 w-4 shrink-0 text-accent-gold" />
-                  {isGM ? (
-                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <div className="flex flex-wrap items-end gap-2">
-                      <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-                        <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                          Ort aus Lore
-                        </span>
-                        <select
-                          value={liveState?.current_location_lore_id || ""}
-                          onChange={(e) => changeSessionLocation(e.target.value)}
-                          className="w-full rounded border border-amber-900/60 bg-background-dark px-2 py-1.5 text-sm text-white focus:border-accent-gold outline-none"
-                        >
-                          <option value="" className="bg-white text-slate-950">
-                            — Kein Lore-Ort —
-                          </option>
-                          {loreLocationOptions.map((o) => (
-                            <option
-                              key={o.id}
-                              value={o.id}
-                              className="bg-white text-slate-950"
-                            >
-                              {o.name}
-                              {o.type ? ` (${o.type})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="flex min-w-[180px] flex-1 flex-col gap-1">
-                        <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                          Anzeigename
-                        </span>
-                        <input
-                          type="text"
-                          value={locationDraft}
-                          onChange={(e) => setLocationDraft(e.target.value)}
-                          onBlur={() =>
-                            updateLiveState({
-                              current_location: locationDraft.trim() || null,
-                            })
-                          }
-                          placeholder="z. B. Hinterraum der Taverne"
-                          className="w-full rounded border border-amber-900/60 bg-background-dark px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-accent-gold outline-none"
-                        />
-                      </label>
-                    </div>
-                    {liveState?.current_location_lore_id ? (
-                      <a
-                        href={`/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex w-fit items-center gap-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-accent-gold transition-colors"
-                      >
-                        <ScrollText className="h-3.5 w-3.5" />
-                        Lore-Eintrag öffnen
-                        <ExternalLink className="h-3 w-3 opacity-80" />
-                      </a>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                      Ort
-                    </span>
-                    <span className="font-libre text-sm text-gray-200 wrap-break-word">
-                      {liveState?.current_location || "Unbekannter Ort"}
-                    </span>
-                    {sessionLocationLoreReadable &&
-                    liveState?.current_location_lore_id ? (
-                      <a
-                        href={`/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex w-fit items-center gap-1.5 rounded border border-amber-900/60 bg-background-dark/80 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:border-accent-gold hover:text-accent-gold transition-colors"
-                      >
-                        <ScrollText className="h-3.5 w-3.5" />
-                        Ort in der Lore lesen
-                        <ExternalLink className="h-3 w-3 opacity-80" />
-                      </a>
-                    ) : null}
-                  </div>
-                )}
-                </div>
-                <div className="min-w-0 shrink-0 border-t border-amber-900/40 pt-3 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0 xl:max-w-[min(100%,28rem)]">
-                  <FateCoinsPool
-                    sessionId={sessionId}
-                    coins={liveState?.fate_coins ?? []}
-                    destroyedCount={liveState?.destroyed_fate_coins ?? 0}
-                    isGM={isGM}
-                    showControls={isGM}
-                    compact
-                    inlineHeader
-                    collapsibleGmSettings={isGM}
-                    gmSettingsOpen={fateGmSettingsOpen}
-                    onGmSettingsToggle={
-                      isGM ? () => setFateGmSettingsOpen((v) => !v) : undefined
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 rounded border border-amber-900/60 bg-[#132e1b] px-3 py-2">
-                <Clock className="h-4 w-4 shrink-0 text-accent-gold" />
-                {isGM ? (
-                  <label className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                      Tageszeit
-                    </span>
-                    <select
-                      value={dayPhase}
-                      onChange={(e) =>
-                        updateLiveState({
-                          current_time: sessionDayPhaseLabel(
-                            e.target.value as SessionDayPhase,
-                          ),
-                        })
-                      }
-                      className="w-full rounded border border-amber-900/60 bg-[#0a1f10] px-2 py-1.5 text-sm text-white focus:border-accent-gold outline-none"
-                    >
-                      {SESSION_DAY_PHASE_ORDER.map((phase) => (
-                        <option
-                          key={phase}
-                          value={phase}
-                          className="bg-white text-slate-950"
-                        >
-                          {sessionDayPhaseLabel(phase)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <span className="font-libre text-sm text-gray-200">
-                    {sessionDayPhaseLabel(dayPhase)}
+      <div
+        className={`relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 pt-3 md:px-5 md:pt-5 ${
+          showGmDeckHand
+            ? stageDeckHandOpen
+              ? "pb-64"
+              : "pb-20"
+            : "pb-3 md:pb-5"
+        }`}
+      >
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-2xl border border-amber-900/60 bg-linear-to-b from-background-card/95 via-emerald-950/90 to-background-dark/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+          <LiveSessionTopToolbar
+            isGM={isGM && !forcePlayerView}
+            panel={topPanel}
+            onToggle={toggleTopPanel}
+            onClose={closeTopPanel}
+            locationLabel={liveState?.current_location || "Unbekannter Ort"}
+            locationLoreHref={
+              sessionLocationLoreReadable && liveState?.current_location_lore_id
+                ? `/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`
+                : null
+            }
+            locationContent={
+              <div className="flex flex-col gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                    Ort aus Lore
                   </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap justify-end gap-2">
-                {isUpdating && (
-                  <span className="self-center font-libre text-xs text-gray-500">
-                    Änderungen werden übertragen...
-                  </span>
-                )}
-                {isGM && (
-                  <>
-                    <Link
-                      href={stagePrepHref}
-                      className="inline-flex items-center gap-1 rounded border border-accent-gold/50 bg-accent-gold/10 px-3 py-2 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:bg-accent-gold/20 transition-colors"
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                      Bühne vorbereiten
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setIsStageManagerOpen(true)}
-                      className="inline-flex items-center gap-1 rounded border border-amber-900/60 bg-background-dark px-3 py-2 font-barlow font-bold uppercase text-[10px] text-gray-200 hover:border-accent-gold hover:text-white transition-colors"
-                    >
-                      Stage live
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNpcSearchModalOpen(true)}
-                      className="inline-flex items-center gap-1 rounded border border-hero-border/50 bg-background-dark px-3 py-2 font-barlow font-bold uppercase text-[10px] text-accent-gold hover:border-accent-gold transition-colors"
-                      title="NPCs suchen und auf die Bühne legen"
-                    >
-                      <Search className="h-3.5 w-3.5" />
-                      NPCs
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBeastSearchModalOpen(true)}
-                      className="inline-flex items-center gap-1 rounded border border-emerald-900/50 bg-background-dark px-3 py-2 font-barlow font-bold uppercase text-[10px] text-emerald-300 hover:border-emerald-500 transition-colors"
-                      title="Kreaturen aus dem Bestarium auf die Bühne legen"
-                    >
-                      <Swords className="h-3.5 w-3.5" />
-                      Biester
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid min-h-0 grid-cols-1 overflow-visible lg:grid-cols-[13rem_minmax(0,1fr)]">
-            <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto border-b border-amber-900/50 bg-linear-to-b from-background-card/90 via-emerald-950/85 to-background-dark/95 p-4 pb-44 lg:border-b-0 lg:border-r">
-              <GmSlideSettingsPanel
-                isGM={isGM}
-                open={weatherGmSettingsOpen}
-                onToggle={() => setWeatherGmSettingsOpen((v) => !v)}
-                settingsLabel="Wetter auswählen"
-                modalSize="lg"
-                preview={
-                  <div
-                    className="flex min-h-36 items-center justify-center p-2"
-                    title={weatherVisual.label}
-                    aria-label={`Wetter: ${weatherVisual.label}`}
+                  <select
+                    value={liveState?.current_location_lore_id || ""}
+                    onChange={(e) => changeSessionLocation(e.target.value)}
+                    className="w-full rounded border border-amber-900/60 bg-background-dark px-2 py-1.5 text-sm text-white outline-none focus:border-accent-gold"
                   >
-                    <WeatherPngIcon
-                      option={weatherVisual}
-                      sizeClassName="h-28 w-28 md:h-36 md:w-36"
-                    />
-                  </div>
-                }
-                previewClassName="w-full"
-              >
-                <div className="grid grid-cols-4 gap-3">
-                  {WEATHER_ICON_OPTIONS.map((option) => {
-                    const active = weatherVisual.id === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => {
-                          const intensity =
-                            normalizeIntensity(liveState?.weather_intensity) ?? 2;
-                          const summary = formatWeatherSummary(
-                            option.id,
-                            intensity,
-                            liveState?.weather_temperature ?? null,
-                            null,
-                          );
-                          updateLiveState({
-                            weather_preset: option.id,
-                            weather_intensity: intensity,
-                            weather: summary,
-                          });
-                          const logByWeather: Partial<Record<WeatherPresetId, string>> = {
-                            sun: "Die Wolken reißen auf und goldene Sonnenstrahlen brechen hervor.",
-                            rain: "Ein feiner Nieselregen beginnt, die Welt in Grau zu hüllen.",
-                            storm: "Ein heftiger Sturm peitscht auf und das Heulen des Windes wird ohrenbetäubend.",
-                          };
-                          if (logByWeather[option.id]) {
-                            writeSystemLog("weather_change", logByWeather[option.id]!);
-                          }
-                        }}
-                        className={`flex items-center justify-center bg-transparent p-0 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${
-                          active
-                            ? "scale-110 drop-shadow-[0_0_10px_rgba(202,185,38,0.8)]"
-                            : "opacity-80 hover:opacity-100"
-                        }`}
-                        title={option.label}
-                        aria-label={`Wetter auf ${option.label} setzen`}
+                    <option value="" className="bg-white text-slate-950">
+                      — Kein Lore-Ort —
+                    </option>
+                    {loreLocationOptions.map((o) => (
+                      <option
+                        key={o.id}
+                        value={o.id}
+                        className="bg-white text-slate-950"
                       >
-                        <WeatherPngIcon option={option} sizeClassName="h-14 w-14" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </GmSlideSettingsPanel>
+                        {o.name}
+                        {o.type ? ` (${o.type})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                    Anzeigename
+                  </span>
+                  <input
+                    type="text"
+                    value={locationDraft}
+                    onChange={(e) => setLocationDraft(e.target.value)}
+                    onBlur={() =>
+                      updateLiveState({
+                        current_location: locationDraft.trim() || null,
+                      })
+                    }
+                    placeholder="z. B. Hinterraum der Taverne"
+                    className="w-full rounded border border-amber-900/60 bg-background-dark px-2 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-accent-gold"
+                  />
+                </label>
+                {liveState?.current_location_lore_id ? (
+                  <a
+                    href={`/dashboard/campaigns/${campaignId}/lore/${liveState.current_location_lore_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-accent-gold"
+                  >
+                    <ScrollText className="h-3.5 w-3.5" />
+                    Lore-Eintrag öffnen
+                    <ExternalLink className="h-3 w-3 opacity-80" />
+                  </a>
+                ) : null}
 
-              <div className="flex items-center justify-center py-1">
-                <SessionDayPhaseIndicator phase={dayPhase} />
               </div>
-
-              {isGM && isPrepMode ? (
-                <>
-                  <SessionChronistModeControl
-                    sessionId={sessionId}
-                    initialMode={activeTranscriptionMode}
-                    variant="sidebar"
-                    onModeChange={setActiveTranscriptionMode}
-                  />
-                  {chronistTableMode ? (
-                    <ChronicleMicTestPanel variant="sidebar" monitor={prepMicTest} />
-                  ) : null}
-                </>
-              ) : null}
-
-              {isGM && sessionStatus === "Live" && !chronistTableMode ? (
-                <div className="rounded border border-amber-900/50 bg-amber-950/30 p-3 space-y-2">
-                  <p className="font-libre text-xs text-amber-100/90">
-                    Chronist-Aufnahme ist nur im <strong>Tisch-Modus</strong> verfügbar
-                    (Jitsi folgt später). Bitte Modus wechseln:
-                  </p>
-                  <SessionChronistModeControl
-                    sessionId={sessionId}
-                    initialMode={activeTranscriptionMode}
-                    variant="sidebar"
-                    onModeChange={setActiveTranscriptionMode}
-                  />
-                </div>
-              ) : null}
-
-              {isGM && sessionStatus === "Live" && chronistTableMode ? (
-                <ChronicleRecorderPanel
-                  sessionId={sessionId}
-                  plannedMode={activeTranscriptionMode}
-                  recorder={chronicleRecorder}
-                  panelOpen={chronistPanelOpen}
-                  onPanelOpenChange={setChronistPanelOpen}
-                  registerStartFlow={(fn) => {
-                    chronistStartFlowRef.current = fn;
-                  }}
-                  registerStopFlow={(fn) => {
-                    chronistStopFlowRef.current = fn;
-                  }}
-                  registerSettingsFlow={(fn) => {
-                    chronistSettingsFlowRef.current = fn;
-                  }}
-                />
-              ) : null}
-
-              {isGM && sessionStatus === "Live" && chronistTableMode ? (
-                <ChronicleInboxFeed
-                  campaignId={campaignId}
-                  sessionId={sessionId}
-                  worldId={worldId}
-                  variant="compact"
-                  npcNames={allCampaignNpcs.map((n) => ({
-                    id: n.id,
-                    name: n.name,
-                  }))}
-                />
-              ) : null}
-
-              {isGM ? (
-                <GmSlideSettingsPanel
-                  variant="beside"
-                  isGM
-                  open={tempGmSettingsOpen}
-                  onToggle={() => setTempGmSettingsOpen((v) => !v)}
-                  settingsLabel="Temperatur anpassen"
-                  preview={
-                    <div
-                      className="relative h-72 w-32 shrink-0 overflow-hidden"
-                      title="Thermometer"
-                      aria-label="Thermometer"
-                    >
-                      <div className="absolute bottom-[29%] left-1/2 z-0 h-[49%] w-[12%] -translate-x-1/2 overflow-hidden rounded-full">
-                        <motion.div
-                          className="absolute bottom-0 left-0 w-full rounded-full shadow-[0_0_18px_rgba(239,68,68,0.65)]"
-                          animate={{ height: `${getTemperatureFillPercent(temperatureValue)}%` }}
-                          transition={{ type: "spring", damping: 28, stiffness: 180 }}
-                          style={{
-                            background: getThermometerFillColor(temperatureValue),
-                          }}
-                        />
-                      </div>
-                      <Image
-                        src="/images/Session_ui/thermometer_frei.png"
-                        alt=""
-                        fill
-                        sizes="96px"
-                        className="pointer-events-none absolute inset-0 z-10 object-contain"
-                        priority={false}
-                      />
-                    </div>
+            }
+            fateCount={(liveState?.fate_coins ?? []).length}
+            fateContent={
+              <FateCoinsPool
+                sessionId={sessionId}
+                coins={liveState?.fate_coins ?? []}
+                destroyedCount={liveState?.destroyed_fate_coins ?? 0}
+                isGM
+                showControls
+                compact
+                inlineHeader
+                collapsibleGmSettings
+                gmSettingsOpen={fateGmSettingsOpen}
+                onGmSettingsToggle={() => setFateGmSettingsOpen((v) => !v)}
+              />
+            }
+            playerFateHud={
+              <FateCoinsPool
+                sessionId={sessionId}
+                coins={liveState?.fate_coins ?? []}
+                destroyedCount={liveState?.destroyed_fate_coins ?? 0}
+                variant="hud"
+              />
+            }
+            combatActive={!!liveState?.is_combat_mode}
+            onToggleCombat={() => {
+              const starting = !liveState?.is_combat_mode;
+              if (starting) {
+                updateLiveState({
+                  is_combat_mode: true,
+                  combat_started: false,
+                  current_turn_index: 0,
+                  combat_round: 1,
+                });
+                writeSystemLog(
+                  "combat_start",
+                  "Der Spielleiter leitet einen Kampf ein — Initiative würfeln!",
+                );
+                void seedCombatParticipantsFromBattlemap();
+              } else {
+                endCombatEncounter();
+              }
+            }}
+            onOpenNpcs={() => setNpcSearchModalOpen(true)}
+            onOpenBeasts={() => setBeastSearchModalOpen(true)}
+            stageRosterOpen={stageDeckHandOpen}
+            stageRosterCount={
+              inHandNpcs.length + inHandFactions.length + inHandScenes.length
+            }
+            onToggleStageRoster={() => setStageDeckHandOpen((v) => !v)}
+            onOpenStageLive={() => setIsStageManagerOpen(true)}
+            stagePrepHref={stagePrepHref}
+            loreHref={`/dashboard/campaigns/${campaignId}?tab=lore`}
+            onOpenPlayerMonitor={
+              actualUserIsGM && !forcePlayerView
+                ? () =>
+                    window.open(`${window.location.pathname}?mode=player`, "_blank")
+                : undefined
+            }
+            onOpenGuestLink={
+              actualUserIsGM && !forcePlayerView && guestJoinUrl
+                ? () => {
+                    void navigator.clipboard?.writeText(guestJoinUrl);
+                    window.open(guestJoinUrl, "_blank", "noopener,noreferrer");
                   }
-                >
-                  <div className="flex min-w-0 flex-col gap-3">
-                    <div className="flex flex-wrap items-end justify-between gap-2 border-b border-white/15 pb-2">
-                      <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
-                        Aktuell (Live)
-                      </span>
-                      <span className="font-barlow text-xl font-extrabold text-accent-gold">
-                        {temperatureValue} °C
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-barlow text-[10px] font-bold uppercase text-gray-500">
-                        Regler
-                      </span>
-                      <span className="font-barlow text-sm font-extrabold text-accent-gold">
-                        {temperatureDraft} °C
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={TEMPERATURE_MIN}
-                      max={TEMPERATURE_MAX}
-                      value={temperatureDraft}
-                      onChange={(e) =>
-                        setTemperatureDraft(normalizeTemperatureValue(e.target.value))
-                      }
-                      onMouseUp={() => commitTemperatureValue()}
-                      onTouchEnd={() => commitTemperatureValue()}
-                      onKeyUp={() => commitTemperatureValue()}
-                      onBlur={() => commitTemperatureValue()}
-                      className="h-2 w-full min-w-[10rem] cursor-pointer appearance-none rounded-full bg-background-dark/80 accent-accent-gold outline-none"
-                    />
-                  </div>
-                </GmSlideSettingsPanel>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <div
-                    className="relative h-72 w-32 overflow-hidden"
-                    title={`Temperatur: ${temperatureValue} °C`}
-                    aria-label={`Temperatur: ${temperatureValue} Grad Celsius`}
-                  >
-                    <div className="absolute bottom-[29%] left-1/2 z-0 h-[49%] w-[12%] -translate-x-1/2 overflow-hidden rounded-full">
-                      <motion.div
-                        className="absolute bottom-0 left-0 w-full rounded-full shadow-[0_0_18px_rgba(239,68,68,0.65)]"
-                        animate={{ height: `${getTemperatureFillPercent(temperatureValue)}%` }}
-                        transition={{ type: "spring", damping: 28, stiffness: 180 }}
-                        style={{
-                          background: getThermometerFillColor(temperatureValue),
-                        }}
-                      />
-                    </div>
-                    <Image
-                      src="/images/Session_ui/thermometer_frei.png"
-                      alt=""
-                      fill
-                      sizes="96px"
-                      className="pointer-events-none absolute inset-0 z-10 object-contain"
-                      priority={false}
-                    />
-                    <span className="absolute inset-x-0 bottom-[10%] z-20 text-center font-barlow text-lg font-extrabold uppercase tracking-wide text-accent-gold drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
-                      {temperatureValue} °C
-                    </span>
-                  </div>
-                </div>
-              )}
+                : undefined
+            }
+            questCount={activeQuests.length}
+            questsOpen={showQuests}
+            onToggleQuests={
+              activeQuests.length > 0 ? () => setShowQuests((prev) => !prev) : undefined
+            }
+            onEndSession={
+              isGM && !isPrepMode ? () => setWrapUpOpen(true) : undefined
+            }
+            sessionEnding={isEnding}
+            onExit={() =>
+              router.push(
+                isPrepMode
+                  ? `/dashboard/campaigns/${campaignId}?tab=sessions`
+                  : "/dashboard",
+              )
+            }
+            exitLabel={isPrepMode ? "Zurück zur Kampagne" : "Session verlassen"}
+            isPrepMode={isPrepMode}
+            initializing={isLiveStateInitializing}
+            statusLabel={
+              isGuest
+                ? `Gast · ${guestDisplayName ?? "Zuschauer"}`
+                : forcePlayerView
+                  ? "Spieler-Monitor"
+                  : !(isGM && !forcePlayerView)
+                    ? "Live Session"
+                    : null
+            }
+            statusHint={
+              isGuest
+                ? `Platzhalter-Slot ${guestSlotIndex ?? "—"} — nur Anschauen`
+                : null
+            }
+            playerExtra={
+              !isGM && sessionStatus === "Live" && chronistTableMode ? (
+                <ChronicleRecordingTopBar
+                  role="player"
+                  transcriptionStatus={topBarTranscriptionStatus}
+                />
+              ) : null
+            }
+          />
 
-              {isGM && (
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleMainSidePanel("travel")}
-                    className="flex w-full min-h-[4.5rem] items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-left backdrop-blur-md transition-colors hover:border-accent-gold/40 hover:bg-white/[0.12]"
-                  >
-                    <Map className="h-10 w-10 shrink-0 text-accent-gold" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold">
-                        Reise &amp; FAP
-                      </span>
-                      <span className="mt-0.5 block font-libre text-[11px] leading-snug text-gray-400">
-                        Großes Fenster: Reisetage, Gruppe, Rationen — nicht mehr in der schmalen Leiste.
-                      </span>
-                    </span>
-                  </button>
-
-                  <GmSlideSettingsPanel
-                    isGM
-                    open={tablePresenceGmSettingsOpen}
-                    onToggle={() => setTablePresenceGmSettingsOpen((v) => !v)}
-                    settingsLabel="Spieler physisch am Tisch"
-                    modalSize="lg"
-                    preview={
-                      <div className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-md">
-                        <Armchair className="h-10 w-10 text-accent-gold" aria-hidden />
-                        <span className="font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-400">
-                          Vor Ort
-                        </span>
-                      </div>
-                    }
-                    previewClassName="w-full"
-                  >
-                    <p className="font-libre mb-3 text-xs leading-relaxed text-gray-300">
-                      Bei Hybridrunden: Wenn jemand physisch am Tisch sitzt, aber keinen Browser offen hat
-                      (z.&nbsp;B. nur der Online-Slot ist belegt), markiere den Charakter hier — das
-                      Portrait wird dann nicht mehr ausgegraut.
-                    </p>
-                    <ul className="max-h-56 space-y-2 overflow-y-auto">
-                      {partyCharacters
-                        .filter((pc) => pc.playerUserId)
-                        .map((pc) => {
-                          const uid = String(pc.playerUserId);
-                          const marked = physicallyPresentIdSet.has(uid);
-                          return (
-                            <li
-                              key={pc.id}
-                              className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-background-dark/60 px-3 py-2"
-                            >
-                              <span className="min-w-0 truncate font-barlow text-sm font-bold text-gray-200">
-                                {pc.name}
-                              </span>
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={marked}
-                                aria-label={
-                                  marked
-                                    ? `Markierung „Am Tisch“ für ${pc.name} aufheben`
-                                    : `${pc.name} als physisch am Tisch anwesend markieren`
-                                }
-                                onClick={() => {
-                                  const cur = new Set(
-                                    normalizePhysicallyPresentUserIds(
-                                      liveStateRef.current?.physically_present_user_ids,
-                                    ),
-                                  );
-                                  if (cur.has(uid)) cur.delete(uid);
-                                  else cur.add(uid);
-                                  updateLiveState({
-                                    physically_present_user_ids: Array.from(cur),
-                                  });
-                                }}
-                                className={`shrink-0 rounded-md border px-2.5 py-1.5 font-barlow text-[10px] font-bold uppercase transition-colors ${
-                                  marked
-                                    ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
-                                    : "border-white/20 text-gray-400 hover:border-accent-gold hover:text-accent-gold"
-                                }`}
-                              >
-                                {marked ? "Markierung aufheben" : "Am Tisch anwesend"}
-                              </button>
-                            </li>
-                          );
-                        })}
-                    </ul>
-                    {partyCharacters.filter((pc) => pc.playerUserId).length === 0 ? (
-                      <p className="font-libre text-xs text-gray-500">
-                        Keine Charaktere mit verknüpftem Spieler-Account in der Gruppe.
-                      </p>
-                    ) : null}
-                  </GmSlideSettingsPanel>
-
-                  <div className="rounded-xl border border-white/15 bg-white/5 p-3 backdrop-blur-md">
-                    <div className="mb-2 flex items-start gap-2">
-                      <UserRound className="h-8 w-8 shrink-0 text-accent-gold" aria-hidden />
-                      <div className="min-w-0">
-                        <p className="font-barlow text-[10px] font-extrabold uppercase text-accent-gold">
-                          Platzhalter-Spieler
-                        </p>
-                        <p className="font-libre text-[10px] leading-snug text-gray-500">
-                          Bis zu drei zusätzliche Portraits (Spieler 1–3) ohne Registrierung — nur
-                          Anzeige, kein Rucksack, kein Chronik-Eintrag.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-center gap-4">
-                      <button
-                        type="button"
-                        disabled={dummyPlayerCountLive <= 0 || isUpdating}
-                        onClick={() =>
-                          updateLiveState({
-                            dummy_player_count: Math.max(0, dummyPlayerCountLive - 1),
-                          })
-                        }
-                        className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label="Platzhalter entfernen"
-                      >
-                        −
-                      </button>
-                      <span className="min-w-[3.5rem] text-center font-barlow text-sm font-extrabold text-accent-gold">
-                        {dummyPlayerCountLive} / 3
-                      </span>
-                      <button
-                        type="button"
-                        disabled={dummyPlayerCountLive >= 3 || isUpdating}
-                        onClick={() =>
-                          updateLiveState({
-                            dummy_player_count: Math.min(3, dummyPlayerCountLive + 1),
-                          })
-                        }
-                        className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label="Platzhalter hinzufügen"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-            </aside>
-
+          <div className="relative min-h-0 h-full overflow-visible">
             <div
-              className={`relative min-h-[calc(48vh+120px)] overflow-x-hidden bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
+              className={`relative h-full min-h-0 overflow-x-hidden bg-slate-950 bg-cover bg-center transition-shadow duration-200 ${
                 battlemapActive ? "overflow-hidden" : "overflow-y-auto"
               } ${
                 stageDropHighlight
@@ -4477,6 +4584,7 @@ export function LiveSessionBoard({
                 tokens={visibleBattlemapTokens}
                 props={visibleBattlemapProps}
                 fogShapes={battlemapFogShapes}
+                effectTemplates={battlemapEffectTemplates}
                 isGm={isGM}
                 characterPlacement={tokenPlacement}
                 gmTokenPlacement={gmTokenPlacement}
@@ -4485,6 +4593,8 @@ export function LiveSessionBoard({
                 selectedPropId={selectedBattlemapPropId}
                 selectedFogShapeId={selectedFogShapeId}
                 fogTool={isGM ? fogTool : null}
+                effectTool={isGM ? effectTool : null}
+                selectedEffectTemplateId={selectedEffectTemplateId}
                 onCancelPlacement={() => {
                   setTokenPlacement(null);
                   setGmTokenPlacement(null);
@@ -4500,6 +4610,7 @@ export function LiveSessionBoard({
                   setSelectedBattlemapTokenId(id);
                   setSelectedBattlemapPropId(null);
                   setSelectedFogShapeId(null);
+                  setSelectedEffectTemplateId(null);
                   if (id && isGM) {
                     const token = battlemapTokens.find((t) => t.id === id);
                     if (token && !token.character_id) {
@@ -4515,6 +4626,7 @@ export function LiveSessionBoard({
                   setSelectedBattlemapPropId(id);
                   setSelectedBattlemapTokenId(null);
                   setSelectedFogShapeId(null);
+                  setSelectedEffectTemplateId(null);
                   setGmMoveTokenId(null);
                   setGmTokenPlacement(null);
                 }}
@@ -4522,6 +4634,14 @@ export function LiveSessionBoard({
                   setSelectedFogShapeId(id);
                   setSelectedBattlemapTokenId(null);
                   setSelectedBattlemapPropId(null);
+                  setSelectedEffectTemplateId(null);
+                  setGmMoveTokenId(null);
+                }}
+                onSelectEffectTemplate={(id) => {
+                  setSelectedEffectTemplateId(id);
+                  setSelectedBattlemapTokenId(null);
+                  setSelectedBattlemapPropId(null);
+                  setSelectedFogShapeId(null);
                   setGmMoveTokenId(null);
                 }}
                 onFogShapeCreate={(input) => {
@@ -4583,6 +4703,81 @@ export function LiveSessionBoard({
                     }
                   });
                 }}
+                onFogShapeDelete={handleFogShapeDelete}
+                onFogToolCancel={() => {
+                  setFogTool(null);
+                  setSelectedFogShapeId(null);
+                }}
+                onEffectTemplateCreate={(input) => {
+                  if (!activeBattlemapId || !isGM) return;
+                  startTransition(async () => {
+                    try {
+                      const created = await createBattlemapEffectTemplate({
+                        sessionId,
+                        battlemapId: activeBattlemapId,
+                        shape: input.shape,
+                        gridX: input.gridX,
+                        gridY: input.gridY,
+                        gridW: input.gridW,
+                        gridH: input.gridH,
+                        directionDeg: input.directionDeg,
+                      });
+                      setBattlemapEffectTemplates((prev) => {
+                        if (prev.some((t) => t.id === created.id)) return prev;
+                        return [...prev, created];
+                      });
+                      setSelectedEffectTemplateId(created.id);
+                      notifyBattlemapEffectChanged({ op: "upsert", template: created });
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Effekt-Schablone konnte nicht erstellt werden.",
+                      );
+                    }
+                  });
+                }}
+                onEffectTemplateMove={(templateId, gridX, gridY) => {
+                  if (!isGM) return;
+                  const prev = battlemapEffectTemplates.find((t) => t.id === templateId);
+                  if (!prev || (prev.grid_x === gridX && prev.grid_y === gridY)) return;
+                  setBattlemapEffectTemplates((list) =>
+                    list.map((t) =>
+                      t.id === templateId ? { ...t, grid_x: gridX, grid_y: gridY } : t,
+                    ),
+                  );
+                  startTransition(async () => {
+                    try {
+                      const updated = await updateBattlemapEffectTemplate({
+                        sessionId,
+                        templateId,
+                        gridX,
+                        gridY,
+                      });
+                      setBattlemapEffectTemplates((list) =>
+                        list.map((t) => (t.id === updated.id ? updated : t)),
+                      );
+                      notifyBattlemapEffectChanged({ op: "upsert", template: updated });
+                    } catch (e) {
+                      if (prev) {
+                        setBattlemapEffectTemplates((list) =>
+                          list.map((t) => (t.id === templateId ? prev : t)),
+                        );
+                      }
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Effekt-Schablone konnte nicht verschoben werden.",
+                      );
+                    }
+                  });
+                }}
+                onEffectTemplateDelete={handleEffectTemplateDelete}
+                onEffectToolCancel={() => {
+                  setEffectTool(null);
+                  setSelectedEffectTemplateId(null);
+                }}
+                onTokenMove={handleBattlemapTokenMove}
                 onPropDrop={handleBattlemapPropDrop}
                 onPropResize={handleBattlemapPropResize}
                 onToggleTokenVisibility={(tokenId, visible) => {
@@ -4643,6 +4838,7 @@ export function LiveSessionBoard({
                   });
                 }}
                 hpByRef={battlemapTokenHpByRef}
+                activeTurnHighlight={activeTurnHighlight}
                 ownCharacterId={currentPlayerCharacter?.id ?? null}
                 characterDisplayUrlById={characterDisplayUrlById}
                 characterConditionsById={characterConditionsById}
@@ -4698,76 +4894,6 @@ export function LiveSessionBoard({
                       }
                     : undefined
                 }
-              />
-            ) : null}
-            {isGM && battlemapActive ? (
-              <BattlemapFogToolbar
-                tool={fogTool}
-                selectedShapeId={selectedFogShapeId}
-                onToolChange={(tool) => {
-                  setFogTool(tool);
-                  if (tool) {
-                    setTokenPlacement(null);
-                    setGmTokenPlacement(null);
-                    setGmMoveTokenId(null);
-                    setSelectedBattlemapTokenId(null);
-                    setSelectedBattlemapPropId(null);
-                  }
-                  if (tool !== "select") setSelectedFogShapeId(null);
-                }}
-                onDeleteSelected={() => {
-                  if (!selectedFogShapeId) return;
-                  const shapeId = selectedFogShapeId;
-                  startTransition(async () => {
-                    try {
-                      await removeBattlemapFogShape(shapeId, sessionId);
-                      setBattlemapFogShapes((prev) => prev.filter((s) => s.id !== shapeId));
-                      setSelectedFogShapeId(null);
-                      notifyBattlemapFogChanged({ op: "delete", shapeId });
-                      toast.success("Fog-Fläche entfernt.");
-                    } catch (e) {
-                      toast.error(
-                        e instanceof Error ? e.message : "Fog-Fläche konnte nicht gelöscht werden.",
-                      );
-                    }
-                  });
-                }}
-              />
-            ) : null}
-            {isGM ? (
-              <BattlemapGmToolbar
-                sessionId={sessionId}
-                battlemaps={sessionBattlemaps}
-                activeBattlemapId={activeBattlemapId}
-                movementPaused={liveState?.battlemap_movement_paused === true}
-                onActiveChange={(id) => {
-                  setLiveState((prev) => {
-                    if (!prev) return prev;
-                    const next = normalizeLiveRow({ ...prev, active_battlemap_id: id });
-                    liveStateRef.current = next;
-                    return next;
-                  });
-                  if (!id) {
-                    setTokenPlacement(null);
-                    setGmTokenPlacement(null);
-                    setGmMoveTokenId(null);
-                    setSelectedBattlemapTokenId(null);
-                    setSelectedBattlemapPropId(null);
-                    setSelectedFogShapeId(null);
-                    setFogTool(null);
-                  }
-                }}
-                onMovementPausedChange={(paused) => {
-                  setLiveState((prev) => {
-                    if (!prev) return prev;
-                    const next = normalizeLiveRow({
-                      ...prev,
-                      battlemap_movement_paused: paused,
-                    });
-                    liveStateRef.current = next;
-                    return next;
-                  });
-                }}
               />
             ) : null}
             {isGM && battlemapActive ? (
@@ -4872,145 +4998,51 @@ export function LiveSessionBoard({
               ) : null}
             </div>
             {liveState?.is_combat_mode ? (
-              <div className="absolute inset-x-4 top-4 z-20">
-                <CombatInitiativeBar
+              <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-3">
+                <CombatInitiativeHud
                   participants={sortedCombatParticipants}
-                  activeParticipantId={activeCombatParticipant?.id ?? null}
+                  combatStarted={combatStarted}
                   combatRound={Math.max(1, Number(liveState?.combat_round ?? 1) || 1)}
                   currentTurnIndex={Math.max(
                     0,
                     Number(liveState?.current_turn_index ?? 0) || 0,
                   )}
+                  activeParticipantId={activeCombatParticipant?.id ?? null}
                   isGM={isGM}
+                  ownCharacterName={currentPlayerCharacter?.name ?? null}
+                  rollingParticipantId={rollingInitiativeId}
+                  onRollInitiative={handleRollInitiative}
+                  onStartCombat={beginCombatEncounter}
+                  onEndCombat={endCombatEncounter}
+                  onEndTurn={handlePlayerEndTurn}
+                  onPrevTurn={prevCombatTurn}
                   onNextTurn={nextCombatTurn}
-                  onUpdateParticipant={updateCombatParticipant}
-                  onDropToken={dropCombatToken}
+                  onUpdateInitiative={async (participantId, label) => {
+                    try {
+                      await setCombatInitiative({
+                        sessionId,
+                        participantId,
+                        initiativeLabel: label,
+                      });
+                      const parsed = parseInitiativeLabel(label);
+                      setCombatParticipants((prev) =>
+                        prev.map((p) =>
+                          p.id === participantId
+                            ? {
+                                ...p,
+                                initiative_value: parsed.base,
+                                initiative_label: parsed.display,
+                              }
+                            : p,
+                        ),
+                      );
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Initiative konnte nicht gespeichert werden.",
+                      );
+                    }
+                  }}
                 />
-                {isGM ? (
-                  <div className="mt-2 rounded-2xl border border-amber-900/45 bg-background-dark/65 px-3 py-2 shadow-2xl backdrop-blur-md">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold">
-                        Token-Bank
-                      </span>
-                      <span className="font-libre text-[10px] text-gray-500">
-                        Kurzer Zugweg nach oben auf den Zeitstrahl
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-2 xl:flex-row xl:items-start">
-                      <div className="min-w-0 flex-1">
-                        <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
-                          Spieler
-                        </span>
-                        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                          {combatPlayerTokens.map((token) => {
-                            const used = isCombatTokenUsed(
-                              token,
-                              combatParticipantNames,
-                              combatParticipantNpcIds,
-                            );
-                            return (
-                              <button
-                                key={token.name}
-                                type="button"
-                                draggable={!used}
-                                onDragStart={(e) => dragCombatToken(e, token)}
-                                onClick={() => void addCombatToken(token)}
-                                disabled={used}
-                                title={token.name}
-                                aria-label={token.name}
-                                className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-900/60 bg-black/35 transition-colors hover:border-accent-gold hover:bg-accent-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                {token.image_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element -- Combat token
-                                  <img
-                                    src={token.image_url}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="font-barlow text-xs font-bold text-accent-gold">
-                                    {token.name[0]}
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="min-w-0 xl:w-72">
-                        <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
-                          Monster
-                        </span>
-                        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                          {combatMonsterTokens.map((token) => {
-                            const used = isCombatTokenUsed(
-                              token,
-                              combatParticipantNames,
-                              combatParticipantNpcIds,
-                            );
-                            return (
-                              <button
-                                key={token.name}
-                                type="button"
-                                draggable={!used}
-                                onDragStart={(e) => dragCombatToken(e, token)}
-                                onClick={() => void addCombatToken(token)}
-                                disabled={used}
-                                title={token.name}
-                                aria-label={token.name}
-                                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-red-900/60 bg-red-950/50 font-barlow text-[10px] font-extrabold text-red-100 transition-colors hover:border-red-400 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-35"
-                              >
-                                <span className="h-2 w-2 rounded-full bg-red-300/80" aria-hidden />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {combatNpcTokens.length > 0 ? (
-                        <div className="min-w-0 flex-1">
-                          <span className="mb-1 block font-barlow text-[9px] font-bold uppercase text-gray-500">
-                            Bühnen-NPCs
-                          </span>
-                          <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                            {combatNpcTokens.map((token) => {
-                              const used = isCombatTokenUsed(
-                                token,
-                                combatParticipantNames,
-                                combatParticipantNpcIds,
-                              );
-                              return (
-                                <button
-                                  key={token.npc_id ?? token.name}
-                                  type="button"
-                                  draggable={!used}
-                                  onDragStart={(e) => dragCombatToken(e, token)}
-                                  onClick={() => void addCombatToken(token)}
-                                  disabled={used}
-                                  title={token.name}
-                                  aria-label={token.name}
-                                  className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-violet-900/60 bg-violet-950/35 transition-colors hover:border-violet-400 hover:bg-violet-900/30 disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                  {token.image_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element -- Combat token
-                                    <img
-                                      src={token.image_url}
-                                      alt=""
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="font-barlow text-xs font-bold text-accent-gold">
-                                      {token.name[0]}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
               </div>
             ) : null}
             {!stageHasDeckContent ? (
@@ -5023,8 +5055,14 @@ export function LiveSessionBoard({
               </div>
             ) : (
               <div
-                className={`relative z-10 flex min-h-[calc(48vh+120px)] flex-col justify-start gap-8 px-5 pb-5 md:px-8 md:pb-8 ${
-                  liveState?.is_combat_mode ? "pt-56" : "pt-[60px]"
+                className={`relative z-10 flex min-h-full flex-col justify-start gap-8 px-5 md:px-8 ${
+                  partyTrayMode === "hidden"
+                    ? "pb-10 md:pb-12"
+                    : partyTrayMode === "compact"
+                      ? "pb-40 md:pb-44"
+                      : "pb-72 md:pb-80"
+                } ${
+                  liveState?.is_combat_mode ? "pt-44" : "pt-[60px]"
                 }`}
               >
                 {!isGuest && liveState?.active_shop_id ? (
@@ -5078,6 +5116,14 @@ export function LiveSessionBoard({
                     />
                   </div>
                 ) : null}
+                <StageRosterCollapse
+                  open={stageRosterOpen}
+                  onToggle={() => setStageRosterOpen((v) => !v)}
+                  npcCount={liveState?.loot_hide_npcs ? 0 : sortedActiveNpcs.length}
+                  creatureCount={activeCreatures.length}
+                  factionCount={activeFactions.length}
+                  previewItems={stageRosterPreview}
+                >
                 {sortedActiveNpcs.length > 0 && !liveState?.loot_hide_npcs ? (
                   <div
                     className={
@@ -5099,6 +5145,7 @@ export function LiveSessionBoard({
                             isGM={isGM}
                             isCombatMode={!!liveState?.is_combat_mode}
                             isInInitiative={combatParticipantNpcIds.has(String(npc.id))}
+                            isActiveTurn={isNpcActiveCombatTurn(String(npc.id), activeTurnHighlight)}
                             isUpdating={isUpdating}
                             reputationScore={npcReputationScores[String(npc.id)] ?? 0}
                             reactions={reactionsForNpc}
@@ -5142,6 +5189,7 @@ export function LiveSessionBoard({
                             creature={creature}
                             isSingle={activeCreatures.length === 1}
                             isGM={isGM}
+                            isActiveTurn={isCreatureActiveCombatTurn(creature.name, activeTurnHighlight)}
                             isUpdating={isUpdating}
                             discoveries={isGM ? discoveries : discoveries}
                             creatureState={state}
@@ -5250,14 +5298,67 @@ export function LiveSessionBoard({
                     </div>
                   </div>
                 )}
+                </StageRosterCollapse>
+
               </div>
             )}
             </div>
-          </div>
 
-          <div className="relative z-50 min-h-44 shrink-0 overflow-visible border-t border-amber-900/50 bg-linear-to-r from-background-card/95 via-emerald-950/90 to-background-dark/95 px-4 pb-2">
-            {displayPartyCharacters.length === 0 ? (
-              <div className="space-y-1">
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-50 overflow-visible bg-transparent px-4 ${
+              partyTrayMode === "hidden" ? "pb-1.5 pt-1.5" : "pb-1"
+            }`}
+          >
+            <div className="pointer-events-auto mb-1 flex items-center justify-end gap-1">
+              <span className="mr-1 hidden font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-500 sm:inline">
+                Helden
+              </span>
+              <button
+                type="button"
+                onClick={() => setPartyTrayMode("full")}
+                title="Volle Avatar-Leiste"
+                aria-label="Volle Avatar-Leiste"
+                aria-pressed={partyTrayMode === "full"}
+                className={`grid h-7 w-7 place-items-center rounded border transition-colors ${
+                  partyTrayMode === "full"
+                    ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                    : "border-amber-900/50 bg-background-dark/70 text-gray-400 hover:border-hero-vibrant/60 hover:text-hero-vibrant"
+                }`}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartyTrayMode("compact")}
+                title="Kompakte Avatar-Leiste"
+                aria-label="Kompakte Avatar-Leiste"
+                aria-pressed={partyTrayMode === "compact"}
+                className={`grid h-7 w-7 place-items-center rounded border transition-colors ${
+                  partyTrayMode === "compact"
+                    ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                    : "border-amber-900/50 bg-background-dark/70 text-gray-400 hover:border-hero-vibrant/60 hover:text-hero-vibrant"
+                }`}
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartyTrayMode("hidden")}
+                title="Avatar-Leiste ausblenden"
+                aria-label="Avatar-Leiste ausblenden"
+                aria-pressed={partyTrayMode === "hidden"}
+                className={`grid h-7 w-7 place-items-center rounded border transition-colors ${
+                  partyTrayMode === "hidden"
+                    ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                    : "border-amber-900/50 bg-background-dark/70 text-gray-400 hover:border-hero-vibrant/60 hover:text-hero-vibrant"
+                }`}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {partyTrayMode === "hidden" ? null : displayPartyCharacters.length === 0 ? (
+              <div className="pointer-events-auto space-y-1 py-3">
                 <p className="font-libre text-xs text-gray-400">
                   Hier erscheinen Charaktere von Spielern, die für diesen Termin zugesagt haben
                   oder vom GM freigegeben wurden.
@@ -5269,9 +5370,13 @@ export function LiveSessionBoard({
                 </p>
               </div>
             ) : (
-              <div className="absolute inset-x-0 -top-[118px] z-[60] flex justify-center px-1 pb-2 pointer-events-none">
-                <div className="pointer-events-auto w-fit max-w-full overflow-x-auto overflow-y-visible">
-                  <div className="flex justify-center gap-5">
+              <div className="pointer-events-auto relative z-[60] flex justify-center px-1">
+                <div className="w-fit max-w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div
+                    className={`flex justify-center ${
+                      partyTrayMode === "compact" ? "gap-3 px-4 py-1" : "gap-5 px-6 py-1"
+                    }`}
+                  >
                 {displayPartyCharacters.map((pc) => {
                   const pid = pc.playerUserId ? String(pc.playerUserId) : "";
                   const isGuestSelf =
@@ -5291,7 +5396,7 @@ export function LiveSessionBoard({
                   const canInteractAvatar =
                     canOpenInventory && showDnd5eSheet;
                   const isActiveTurn =
-                    liveState?.is_combat_mode &&
+                    combatStarted &&
                     activeCombatParticipant?.type === "player" &&
                     activeCombatParticipant.name === pc.name &&
                     !pc.isSessionDummy;
@@ -5302,16 +5407,17 @@ export function LiveSessionBoard({
                         (r.characterId != null && r.characterId === pc.id),
                     ) ?? null;
                   const playerColor = playerColorByCharacterId[pc.id] ?? FALLBACK_PLAYER_COLOR;
+                  const compact = partyTrayMode === "compact";
                   return (
                     <motion.div
                       key={pc.id}
-                      className={`relative flex w-[272px] shrink-0 flex-col items-center pt-10 transition-[opacity,filter,transform] duration-200 ${
-                        onDeck ? "" : "opacity-50 grayscale"
-                      }`}
+                      className={`relative flex shrink-0 flex-col items-center pt-2 transition-[opacity,filter,transform] duration-200 ${
+                        compact ? "w-[118px]" : "w-[272px] pt-4"
+                      } ${onDeck ? "" : "opacity-50 grayscale"}`}
                       animate={
                         isActiveTurn
                           ? {
-                              y: [0, -6, 0],
+                              y: [0, compact ? -3 : -6, 0],
                               filter: [
                                 "drop-shadow(0 0 0 rgba(202,185,38,0))",
                                 "drop-shadow(0 0 18px rgba(202,185,38,0.85))",
@@ -5326,17 +5432,40 @@ export function LiveSessionBoard({
                           : { duration: 0.2 }
                       }
                     >
-                      <div className="relative h-64 w-56 drop-shadow-2xl">
+                      {isActiveTurn ? (
+                        <span
+                          className={`mb-1 rounded-full border border-accent-gold bg-accent-gold/20 font-barlow font-extrabold uppercase tracking-wide text-accent-gold shadow-[0_0_18px_rgba(202,185,38,0.65)] ${
+                            compact
+                              ? "px-2 py-0.5 text-[8px]"
+                              : "mb-2 px-4 py-1 text-xs"
+                          }`}
+                        >
+                          {activeCombatParticipant?.name === pc.name && currentPlayerCharacter?.id === pc.id
+                            ? "Du bist am Zug"
+                            : "Am Zug"}
+                        </span>
+                      ) : null}
+                      <div
+                        className={`relative drop-shadow-2xl ${
+                          compact ? "h-32 w-28" : "h-64 w-56"
+                        }`}
+                      >
                         <Image
                           src="/images/Session_ui/player-frame.png?v=20260429-freigestellt"
                           alt=""
                           fill
-                          sizes="224px"
+                          sizes={compact ? "112px" : "224px"}
                           className="pointer-events-none object-contain object-bottom"
                           priority={false}
                           unoptimized
                         />
-                        <div className="absolute inset-x-3 bottom-12 top-8 z-30 flex flex-col items-center justify-end text-center">
+                        <div
+                          className={`absolute z-30 flex flex-col items-center justify-end text-center ${
+                            compact
+                              ? "inset-x-2 bottom-5 top-5"
+                              : "inset-x-3 bottom-7 top-8"
+                          }`}
+                        >
                           <LiveSessionCharacterAvatar
                             sessionId={sessionId}
                             campaignId={campaignId}
@@ -5347,6 +5476,7 @@ export function LiveSessionBoard({
                             avatarDisplay={pc.avatar_display}
                             isDummy={pc.isSessionDummy}
                             isGm={isGM}
+                            density={compact ? "compact" : "full"}
                             canInteract={
                               canInteractAvatar &&
                               (pid === userId || isGM)
@@ -5379,12 +5509,30 @@ export function LiveSessionBoard({
                               );
                               notifyBattlemapTokensChanged({ op: "upsert", token: updated });
                             }}
+                            combatMode={!!liveState?.is_combat_mode}
+                            canJoinCombat={
+                              !pc.isSessionDummy &&
+                              !combatParticipantNames.has(pc.name)
+                            }
+                            onJoinCombat={
+                              isGM && liveState?.is_combat_mode && !pc.isSessionDummy
+                                ? () => {
+                                    void addCombatToken({
+                                      type: "player",
+                                      name: pc.name,
+                                      image_url: pc.avatar_url,
+                                    });
+                                  }
+                                : undefined
+                            }
                           />
                         </div>
                         {handRaise ? (
                           <span
                             title={handRaise.urgent ? "Dringend gemeldet" : "Meldet sich"}
-                            className={`absolute left-1/2 top-4 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border px-2 py-1 shadow-lg ${
+                            className={`absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border shadow-lg ${
+                              compact ? "top-2 px-1.5 py-0.5" : "top-4 px-2 py-1"
+                            } ${
                               handRaise.urgent
                                 ? "border-accent-gold bg-accent-blood/90 text-accent-gold"
                                 : "bg-background-dark/90"
@@ -5398,7 +5546,7 @@ export function LiveSessionBoard({
                                   }
                             }
                           >
-                            <Hand className="h-4 w-4" />
+                            <Hand className={compact ? "h-3 w-3" : "h-4 w-4"} />
                             {handRaise.urgent ? (
                               <span className="font-barlow text-[10px] font-bold">!</span>
                             ) : null}
@@ -5407,7 +5555,11 @@ export function LiveSessionBoard({
                         {isScribe && (
                           <span
                             title="Chronist"
-                            className="absolute right-7 top-6 z-20 text-xl text-accent-gold drop-shadow-[0_0_6px_rgba(202,185,38,0.9)]"
+                            className={`absolute z-20 text-accent-gold drop-shadow-[0_0_6px_rgba(202,185,38,0.9)] ${
+                              compact
+                                ? "right-3 top-3 text-sm"
+                                : "right-7 top-6 text-xl"
+                            }`}
                           >
                             🪶
                           </span>
@@ -5416,7 +5568,9 @@ export function LiveSessionBoard({
                           <button
                             type="button"
                             onClick={() => assignScribe(isScribe ? null : pid)}
-                            className={`absolute right-6 top-6 z-30 rounded-full border p-2 text-sm transition-colors ${
+                            className={`absolute z-30 rounded-full border transition-colors ${
+                              compact ? "right-2 top-2 p-1 text-[10px]" : "right-6 top-6 p-2 text-sm"
+                            } ${
                               isScribe
                                 ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
                                 : "border-amber-900/60 bg-background-dark/85 text-gray-300 hover:text-accent-gold"
@@ -5424,57 +5578,58 @@ export function LiveSessionBoard({
                             title={isScribe ? "Chronist entfernen" : "Als Chronist setzen"}
                             aria-label={isScribe ? "Chronist entfernen" : "Als Chronist setzen"}
                           >
-                            <Feather className="h-3.5 w-3.5" />
+                            <Feather className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
                           </button>
                         ) : null}
                         {canOpenInventory ? (
                           <button
                             type="button"
                             onClick={() => setInventoryCharacter(pc)}
-                            className="absolute -left-8 top-[70px] z-20 cursor-pointer transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold"
+                            className={`absolute z-20 cursor-pointer transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${
+                              compact
+                                ? "-left-3 top-[38px]"
+                                : "-left-8 top-[70px]"
+                            }`}
                             title={`Rucksack von ${pc.name} öffnen`}
                             aria-label={`Rucksack von ${pc.name} öffnen`}
                           >
                             <Image
                               src="/images/Session_ui/rucksack.png"
                               alt=""
-                              width={88}
-                              height={88}
+                              width={compact ? 40 : 88}
+                              height={compact ? 40 : 88}
                               className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
                             />
                           </button>
                         ) : null}
-                      </div>
-                      <div className="mt-1 w-full rounded-md bg-black/50 px-2 py-1.5 text-center backdrop-blur-sm">
-                        <p
-                          className="font-barlow text-sm font-extrabold uppercase leading-snug tracking-wide drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
-                          style={{ color: playerColor }}
-                          title={pc.name}
+                        <div
+                          className={`absolute inset-x-1 z-40 px-1 text-center leading-none ${
+                            compact ? "bottom-0.5" : "bottom-1"
+                          }`}
                         >
-                          {pc.name}
-                        </p>
-                        {pc.isSessionDummy ? (
-                          <p className="mt-1 font-libre text-xs leading-snug text-gray-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
-                            Platzhalter · kein Account
+                          <p
+                            className={`truncate font-barlow font-bold uppercase tracking-wide drop-shadow-[0_2px_3px_rgba(0,0,0,0.95)] ${
+                              compact ? "text-[9px]" : "text-[11px]"
+                            }`}
+                            style={{ color: playerColor }}
+                            title={`${pc.name} ( ${pc.level || 1} )`}
+                          >
+                            {pc.name}{" "}
+                            <span className="font-semibold text-accent-gold">
+                              ( {pc.level || 1} )
+                            </span>
                           </p>
-                        ) : (
-                          <div className="mt-1 space-y-0.5">
-                            <p className="font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
-                              Level {pc.level || 1}
+                          {!compact && pc.isSessionDummy ? (
+                            <p className="mt-0.5 font-libre text-[9px] leading-none text-gray-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)]">
+                              Platzhalter
                             </p>
-                            <p
-                              className="font-libre text-xs leading-snug text-gray-200 drop-shadow-[0_2px_2px_rgba(0,0,0,0.85)] [overflow-wrap:anywhere]"
-                              title={pc.class || "Unbekannt"}
-                            >
-                              {pc.class || "Unbekannt"}
+                          ) : null}
+                          {!compact && pid && !self && !onDeck ? (
+                            <p className="mt-0.5 font-libre text-[9px] leading-none text-amber-300/90">
+                              Nicht online
                             </p>
-                          </div>
-                        )}
-                        {pid && !self && !onDeck ? (
-                          <p className="mt-1 font-libre text-[10px] text-amber-300/90">
-                            Nicht online
-                          </p>
-                        ) : null}
+                          ) : null}
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -5484,16 +5639,19 @@ export function LiveSessionBoard({
               </div>
             )}
           </div>
+          </div>
         </div>
 
-        {isGM && (inHandNpcs.length > 0 || inHandFactions.length > 0 || inHandScenes.length > 0) && (
+        {showGmDeckHand ? (
           <StageDeckHand
+            open={stageDeckHandOpen}
+            onToggle={() => setStageDeckHandOpen((v) => !v)}
             npcs={inHandNpcs}
             factions={inHandFactions}
             scenes={inHandScenes}
             onPlace={placeOnStage}
           />
-        )}
+        ) : null}
       </div>
 
       {isGM ? (
@@ -5590,6 +5748,8 @@ export function LiveSessionBoard({
         />
       ) : null}
 
+
+
       <DiceRollOverlay
         logs={systemLogs as import("@/src/lib/actions/session-activity-actions").SessionActivityEntry[]}
       />
@@ -5674,6 +5834,24 @@ export function LiveSessionBoard({
                 }
               : undefined
           }
+          canJoinCombat={(() => {
+            if (!liveState?.is_combat_mode || !isGM) return false;
+            const payload = battlemapTokenToCombatPayload(tokenRadial.token);
+            if (!payload) return false;
+            return !isCombatTokenUsed(
+              payload,
+              combatParticipantNames,
+              combatParticipantNpcIds,
+            );
+          })()}
+          onJoinCombat={
+            isGM && liveState?.is_combat_mode
+              ? () => {
+                  const payload = battlemapTokenToCombatPayload(tokenRadial.token);
+                  if (payload) void addCombatToken(payload);
+                }
+              : undefined
+          }
           onSaveSettings={(settings) => {
             startTransition(async () => {
               try {
@@ -5698,6 +5876,446 @@ export function LiveSessionBoard({
         />
       ) : null}
 
+      <LiveSessionLeftDock
+        panel={leftPanel}
+        onToggle={toggleLeftPanel}
+        onClose={closeLeftPanel}
+        isGM={isGM && !forcePlayerView}
+        showDice={!isGuest}
+        diceOpen={isDiceOpen}
+        onToggleDice={() => {
+          setIsDiceOpen((v) => !v);
+          setLeftPanel(null);
+          setTopPanel(null);
+        }}
+        diceContent={
+          !isGuest ? (
+            <LiveSessionDicePanel
+              embedded
+              sessionId={sessionId}
+              campaignId={campaignId}
+              open={isDiceOpen}
+              onClose={() => setIsDiceOpen(false)}
+              currentCharacter={activityCharacter}
+              isPrepMode={isPrepMode}
+              prepTestCharacters={
+                isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
+                  ? partyCharacters
+                      .filter((pc) => !pc.isSessionDummy)
+                      .map((pc) => ({ id: pc.id, name: pc.name }))
+                  : undefined
+              }
+              prepTestCharacterId={prepTestCharacterId}
+              onPrepTestCharacterChange={setPrepTestCharacterId}
+              onActivityPosted={(entry) => {
+                setLiveState((prev) => {
+                  if (!prev) return prev;
+                  const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+                  if (logs.some((l) => l.id === entry.id)) return prev;
+                  const next = {
+                    ...prev,
+                    system_logs: [...logs, entry].slice(-120),
+                  };
+                  liveStateRef.current = next;
+                  return next;
+                });
+              }}
+            />
+          ) : null
+        }
+        weatherIcon={
+          <WeatherPngIcon option={weatherVisual} sizeClassName="h-full w-full" />
+        }
+        weatherLabel={weatherVisual.label}
+        dayPhase={dayPhase}
+        temperatureValue={temperatureValue}
+        chronistRecording={chronicleRecorder.phase === "recording"}
+        tableMarked={physicallyPresentIdSet.size > 0 || dummyPlayerCountLive > 0}
+        battlemapActive={battlemapActive}
+        fogTool={fogTool}
+        selectedFogShapeId={selectedFogShapeId}
+        onFogToolChange={(tool) => {
+          setFogTool(tool);
+          if (tool) {
+            setEffectTool(null);
+            setSelectedEffectTemplateId(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedFogShapeId(null);
+        }}
+        effectTool={effectTool}
+        selectedEffectTemplateId={selectedEffectTemplateId}
+        onEffectToolChange={(tool) => {
+          setEffectTool(tool);
+          if (tool) {
+            setFogTool(null);
+            setSelectedFogShapeId(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedEffectTemplateId(null);
+        }}
+        onEffectDelete={() => {
+          const fallbackId =
+            selectedEffectTemplateId ??
+            (battlemapEffectTemplates.length > 0
+              ? battlemapEffectTemplates[battlemapEffectTemplates.length - 1]?.id
+              : null);
+          if (!fallbackId) {
+            toast.message("Effekt-Schablone auf der Karte anklicken, dann löschen — oder Entf.");
+            return;
+          }
+          handleEffectTemplateDelete(fallbackId);
+        }}
+        onFogDelete={() => {
+          const fallbackShapeId =
+            selectedFogShapeId ??
+            (battlemapFogShapes.length > 0
+              ? battlemapFogShapes[battlemapFogShapes.length - 1]?.id
+              : null);
+          if (!fallbackShapeId) {
+            toast.message("Fog-Fläche auf der Karte anklicken, dann löschen — oder Entf.");
+            return;
+          }
+          handleFogShapeDelete(fallbackShapeId);
+        }}
+        atmosphereContent={
+          <div className="space-y-6">
+            <section>
+              <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2">
+                Wetter
+              </h3>
+              <div className="grid grid-cols-4 gap-3">
+                {WEATHER_ICON_OPTIONS.map((option) => {
+                  const active = weatherVisual.id === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        const intensity =
+                          normalizeIntensity(liveState?.weather_intensity) ?? 2;
+                        const summary = formatWeatherSummary(
+                          option.id,
+                          intensity,
+                          liveState?.weather_temperature ?? null,
+                          null,
+                        );
+                        updateLiveState({
+                          weather_preset: option.id,
+                          weather_intensity: intensity,
+                          weather: summary,
+                        });
+                        const logByWeather: Partial<Record<WeatherPresetId, string>> = {
+                          sun: "Die Wolken reißen auf und goldene Sonnenstrahlen brechen hervor.",
+                          rain: "Ein feiner Nieselregen beginnt, die Welt in Grau zu hüllen.",
+                          storm: "Ein heftiger Sturm peitscht auf und das Heulen des Windes wird ohrenbetäubend.",
+                        };
+                        if (logByWeather[option.id]) {
+                          writeSystemLog("weather_change", logByWeather[option.id]!);
+                        }
+                      }}
+                      className={`flex items-center justify-center bg-transparent p-0 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${
+                        active
+                          ? "scale-110 drop-shadow-[0_0_10px_rgba(202,185,38,0.8)]"
+                          : "opacity-80 hover:opacity-100"
+                      }`}
+                      title={option.label}
+                      aria-label={`Wetter auf ${option.label} setzen`}
+                    >
+                      <WeatherPngIcon option={option} sizeClassName="h-14 w-14" />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+            <section>
+              <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2">
+                Tageszeit
+              </h3>
+              <div className="flex justify-center py-2">
+                <SessionDayPhaseIndicator phase={dayPhase} />
+              </div>
+              <label className="mt-2 flex flex-col gap-1">
+                <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                  Phase setzen
+                </span>
+                <select
+                  value={dayPhase}
+                  onChange={(e) =>
+                    updateLiveState({
+                      current_time: sessionDayPhaseLabel(
+                        e.target.value as SessionDayPhase,
+                      ),
+                    })
+                  }
+                  className="w-full rounded border border-amber-900/60 bg-[#0a1f10] px-2 py-1.5 text-sm text-white outline-none focus:border-accent-gold"
+                >
+                  {SESSION_DAY_PHASE_ORDER.map((phase) => (
+                    <option
+                      key={phase}
+                      value={phase}
+                      className="bg-white text-slate-950"
+                    >
+                      {sessionDayPhaseLabel(phase)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+            <section>
+              <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2">
+                Temperatur
+              </h3>
+              <div className="flex flex-col items-center gap-4">
+                <div
+                  className="relative h-64 w-28 overflow-hidden"
+                  title={`Temperatur: ${temperatureValue} °C`}
+                  aria-label={`Temperatur: ${temperatureValue} Grad Celsius`}
+                >
+                  <div className="absolute bottom-[29%] left-1/2 z-0 h-[49%] w-[12%] -translate-x-1/2 overflow-hidden rounded-full">
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-full w-full origin-bottom rounded-full shadow-[0_0_18px_rgba(239,68,68,0.65)]"
+                      initial={false}
+                      animate={{
+                        scaleY: getTemperatureFillPercent(temperatureValue) / 100,
+                      }}
+                      transition={{ type: "spring", damping: 28, stiffness: 180 }}
+                      style={{
+                        background: getThermometerFillColor(temperatureValue),
+                      }}
+                    />
+                  </div>
+                  <Image
+                    src="/images/Session_ui/thermometer_frei.png"
+                    alt=""
+                    fill
+                    sizes="96px"
+                    className="pointer-events-none absolute inset-0 z-10 object-contain"
+                    priority={false}
+                  />
+                  <span className="absolute inset-x-0 bottom-[10%] z-20 text-center font-barlow text-lg font-extrabold uppercase tracking-wide text-accent-gold drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
+                    {temperatureValue} °C
+                  </span>
+                </div>
+                <div className="flex w-full min-w-0 flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                      Regler
+                    </span>
+                    <span className="font-barlow text-sm font-extrabold text-accent-gold">
+                      {temperatureDraft} °C
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={TEMPERATURE_MIN}
+                    max={TEMPERATURE_MAX}
+                    value={temperatureDraft}
+                    onChange={(e) =>
+                      setTemperatureDraft(normalizeTemperatureValue(e.target.value))
+                    }
+                    onMouseUp={() => commitTemperatureValue()}
+                    onTouchEnd={() => commitTemperatureValue()}
+                    onKeyUp={() => commitTemperatureValue()}
+                    onBlur={() => commitTemperatureValue()}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-background-dark/80 accent-accent-gold outline-none"
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+        }
+        chronistContent={
+          <div className="space-y-3">
+            {isPrepMode ? (
+              <>
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex w-full items-center justify-center gap-2 rounded border border-red-500/40 bg-red-950/30 px-3 py-2.5 font-barlow text-xs font-bold uppercase text-red-200/80 disabled:cursor-not-allowed"
+                >
+                  <Mic className="h-4 w-4" />
+                  Aufnahme starten
+                </button>
+                <p className="font-libre text-[11px] leading-relaxed text-gray-500">
+                  Die Aufnahme startest du, sobald die Session live läuft. Hier kannst du
+                  Modus und Mikrofon schon testen.
+                </p>
+                <SessionChronistModeControl
+                  sessionId={sessionId}
+                  initialMode={activeTranscriptionMode}
+                  variant="sidebar"
+                  onModeChange={setActiveTranscriptionMode}
+                />
+                {chronistTableMode ? (
+                  <ChronicleMicTestPanel variant="sidebar" monitor={prepMicTest} />
+                ) : null}
+              </>
+            ) : null}
+            {sessionStatus === "Live" && !chronistTableMode ? (
+              <div className="space-y-2 rounded border border-amber-900/50 bg-amber-950/30 p-3">
+                <p className="font-libre text-xs text-amber-100/90">
+                  Chronist-Aufnahme ist nur im <strong>Tisch-Modus</strong> verfügbar
+                  (Jitsi folgt später). Bitte Modus wechseln:
+                </p>
+                <SessionChronistModeControl
+                  sessionId={sessionId}
+                  initialMode={activeTranscriptionMode}
+                  variant="sidebar"
+                  onModeChange={setActiveTranscriptionMode}
+                />
+              </div>
+            ) : null}
+            {sessionStatus === "Live" && chronistTableMode ? (
+              <ChronicleRecorderPanel
+                sessionId={sessionId}
+                plannedMode={activeTranscriptionMode}
+                recorder={chronicleRecorder}
+                panelOpen={chronistPanelOpen}
+                onPanelOpenChange={setChronistPanelOpen}
+                layout="inline"
+                registerStartFlow={(fn) => {
+                  chronistStartFlowRef.current = fn;
+                }}
+                registerStopFlow={(fn) => {
+                  chronistStopFlowRef.current = fn;
+                }}
+                registerSettingsFlow={(fn) => {
+                  chronistSettingsFlowRef.current = fn;
+                }}
+              />
+            ) : null}
+            {sessionStatus === "Live" && chronistTableMode ? (
+              <ChronicleInboxFeed
+                campaignId={campaignId}
+                sessionId={sessionId}
+                worldId={worldId}
+                variant="compact"
+                npcNames={allCampaignNpcs.map((n) => ({
+                  id: n.id,
+                  name: n.name,
+                }))}
+              />
+            ) : null}
+          </div>
+        }
+        tableContent={
+          <div className="space-y-4">
+            <p className="font-libre text-xs leading-relaxed text-gray-300">
+              Bei Hybridrunden: Wenn jemand physisch am Tisch sitzt, aber keinen Browser offen hat,
+              markiere den Charakter hier — das Portrait wird dann nicht mehr ausgegraut.
+            </p>
+            <ul className="max-h-56 space-y-2 overflow-y-auto">
+              {partyCharacters
+                .filter((pc) => pc.playerUserId)
+                .map((pc) => {
+                  const uid = String(pc.playerUserId);
+                  const marked = physicallyPresentIdSet.has(uid);
+                  return (
+                    <li
+                      key={pc.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-background-dark/60 px-3 py-2"
+                    >
+                      <span className="min-w-0 truncate font-barlow text-sm font-bold text-gray-200">
+                        {pc.name}
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={marked}
+                        aria-label={
+                          marked
+                            ? `Markierung „Am Tisch“ für ${pc.name} aufheben`
+                            : `${pc.name} als physisch am Tisch anwesend markieren`
+                        }
+                        onClick={() => {
+                          const cur = new Set(
+                            normalizePhysicallyPresentUserIds(
+                              liveStateRef.current?.physically_present_user_ids,
+                            ),
+                          );
+                          if (cur.has(uid)) cur.delete(uid);
+                          else cur.add(uid);
+                          updateLiveState({
+                            physically_present_user_ids: Array.from(cur),
+                          });
+                        }}
+                        className={`shrink-0 rounded-md border px-2.5 py-1.5 font-barlow text-[10px] font-bold uppercase transition-colors ${
+                          marked
+                            ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
+                            : "border-white/20 text-gray-400 hover:border-accent-gold hover:text-accent-gold"
+                        }`}
+                      >
+                        {marked ? "Markierung aufheben" : "Am Tisch anwesend"}
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
+            {partyCharacters.filter((pc) => pc.playerUserId).length === 0 ? (
+              <p className="font-libre text-xs text-gray-500">
+                Keine Charaktere mit verknüpftem Spieler-Account in der Gruppe.
+              </p>
+            ) : null}
+            <div className="rounded-xl border border-white/15 bg-white/5 p-3 backdrop-blur-md">
+              <div className="mb-2 flex items-start gap-2">
+                <UserRound className="h-8 w-8 shrink-0 text-accent-gold" aria-hidden />
+                <div className="min-w-0">
+                  <p className="font-barlow text-[10px] font-extrabold uppercase text-accent-gold">
+                    Platzhalter-Spieler
+                  </p>
+                  <p className="font-libre text-[10px] leading-snug text-gray-500">
+                    Bis zu drei zusätzliche Portraits (Spieler 1–3) ohne Registrierung — nur
+                    Anzeige, kein Rucksack, kein Chronik-Eintrag.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  disabled={dummyPlayerCountLive <= 0 || isUpdating}
+                  onClick={() =>
+                    updateLiveState({
+                      dummy_player_count: Math.max(0, dummyPlayerCountLive - 1),
+                    })
+                  }
+                  className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Platzhalter entfernen"
+                >
+                  −
+                </button>
+                <span className="min-w-[3.5rem] text-center font-barlow text-sm font-extrabold text-accent-gold">
+                  {dummyPlayerCountLive} / 3
+                </span>
+                <button
+                  type="button"
+                  disabled={dummyPlayerCountLive >= 3 || isUpdating}
+                  onClick={() =>
+                    updateLiveState({
+                      dummy_player_count: Math.min(3, dummyPlayerCountLive + 1),
+                    })
+                  }
+                  className="grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-background-dark/80 font-barlow text-lg font-bold text-gray-200 hover:border-accent-gold hover:text-accent-gold disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Platzhalter hinzufügen"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      />
+
       {!isGuest ? (
         <LiveSessionSidePanels
           sessionId={sessionId}
@@ -5705,9 +6323,7 @@ export function LiveSessionBoard({
           isGM={isGM && !forcePlayerView}
           isPrepMode={isPrepMode}
           mainPanel={mainSidePanel}
-          diceOpen={isDiceOpen}
           onToggleMain={toggleMainSidePanel}
-          onToggleDice={() => setIsDiceOpen((v) => !v)}
           onCloseMain={closeMainSidePanel}
           handRaises={handRaises}
           downtimeActive={!!liveState?.downtime_active}

@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useScroll, useTransform, useSpring, MotionValue, Variants } from "framer-motion";
-import { useRef, useState } from "react";
+import { motion, useScroll, useTransform, useSpring, Variants } from "framer-motion";
+import { useRef } from "react";
 import Image from "next/image";
 
 const containerVariants: Variants = {

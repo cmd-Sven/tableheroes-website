@@ -7,6 +7,16 @@ export type ParsedRollCommand = {
   label?: string;
 };
 
+export type DicePoolGroup = {
+  count: number;
+  sides: number;
+};
+
+export type DiceBubblePart = {
+  sides: number;
+  value: number;
+};
+
 export type DiceRollOutcome = {
   mode: DiceRollMode;
   sides: number;
@@ -15,6 +25,10 @@ export type DiceRollOutcome = {
   rolls: number[];
   /** Faces die als 3D-Würfel sichtbar gerollt werden. */
   faces: number[];
+  /** Seiten je 3D-Face (parallel zu faces). */
+  dieSides: number[];
+  /** Sprechblase: nur genutzte Würfel (VOR/NACH = Gewinner). */
+  bubbleParts: DiceBubblePart[];
   /** Summe der genutzten Würfel (ohne Mod), bei VOR/NACH der gewählte Einzelwurf. */
   usedRoll: number;
   total: number;
@@ -106,61 +120,112 @@ export function formatDiceBreakdown(
   return `${usedRoll}${modStr} = ${usedRoll + modifier}`;
 }
 
-export function executeDiceRoll(
-  parsed: ParsedRollCommand,
+export function normalizeDicePool(groups: DicePoolGroup[]): DicePoolGroup[] {
+  const bySides = new Map<number, number>();
+  for (const g of groups) {
+    const sides = Math.max(2, Math.min(100, Math.round(g.sides)));
+    const count = Math.max(0, Math.min(12, Math.round(g.count)));
+    if (count <= 0) continue;
+    bySides.set(sides, (bySides.get(sides) ?? 0) + count);
+  }
+  const out: DicePoolGroup[] = [];
+  let remaining = 12;
+  for (const [sides, count] of bySides) {
+    if (remaining <= 0) break;
+    const n = Math.min(count, remaining);
+    out.push({ sides, count: n });
+    remaining -= n;
+  }
+  return out;
+}
+
+export function dicePoolSize(groups: DicePoolGroup[]): number {
+  return groups.reduce((sum, g) => sum + g.count, 0);
+}
+
+export function formatDicePoolFormula(groups: DicePoolGroup[], modifier = 0): string {
+  const core = groups.map((g) => `${g.count}w${g.sides}`).join(" + ");
+  return `${core}${formatModPart(modifier)}`;
+}
+
+export function executeDicePool(
+  groups: DicePoolGroup[],
+  modifier: number,
   mode: DiceRollMode = "normal",
   rng: () => number = Math.random,
   seed?: string,
 ): DiceRollOutcome {
-  const { dice, sides, modifier } = parsed;
-  const rolls: number[] = [];
-  for (let i = 0; i < dice; i++) {
-    rolls.push(rollOnce(sides, rng));
+  const pool = normalizeDicePool(groups);
+  if (pool.length === 0) {
+    pool.push({ count: 1, sides: 20 });
   }
 
-  let usedRoll: number;
-  let faces: number[];
+  const rolls: number[] = [];
+  const faces: number[] = [];
+  const dieSides: number[] = [];
+  const bubbleParts: DiceBubblePart[] = [];
+  const chatChunks: string[] = [];
+  let usedRoll = 0;
 
-  if (mode === "advantage" && dice === 1) {
-    const second = rollOnce(sides, rng);
-    rolls.push(second);
-    usedRoll = Math.max(rolls[0]!, second);
-    faces = [...rolls];
-  } else if (mode === "disadvantage" && dice === 1) {
-    const second = rollOnce(sides, rng);
-    rolls.push(second);
-    usedRoll = Math.min(rolls[0]!, second);
-    faces = [...rolls];
-  } else if (dice > 1) {
-    usedRoll = rolls.reduce((a, b) => a + b, 0);
-    faces = [...rolls];
-  } else {
-    usedRoll = rolls[0] ?? 0;
-    faces = [...rolls];
+  const applyAdv = mode === "advantage" || mode === "disadvantage";
+
+  for (const group of pool) {
+    const groupRolls: number[] = [];
+    for (let i = 0; i < group.count; i++) {
+      groupRolls.push(rollOnce(group.sides, rng));
+    }
+
+    const isAdvPair = applyAdv && group.sides === 20 && group.count === 1;
+    if (isAdvPair) {
+      const second = rollOnce(group.sides, rng);
+      const first = groupRolls[0]!;
+      const winner =
+        mode === "advantage" ? Math.max(first, second) : Math.min(first, second);
+      rolls.push(first, second);
+      faces.push(first, second);
+      dieSides.push(20, 20);
+      bubbleParts.push({ sides: 20, value: winner });
+      usedRoll += winner;
+      const tag = mode === "advantage" ? "VOR" : "NACH";
+      chatChunks.push(`${tag}: [${first} / ${second}] → ${winner}`);
+    } else {
+      const sum = groupRolls.reduce((a, b) => a + b, 0);
+      rolls.push(...groupRolls);
+      faces.push(...groupRolls);
+      for (const value of groupRolls) {
+        dieSides.push(group.sides);
+        bubbleParts.push({ sides: group.sides, value });
+      }
+      usedRoll += sum;
+      chatChunks.push(
+        group.count > 1 ? `[${groupRolls.join(" + ")}]` : String(groupRolls[0]),
+      );
+    }
   }
 
   const total = usedRoll + modifier;
-  const isCritical = dice === 1 && sides === 20 && usedRoll === 20;
-  const isFumble = dice === 1 && sides === 20 && usedRoll === 1;
-
+  const onlySingleD20 = pool.length === 1 && pool[0]!.sides === 20 && pool[0]!.count === 1;
+  const isCritical = onlySingleD20 && usedRoll === 20;
+  const isFumble = onlySingleD20 && usedRoll === 1;
+  const primarySides = pool[0]!.sides;
+  const formula = formatDicePoolFormula(pool, modifier);
   const modStr = formatModPart(modifier);
-  const formula =
-    mode === "advantage"
-      ? `VOR w${sides}${modStr}`
-      : mode === "disadvantage"
-        ? `NACH w${sides}${modStr}`
-        : dice > 1
-          ? `${dice}d${sides}${modStr}`
-          : `w${sides}${modStr}`;
-
-  const display = formatDiceBreakdown(rolls, usedRoll, modifier, { mode, dice });
+  const display =
+    chatChunks.length === 1 && !applyAdv
+      ? formatDiceBreakdown(rolls, usedRoll, modifier, {
+          mode,
+          dice: pool[0]!.count,
+        })
+      : `${chatChunks.join(" + ")}${modStr} = ${total}`;
 
   return {
     mode,
-    sides,
+    sides: primarySides,
     modifier,
     rolls,
     faces,
+    dieSides,
+    bubbleParts,
     usedRoll,
     total,
     isCritical,
@@ -169,6 +234,21 @@ export function executeDiceRoll(
     display,
     seed,
   };
+}
+
+export function executeDiceRoll(
+  parsed: ParsedRollCommand,
+  mode: DiceRollMode = "normal",
+  rng: () => number = Math.random,
+  seed?: string,
+): DiceRollOutcome {
+  return executeDicePool(
+    [{ count: parsed.dice, sides: parsed.sides }],
+    parsed.modifier,
+    mode,
+    rng,
+    seed,
+  );
 }
 
 /** Unterstützte 3D-Polyeder (D&D-Standard). */

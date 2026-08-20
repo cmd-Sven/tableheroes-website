@@ -34,11 +34,9 @@ const faqs = [
 function FaqItem({
   question,
   answer,
-  index,
 }: {
   question: string;
   answer: string;
-  index: number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -109,12 +107,11 @@ export function FaqSection() {
           </div>
 
           <div className="mt-8 space-y-3">
-            {faqs.map((item, index) => (
+            {faqs.map((item) => (
               <FaqItem
                 key={item.q}
                 question={item.q}
                 answer={item.a}
-                index={index}
               />
             ))}
           </div>

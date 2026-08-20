@@ -27,6 +27,7 @@ type Props = {
   onShapeDragStart?: (shapeId: string, gridX: number, gridY: number) => void;
   onShapeDragMove?: (shapeId: string, gridX: number, gridY: number) => void;
   onShapeDragEnd?: (shapeId: string, gridX: number, gridY: number) => void;
+  onDeleteShape?: (shapeId: string) => void;
 };
 
 function shapeStyle(
@@ -68,21 +69,23 @@ export function BattlemapFogLayer({
   onShapeDragStart,
   onShapeDragMove,
   onShapeDragEnd,
+  onDeleteShape,
 }: Props) {
   const fillClass = isGm ? "bg-black/45" : "bg-black";
   const borderClass = isGm
     ? "border border-dashed border-accent-gold/50"
     : "border-0";
-  const canInteract = Boolean(isGm && interactive && onSelectShape);
+  const canInteract = Boolean(isGm && interactive);
   const cellPx = Math.max(1, config.cellSizePx * Math.max(0.05, interactionScale));
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[35]">
+    <div className={`pointer-events-none absolute inset-0 ${isGm ? "z-[35]" : "z-[50]"}`}>
       {shapes.map((shape) => {
         const selected = selectedShapeId === shape.id;
         return (
           <div
             key={shape.id}
+            data-fog-shape={shape.id}
             role={canInteract ? "button" : undefined}
             className={`absolute ${fillClass} ${borderClass} ${
               canInteract
@@ -92,7 +95,7 @@ export function BattlemapFogLayer({
                   : ""
             } ${selected ? "ring-2 ring-accent-gold" : ""}`}
             style={shapeStyle(shape, config)}
-            title={isGm ? "Fog-Fläche (SL: halbtransparent)" : undefined}
+            title={isGm ? "Fog-Fläche (anklicken · Entf löscht)" : undefined}
             onPointerDown={
               canInteract
                 ? (e) => {
@@ -127,7 +130,25 @@ export function BattlemapFogLayer({
                   }
                 : undefined
             }
-          />
+          >
+            {canInteract && selected && onDeleteShape ? (
+              <button
+                type="button"
+                aria-label="Fog-Fläche löschen"
+                title="Fog-Fläche löschen"
+                className="absolute -right-2 -top-2 z-[1] grid h-6 w-6 place-items-center rounded-full border border-red-500/80 bg-red-950 text-[11px] font-bold text-red-200 hover:bg-red-800"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteShape(shape.id);
+                }}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         );
       })}
       {draft ? (

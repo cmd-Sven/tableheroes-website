@@ -8,6 +8,7 @@ export const CHARACTER_DISPLAY_CHANGED_EVENT = "th:character-display-changed";
 export const CHARACTER_DISPLAY_CHANGED_BROADCAST = "character_display_changed";
 export const BATTLEMAP_TOKENS_CHANGED_BROADCAST = "battlemap_tokens_changed";
 export const BATTLEMAP_FOG_CHANGED_BROADCAST = "battlemap_fog_changed";
+export const BATTLEMAP_EFFECT_CHANGED_BROADCAST = "battlemap_effect_changed";
 
 export type OpenCharacterRadialDetail = {
   characterId: string;
@@ -56,6 +57,16 @@ export type BattlemapFogChangedDetail = {
   op?: BattlemapFogSyncOp;
   shape?: Record<string, unknown> | null;
   shapeId?: string | null;
+  senderId?: string | null;
+};
+
+export type BattlemapEffectSyncOp = "upsert" | "delete" | "refresh";
+
+export type BattlemapEffectChangedDetail = {
+  battlemapId: string;
+  op?: BattlemapEffectSyncOp;
+  template?: Record<string, unknown> | null;
+  templateId?: string | null;
   senderId?: string | null;
 };
 

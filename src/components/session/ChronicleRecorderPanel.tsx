@@ -38,6 +38,8 @@ type Props = {
   registerStopFlow?: (stopFlow: () => void) => void;
   /** Parent kann das Chronist-Modal öffnen (z. B. vom fixed Mikro-Monitor). */
   registerSettingsFlow?: (openSettings: () => void) => void;
+  /** inline: Steuerung direkt sichtbar (Linke Leiste). modal: hinter Zahnrad. */
+  layout?: "modal" | "inline";
 };
 
 export function ChronicleRecorderPanel({
@@ -49,6 +51,7 @@ export function ChronicleRecorderPanel({
   registerStartFlow,
   registerStopFlow,
   registerSettingsFlow,
+  layout = "modal",
 }: Props) {
   const [internalPanelOpen, setInternalPanelOpen] = useState(true);
   const panelOpen = panelOpenProp ?? internalPanelOpen;
@@ -304,7 +307,9 @@ export function ChronicleRecorderPanel({
 
   return (
     <>
-      {isActive ? (
+      {layout === "inline" ? (
+        settingsContent
+      ) : isActive ? (
         <GmBoardSettingsModal
           open={panelOpen}
           onClose={() => setPanelOpen(false)}

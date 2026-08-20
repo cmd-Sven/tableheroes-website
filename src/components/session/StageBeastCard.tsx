@@ -50,6 +50,7 @@ type Props = {
   creature: StageCreature;
   isSingle: boolean;
   isGM: boolean;
+  isActiveTurn?: boolean;
   isUpdating: boolean;
   discoveries: BeastDiscoveries;
   creatureState?: CampaignCreatureStateRow | null;
@@ -64,6 +65,7 @@ export function StageBeastCard({
   creature,
   isSingle,
   isGM,
+  isActiveTurn = false,
   isUpdating,
   discoveries,
   creatureState,
@@ -85,7 +87,7 @@ export function StageBeastCard({
         isSingle ? "max-w-xs" : ""
       } ${creature.image_url ? "cursor-zoom-in" : "cursor-default"} ${
         isDefeated ? "opacity-60 grayscale" : ""
-      }`}
+      } ${isActiveTurn ? "ring-4 ring-accent-gold shadow-[0_0_28px_rgba(202,185,38,0.75)]" : ""}`}
       initial={{ opacity: 0, scale: 1.5, y: 200, rotateZ: -15 }}
       animate={{ opacity: 1, scale: 1, y: 0, rotateZ: 0 }}
       exit={{ opacity: 0, scale: 0.8, y: -50, transition: { duration: 0.2 } }}
@@ -127,6 +129,14 @@ export function StageBeastCard({
             <p className="font-libre text-[11px] text-gray-300 capitalize">{creature.creature_type}</p>
           ) : null}
         </div>
+
+        {isActiveTurn ? (
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center">
+            <span className="rounded-full border border-accent-gold bg-accent-gold/25 px-3 py-1 font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold shadow-[0_0_16px_rgba(202,185,38,0.65)] backdrop-blur-sm">
+              Am Zug
+            </span>
+          </div>
+        ) : null}
 
         {visibleKeys.length > 0 && (
           <div className="absolute left-2 top-2 flex flex-wrap gap-1 max-w-[85%]">

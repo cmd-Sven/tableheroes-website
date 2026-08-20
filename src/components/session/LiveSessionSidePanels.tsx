@@ -5,11 +5,9 @@ import { Gift, Map, X } from "lucide-react";
 import { LiveSessionActivityPanel } from "@/src/components/session/LiveSessionActivityPanel";
 import { LiveSessionBattlemapsPanel } from "@/src/components/session/LiveSessionBattlemapsPanel";
 import { LiveSessionChroniclePanel } from "@/src/components/session/LiveSessionChroniclePanel";
-import { LiveSessionDicePanel } from "@/src/components/session/LiveSessionDicePanel";
 import { LootDraftPanel } from "@/src/components/session/LootDraftPanel";
 import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import {
-  LIVE_SESSION_DICE_PANEL_HEIGHT_CLASS,
   LIVE_SESSION_MAIN_PANEL_HEIGHT_CLASS,
   LIVE_SESSION_SIDE_PANEL_WIDTH_CLASS,
 } from "@/src/components/session/live-session-side-types";
@@ -50,9 +48,7 @@ type Props = {
   isGM: boolean;
   isPrepMode: boolean;
   mainPanel: MainSidePanelId | null;
-  diceOpen: boolean;
   onToggleMain: (id: MainSidePanelId) => void;
-  onToggleDice: () => void;
   onCloseMain: () => void;
   handRaises: SessionHandRaise[];
   downtimeActive: boolean;
@@ -110,9 +106,7 @@ export function LiveSessionSidePanels({
   isGM,
   isPrepMode,
   mainPanel,
-  diceOpen,
   onToggleMain,
-  onToggleDice,
   onCloseMain,
   handRaises,
   downtimeActive,
@@ -163,11 +157,10 @@ export function LiveSessionSidePanels({
   onLootPublished,
 }: Props) {
   const showMain = mainPanel != null;
-  const showDice = diceOpen;
-  const showPanelStack = showMain || showDice;
+  const showPanelStack = showMain;
 
   return (
-    <div className="pointer-events-none fixed inset-y-0 right-0 z-[55] flex">
+    <div className="pointer-events-none fixed inset-y-0 right-0 z-[80] flex">
       <AnimatePresence>
         {showPanelStack ? (
           <motion.div
@@ -355,33 +348,6 @@ export function LiveSessionSidePanels({
                 </motion.div>
               ) : null}
             </AnimatePresence>
-
-            <AnimatePresence>
-              {showDice ? (
-                <motion.div
-                  key="dice-panel"
-                  initial={PANEL_SLIDE.initial}
-                  animate={PANEL_SLIDE.animate}
-                  exit={PANEL_SLIDE.exit}
-                  transition={PANEL_SLIDE.transition}
-                  className={`absolute inset-x-0 bottom-0 ${LIVE_SESSION_DICE_PANEL_HEIGHT_CLASS} overflow-hidden`}
-                >
-                  <LiveSessionDicePanel
-                    embedded
-                    sessionId={sessionId}
-                    campaignId={campaignId}
-                    open
-                    onClose={onToggleDice}
-                    currentCharacter={currentCharacter}
-                    isPrepMode={isPrepMode}
-                    prepTestCharacters={prepTestCharacters}
-                    prepTestCharacterId={prepTestCharacterId}
-                    onPrepTestCharacterChange={onPrepTestCharacterChange}
-                    onActivityPosted={onActivityPosted}
-                  />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -389,13 +355,11 @@ export function LiveSessionSidePanels({
       <div className="pointer-events-auto flex h-dvh shrink-0">
         <LiveSessionSideRail
           mainPanel={mainPanel}
-          diceOpen={diceOpen}
           isGM={isGM}
           handRaiseCount={handRaises.length}
           downtimeActive={downtimeActive}
           lootActive={lootActive}
           onToggleMain={onToggleMain}
-          onToggleDice={onToggleDice}
         />
       </div>
     </div>

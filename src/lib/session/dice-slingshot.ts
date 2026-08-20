@@ -9,11 +9,11 @@ export const SLINGSHOT_TAP_THRESHOLD_PX = 10;
 export const SLINGSHOT_MAX_STRETCH_PX = 180;
 
 /** Schwacher Zug → kurzes, langsames Rollen. */
-export const SLINGSHOT_MIN_SPEED = 1.35;
+export const SLINGSHOT_MIN_SPEED = 2.55;
 /** Tap ohne Zug. */
-export const SLINGSHOT_DEFAULT_SPEED = 3.1;
+export const SLINGSHOT_DEFAULT_SPEED = 4.05;
 /** Voller Zug → weites, schnelles Rollen. */
-export const SLINGSHOT_MAX_SPEED = 8.4;
+export const SLINGSHOT_MAX_SPEED = 9.15;
 
 export type SlingshotThrow = {
   isTap: boolean;
@@ -77,7 +77,7 @@ export function slingshotSpeedFromStrength(
   jitter = 0,
 ): number {
   if (isTap || strength === undefined) {
-    return SLINGSHOT_DEFAULT_SPEED + jitter * 0.35;
+    return SLINGSHOT_DEFAULT_SPEED + jitter * 0.85;
   }
   const s = Math.min(1, Math.max(0, strength));
   // Leicht gekrümmt: schwache Würfe langsamer, starke deutlich schneller
@@ -85,7 +85,7 @@ export function slingshotSpeedFromStrength(
   return (
     SLINGSHOT_MIN_SPEED +
     curved * (SLINGSHOT_MAX_SPEED - SLINGSHOT_MIN_SPEED) +
-    jitter * 0.35
+    jitter * 0.85
   );
 }
 
@@ -95,7 +95,7 @@ export function estimateRollDurationMs(
   isTap?: boolean,
 ): number {
   const speed = slingshotSpeedFromStrength(strength, isTap === true);
-  return Math.min(5000, Math.max(550, Math.round(350 + speed * 340)));
+  return Math.min(5000, Math.max(1800, Math.round(1650 + speed * 310)));
 }
 
 /** 0…1 für UI-Feedback (Dehnung relativ zu Max-Stretch). */

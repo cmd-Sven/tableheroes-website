@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
+import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
 import {
   announceLiveSessionSpell,
   applyLiveSessionLoadout,
@@ -127,10 +128,16 @@ type Props = {
     sizeCells: number;
   } | null;
   onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
+  /** Kampfmodus: SL kann Charakter in Initiative aufnehmen */
+  combatMode?: boolean;
+  canJoinCombat?: boolean;
+  onJoinCombat?: () => void;
+  /** Kompakte Mini-Darstellung in der Party-Leiste */
+  density?: "full" | "compact";
 };
 
 const RADIAL_ITEMS: {
-  id: Exclude<RadialPanel, null> | "sheet" | "token";
+  id: Exclude<RadialPanel, null> | "sheet" | "token" | "join_combat";
   label: string;
   Icon: typeof Swords;
   angle: number;
@@ -140,10 +147,18 @@ const RADIAL_ITEMS: {
   gmOnly?: boolean;
   tokenOnly?: boolean;
   tokenSettingsOnly?: boolean;
+  joinCombatOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
   { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
   { id: "gm_state", label: "Zustand (SL)", Icon: ShieldAlert, angle: -15, gmOnly: true },
+  {
+    id: "join_combat",
+    label: "Am Kampf teilnehmen",
+    Icon: Swords,
+    angle: -5,
+    joinCombatOnly: true,
+  },
   {
     id: "token_settings",
     label: "Token-Einstellungen",
@@ -188,8 +203,12 @@ export function LiveSessionCharacterAvatar({
   onStartTokenPlacement,
   battlemapToken = null,
   onBattlemapTokenSaved,
+  combatMode = false,
+  canJoinCombat = false,
+  onJoinCombat,
+  density = "full",
 }: Props) {
-  const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
+  const compact = density === "compact";  const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<RadialPanel>(null);
   const [pending, startTransition] = useTransition();
@@ -208,6 +227,7 @@ export function LiveSessionCharacterAvatar({
     kind: AvatarSpeechBubbleKind;
     text: string;
     key: string;
+    diceGlyphs?: { sides: number; value: number }[];
   } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
@@ -254,7 +274,12 @@ export function LiveSessionCharacterAvatar({
       if (rememberSourceId(seenSpeechBubbleIdsRef.current, detail.sourceId)) return;
       const duration = detail.durationMs ?? AVATAR_SPEECH_BUBBLE_DURATION_MS;
       const key = detail.sourceId ?? `${Date.now()}-${detail.text}`;
-      setSpeechBubble({ kind: detail.kind, text: detail.text, key });
+      setSpeechBubble({
+        kind: detail.kind,
+        text: detail.text,
+        key,
+        diceGlyphs: detail.diceGlyphs,
+      });
       if (speechBubbleTimerRef.current != null) window.clearTimeout(speechBubbleTimerRef.current);
       speechBubbleTimerRef.current = window.setTimeout(() => {
         setSpeechBubble(null);
@@ -449,6 +474,7 @@ export function LiveSessionCharacterAvatar({
       if (item.id === "sheet") return showDnd5eSheet;
       if (item.moodOnly) return true;
       if (item.gmOnly) return isGm;
+      if (item.joinCombatOnly) return isGm && combatMode && canJoinCombat && Boolean(onJoinCombat);
       if (item.tokenSettingsOnly) return hasBattlemapToken;
       if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
       if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
@@ -472,6 +498,9 @@ export function LiveSessionCharacterAvatar({
     battlemapActive,
     onStartTokenPlacement,
     hasBattlemapToken,
+    combatMode,
+    canJoinCombat,
+    onJoinCombat,
   ]);
 
   function openSheetTab() {
@@ -487,6 +516,12 @@ export function LiveSessionCharacterAvatar({
   function handleRadialClick(id: (typeof RADIAL_ITEMS)[number]["id"]) {
     if (id === "sheet") {
       openSheetTab();
+      return;
+    }
+    if (id === "join_combat") {
+      onJoinCombat?.();
+      setMenuOpen(false);
+      setPanel(null);
       return;
     }
     if (id === "token") {
@@ -913,7 +948,11 @@ export function LiveSessionCharacterAvatar({
   return (
     <div ref={rootRef} className="relative flex h-full w-full flex-col items-center">
       {/* Feste Höhe über dem Avatar → kein CLS beim Einblenden */}
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-[70] mb-1 flex h-[3.25rem] w-[11.5rem] -translate-x-1/2 items-end justify-center">
+      <div
+        className={`pointer-events-none absolute bottom-full left-1/2 z-[70] mb-1 flex -translate-x-1/2 items-end justify-center ${
+          compact ? "h-[2.25rem] w-[8rem]" : "h-[3.25rem] w-[14rem]"
+        }`}
+      >
         <AnimatePresence mode="wait">
           {speechBubble ? (
             <motion.div
@@ -937,15 +976,31 @@ export function LiveSessionCharacterAvatar({
                   boxShadow: `0 8px 24px ${playerColorAlpha(playerColor, 0.35)}`,
                 }}
               >
-                <p
-                  className={`text-center leading-snug ${
-                    speechBubble.kind === "dice"
-                      ? "font-barlow text-xs font-bold uppercase tracking-wide"
-                      : "font-libre text-[11px]"
-                  }`}
-                >
-                  {speechBubble.text}
-                </p>
+                {speechBubble.kind === "dice" &&
+                speechBubble.diceGlyphs &&
+                speechBubble.diceGlyphs.length > 0 ? (
+                  <div className="flex items-center justify-center gap-1.5">
+                    {speechBubble.diceGlyphs.map((g, i) => (
+                      <span
+                        key={`${g.sides}-${g.value}-${i}`}
+                        className="inline-flex items-center gap-0.5 font-barlow text-sm font-extrabold tabular-nums leading-none"
+                      >
+                        <DiceGlyph sides={g.sides} className="h-3.5 w-3.5" />
+                        {g.value}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p
+                    className={`text-center leading-snug ${
+                      speechBubble.kind === "dice"
+                        ? "font-barlow text-xs font-bold uppercase tracking-wide"
+                        : "font-libre text-[11px]"
+                    }`}
+                  >
+                    {speechBubble.text}
+                  </p>
+                )}
               </div>
               <span
                 aria-hidden
@@ -979,7 +1034,9 @@ export function LiveSessionCharacterAvatar({
           opacity: 1,
         }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className={`relative z-10 flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] bg-hero-dark shadow-xl ${
+        className={`relative z-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-hero-dark shadow-xl ${
+          compact ? "h-14 w-14 border-2" : "h-36 w-36 border-[3px]"
+        } ${
           isDummy ? "border-dashed border-amber-600/90" : isCritFx ? "border-accent-gold" : ""
         } ${canInteract && !isDummy ? "cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-accent-gold" : "cursor-default"}`}
         style={
@@ -987,7 +1044,9 @@ export function LiveSessionCharacterAvatar({
             ? undefined
             : {
                 borderColor: playerColor,
-                boxShadow: `0 0 0 2px ${playerColorAlpha(playerColor, 0.35)}, 0 10px 28px rgba(0,0,0,0.45)`,
+                boxShadow: compact
+                  ? `0 0 0 1px ${playerColorAlpha(playerColor, 0.35)}, 0 4px 12px rgba(0,0,0,0.45)`
+                  : `0 0 0 2px ${playerColorAlpha(playerColor, 0.35)}, 0 10px 28px rgba(0,0,0,0.45)`,
               }
         }
         title={canInteract && !isDummy ? `${characterName} — Aktionen` : characterName}
@@ -1003,18 +1062,24 @@ export function LiveSessionCharacterAvatar({
             />
           </div>
         ) : (
-          <span className="font-barlow text-4xl text-accent-gold">
+          <span
+            className={`font-barlow text-accent-gold ${compact ? "text-lg" : "text-4xl"}`}
+          >
             {characterName[0]?.toUpperCase()}
           </span>
         )}
         {rollFx && !status?.moodTokenUrls?.[rollFx.moodKey] ? (
-          <span className="pointer-events-none absolute inset-x-1 bottom-2 z-10 rounded bg-black/75 px-1 py-0.5 text-center font-barlow text-[8px] font-bold uppercase leading-tight text-accent-gold">
+          <span
+            className={`pointer-events-none absolute inset-x-1 z-10 rounded bg-black/75 px-1 py-0.5 text-center font-barlow font-bold uppercase leading-tight text-accent-gold ${
+              compact ? "bottom-0.5 text-[6px]" : "bottom-2 text-[8px]"
+            }`}
+          >
             {fxMoodLabel}
           </span>
         ) : null}
       </motion.button>
 
-      {!isDummy ? (
+      {!isDummy && !compact ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[-6px] z-20 flex flex-col items-center gap-1 px-2">
           <p
             className="max-w-[200px] truncate rounded bg-black/65 px-2 py-0.5 text-center font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold"
@@ -1036,6 +1101,19 @@ export function LiveSessionCharacterAvatar({
               {hpCurrent}/{hpMax}
               {status && status.hpTemp > 0 ? ` (+${status.hpTemp})` : ""} TP
             </p>
+          </div>
+        </div>
+      ) : !isDummy && compact ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[-4px] z-20 flex justify-center px-1">
+          <div className="w-[52px] rounded-full border border-black/40 bg-black/70 p-px shadow-md">
+            <div className="relative h-1 overflow-hidden rounded-full bg-red-950/80">
+              <div
+                className={`h-full transition-[width] ${
+                  hpPct > 50 ? "bg-hero-vibrant" : hpPct > 25 ? "bg-amber-500" : "bg-red-500"
+                }`}
+                style={{ width: `${hpPct}%` }}
+              />
+            </div>
           </div>
         </div>
       ) : null}

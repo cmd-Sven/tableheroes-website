@@ -5,8 +5,6 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { ImageCarousel3D } from "@/src/components/ui/ImageCarousel3D";
 
-const SLIDE_INTERVAL_MS = 6000;
-
 type Slide = {
   src: string;
   alt: string;

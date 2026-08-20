@@ -6,6 +6,40 @@ Live: [table-heroes.de](https://table-heroes.de) · Repo: [cmd-Sven/tableheroes-
 
 ---
 
+## Neuestes Update (August 2026) — Live-Tisch & Combat
+
+Dieses Release baut den **Live-Session-Tisch** spürbar in Richtung VTT aus. Highlights:
+
+### Combat & Initiative
+- **Neues Initiative-HUD** oben mittig (transparent): Teilnehmer von der Battlemap, Initiative würfeln, erst danach **Kampf starten**
+- Phasen: Setup (`is_combat_mode`) → aktiver Kampf (`combat_started`) mit Zugsteuerung (vor/zurück/beenden)
+- **Kampfstart-Video**: Modal mit `battle_begins.mp4`, Sound, feurigem Glow und Text „Lasst die Schlacht beginnen“
+- Token-Radial / Avatar: „Am Kampf teilnehmen“ (SL)
+
+### Würfel
+- **Würfel-Roll-Sound** aus MP3 (`public/sounds/dice-roll.mp3`) beim Rollen
+- **Ergebnisse erst nach Landung**: Chat und Avatar-Sprechblase erscheinen erst, wenn die Würfel zur Ruhe gekommen sind
+- Crit-/Patzer-Sounds und Avatar-FX unverändert danach
+
+### Battlemap & SL-Werkzeuge
+- **Fog of War** und **Effekt-Schablonen**: Menüs klappen seitlich aus der linken Leiste auf (Werkzeugwahl)
+- Effekt-Schablonen (Rechteck / Kreis / Kegel) inkl. Migration
+- Animierte Token-Bewegung (laufen statt teleportieren)
+
+### Live-Session UI
+- **Avatar-Leiste** über der Bühne (Overlay bis zum goldenen Frame-Rand)
+- Drei Modi: **Voll / Mini / Aus** (lokal gespeichert) — für SL und Spielermonitor
+- Bühne größer: füllt den Picture-Frame bis unten
+- **Linkes Dock** (Atmosphäre, Chronist, Tisch, Fog/Effekte, Würfel) und **Top-Toolbar** (Ort, Schicksalsmünzen, SL-Aktionen)
+- Spielermonitor: eine zusammengeführte Kopfzeile statt doppelter Balken
+
+### Datenbank
+- Migrationen: `combat_started` an `session_live_states`, `session_battlemap_effect_templates`
+
+> Production-Build (`npm run build`) vor dem Deploy erfolgreich.
+
+---
+
 ## Produkt (Was ist Table Heroes?)
 
 Heute verbindet Table Heroes drei Dinge:
@@ -16,7 +50,7 @@ Heute verbindet Table Heroes drei Dinge:
 
 **Vision / Roadmap:** den Live-Tisch so ausbauen, dass Table Heroes als **VTT-Alternative zu Roll20 und Foundry** nutzbar ist (eigene Battlemap, Tokens, Combat, Medien, Sync) — parallel bleibt die Integration mit Foundry über das Bridge-Modul und die Sync-API erhalten.
 
-> **Hinweis:** Was unten unter „Bereits umgesetzt“ steht, basiert auf dem aktuellen Code. VTT-Ziele wie vollständiges Fog of War oder ein kompletter Foundry-/Roll20-Ersatz sind **Roadmap**, nicht Status quo.
+> **Hinweis:** Was unter „Bereits umgesetzt“ und im Block **Neuestes Update** steht, basiert auf dem aktuellen Code. Ein kompletter Foundry-/Roll20-Ersatz bleibt **Roadmap**.
 
 ---
 
@@ -84,17 +118,18 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 ### Live-Session (Session Board) — Kern des VTT-Pfads
 - Live-Session-Seite `/session/[sessionId]` und Gast-Join `/session/join/[token]`
-- Rechte **Side-Rail** mit Panels: Aktivität/Chat, Szenen, Battlemaps, Tokens, Chronik, Würfel (eigenes Toggle)
+- **Linkes Dock** + **Top-Toolbar** (Ort, Fate Coins, SL-Werkzeuge); Würfel als eigenes Panel
+- **Avatar-Leiste** als Overlay über der Bühne (Voll / Mini / Aus)
 - **Battlemap** (Stand siehe [`BATTLEMAP.md`](./BATTLEMAP.md)):
   - Session-Maps, Grid, Charakter-/NSC-/Kreatur-Tokens, Props
   - Overlay-Navigation (Pfeile / Zoom % / Einpassen)
-  - Bewegung inkl. Dash & Pause; Token-Einstellungen (HP-Balken oben am Token, Größe, Sichtbarkeit)
+  - Bewegung inkl. Dash & Pause (animiert); Token-Einstellungen (HP-Balken, Größe, Sichtbarkeit)
   - Spieler-Token: gleiches Radialmenü wie Avatar (Gemüt, SL-Zustand, Waffen, …)
   - Zustands-Badge + Tooltip; Live-Bild nach Gemüt/Zustand
   - **Just-in-Time-Sync** für Bewegung, Einstellungen und Zustände (Broadcast-Snapshots + Realtime)
-- Fog-of-War-Layer-Komponente vorhanden; laut Roadmap Phase 3 noch nicht fertig ausgebaut
-- Combat / Initiative-Leiste, Conditions
-- 3D-Würfel-Overlay (R3F)
+  - **Fog of War** (manuell zeichnen) + **Effekt-Schablonen** mit seitlichen Werkzeug-Flyouts
+- **Combat**: Initiative-HUD, würfeln → Kampf starten, Video-Intro, Zugsteuerung
+- **3D-Würfel** (R3F) inkl. Roll-Sound und Reveal erst nach Landung
 - Handheben (Hand Raise)
 - Szenen-Karten, Beast Cards, Loot (Chest, Draft, GM-Modals)
 - Travel / Downtime
@@ -114,8 +149,8 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 | Status | Themen |
 |--------|--------|
-| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), Combat-UI, Würfel, Side-Rail, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
-| **Geplant (VTT)** | Fog of War ausbauen, Initiative-Fokus auf dem Tisch, weitere Tisch-Features Richtung vollwertigem VTT |
+| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), **Fog of War**, **Effekt-Schablonen**, Combat-HUD + Kampfstart-Video, Würfel (Sound/Reveal), Dock/Toolbar, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
+| **Geplant (VTT)** | Fog/Effekte weiter verfeinern, Initiative-Fokus auf dem Tisch, weitere Tisch-Features Richtung vollwertigem VTT |
 | **Bewusst nicht** (aktuell laut `BATTLEMAP.md`) | Sync des SL-Viewports (Zoom/Pan bleibt lokal pro Client) |
 
 Details zur Battlemap: [`BATTLEMAP.md`](./BATTLEMAP.md). Weitere Fach-Docs: `FACTIONS_SYSTEM_README.md`, `WORLD_LORE_SYSTEM.md`, `PLAYER_VIEW_UPDATE.md`, `PROJECT_STRUCTURE.md`.

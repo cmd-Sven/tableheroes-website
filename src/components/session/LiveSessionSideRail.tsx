@@ -4,7 +4,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
   CircleDot,
-  Dices,
   Gift,
   Globe2,
   ImageIcon,
@@ -18,7 +17,7 @@ import {
 } from "@/src/components/session/live-session-side-types";
 
 type RailItem = {
-  id: MainSidePanelId | "dice";
+  id: MainSidePanelId;
   label: string;
   icon: LucideIcon;
   active: boolean;
@@ -30,13 +29,11 @@ type RailItem = {
 
 type Props = {
   mainPanel: MainSidePanelId | null;
-  diceOpen: boolean;
   isGM: boolean;
   handRaiseCount?: number;
   downtimeActive?: boolean;
   lootActive?: boolean;
   onToggleMain: (id: MainSidePanelId) => void;
-  onToggleDice: () => void;
 };
 
 function SideRailButton({
@@ -84,13 +81,11 @@ function SideRailButton({
 
 export function LiveSessionSideRail({
   mainPanel,
-  diceOpen,
   isGM,
   handRaiseCount = 0,
   downtimeActive = false,
   lootActive = false,
   onToggleMain,
-  onToggleDice,
 }: Props) {
   const mainItems: RailItem[] = [
     {
@@ -172,12 +167,6 @@ export function LiveSessionSideRail({
       {mainItems.map((item) => (
         <SideRailButton key={item.id} {...item} />
       ))}
-      <SideRailButton
-        label="Würfel"
-        icon={Dices}
-        active={diceOpen}
-        onClick={onToggleDice}
-      />
     </nav>
   );
 }

@@ -7,7 +7,10 @@ import {
 } from "@/src/lib/actions/session-activity-actions";
 import {
   createSeededRng,
+  executeDicePool,
   executeDiceRoll,
+  normalizeDicePool,
+  type DicePoolGroup,
   type DiceRollMode,
 } from "@/src/lib/session/dice-roll";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
@@ -22,6 +25,8 @@ export type RequestLiveDiceRollInput = {
   characterName: string;
   dice: number;
   sides: number;
+  /** Gemischter Pool, z. B. 1w20 + 2w6. Überschreibt dice/sides wenn gesetzt. */
+  diceGroups?: DicePoolGroup[];
   modifier?: number;
   mode?: DiceRollMode;
   kind: LiveDiceRollKind;
@@ -92,9 +97,9 @@ function buildActivityText(
     };
   }
 
-  const prefix = extras.label
+  const  prefix = extras.label
     ? `${characterName} würfelt ${extras.label}`
-    : `${characterName} w${outcome.sides} gewürfelt`;
+    : `${characterName} würfelt ${outcome.formula}`;
   return {
     type: "dice",
     text: `${prefix}: ${outcome.display}`,
@@ -115,8 +120,14 @@ export async function requestLiveDiceRoll(
     throw new Error("Kein Charakter für den Wurf.");
   }
 
-  const dice = Math.max(1, Math.min(20, Math.round(input.dice)));
-  const sides = Math.max(2, Math.min(100, Math.round(input.sides)));
+  const groups = normalizeDicePool(input.diceGroups ?? []);
+  const usePool = groups.length > 0;
+  const dice = usePool
+    ? groups.reduce((s, g) => s + g.count, 0)
+    : Math.max(1, Math.min(20, Math.round(input.dice)));
+  const sides = usePool
+    ? groups[0]!.sides
+    : Math.max(2, Math.min(100, Math.round(input.sides)));
   const mode: DiceRollMode = input.mode ?? "normal";
 
   const sheetMod = await resolveLiveDiceSheetModifier({
@@ -137,7 +148,9 @@ export async function requestLiveDiceRoll(
 
   const seed = randomBytes(16).toString("hex");
   const rng = createSeededRng(seed);
-  const outcome = executeDiceRoll({ dice, sides, modifier }, mode, rng, seed);
+  const outcome = usePool
+    ? executeDicePool(groups, modifier, mode, rng, seed)
+    : executeDiceRoll({ dice, sides, modifier }, mode, rng, seed);
 
   const { type, text } = buildActivityText(input.kind, characterName, outcome, {
     label,
@@ -159,6 +172,8 @@ export async function requestLiveDiceRoll(
     ...outcome,
     animate: true,
     faces: outcome.faces,
+    dieSides: outcome.dieSides,
+    bubbleParts: outcome.bubbleParts,
     seed,
     label,
     modifier,

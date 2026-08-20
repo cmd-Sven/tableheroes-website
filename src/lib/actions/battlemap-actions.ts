@@ -12,9 +12,11 @@ import { parseSheetData } from "@/src/lib/characters/dnd5e/defaults";
 import {
   DEFAULT_BATTLEMAP_GRID,
   type BattlemapFogShapeKind,
+  type BattlemapEffectShapeKind,
   type BattlemapGridConfig,
   type BattlemapTokenSide,
   type SessionBattlemap,
+  type SessionBattlemapEffectTemplate,
   type SessionBattlemapFogShape,
   type SessionBattlemapProp,
   type SessionBattlemapToken,
@@ -922,4 +924,178 @@ export async function saveBattlemapFogPreset(
   if (!user) throw new Error("Nicht authentifiziert.");
   await assertSessionGm(sessionId, user.id);
   await persistFogPresetForBattlemap(supabase, battlemapId);
+}
+
+function normalizeEffectTemplate(row: Record<string, unknown>): SessionBattlemapEffectTemplate {
+  const shapeRaw = String(row.shape ?? "rect");
+  const shape: BattlemapEffectShapeKind =
+    shapeRaw === "circle" ? "circle" : shapeRaw === "cone" ? "cone" : "rect";
+  const gridW = Math.max(1, Math.min(200, Math.round(Number(row.grid_w ?? 1))));
+  const gridH =
+    shape === "rect"
+      ? Math.max(1, Math.min(200, Math.round(Number(row.grid_h ?? 1))))
+      : gridW;
+  return {
+    id: String(row.id),
+    battlemap_id: String(row.battlemap_id),
+    session_id: String(row.session_id),
+    campaign_id: String(row.campaign_id),
+    shape,
+    grid_x: Math.round(Number(row.grid_x ?? 0)),
+    grid_y: Math.round(Number(row.grid_y ?? 0)),
+    grid_w: gridW,
+    grid_h: gridH,
+    direction_deg: Math.round(Number(row.direction_deg ?? 0)) % 360,
+    z_index: Math.round(Number(row.z_index ?? 0)),
+    created_at: row.created_at != null ? String(row.created_at) : undefined,
+    updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
+  };
+}
+
+export async function listBattlemapEffectTemplates(
+  battlemapId: string,
+  sessionId: string,
+): Promise<SessionBattlemapEffectTemplate[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .select("*")
+    .eq("battlemap_id", battlemapId)
+    .eq("session_id", sessionId)
+    .order("z_index", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(normalizeEffectTemplate);
+}
+
+export async function createBattlemapEffectTemplate(input: {
+  sessionId: string;
+  battlemapId: string;
+  shape: BattlemapEffectShapeKind;
+  gridX: number;
+  gridY: number;
+  gridW: number;
+  gridH: number;
+  directionDeg?: number;
+}): Promise<SessionBattlemapEffectTemplate> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const { data: mapRaw } = await (supabase as any)
+    .from("session_battlemaps")
+    .select("id, campaign_id")
+    .eq("id", input.battlemapId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (!mapRaw) throw new Error("Battlemap nicht gefunden.");
+  const campaignId = String((mapRaw as { campaign_id: string }).campaign_id);
+
+  const shape = input.shape;
+  const gridW = Math.max(1, Math.min(200, Math.round(input.gridW)));
+  const gridH =
+    shape === "rect" ? Math.max(1, Math.min(200, Math.round(input.gridH))) : gridW;
+  const directionDeg =
+    shape === "cone"
+      ? Math.round(Number(input.directionDeg ?? 0)) % 360
+      : 0;
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .insert({
+      battlemap_id: input.battlemapId,
+      session_id: input.sessionId,
+      campaign_id: campaignId,
+      shape,
+      grid_x: Math.round(input.gridX),
+      grid_y: Math.round(input.gridY),
+      grid_w: gridW,
+      grid_h: gridH,
+      direction_deg: directionDeg,
+      z_index: Date.now() % 100000,
+    })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message || "Effekt-Schablone konnte nicht erstellt werden.");
+  return normalizeEffectTemplate(data as Record<string, unknown>);
+}
+
+export async function updateBattlemapEffectTemplate(input: {
+  sessionId: string;
+  templateId: string;
+  gridX?: number;
+  gridY?: number;
+  gridW?: number;
+  gridH?: number;
+  directionDeg?: number;
+}): Promise<SessionBattlemapEffectTemplate> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const { data: existingRaw } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .select("*")
+    .eq("id", input.templateId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (!existingRaw) throw new Error("Effekt-Schablone nicht gefunden.");
+  const existing = normalizeEffectTemplate(existingRaw as Record<string, unknown>);
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.gridX != null) patch.grid_x = Math.round(input.gridX);
+  if (input.gridY != null) patch.grid_y = Math.round(input.gridY);
+  if (input.gridW != null) {
+    const w = Math.max(1, Math.min(200, Math.round(input.gridW)));
+    patch.grid_w = w;
+    if (existing.shape !== "rect") patch.grid_h = w;
+  }
+  if (input.gridH != null && existing.shape === "rect") {
+    patch.grid_h = Math.max(1, Math.min(200, Math.round(input.gridH)));
+  }
+  if (input.directionDeg != null && existing.shape === "cone") {
+    patch.direction_deg = Math.round(input.directionDeg) % 360;
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .update(patch)
+    .eq("id", input.templateId)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return normalizeEffectTemplate(data as Record<string, unknown>);
+}
+
+export async function removeBattlemapEffectTemplate(
+  templateId: string,
+  sessionId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(sessionId, user.id);
+
+  const { error } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .delete()
+    .eq("id", templateId)
+    .eq("session_id", sessionId);
+  if (error) throw new Error(error.message);
 }

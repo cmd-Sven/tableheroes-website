@@ -13,7 +13,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { ApplyButton } from "./ApplyButton";
-import { CampaignMembershipSchema, CampaignSchema } from "@/src/lib/validations/schemas";
+import { CampaignSchema } from "@/src/lib/validations/schemas";
 import { z } from "zod";
 type Props = {
   params: Promise<{ id: string }>;

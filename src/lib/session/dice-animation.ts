@@ -16,6 +16,7 @@ export type DiceAnimCompleteDetail = {
 export type DiceRollAnimMeta = {
   animate?: boolean;
   faces?: number[];
+  dieSides?: number[];
   sides?: number;
   seed?: string;
   display?: string;

@@ -11,7 +11,7 @@ import {
   computeEquippedWeaponAttacks,
   type WeaponAttackPreview,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { parseRollCommand, type DiceRollMode } from "@/src/lib/session/dice-roll";
+import { parseRollCommand, formatDicePoolFormula, type DicePoolGroup, type DiceRollMode } from "@/src/lib/session/dice-roll";
 import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
 import { requestDiceDropPlacement } from "@/src/lib/session/dice-placement-store";
 import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
@@ -95,9 +95,11 @@ export function useLiveSessionDiceRoll({
         let throwStrength: number | undefined;
         let isTap: boolean | undefined;
         try {
-          const drop = await requestDiceDropPlacement({
+        const drop = await requestDiceDropPlacement({
             sides: input.sides,
-            count: input.dice,
+            count: input.diceGroups
+              ? input.diceGroups.reduce((s, g) => s + g.count, 0)
+              : input.dice,
           });
           dropNx = drop.dropNx;
           dropNy = drop.dropNy;
@@ -134,6 +136,19 @@ export function useLiveSessionDiceRoll({
       sides,
       modifier,
       mode,
+    });
+  }
+
+  function rollPool(groups: DicePoolGroup[], mode: DiceRollMode = rollMode) {
+    const total = groups.reduce((s, g) => s + g.count, 0);
+    if (total <= 0) return;
+    postLiveDiceRoll({
+      kind: "dice",
+      dice: total,
+      sides: groups[0]?.sides ?? 20,
+      diceGroups: groups,
+      mode,
+      label: formatDicePoolFormula(groups),
     });
   }
 
@@ -260,6 +275,7 @@ export function useLiveSessionDiceRoll({
     primaryAttack,
     pending,
     rollDice,
+    rollPool,
     rollFromCommand,
     handleSkillCheck,
     handleSavingThrow,

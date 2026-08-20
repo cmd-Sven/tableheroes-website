@@ -30,6 +30,31 @@ export type SessionBattlemapFogShape = {
 
 export type BattlemapFogTool = "select" | "rect" | "circle" | null;
 
+export type BattlemapEffectShapeKind = "rect" | "circle" | "cone";
+
+/** SL-Schablone zur Markierung von Effektbereichen (Zauber, Auren, …). */
+export type SessionBattlemapEffectTemplate = {
+  id: string;
+  battlemap_id: string;
+  session_id: string;
+  campaign_id: string;
+  shape: BattlemapEffectShapeKind;
+  /** Rect: oben links; Circle: Zentrum; Cone: Spitze */
+  grid_x: number;
+  grid_y: number;
+  /** Rect: Breite; Circle: Radius; Cone: Länge in Zellen */
+  grid_w: number;
+  /** Rect: Höhe; Circle: = grid_w */
+  grid_h: number;
+  /** Cone: Richtung in Grad (0 = Ost, im Uhrzeigersinn) */
+  direction_deg: number;
+  z_index: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BattlemapEffectTool = "select" | "rect" | "circle" | "cone" | null;
+
 export type CharacterTokenPlacement = {
   characterId: string;
   characterName: string;

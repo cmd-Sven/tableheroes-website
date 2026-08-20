@@ -110,6 +110,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     id: String(npc.id),
     name: String(npc.name ?? "NPC"),
     title: npc.title != null ? String(npc.title) : null,
+    image_url: npc.image_url != null ? String(npc.image_url) : null,
   }));
 
   const factionsRaw = await getFactionsWithMembers(campaignId);
@@ -117,6 +118,8 @@ export default async function SessionStagePrepPage({ params }: Props) {
     id: String(f.id),
     name: String(f.name ?? "Fraktion"),
     type: f.type != null ? String(f.type) : null,
+    image_url: f.image_url != null ? String(f.image_url) : null,
+    banner_url: f.banner_url != null ? String(f.banner_url) : null,
   }));
 
   const bestariumPayload = await getBestariumCreaturesForCampaign(campaignId, true);
@@ -125,6 +128,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     name: String(c.name ?? "Kreatur"),
     creature_type: c.creature_type != null ? String(c.creature_type) : null,
     is_revealed: !!c.is_revealed,
+    image_url: c.image_url != null ? String(c.image_url) : null,
   }));
 
   const stageDeckNpcIds =

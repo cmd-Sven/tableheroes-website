@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { DragEvent } from "react";
 import { X } from "lucide-react";
@@ -33,6 +33,8 @@ type Props = {
   combatRound: number;
   currentTurnIndex: number;
   isGM: boolean;
+  /** Name des eigenen Charakters — für „Du bist dran!“ */
+  ownCharacterName?: string | null;
   onNextTurn: () => void;
   onUpdateParticipant: (
     id: string,
@@ -98,12 +100,24 @@ export function CombatInitiativeBar({
   combatRound,
   currentTurnIndex,
   isGM,
+  ownCharacterName = null,
   onNextTurn,
   onUpdateParticipant,
   onDropToken,
 }: Props) {
   const [initiativeDrafts, setInitiativeDrafts] = useState<Record<string, string>>({});
   const [conditionPickerId, setConditionPickerId] = useState<string | null>(null);
+  const activeTokenRef = useRef<HTMLDivElement | null>(null);
+
+  const activeParticipant = useMemo(
+    () => participants.find((p) => p.id === activeParticipantId) ?? null,
+    [participants, activeParticipantId],
+  );
+
+  const isOwnTurn =
+    Boolean(ownCharacterName) &&
+    activeParticipant?.type === "player" &&
+    activeParticipant.name === ownCharacterName;
 
   const conditionPickerParticipant = useMemo(
     () => participants.find((p) => p.id === conditionPickerId) ?? null,
@@ -113,6 +127,15 @@ export function CombatInitiativeBar({
   const safeTurnIndex = participants.length
     ? Math.min(Math.max(0, currentTurnIndex), participants.length - 1)
     : 0;
+
+  useEffect(() => {
+    if (!activeParticipantId) return;
+    activeTokenRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [activeParticipantId, combatRound, currentTurnIndex]);
 
   useEffect(() => {
     setInitiativeDrafts((prev) => {
@@ -188,6 +211,20 @@ export function CombatInitiativeBar({
                 Zug {safeTurnIndex + 1} / {participants.length}
               </span>
             ) : null}
+            {activeParticipant ? (
+              <motion.span
+                key={activeParticipant.id}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`rounded-lg border px-3 py-1 font-barlow text-[11px] font-extrabold uppercase tracking-wide shadow-md ${
+                  isOwnTurn
+                    ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                    : "border-hero-vibrant/60 bg-hero-vibrant/10 text-hero-vibrant"
+                }`}
+              >
+                {isOwnTurn ? "Du bist dran!" : `Am Zug: ${activeParticipant.name}`}
+              </motion.span>
+            ) : null}
           </div>
           {isGM ? (
             <button
@@ -216,6 +253,7 @@ export function CombatInitiativeBar({
               return (
                 <div
                   key={participant.id}
+                  ref={active ? activeTokenRef : undefined}
                   className="relative flex w-[5.75rem] shrink-0 flex-col items-center gap-1.5"
                 >
                   <div className="flex h-6 w-full items-end justify-center">

@@ -15,6 +15,8 @@ import {
   Search,
   LayoutGrid,
   PawPrint,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { createSessionWithScenes, getSessionWizardContext, updateSessionFromWizard } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import {
@@ -791,9 +793,40 @@ export function SessionWizardModal({
               </div>
 
               <div>
-                <label className="mb-2 block font-barlow text-sm font-bold uppercase text-gray-300">
-                  NPCs auswählen
-                </label>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <label className="block font-barlow text-sm font-bold uppercase text-gray-300">
+                    NPCs auswählen
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedNPCIds((prev) => {
+                          const next = new Set(prev);
+                          for (const npc of filteredNpcs) next.add(npc.id);
+                          return Array.from(next);
+                        })
+                      }
+                      disabled={filteredNpcs.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/15 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/25 disabled:opacity-40"
+                    >
+                      <CheckSquare className="h-3.5 w-3.5" />
+                      {npcSearch.trim() ? "Treffer anwählen" : "Alle anwählen"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const visible = new Set(filteredNpcs.map((n) => n.id));
+                        setSelectedNPCIds((prev) => prev.filter((id) => !visible.has(id)));
+                      }}
+                      disabled={filteredNpcs.every((n) => !selectedNPCIds.includes(n.id))}
+                      className="inline-flex items-center gap-1.5 rounded border border-hero-border/70 bg-slate-900 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-200 hover:border-hero-vibrant disabled:opacity-40"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                      {npcSearch.trim() ? "Treffer abwählen" : "Alle abwählen"}
+                    </button>
+                  </div>
+                </div>
                 <div className="max-h-72 space-y-2 overflow-y-auto rounded border border-hero-dark bg-slate-900 p-3">
                   {npcs.length === 0 ? (
                     <p className="py-4 text-center font-libre text-sm text-gray-500">Noch keine NPCs vorhanden.</p>

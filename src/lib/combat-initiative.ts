@@ -125,3 +125,122 @@ export function normalizeCombatParticipantSide(raw: unknown): CombatParticipantS
   if (raw === "friend" || raw === "nemesis") return raw;
   return null;
 }
+
+/** Ziel für „Am Zug“-Markierung über Bühne, Avatare und Battlemap. */
+export type ActiveCombatTurnHighlight = {
+  participantId: string;
+  participantName: string;
+  characterId: string | null;
+  npcId: string | null;
+  tokenId: string | null;
+  matchLabel: string;
+};
+
+type TurnParticipantLike = {
+  id: string;
+  name: string;
+  type: "player" | "monster" | "npc";
+  npc_id?: string | null;
+};
+
+type PartyCharacterLike = {
+  id: string;
+  name: string;
+  isSessionDummy?: boolean;
+};
+
+type BattlemapTokenLike = {
+  id: string;
+  character_id: string | null;
+  npc_id: string | null;
+  label: string | null;
+};
+
+export function resolveActiveCombatTurnHighlight(
+  participant: TurnParticipantLike | null | undefined,
+  partyCharacters: PartyCharacterLike[],
+  battlemapTokens: BattlemapTokenLike[] = [],
+): ActiveCombatTurnHighlight | null {
+  if (!participant) return null;
+
+  const characterId =
+    participant.type === "player"
+      ? (partyCharacters.find((c) => !c.isSessionDummy && c.name === participant.name)?.id ??
+        null)
+      : null;
+  const npcId =
+    participant.type === "npc" && participant.npc_id ? String(participant.npc_id) : null;
+
+  const token =
+    battlemapTokens.find(
+      (t) =>
+        (characterId && t.character_id === characterId) ||
+        (npcId && t.npc_id === npcId) ||
+        (t.label && t.label === participant.name),
+    ) ?? null;
+
+  return {
+    participantId: participant.id,
+    participantName: participant.name,
+    characterId,
+    npcId,
+    tokenId: token?.id ?? null,
+    matchLabel: participant.name,
+  };
+}
+
+export function isNpcActiveCombatTurn(
+  npcId: string,
+  highlight: ActiveCombatTurnHighlight | null | undefined,
+): boolean {
+  return Boolean(highlight?.npcId && highlight.npcId === npcId);
+}
+
+export function isCreatureActiveCombatTurn(
+  creatureName: string,
+  highlight: ActiveCombatTurnHighlight | null | undefined,
+): boolean {
+  if (!highlight) return false;
+  return highlight.matchLabel === creatureName;
+}
+
+export function isCharacterActiveCombatTurn(
+  characterId: string,
+  highlight: ActiveCombatTurnHighlight | null | undefined,
+): boolean {
+  return Boolean(highlight?.characterId && highlight.characterId === characterId);
+}
+
+/** Initiative gilt als gewürfelt, wenn ein Label gesetzt ist. */
+export function hasRolledCombatInitiative(participant: {
+  initiative_label?: string | null;
+}): boolean {
+  return (
+    participant.initiative_label != null &&
+    String(participant.initiative_label).trim() !== ""
+  );
+}
+
+/**
+ * HUD-Sortierung: gewürfelte nach Initiative, Ungewürfelte ans Ende (Sort-Order).
+ */
+export function compareCombatHudOrder(
+  a: {
+    initiative_label?: string | null;
+    initiative_value: number;
+    sort_order: number;
+    name: string;
+  },
+  b: {
+    initiative_label?: string | null;
+    initiative_value: number;
+    sort_order: number;
+    name: string;
+  },
+): number {
+  const aRolled = hasRolledCombatInitiative(a);
+  const bRolled = hasRolledCombatInitiative(b);
+  if (aRolled !== bRolled) return aRolled ? -1 : 1;
+  if (!aRolled) return a.sort_order - b.sort_order || a.name.localeCompare(b.name, "de");
+  return compareCombatInitiative(a, b);
+}

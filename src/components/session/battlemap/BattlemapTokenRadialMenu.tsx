@@ -8,6 +8,7 @@ import {
   Heart,
   Move,
   Settings2,
+  Swords,
   Trash2,
   X,
 } from "lucide-react";
@@ -30,6 +31,9 @@ type Props = {
   onMove?: () => void;
   onToggleVisibility?: (visible: boolean) => void;
   onRemove?: () => void;
+  /** SL: Token in die Initiative aufnehmen (wenn Kampfmodus, noch nicht drin) */
+  onJoinCombat?: () => void;
+  canJoinCombat?: boolean;
   onSaveSettings: (settings: {
     showHpBar: boolean;
     sizeCells: number;
@@ -46,6 +50,8 @@ export function BattlemapTokenRadialMenu({
   onMove,
   onToggleVisibility,
   onRemove,
+  onJoinCombat,
+  canJoinCombat = false,
   onSaveSettings,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -73,6 +79,18 @@ export function BattlemapTokenRadialMenu({
         Icon: Move,
         onClick: () => {
           onMove();
+          onClose();
+        },
+      });
+    }
+
+    if (isGm && canJoinCombat && onJoinCombat) {
+      list.push({
+        id: "join_combat",
+        label: "Am Kampf teilnehmen",
+        Icon: Swords,
+        onClick: () => {
+          onJoinCombat();
           onClose();
         },
       });
@@ -111,7 +129,16 @@ export function BattlemapTokenRadialMenu({
     }
 
     return list;
-  }, [isGm, onClose, onMove, onRemove, onToggleVisibility, token.is_visible_to_players]);
+  }, [
+    canJoinCombat,
+    isGm,
+    onClose,
+    onJoinCombat,
+    onMove,
+    onRemove,
+    onToggleVisibility,
+    token.is_visible_to_players,
+  ]);
 
   const radius = 72;
 

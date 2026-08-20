@@ -15,14 +15,16 @@ import {
   UserPlus,
 } from "lucide-react";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
-import type { SessionTicket } from "@/src/components/marketing/CampaignListAnimation";
 import { SlotProgressBar } from "@/src/components/marketing/SessionTicketCardParts";
 import {
   COMMUNITY_EVENT_KIND_LABELS,
   type CommunityEvent,
 } from "@/src/lib/community-events/types";
 import { APP_TIMEZONE } from "@/src/lib/datetime/berlin";
-import { loadLandingSessionTickets } from "@/src/lib/marketing/load-landing-session-tickets";
+import {
+  loadLandingSessionTickets,
+  type SessionTicket,
+} from "@/src/lib/marketing/load-landing-session-tickets";
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
 
@@ -392,7 +394,7 @@ export function TermineUndRundenSection({ events }: Props) {
         ) : null}
       </div>
 
-      {/* Dekoration (aus ActiveCampaignsSection) */}
+      {/* Dekoration */}
       <div className="pointer-events-none absolute left-4 top-1/2 z-20 hidden -translate-y-1/2 lg:block">
         <div className="relative">
           <Image

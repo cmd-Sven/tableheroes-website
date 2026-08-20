@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
@@ -14,17 +14,21 @@ import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
 import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import { SessionWorldMapsPanel } from "@/src/components/world-maps/SessionWorldMapsPanel";
+import { StagePrepDeckPicker } from "@/src/components/session/StagePrepDeckPicker";
 
 type CampaignNpc = {
   id: string;
   name: string;
   title: string | null;
+  image_url?: string | null;
 };
 
 type CampaignFaction = {
   id: string;
   name: string;
   type: string | null;
+  image_url?: string | null;
+  banner_url?: string | null;
 };
 
 type CampaignCreature = {
@@ -32,6 +36,7 @@ type CampaignCreature = {
   name: string;
   creature_type: string | null;
   is_revealed: boolean;
+  image_url?: string | null;
 };
 
 type Props = {
@@ -97,20 +102,17 @@ export function StagePrepClient({
   const [creatureDeckAll, setCreatureDeckAll] = useState(stageDeckCreatureIds == null);
   const [npcDeckPick, setNpcDeckPick] = useState<Set<string>>(() => {
     if (stageDeckNpcIds?.length) return new Set(stageDeckNpcIds);
-    return new Set(allCampaignNpcs.map((n) => n.id));
+    return new Set();
   });
   const [factionDeckPick, setFactionDeckPick] = useState<Set<string>>(() => {
     if (stageDeckFactionIds?.length) return new Set(stageDeckFactionIds);
-    return new Set(allCampaignFactions.map((f) => f.id));
+    return new Set();
   });
   const [creatureDeckPick, setCreatureDeckPick] = useState<Set<string>>(() => {
     if (stageDeckCreatureIds?.length) return new Set(stageDeckCreatureIds);
-    return new Set(allCampaignCreatures.map((c) => c.id));
+    return new Set();
   });
   const [bgUrl, setBgUrl] = useState(initialBackgroundUrl || "");
-  const [npcSearch, setNpcSearch] = useState("");
-  const [facSearch, setFacSearch] = useState("");
-  const [creatureSearch, setCreatureSearch] = useState("");
 
   useEffect(() => {
     setBgUrl(initialBackgroundUrl || "");
@@ -120,32 +122,17 @@ export function StagePrepClient({
     setNpcDeckAll(stageDeckNpcIds == null);
     setFactionDeckAll(stageDeckFactionIds == null);
     setCreatureDeckAll(stageDeckCreatureIds == null);
-    setNpcDeckPick(
-      new Set(
-        stageDeckNpcIds?.length ? stageDeckNpcIds : allCampaignNpcs.map((n) => n.id),
-      ),
-    );
+    setNpcDeckPick(new Set(stageDeckNpcIds?.length ? stageDeckNpcIds : []));
     setFactionDeckPick(
-      new Set(
-        stageDeckFactionIds?.length
-          ? stageDeckFactionIds
-          : allCampaignFactions.map((f) => f.id),
-      ),
+      new Set(stageDeckFactionIds?.length ? stageDeckFactionIds : []),
     );
     setCreatureDeckPick(
-      new Set(
-        stageDeckCreatureIds?.length
-          ? stageDeckCreatureIds
-          : allCampaignCreatures.map((c) => c.id),
-      ),
+      new Set(stageDeckCreatureIds?.length ? stageDeckCreatureIds : []),
     );
   }, [
     stageDeckNpcIds,
     stageDeckFactionIds,
     stageDeckCreatureIds,
-    allCampaignNpcs,
-    allCampaignFactions,
-    allCampaignCreatures,
   ]);
 
   function saveDeck() {
@@ -206,16 +193,36 @@ export function StagePrepClient({
     });
   }
 
-  const npcFiltered = allCampaignNpcs.filter((n) =>
-    `${n.name} ${n.title || ""}`.toLowerCase().includes(npcSearch.trim().toLowerCase()),
+  const npcPickerItems = useMemo(
+    () =>
+      allCampaignNpcs.map((npc) => ({
+        id: npc.id,
+        name: npc.name,
+        subtitle: npc.title,
+        imageUrl: npc.image_url,
+      })),
+    [allCampaignNpcs],
   );
-  const facFiltered = allCampaignFactions.filter((f) =>
-    `${f.name} ${f.type || ""}`.toLowerCase().includes(facSearch.trim().toLowerCase()),
+  const factionPickerItems = useMemo(
+    () =>
+      allCampaignFactions.map((fac) => ({
+        id: fac.id,
+        name: fac.name,
+        subtitle: fac.type,
+        imageUrl: fac.image_url || fac.banner_url,
+      })),
+    [allCampaignFactions],
   );
-  const creatureFiltered = allCampaignCreatures.filter((c) =>
-    `${c.name} ${c.creature_type || ""}`
-      .toLowerCase()
-      .includes(creatureSearch.trim().toLowerCase()),
+  const creaturePickerItems = useMemo(
+    () =>
+      allCampaignCreatures.map((creature) => ({
+        id: creature.id,
+        name: creature.name,
+        subtitle: creature.creature_type,
+        imageUrl: creature.image_url,
+        badge: creature.is_revealed ? null : "verborgen",
+      })),
+    [allCampaignCreatures],
   );
 
   const sessionPath = `/session/${sessionId}`;
@@ -270,7 +277,7 @@ export function StagePrepClient({
 
         <div className="grid gap-8 lg:grid-cols-2">
           <section
-            className="rounded-lg border border-hero-dark p-6 shadow-lg"
+            className="rounded-lg border border-hero-dark p-6 shadow-lg lg:col-span-2"
             style={marblePanelStyle}
           >
             <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
@@ -296,52 +303,23 @@ export function StagePrepClient({
                     type="radio"
                     name="npc-deck-full"
                     checked={!npcDeckAll}
-                    onChange={() => {
-                      setNpcDeckAll(false);
-                      setNpcDeckPick(new Set(allCampaignNpcs.map((n) => n.id)));
-                    }}
+                    onChange={() => setNpcDeckAll(false)}
                     className="border-hero-border text-hero-vibrant"
                   />
                   Nur ausgewählte
                 </label>
+                <p className="mt-1 mb-1 font-libre text-xs text-gray-500">
+                  „Nur ausgewählte“ startet leer. Dann Kacheln antippen oder Alle anwählen / abwählen.
+                </p>
                 {!npcDeckAll && (
-                  <>
-                    <input
-                      type="search"
-                      value={npcSearch}
-                      onChange={(e) => setNpcSearch(e.target.value)}
-                      placeholder="NPCs filtern…"
-                      className="mt-3 w-full rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white focus:border-hero-vibrant outline-none"
-                    />
-                    <div className="mt-2 max-h-[min(50vh,28rem)] overflow-y-auto rounded border border-hero-border/40 bg-background-dark/90 p-3 space-y-2">
-                      {npcFiltered.map((npc) => (
-                        <label
-                          key={npc.id}
-                          className="flex items-center gap-2 cursor-pointer text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={npcDeckPick.has(npc.id)}
-                            onChange={(e) => {
-                              setNpcDeckPick((prev) => {
-                                const next = new Set(prev);
-                                if (e.target.checked) next.add(npc.id);
-                                else next.delete(npc.id);
-                                return next;
-                              });
-                            }}
-                            className="rounded border-hero-border"
-                          />
-                          <span>
-                            {npc.name}
-                            {npc.title ? (
-                              <span className="text-gray-500 text-xs"> · {npc.title}</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </>
+                  <StagePrepDeckPicker
+                    items={npcPickerItems}
+                    selectedIds={npcDeckPick}
+                    onChange={setNpcDeckPick}
+                    searchPlaceholder="NPCs suchen…"
+                    emptyLabel="Noch keine NPCs in dieser Kampagne."
+                    entityLabel="NPCs"
+                  />
                 )}
               </div>
 
@@ -364,52 +342,20 @@ export function StagePrepClient({
                     type="radio"
                     name="fac-deck-full"
                     checked={!factionDeckAll}
-                    onChange={() => {
-                      setFactionDeckAll(false);
-                      setFactionDeckPick(new Set(allCampaignFactions.map((f) => f.id)));
-                    }}
+                    onChange={() => setFactionDeckAll(false)}
                     className="border-hero-border text-hero-vibrant"
                   />
                   Nur ausgewählte
                 </label>
                 {!factionDeckAll && (
-                  <>
-                    <input
-                      type="search"
-                      value={facSearch}
-                      onChange={(e) => setFacSearch(e.target.value)}
-                      placeholder="Fraktionen filtern…"
-                      className="mt-3 w-full rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white focus:border-hero-vibrant outline-none"
-                    />
-                    <div className="mt-2 max-h-[min(40vh,22rem)] overflow-y-auto rounded border border-hero-border/40 bg-background-dark/90 p-3 space-y-2">
-                      {facFiltered.map((fac) => (
-                        <label
-                          key={fac.id}
-                          className="flex items-center gap-2 cursor-pointer text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={factionDeckPick.has(fac.id)}
-                            onChange={(e) => {
-                              setFactionDeckPick((prev) => {
-                                const next = new Set(prev);
-                                if (e.target.checked) next.add(fac.id);
-                                else next.delete(fac.id);
-                                return next;
-                              });
-                            }}
-                            className="rounded border-hero-border"
-                          />
-                          <span>
-                            {fac.name}
-                            {fac.type ? (
-                              <span className="text-gray-500 text-xs"> · {fac.type}</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </>
+                  <StagePrepDeckPicker
+                    items={factionPickerItems}
+                    selectedIds={factionDeckPick}
+                    onChange={setFactionDeckPick}
+                    searchPlaceholder="Fraktionen suchen…"
+                    emptyLabel="Noch keine Fraktionen in dieser Kampagne."
+                    entityLabel="Fraktionen"
+                  />
                 )}
               </div>
 
@@ -445,60 +391,20 @@ export function StagePrepClient({
                         type="radio"
                         name="creature-deck-full"
                         checked={!creatureDeckAll}
-                        onChange={() => {
-                          setCreatureDeckAll(false);
-                          setCreatureDeckPick(new Set(allCampaignCreatures.map((c) => c.id)));
-                        }}
+                        onChange={() => setCreatureDeckAll(false)}
                         className="border-hero-border text-hero-vibrant"
                       />
                       Nur ausgewählte
                     </label>
                     {!creatureDeckAll && (
-                      <>
-                        <input
-                          type="search"
-                          value={creatureSearch}
-                          onChange={(e) => setCreatureSearch(e.target.value)}
-                          placeholder="Kreaturen filtern…"
-                          className="mt-3 w-full rounded bg-slate-900 border border-hero-dark px-3 py-2 text-sm text-white focus:border-hero-vibrant outline-none"
-                        />
-                        <div className="mt-2 max-h-[min(40vh,22rem)] overflow-y-auto rounded border border-emerald-900/30 bg-background-dark/90 p-3 space-y-2">
-                          {creatureFiltered.map((creature) => (
-                            <label
-                              key={creature.id}
-                              className="flex items-center gap-2 cursor-pointer text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={creatureDeckPick.has(creature.id)}
-                                onChange={(e) => {
-                                  setCreatureDeckPick((prev) => {
-                                    const next = new Set(prev);
-                                    if (e.target.checked) next.add(creature.id);
-                                    else next.delete(creature.id);
-                                    return next;
-                                  });
-                                }}
-                                className="rounded border-hero-border"
-                              />
-                              <span>
-                                {creature.name}
-                                {creature.creature_type ? (
-                                  <span className="text-gray-500 text-xs capitalize">
-                                    {" "}
-                                    · {creature.creature_type}
-                                  </span>
-                                ) : null}
-                                {!creature.is_revealed ? (
-                                  <span className="text-amber-500/90 text-[10px] uppercase ml-1">
-                                    · verborgen
-                                  </span>
-                                ) : null}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </>
+                      <StagePrepDeckPicker
+                        items={creaturePickerItems}
+                        selectedIds={creatureDeckPick}
+                        onChange={setCreatureDeckPick}
+                        searchPlaceholder="Kreaturen suchen…"
+                        emptyLabel="Noch keine Kreaturen im Bestarium."
+                        entityLabel="Kreaturen"
+                      />
                     )}
                   </>
                 )}

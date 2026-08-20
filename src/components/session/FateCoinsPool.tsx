@@ -24,6 +24,8 @@ type Props = {
   compact?: boolean;
   /** Kompakteres Panel für die Session-Leiste neben der Ortsanzeige */
   inlineHeader?: boolean;
+  /** Spieler-HUD: Münzen ohne Karte, groß und immer sichtbar */
+  variant?: "default" | "hud";
   /** GM: Pool-Anzahl / Setzen hinter Zahnrad (open/toggle nur lokal im Parent) */
   collapsibleGmSettings?: boolean;
   gmSettingsOpen?: boolean;
@@ -110,6 +112,7 @@ export function FateCoinsPool({
   showControls = false,
   compact = false,
   inlineHeader = false,
+  variant = "default",
   collapsibleGmSettings = false,
   gmSettingsOpen = false,
   onGmSettingsToggle,
@@ -150,9 +153,12 @@ export function FateCoinsPool({
     });
   };
 
-  const showInlineControlsBlock = showControls && isGM && !useCollapsibleGm;
+  const isHud = variant === "hud";
+  const showInlineControlsBlock = showControls && isGM && !useCollapsibleGm && !isHud;
 
-  const shellClass = useCollapsibleGm
+  const shellClass = isHud
+    ? "min-w-0"
+    : useCollapsibleGm
     ? "rounded-xl border border-white/15 bg-white/5 p-2 shadow-md backdrop-blur-md"
     : `border border-accent-gold/45 bg-background-card/90 shadow-black/40 backdrop-blur ${
         inlineHeader
@@ -162,7 +168,7 @@ export function FateCoinsPool({
 
   return (
     <section className={shellClass}>
-      {!useCollapsibleGm ? (
+      {!useCollapsibleGm && !isHud ? (
         <div
           className={`flex items-center justify-between gap-3 ${inlineHeader ? "mb-2" : "mb-3"}`}
         >
@@ -183,14 +189,25 @@ export function FateCoinsPool({
           </div>
           {isPending ? <Loader2 className="h-4 w-4 animate-spin text-accent-gold" /> : null}
         </div>
-      ) : (
+      ) : isPending ? (
         <div className="mb-1 flex items-center justify-end gap-2">
-          {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-gold" /> : null}
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-gold" />
         </div>
-      )}
+      ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className={`flex min-w-0 flex-1 flex-wrap ${inlineHeader ? "gap-2" : "gap-3"}`}>
+      <div className={`flex flex-wrap items-center gap-2 ${isHud ? "justify-end" : ""}`}>
+        {isHud ? (
+          <div className="mr-1 hidden min-[520px]:block text-right">
+            <p className="font-barlow text-[10px] font-extrabold uppercase tracking-wide text-accent-gold">
+              Schicksalsmünzen
+            </p>
+            <p className="font-libre text-[10px] text-gray-400">
+              Zerstört:{" "}
+              <span className="font-barlow font-extrabold text-red-300">{destroyedCount}</span>
+            </p>
+          </div>
+        ) : null}
+        <div className={`flex min-w-0 flex-1 flex-wrap ${isHud ? "justify-end gap-2.5" : inlineHeader ? "gap-2" : "gap-3"}`}>
           <AnimatePresence mode="popLayout">
             {coins.map((coin) => {
               const pending = pendingCoinId === coin.id;
@@ -221,7 +238,11 @@ export function FateCoinsPool({
                     handleDestroy(coin.id);
                   }}
                   className={`group relative grid transform-3d place-items-center rounded-full border-2 font-cinzel font-bold ${
-                    inlineHeader || compact ? "size-15 text-base" : "size-18 text-lg"
+                    isHud
+                      ? "size-10 text-sm sm:size-11 sm:text-base"
+                      : inlineHeader || compact
+                        ? "size-15 text-base"
+                        : "size-18 text-lg"
                   } ${coinClasses(coin.side)}`}
                   title="Klick: wenden. Rechtsklick oder X: zerstören."
                 >
@@ -253,7 +274,7 @@ export function FateCoinsPool({
             </div>
           ) : null}
         </div>
-        {useCollapsibleGm ? (
+        {useCollapsibleGm && !isHud ? (
           <button
             type="button"
             onClick={onGmSettingsToggle}

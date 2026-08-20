@@ -139,6 +139,7 @@ function AnimatedDie({
 type DiceSceneProps = {
   sides: number;
   faces: number[];
+  dieSides?: number[];
   seed: string;
   aimX: number;
   aimZ: number;
@@ -153,6 +154,7 @@ type DiceSceneProps = {
 export function DiceRollScene({
   sides,
   faces,
+  dieSides,
   seed,
   aimX,
   aimZ,
@@ -178,6 +180,7 @@ export function DiceRollScene({
       buildDiceTrajectories({
         sides,
         faces,
+        dieSides,
         seed,
         aimX,
         aimZ,
@@ -186,7 +189,7 @@ export function DiceRollScene({
         throwStrength,
         isTap,
       }),
-    [sides, faces, seed, aimX, aimZ, throwDirX, throwDirZ, throwStrength, isTap],
+    [sides, faces, dieSides, seed, aimX, aimZ, throwDirX, throwDirZ, throwStrength, isTap],
   );
 
   useLayoutEffect(() => {
@@ -228,10 +231,12 @@ export function DiceRollScene({
           </p>
         </Html>
       ) : null}
-      {faces.map((face, i) => (
+      {faces.map((face, i) => {
+        const dieS = dieSides?.[i] ?? sides;
+        return (
         <AnimatedDie
-          key={`${seed}-${i}-${face}`}
-          sides={sides}
+          key={`${seed}-${i}-${dieS}-${face}`}
+          sides={dieS}
           frames={trajectories[i] ?? []}
           index={i}
           playbackStartRef={playbackStartRef}
@@ -239,10 +244,11 @@ export function DiceRollScene({
           aimZ={aimZ}
           durationMs={durationMs}
           showResult={showResult}
-          natHighlight={dieNatHighlight(sides, face)}
+          natHighlight={dieNatHighlight(dieS, face)}
           onSettled={handleSettled}
         />
-      ))}
+        );
+      })}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[9, 7]} />
         <shadowMaterial opacity={0.14} />

@@ -6,7 +6,6 @@ import {
   DICE_ANIMATION_STALE_MS,
   type DiceAnimCompleteDetail,
   isDiceAnimMeta,
-  shouldAnimateDiceEntry,
 } from "@/src/lib/session/dice-animation";
 
 const revealed = new Set<string>();
@@ -60,8 +59,8 @@ export function isDiceEntryRevealed(
   if (!entry.id) return true;
   if (revealed.has(entry.id)) return true;
   if (!isDiceAnimMeta(entry.meta) || entry.meta.animate !== true) return true;
-  // Late join / stale
-  if (!shouldAnimateDiceEntry(entry, now)) return true;
+
+  // Ergebnis erst nach markDiceEntryRevealed (Würfel liegt) oder nach Stale-Timeout.
   const at = entry.at ? Date.parse(entry.at) : NaN;
   if (Number.isFinite(at) && now - at > DICE_ANIMATION_STALE_MS) return true;
   return false;

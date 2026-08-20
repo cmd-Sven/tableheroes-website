@@ -14,6 +14,7 @@ export type AvatarSpeechBubbleDetail = {
   /** Activity-Log-ID zur Deduplizierung (lokal + remote). */
   sourceId?: string;
   durationMs?: number;
+  diceGlyphs?: { sides: number; value: number }[];
 };
 
 const DICE_ACTIVITY_TYPES = new Set([
@@ -48,7 +49,35 @@ export function dispatchAvatarSpeechBubble(detail: AvatarSpeechBubbleDetail): vo
 }
 
 /** Kurztext für Würfel-Sprechblase aus Activity-Meta. */
+export function parseDiceBubbleParts(
+  meta: unknown,
+): { sides: number; value: number }[] {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return [];
+  const row = meta as Record<string, unknown>;
+  if (Array.isArray(row.bubbleParts)) {
+    return row.bubbleParts
+      .map((p) => {
+        if (!p || typeof p !== "object") return null;
+        const rec = p as Record<string, unknown>;
+        const sides = Math.round(Number(rec.sides));
+        const value = Math.round(Number(rec.value));
+        if (!Number.isFinite(sides) || !Number.isFinite(value)) return null;
+        return { sides, value };
+      })
+      .filter((p): p is { sides: number; value: number } => p != null);
+  }
+  const used = typeof row.usedRoll === "number" ? row.usedRoll : null;
+  const sides = typeof row.sides === "number" ? row.sides : 20;
+  if (used != null) return [{ sides, value: used }];
+  return [];
+}
+
+/** Kurztext für Würfel-Sprechblase aus Activity-Meta. */
 export function formatDiceSpeechBubbleText(meta: unknown, fallbackText?: string): string {
+  const parts = parseDiceBubbleParts(meta);
+  if (parts.length > 0) {
+    return parts.map((p) => String(p.value)).join(" · ");
+  }
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const row = meta as Record<string, unknown>;
     const total = typeof row.total === "number" ? row.total : null;
@@ -115,6 +144,7 @@ export function speechBubbleFromActivityEntry(entry: {
       characterId,
       kind: "dice",
       text: formatDiceSpeechBubbleText(entry.meta, entry.text ?? undefined),
+      diceGlyphs: parseDiceBubbleParts(entry.meta),
       sourceId: entry.id ?? undefined,
     };
   }

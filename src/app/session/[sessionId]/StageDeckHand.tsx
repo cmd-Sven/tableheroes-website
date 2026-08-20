@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
-import { Flag } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronUp, Flag, Layers } from "lucide-react";
 import { StageSceneDeckMiniCard, type StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 
 type HandNpc = {
@@ -24,13 +26,42 @@ type DeckEntry =
   | { kind: "scene"; item: StageSceneMediaItem; stackIndex: number };
 
 type Props = {
+  open: boolean;
+  onToggle: () => void;
   npcs: HandNpc[];
   factions: HandFaction[];
   scenes?: StageSceneMediaItem[];
   onPlace: (kind: "npc" | "faction" | "scene", id: string) => void;
 };
 
-export function StageDeckHand({ npcs, factions, scenes = [], onPlace }: Props) {
+export function StageDeckHand({
+  open,
+  onToggle,
+  npcs,
+  factions,
+  scenes = [],
+  onPlace,
+}: Props) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.setAttribute("data-th-stage-deck-hand", "true");
+    document.body.appendChild(el);
+    setHost(el);
+    return () => {
+      el.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--th-hand-dock-h", open ? "16rem" : "4.75rem");
+    return () => {
+      root.style.removeProperty("--th-hand-dock-h");
+    };
+  }, [open]);
+
   const entries: DeckEntry[] = useMemo(() => {
     const n = npcs.map((item, stackIndex) => ({
       kind: "npc" as const,
@@ -52,29 +83,67 @@ export function StageDeckHand({ npcs, factions, scenes = [], onPlace }: Props) {
     return [...n, ...f, ...s];
   }, [npcs, factions, scenes]);
 
-  if (entries.length === 0) return null;
+  if (entries.length === 0 || !host) return null;
 
-  return (
-    <div className="rounded-lg border border-hero-dark bg-background-card/90 px-3 py-3 shadow-lg">
-      <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
-        Deck — NSC, Fraktionen & Szenen. Ziehen oder doppelklicken.
-      </p>
-      <div className="flex min-h-[120px] items-end overflow-x-auto overflow-y-visible pb-2 pl-3 pr-2 pt-5">
-        {entries.map((entry) =>
-          entry.kind === "scene" ? (
-            <StageSceneDeckMiniCard
-              key={`scene-${entry.item.id}`}
-              scene={entry.item}
-              stackIndex={entry.stackIndex}
-              onPlace={(id: string) => onPlace("scene", id)}
-            />
-          ) : (
-            <DeckMiniCard key={`${entry.kind}-${entry.item.id}`} entry={entry} onPlace={onPlace} />
-          ),
+  const tray = (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[65] flex flex-col-reverse pl-11 pr-11">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="pointer-events-auto flex w-full items-center gap-3 border-t-2 border-accent-gold bg-[#132e1b] px-4 py-2.5 text-left shadow-[0_-12px_28px_rgba(0,0,0,0.55)]"
+      >
+        <Layers className="h-5 w-5 shrink-0 text-accent-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
+            {open ? "Hand ausblenden" : "Hand einblenden"}
+          </span>
+          <span className="block font-libre text-[11px] text-gray-400">
+            {entries.length} Karte{entries.length === 1 ? "" : "n"} aus der Vorbereitung · ziehen oder doppelklicken
+          </span>
+        </span>
+        {open ? (
+          <ChevronDown className="h-5 w-5 shrink-0 text-accent-gold" />
+        ) : (
+          <ChevronUp className="h-5 w-5 shrink-0 text-accent-gold" />
         )}
-      </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="stage-deck-hand"
+            initial={{ y: 28, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 28, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="pointer-events-auto border-t border-accent-gold/40 bg-background-card/95 px-3 py-3"
+          >
+            <div className="flex min-h-[120px] items-end overflow-x-auto overflow-y-visible pb-2 pl-3 pr-2 pt-5">
+              {entries.map((entry) =>
+                entry.kind === "scene" ? (
+                  <StageSceneDeckMiniCard
+                    key={`scene-${entry.item.id}`}
+                    scene={entry.item}
+                    stackIndex={entry.stackIndex}
+                    onPlace={(id: string) => onPlace("scene", id)}
+                  />
+                ) : (
+                  <DeckMiniCard
+                    key={`${entry.kind}-${entry.item.id}`}
+                    entry={entry}
+                    onPlace={onPlace}
+                  />
+                ),
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
+
+  return createPortal(tray, host);
 }
 
 function DeckMiniCard({
@@ -112,7 +181,7 @@ function DeckMiniCard({
       }}
       aria-label={tooltip}
       className={[
-        "relative h-[104px] w-[76px] shrink-0 cursor-grab select-none rounded-md border-2 bg-background-dark shadow-md transition-transform duration-200 active:cursor-grabbing overflow-hidden",
+        "relative h-[104px] w-[76px] shrink-0 cursor-grab select-none overflow-hidden rounded-md border-2 bg-background-dark shadow-md transition-transform duration-200 active:cursor-grabbing",
         "hover:z-[60] hover:-translate-y-3 hover:scale-105",
         isFaction
           ? "border-amber-700/60 hover:border-amber-500/80"
@@ -124,11 +193,11 @@ function DeckMiniCard({
       }}
     >
       {item.image_url ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={item.image_url}
           alt=""
-          className="h-full w-full object-cover pointer-events-none"
+          className="pointer-events-none h-full w-full object-cover"
           draggable={false}
         />
       ) : (

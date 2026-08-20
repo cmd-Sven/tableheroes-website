@@ -1,5 +1,24 @@
 import { supabase } from "@/src/lib/supabaseClient";
-import type { SessionTicket } from "@/src/components/marketing/CampaignListAnimation";
+
+export type SessionTicket = {
+  campaignId: string;
+  campaignName: string;
+  sessionTitle?: string | null;
+  gameSystem: string;
+  gmUsername: string;
+  gmAvatarUrl: string | null;
+  bannerUrl: string | null;
+  location: string;
+  dateString: string;
+  timeString: string;
+  slotsLabel: string;
+  currentPlayers: number;
+  maxPlayers: number;
+  startTimeMs?: number;
+  registrationClosedOnLanding?: boolean;
+  showOpenSlotsOnLanding?: boolean;
+  showSessionTitleOnLanding?: boolean;
+};
 
 type SessionRow = {
   id: string;
