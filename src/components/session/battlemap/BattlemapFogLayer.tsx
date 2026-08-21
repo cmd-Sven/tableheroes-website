@@ -79,7 +79,11 @@ export function BattlemapFogLayer({
   const cellPx = Math.max(1, config.cellSizePx * Math.max(0.05, interactionScale));
 
   return (
-    <div className={`pointer-events-none absolute inset-0 ${isGm ? "z-[35]" : "z-[50]"}`}>
+    <div
+      className={`pointer-events-none absolute inset-0 ${
+        canInteract ? "z-[47]" : isGm ? "z-[35]" : "z-[50]"
+      }`}
+    >
       {shapes.map((shape) => {
         const selected = selectedShapeId === shape.id;
         return (
@@ -87,13 +91,17 @@ export function BattlemapFogLayer({
             key={shape.id}
             data-fog-shape={shape.id}
             role={canInteract ? "button" : undefined}
-            className={`absolute ${fillClass} ${borderClass} ${
+            className={`absolute ${fillClass} ${
+              selected
+                ? "border-2 border-accent-gold ring-[3px] ring-accent-gold shadow-[0_0_0_1px_#cab926]"
+                : borderClass
+            } ${
               canInteract
                 ? "pointer-events-auto cursor-grab active:cursor-grabbing"
                 : !isGm
                   ? "pointer-events-auto"
                   : ""
-            } ${selected ? "ring-2 ring-accent-gold" : ""}`}
+            }`}
             style={shapeStyle(shape, config)}
             title={isGm ? "Fog-Fläche (anklicken · Entf löscht)" : undefined}
             onPointerDown={

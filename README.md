@@ -6,40 +6,37 @@ Live: [table-heroes.de](https://table-heroes.de) · Repo: [cmd-Sven/tableheroes-
 
 ---
 
-## Neuestes Update (August 2026) — Live-Tisch & Combat
+## Neuestes Update (August 2026) — Battlemap-Marker, Fallen & Combat-Feinschliff
 
-Dieses Release baut den **Live-Session-Tisch** spürbar in Richtung VTT aus. Highlights:
+Weiterer Ausbau des **Live-Session-Tisches**: Spezialeffekte, Fallen und präzisere Fog-/Schablonen-Bedienung — plus Stabilitätsfixes für Initiative.
+
+### Battlemap: Spezialeffekte & Marker
+- **Spezialeffekte-Marker** auf der Karte: Feuer, Eis, Geröll, Riss, Gefahr, Interessant, Falle-Icon
+- Marker gezielt platzieren und **Alle löschen** für den Schnell-Reset
+
+### Fog of War & Effekt-Schablonen
+- **Auswählen** mit goldenem Rahmen (Fog-Polygone und Schablonen)
+- **Alle löschen** für Fog bzw. Effekt-Schablonen
+- Menüs klappen weiterhin seitlich aus der linken Leiste auf; Schablonen (Rechteck / Kreis / Kegel)
+
+### Trap-System
+- **Trap-Wizard** (manuell oder **KI** mit World-Lore): Fallen anlegen und konfigurieren
+- **1 Trigger-Feld**; Passive Perception / Detection; **Bewegungspause** beim Betreten
+- **AoE erst nach Auslösen** (nicht schon beim Platzieren)
+- Bei fehlgeschlagenem Save: **Status-Effekt** über das bestehende Zustands-/Avatar-System
+- Wizard-Fixes: **Leerzeichen in Freitextfeldern**; robusterer **OpenAI-JSON-Prompt**
 
 ### Combat & Initiative
-- **Neues Initiative-HUD** oben mittig (transparent): Teilnehmer von der Battlemap, Initiative würfeln, erst danach **Kampf starten**
-- Phasen: Setup (`is_combat_mode`) → aktiver Kampf (`combat_started`) mit Zugsteuerung (vor/zurück/beenden)
-- **Kampfstart-Video**: Modal mit `battle_begins.mp4`, Sound, feurigem Glow und Text „Lasst die Schlacht beginnen“
-- Token-Radial / Avatar: „Am Kampf teilnehmen“ (SL)
-
-### Würfel
-- **Würfel-Roll-Sound** aus MP3 (`public/sounds/dice-roll.mp3`) beim Rollen
-- **Ergebnisse erst nach Landung**: Chat und Avatar-Sprechblase erscheinen erst, wenn die Würfel zur Ruhe gekommen sind
-- Crit-/Patzer-Sounds und Avatar-FX unverändert danach
-
-### Battlemap & SL-Werkzeuge
-- **Fog of War** und **Effekt-Schablonen**: Menüs klappen seitlich aus der linken Leiste auf (Werkzeugwahl)
-- Effekt-Schablonen (Rechteck / Kreis / Kegel) inkl. Migration
-- Animierte Token-Bewegung (laufen statt teleportieren)
-
-### Live-Session UI
-- **Avatar-Leiste** über der Bühne (Overlay bis zum goldenen Frame-Rand)
-- Drei Modi: **Voll / Mini / Aus** (lokal gespeichert) — für SL und Spielermonitor
-- Bühne größer: füllt den Picture-Frame bis unten
-- **Linkes Dock** (Atmosphäre, Chronist, Tisch, Fog/Effekte, Würfel) und **Top-Toolbar** (Ort, Schicksalsmünzen, SL-Aktionen)
-- Spielermonitor: eine zusammengeführte Kopfzeile statt doppelter Balken
+- **Active-Turn**: nur Border-Glow / leichte Rotation — das Tokenbild bleibt unverändert
+- **Initiative-Seed Race-Condition** behoben: Combat-Teilnehmer bleiben sichtbar
+- Weiterhin: Initiative-HUD, würfeln → Kampf starten, Kampfstart-Video, Zugsteuerung
 
 ### Datenbank
-- Migrationen: `combat_started` an `session_live_states`, `session_battlemap_effect_templates`
+- Migrationen: `session_battlemap_markers`, `session_battlemap_traps` (+ Status-Effekt-Spalte); zuvor u. a. `combat_started`, Effekt-Schablonen
 
 > Production-Build (`npm run build`) vor dem Deploy erfolgreich.
 
 ---
-
 ## Produkt (Was ist Table Heroes?)
 
 Heute verbindet Table Heroes drei Dinge:
@@ -127,8 +124,9 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
   - Spieler-Token: gleiches Radialmenü wie Avatar (Gemüt, SL-Zustand, Waffen, …)
   - Zustands-Badge + Tooltip; Live-Bild nach Gemüt/Zustand
   - **Just-in-Time-Sync** für Bewegung, Einstellungen und Zustände (Broadcast-Snapshots + Realtime)
-  - **Fog of War** (manuell zeichnen) + **Effekt-Schablonen** mit seitlichen Werkzeug-Flyouts
-- **Combat**: Initiative-HUD, würfeln → Kampf starten, Video-Intro, Zugsteuerung
+  - **Fog of War** (manuell zeichnen, Auswählen, Alle löschen) + **Effekt-Schablonen** (Flyouts, goldene Auswahl, Alle löschen)
+  - **Spezialeffekte-Marker** und **Trap-System** (Wizard manuell/KI, Trigger, AoE nach Auslösen, Status bei Save-Fail)
+- **Combat**: Initiative-HUD, Active-Turn nur Border-Glow, Video-Intro, Zugsteuerung
 - **3D-Würfel** (R3F) inkl. Roll-Sound und Reveal erst nach Landung
 - Handheben (Hand Raise)
 - Szenen-Karten, Beast Cards, Loot (Chest, Draft, GM-Modals)
@@ -149,7 +147,7 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 | Status | Themen |
 |--------|--------|
-| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), **Fog of War**, **Effekt-Schablonen**, Combat-HUD + Kampfstart-Video, Würfel (Sound/Reveal), Dock/Toolbar, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
+| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), **Fog of War**, **Effekt-Schablonen**, **Marker**, **Fallen**, Combat-HUD + Kampfstart-Video, Würfel (Sound/Reveal), Dock/Toolbar, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
 | **Geplant (VTT)** | Fog/Effekte weiter verfeinern, Initiative-Fokus auf dem Tisch, weitere Tisch-Features Richtung vollwertigem VTT |
 | **Bewusst nicht** (aktuell laut `BATTLEMAP.md`) | Sync des SL-Viewports (Zoom/Pan bleibt lokal pro Client) |
 

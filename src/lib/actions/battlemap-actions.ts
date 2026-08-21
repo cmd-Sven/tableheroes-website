@@ -10,14 +10,17 @@ import {
 } from "@/src/lib/session/battlemap-movement";
 import { parseSheetData } from "@/src/lib/characters/dnd5e/defaults";
 import {
+  BATTLEMAP_MARKER_KINDS,
   DEFAULT_BATTLEMAP_GRID,
   type BattlemapFogShapeKind,
   type BattlemapEffectShapeKind,
   type BattlemapGridConfig,
+  type BattlemapMarkerKind,
   type BattlemapTokenSide,
   type SessionBattlemap,
   type SessionBattlemapEffectTemplate,
   type SessionBattlemapFogShape,
+  type SessionBattlemapMarker,
   type SessionBattlemapProp,
   type SessionBattlemapToken,
 } from "@/src/lib/session/battlemap-types";
@@ -912,6 +915,27 @@ export async function removeBattlemapFogShape(
   return { battlemapId };
 }
 
+/** Alle Fog-Flächen der aktiven Battlemap löschen. */
+export async function clearBattlemapFogShapes(
+  battlemapId: string,
+  sessionId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(sessionId, user.id);
+
+  const { error } = await (supabase as any)
+    .from("session_battlemap_fog_shapes")
+    .delete()
+    .eq("battlemap_id", battlemapId)
+    .eq("session_id", sessionId);
+  if (error) throw new Error(error.message);
+  void persistFogPresetForBattlemap(supabase, battlemapId);
+}
+
 /** Explizit Fog der aktiven Map für spätere Sessions sichern. */
 export async function saveBattlemapFogPreset(
   battlemapId: string,
@@ -1096,6 +1120,198 @@ export async function removeBattlemapEffectTemplate(
     .from("session_battlemap_effect_templates")
     .delete()
     .eq("id", templateId)
+    .eq("session_id", sessionId);
+  if (error) throw new Error(error.message);
+}
+
+/** Alle Effekt-Schablonen der aktiven Battlemap löschen. */
+export async function clearBattlemapEffectTemplates(
+  battlemapId: string,
+  sessionId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(sessionId, user.id);
+
+  const { error } = await (supabase as any)
+    .from("session_battlemap_effect_templates")
+    .delete()
+    .eq("battlemap_id", battlemapId)
+    .eq("session_id", sessionId);
+  if (error) throw new Error(error.message);
+}
+
+function normalizeMarker(row: Record<string, unknown>): SessionBattlemapMarker {
+  const kindRaw = String(row.kind ?? "fire");
+  const kind: BattlemapMarkerKind = (
+    BATTLEMAP_MARKER_KINDS as readonly string[]
+  ).includes(kindRaw)
+    ? (kindRaw as BattlemapMarkerKind)
+    : "fire";
+  return {
+    id: String(row.id),
+    battlemap_id: String(row.battlemap_id),
+    session_id: String(row.session_id),
+    campaign_id: String(row.campaign_id),
+    kind,
+    grid_x: Math.round(Number(row.grid_x ?? 0)),
+    grid_y: Math.round(Number(row.grid_y ?? 0)),
+    is_visible_to_players: row.is_visible_to_players !== false,
+    z_index: Math.round(Number(row.z_index ?? 0)),
+    created_at: row.created_at != null ? String(row.created_at) : undefined,
+    updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
+  };
+}
+
+export async function listBattlemapMarkers(
+  battlemapId: string,
+  sessionId: string,
+): Promise<SessionBattlemapMarker[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .select("*")
+    .eq("battlemap_id", battlemapId)
+    .eq("session_id", sessionId)
+    .order("z_index", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(normalizeMarker);
+}
+
+export async function createBattlemapMarker(input: {
+  sessionId: string;
+  battlemapId: string;
+  kind: BattlemapMarkerKind;
+  gridX: number;
+  gridY: number;
+  isVisibleToPlayers?: boolean;
+}): Promise<SessionBattlemapMarker> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const { data: mapRaw } = await (supabase as any)
+    .from("session_battlemaps")
+    .select("id, campaign_id")
+    .eq("id", input.battlemapId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (!mapRaw) throw new Error("Battlemap nicht gefunden.");
+  const campaignId = String((mapRaw as { campaign_id: string }).campaign_id);
+
+  const kind = (
+    BATTLEMAP_MARKER_KINDS as readonly string[]
+  ).includes(input.kind)
+    ? input.kind
+    : "fire";
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .insert({
+      battlemap_id: input.battlemapId,
+      session_id: input.sessionId,
+      campaign_id: campaignId,
+      kind,
+      grid_x: Math.round(input.gridX),
+      grid_y: Math.round(input.gridY),
+      is_visible_to_players: input.isVisibleToPlayers !== false,
+      z_index: Date.now() % 100000,
+    })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message || "Marker konnte nicht erstellt werden.");
+  return normalizeMarker(data as Record<string, unknown>);
+}
+
+export async function updateBattlemapMarker(input: {
+  sessionId: string;
+  markerId: string;
+  gridX?: number;
+  gridY?: number;
+  isVisibleToPlayers?: boolean;
+}): Promise<SessionBattlemapMarker> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const { data: existingRaw } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .select("id")
+    .eq("id", input.markerId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (!existingRaw) throw new Error("Marker nicht gefunden.");
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.gridX != null) patch.grid_x = Math.round(input.gridX);
+  if (input.gridY != null) patch.grid_y = Math.round(input.gridY);
+  if (input.isVisibleToPlayers != null) {
+    patch.is_visible_to_players = input.isVisibleToPlayers;
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .update(patch)
+    .eq("id", input.markerId)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return normalizeMarker(data as Record<string, unknown>);
+}
+
+export async function removeBattlemapMarker(
+  markerId: string,
+  sessionId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(sessionId, user.id);
+
+  const { error } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .delete()
+    .eq("id", markerId)
+    .eq("session_id", sessionId);
+  if (error) throw new Error(error.message);
+}
+
+/** Alle Spezialeffekt-Marker der aktiven Battlemap löschen. */
+export async function clearBattlemapMarkers(
+  battlemapId: string,
+  sessionId: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(sessionId, user.id);
+
+  const { error } = await (supabase as any)
+    .from("session_battlemap_markers")
+    .delete()
+    .eq("battlemap_id", battlemapId)
     .eq("session_id", sessionId);
   if (error) throw new Error(error.message);
 }

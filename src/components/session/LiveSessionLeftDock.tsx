@@ -1,23 +1,44 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Armchair,
+  AlertTriangle,
   Circle,
   Cloud,
   Dices,
+  Eraser,
+  Eye,
+  Flame,
   Mic,
+  Mountain,
   MousePointer2,
+  Snowflake,
   Sparkles,
+  Split,
+  Skull,
   Square,
   Trash2,
   Triangle,
+  Wand2,
+  Bomb,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { SessionDayPhase } from "@/src/lib/session-day-phase";
 import { SESSION_DAY_PHASE_META } from "@/src/lib/session-day-phase";
-import type { BattlemapEffectTool, BattlemapFogTool } from "@/src/lib/session/battlemap-types";
+import type {
+  BattlemapEffectTool,
+  BattlemapFogTool,
+  BattlemapMarkerKind,
+  BattlemapMarkerTool,
+  BattlemapTrapTool,
+} from "@/src/lib/session/battlemap-types";
+import {
+  BATTLEMAP_MARKER_KINDS,
+  BATTLEMAP_MARKER_META,
+} from "@/src/lib/session/battlemap-types";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
 import {
   LIVE_SESSION_PLAYER_ATMOSPHERE_WIDTH_CLASS,
@@ -45,7 +66,7 @@ const PANEL_META: Record<LeftPanelId, { title: string; subtitle: string }> = {
   table: { title: "Tisch", subtitle: "Anwesenheit & Platzhalter" },
 };
 
-type ToolFlyoutId = "fog" | "effect";
+type ToolFlyoutId = "fog" | "effect" | "marker" | "trap";
 
 type Props = {
   panel: LeftPanelId | null;
@@ -63,10 +84,26 @@ type Props = {
   selectedFogShapeId?: string | null;
   onFogToolChange?: (tool: BattlemapFogTool) => void;
   onFogDelete?: () => void;
+  onFogClearAll?: () => void;
+  fogCount?: number;
   effectTool?: BattlemapEffectTool;
   selectedEffectTemplateId?: string | null;
   onEffectToolChange?: (tool: BattlemapEffectTool) => void;
   onEffectDelete?: () => void;
+  onEffectClearAll?: () => void;
+  effectCount?: number;
+  markerTool?: BattlemapMarkerTool;
+  selectedMarkerId?: string | null;
+  onMarkerToolChange?: (tool: BattlemapMarkerTool) => void;
+  onMarkerDelete?: () => void;
+  onMarkerClearAll?: () => void;
+  markerCount?: number;
+  trapTool?: BattlemapTrapTool;
+  selectedTrapId?: string | null;
+  onTrapToolChange?: (tool: BattlemapTrapTool) => void;
+  onTrapDelete?: () => void;
+  onTrapClearAll?: () => void;
+  trapCount?: number;
   atmosphereContent: ReactNode;
   chronistContent?: ReactNode;
   tableContent?: ReactNode;
@@ -81,6 +118,7 @@ function RailButton({
   active,
   onClick,
   badgeDot,
+  hideLabel = false,
   className = "",
   children,
 }: {
@@ -88,6 +126,7 @@ function RailButton({
   active: boolean;
   onClick: () => void;
   badgeDot?: boolean;
+  hideLabel?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -98,18 +137,21 @@ function RailButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
+      aria-expanded={hideLabel ? true : undefined}
       className={`group relative grid w-11 place-items-center border transition-colors ${
         active
           ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
           : "border-hero-border/50 bg-background-card/95 text-gray-300 hover:border-hero-vibrant/70 hover:bg-emerald-950 hover:text-hero-vibrant"
       } ${className}`}
     >
-      <span
-        className="pointer-events-none absolute left-full ml-2 z-20 whitespace-nowrap rounded border border-hero-border/60 bg-background-card px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        aria-hidden
-      >
-        {label}
-      </span>
+      {!hideLabel ? (
+        <span
+          className="pointer-events-none absolute left-full ml-2 z-20 whitespace-nowrap rounded border border-hero-border/60 bg-background-card px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          aria-hidden
+        >
+          {label}
+        </span>
+      ) : null}
       {children}
       {badgeDot ? (
         <span
@@ -179,10 +221,26 @@ export function LiveSessionLeftDock({
   selectedFogShapeId = null,
   onFogToolChange,
   onFogDelete,
+  onFogClearAll,
+  fogCount = 0,
   effectTool = null,
   selectedEffectTemplateId = null,
   onEffectToolChange,
   onEffectDelete,
+  onEffectClearAll,
+  effectCount = 0,
+  markerTool = null,
+  selectedMarkerId = null,
+  onMarkerToolChange,
+  onMarkerDelete,
+  onMarkerClearAll,
+  markerCount = 0,
+  trapTool = null,
+  selectedTrapId = null,
+  onTrapToolChange,
+  onTrapDelete,
+  onTrapClearAll,
+  trapCount = 0,
   atmosphereContent,
   chronistContent,
   tableContent,
@@ -196,10 +254,81 @@ export function LiveSessionLeftDock({
   const showPanel = isGM && panel != null;
   const meta = panel ? PANEL_META[panel] : null;
   const [toolFlyout, setToolFlyout] = useState<ToolFlyoutId | null>(null);
+  const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const fogAnchorRef = useRef<HTMLDivElement>(null);
+  const effectAnchorRef = useRef<HTMLDivElement>(null);
+  const markerAnchorRef = useRef<HTMLDivElement>(null);
+  const trapAnchorRef = useRef<HTMLDivElement>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (!battlemapActive) setToolFlyout(null);
   }, [battlemapActive]);
+
+  function flyoutAnchorEl(id: ToolFlyoutId) {
+    if (id === "fog") return fogAnchorRef.current;
+    if (id === "effect") return effectAnchorRef.current;
+    if (id === "marker") return markerAnchorRef.current;
+    return trapAnchorRef.current;
+  }
+
+  useLayoutEffect(() => {
+    if (!toolFlyout) {
+      setFlyoutPos(null);
+      return;
+    }
+    const anchor = flyoutAnchorEl(toolFlyout);
+    if (!anchor) return;
+
+    function updatePos() {
+      if (!toolFlyout) return;
+      const el = flyoutAnchorEl(toolFlyout);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setFlyoutPos({
+        top: rect.top,
+        left: rect.right + 8,
+      });
+    }
+
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [toolFlyout]);
+
+  useEffect(() => {
+    if (!toolFlyout) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setToolFlyout(null);
+    }
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (fogAnchorRef.current?.contains(target)) return;
+      if (effectAnchorRef.current?.contains(target)) return;
+      if (markerAnchorRef.current?.contains(target)) return;
+      if (trapAnchorRef.current?.contains(target)) return;
+      const flyout = document.getElementById("th-tool-flyout");
+      if (flyout?.contains(target)) return;
+      setToolFlyout(null);
+    }
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [toolFlyout]);
 
   const panelBody =
     panel === "atmosphere"
@@ -217,10 +346,10 @@ export function LiveSessionLeftDock({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-y-0 left-0 z-[80] flex">
+    <div className="pointer-events-none fixed inset-y-0 left-0 z-[80] flex overflow-visible">
       {isGM ? (
         <nav
-          className={`pointer-events-auto ${LIVE_SESSION_SIDE_RAIL_WIDTH_CLASS} flex h-dvh flex-col overflow-hidden border-r border-hero-border/60 bg-background-dark/95 shadow-2xl backdrop-blur-md`}
+          className={`pointer-events-auto ${LIVE_SESSION_SIDE_RAIL_WIDTH_CLASS} relative z-[81] flex h-dvh flex-col overflow-visible border-r border-hero-border/60 bg-background-dark/95 shadow-2xl backdrop-blur-md`}
           aria-label="Tisch-Atmosphäre"
         >
           <RailButton
@@ -259,153 +388,62 @@ export function LiveSessionLeftDock({
           </RailButton>
 
           {battlemapActive && onFogToolChange ? (
-            <div className="relative">
+            <div ref={fogAnchorRef} className="relative">
               <div className="mx-2 my-1 h-px bg-hero-border/40" />
               <RailButton
                 label="Fog of War"
                 active={toolFlyout === "fog" || fogTool != null}
+                hideLabel={toolFlyout === "fog"}
                 onClick={() => toggleToolFlyout("fog")}
                 className="h-11"
               >
                 <Cloud className="h-5 w-5" />
               </RailButton>
-              <AnimatePresence>
-                {toolFlyout === "fog" ? (
-                  <motion.div
-                    key="fog-flyout"
-                    initial={FLYOUT_SLIDE.initial}
-                    animate={FLYOUT_SLIDE.animate}
-                    exit={FLYOUT_SLIDE.exit}
-                    transition={FLYOUT_SLIDE.transition}
-                    className="pointer-events-auto absolute left-full top-2 z-[90] ml-2 flex items-center gap-1.5 rounded-xl border border-amber-900/60 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
-                    role="toolbar"
-                    aria-label="Fog-of-War-Werkzeuge"
-                  >
-                    <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-400">
-                      Nebel
-                    </span>
-                    <ToolFlyoutButton
-                      label="Nebel: Auswählen"
-                      active={fogTool === "select"}
-                      onClick={() =>
-                        onFogToolChange(fogTool === "select" ? null : "select")
-                      }
-                    >
-                      <MousePointer2 className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Nebel: Rechteck"
-                      active={fogTool === "rect"}
-                      onClick={() =>
-                        onFogToolChange(fogTool === "rect" ? null : "rect")
-                      }
-                    >
-                      <Square className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Nebel: Kreis"
-                      active={fogTool === "circle"}
-                      onClick={() =>
-                        onFogToolChange(fogTool === "circle" ? null : "circle")
-                      }
-                    >
-                      <Circle className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Nebel: Fläche löschen (Entf)"
-                      active={false}
-                      tone="danger"
-                      onClick={() => onFogDelete?.()}
-                    >
-                      <Trash2
-                        className={`h-4 w-4 ${selectedFogShapeId ? "text-red-300" : "opacity-40"}`}
-                      />
-                    </ToolFlyoutButton>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
             </div>
           ) : null}
 
           {battlemapActive && onEffectToolChange ? (
-            <div className="relative">
+            <div ref={effectAnchorRef} className="relative">
               <div className="mx-2 my-1 h-px bg-hero-border/40" />
               <RailButton
                 label="Effekt-Schablonen"
                 active={toolFlyout === "effect" || effectTool != null}
+                hideLabel={toolFlyout === "effect"}
                 onClick={() => toggleToolFlyout("effect")}
                 className="h-11"
               >
                 <Sparkles className="h-5 w-5 text-red-300" />
               </RailButton>
-              <AnimatePresence>
-                {toolFlyout === "effect" ? (
-                  <motion.div
-                    key="effect-flyout"
-                    initial={FLYOUT_SLIDE.initial}
-                    animate={FLYOUT_SLIDE.animate}
-                    exit={FLYOUT_SLIDE.exit}
-                    transition={FLYOUT_SLIDE.transition}
-                    className="pointer-events-auto absolute left-full top-2 z-[90] ml-2 flex items-center gap-1.5 rounded-xl border border-red-900/50 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
-                    role="toolbar"
-                    aria-label="Effekt-Schablonen-Werkzeuge"
-                  >
-                    <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-red-300/80">
-                      Effekt
-                    </span>
-                    <ToolFlyoutButton
-                      label="Effekt: Auswählen"
-                      active={effectTool === "select"}
-                      tone="effect"
-                      onClick={() =>
-                        onEffectToolChange(effectTool === "select" ? null : "select")
-                      }
-                    >
-                      <MousePointer2 className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Effekt: Rechteck"
-                      active={effectTool === "rect"}
-                      tone="effect"
-                      onClick={() =>
-                        onEffectToolChange(effectTool === "rect" ? null : "rect")
-                      }
-                    >
-                      <Square className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Effekt: Kreis"
-                      active={effectTool === "circle"}
-                      tone="effect"
-                      onClick={() =>
-                        onEffectToolChange(effectTool === "circle" ? null : "circle")
-                      }
-                    >
-                      <Circle className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Effekt: Kegel"
-                      active={effectTool === "cone"}
-                      tone="effect"
-                      onClick={() =>
-                        onEffectToolChange(effectTool === "cone" ? null : "cone")
-                      }
-                    >
-                      <Triangle className="h-4 w-4" />
-                    </ToolFlyoutButton>
-                    <ToolFlyoutButton
-                      label="Effekt: Schablone löschen (Entf)"
-                      active={false}
-                      tone="danger"
-                      onClick={() => onEffectDelete?.()}
-                    >
-                      <Trash2
-                        className={`h-4 w-4 ${selectedEffectTemplateId ? "text-red-300" : "opacity-40"}`}
-                      />
-                    </ToolFlyoutButton>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
+            </div>
+          ) : null}
+
+          {battlemapActive && onMarkerToolChange ? (
+            <div ref={markerAnchorRef} className="relative">
+              <div className="mx-2 my-1 h-px bg-hero-border/40" />
+              <RailButton
+                label="Spezialeffekte"
+                active={toolFlyout === "marker" || markerTool != null}
+                hideLabel={toolFlyout === "marker"}
+                onClick={() => toggleToolFlyout("marker")}
+                className="h-11"
+              >
+                <Wand2 className="h-5 w-5 text-accent-gold" />
+              </RailButton>
+            </div>
+          ) : null}
+
+          {battlemapActive && onTrapToolChange ? (
+            <div ref={trapAnchorRef} className="relative">
+              <div className="mx-2 my-1 h-px bg-hero-border/40" />
+              <RailButton
+                label="Fallen (Trap-Wizard)"
+                active={toolFlyout === "trap" || trapTool != null}
+                hideLabel={toolFlyout === "trap"}
+                onClick={() => toggleToolFlyout("trap")}
+                className="h-11"
+              >
+                <Bomb className="h-5 w-5 text-red-300" />
+              </RailButton>
             </div>
           ) : null}
 
@@ -520,6 +558,294 @@ export function LiveSessionLeftDock({
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      {portalReady && toolFlyout && flyoutPos
+        ? createPortal(
+            <AnimatePresence>
+              {toolFlyout === "fog" && onFogToolChange ? (
+                <motion.div
+                  id="th-tool-flyout"
+                  key="fog-flyout"
+                  initial={FLYOUT_SLIDE.initial}
+                  animate={FLYOUT_SLIDE.animate}
+                  exit={FLYOUT_SLIDE.exit}
+                  transition={FLYOUT_SLIDE.transition}
+                  style={{ top: flyoutPos.top, left: flyoutPos.left }}
+                  className="pointer-events-auto fixed z-[200] flex items-center gap-1.5 rounded-xl border border-amber-900/60 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+                  role="toolbar"
+                  aria-label="Fog-of-War-Werkzeuge"
+                >
+                  <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                    Nebel
+                  </span>
+                  <ToolFlyoutButton
+                    label="Nebel: Auswählen"
+                    active={fogTool === "select"}
+                    onClick={() =>
+                      onFogToolChange(fogTool === "select" ? null : "select")
+                    }
+                  >
+                    <MousePointer2 className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Nebel: Rechteck"
+                    active={fogTool === "rect"}
+                    onClick={() =>
+                      onFogToolChange(fogTool === "rect" ? null : "rect")
+                    }
+                  >
+                    <Square className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Nebel: Kreis"
+                    active={fogTool === "circle"}
+                    onClick={() =>
+                      onFogToolChange(fogTool === "circle" ? null : "circle")
+                    }
+                  >
+                    <Circle className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Nebel: Fläche löschen (Entf)"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onFogDelete?.()}
+                  >
+                    <Trash2
+                      className={`h-4 w-4 ${selectedFogShapeId ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Nebel: Alle Flächen löschen"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onFogClearAll?.()}
+                  >
+                    <Eraser
+                      className={`h-4 w-4 ${fogCount > 0 ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                </motion.div>
+              ) : null}
+              {toolFlyout === "effect" && onEffectToolChange ? (
+                <motion.div
+                  id="th-tool-flyout"
+                  key="effect-flyout"
+                  initial={FLYOUT_SLIDE.initial}
+                  animate={FLYOUT_SLIDE.animate}
+                  exit={FLYOUT_SLIDE.exit}
+                  transition={FLYOUT_SLIDE.transition}
+                  style={{ top: flyoutPos.top, left: flyoutPos.left }}
+                  className="pointer-events-auto fixed z-[200] flex items-center gap-1.5 rounded-xl border border-red-900/50 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+                  role="toolbar"
+                  aria-label="Effekt-Schablonen-Werkzeuge"
+                >
+                  <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-red-300/80">
+                    Effekt
+                  </span>
+                  <ToolFlyoutButton
+                    label="Effekt: Auswählen"
+                    active={effectTool === "select"}
+                    tone="effect"
+                    onClick={() =>
+                      onEffectToolChange(effectTool === "select" ? null : "select")
+                    }
+                  >
+                    <MousePointer2 className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Effekt: Rechteck"
+                    active={effectTool === "rect"}
+                    tone="effect"
+                    onClick={() =>
+                      onEffectToolChange(effectTool === "rect" ? null : "rect")
+                    }
+                  >
+                    <Square className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Effekt: Kreis"
+                    active={effectTool === "circle"}
+                    tone="effect"
+                    onClick={() =>
+                      onEffectToolChange(effectTool === "circle" ? null : "circle")
+                    }
+                  >
+                    <Circle className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Effekt: Kegel"
+                    active={effectTool === "cone"}
+                    tone="effect"
+                    onClick={() =>
+                      onEffectToolChange(effectTool === "cone" ? null : "cone")
+                    }
+                  >
+                    <Triangle className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Effekt: Schablone löschen (Entf)"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onEffectDelete?.()}
+                  >
+                    <Trash2
+                      className={`h-4 w-4 ${selectedEffectTemplateId ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Effekt: Alle Schablonen löschen"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onEffectClearAll?.()}
+                  >
+                    <Eraser
+                      className={`h-4 w-4 ${effectCount > 0 ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                </motion.div>
+              ) : null}
+              {toolFlyout === "marker" && onMarkerToolChange ? (
+                <motion.div
+                  id="th-tool-flyout"
+                  key="marker-flyout"
+                  initial={FLYOUT_SLIDE.initial}
+                  animate={FLYOUT_SLIDE.animate}
+                  exit={FLYOUT_SLIDE.exit}
+                  transition={FLYOUT_SLIDE.transition}
+                  style={{ top: flyoutPos.top, left: flyoutPos.left }}
+                  className="pointer-events-auto fixed z-[200] flex max-w-[min(92vw,28rem)] flex-wrap items-center gap-1.5 rounded-xl border border-accent-gold/40 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+                  role="toolbar"
+                  aria-label="Spezialeffekt-Marker"
+                >
+                  <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold/90">
+                    Spezial
+                  </span>
+                  <ToolFlyoutButton
+                    label="Marker: Auswählen / verschieben"
+                    active={markerTool === "select"}
+                    onClick={() =>
+                      onMarkerToolChange(markerTool === "select" ? null : "select")
+                    }
+                  >
+                    <MousePointer2 className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  {BATTLEMAP_MARKER_KINDS.map((kind) => (
+                    <ToolFlyoutButton
+                      key={kind}
+                      label={`${BATTLEMAP_MARKER_META[kind].label}: ${BATTLEMAP_MARKER_META[kind].hint}`}
+                      active={markerTool === kind}
+                      onClick={() =>
+                        onMarkerToolChange(markerTool === kind ? null : kind)
+                      }
+                    >
+                      <MarkerKindIcon kind={kind} />
+                    </ToolFlyoutButton>
+                  ))}
+                  <ToolFlyoutButton
+                    label="Marker löschen (Entf)"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onMarkerDelete?.()}
+                  >
+                    <Trash2
+                      className={`h-4 w-4 ${selectedMarkerId ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Alle Spezialeffekte löschen"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onMarkerClearAll?.()}
+                  >
+                    <Eraser
+                      className={`h-4 w-4 ${markerCount > 0 ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                </motion.div>
+              ) : null}
+              {toolFlyout === "trap" && onTrapToolChange ? (
+                <motion.div
+                  id="th-tool-flyout"
+                  key="trap-flyout"
+                  initial={FLYOUT_SLIDE.initial}
+                  animate={FLYOUT_SLIDE.animate}
+                  exit={FLYOUT_SLIDE.exit}
+                  transition={FLYOUT_SLIDE.transition}
+                  style={{ top: flyoutPos.top, left: flyoutPos.left }}
+                  className="pointer-events-auto fixed z-[200] flex items-center gap-1.5 rounded-xl border border-red-800/50 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+                  role="toolbar"
+                  aria-label="Fallen-Werkzeuge"
+                >
+                  <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-red-300/90">
+                    Falle
+                  </span>
+                  <ToolFlyoutButton
+                    label="Falle: Auswählen"
+                    active={trapTool === "select"}
+                    tone="effect"
+                    onClick={() =>
+                      onTrapToolChange(trapTool === "select" ? null : "select")
+                    }
+                  >
+                    <MousePointer2 className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Falle platzieren (1 Trigger-Zelle)"
+                    active={trapTool === "place"}
+                    tone="effect"
+                    onClick={() =>
+                      onTrapToolChange(trapTool === "place" ? null : "place")
+                    }
+                  >
+                    <Bomb className="h-4 w-4" />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Falle löschen"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onTrapDelete?.()}
+                  >
+                    <Trash2
+                      className={`h-4 w-4 ${selectedTrapId ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                  <ToolFlyoutButton
+                    label="Alle Fallen löschen"
+                    active={false}
+                    tone="danger"
+                    onClick={() => onTrapClearAll?.()}
+                  >
+                    <Eraser
+                      className={`h-4 w-4 ${trapCount > 0 ? "text-red-300" : "opacity-40"}`}
+                    />
+                  </ToolFlyoutButton>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
     </div>
   );
+}
+
+function MarkerKindIcon({ kind }: { kind: BattlemapMarkerKind }) {
+  const cls = "h-4 w-4";
+  switch (kind) {
+    case "fire":
+      return <Flame className={`${cls} text-orange-400`} />;
+    case "ice":
+      return <Snowflake className={`${cls} text-sky-300`} />;
+    case "debris":
+      return <Mountain className={`${cls} text-stone-300`} />;
+    case "crack":
+      return <Split className={`${cls} text-violet-300`} />;
+    case "danger":
+      return <AlertTriangle className={`${cls} text-amber-300`} />;
+    case "interest":
+      return <Eye className={`${cls} text-accent-gold`} />;
+    case "trap":
+      return <Skull className={`${cls} text-red-300`} />;
+  }
 }

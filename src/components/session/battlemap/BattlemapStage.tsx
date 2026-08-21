@@ -25,15 +25,21 @@ import {
 import type {
   BattlemapEffectTool,
   BattlemapFogTool,
+  BattlemapMarkerKind,
+  BattlemapMarkerTool,
+  BattlemapTrapTool,
   CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
+  SessionBattlemapMarker,
   SessionBattlemapProp,
   SessionBattlemapToken,
+  SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
+import { BATTLEMAP_MARKER_KINDS, BATTLEMAP_MARKER_META } from "@/src/lib/session/battlemap-types";
 import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import type { ActiveCombatTurnHighlight } from "@/src/lib/combat-initiative";
 import {
@@ -60,6 +66,22 @@ import {
   normalizeFogCircle,
   normalizeFogRect,
 } from "./BattlemapFogLayer";
+import { BattlemapMarkerLayer } from "./BattlemapMarkerLayer";
+import { BattlemapTrapOverlayLayer } from "./BattlemapTrapOverlayLayer";
+
+function isMarkerPlaceKind(tool: BattlemapMarkerTool): tool is BattlemapMarkerKind {
+  return Boolean(tool && tool !== "select" && (BATTLEMAP_MARKER_KINDS as readonly string[]).includes(tool));
+}
+
+/** Space/hotkeys müssen Textfelder nicht abfangen (z. B. Trap-Wizard). */
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (el.isContentEditable) return true;
+  return Boolean(el.closest?.("[contenteditable='true']"));
+}
 
 type Props = {
   battlemap: SessionBattlemap;
@@ -67,6 +89,8 @@ type Props = {
   props: SessionBattlemapProp[];
   fogShapes?: SessionBattlemapFogShape[];
   effectTemplates?: SessionBattlemapEffectTemplate[];
+  markers?: SessionBattlemapMarker[];
+  traps?: SessionBattlemapTrap[];
   isGm?: boolean;
   characterPlacement?: CharacterTokenPlacement | null;
   gmTokenPlacement?: GmTokenPlacementDraft | null;
@@ -76,7 +100,13 @@ type Props = {
   selectedFogShapeId?: string | null;
   fogTool?: BattlemapFogTool;
   effectTool?: BattlemapEffectTool;
+  markerTool?: BattlemapMarkerTool;
+  trapTool?: BattlemapTrapTool;
+  /** Wenn true: Space-Pan nicht aktiv (z. B. Trap-Wizard-Modal offen). */
+  disableSpacePan?: boolean;
   selectedEffectTemplateId?: string | null;
+  selectedMarkerId?: string | null;
+  selectedTrapId?: string | null;
   onSelectEffectTemplate?: (templateId: string | null) => void;
   onEffectTemplateCreate?: (input: {
     shape: "rect" | "circle" | "cone";
@@ -89,6 +119,18 @@ type Props = {
   onEffectTemplateMove?: (templateId: string, gridX: number, gridY: number) => void;
   onEffectTemplateDelete?: (templateId: string) => void;
   onEffectToolCancel?: () => void;
+  onSelectMarker?: (markerId: string | null) => void;
+  onMarkerCreate?: (input: {
+    kind: BattlemapMarkerKind;
+    gridX: number;
+    gridY: number;
+  }) => void;
+  onMarkerMove?: (markerId: string, gridX: number, gridY: number) => void;
+  onMarkerDelete?: (markerId: string) => void;
+  onMarkerToolCancel?: () => void;
+  onSelectTrap?: (trapId: string | null) => void;
+  onTrapPlaceCell?: (gridX: number, gridY: number) => void;
+  onTrapToolCancel?: () => void;
   onCancelPlacement?: () => void;
   onToggleDash?: () => void;
   onCellClick?: (gridX: number, gridY: number) => void;
@@ -162,6 +204,8 @@ export function BattlemapStage({
   props,
   fogShapes = [],
   effectTemplates = [],
+  markers = [],
+  traps = [],
   isGm = false,
   characterPlacement,
   gmTokenPlacement,
@@ -171,12 +215,25 @@ export function BattlemapStage({
   selectedFogShapeId = null,
   fogTool = null,
   effectTool = null,
+  markerTool = null,
+  trapTool = null,
+  disableSpacePan = false,
   selectedEffectTemplateId = null,
+  selectedMarkerId = null,
+  selectedTrapId = null,
   onSelectEffectTemplate,
   onEffectTemplateCreate,
   onEffectTemplateMove,
   onEffectTemplateDelete,
   onEffectToolCancel,
+  onSelectMarker,
+  onMarkerCreate,
+  onMarkerMove,
+  onMarkerDelete,
+  onMarkerToolCancel,
+  onSelectTrap,
+  onTrapPlaceCell,
+  onTrapToolCancel,
   onCancelPlacement,
   onToggleDash,
   onCellClick,
@@ -238,6 +295,11 @@ export function BattlemapStage({
     gridX: number;
     gridY: number;
   } | null>(null);
+  const [markerMovePreview, setMarkerMovePreview] = useState<{
+    markerId: string;
+    gridX: number;
+    gridY: number;
+  } | null>(null);
   const [tokenDragPreview, setTokenDragPreview] = useState<{
     tokenId: string;
     originGridX: number;
@@ -255,10 +317,52 @@ export function BattlemapStage({
       (effectTool === "rect" || effectTool === "circle" || effectTool === "cone") &&
       onEffectTemplateCreate,
   );
+  const markerPlaceActive = Boolean(
+    isGm && isMarkerPlaceKind(markerTool) && onMarkerCreate,
+  );
+  const trapPlaceActive = Boolean(isGm && trapTool === "place" && onTrapPlaceCell);
   const shapeDrawActive = fogDrawActive || effectDrawActive;
-  const fogInteractive = Boolean(isGm && !placementActive && !fogDrawActive && !effectDrawActive);
-  const effectInteractive = Boolean(isGm && !placementActive && !fogDrawActive && !effectDrawActive);
-  const mapInteractionLocked = placementActive || shapeDrawActive;
+  /** Nur im jeweiligen Auswählen-Modus klickbar — analog Marker. */
+  const fogInteractive = Boolean(
+    isGm &&
+      fogTool === "select" &&
+      !placementActive &&
+      !fogDrawActive &&
+      !effectDrawActive &&
+      !markerPlaceActive &&
+      !trapPlaceActive,
+  );
+  const effectInteractive = Boolean(
+    isGm &&
+      effectTool === "select" &&
+      !placementActive &&
+      !fogDrawActive &&
+      !effectDrawActive &&
+      !markerPlaceActive &&
+      !trapPlaceActive,
+  );
+  const markerInteractive = Boolean(
+    isGm &&
+      markerTool === "select" &&
+      !placementActive &&
+      !fogDrawActive &&
+      !effectDrawActive &&
+      !markerPlaceActive &&
+      !trapPlaceActive,
+  );
+  const trapInteractive = Boolean(
+    isGm &&
+      trapTool === "select" &&
+      !placementActive &&
+      !fogDrawActive &&
+      !effectDrawActive &&
+      !markerPlaceActive &&
+      !trapPlaceActive,
+  );
+  const shapeSelectActive =
+    fogInteractive || effectInteractive || markerInteractive || trapInteractive;
+  const mapInteractionLocked =
+    placementActive || shapeDrawActive || markerPlaceActive || trapPlaceActive;
 
   const movingGmToken = gmMoveTokenId
     ? tokens.find((t) => t.id === gmMoveTokenId) ?? null
@@ -289,7 +393,11 @@ export function BattlemapStage({
               : effectTool === "cone"
                 ? "Effekt: Kegel ziehen (Spitze → Richtung)"
                 : "Effekt: Rechteck ziehen"
-            : null;
+            : markerPlaceActive && isMarkerPlaceKind(markerTool)
+              ? `Marker: ${BATTLEMAP_MARKER_META[markerTool].label} setzen`
+              : trapPlaceActive
+                ? "Falle: Trigger-Zelle wählen (Trap-Wizard)"
+                : null;
 
   const computeFitScale = useCallback(() => {
     const stage = stageRef.current;
@@ -367,7 +475,8 @@ export function BattlemapStage({
   }, []);
 
   useEffect(() => {
-    if (!placementActive && !shapeDrawActive) return;
+    if (!placementActive && !shapeDrawActive && !markerPlaceActive && !trapPlaceActive)
+      return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -389,10 +498,20 @@ export function BattlemapStage({
           onEffectToolCancel?.();
           return;
         }
+        if (markerPlaceActive) {
+          onMarkerToolCancel?.();
+          return;
+        }
+        if (trapPlaceActive) {
+          onTrapToolCancel?.();
+          return;
+        }
         onCancelPlacement?.();
         return;
       }
       if (e.key === " " || e.code === "Space") {
+        // Textfelder / offene Modals (Trap-Wizard): Space nicht für Pan kapern
+        if (disableSpacePan || isEditableKeyboardTarget(e.target)) return;
         e.preventDefault();
         setSpacePanHeld(true);
       }
@@ -412,6 +531,9 @@ export function BattlemapStage({
   }, [
     placementActive,
     shapeDrawActive,
+    markerPlaceActive,
+    trapPlaceActive,
+    disableSpacePan,
     fogDrawActive,
     effectDrawActive,
     fogDraft,
@@ -419,6 +541,8 @@ export function BattlemapStage({
     onCancelPlacement,
     onFogToolCancel,
     onEffectToolCancel,
+    onMarkerToolCancel,
+    onTrapToolCancel,
   ]);
 
   useEffect(() => {
@@ -456,6 +580,23 @@ export function BattlemapStage({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isGm, onEffectTemplateDelete, selectedEffectTemplateId]);
+
+  useEffect(() => {
+    if (!isGm || !selectedMarkerId || !onMarkerDelete) return;
+    const markerId = selectedMarkerId;
+    const deleteFn = onMarkerDelete;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement | null)?.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      deleteFn(markerId);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isGm, onMarkerDelete, selectedMarkerId]);
 
   const cellFromClient = useCallback(
     (clientX: number, clientY: number, el: HTMLElement) => {
@@ -686,6 +827,14 @@ export function BattlemapStage({
       )
     : effectTemplates;
 
+  const displayMarkers = markerMovePreview
+    ? markers.map((m) =>
+        m.id === markerMovePreview.markerId
+          ? { ...m, grid_x: markerMovePreview.gridX, grid_y: markerMovePreview.gridY }
+          : m,
+      )
+    : markers;
+
   const displayTokens = tokens;
 
   const isCellReachable = useCallback(
@@ -751,6 +900,62 @@ export function BattlemapStage({
       if (effectInteractive && e.target === e.currentTarget) {
         onSelectEffectTemplate?.(null);
       }
+      if (markerInteractive && e.target === e.currentTarget) {
+        onSelectMarker?.(null);
+      }
+      if (trapInteractive && e.target === e.currentTarget) {
+        onSelectTrap?.(null);
+      }
+      if (markerPlaceActive && isMarkerPlaceKind(markerTool) && onMarkerCreate) {
+        if (e.button !== 0) return;
+        const coords = clientToMapPixels(
+          e.clientX,
+          e.clientY,
+          e.currentTarget,
+          mapSize.width,
+          mapSize.height,
+        );
+        if (!coords) return;
+        const cell = pixelToGrid(coords.px, coords.py, config);
+        if (!cell) return;
+        if (
+          cell.gridX < 0 ||
+          cell.gridY < 0 ||
+          cell.gridX >= config.columns ||
+          cell.gridY >= config.rows
+        ) {
+          return;
+        }
+        onMarkerCreate({
+          kind: markerTool,
+          gridX: cell.gridX,
+          gridY: cell.gridY,
+        });
+        return;
+      }
+      if (trapPlaceActive && onTrapPlaceCell) {
+        if (e.button !== 0) return;
+        const coords = clientToMapPixels(
+          e.clientX,
+          e.clientY,
+          e.currentTarget,
+          mapSize.width,
+          mapSize.height,
+        );
+        if (!coords) return;
+        const cell = pixelToGrid(coords.px, coords.py, config);
+        if (!cell) return;
+        if (
+          cell.gridX < 0 ||
+          cell.gridY < 0 ||
+          cell.gridX >= config.columns ||
+          cell.gridY >= config.rows
+        ) {
+          return;
+        }
+        onTrapPlaceCell(cell.gridX, cell.gridY);
+        return;
+      }
       if (!placementActive || !onCellClick) return;
       if (e.button !== 0) return;
       const coords = clientToMapPixels(
@@ -778,16 +983,25 @@ export function BattlemapStage({
       isCellReachable,
       mapSize.height,
       mapSize.width,
+      markerInteractive,
+      markerPlaceActive,
+      markerTool,
+      trapInteractive,
+      trapPlaceActive,
       onCellClick,
+      onMarkerCreate,
+      onTrapPlaceCell,
       onSelectEffectTemplate,
       onSelectFogShape,
+      onSelectMarker,
+      onSelectTrap,
       placementActive,
     ],
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!placementActive) {
+      if (!placementActive && !markerPlaceActive && !trapPlaceActive) {
         setHoverCell(null);
         return;
       }
@@ -805,7 +1019,7 @@ export function BattlemapStage({
       const cell = pixelToGrid(coords.px, coords.py, config);
       setHoverCell(cell ? { x: cell.gridX, y: cell.gridY } : null);
     },
-    [config, mapSize.height, mapSize.width, placementActive],
+    [config, mapSize.height, mapSize.width, markerPlaceActive, placementActive, trapPlaceActive],
   );
 
   const handlePropDragOver = useCallback(
@@ -1181,7 +1395,15 @@ export function BattlemapStage({
               mapHeight={mapSize.height}
               isGm={isGm}
               selectedPropId={selectedPropId}
-              onSelectProp={placementActive || shapeDrawActive ? undefined : onSelectProp}
+              onSelectProp={
+                placementActive ||
+                shapeDrawActive ||
+                markerPlaceActive ||
+                trapPlaceActive ||
+                shapeSelectActive
+                  ? undefined
+                  : onSelectProp
+              }
             />
             <BattlemapFogLayer
               shapes={displayFogShapes}
@@ -1195,6 +1417,9 @@ export function BattlemapStage({
                 onSelectFogShape?.(id);
                 onSelectToken?.(null);
                 onSelectProp?.(null);
+                onSelectEffectTemplate?.(null);
+                onSelectMarker?.(null);
+                onSelectTrap?.(null);
               }}
               onShapeDragMove={(shapeId, gridX, gridY) => {
                 setFogMovePreview({ shapeId, gridX, gridY });
@@ -1218,6 +1443,8 @@ export function BattlemapStage({
                 onSelectToken?.(null);
                 onSelectProp?.(null);
                 onSelectFogShape?.(null);
+                onSelectMarker?.(null);
+                onSelectTrap?.(null);
               }}
               onTemplateDragMove={(templateId, gridX, gridY) => {
                 setEffectMovePreview({ templateId, gridX, gridY });
@@ -1227,6 +1454,54 @@ export function BattlemapStage({
                 onEffectTemplateMove?.(templateId, gridX, gridY);
               }}
               onDeleteTemplate={onEffectTemplateDelete}
+            />
+            <BattlemapMarkerLayer
+              markers={displayMarkers}
+              config={config}
+              isGm={isGm}
+              interactive={markerInteractive}
+              interactionScale={viewScale}
+              selectedMarkerId={selectedMarkerId}
+              draftCell={
+                markerPlaceActive && isMarkerPlaceKind(markerTool) && hoverCell
+                  ? {
+                      kind: markerTool,
+                      gridX: hoverCell.x,
+                      gridY: hoverCell.y,
+                    }
+                  : null
+              }
+              onSelectMarker={(id) => {
+                onSelectMarker?.(id);
+                onSelectToken?.(null);
+                onSelectProp?.(null);
+                onSelectFogShape?.(null);
+                onSelectEffectTemplate?.(null);
+                onSelectTrap?.(null);
+              }}
+              onMarkerDragMove={(markerId, gridX, gridY) => {
+                setMarkerMovePreview({ markerId, gridX, gridY });
+              }}
+              onMarkerDragEnd={(markerId, gridX, gridY) => {
+                setMarkerMovePreview(null);
+                onMarkerMove?.(markerId, gridX, gridY);
+              }}
+              onDeleteMarker={onMarkerDelete}
+            />
+            <BattlemapTrapOverlayLayer
+              traps={traps}
+              config={config}
+              isGm={isGm}
+              interactive={trapInteractive}
+              selectedTrapId={selectedTrapId}
+              onSelectTrap={(id) => {
+                onSelectTrap?.(id);
+                onSelectToken?.(null);
+                onSelectProp?.(null);
+                onSelectFogShape?.(null);
+                onSelectEffectTemplate?.(null);
+                onSelectMarker?.(null);
+              }}
             />
             <BattlemapTokenLayer
               tokens={displayTokens}
@@ -1239,10 +1514,14 @@ export function BattlemapStage({
               ownCharacterId={ownCharacterId}
               characterDisplayUrlById={characterDisplayUrlById}
               characterConditionsById={characterConditionsById}
-              onSelectToken={placementActive ? undefined : onSelectToken}
-              onTokenContextMenu={placementActive ? undefined : onTokenContextMenu}
+              onSelectToken={
+                placementActive || shapeSelectActive ? undefined : onSelectToken
+              }
+              onTokenContextMenu={
+                placementActive || shapeSelectActive ? undefined : onTokenContextMenu
+              }
               canDragToken={(token) => {
-                if (placementActive) return false;
+                if (placementActive || shapeSelectActive) return false;
                 if (isGm) return true;
                 return Boolean(ownCharacterId && token.character_id === ownCharacterId);
               }}

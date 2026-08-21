@@ -151,8 +151,8 @@ export function CombatInitiativeHud({
 
         {participants.length === 0 ? (
           <p className="px-2 py-4 text-center font-libre text-xs text-gray-400">
-            Keine Teilnehmer auf der Karte. Der SL kann Tokens über „Am Kampf teilnehmen“
-            hinzufügen.
+            Keine Teilnehmer auf der Karte. Stelle sicher, dass Spieler-Tokens auf der
+            aktiven Battlemap liegen — oder füge Tokens über „Am Kampf teilnehmen“ hinzu.
           </p>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-1 pt-1">

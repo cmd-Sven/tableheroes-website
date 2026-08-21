@@ -55,6 +55,105 @@ export type SessionBattlemapEffectTemplate = {
 
 export type BattlemapEffectTool = "select" | "rect" | "circle" | "cone" | null;
 
+/** 1-Feld-Spezialeffekt-Marker auf der Battlemap. */
+export type BattlemapMarkerKind =
+  | "fire"
+  | "ice"
+  | "debris"
+  | "crack"
+  | "danger"
+  | "interest"
+  | "trap";
+
+export type SessionBattlemapMarker = {
+  id: string;
+  battlemap_id: string;
+  session_id: string;
+  campaign_id: string;
+  kind: BattlemapMarkerKind;
+  grid_x: number;
+  grid_y: number;
+  is_visible_to_players: boolean;
+  z_index: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** null = Werkzeug aus; select = verschieben/löschen; sonst Art zum Platzieren */
+export type BattlemapMarkerTool = "select" | BattlemapMarkerKind | null;
+
+export const BATTLEMAP_MARKER_KINDS: readonly BattlemapMarkerKind[] = [
+  "fire",
+  "ice",
+  "debris",
+  "crack",
+  "danger",
+  "interest",
+  "trap",
+] as const;
+
+export const BATTLEMAP_MARKER_META: Record<
+  BattlemapMarkerKind,
+  { label: string; hint: string }
+> = {
+  fire: { label: "Feuer", hint: "Flammen / Brand auf dem Feld" },
+  ice: { label: "Eis", hint: "Frost / Eisfläche" },
+  debris: { label: "Geröll", hint: "Unpassierbar durch Trümmer" },
+  crack: { label: "Riss", hint: "Loch oder Riss im Boden" },
+  danger: { label: "Gefahr", hint: "Wahrnehmung: gefährlich" },
+  interest: { label: "Interessant", hint: "Etwas Entdeckenswertes" },
+  trap: { label: "Falle", hint: "Achtung Falle" },
+};
+
+/** Schwierigkeit für Trap-Wizard / AI. */
+export type BattlemapTrapDifficulty = "easy" | "medium" | "hard" | "deadly";
+
+export type BattlemapTrapEffectShape = "circle" | "rect";
+
+/** Runtime-Falle auf der Battlemap (unsichtbar bis Detection/Trigger). */
+export type SessionBattlemapTrap = {
+  id: string;
+  battlemap_id: string;
+  session_id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  trap_type: string;
+  difficulty: BattlemapTrapDifficulty;
+  grid_x: number;
+  grid_y: number;
+  /** Spec: detectionDC */
+  detection_dc: number;
+  /** Spec: isAreaEffect — Schaden/Effekt-Fläche nach Auslösen (nicht Trigger) */
+  is_area_effect: boolean;
+  effect_shape: BattlemapTrapEffectShape;
+  /** Spec: effectRadius in Gridfeldern (AoE nach Trigger; Trigger bleibt 1 Zelle) */
+  effect_radius: number;
+  /** Spec: damage (z. B. 2d6) */
+  damage: string;
+  damage_type: string;
+  save_ability: string | null;
+  save_dc: number | null;
+  /**
+   * Optionaler SL-Zustand (CharacterConditionKey), der bei fehlgeschlagenem
+   * Rettungswurf über das bestehende Zustands-/Avatar-System gesetzt wird.
+   */
+  status_effect: string | null;
+  is_armed: boolean;
+  is_detected: boolean;
+  is_triggered: boolean;
+  is_visible_to_players: boolean;
+  triggered_by_character_id: string | null;
+  triggered_at?: string | null;
+  lore_context?: string | null;
+  ai_payload?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** null = aus; place = Falle setzen; select = auswählen */
+export type BattlemapTrapTool = "select" | "place" | null;
+
 export type CharacterTokenPlacement = {
   characterId: string;
   characterName: string;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { ShieldAlert } from "lucide-react";
 import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import { CHARACTER_CONDITION_DEFINITIONS } from "@/src/lib/characters/condition-tokens";
@@ -246,7 +247,9 @@ function AnimatedToken({
     Boolean(highlightCharacterId && token.character_id === highlightCharacterId);
   const isSelected = selectedTokenId === token.id;
   const isOwnCharacter = Boolean(ownCharacterId) && token.character_id === ownCharacterId;
-  const canOpenMenu = isGm || isOwnCharacter;
+  const canOpenMenu =
+    (isGm || isOwnCharacter) && Boolean(onSelectToken || onTokenContextMenu);
+  const pointerActive = canOpenMenu || canDrag;
   const hiddenFromPlayers = !token.is_visible_to_players;
   const borderClass = SIDE_BORDER[token.token_side] ?? "border-hero-vibrant/80";
 
@@ -278,11 +281,11 @@ function AnimatedToken({
   return (
     <div
       data-battlemap-token={token.id}
-      role={canOpenMenu || canDrag ? "button" : undefined}
-      tabIndex={canOpenMenu || canDrag ? 0 : undefined}
+      role={pointerActive ? "button" : undefined}
+      tabIndex={pointerActive ? 0 : undefined}
       className={`absolute touch-none ${
         isActiveTurn ? "z-[46]" : "z-[45]"
-      } ${
+      } ${pointerActive ? "" : "pointer-events-none"} ${
         canDrag ? "cursor-grab active:cursor-grabbing" : canOpenMenu ? "cursor-pointer" : ""
       } ${canOpenMenu || canDrag ? "hover:brightness-110" : ""} ${
         isDragging ? "brightness-125 ring-2 ring-accent-gold/70 ring-offset-1 ring-offset-transparent" : ""
@@ -298,7 +301,7 @@ function AnimatedToken({
       }}
       title={title}
       onPointerDown={
-        canOpenMenu || canDrag
+        pointerActive
           ? (e) => {
               if (e.button !== 0) return;
               e.stopPropagation();
@@ -331,7 +334,7 @@ function AnimatedToken({
           : undefined
       }
       onPointerUp={
-        canOpenMenu || canDrag
+        pointerActive
           ? (e) => {
               const drag = dragRef.current;
               if (!drag || drag.token.id !== token.id) return;
@@ -356,7 +359,7 @@ function AnimatedToken({
           : undefined
       }
       onPointerCancel={
-        canOpenMenu || canDrag
+        pointerActive
           ? () => {
               dragRef.current = null;
               setIsDraggingLocal(false);
@@ -409,15 +412,16 @@ function AnimatedToken({
         </div>
       ) : null}
 
+      {/* Token artwork stays static — no pulse/scale on the image */}
       <div
         className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-full border-2 bg-black/40 shadow-lg ${
           isActiveTurn
-            ? "border-accent-gold ring-4 ring-accent-gold/60 animate-pulse"
+            ? "border-accent-gold"
             : isHighlight
               ? "border-accent-gold ring-2 ring-accent-gold/60"
               : borderClass
         } ${hiddenFromPlayers && isGm ? "opacity-45 ring-2 ring-dashed ring-accent-gold/60" : ""} ${
-          isSelected ? "ring-2 ring-accent-gold" : ""
+          isSelected && !isActiveTurn ? "ring-2 ring-accent-gold" : ""
         }`}
       >
         {imageUrl ? (
@@ -440,10 +444,25 @@ function AnimatedToken({
         ) : null}
       </div>
 
+      {/* Active turn: only border/ring animates (opacity + transform), never the artwork */}
       {isActiveTurn ? (
-        <span className="pointer-events-none absolute -top-7 left-1/2 z-[50] -translate-x-1/2 whitespace-nowrap rounded-full border border-accent-gold/80 bg-background-dark/95 px-2 py-0.5 font-barlow text-[9px] font-extrabold uppercase tracking-wide text-accent-gold shadow-lg">
-          Am Zug
-        </span>
+        <>
+          <motion.span
+            className="pointer-events-none absolute -inset-1 z-[20] rounded-full border-2 border-accent-gold shadow-[0_0_14px_rgba(202,185,38,0.75)]"
+            aria-hidden
+            animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.span
+            className="pointer-events-none absolute -inset-[5px] z-[20] rounded-full border-2 border-dashed border-accent-gold/70"
+            aria-hidden
+            animate={{ rotate: 360 }}
+            transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+          />
+          <span className="pointer-events-none absolute -top-7 left-1/2 z-[50] -translate-x-1/2 whitespace-nowrap rounded-full border border-accent-gold/80 bg-background-dark/95 px-2 py-0.5 font-barlow text-[9px] font-extrabold uppercase tracking-wide text-accent-gold shadow-lg">
+            Am Zug
+          </span>
+        </>
       ) : null}
 
       {conditions.length > 0 ? (

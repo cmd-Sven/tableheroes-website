@@ -34,9 +34,9 @@ export function BattlemapPropsLayer({
           <div
             key={prop.id}
             className={`absolute overflow-hidden rounded-md shadow-xl ${
-              isGm ? "cursor-pointer" : "pointer-events-none"
+              isGm && onSelectProp ? "cursor-pointer" : "pointer-events-none"
             } ${hiddenFromPlayers && isGm ? "opacity-50 ring-2 ring-dashed ring-accent-gold/70" : ""} ${
-              isSelected ? "ring-2 ring-accent-gold" : "border border-hero-border/40"
+              isSelected ? "ring-[3px] ring-accent-gold border-2 border-accent-gold" : "border border-hero-border/40"
             }`}
             style={{
               left,

@@ -160,6 +160,61 @@ export function getConditionDefinition(key: string): CharacterConditionDefinitio
   return CONDITION_BY_KEY[key as CharacterConditionKey] ?? null;
 }
 
+export function isCharacterConditionKey(key: string): key is CharacterConditionKey {
+  return getConditionDefinition(key) != null;
+}
+
+/** Freitext / Aliase (DE/EN) → bekannter CharacterConditionKey. */
+const CONDITION_ALIASES: Record<string, CharacterConditionKey> = {
+  vergiftet: "poisoned",
+  poison: "poisoned",
+  poisoned: "poisoned",
+  bezaubert: "charmed",
+  charmed: "charmed",
+  bewusstlos: "unconscious",
+  unconscious: "unconscious",
+  blind: "blinded",
+  blinded: "blinded",
+  erschöpfung: "exhaustion",
+  exhaustion: "exhaustion",
+  festgesetzt: "restrained",
+  restrained: "restrained",
+  gelähmt: "paralyzed",
+  paralyzed: "paralyzed",
+  gepackt: "grappled",
+  grappled: "grappled",
+  handlungsunfähig: "incapacitated",
+  incapacitated: "incapacitated",
+  liegend: "prone",
+  prone: "prone",
+  taub: "deafened",
+  deafened: "deafened",
+  unsichtbar: "invisible",
+  invisible: "invisible",
+  angst: "frightened",
+  fear: "frightened",
+  frightened: "frightened",
+  verstummt: "silenced",
+  silenced: "silenced",
+  krank: "sick",
+  sick: "sick",
+  verflucht: "cursed",
+  cursed: "cursed",
+};
+
+/**
+ * Parst einen Fallen-Status-Effekt zu einem CharacterConditionKey
+ * (Key, Label DE/EN oder Alias).
+ */
+export function parseTrapStatusEffect(raw: unknown): CharacterConditionKey | null {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  if (isCharacterConditionKey(trimmed)) return trimmed;
+  const alias = CONDITION_ALIASES[trimmed.toLowerCase()];
+  return alias ?? null;
+}
+
 export function getConditionLabel(
   locale: CharacterSheetLocale,
   key: CharacterConditionKey,

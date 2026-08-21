@@ -225,35 +225,56 @@ import {
 import {
   createBattlemapEffectTemplate,
   createBattlemapFogShape,
+  createBattlemapMarker,
   createBattlemapProp,
+  clearBattlemapEffectTemplates,
+  clearBattlemapFogShapes,
+  clearBattlemapMarkers,
   getCharacterMovementRange,
   getSessionBattlemaps,
   listBattlemapEffectTemplates,
   listBattlemapFogShapes,
+  listBattlemapMarkers,
   placeBattlemapCharacterToken,
   placeBattlemapGmToken,
   removeBattlemapEffectTemplate,
   removeBattlemapFogShape,
+  removeBattlemapMarker,
   removeBattlemapProp,
   removeBattlemapToken,
   toggleBattlemapTokenVisibility,
   updateBattlemapEffectTemplate,
   updateBattlemapFogShape,
+  updateBattlemapMarker,
   updateBattlemapProp,
   updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
   BattlemapEffectTool,
   BattlemapFogTool,
+  BattlemapMarkerKind,
+  BattlemapMarkerTool,
+  BattlemapTrapTool,
   CharacterTokenPlacement,
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
+  SessionBattlemapMarker,
   SessionBattlemapProp,
   SessionBattlemapToken,
+  SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
+import { BATTLEMAP_MARKER_KINDS } from "@/src/lib/session/battlemap-types";
+import {
+  checkBattlemapTrapsOnEnter,
+  clearBattlemapTraps,
+  listBattlemapTraps,
+  removeBattlemapTrap,
+} from "@/src/lib/actions/battlemap-trap-actions";
+import { TrapWizardModal } from "@/src/components/session/battlemap/TrapWizardModal";
+import { TrapTriggerModal } from "@/src/components/session/battlemap/TrapTriggerModal";
 import {
   isWithinMovementRange,
   movementCellsForBurst,
@@ -1383,10 +1404,26 @@ export function LiveSessionBoard({
   const [battlemapEffectTemplates, setBattlemapEffectTemplates] = useState<
     SessionBattlemapEffectTemplate[]
   >([]);
+  const [battlemapMarkers, setBattlemapMarkers] = useState<SessionBattlemapMarker[]>([]);
+  const [battlemapTraps, setBattlemapTraps] = useState<SessionBattlemapTrap[]>([]);
   const [fogTool, setFogTool] = useState<BattlemapFogTool>(null);
   const [effectTool, setEffectTool] = useState<BattlemapEffectTool>(null);
+  const [markerTool, setMarkerTool] = useState<BattlemapMarkerTool>(null);
+  const [trapTool, setTrapTool] = useState<BattlemapTrapTool>(null);
   const [selectedFogShapeId, setSelectedFogShapeId] = useState<string | null>(null);
   const [selectedEffectTemplateId, setSelectedEffectTemplateId] = useState<string | null>(null);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  const [selectedTrapId, setSelectedTrapId] = useState<string | null>(null);
+  const [trapWizardCell, setTrapWizardCell] = useState<{
+    gridX: number;
+    gridY: number;
+  } | null>(null);
+  const [trapTriggerEvent, setTrapTriggerEvent] = useState<{
+    trap: SessionBattlemapTrap;
+    characterName: string;
+    characterId: string;
+    passivePerception: number;
+  } | null>(null);
   const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);
   const [gmTokenPlacement, setGmTokenPlacement] = useState<GmTokenPlacementDraft | null>(null);
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
@@ -1846,6 +1883,128 @@ export function LiveSessionBoard({
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {
+      setBattlemapMarkers([]);
+      setSelectedMarkerId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadMarkers() {
+      try {
+        const list = await listBattlemapMarkers(activeBattlemapId!, sessionId);
+        if (!cancelled) setBattlemapMarkers(list);
+      } catch {
+        if (!cancelled) setBattlemapMarkers([]);
+      }
+    }
+
+    void loadMarkers();
+
+    const channel = supabase
+      .channel(`session_battlemap_markers_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_markers",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+          if (eventType === "DELETE") {
+            const oldId =
+              payload.old && typeof payload.old === "object" && "id" in payload.old
+                ? String((payload.old as { id: unknown }).id)
+                : "";
+            if (oldId) {
+              setBattlemapMarkers((prev) => prev.filter((m) => m.id !== oldId));
+              setSelectedMarkerId((prev) => (prev === oldId ? null : prev));
+            }
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row?.id) {
+            void loadMarkers();
+            return;
+          }
+          const kindRaw = String(row.kind ?? "fire");
+          const kind: BattlemapMarkerKind = (
+            BATTLEMAP_MARKER_KINDS as readonly string[]
+          ).includes(kindRaw)
+            ? (kindRaw as BattlemapMarkerKind)
+            : "fire";
+          const marker: SessionBattlemapMarker = {
+            id: String(row.id),
+            battlemap_id: String(row.battlemap_id),
+            session_id: String(row.session_id),
+            campaign_id: String(row.campaign_id),
+            kind,
+            grid_x: Math.round(Number(row.grid_x ?? 0)),
+            grid_y: Math.round(Number(row.grid_y ?? 0)),
+            is_visible_to_players: row.is_visible_to_players !== false,
+            z_index: Math.round(Number(row.z_index ?? 0)),
+          };
+          setBattlemapMarkers((prev) => {
+            const idx = prev.findIndex((m) => m.id === marker.id);
+            if (idx < 0) return [...prev, marker];
+            const next = [...prev];
+            next[idx] = marker;
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, isGuest, sessionId, supabase]);
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
+      setBattlemapTraps([]);
+      setSelectedTrapId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadTraps() {
+      try {
+        const list = await listBattlemapTraps(activeBattlemapId!, sessionId);
+        if (!cancelled) setBattlemapTraps(list);
+      } catch {
+        if (!cancelled) setBattlemapTraps([]);
+      }
+    }
+
+    void loadTraps();
+
+    const channel = supabase
+      .channel(`session_battlemap_traps_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_traps",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        () => {
+          void loadTraps();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, isGuest, sessionId, supabase]);
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
       setBattlemapProps([]);
       return;
     }
@@ -2168,6 +2327,60 @@ export function LiveSessionBoard({
     ],
   );
 
+  const runTrapEnterCheck = useCallback(
+    async (characterId: string, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      try {
+        const result = await checkBattlemapTrapsOnEnter({
+          sessionId,
+          battlemapId: activeBattlemapId,
+          characterId,
+          gridX,
+          gridY,
+        });
+        if (result.kind === "detected") {
+          setBattlemapTraps((prev) => {
+            const idx = prev.findIndex((t) => t.id === result.trap.id);
+            if (idx < 0) return [...prev, result.trap];
+            const next = [...prev];
+            next[idx] = result.trap;
+            return next;
+          });
+          toast.message(
+            `${result.characterName} bemerkt „${result.trap.name}“ (PP ${result.passivePerception} ≥ DC ${result.trap.detection_dc}).`,
+          );
+        } else if (result.kind === "triggered") {
+          setBattlemapTraps((prev) => {
+            const idx = prev.findIndex((t) => t.id === result.trap.id);
+            if (idx < 0) return [...prev, result.trap];
+            const next = [...prev];
+            next[idx] = result.trap;
+            return next;
+          });
+          setLiveState((prev) => {
+            if (!prev) return prev;
+            const updated = normalizeLiveRow({
+              ...prev,
+              battlemap_movement_paused: true,
+            });
+            liveStateRef.current = updated;
+            return updated;
+          });
+          setTrapTriggerEvent({
+            trap: result.trap,
+            characterName: result.characterName,
+            characterId: result.characterId,
+            passivePerception: result.passivePerception,
+          });
+          toast.error(`Falle „${result.trap.name}“ ausgelöst!`);
+        }
+      } catch {
+        /* Trap-Check optional — Bewegung bleibt gültig */
+      }
+    },
+    [activeBattlemapId, sessionId],
+  );
+
   const handleBattlemapTokenMove = useCallback(
     (token: SessionBattlemapToken, gridX: number, gridY: number) => {
       if (!activeBattlemapId) return;
@@ -2207,6 +2420,7 @@ export function LiveSessionBoard({
             });
             notifyBattlemapTokensChanged({ op: "upsert", token: placed });
             toast.success(`Token für ${characterName} bewegt.`);
+            void runTrapEnterCheck(characterId, gridX, gridY);
           } catch (e) {
             applyLocalMove(originGrid.grid_x, originGrid.grid_y);
             toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
@@ -2253,6 +2467,7 @@ export function LiveSessionBoard({
       isGM,
       liveState?.battlemap_movement_paused,
       notifyBattlemapTokensChanged,
+      runTrapEnterCheck,
       sessionId,
       startTransition,
     ],
@@ -2295,6 +2510,140 @@ export function LiveSessionBoard({
     },
     [notifyBattlemapEffectChanged, sessionId, startTransition],
   );
+
+  const handleMarkerDelete = useCallback(
+    (markerId: string) => {
+      startTransition(async () => {
+        try {
+          await removeBattlemapMarker(markerId, sessionId);
+          setBattlemapMarkers((prev) => prev.filter((m) => m.id !== markerId));
+          setSelectedMarkerId((prev) => (prev === markerId ? null : prev));
+          toast.success("Spezialeffekt entfernt.");
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Marker konnte nicht gelöscht werden.",
+          );
+        }
+      });
+    },
+    [sessionId, startTransition],
+  );
+
+  const handleFogClearAll = useCallback(() => {
+    if (!activeBattlemapId || !isGM) return;
+    if (battlemapFogShapes.length === 0) {
+      toast.message("Keine Fog-Flächen zum Löschen.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await clearBattlemapFogShapes(activeBattlemapId, sessionId);
+        setBattlemapFogShapes([]);
+        setSelectedFogShapeId(null);
+        notifyBattlemapFogChanged({ op: "refresh" });
+        toast.success("Alle Fog-Flächen entfernt.");
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Fog-Flächen konnten nicht gelöscht werden.",
+        );
+      }
+    });
+  }, [
+    activeBattlemapId,
+    battlemapFogShapes.length,
+    isGM,
+    notifyBattlemapFogChanged,
+    sessionId,
+    startTransition,
+  ]);
+
+  const handleEffectClearAll = useCallback(() => {
+    if (!activeBattlemapId || !isGM) return;
+    if (battlemapEffectTemplates.length === 0) {
+      toast.message("Keine Effekt-Schablonen zum Löschen.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await clearBattlemapEffectTemplates(activeBattlemapId, sessionId);
+        setBattlemapEffectTemplates([]);
+        setSelectedEffectTemplateId(null);
+        notifyBattlemapEffectChanged({ op: "refresh" });
+        toast.success("Alle Effekt-Schablonen entfernt.");
+      } catch (e) {
+        toast.error(
+          e instanceof Error
+            ? e.message
+            : "Effekt-Schablonen konnten nicht gelöscht werden.",
+        );
+      }
+    });
+  }, [
+    activeBattlemapId,
+    battlemapEffectTemplates.length,
+    isGM,
+    notifyBattlemapEffectChanged,
+    sessionId,
+    startTransition,
+  ]);
+
+  const handleMarkerClearAll = useCallback(() => {
+    if (!activeBattlemapId || !isGM) return;
+    if (battlemapMarkers.length === 0) {
+      toast.message("Keine Spezialeffekte zum Löschen.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await clearBattlemapMarkers(activeBattlemapId, sessionId);
+        setBattlemapMarkers([]);
+        setSelectedMarkerId(null);
+        toast.success("Alle Spezialeffekte entfernt.");
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Marker konnten nicht gelöscht werden.",
+        );
+      }
+    });
+  }, [activeBattlemapId, battlemapMarkers.length, isGM, sessionId, startTransition]);
+
+  const handleTrapDelete = useCallback(
+    (trapId: string) => {
+      startTransition(async () => {
+        try {
+          await removeBattlemapTrap(trapId, sessionId);
+          setBattlemapTraps((prev) => prev.filter((t) => t.id !== trapId));
+          setSelectedTrapId((prev) => (prev === trapId ? null : prev));
+          toast.success("Falle entfernt.");
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Falle konnte nicht gelöscht werden.",
+          );
+        }
+      });
+    },
+    [sessionId, startTransition],
+  );
+
+  const handleTrapClearAll = useCallback(() => {
+    if (!activeBattlemapId || !isGM) return;
+    if (battlemapTraps.length === 0) {
+      toast.message("Keine Fallen zum Löschen.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await clearBattlemapTraps(activeBattlemapId, sessionId);
+        setBattlemapTraps([]);
+        setSelectedTrapId(null);
+        toast.success("Alle Fallen entfernt.");
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Fallen konnten nicht gelöscht werden.",
+        );
+      }
+    });
+  }, [activeBattlemapId, battlemapTraps.length, isGM, sessionId, startTransition]);
 
   const handleBattlemapPropDrop = useCallback(
     (draft: GmPropPlacementDraft, posX: number, posY: number) => {
@@ -2448,6 +2797,8 @@ export function LiveSessionBoard({
   const [npcReactions, setNpcReactions] = useState<ActiveNpcReaction[]>([]);
   const [npcReputationScores, setNpcReputationScores] = useState<Record<string, number>>({});
   const [combatParticipants, setCombatParticipants] = useState<CombatParticipant[]>([]);
+  /** Verhindert, dass veraltete Realtime-Reloads die Initiative-Liste nach dem Seed leeren. */
+  const combatParticipantsLoadGenRef = useRef(0);
   const [rollingInitiativeId, setRollingInitiativeId] = useState<string | null>(null);
   const [lightningPulseKey, setLightningPulseKey] = useState(0);
   const [locationDraft, setLocationDraft] = useState(
@@ -3264,12 +3615,14 @@ export function LiveSessionBoard({
     let cancelled = false;
 
     async function loadCombatParticipants() {
+      const gen = ++combatParticipantsLoadGenRef.current;
       const { data, error } = await ((supabase as any).from("combat_participants") as any)
         .select("*")
         .eq("session_id", sessionId)
         .eq("is_active", true);
 
-      if (!cancelled && !error) {
+      if (cancelled || gen !== combatParticipantsLoadGenRef.current) return;
+      if (!error) {
         setCombatParticipants(normalizeCombatParticipants(data ?? []));
       }
     }
@@ -3292,6 +3645,7 @@ export function LiveSessionBoard({
 
     return () => {
       cancelled = true;
+      combatParticipantsLoadGenRef.current += 1;
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase]);
@@ -4048,13 +4402,16 @@ export function LiveSessionBoard({
   function battlemapTokenToCombatPayload(
     token: SessionBattlemapToken,
   ): CombatTokenPayload | null {
+    // Party-/PC-Tokens: character_id zählt — auch wenn der Tray-Eintrag fehlt (Label-Fallback).
     if (token.character_id) {
       const pc = partyCharacters.find((c) => c.id === token.character_id);
-      if (!pc || pc.isSessionDummy) return null;
+      if (pc?.isSessionDummy) return null;
+      const name = (pc?.name || token.label || "").trim();
+      if (!name) return null;
       return {
         type: "player",
-        name: pc.name,
-        image_url: token.image_url || pc.avatar_url,
+        name,
+        image_url: token.image_url || pc?.avatar_url || null,
       };
     }
     if (token.npc_id) {
@@ -4081,15 +4438,11 @@ export function LiveSessionBoard({
   async function seedCombatParticipantsFromBattlemap() {
     if (!isGM) return;
 
-    // Vorherige Runde zurücksetzen — frische Initiative
-    await ((supabase as any).from("combat_participants") as any)
-      .update({ is_active: false })
-      .eq("session_id", sessionId);
-
     const payloads: CombatTokenPayload[] = [];
     const seenNames = new Set<string>();
     const seenNpcIds = new Set<string>();
 
+    // Immer voller Token-State (nicht visibleBattlemapTokens / Pointer-Filter).
     for (const token of battlemapTokens) {
       const payload = battlemapTokenToCombatPayload(token);
       if (!payload) continue;
@@ -4099,8 +4452,21 @@ export function LiveSessionBoard({
       else seenNames.add(payload.name);
     }
 
-    setCombatParticipants([]);
-    if (payloads.length === 0) return;
+    // Vorherige Runde zurücksetzen — frische Initiative
+    await ((supabase as any).from("combat_participants") as any)
+      .update({ is_active: false })
+      .eq("session_id", sessionId);
+
+    // Realtime-Reload vom Deactivate darf die neue Liste nicht wieder leeren.
+    combatParticipantsLoadGenRef.current += 1;
+
+    if (payloads.length === 0) {
+      setCombatParticipants([]);
+      toast.error(
+        "Keine aktiven Spieler-/NSC-Tokens auf der Battlemap. Platziere zuerst Tokens, dann Combat starten.",
+      );
+      return;
+    }
 
     const rows = payloads.map((token, index) => ({
       session_id: sessionId,
@@ -4116,10 +4482,17 @@ export function LiveSessionBoard({
       conditions: [],
     }));
 
-    const { error } = await ((supabase as any).from("combat_participants") as any).insert(
-      rows,
-    );
-    if (error) toast.error(error.message);
+    const { data, error } = await ((supabase as any).from("combat_participants") as any)
+      .insert(rows)
+      .select("*");
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    combatParticipantsLoadGenRef.current += 1;
+    setCombatParticipants(normalizeCombatParticipants(data ?? []));
   }
 
   function dragCombatToken(e: DragEvent<HTMLElement>, token: CombatTokenPayload) {
@@ -4585,6 +4958,8 @@ export function LiveSessionBoard({
                 props={visibleBattlemapProps}
                 fogShapes={battlemapFogShapes}
                 effectTemplates={battlemapEffectTemplates}
+                markers={battlemapMarkers}
+                traps={battlemapTraps}
                 isGm={isGM}
                 characterPlacement={tokenPlacement}
                 gmTokenPlacement={gmTokenPlacement}
@@ -4594,7 +4969,12 @@ export function LiveSessionBoard({
                 selectedFogShapeId={selectedFogShapeId}
                 fogTool={isGM ? fogTool : null}
                 effectTool={isGM ? effectTool : null}
+                markerTool={isGM ? markerTool : null}
+                trapTool={isGM ? trapTool : null}
+                disableSpacePan={Boolean(trapWizardCell)}
                 selectedEffectTemplateId={selectedEffectTemplateId}
+                selectedMarkerId={selectedMarkerId}
+                selectedTrapId={selectedTrapId}
                 onCancelPlacement={() => {
                   setTokenPlacement(null);
                   setGmTokenPlacement(null);
@@ -4611,6 +4991,8 @@ export function LiveSessionBoard({
                   setSelectedBattlemapPropId(null);
                   setSelectedFogShapeId(null);
                   setSelectedEffectTemplateId(null);
+                  setSelectedMarkerId(null);
+                  setSelectedTrapId(null);
                   if (id && isGM) {
                     const token = battlemapTokens.find((t) => t.id === id);
                     if (token && !token.character_id) {
@@ -4627,6 +5009,8 @@ export function LiveSessionBoard({
                   setSelectedBattlemapTokenId(null);
                   setSelectedFogShapeId(null);
                   setSelectedEffectTemplateId(null);
+                  setSelectedMarkerId(null);
+                  setSelectedTrapId(null);
                   setGmMoveTokenId(null);
                   setGmTokenPlacement(null);
                 }}
@@ -4635,6 +5019,8 @@ export function LiveSessionBoard({
                   setSelectedBattlemapTokenId(null);
                   setSelectedBattlemapPropId(null);
                   setSelectedEffectTemplateId(null);
+                  setSelectedMarkerId(null);
+                  setSelectedTrapId(null);
                   setGmMoveTokenId(null);
                 }}
                 onSelectEffectTemplate={(id) => {
@@ -4642,6 +5028,17 @@ export function LiveSessionBoard({
                   setSelectedBattlemapTokenId(null);
                   setSelectedBattlemapPropId(null);
                   setSelectedFogShapeId(null);
+                  setSelectedMarkerId(null);
+                  setSelectedTrapId(null);
+                  setGmMoveTokenId(null);
+                }}
+                onSelectMarker={(id) => {
+                  setSelectedMarkerId(id);
+                  setSelectedBattlemapTokenId(null);
+                  setSelectedBattlemapPropId(null);
+                  setSelectedFogShapeId(null);
+                  setSelectedEffectTemplateId(null);
+                  setSelectedTrapId(null);
                   setGmMoveTokenId(null);
                 }}
                 onFogShapeCreate={(input) => {
@@ -4776,6 +5173,85 @@ export function LiveSessionBoard({
                 onEffectToolCancel={() => {
                   setEffectTool(null);
                   setSelectedEffectTemplateId(null);
+                }}
+                onMarkerCreate={(input) => {
+                  if (!activeBattlemapId || !isGM) return;
+                  startTransition(async () => {
+                    try {
+                      const created = await createBattlemapMarker({
+                        sessionId,
+                        battlemapId: activeBattlemapId,
+                        kind: input.kind,
+                        gridX: input.gridX,
+                        gridY: input.gridY,
+                      });
+                      setBattlemapMarkers((prev) => {
+                        if (prev.some((m) => m.id === created.id)) return prev;
+                        return [...prev, created];
+                      });
+                      setSelectedMarkerId(created.id);
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : "Marker konnte nicht gesetzt werden.",
+                      );
+                    }
+                  });
+                }}
+                onMarkerMove={(markerId, gridX, gridY) => {
+                  if (!isGM) return;
+                  const prev = battlemapMarkers.find((m) => m.id === markerId);
+                  if (!prev || (prev.grid_x === gridX && prev.grid_y === gridY)) return;
+                  setBattlemapMarkers((list) =>
+                    list.map((m) =>
+                      m.id === markerId ? { ...m, grid_x: gridX, grid_y: gridY } : m,
+                    ),
+                  );
+                  startTransition(async () => {
+                    try {
+                      const updated = await updateBattlemapMarker({
+                        sessionId,
+                        markerId,
+                        gridX,
+                        gridY,
+                      });
+                      setBattlemapMarkers((list) =>
+                        list.map((m) => (m.id === updated.id ? updated : m)),
+                      );
+                    } catch (e) {
+                      if (prev) {
+                        setBattlemapMarkers((list) =>
+                          list.map((m) => (m.id === markerId ? prev : m)),
+                        );
+                      }
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Marker konnte nicht verschoben werden.",
+                      );
+                    }
+                  });
+                }}
+                onMarkerDelete={handleMarkerDelete}
+                onMarkerToolCancel={() => {
+                  setMarkerTool(null);
+                  setSelectedMarkerId(null);
+                }}
+                onSelectTrap={(id) => {
+                  setSelectedTrapId(id);
+                  setSelectedBattlemapTokenId(null);
+                  setSelectedBattlemapPropId(null);
+                  setSelectedFogShapeId(null);
+                  setSelectedEffectTemplateId(null);
+                  setSelectedMarkerId(null);
+                  setGmMoveTokenId(null);
+                }}
+                onTrapPlaceCell={(gridX, gridY) => {
+                  setTrapWizardCell({ gridX, gridY });
+                }}
+                onTrapToolCancel={() => {
+                  setTrapTool(null);
+                  setSelectedTrapId(null);
+                  setTrapWizardCell(null);
                 }}
                 onTokenMove={handleBattlemapTokenMove}
                 onPropDrop={handleBattlemapPropDrop}
@@ -5939,6 +6415,10 @@ export function LiveSessionBoard({
           if (tool) {
             setEffectTool(null);
             setSelectedEffectTemplateId(null);
+            setMarkerTool(null);
+            setSelectedMarkerId(null);
+            setTrapTool(null);
+            setSelectedTrapId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -5955,6 +6435,10 @@ export function LiveSessionBoard({
           if (tool) {
             setFogTool(null);
             setSelectedFogShapeId(null);
+            setMarkerTool(null);
+            setSelectedMarkerId(null);
+            setTrapTool(null);
+            setSelectedTrapId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -5964,6 +6448,74 @@ export function LiveSessionBoard({
           }
           if (tool !== "select") setSelectedEffectTemplateId(null);
         }}
+        markerTool={markerTool}
+        selectedMarkerId={selectedMarkerId}
+        onMarkerToolChange={(tool) => {
+          setMarkerTool(tool);
+          if (tool) {
+            setFogTool(null);
+            setSelectedFogShapeId(null);
+            setEffectTool(null);
+            setSelectedEffectTemplateId(null);
+            setTrapTool(null);
+            setSelectedTrapId(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedMarkerId(null);
+        }}
+        onMarkerDelete={() => {
+          const fallbackId =
+            selectedMarkerId ??
+            (battlemapMarkers.length > 0
+              ? battlemapMarkers[battlemapMarkers.length - 1]?.id
+              : null);
+          if (!fallbackId) {
+            toast.message("Marker auf der Karte anklicken, dann löschen — oder Entf.");
+            return;
+          }
+          handleMarkerDelete(fallbackId);
+        }}
+        onMarkerClearAll={handleMarkerClearAll}
+        markerCount={battlemapMarkers.length}
+        trapTool={trapTool}
+        selectedTrapId={selectedTrapId}
+        onTrapToolChange={(tool) => {
+          setTrapTool(tool);
+          if (tool) {
+            setFogTool(null);
+            setSelectedFogShapeId(null);
+            setEffectTool(null);
+            setSelectedEffectTemplateId(null);
+            setMarkerTool(null);
+            setSelectedMarkerId(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedTrapId(null);
+        }}
+        onTrapDelete={() => {
+          const fallbackId =
+            selectedTrapId ??
+            (battlemapTraps.length > 0
+              ? battlemapTraps[battlemapTraps.length - 1]?.id
+              : null);
+          if (!fallbackId) {
+            toast.message("Falle auf der Karte auswählen, dann löschen.");
+            return;
+          }
+          handleTrapDelete(fallbackId);
+        }}
+        onTrapClearAll={handleTrapClearAll}
+        trapCount={battlemapTraps.length}
         onEffectDelete={() => {
           const fallbackId =
             selectedEffectTemplateId ??
@@ -5976,6 +6528,8 @@ export function LiveSessionBoard({
           }
           handleEffectTemplateDelete(fallbackId);
         }}
+        onEffectClearAll={handleEffectClearAll}
+        effectCount={battlemapEffectTemplates.length}
         onFogDelete={() => {
           const fallbackShapeId =
             selectedFogShapeId ??
@@ -5988,6 +6542,8 @@ export function LiveSessionBoard({
           }
           handleFogShapeDelete(fallbackShapeId);
         }}
+        onFogClearAll={handleFogClearAll}
+        fogCount={battlemapFogShapes.length}
         atmosphereContent={
           <div className="space-y-6">
             <section>
@@ -6992,6 +7548,52 @@ export function LiveSessionBoard({
       {isGM && sessionStatus === "Live" && chronistTableMode ? (
         <ChronicleLiveMarkerBar recorder={chronicleRecorder} />
       ) : null}
+
+      <TrapWizardModal
+        open={Boolean(isGM && trapWizardCell && activeBattlemapId)}
+        onClose={() => {
+          setTrapWizardCell(null);
+          setTrapTool(null);
+        }}
+        sessionId={sessionId}
+        campaignId={campaignId}
+        battlemapId={activeBattlemapId ?? ""}
+        gridX={trapWizardCell?.gridX ?? 0}
+        gridY={trapWizardCell?.gridY ?? 0}
+        locationLoreContext={
+          liveState?.current_location
+            ? `Aktueller Ort: ${liveState.current_location}`
+            : ""
+        }
+        targetLevel={3}
+        onCreated={(trapId) => {
+          setSelectedTrapId(trapId);
+          setTrapTool("select");
+          void listBattlemapTraps(activeBattlemapId!, sessionId)
+            .then((list) => setBattlemapTraps(list))
+            .catch(() => undefined);
+        }}
+      />
+
+      <TrapTriggerModal
+        open={Boolean(trapTriggerEvent)}
+        trap={trapTriggerEvent?.trap ?? null}
+        characterName={trapTriggerEvent?.characterName ?? ""}
+        characterId={trapTriggerEvent?.characterId ?? ""}
+        campaignId={campaignId}
+        passivePerception={trapTriggerEvent?.passivePerception ?? 10}
+        isGm={isGM}
+        sessionId={sessionId}
+        onClose={() => setTrapTriggerEvent(null)}
+        onRequestSaveRoll={(ability, dc) => {
+          toast.message(
+            `Rettungswurf ${ability.toUpperCase()} gegen DC ${dc} — bitte über das Würfelpanel würfeln.`,
+          );
+        }}
+        onRequestDamageRoll={(formula, damageType) => {
+          toast.message(`Schaden: ${formula} ${damageType} — bitte über das Würfelpanel würfeln.`);
+        }}
+      />
 
       <SessionEndWrapUpModal
         open={wrapUpOpen}

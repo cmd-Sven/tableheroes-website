@@ -451,3 +451,31 @@ export async function toggleCharacterActiveCondition(input: {
     };
   }
 }
+
+/**
+ * Setzt einen SL-Zustand (ohne Toggle) — z. B. nach fehlgeschlagenem Fallen-Save.
+ * Der neue Zustand wird an den Anfang gestellt (primäres Avatar-Token).
+ */
+export async function addCharacterActiveCondition(input: {
+  campaignId: string;
+  characterId: string;
+  conditionKey: CharacterConditionKey;
+}): Promise<{ success: boolean; activeConditions: CharacterConditionKey[]; error?: string }> {
+  try {
+    const { character } = await assertCharacterStateAccess(input.campaignId, input.characterId);
+    const current = parseActiveConditions(character.active_conditions);
+    const without = current.filter((k) => k !== input.conditionKey);
+    const next = [input.conditionKey, ...without];
+    return setCharacterActiveConditions({
+      campaignId: input.campaignId,
+      characterId: input.characterId,
+      conditions: next,
+    });
+  } catch (e: unknown) {
+    return {
+      success: false,
+      activeConditions: [],
+      error: e instanceof Error ? e.message : "Zustand konnte nicht gesetzt werden.",
+    };
+  }
+}

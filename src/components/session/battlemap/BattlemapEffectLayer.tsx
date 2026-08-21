@@ -189,7 +189,9 @@ function EffectShape({
         data-effect-template={template.id}
         role={canInteract ? "button" : undefined}
         className={`absolute ${canInteract ? "pointer-events-auto cursor-grab active:cursor-grabbing" : "pointer-events-none"} ${
-          selected ? "ring-2 ring-accent-gold" : ""
+          selected
+            ? "ring-[3px] ring-accent-gold border-2 border-accent-gold shadow-[0_0_0_1px_#cab926]"
+            : ""
         }`}
         style={{
           left: bounds.left,
@@ -205,9 +207,9 @@ function EffectShape({
             points={points}
             className={fillClass}
             fill="rgba(239, 68, 68, 0.22)"
-            stroke="rgba(248, 113, 113, 0.85)"
-            strokeWidth={2}
-            strokeDasharray="6 4"
+            stroke={selected ? "#cab926" : "rgba(248, 113, 113, 0.85)"}
+            strokeWidth={selected ? 3 : 2}
+            strokeDasharray={selected ? undefined : "6 4"}
           />
         </svg>
         {canInteract && selected && onDeleteTemplate ? (
@@ -221,9 +223,13 @@ function EffectShape({
     <div
       data-effect-template={template.id}
       role={canInteract ? "button" : undefined}
-      className={`absolute ${fillClass} ${borderClass} ${
+      className={`absolute ${fillClass} ${
+        selected
+          ? "border-2 border-accent-gold ring-[3px] ring-accent-gold shadow-[0_0_0_1px_#cab926]"
+          : borderClass
+      } ${
         canInteract ? "pointer-events-auto cursor-grab active:cursor-grabbing" : "pointer-events-none"
-      } ${selected ? "ring-2 ring-accent-gold" : ""}`}
+      }`}
       style={rectCircleStyle(template, config)}
       title={canInteract ? "Effekt-Schablone (anklicken · Entf löscht)" : undefined}
       {...dragHandlers}
@@ -271,7 +277,9 @@ export function BattlemapEffectLayer({
   const cellPx = Math.max(1, config.cellSizePx * Math.max(0.05, interactionScale));
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[40]">
+    <div
+      className={`pointer-events-none absolute inset-0 ${canInteract ? "z-[47]" : "z-[40]"}`}
+    >
       {templates.map((template) => (
         <EffectShape
           key={template.id}
