@@ -35,6 +35,7 @@ import {
 } from "@/src/lib/session/dice-nat-highlight";
 import { DiceRollMoodFx } from "./DiceRollMoodFx";
 import { playDiceRollSound } from "@/src/lib/session/dice-nat-sounds";
+import { parseDiceSkinId, type DiceSkinId } from "@/src/lib/session/dice-skins";
 
 const DiceCanvas = dynamic(() => import("./DiceRollCanvas"), {
   ssr: false,
@@ -59,19 +60,31 @@ type ActiveRoll = {
   throwDirZ?: number;
   throwStrength?: number;
   isTap?: boolean;
+  skinId?: DiceSkinId | null;
 };
 
 type Props = {
   logs: SessionActivityEntry[];
 };
 
+/**
+ * WebGL-Probe ohne Context-Leak (loseContext), damit der spätere R3F-Canvas
+ * nicht an Browser-Limits (oft 8–16 Contexts) scheitert.
+ */
 function detectWebGL(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const canvas = document.createElement("canvas");
-    return Boolean(
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl"),
-    );
+    const gl =
+      canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ||
+      canvas.getContext("webgl", { failIfMajorPerformanceCaveat: false }) ||
+      canvas.getContext("experimental-webgl");
+    if (!gl || typeof (gl as WebGLRenderingContext).getExtension !== "function") {
+      return false;
+    }
+    const lose = (gl as WebGLRenderingContext).getExtension("WEBGL_lose_context");
+    lose?.loseContext();
+    return true;
   } catch {
     return false;
   }
@@ -130,7 +143,9 @@ export function DiceRollOverlay({ logs }: Props) {
   const aimingRef = useRef(false);
   const originRef = useRef({ x: 0, y: 0 });
   const [queue, setQueue] = useState<ActiveRoll[]>([]);
+  /** Optimistic: 3D zuerst. Nur bei bestätigtem WebGL-Fail → Text-Fallback. */
   const [webgl, setWebgl] = useState(true);
+  const [canvasFailed, setCanvasFailed] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const placement = useDicePlacementPending();
   const placementId = placement?.id ?? null;
@@ -139,8 +154,14 @@ export function DiceRollOverlay({ logs }: Props) {
   activeRef.current = active;
 
   useEffect(() => {
-    setWebgl(detectWebGL());
+    // Probe nur einmal; Context sofort freigeben (siehe detectWebGL).
+    const ok = detectWebGL();
+    if (!ok) setWebgl(false);
   }, []);
+
+  useEffect(() => {
+    setCanvasFailed(false);
+  }, [activeId]);
 
   useEffect(() => {
     setShowResult(false);
@@ -328,18 +349,21 @@ export function DiceRollOverlay({ logs }: Props) {
       const { dropNx, dropNy } = readDropNorm(meta as Record<string, unknown>);
       const throwMeta = readThrowMeta(meta as Record<string, unknown>);
       const { x: aimX, z: aimZ } = dropNormToTablePoint(dropNx, dropNy, aspect);
-      const all3d = (dieSides ?? [sides]).every((s) => supports3dDice(s));
+      const sidesFor3d = dieSides && dieSides.length > 0 ? dieSides : [sides];
+      const all3d = sidesFor3d.every((s) => supports3dDice(s));
       fresh.push({
         sourceId: entry.id,
         sides,
         faces: clippedFaces,
         dieSides,
         seed: typeof meta.seed === "string" ? meta.seed : entry.id,
+        // Skins dürfen 3D nicht abschalten — nur fehlendes WebGL / unstützte Polyeder.
         use3d: webgl && all3d,
         dropNx,
         dropNy,
         aimX,
         aimZ,
+        skinId: parseDiceSkinId(meta.diceSkin),
         ...throwMeta,
       });
     }
@@ -353,6 +377,8 @@ export function DiceRollOverlay({ logs }: Props) {
       }
     }
   }, [logs, webgl]);
+
+  const show3d = Boolean(active?.use3d && !canvasFailed);
 
   const revealAndDispatch = useCallback((sourceId: string) => {
     markDiceEntryRevealed(sourceId);
@@ -398,22 +424,22 @@ export function DiceRollOverlay({ logs }: Props) {
   useEffect(() => {
     if (!activeId || !active) return;
     // 3D-Canvas braucht kurz zum Laden — Sound erst mit sichtbarem Wurf.
-    const delayMs = active.use3d ? 450 : 0;
+    const delayMs = show3d ? 450 : 0;
     const t = window.setTimeout(() => {
       playDiceRollSound(activeId, rollDurationEstimateMs);
     }, delayMs);
     return () => window.clearTimeout(t);
-  }, [activeId, active, rollDurationEstimateMs]);
+  }, [activeId, active, show3d, rollDurationEstimateMs]);
 
   useEffect(() => {
     if (!activeId) return;
     // Safety: nur force-settle — nie vor der max. Physikdauer + Canvas-Puffer.
-    const canvasBootstrapMs = active?.use3d ? 1600 : 0;
+    const canvasBootstrapMs = show3d ? 1600 : 0;
     const t = window.setTimeout(() => {
       handleAllSettled();
     }, canvasBootstrapMs + DICE_PHYSICS_MAX_MS + 200);
     return () => window.clearTimeout(t);
-  }, [activeId, active?.use3d, handleAllSettled]);
+  }, [activeId, show3d, handleAllSettled]);
 
   const rollMood = useMemo((): DieNatHighlight | null => {
     if (!active || !showResult) return null;
@@ -549,7 +575,7 @@ export function DiceRollOverlay({ logs }: Props) {
           >
             {rollMood ? <DiceRollMoodFx kind={rollMood} /> : null}
 
-            {active.use3d ? (
+            {show3d ? (
               <div className="absolute inset-0">
                 <DiceCanvas
                   sides={active.sides}
@@ -562,8 +588,10 @@ export function DiceRollOverlay({ logs }: Props) {
                   throwDirZ={active.throwDirZ}
                   throwStrength={active.throwStrength}
                   isTap={active.isTap}
+                  skinId={active.skinId}
                   onSettled={handleAllSettled}
                   showResult={showResult}
+                  onContextLost={() => setCanvasFailed(true)}
                 />
               </div>
             ) : !showResult ? (

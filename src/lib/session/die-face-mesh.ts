@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { dieColor, faceNormal } from "@/src/lib/session/dice-3d-math";
+import { faceNormal } from "@/src/lib/session/dice-3d-math";
+import {
+  getDiceSkin,
+  type DiceSkinDef,
+  type DiceSkinId,
+  type DiceSkinPattern,
+} from "@/src/lib/session/dice-skins";
 
 const textureCache = new Map<string, THREE.CanvasTexture>();
 
@@ -13,13 +19,80 @@ const _bitangent = new THREE.Vector3();
 const _delta = new THREE.Vector3();
 const _match = new THREE.Vector3();
 
-function textureKey(value: number, bg: string): string {
-  return `face-v4:${value}:${bg}`;
+function textureKey(
+  value: number,
+  bg: string,
+  numeral: string,
+  pattern: DiceSkinPattern,
+): string {
+  return `face-v5:${value}:${bg}:${numeral}:${pattern}`;
 }
 
-/** Opake Face-Textur: Würfelfarbe + kleinere, gepolsterte Augenzahl. */
-export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasTexture {
-  const key = textureKey(value, bgColor);
+function hashSeed(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function fillMarbleBackground(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  seed: number,
+): void {
+  const g = ctx.createLinearGradient(0, 0, size, size);
+  g.addColorStop(0, "#f4f4f1");
+  g.addColorStop(0.35, "#d8d8d4");
+  g.addColorStop(0.55, "#b8b8b4");
+  g.addColorStop(0.75, "#eaeae6");
+  g.addColorStop(1, "#cfcfca");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+
+  let rng = seed || 1;
+  const next = () => {
+    rng = (Math.imul(rng, 1664525) + 1013904223) >>> 0;
+    return rng / 0xffffffff;
+  };
+
+  for (let i = 0; i < 8; i++) {
+    const x0 = next() * size;
+    const y0 = next() * size;
+    const x1 = next() * size;
+    const y1 = next() * size;
+    const cpx = (x0 + x1) / 2 + (next() - 0.5) * size * 0.45;
+    const cpy = (y0 + y1) / 2 + (next() - 0.5) * size * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cpx, cpy, x1, y1);
+    ctx.strokeStyle = `rgba(${70 + next() * 40},${70 + next() * 35},${75 + next() * 40},${0.22 + next() * 0.28})`;
+    ctx.lineWidth = 2 + next() * 5;
+    ctx.stroke();
+  }
+
+  // Soft haze patches instead of per-pixel noise (faster, no getImageData)
+  for (let i = 0; i < 5; i++) {
+    const rx = next() * size;
+    const ry = next() * size;
+    const rr = 18 + next() * 40;
+    const haze = ctx.createRadialGradient(rx, ry, 0, rx, ry, rr);
+    haze.addColorStop(0, `rgba(255,255,255,${0.12 + next() * 0.18})`);
+    haze.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(rx - rr, ry - rr, rr * 2, rr * 2);
+  }
+}
+
+/** Opake Face-Textur: Skin-Hintergrund + Augenzahl. */
+export function getDieFaceTexture(
+  value: number,
+  bgColor: string,
+  numeralColor = "#ffffff",
+  pattern: DiceSkinPattern = "solid",
+): THREE.CanvasTexture {
+  const key = textureKey(value, bgColor, numeralColor, pattern);
   const cached = textureCache.get(key);
   if (cached) return cached;
 
@@ -28,18 +101,33 @@ export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasT
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    // Extrem selten — solide Fallback-Textur ohne 2D-Context.
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
 
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, size, size);
+  if (pattern === "marble") {
+    try {
+      fillMarbleBackground(ctx, size, hashSeed(`marble:${value}:${bgColor}`));
+    } catch {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, size, size);
+    }
+  } else {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, size, size);
+  }
 
   // Leichter Rand / Facetten-Hint
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.strokeStyle = pattern === "marble" ? "rgba(40,40,40,0.28)" : "rgba(0,0,0,0.35)";
   ctx.lineWidth = 8;
   ctx.strokeRect(pad * 0.35, pad * 0.35, size - pad * 0.7, size - pad * 0.7);
 
   const label = String(value);
-  // Deutlich kleiner als zuvor (140/112) — lesbar, ohne Face zu füllen
   const fontPx = value >= 10 ? 54 : 68;
   ctx.font = `800 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
   ctx.textAlign = "center";
@@ -50,11 +138,15 @@ export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasT
   const cx = size / 2;
   const cy = size / 2 + 2;
 
+  const stroke =
+    numeralColor === "#ffffff" || numeralColor.toLowerCase() === "#fff"
+      ? "#000000"
+      : "rgba(0,0,0,0.55)";
   ctx.lineWidth = 10;
-  ctx.strokeStyle = "#000000";
+  ctx.strokeStyle = stroke;
   ctx.strokeText(label, cx, cy);
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = numeralColor;
   ctx.fillText(label, cx, cy);
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -68,17 +160,31 @@ export function getDieFaceTexture(value: number, bgColor: string): THREE.CanvasT
   return tex;
 }
 
-function createBlankTexture(bgColor: string): THREE.CanvasTexture {
-  const key = `blank-v4:${bgColor}`;
+function createBlankTexture(
+  bgColor: string,
+  pattern: DiceSkinPattern,
+): THREE.CanvasTexture {
+  const key = `blank-v5:${bgColor}:${pattern}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
 
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, 64, 64);
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    if (pattern === "marble") {
+      try {
+        fillMarbleBackground(ctx, 64, hashSeed(`blank:${bgColor}`));
+      } catch {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, 64, 64);
+      }
+    } else {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 64, 64);
+    }
+  }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -90,14 +196,16 @@ function createBlankTexture(bgColor: string): THREE.CanvasTexture {
 function createFaceMaterial(
   map: THREE.CanvasTexture,
   sides: number,
+  pattern: DiceSkinPattern,
 ): THREE.MeshStandardMaterial {
+  const marble = pattern === "marble";
   return new THREE.MeshStandardMaterial({
     map,
     color: "#ffffff",
-    metalness: 0.28,
-    roughness: 0.32,
-    emissive: sides === 20 ? "#3a3208" : "#0a1f10",
-    emissiveIntensity: 0.28,
+    metalness: marble ? 0.06 : 0.28,
+    roughness: marble ? 0.58 : 0.32,
+    emissive: marble ? "#121212" : sides === 20 ? "#3a3208" : "#0a1f10",
+    emissiveIntensity: marble ? 0.1 : 0.28,
     depthTest: true,
     depthWrite: true,
     transparent: false,
@@ -239,10 +347,20 @@ export type DieFaceMeshData = {
   materials: THREE.MeshStandardMaterial[];
 };
 
+function resolveSkin(skinId?: DiceSkinId | null): DiceSkinDef {
+  return getDiceSkin(skinId);
+}
+
 /** Baut Multi-Material-Würfel mit opaken Face-Texturen (Zahlen zentriert per UV). */
-export function buildDieFaceMesh(sides: number): DieFaceMeshData {
+export function buildDieFaceMesh(
+  sides: number,
+  skinId?: DiceSkinId | null,
+): DieFaceMeshData {
   const n = Math.max(2, Math.round(sides));
-  const bg = dieColor(n);
+  const skin = resolveSkin(skinId);
+  const bg = skin.bodyColor;
+  const numeral = skin.numeralColor;
+  const pattern = skin.pattern;
   let geometry = baseGeometry(n);
 
   // Indexed + shared verts würden Face-UVs überschreiben → immer unique verts
@@ -252,10 +370,14 @@ export function buildDieFaceMesh(sides: number): DieFaceMeshData {
 
   const materials: THREE.MeshStandardMaterial[] = [];
   for (let v = 1; v <= n; v++) {
-    materials.push(createFaceMaterial(getDieFaceTexture(v, bg), n));
+    materials.push(
+      createFaceMaterial(getDieFaceTexture(v, bg, numeral, pattern), n, pattern),
+    );
   }
   const blankIndex = materials.length;
-  materials.push(createFaceMaterial(createBlankTexture(bg), n));
+  materials.push(
+    createFaceMaterial(createBlankTexture(bg, pattern), n, pattern),
+  );
 
   if (n === 6) {
     // Box hat bereits korrekte Gruppen + UVs
@@ -281,7 +403,11 @@ export function buildDieFaceMesh(sides: number): DieFaceMeshData {
 
   geometry.clearGroups();
 
-  if (indexed && geometry.index) {
+  if (clusters.length === 0) {
+    // Sicherheit: ohne Gruppen bleibt Multi-Material unsichtbar
+    const count = geometry.attributes.position.count;
+    geometry.addGroup(0, count, 0);
+  } else if (indexed && geometry.index) {
     // Sollte bei uns nach Cone-toNonIndexed nicht vorkommen; Fallback
     for (const cluster of clusters) {
       const matIndex = cluster.value != null ? cluster.value - 1 : blankIndex;
@@ -325,4 +451,26 @@ export function disposeDieFaceMesh(data: DieFaceMeshData): void {
     // Texturen sind gecacht — nicht disposen
     m.dispose();
   }
+}
+
+const COMMON_DIE_SIDES = [4, 6, 8, 10, 12, 20] as const;
+
+/**
+ * Prefills the CanvasTexture cache for common dice faces (default skin).
+ * Safe to call during session loading — no WebGL context required.
+ */
+export function warmCommonDiceFaceTextures(
+  skinId?: DiceSkinId | null,
+): void {
+  if (typeof document === "undefined") return;
+  const skin = resolveSkin(skinId);
+  const bg = skin.bodyColor;
+  const numeral = skin.numeralColor;
+  const pattern = skin.pattern;
+  for (const sides of COMMON_DIE_SIDES) {
+    for (let v = 1; v <= sides; v++) {
+      getDieFaceTexture(v, bg, numeral, pattern);
+    }
+  }
+  createBlankTexture(bg, pattern);
 }

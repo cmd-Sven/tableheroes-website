@@ -189,6 +189,40 @@ export function playDiceRollSound(
   }
 }
 
+/** Lädt Roll-MP3 in den Browser-Cache (ohne Abspielen). */
+export function preloadDiceRollSound(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const audio = getRollAudio();
+    if (!audio) {
+      resolve();
+      return;
+    }
+    if (audio.readyState >= 2) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      audio.removeEventListener("canplaythrough", done);
+      audio.removeEventListener("error", done);
+      resolve();
+    };
+    audio.addEventListener("canplaythrough", done);
+    audio.addEventListener("error", done);
+    try {
+      audio.load();
+    } catch {
+      done();
+      return;
+    }
+    // Nicht ewig blockieren, falls canplaythrough ausbleibt
+    window.setTimeout(done, 2500);
+  });
+}
+
 /** Beim ersten Klick/Touch Audio freischalten (Browser-Autoplay-Policy). */
 export function primeDiceNatSounds(): void {
   const ctx = getAudioContext();

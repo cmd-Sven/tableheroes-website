@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -187,7 +187,7 @@ const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
 
 type AnchorRect = { cx: number; cy: number; top: number; width: number; height: number };
 
-export function LiveSessionCharacterAvatar({
+export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvatar({
   sessionId,
   campaignId,
   characterId,
@@ -208,7 +208,8 @@ export function LiveSessionCharacterAvatar({
   onJoinCombat,
   density = "full",
 }: Props) {
-  const compact = density === "compact";  const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
+  const compact = density === "compact";
+  const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<RadialPanel>(null);
   const [pending, startTransition] = useTransition();
@@ -1121,7 +1122,7 @@ export function LiveSessionCharacterAvatar({
       {overlay}
     </div>
   );
-}
+});
 
 function ActionList({
   items,

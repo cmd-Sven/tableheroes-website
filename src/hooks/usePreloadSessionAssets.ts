@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PreloadStep } from "@/src/components/session/LiveSessionLoadingScreen";
+import { preloadDiceRollSound } from "@/src/lib/session/dice-nat-sounds";
 
 type AssetManifest = {
   backgroundUrl?: string | null;
   battlemapUrl?: string | null;
   npcPortraits?: string[];
   characterPortraits?: string[];
+  /** Token / prop images already on the active battlemap */
+  tokenImageUrls?: string[];
   weatherIcons?: boolean;
+  /** Würfel-MP3 + Face-Textur-Cache + R3F-Chunk warmhalten */
+  diceAssets?: boolean;
 };
 
 function preloadImage(src: string): Promise<void> {
@@ -20,6 +25,18 @@ function preloadImage(src: string): Promise<void> {
   });
 }
 
+function uniqueUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    const src = raw.trim();
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    out.push(src);
+  }
+  return out;
+}
+
 const WEATHER_ICON_PATHS = [
   "/images/Session_ui/weather/sun.png",
   "/images/Session_ui/weather/clouds.png",
@@ -28,6 +45,15 @@ const WEATHER_ICON_PATHS = [
   "/images/Session_ui/weather/snow.png",
   "/images/Session_ui/weather/fog.png",
 ];
+
+async function warmDiceRuntime(): Promise<void> {
+  const [{ warmCommonDiceFaceTextures }] = await Promise.all([
+    import("@/src/lib/session/die-face-mesh"),
+    preloadDiceRollSound(),
+    import("@/src/components/session/dice/DiceRollCanvas").then(() => {}),
+  ]);
+  warmCommonDiceFaceTextures(null);
+}
 
 export function usePreloadSessionAssets(manifest: AssetManifest | null) {
   const [steps, setSteps] = useState<PreloadStep[]>([]);
@@ -67,10 +93,10 @@ export function usePreloadSessionAssets(manifest: AssetManifest | null) {
       });
     }
 
-    const portraits = [
+    const portraits = uniqueUrls([
       ...(manifest.characterPortraits ?? []),
       ...(manifest.npcPortraits ?? []),
-    ].filter(Boolean);
+    ]);
     if (portraits.length > 0) {
       initialSteps.push({ id: "portraits", label: "Portraits laden", icon: "users", status: "pending" });
       tasks.push({
@@ -79,11 +105,40 @@ export function usePreloadSessionAssets(manifest: AssetManifest | null) {
       });
     }
 
+    const tokenImages = uniqueUrls(manifest.tokenImageUrls ?? []).filter(
+      (url) => !portraits.includes(url),
+    );
+    if (tokenImages.length > 0) {
+      initialSteps.push({
+        id: "tokens",
+        label: "Token-Bilder laden",
+        icon: "users",
+        status: "pending",
+      });
+      tasks.push({
+        id: "tokens",
+        run: () => Promise.all(tokenImages.map(preloadImage)).then(() => {}),
+      });
+    }
+
     if (manifest.weatherIcons) {
       initialSteps.push({ id: "weather", label: "UI-Assets laden", icon: "shield", status: "pending" });
       tasks.push({
         id: "weather",
         run: () => Promise.all(WEATHER_ICON_PATHS.map(preloadImage)).then(() => {}),
+      });
+    }
+
+    if (manifest.diceAssets) {
+      initialSteps.push({
+        id: "dice",
+        label: "Würfel vorbereiten",
+        icon: "dices",
+        status: "pending",
+      });
+      tasks.push({
+        id: "dice",
+        run: () => warmDiceRuntime(),
       });
     }
 
@@ -97,7 +152,7 @@ export function usePreloadSessionAssets(manifest: AssetManifest | null) {
     let completed = 0;
     const total = tasks.length;
 
-    const timeout = window.setTimeout(() => setDone(true), 4000);
+    const timeout = window.setTimeout(() => setDone(true), 5500);
 
     (async () => {
       for (const task of tasks) {

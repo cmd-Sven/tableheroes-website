@@ -1,13 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Loader2, Shield, Swords, Map, Users } from "lucide-react";
+import { Loader2, Shield, Swords, Map, Users, Dices } from "lucide-react";
 import Image from "next/image";
 
 export type PreloadStep = {
   id: string;
   label: string;
-  icon: "shield" | "swords" | "map" | "users";
+  icon: "shield" | "swords" | "map" | "users" | "dices";
   status: "pending" | "loading" | "done" | "error";
 };
 
@@ -16,6 +16,7 @@ const STEP_ICONS = {
   swords: Swords,
   map: Map,
   users: Users,
+  dices: Dices,
 } as const;
 
 type Props = {

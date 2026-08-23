@@ -12,6 +12,7 @@ import {
 } from "@/src/lib/session/dice-roll";
 import { useLiveSessionDiceRoll } from "@/src/components/session/useLiveSessionDiceRoll";
 import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
+import { DiceSkinPalette } from "@/src/components/session/dice/DiceSkinPalette";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
 
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
@@ -30,6 +31,8 @@ type Props = {
   prepTestCharacterId?: string | null;
   onPrepTestCharacterChange?: (id: string) => void;
   onActivityPosted?: (entry: SessionActivityEntry) => void;
+  userId?: string | null;
+  isGM?: boolean;
 };
 
 export function LiveSessionDicePanel({
@@ -45,6 +48,8 @@ export function LiveSessionDicePanel({
   prepTestCharacterId,
   onPrepTestCharacterChange,
   onActivityPosted,
+  userId = null,
+  isGM = false,
 }: Props) {
   const dice = useLiveSessionDiceRoll({
     sessionId,
@@ -52,6 +57,8 @@ export function LiveSessionDicePanel({
     currentCharacter,
     active: open,
     onActivityPosted,
+    userId,
+    isGM,
   });
   const [pool, setPool] = useState<Partial<Record<number, number>>>({});
   const handleClose = onClose ?? onToggle;
@@ -145,6 +152,12 @@ export function LiveSessionDicePanel({
       </div>
 
       <div className="space-y-2 p-3">
+        <DiceSkinPalette
+          value={dice.skinId}
+          onChange={dice.setSkinId}
+          isGM={isGM}
+        />
+
         <div className="grid grid-cols-6 gap-1">
           {DICE_SIDES.map((s) => {
             const n = pool[s] ?? 0;

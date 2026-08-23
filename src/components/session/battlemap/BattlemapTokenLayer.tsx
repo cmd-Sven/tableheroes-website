@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { ShieldAlert } from "lucide-react";
@@ -71,7 +71,7 @@ type Props = {
   onTokenDragCancel?: () => void;
 };
 
-export function BattlemapTokenLayer({
+export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
   tokens,
   config,
   highlightCharacterId,
@@ -123,7 +123,7 @@ export function BattlemapTokenLayer({
       ))}
     </>
   );
-}
+});
 
 type AnimatedTokenProps = {
   token: SessionBattlemapToken;
@@ -151,7 +151,7 @@ type AnimatedTokenProps = {
   onTokenDragCancel?: () => void;
 };
 
-function AnimatedToken({
+const AnimatedToken = memo(function AnimatedToken({
   token,
   config,
   highlightCharacterId,
@@ -429,6 +429,7 @@ function AnimatedToken({
             src={imageUrl}
             alt={token.label ?? "Token"}
             fill
+            sizes="96px"
             unoptimized
             className="object-cover"
           />
@@ -478,4 +479,4 @@ function AnimatedToken({
       ) : null}
     </div>
   );
-}
+});

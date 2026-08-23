@@ -97,6 +97,8 @@ export function LiveSessionActivityPanel({
     currentCharacter,
     active: open,
     onActivityPosted,
+    userId: currentUserId,
+    isGM,
   });
 
   const myHandRaise = useMemo(

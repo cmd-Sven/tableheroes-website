@@ -18,6 +18,8 @@ import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers
 import type { CharacterSheetPayload } from "@/src/lib/characters/dnd5e/types";
 import type { Dnd5eSkillKey } from "@/src/lib/characters/dnd5e/types";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
+import { useDiceSkin } from "@/src/hooks/useDiceSkin";
+import type { DiceSkinId } from "@/src/lib/session/dice-skins";
 
 function sheetDerivedForRolls(payload: CharacterSheetPayload) {
   const base = computeDerivedDnd5eSheet(payload.sheet, payload.level);
@@ -32,6 +34,10 @@ type UseLiveSessionDiceRollOptions = {
   /** Panel sichtbar — Charakterbogen für Angriff/Fertigkeit laden. */
   active: boolean;
   onActivityPosted?: (entry: SessionActivityEntry) => void;
+  userId?: string | null;
+  isGM?: boolean;
+  /** Überschreibt den Hook-Skin (z. B. wenn Palette separat gesteuert wird). */
+  diceSkinId?: DiceSkinId;
 };
 
 export function useLiveSessionDiceRoll({
@@ -40,6 +46,9 @@ export function useLiveSessionDiceRoll({
   currentCharacter,
   active,
   onActivityPosted,
+  userId = null,
+  isGM = false,
+  diceSkinId: diceSkinIdProp,
 }: UseLiveSessionDiceRollOptions) {
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
   const [selectedSkill, setSelectedSkill] = useState("");
@@ -48,6 +57,8 @@ export function useLiveSessionDiceRoll({
   const [saveBonus, setSaveBonus] = useState(0);
   const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
   const [pending, startTransition] = useTransition();
+  const { skinId: storedSkinId, setSkinId } = useDiceSkin(userId, isGM);
+  const skinId = diceSkinIdProp ?? storedSkinId;
 
   useEffect(() => {
     if (!active || !currentCharacter) return;
@@ -121,6 +132,7 @@ export function useLiveSessionDiceRoll({
           throwDirZ,
           throwStrength,
           isTap,
+          diceSkin: skinId,
         });
         onActivityPosted?.(entry);
       } catch (err) {
@@ -274,6 +286,8 @@ export function useLiveSessionDiceRoll({
     saveBonus,
     primaryAttack,
     pending,
+    skinId,
+    setSkinId,
     rollDice,
     rollPool,
     rollFromCommand,

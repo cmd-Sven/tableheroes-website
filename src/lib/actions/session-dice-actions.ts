@@ -18,6 +18,7 @@ import {
   resolveLiveDiceSheetModifier,
   type LiveDiceRollKind,
 } from "@/src/lib/session/resolve-live-dice-modifier";
+import { parseDiceSkinId } from "@/src/lib/session/dice-skins";
 
 export type RequestLiveDiceRollInput = {
   sessionId: string;
@@ -50,6 +51,8 @@ export type RequestLiveDiceRollInput = {
   throwDirZ?: number;
   throwStrength?: number;
   isTap?: boolean;
+  /** Würfel-Skin des Werfers — für synchrone Darstellung bei allen Clients. */
+  diceSkin?: string;
 };
 
 function buildActivityText(
@@ -199,6 +202,9 @@ export async function requestLiveDiceRoll(
     meta.throwStrength = Math.min(1, Math.max(0, input.throwStrength));
   }
   if (input.isTap === true) meta.isTap = true;
+
+  const diceSkin = parseDiceSkinId(input.diceSkin);
+  if (diceSkin) meta.diceSkin = diceSkin;
 
   if (input.kind === "attack") {
     meta.pending = true;

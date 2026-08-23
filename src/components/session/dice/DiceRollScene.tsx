@@ -16,6 +16,7 @@ import {
   natHighlightLabelDe,
   type DieNatHighlight,
 } from "@/src/lib/session/dice-nat-highlight";
+import type { DiceSkinId } from "@/src/lib/session/dice-skins";
 import { DieFaceMesh } from "./DieFaceMesh";
 
 type DieMeshProps = {
@@ -28,6 +29,7 @@ type DieMeshProps = {
   durationMs?: number;
   showResult?: boolean;
   natHighlight?: DieNatHighlight | null;
+  skinId?: DiceSkinId | null;
   onSettled?: (index: number) => void;
 };
 
@@ -76,6 +78,7 @@ function AnimatedDie({
   durationMs = DICE_PHYSICS_MAX_MS,
   showResult = false,
   natHighlight = null,
+  skinId = null,
   onSettled,
 }: DieMeshProps) {
   const group = useRef<THREE.Group>(null);
@@ -120,7 +123,7 @@ function AnimatedDie({
 
   return (
     <group ref={group} position={[aimX, 0.5, aimZ]}>
-      <DieFaceMesh sides={sides} />
+      <DieFaceMesh sides={sides} skinId={skinId} />
       {highlight === "crit" ? (
         <pointLight color="#cab926" intensity={2.4} distance={2.2} decay={2} />
       ) : null}
@@ -147,6 +150,7 @@ type DiceSceneProps = {
   throwDirZ?: number;
   throwStrength?: number;
   isTap?: boolean;
+  skinId?: DiceSkinId | null;
   onAllSettled: () => void;
   showResult?: boolean;
 };
@@ -162,6 +166,7 @@ export function DiceRollScene({
   throwDirZ,
   throwStrength,
   isTap,
+  skinId = null,
   onAllSettled,
   showResult = false,
 }: DiceSceneProps) {
@@ -224,18 +229,11 @@ export function DiceRollScene({
       <ambientLight intensity={0.85} />
       <directionalLight position={[2, 10, 1]} intensity={1.1} castShadow />
       <pointLight position={[-2, 6, -1]} intensity={0.35} color="#cab926" />
-      {!showResult ? (
-        <Html position={[aimX, 0.15, aimZ]} center style={{ pointerEvents: "none" }}>
-          <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold drop-shadow">
-            {faces.length > 1 ? `${faces.length}×W${sides}` : `W${sides}`}
-          </p>
-        </Html>
-      ) : null}
       {faces.map((face, i) => {
         const dieS = dieSides?.[i] ?? sides;
         return (
         <AnimatedDie
-          key={`${seed}-${i}-${dieS}-${face}`}
+          key={`${seed}-${i}-${dieS}-${face}-${skinId ?? "default"}`}
           sides={dieS}
           frames={trajectories[i] ?? []}
           index={i}
@@ -245,6 +243,7 @@ export function DiceRollScene({
           durationMs={durationMs}
           showResult={showResult}
           natHighlight={dieNatHighlight(dieS, face)}
+          skinId={skinId}
           onSettled={handleSettled}
         />
         );

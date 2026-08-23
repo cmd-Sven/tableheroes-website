@@ -1,10 +1,11 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { Component, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DiceRollScene } from "./DiceRollScene";
 import { DICE_CAMERA } from "@/src/lib/session/dice-screen-project";
+import type { DiceSkinId } from "@/src/lib/session/dice-skins";
 
 type Props = {
   sides: number;
@@ -17,8 +18,11 @@ type Props = {
   throwDirZ?: number;
   throwStrength?: number;
   isTap?: boolean;
+  skinId?: DiceSkinId | null;
   onSettled: () => void;
   showResult?: boolean;
+  /** R3F-/WebGL-Crash → Overlay darf Text-Fallback nutzen. */
+  onContextLost?: () => void;
 };
 
 function TopDownOrthoCamera() {
@@ -49,6 +53,32 @@ function TopDownOrthoCamera() {
   return null;
 }
 
+type BoundaryProps = {
+  onError?: () => void;
+  children: ReactNode;
+};
+
+type BoundaryState = { failed: boolean };
+
+/** Fängt Scene-Crashes (z. B. Material/Skin) ab, ohne den ganzen Overlay-Tree zu töten. */
+class DiceCanvasErrorBoundary extends Component<BoundaryProps, BoundaryState> {
+  state: BoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): BoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn("[DiceRollCanvas] 3D-Scene Fehler:", error);
+    this.props.onError?.();
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
 export default function DiceRollCanvas({
   sides,
   faces,
@@ -60,39 +90,63 @@ export default function DiceRollCanvas({
   throwDirZ,
   throwStrength,
   isTap,
+  skinId = null,
   onSettled,
   showResult,
+  onContextLost,
 }: Props) {
+  const effectiveSkin = skinId;
+  const lostRef = useRef(false);
+
   return (
-    <Canvas
-      frameloop="always"
-      orthographic
-      camera={{
-        position: [...DICE_CAMERA.position],
-        near: DICE_CAMERA.near,
-        far: DICE_CAMERA.far,
-        zoom: 1,
+    <DiceCanvasErrorBoundary
+      onError={() => {
+        if (lostRef.current) return;
+        lostRef.current = true;
+        onContextLost?.();
       }}
-      dpr={[1, 1.75]}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      style={{ width: "100%", height: "100%", background: "transparent" }}
-      shadows
     >
-      <TopDownOrthoCamera />
-      <DiceRollScene
-        sides={sides}
-        faces={faces}
-        dieSides={dieSides}
-        seed={seed}
-        aimX={aimX}
-        aimZ={aimZ}
-        throwDirX={throwDirX}
-        throwDirZ={throwDirZ}
-        throwStrength={throwStrength}
-        isTap={isTap}
-        onAllSettled={onSettled}
-        showResult={showResult}
-      />
-    </Canvas>
+      <Canvas
+        frameloop="always"
+        orthographic
+        camera={{
+          position: [...DICE_CAMERA.position],
+          near: DICE_CAMERA.near,
+          far: DICE_CAMERA.far,
+          zoom: 1,
+        }}
+        dpr={[1, 1.75]}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        style={{ width: "100%", height: "100%", background: "transparent" }}
+        shadows
+        onCreated={({ gl }) => {
+          const canvas = gl.domElement;
+          const onLost = (e: Event) => {
+            e.preventDefault();
+            if (lostRef.current) return;
+            lostRef.current = true;
+            onContextLost?.();
+          };
+          canvas.addEventListener("webglcontextlost", onLost, false);
+        }}
+      >
+        <TopDownOrthoCamera />
+        <DiceRollScene
+          sides={sides}
+          faces={faces}
+          dieSides={dieSides}
+          seed={seed}
+          aimX={aimX}
+          aimZ={aimZ}
+          throwDirX={throwDirX}
+          throwDirZ={throwDirZ}
+          throwStrength={throwStrength}
+          isTap={isTap}
+          skinId={effectiveSkin}
+          onAllSettled={onSettled}
+          showResult={showResult}
+        />
+      </Canvas>
+    </DiceCanvasErrorBoundary>
   );
 }
