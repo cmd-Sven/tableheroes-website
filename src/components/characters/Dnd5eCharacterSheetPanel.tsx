@@ -236,6 +236,7 @@ function NumberInput({
   className = "",
   min,
   max,
+  "aria-label": ariaLabel,
 }: {
   value: number;
   onChange: (v: number) => void;
@@ -243,6 +244,7 @@ function NumberInput({
   className?: string;
   min?: number;
   max?: number;
+  "aria-label"?: string;
 }) {
   return (
     <input
@@ -251,6 +253,7 @@ function NumberInput({
       min={min}
       max={max}
       disabled={disabled}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(Number(e.target.value))}
       className={`w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 text-center font-barlow text-sm text-white disabled:opacity-60 ${className}`}
     />
@@ -461,7 +464,21 @@ export function Dnd5eCharacterSheetPanel({
     if (!sheet) return;
     setSheet({
       ...sheet,
-      savingThrows: { ...sheet.savingThrows, [key]: { proficient } },
+      savingThrows: {
+        ...sheet.savingThrows,
+        [key]: { ...sheet.savingThrows[key], proficient },
+      },
+    });
+  }
+
+  function updateSaveManualBonus(key: AbilityKey, manualBonus: number) {
+    if (!sheet) return;
+    setSheet({
+      ...sheet,
+      savingThrows: {
+        ...sheet.savingThrows,
+        [key]: { ...sheet.savingThrows[key], manualBonus },
+      },
     });
   }
 
@@ -470,6 +487,14 @@ export function Dnd5eCharacterSheetPanel({
     setSheet({
       ...sheet,
       skills: { ...sheet.skills, [key]: { ...sheet.skills[key], proficient } },
+    });
+  }
+
+  function updateSkillManualBonus(key: Dnd5eSkillKey, manualBonus: number) {
+    if (!sheet) return;
+    setSheet({
+      ...sheet,
+      skills: { ...sheet.skills, [key]: { ...sheet.skills[key], manualBonus } },
     });
   }
 
@@ -1463,6 +1488,14 @@ export function Dnd5eCharacterSheetPanel({
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2 flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5" /> {t("combat.savingThrows")}
                 </h3>
+                {!readOnly ? (
+                  <div className="mb-1 flex items-center justify-end gap-2 px-1">
+                    <span className="w-12 text-center font-barlow text-[9px] uppercase text-gray-600">
+                      {t("combat.manualBonus")}
+                    </span>
+                    <span className="w-8" />
+                  </div>
+                ) : null}
                 <div className="space-y-1">
                   {ABILITY_KEYS.map((key) => (
                     <div
@@ -1487,12 +1520,22 @@ export function Dnd5eCharacterSheetPanel({
                           />
                         )}
                         <span className="font-libre text-xs text-gray-300 truncate">
-                                                    {abilityLabel(key)}
+                          {abilityLabel(key)}
                         </span>
                       </div>
-                      <span className="font-barlow text-sm text-accent-gold shrink-0">
-                        {formatSigned(displayDerived.savingThrows[key].total)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!readOnly ? (
+                          <NumberInput
+                            value={sheet.savingThrows[key].manualBonus ?? 0}
+                            className="!w-12 !py-0.5 !text-xs"
+                            aria-label={t("combat.manualBonusAria", { name: abilityLabel(key) })}
+                            onChange={(v) => updateSaveManualBonus(key, v)}
+                          />
+                        ) : null}
+                        <span className="font-barlow text-sm text-accent-gold w-8 text-right">
+                          {formatSigned(displayDerived.savingThrows[key].total)}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1502,6 +1545,14 @@ export function Dnd5eCharacterSheetPanel({
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2">
                   {t("combat.skills")}
                 </h3>
+                {!readOnly ? (
+                  <div className="mb-1 flex items-center justify-end gap-2 px-1">
+                    <span className="w-12 text-center font-barlow text-[9px] uppercase text-gray-600">
+                      {t("combat.manualBonus")}
+                    </span>
+                    <span className="w-8" />
+                  </div>
+                ) : null}
                 <div className="space-y-0.5 max-h-[28rem] overflow-y-auto pr-1">
                   {DND5E_SKILLS.map((def) => {
                     const skillDerived = displayDerived.skills[def.key];
@@ -1543,9 +1594,19 @@ export function Dnd5eCharacterSheetPanel({
                             </span>
                           </span>
                         </div>
-                        <span className="font-barlow text-sm text-accent-gold shrink-0 w-8 text-right">
-                          {formatSigned(skillDerived.total)}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!readOnly ? (
+                            <NumberInput
+                              value={entry.manualBonus ?? 0}
+                              className="!w-12 !py-0.5 !text-xs"
+                              aria-label={t("combat.manualBonusAria", { name: skillLabel(def.key) })}
+                              onChange={(v) => updateSkillManualBonus(def.key, v)}
+                            />
+                          ) : null}
+                          <span className="font-barlow text-sm text-accent-gold w-8 text-right">
+                            {formatSigned(skillDerived.total)}
+                          </span>
+                        </div>
                       </div>
                     );
                   })}

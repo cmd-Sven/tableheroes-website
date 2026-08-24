@@ -61,6 +61,8 @@ export const characterSheetMessagesDe = {
 
   "combat.savingThrows": "Rettungswürfe",
   "combat.skills": "Fertigkeiten",
+  "combat.manualBonus": "Bonus",
+  "combat.manualBonusAria": "Manueller Bonus für {name}",
   "combat.passivePerception": "Passive Wahrnehmung",
   "combat.ac": "RK",
   "combat.acFromEquipment": "Aus angelegter Ausrüstung",

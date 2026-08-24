@@ -61,6 +61,8 @@ export const characterSheetMessagesEn = {
 
   "combat.savingThrows": "Saving Throws",
   "combat.skills": "Skills",
+  "combat.manualBonus": "Bonus",
+  "combat.manualBonusAria": "Manual bonus for {name}",
   "combat.passivePerception": "Passive Perception",
   "combat.ac": "AC",
   "combat.acFromEquipment": "From equipped gear",

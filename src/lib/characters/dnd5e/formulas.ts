@@ -29,15 +29,21 @@ export function skillTotalModifier(
   if (entry.bonusOverride != null && !Number.isNaN(entry.bonusOverride)) {
     return Math.round(entry.bonusOverride);
   }
-  return abilityMod + skillProficiencyBonus(entry.proficient, pb) + (entry.flatBonus ?? 0);
+  return (
+    abilityMod +
+    skillProficiencyBonus(entry.proficient, pb) +
+    (entry.flatBonus ?? 0) +
+    (entry.manualBonus ?? 0)
+  );
 }
 
 export function savingThrowTotal(
   abilityMod: number,
   proficient: boolean,
   pb: number,
+  manualBonus = 0,
 ): number {
-  return abilityMod + (proficient ? pb : 0);
+  return abilityMod + (proficient ? pb : 0) + manualBonus;
 }
 
 /** Initiative: DEX-Mod + Bonus; Override ersetzt Berechnung vollständig */

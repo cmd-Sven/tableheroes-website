@@ -41,12 +41,14 @@ export function computeDerivedDnd5eSheet(
 
   const savingThrows = {} as Dnd5eDerivedSheet["savingThrows"];
   for (const key of ABILITY_KEYS) {
-    const proficient = sheet.savingThrows[key]?.proficient ?? false;
+    const saveEntry = sheet.savingThrows[key] ?? { proficient: false };
+    const proficient = saveEntry.proficient ?? false;
+    const manualBonus = saveEntry.manualBonus ?? 0;
     const modifier = abilityMods[key];
     savingThrows[key] = {
       modifier,
       proficient,
-      total: savingThrowTotal(modifier, proficient, pb) + exhaustionPenalty,
+      total: savingThrowTotal(modifier, proficient, pb, manualBonus) + exhaustionPenalty,
     };
   }
 

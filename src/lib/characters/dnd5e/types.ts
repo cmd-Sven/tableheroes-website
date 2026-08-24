@@ -52,6 +52,14 @@ export type Dnd5eSkillEntry = {
   bonusOverride?: number | null;
   /** Flat-Bonus (z. B. Lore-Rassenboni) — addiert zum berechneten Modifikator */
   flatBonus?: number;
+  /** Vom Spieler gesetzter Zusatzbonus (Charakterblatt, Bearbeitungsmodus) */
+  manualBonus?: number;
+};
+
+export type Dnd5eSavingThrowEntry = {
+  proficient: boolean;
+  /** Vom Spieler gesetzter Zusatzbonus (Charakterblatt, Bearbeitungsmodus) */
+  manualBonus?: number;
 };
 
 export type Dnd5eAttackEntry = {
@@ -143,7 +151,7 @@ export type Dnd5eCharacterAchievement = {
 export type Dnd5eSheetData = {
   version: 1;
   abilities: Record<AbilityKey, { score: number }>;
-  savingThrows: Record<AbilityKey, { proficient: boolean }>;
+  savingThrows: Record<AbilityKey, Dnd5eSavingThrowEntry>;
   skills: Record<Dnd5eSkillKey, Dnd5eSkillEntry>;
   combat: {
     hpMax: number;
