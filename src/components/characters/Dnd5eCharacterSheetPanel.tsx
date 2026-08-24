@@ -445,10 +445,19 @@ export function Dnd5eCharacterSheetPanel({
       ? displayDerived?.ac ?? 10
       : (equipmentAcPreview?.ac ?? displayDerived?.ac ?? 10);
 
+  const displayInitiative =
+    sheet?.combat.initiativeOverride != null
+      ? derived?.initiative ?? 0
+      : displayDerived?.initiative ?? 0;
+
+  const displaySpeed =
+    sheet?.combat.speedOverride != null
+      ? derived?.speed ?? sheet?.combat.speed ?? 0
+      : flawAdjusted?.displaySpeed ?? derived?.speed ?? sheet?.combat.speed ?? 0;
+
   const canEdit = payload?.canEdit ?? false;
   const readOnly = !editMode || !canEdit;
   const passivePerception = flawAdjusted?.passivePerception ?? (derived ? 10 + derived.skills.prc.total : 10);
-  const displaySpeed = flawAdjusted?.displaySpeed ?? sheet?.combat.speed ?? 0;
   const flawNotes = flawAdjusted?.flawNotes ?? [];
   const hasFlawAdjustments = flawAdjusted?.hasFlawAdjustments ?? false;
 
@@ -1647,15 +1656,50 @@ export function Dnd5eCharacterSheetPanel({
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.initiative")}</p>
                     {readOnly ? (
                       <p className="font-barlow text-4xl font-bold text-white mt-1">
-                        {formatSigned(displayDerived.initiative)}
+                        {formatSigned(displayInitiative)}
                       </p>
                     ) : (
                       <NumberInput
-                        value={sheet.combat.initiativeBonus}
+                        value={
+                          sheet.combat.initiativeOverride != null
+                            ? sheet.combat.initiativeOverride
+                            : sheet.combat.initiativeBonus
+                        }
                         className="mt-1 !text-2xl !font-bold"
-                        onChange={(v) => updateCombat("initiativeBonus", v)}
+                        aria-label={t("combat.initiative")}
+                        onChange={(v) =>
+                          updateCombat(
+                            sheet.combat.initiativeOverride != null
+                              ? "initiativeOverride"
+                              : "initiativeBonus",
+                            v,
+                          )
+                        }
                       />
                     )}
+                    {!readOnly ? (
+                      <label className="mt-1 flex items-center justify-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="shrink-0"
+                          checked={sheet.combat.initiativeOverride != null}
+                          onChange={(e) =>
+                            updateCombat(
+                              "initiativeOverride",
+                              e.target.checked ? displayInitiative : null,
+                            )
+                          }
+                        />
+                        <span className="font-libre text-[9px] text-gray-500 leading-tight">
+                          {t("combat.useManualOverride")}
+                        </span>
+                      </label>
+                    ) : null}
+                    <p className="mt-0.5 font-libre text-[9px] text-gray-500 leading-tight">
+                      {sheet.combat.initiativeOverride != null
+                        ? t("combat.initiativeOverrideHint")
+                        : t("combat.initiativeFromDex")}
+                    </p>
                   </div>
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
@@ -1667,13 +1711,47 @@ export function Dnd5eCharacterSheetPanel({
                       </p>
                     ) : (
                       <NumberInput
-                        value={sheet.combat.speed}
+                        value={
+                          sheet.combat.speedOverride != null
+                            ? sheet.combat.speedOverride
+                            : sheet.combat.speed
+                        }
                         min={0}
                         className="mt-1 !text-2xl !font-bold"
-                        onChange={(v) => updateCombat("speed", v)}
+                        aria-label={t("combat.speed")}
+                        onChange={(v) =>
+                          updateCombat(
+                            sheet.combat.speedOverride != null ? "speedOverride" : "speed",
+                            v,
+                          )
+                        }
                       />
                     )}
-                    <p className="font-barlow text-[9px] text-gray-500 mt-0.5">{t("combat.speedUnit")}</p>
+                    {!readOnly ? (
+                      <label className="mt-0.5 flex items-center justify-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="shrink-0"
+                          checked={sheet.combat.speedOverride != null}
+                          onChange={(e) =>
+                            updateCombat(
+                              "speedOverride",
+                              e.target.checked ? displaySpeed : null,
+                            )
+                          }
+                        />
+                        <span className="font-libre text-[9px] text-gray-500 leading-tight">
+                          {t("combat.useManualOverride")}
+                        </span>
+                      </label>
+                    ) : null}
+                    <p className="font-barlow text-[9px] text-gray-500 mt-0.5">
+                      {sheet.combat.speedOverride != null
+                        ? t("combat.speedOverrideHint")
+                        : t("combat.speedFromBase")}
+                      {" · "}
+                      {t("combat.speedUnit")}
+                    </p>
                   </div>
                 </div>
               </section>

@@ -166,7 +166,10 @@ export type Dnd5eSheetData = {
     acOverride?: number | null;
     /** Zusatz auf Initiative (neben DEX) */
     initiativeBonus: number;
+    /** Manueller Initiative-Gesamtwert — ignoriert DEX, Bonus, Erschöpfung, Makel */
     initiativeOverride?: number | null;
+    /** Manueller Bewegungswert — ignoriert Erschöpfung, Makel */
+    speedOverride?: number | null;
     deathSaveSuccesses?: number;
     deathSaveFailures?: number;
     /**

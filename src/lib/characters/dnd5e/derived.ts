@@ -10,6 +10,7 @@ import {
   abilityModifier,
   armorClassValue,
   initiativeTotal,
+  speedValue,
   proficiencyBonus,
   savingThrowTotal,
   skillTotalModifier,
@@ -67,15 +68,19 @@ export function computeDerivedDnd5eSheet(
   }
 
   const ac = armorClassValue(sheet.combat.ac, sheet.combat.acOverride);
+  const initiativeBase = initiativeTotal(
+    abilityMods.dex,
+    sheet.combat.initiativeBonus ?? 0,
+    sheet.combat.initiativeOverride,
+  );
   const initiative =
-    initiativeTotal(
-      abilityMods.dex,
-      sheet.combat.initiativeBonus ?? 0,
-      sheet.combat.initiativeOverride,
-    ) + exhaustionPenalty;
-  const speed = Math.max(
-    0,
-    (sheet.combat.speed ?? 0) - exhaustionSpeedPenaltyFeet(exhaustionLevel),
+    sheet.combat.initiativeOverride != null
+      ? initiativeBase
+      : initiativeBase + exhaustionPenalty;
+  const speed = speedValue(
+    sheet.combat.speed ?? 0,
+    exhaustionSpeedPenaltyFeet(exhaustionLevel),
+    sheet.combat.speedOverride,
   );
 
   let derivedSpellSaveDc: number | null = null;

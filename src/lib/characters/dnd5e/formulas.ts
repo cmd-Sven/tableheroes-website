@@ -56,6 +56,18 @@ export function initiativeTotal(
   return dexMod + bonus;
 }
 
+/** Bewegung: Basis − Erschöpfung; Override ersetzt Berechnung vollständig */
+export function speedValue(
+  baseSpeed: number,
+  exhaustionPenaltyFeet: number,
+  override?: number | null,
+): number {
+  if (override != null && !Number.isNaN(override)) {
+    return Math.max(0, Math.round(override));
+  }
+  return Math.max(0, baseSpeed - exhaustionPenaltyFeet);
+}
+
 /** Spell Save DC = 8 + PB + Casting Ability Mod */
 export function spellSaveDc(
   pb: number,
