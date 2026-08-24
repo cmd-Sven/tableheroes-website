@@ -44,7 +44,7 @@ export function AuthLayoutClient({ children }: Props) {
   return (
     <div className="relative flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Image
-        src="/images/bg_hero_castle.jpg"
+        src="/images/bg_hero_castle.webp"
         alt=""
         fill
         className="object-cover"
@@ -69,7 +69,7 @@ export function AuthLayoutClient({ children }: Props) {
             <div className="relative z-20 min-h-[420px] w-full overflow-visible">
               <div className="absolute left-1/2 top-0 z-0 h-28 w-28 -translate-x-1/2 -translate-y-2 opacity-90 sm:-translate-y-4">
                 <Image
-                  src="/images/dragon-wing.png"
+                  src="/images/dragon/dragon-wing.webp"
                   alt=""
                   width={112}
                   height={112}
@@ -78,7 +78,7 @@ export function AuthLayoutClient({ children }: Props) {
               </div>
               <div className="absolute left-1/2 top-12 z-10 h-52 w-60 -translate-x-1/2">
                 <Image
-                  src="/images/dragon-body.png"
+                  src="/images/dragon/dragon-body.webp"
                   alt=""
                   width={240}
                   height={208}
@@ -86,7 +86,7 @@ export function AuthLayoutClient({ children }: Props) {
                 />
                 <div className="absolute -right-6 top-1 h-20 w-20">
                   <Image
-                    src="/images/dragon-head.png"
+                    src="/images/dragon/dragon-head.webp"
                     alt=""
                     width={80}
                     height={80}
@@ -95,7 +95,7 @@ export function AuthLayoutClient({ children }: Props) {
                 </div>
                 <div className="absolute -left-6 top-3 h-16 w-24">
                   <Image
-                    src="/images/dragon-tail.png"
+                    src="/images/dragon/dragon-tail.webp"
                     alt=""
                     width={96}
                     height={64}
@@ -105,7 +105,7 @@ export function AuthLayoutClient({ children }: Props) {
               </div>
               <div className="absolute left-[calc(50%+0.5rem)] top-4 z-20 h-24 w-24 -translate-x-1/2 translate-y-1 opacity-95 sm:left-[calc(50%+1rem)]">
                 <Image
-                  src="/images/dragon-wing.png"
+                  src="/images/dragon/dragon-wing.webp"
                   alt=""
                   width={96}
                   height={96}

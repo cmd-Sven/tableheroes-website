@@ -253,7 +253,7 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
       <div
         className="rounded-lg border border-hero-border bg-background-card/80 p-4 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -274,7 +274,7 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
       <section
         className="rounded-lg border border-hero-border bg-background-card shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -389,7 +389,7 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
       <section
         className="rounded-lg border border-hero-border bg-background-card shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >

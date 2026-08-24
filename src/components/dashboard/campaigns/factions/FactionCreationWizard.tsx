@@ -594,7 +594,7 @@ export function FactionCreationWizard({
     <div
       className="min-h-screen p-6 relative"
       style={{
-        backgroundImage: "url('/images/scroll-paper.png')",
+        backgroundImage: "url('/images/scroll-paper.webp')",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",

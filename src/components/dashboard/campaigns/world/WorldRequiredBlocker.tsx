@@ -25,7 +25,7 @@ export function WorldRequiredBlocker({ campaignId, isGM, worlds = [] }: Props) {
         className="rounded-lg p-12 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
         style={{
           border: "3px solid #B8860B",
-          backgroundImage: "url('/images/backgrounds/dark-marble.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -64,7 +64,7 @@ export function WorldRequiredBlocker({ campaignId, isGM, worlds = [] }: Props) {
       className="rounded-lg p-12 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
       style={{
         border: "3px solid #B8860B",
-        backgroundImage: "url('/images/backgrounds/dark-marble.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}

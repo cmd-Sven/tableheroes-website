@@ -325,7 +325,7 @@ export function CharacterCreateRulesPanel({
               onChange={(e) => onApplyRacialBonuses(e.target.checked)}
               className="accent-accent-gold"
             />
-            Rassenboni anwenden
+            2014-Rassenboni anwenden
           </label>
         </div>
         <div>

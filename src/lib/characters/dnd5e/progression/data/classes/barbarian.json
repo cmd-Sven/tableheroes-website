@@ -350,8 +350,8 @@
       "level": 3,
       "nameEn": "Frenzy",
       "nameDe": "Raserei",
-      "descriptionEn": "Starting when you choose this path at 3rd level, you can go into a frenzy when you rage. If you do so, for the duration of your rage you can make a single melee weapon attack as a bonus action on each of your turns after this one. When your rage ends, you suffer one level of exhaustion (as described in appendix A).",
-      "descriptionDe": "Entscheidest du dich auf der 3. Stufe für diesen Pfad, kannst du von nun an in Raserei verfallen, wenn du deinen @Compendium[dnd5e.classfeatures.VoR0SUrNX5EJVPIO]{Kampfrausch} entfesselst. Für die Dauer des Kampfrausches kannst du dann in jedem Zug außer dem ersten einen einzelnen Nahkampfangriff als Bonusaktion ausführen. Sobald dein Kampfrausch endet, erhältst du eine Stufe Erschöpfung (Beschreibung siehe Anhang A „Zustände“).",
+      "descriptionEn": "When you rage, you can frenzy. If you do, you can make one extra melee attack as a Bonus Action on each of your turns while raging. Frenzy does not cause Exhaustion.",
+      "descriptionDe": "Wenn du in Kampfrausch gerätst, kannst du rasen. Solange der Rausch anhält, kannst du in jedem deiner Züge als Bonusaktion einen zusätzlichen Nahkampfangriff machen. Raserei verursacht keine Erschöpfung.",
       "subclass": "berserker"
     },
     {
@@ -393,8 +393,8 @@
           "level": 3,
           "nameEn": "Frenzy",
           "nameDe": "Raserei",
-          "descriptionEn": "Starting when you choose this path at 3rd level, you can go into a frenzy when you rage. If you do so, for the duration of your rage you can make a single melee weapon attack as a bonus action on each of your turns after this one. When your rage ends, you suffer one level of exhaustion (as described in appendix A).",
-          "descriptionDe": "Entscheidest du dich auf der 3. Stufe für diesen Pfad, kannst du von nun an in Raserei verfallen, wenn du deinen @Compendium[dnd5e.classfeatures.VoR0SUrNX5EJVPIO]{Kampfrausch} entfesselst. Für die Dauer des Kampfrausches kannst du dann in jedem Zug außer dem ersten einen einzelnen Nahkampfangriff als Bonusaktion ausführen. Sobald dein Kampfrausch endet, erhältst du eine Stufe Erschöpfung (Beschreibung siehe Anhang A „Zustände“).",
+          "descriptionEn": "When you rage, you can frenzy. If you do, you can make one extra melee attack as a Bonus Action on each of your turns while raging. Frenzy does not cause Exhaustion.",
+          "descriptionDe": "Wenn du in Kampfrausch gerätst, kannst du rasen. Solange der Rausch anhält, kannst du in jedem deiner Züge als Bonusaktion einen zusätzlichen Nahkampfangriff machen. Raserei verursacht keine Erschöpfung.",
           "subclass": "berserker"
         },
         {

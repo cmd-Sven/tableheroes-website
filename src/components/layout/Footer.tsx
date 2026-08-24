@@ -61,7 +61,7 @@ export function Footer({ showStarrySection = true }: FooterProps) {
                 style={{ WebkitMaskImage: "radial-gradient(ellipse 80% 70% at 50% 50%, black 55%, transparent 100%)" }}
               >
                 <Image
-                  src="/images/camp-footer-top.png"
+                  src="/images/camp-footer-top.webp"
                   alt=""
                   fill
                   priority

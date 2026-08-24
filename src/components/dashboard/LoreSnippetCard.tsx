@@ -58,7 +58,7 @@ export function LoreSnippetCard({
         <div
           className="rounded-lg border border-hero-border/40 bg-hero-dark/20 p-4 text-center"
           style={{
-            backgroundImage: "url('/images/dark-marmor.jpg')",
+            backgroundImage: "url('/images/dark-marmor.webp')",
             backgroundSize: "cover",
           }}
         >
@@ -100,7 +100,7 @@ export function LoreSnippetCard({
             <div
               className="absolute inset-0 flex items-center justify-center"
               style={{
-                backgroundImage: "url('/images/dark-marmor.jpg')",
+                backgroundImage: "url('/images/dark-marmor.webp')",
                 backgroundSize: "cover",
               }}
             >

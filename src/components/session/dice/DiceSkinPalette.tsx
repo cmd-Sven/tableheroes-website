@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { DICE_SKINS, type DiceSkinId } from "@/src/lib/session/dice-skins";
+import { diceSkinsForPalette, type DiceSkinId } from "@/src/lib/session/dice-skins";
 
 type Props = {
   value: DiceSkinId;
@@ -11,13 +11,14 @@ type Props = {
 };
 
 export function DiceSkinPalette({ value, onChange, isGM = false }: Props) {
+  const skins = diceSkinsForPalette(isGM);
   return (
     <div className="space-y-1">
       <p className="font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-500">
         Würfel-Skin
       </p>
       <div className="flex flex-wrap gap-1" role="listbox" aria-label="Würfel-Skin wählen">
-        {DICE_SKINS.map((skin) => {
+        {skins.map((skin) => {
           const selected = value === skin.id;
           const emphasizeGm = isGM && skin.gmPreset;
           return (
@@ -40,7 +41,7 @@ export function DiceSkinPalette({ value, onChange, isGM = false }: Props) {
               }`}
               style={{ background: skin.swatch }}
             >
-              {skin.pattern === "marble" ? (
+              {skin.pattern === "marble" || skin.pattern === "void-swirl" || skin.pattern === "chrome" ? (
                 <span
                   className="pointer-events-none absolute inset-0 flex items-center justify-center font-barlow text-[8px] font-extrabold leading-none"
                   style={{ color: skin.numeralColor }}

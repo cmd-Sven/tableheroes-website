@@ -9,8 +9,23 @@ const nextConfig: NextConfig = {
     "@react-three/drei",
   ],
   images: {
+    // Sharp (installiert) liefert WebP/AVIF über die Image Optimization API
+    formats: ["image/avif", "image/webp"],
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Next 16: lokale src mit Query-String brauchen explizite localPatterns
+    localPatterns: [
+      {
+        pathname: "/api/achievement-image",
+        // search weglassen = beliebige ?file=… Query erlaubt
+      },
+      {
+        pathname: "/images/**",
+      },
+      {
+        pathname: "/videos/**",
+      },
+    ],
     remotePatterns: [
       // Erlaube alle HTTPS-Verbindungen für flexible Bild-Einbindung
       {

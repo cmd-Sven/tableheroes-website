@@ -8,7 +8,7 @@ export type MainSidePanelId =
   | "travel"
   | "loot";
 
-export type LeftPanelId = "atmosphere" | "chronist" | "table";
+export type LeftPanelId = "atmosphere" | "chronist" | "table" | "party";
 
 export type TopToolbarPanelId = "location" | "fate";
 

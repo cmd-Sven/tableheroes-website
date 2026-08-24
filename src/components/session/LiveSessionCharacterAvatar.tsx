@@ -1,191 +1,19 @@
+/**
+ * LiveSessionCharacterAvatar — Party-tray character portrait with radial menu and optional webcam.
+ */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, memo } from "react";
-import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState, memo } from "react";
+import type { LiveAvatarStatus } from "@/src/lib/actions/live-session-avatar-actions";
 import {
-  BookOpen,
-  Heart,
-  MapPin,
-  Package,
-  ScrollText,
-  Settings2,
-  Shield,
-  ShieldAlert,
-  Smile,
-  Sparkles,
-  Swords,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
-import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
-import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
-import {
-  announceLiveSessionSpell,
-  applyLiveSessionLoadout,
-  applyLiveSessionWeaponPreset,
-  getLiveSessionAvatarStatus,
-  useLiveSessionBeltItem,
-  useLiveSessionClassAbility,
-  type LiveAvatarStatus,
-} from "@/src/lib/actions/live-session-avatar-actions";
-import { updateBattlemapTokenSettings } from "@/src/lib/actions/battlemap-actions";
-import {
-  setCharacterMoodState,
-  toggleCharacterActiveCondition,
-} from "@/src/app/dashboard/campaigns/[id]/character-state-actions";
-import {
-  CHARACTER_CONDITION_DEFINITIONS,
-  type CharacterConditionKey,
-} from "@/src/lib/characters/condition-tokens";
-import {
-  MOOD_STATE_DEFINITIONS,
-  type MoodStateKey,
-} from "@/src/lib/characters/mood-states";
-import {
-  NPC_SIZE_CELLS,
-  NPC_SIZE_LABELS_DE,
-  parseNpcTokenSizeCategory,
-  type NpcTokenSizeCategory,
-} from "@/src/lib/npcs/npc-sheet-types";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
-import {
-  AVATAR_ROLL_FX_DURATION_MS,
-  AVATAR_ROLL_FX_EVENT,
-  moodKeyForRollFx,
-  type AvatarRollFxDetail,
-  type AvatarRollFxKind,
-} from "@/src/lib/session/avatar-roll-fx";
-import {
-  AVATAR_SPEECH_BUBBLE_DURATION_MS,
-  AVATAR_SPEECH_BUBBLE_EVENT,
-  type AvatarSpeechBubbleDetail,
-  type AvatarSpeechBubbleKind,
-} from "@/src/lib/session/avatar-speech-bubble";
-import {
-  getPlayerColorForClass,
-  playerColorAlpha,
-} from "@/src/lib/session/class-player-color";
-import {
-  CHARACTER_DISPLAY_CHANGED_EVENT,
-  dispatchCharacterDisplayChanged,
-  OPEN_CHARACTER_RADIAL_EVENT,
-  type OpenCharacterRadialDetail,
-} from "@/src/lib/session/character-radial-bridge";
-
-type RadialPanel =
-  | "weapons"
-  | "loadouts"
-  | "spells"
-  | "abilities"
-  | "belt"
-  | "mood"
-  | "gm_state"
-  | "token_settings"
-  | null;
-
-function isCasterHeuristic(className: string | null): boolean {
-  const c = (className ?? "").toLowerCase();
-  return /magier|wizard|zauberer|sorcerer|kleriker|cleric|paladin|barde|bard|hexer|warlock|druide|druid|waldläufer|ranger|artificer/.test(
-    c,
-  );
-}
-
-function hasClassAbilitiesHeuristic(className: string | null): boolean {
-  const c = (className ?? "").toLowerCase();
-  return /barbar|barbarian|kämpfer|fighter|mönch|monk|kleriker|cleric|paladin|barde|bard|hexer|warlock|zauberer|sorcerer|druide|druid/.test(
-    c,
-  );
-}
-
-function sizeCategoryFromCells(sizeCells: number): NpcTokenSizeCategory {
-  const fromCells = (Object.entries(NPC_SIZE_CELLS) as [NpcTokenSizeCategory, number][]).find(
-    ([, cells]) => cells === sizeCells,
-  )?.[0];
-  return fromCells ?? "medium";
-}
-
-type Props = {
-  sessionId: string;
-  campaignId: string;
-  characterId: string;
-  characterName: string;
-  className: string | null;
-  fallbackAvatarUrl: string | null;
-  avatarDisplay?: unknown | null;
-  isDummy?: boolean;
-  canInteract: boolean;
-  /** SL darf Zustände setzen (überlagert Spieler-Gemüt). */
-  isGm?: boolean;
-  showDnd5eSheet: boolean;
-  /** Battlemap aktiv — Rad-Menü „Token setzen“. */
-  battlemapActive?: boolean;
-  onStartTokenPlacement?: () => void;
-  /** Platziertes Map-Token dieses Charakters (für Token-Einstellungen). */
-  battlemapToken?: {
-    id: string;
-    showHpBar: boolean;
-    sizeCells: number;
-  } | null;
-  onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
-  /** Kampfmodus: SL kann Charakter in Initiative aufnehmen */
-  combatMode?: boolean;
-  canJoinCombat?: boolean;
-  onJoinCombat?: () => void;
-  /** Kompakte Mini-Darstellung in der Party-Leiste */
-  density?: "full" | "compact";
-};
-
-const RADIAL_ITEMS: {
-  id: Exclude<RadialPanel, null> | "sheet" | "token" | "join_combat";
-  label: string;
-  Icon: typeof Swords;
-  angle: number;
-  casterOnly?: boolean;
-  abilitiesOnly?: boolean;
-  moodOnly?: boolean;
-  gmOnly?: boolean;
-  tokenOnly?: boolean;
-  tokenSettingsOnly?: boolean;
-  joinCombatOnly?: boolean;
-}[] = [
-  { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
-  { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
-  { id: "gm_state", label: "Zustand (SL)", Icon: ShieldAlert, angle: -15, gmOnly: true },
-  {
-    id: "join_combat",
-    label: "Am Kampf teilnehmen",
-    Icon: Swords,
-    angle: -5,
-    joinCombatOnly: true,
-  },
-  {
-    id: "token_settings",
-    label: "Token-Einstellungen",
-    Icon: Settings2,
-    angle: 0,
-    tokenSettingsOnly: true,
-  },
-  { id: "weapons", label: "Waffenset", Icon: Swords, angle: 30 },
-  { id: "loadouts", label: "Ausrüstungsset", Icon: Shield, angle: 75 },
-  { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
-  { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 165, abilitiesOnly: true },
-  { id: "belt", label: "Gürtel", Icon: Package, angle: 210 },
-  { id: "token", label: "Token setzen", Icon: MapPin, angle: 255, tokenOnly: true },
-];
-
-const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
-  weapons: "Waffenset",
-  loadouts: "Ausrüstungsset",
-  spells: "Zauberbuch",
-  abilities: "Klassenfähigkeiten",
-  belt: "Gürtel",
-  mood: "Gemütszustand auswählen",
-  gm_state: "Zustand zuweisen (SL)",
-  token_settings: "Token-Einstellungen",
-};
-
-type AnchorRect = { cx: number; cy: number; top: number; width: number; height: number };
+  type LiveSessionCharacterAvatarProps as Props,
+} from "./live-session-character-avatar.constants";
+import { LiveSessionCharacterAvatarPortrait } from "./LiveSessionCharacterAvatarPortrait";
+import { LiveSessionCharacterAvatarRadialOverlay } from "./LiveSessionCharacterAvatarRadialOverlay";
+import { useLiveSessionCharacterAvatarEffects } from "./useLiveSessionCharacterAvatarEffects";
+import { useLiveSessionCharacterAvatarHandlers } from "./useLiveSessionCharacterAvatarHandlers";
+import { useLiveSessionCharacterAvatarMenuLifecycle } from "./useLiveSessionCharacterAvatarMenuLifecycle";
+import { usePlayerAvatarCam } from "./usePlayerAvatarCam";
 
 export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvatar({
   sessionId,
@@ -207,949 +35,128 @@ export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvat
   canJoinCombat = false,
   onJoinCombat,
   density = "full",
+  canControlWebcam = false,
+  isCameraOwner = false,
 }: Props) {
   const compact = density === "compact";
   const [status, setStatus] = useState<LiveAvatarStatus | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [panel, setPanel] = useState<RadialPanel>(null);
-  const [pending, startTransition] = useTransition();
-  const [mounted, setMounted] = useState(false);
-  const [anchor, setAnchor] = useState<AnchorRect | null>(null);
-  const [tokenShowHpBar, setTokenShowHpBar] = useState(false);
-  const [tokenSizeCategory, setTokenSizeCategory] =
-    useState<NpcTokenSizeCategory>("medium");
-  const [activeBattlemapTokenId, setActiveBattlemapTokenId] = useState<string | null>(null);
-  const [rollFx, setRollFx] = useState<{
-    kind: AvatarRollFxKind;
-    moodKey: MoodStateKey;
-    endsAt: number;
-  } | null>(null);
-  const [speechBubble, setSpeechBubble] = useState<{
-    kind: AvatarSpeechBubbleKind;
-    text: string;
-    key: string;
-    diceGlyphs?: { sides: number; value: number }[];
-  } | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const avatarBtnRef = useRef<HTMLButtonElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const openedFromMapRef = useRef(false);
-  const rollFxTimerRef = useRef<number | null>(null);
-  const speechBubbleTimerRef = useRef<number | null>(null);
-  const seenRollFxIdsRef = useRef<Set<string>>(new Set());
-  const seenSpeechBubbleIdsRef = useRef<Set<string>>(new Set());
+  const { rollFx, speechBubble } = useLiveSessionCharacterAvatarEffects(characterId);
+  const reloadRef = useRef<() => Promise<LiveAvatarStatus | null>>(async () => null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const webcamControl = canControlWebcam && !isDummy;
+  const cameraOwner = isCameraOwner && !isDummy;
+  const webcam = usePlayerAvatarCam({
+    characterId,
+    isCameraOwner: cameraOwner,
+    canControl: webcamControl,
+  });
 
-  useEffect(() => {
-    function rememberSourceId(set: Set<string>, sourceId: string | undefined): boolean {
-      if (!sourceId) return false;
-      if (set.has(sourceId)) return true;
-      set.add(sourceId);
-      if (set.size > 40) {
-        const oldest = set.values().next().value;
-        if (oldest) set.delete(oldest);
-      }
-      return false;
-    }
+  const menu = useLiveSessionCharacterAvatarMenuLifecycle({
+    characterId,
+    canInteract,
+    isDummy: Boolean(isDummy),
+    battlemapToken,
+    reload: () => reloadRef.current(),
+  });
 
-    function onRollFx(e: Event) {
-      const detail = (e as CustomEvent<AvatarRollFxDetail>).detail;
-      if (!detail || detail.characterId !== characterId) return;
-      if (rememberSourceId(seenRollFxIdsRef.current, detail.sourceId)) return;
-      const duration = detail.durationMs ?? AVATAR_ROLL_FX_DURATION_MS;
-      const moodKey = moodKeyForRollFx(detail.kind);
-      setRollFx({ kind: detail.kind, moodKey, endsAt: Date.now() + duration });
-      if (rollFxTimerRef.current != null) window.clearTimeout(rollFxTimerRef.current);
-      rollFxTimerRef.current = window.setTimeout(() => {
-        setRollFx(null);
-        rollFxTimerRef.current = null;
-      }, duration);
-    }
-
-    function onSpeechBubble(e: Event) {
-      const detail = (e as CustomEvent<AvatarSpeechBubbleDetail>).detail;
-      if (!detail || detail.characterId !== characterId) return;
-      if (rememberSourceId(seenSpeechBubbleIdsRef.current, detail.sourceId)) return;
-      const duration = detail.durationMs ?? AVATAR_SPEECH_BUBBLE_DURATION_MS;
-      const key = detail.sourceId ?? `${Date.now()}-${detail.text}`;
-      setSpeechBubble({
-        kind: detail.kind,
-        text: detail.text,
-        key,
-        diceGlyphs: detail.diceGlyphs,
-      });
-      if (speechBubbleTimerRef.current != null) window.clearTimeout(speechBubbleTimerRef.current);
-      speechBubbleTimerRef.current = window.setTimeout(() => {
-        setSpeechBubble(null);
-        speechBubbleTimerRef.current = null;
-      }, duration);
-    }
-
-    window.addEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
-    window.addEventListener(AVATAR_SPEECH_BUBBLE_EVENT, onSpeechBubble);
-    return () => {
-      window.removeEventListener(AVATAR_ROLL_FX_EVENT, onRollFx);
-      window.removeEventListener(AVATAR_SPEECH_BUBBLE_EVENT, onSpeechBubble);
-      if (rollFxTimerRef.current != null) window.clearTimeout(rollFxTimerRef.current);
-      if (speechBubbleTimerRef.current != null) window.clearTimeout(speechBubbleTimerRef.current);
-    };
-  }, [characterId]);
-
-  const reload = useCallback(async (): Promise<LiveAvatarStatus | null> => {
-    if (isDummy) return null;
-    try {
-      const next = await getLiveSessionAvatarStatus(characterId);
-      setStatus(next);
-      return next;
-    } catch {
-      return null;
-    }
-  }, [characterId, isDummy]);
-
-  function broadcastDisplaySnapshot(next: LiveAvatarStatus | null) {
-    if (!next) {
-      dispatchCharacterDisplayChanged({ characterId });
-      return;
-    }
-    const moodTokenUrls: Record<string, string> = {};
-    for (const [k, v] of Object.entries(next.moodTokenUrls ?? {})) {
-      if (v?.trim()) moodTokenUrls[k] = v.trim();
-    }
-    dispatchCharacterDisplayChanged({
-      characterId,
-      snapshot: {
-        url: next.displayAvatarUrl,
-        activeConditions: next.activeConditions ?? [],
-        hpCurrent: next.hpCurrent,
-        hpMax: next.hpMax,
-        moodTokenUrls,
-      },
-    });
-  }
-
-  const updateAnchor = useCallback(() => {
-    const el = avatarBtnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setAnchor({
-      cx: r.left + r.width / 2,
-      cy: r.top + r.height / 2,
-      top: r.top,
-      width: r.width,
-      height: r.height,
-    });
-  }, []);
-
-  useEffect(() => {
-    void reload();
-    const id = window.setInterval(() => void reload(), 20000);
-    return () => window.clearInterval(id);
-  }, [reload]);
-
-  useEffect(() => {
-    function applyTokenDraft(token: {
-      tokenId: string;
-      showHpBar: boolean;
-      sizeCells: number;
-    }) {
-      setActiveBattlemapTokenId(token.tokenId);
-      setTokenShowHpBar(token.showHpBar);
-      setTokenSizeCategory(sizeCategoryFromCells(token.sizeCells));
-    }
-
-    function onOpenRadial(e: Event) {
-      const detail = (e as CustomEvent<OpenCharacterRadialDetail>).detail;
-      if (!detail || detail.characterId !== characterId) return;
-      if (!canInteract || isDummy) return;
-      openedFromMapRef.current = true;
-      if (detail.battlemapToken) {
-        applyTokenDraft(detail.battlemapToken);
-      } else if (battlemapToken) {
-        applyTokenDraft({
-          tokenId: battlemapToken.id,
-          showHpBar: battlemapToken.showHpBar,
-          sizeCells: battlemapToken.sizeCells,
-        });
-      }
-      setMenuOpen(true);
-      setPanel(null);
-      setAnchor({
-        cx: detail.clientX,
-        cy: detail.clientY,
-        top: detail.clientY,
-        width: 0,
-        height: 0,
-      });
-      void reload();
-    }
-    function onDisplayChanged(e: Event) {
-      const detail = (e as CustomEvent<{ characterId: string }>).detail;
-      if (!detail || detail.characterId !== characterId) return;
-      void reload();
-    }
-    window.addEventListener(OPEN_CHARACTER_RADIAL_EVENT, onOpenRadial);
-    window.addEventListener(CHARACTER_DISPLAY_CHANGED_EVENT, onDisplayChanged);
-    return () => {
-      window.removeEventListener(OPEN_CHARACTER_RADIAL_EVENT, onOpenRadial);
-      window.removeEventListener(CHARACTER_DISPLAY_CHANGED_EVENT, onDisplayChanged);
-    };
-  }, [battlemapToken, canInteract, characterId, isDummy, reload]);
-
-  useEffect(() => {
-    if (!battlemapToken) {
-      setActiveBattlemapTokenId(null);
-      return;
-    }
-    setActiveBattlemapTokenId(battlemapToken.id);
-    if (panel !== "token_settings") {
-      setTokenShowHpBar(battlemapToken.showHpBar);
-      setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
-    }
-  }, [battlemapToken, panel]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    if (!openedFromMapRef.current) {
-      updateAnchor();
-    }
-    function onScrollOrResize() {
-      if (openedFromMapRef.current) return;
-      updateAnchor();
-    }
-    window.addEventListener("resize", onScrollOrResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    return () => {
-      window.removeEventListener("resize", onScrollOrResize);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-    };
-  }, [menuOpen, updateAnchor]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDown(e: MouseEvent) {
-      const target = e.target as Node;
-      if (overlayRef.current?.contains(target)) return;
-      if (avatarBtnRef.current?.contains(target)) return;
-      setMenuOpen(false);
-      setPanel(null);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setMenuOpen(false);
-        setPanel(null);
-      }
-    }
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
-  const avatarUrl = (() => {
-    if (rollFx) {
-      const fxUrl = status?.moodTokenUrls?.[rollFx.moodKey]?.trim();
-      if (fxUrl) return fxUrl;
-    }
-    return status?.displayAvatarUrl || fallbackAvatarUrl;
-  })();
-  const fxMoodLabel = rollFx
-    ? MOOD_STATE_DEFINITIONS.find((d) => d.key === rollFx.moodKey)?.labelDe ?? rollFx.moodKey
-    : null;
-  const isCritFx = rollFx?.kind === "crit";
-  const hpCurrent = status?.hpCurrent ?? 0;
-  const hpMax = Math.max(1, status?.hpMax ?? 1);
-  const hpPct = Math.min(100, Math.round((hpCurrent / hpMax) * 100));
-  const weaponLine =
-    status?.weaponLabels?.length ? status.weaponLabels.join(" · ") : "Keine Waffe";
-  const playerColor = getPlayerColorForClass(className);
-
-  const hasBattlemapToken = Boolean(activeBattlemapTokenId || battlemapToken?.id);
-
-  const visibleRadial = useMemo(() => {
-    const filtered = RADIAL_ITEMS.filter((item) => {
-      if (item.id === "sheet") return showDnd5eSheet;
-      if (item.moodOnly) return true;
-      if (item.gmOnly) return isGm;
-      if (item.joinCombatOnly) return isGm && combatMode && canJoinCombat && Boolean(onJoinCombat);
-      if (item.tokenSettingsOnly) return hasBattlemapToken;
-      if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
-      if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
-      if (item.abilitiesOnly) {
-        if ((status?.classResources?.length ?? 0) > 0) return true;
-        return hasClassAbilitiesHeuristic(className);
-      }
-      return true;
-    });
-    const count = filtered.length;
-    if (count === 0) return filtered;
-    return filtered.map((item, index) => ({
-      ...item,
-      angle: -90 + (360 / count) * index,
-    }));
-  }, [
-    status,
+  const handlers = useLiveSessionCharacterAvatarHandlers({
+    sessionId,
+    campaignId,
+    characterId,
     className,
-    showDnd5eSheet,
+    isDummy: Boolean(isDummy),
     isGm,
+    showDnd5eSheet,
     battlemapActive,
     onStartTokenPlacement,
-    hasBattlemapToken,
+    battlemapToken,
+    onBattlemapTokenSaved,
     combatMode,
     canJoinCombat,
     onJoinCombat,
-  ]);
+    status,
+    setStatus,
+    activeBattlemapTokenId: menu.activeBattlemapTokenId,
+    tokenShowHpBar: menu.tokenShowHpBar,
+    tokenSizeCategory: menu.tokenSizeCategory,
+    setTokenShowHpBar: menu.setTokenShowHpBar,
+    setTokenSizeCategory: menu.setTokenSizeCategory,
+    panel: menu.panel,
+    setPanel: menu.setPanel,
+    setMenuOpen: menu.setMenuOpen,
+    canControlWebcam: webcamControl,
+    webcamActive: webcam.webcamModeActive,
+    onToggleWebcam: () => {
+      webcam.toggleDisplayMode();
+    },
+  });
+  reloadRef.current = handlers.reload;
 
-  function openSheetTab() {
-    window.open(
-      `/dashboard/campaigns/${campaignId}/characters/${characterId}/player-view`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-    setMenuOpen(false);
-    setPanel(null);
-  }
+  useEffect(() => {
+    void handlers.reload();
+    const id = window.setInterval(() => void handlers.reload(), 20000);
+    return () => window.clearInterval(id);
+  }, [handlers.reload]);
 
-  function handleRadialClick(id: (typeof RADIAL_ITEMS)[number]["id"]) {
-    if (id === "sheet") {
-      openSheetTab();
-      return;
-    }
-    if (id === "join_combat") {
-      onJoinCombat?.();
-      setMenuOpen(false);
-      setPanel(null);
-      return;
-    }
-    if (id === "token") {
-      onStartTokenPlacement?.();
-      setMenuOpen(false);
-      setPanel(null);
-      return;
-    }
-    if (id === "token_settings") {
-      const tokenId = activeBattlemapTokenId ?? battlemapToken?.id ?? null;
-      if (tokenId && battlemapToken && battlemapToken.id === tokenId) {
-        setTokenShowHpBar(battlemapToken.showHpBar);
-        setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
-      }
-      setPanel((prev) => (prev === id ? null : id));
-      return;
-    }
-    setPanel((prev) => (prev === id ? null : id));
-  }
-
-  function saveTokenSettings() {
-    const tokenId = activeBattlemapTokenId ?? battlemapToken?.id ?? null;
-    if (!tokenId) return;
-    startTransition(async () => {
-      try {
-        const updated = await updateBattlemapTokenSettings({
-          tokenId,
-          sessionId,
-          showHpBar: tokenShowHpBar,
-          sizeCells: NPC_SIZE_CELLS[tokenSizeCategory],
-        });
-        onBattlemapTokenSaved?.(updated);
-        toast.success("Token-Einstellungen gespeichert.");
-        setPanel(null);
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Token-Einstellungen fehlgeschlagen.",
-        );
-      }
-    });
-  }
-
-  function runAction(fn: () => Promise<LiveAvatarStatus | void>) {
-    startTransition(async () => {
-      try {
-        const next = await fn();
-        if (next) setStatus(next);
-        else await reload();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Aktion fehlgeschlagen.");
-      }
-    });
-  }
-
-  function saveMood(moodKey: MoodStateKey | null) {
-    startTransition(async () => {
-      try {
-        const result = await setCharacterMoodState({
-          campaignId,
-          characterId,
-          moodKey,
-        });
-        if (!result.success) {
-          toast.error(result.error ?? "Gemütszustand konnte nicht gespeichert werden.");
-          return;
-        }
-        const next = await reload();
-        broadcastDisplaySnapshot(next);
-        toast.success(
-          moodKey
-            ? `Gemüt: ${MOOD_STATE_DEFINITIONS.find((d) => d.key === moodKey)?.labelDe ?? moodKey}`
-            : "Gemütszustand zurückgesetzt.",
-        );
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Gemütszustand fehlgeschlagen.");
-      }
-    });
-  }
-
-  function toggleGmCondition(conditionKey: CharacterConditionKey) {
-    if (!isGm) return;
-    startTransition(async () => {
-      try {
-        const result = await toggleCharacterActiveCondition({
-          campaignId,
-          characterId,
-          conditionKey,
-        });
-        if (!result.success) {
-          toast.error(result.error ?? "Zustand konnte nicht gesetzt werden.");
-          return;
-        }
-        const next = await reload();
-        broadcastDisplaySnapshot(next);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Zustand fehlgeschlagen.");
-      }
-    });
-  }
-
-  const overlay =
-    mounted && menuOpen && canInteract && anchor
-      ? createPortal(
-          <div
-            ref={overlayRef}
-            className="pointer-events-none fixed inset-0 z-[220]"
-            aria-hidden={false}
-          >
-            <AnimatePresence>
-              <motion.div
-                key="radial"
-                className="pointer-events-none absolute"
-                style={{ left: anchor.cx, top: anchor.cy }}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }}
-                transition={{ duration: 0.2 }}
-              >
-                {visibleRadial.map((item) => {
-                  const radius = 92;
-                  const rad = (item.angle * Math.PI) / 180;
-                  const x = Math.cos(rad) * radius;
-                  const y = Math.sin(rad) * radius;
-                  const Icon = item.Icon;
-                  const active = panel === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      disabled={pending}
-                      onClick={() => handleRadialClick(item.id)}
-                      title={item.label}
-                      aria-label={item.label}
-                      className={`pointer-events-auto absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-xl transition-transform hover:scale-110 ${
-                        active
-                          ? "border-hero-vibrant bg-hero-vibrant/25 text-hero-vibrant"
-                          : "border-amber-700/80 bg-background-dark/95 text-accent-gold"
-                      }`}
-                      style={{ left: x, top: y }}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setPanel(null);
-                  }}
-                  className="pointer-events-auto absolute left-0 top-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-600 bg-background-card text-gray-400"
-                  title="Schließen"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </motion.div>
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {panel ? (
-                <motion.div
-                  key={panel}
-                  initial={{ opacity: 0, y: 18 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 12 }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                  className="pointer-events-auto absolute w-60 -translate-x-1/2 rounded-lg border border-hero-border bg-background-card p-2 shadow-2xl"
-                  style={{
-                    left: anchor.cx,
-                    bottom: `calc(100vh - ${anchor.top}px + 12px)`,
-                  }}
-                >
-                  <p className="mb-2 font-barlow text-[10px] font-bold uppercase text-accent-gold">
-                    {PANEL_TITLES[panel]}
-                  </p>
-
-                  {status?.displaySource === "gm_condition" && panel === "mood" ? (
-                    <p className="mb-2 font-libre text-[10px] leading-snug text-amber-200/90">
-                      Ein SL-Zustand überdeckt aktuell dein Gemüt. Das Gemüt bleibt gespeichert.
-                    </p>
-                  ) : null}
-
-                  {panel === "weapons" ? (
-                    <ActionList
-                      empty="Keine Waffenkombination gespeichert."
-                      items={(status?.weaponPresets ?? []).map((p) => ({
-                        id: p.id,
-                        label: p.name,
-                        onClick: () =>
-                          runAction(() =>
-                            applyLiveSessionWeaponPreset({
-                              sessionId,
-                              characterId,
-                              characterName,
-                              presetId: p.id,
-                            }),
-                          ),
-                      }))}
-                      pending={pending}
-                    />
-                  ) : null}
-
-                  {panel === "loadouts" ? (
-                    <ActionList
-                      empty="Kein Ausrüstungsset gespeichert."
-                      items={(status?.loadouts ?? []).map((l) => ({
-                        id: l.id,
-                        label: l.name,
-                        onClick: () => {
-                          if (
-                            !confirm(
-                              `Loadout „${l.name}" anwenden? Laut PHB nur bei kurzer oder langer Rast.`,
-                            )
-                          ) {
-                            return;
-                          }
-                          runAction(() =>
-                            applyLiveSessionLoadout({
-                              sessionId,
-                              characterId,
-                              characterName,
-                              loadoutId: l.id,
-                            }),
-                          );
-                        },
-                      }))}
-                      pending={pending}
-                    />
-                  ) : null}
-
-                  {panel === "spells" ? (
-                    (status?.spells ?? []).length === 0 ? (
-                      <p className="font-libre text-xs text-gray-500 italic">
-                        Zauberbuch folgt — Zauber werden später integriert.
-                      </p>
-                    ) : (
-                      <ActionList
-                        empty=""
-                        items={(status?.spells ?? []).map((s) => ({
-                          id: s.id,
-                          label: s.name,
-                          onClick: () =>
-                            runAction(async () => {
-                              await announceLiveSessionSpell({
-                                sessionId,
-                                characterId,
-                                characterName,
-                                spellName: s.name,
-                              });
-                              toast.success(`„${s.name}" angekündigt.`);
-                            }),
-                        }))}
-                        pending={pending}
-                      />
-                    )
-                  ) : null}
-
-                  {panel === "abilities" ? (
-                    <ActionList
-                      empty="Keine Klassenfähigkeiten."
-                      items={(status?.classResources ?? []).map((r) => ({
-                        id: r.id,
-                        label: `${r.label} (${r.current}/${r.max})`,
-                        disabled: r.current <= 0,
-                        onClick: () =>
-                          runAction(() =>
-                            useLiveSessionClassAbility({
-                              sessionId,
-                              characterId,
-                              characterName,
-                              resourceId: r.id,
-                            }),
-                          ),
-                      }))}
-                      pending={pending}
-                    />
-                  ) : null}
-
-                  {panel === "belt" ? (
-                    <ActionList
-                      empty="Gürtel ist leer."
-                      items={(status?.beltItems ?? []).map((b) => ({
-                        id: b.id,
-                        label: `${b.name}${b.quantity > 1 ? ` ×${b.quantity}` : ""}${
-                          b.isConsumable ? " · Verbrauch" : ""
-                        }`,
-                        onClick: () =>
-                          runAction(() =>
-                            useLiveSessionBeltItem({
-                              sessionId,
-                              characterId,
-                              characterName,
-                              itemId: b.id,
-                            }),
-                          ),
-                      }))}
-                      pending={pending}
-                    />
-                  ) : null}
-
-                  {panel === "mood" ? (
-                    <div className="max-h-48 space-y-1 overflow-y-auto">
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => saveMood(null)}
-                        className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
-                          !status?.moodState
-                            ? "border-hero-vibrant/60 bg-hero-vibrant/10 text-hero-vibrant"
-                            : "border-hero-border/40 text-gray-400"
-                        }`}
-                      >
-                        Neutral (Basis)
-                      </button>
-                      {MOOD_STATE_DEFINITIONS.map((def) => {
-                        const selected = status?.moodState === def.key;
-                        const hasToken = Boolean(status?.moodTokenUrls?.[def.key]);
-                        return (
-                          <button
-                            key={def.key}
-                            type="button"
-                            disabled={pending}
-                            onClick={() => saveMood(def.key)}
-                            className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
-                              selected
-                                ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
-                                : "border-hero-border/40 text-gray-200"
-                            }`}
-                          >
-                            {def.labelDe}
-                            {selected ? " · Aktiv" : ""}
-                            {!hasToken ? " · ohne Bild" : ""}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
-                  {panel === "gm_state" && isGm ? (
-                    <div className="max-h-52 space-y-1 overflow-y-auto">
-                      <p className="mb-1 font-libre text-[10px] text-gray-500">
-                        Überlagert immer den Spieler-Gemütszustand.
-                      </p>
-                      {CHARACTER_CONDITION_DEFINITIONS.map((def) => {
-                        const active = (status?.activeConditions ?? []).includes(def.key);
-                        return (
-                          <button
-                            key={def.key}
-                            type="button"
-                            disabled={pending}
-                            onClick={() => toggleGmCondition(def.key)}
-                            aria-pressed={active}
-                            className={`w-full rounded border px-2 py-1.5 text-left font-libre text-xs hover:bg-hero-dark/50 disabled:opacity-40 ${
-                              active
-                                ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
-                                : "border-hero-border/40 text-gray-200"
-                            }`}
-                          >
-                            {def.labelDe}
-                            {active ? " · Aktiv" : ""}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
-                  {panel === "token_settings" ? (
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-sm text-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={tokenShowHpBar}
-                          onChange={(e) => setTokenShowHpBar(e.target.checked)}
-                          disabled={pending}
-                        />
-                        <Heart className="h-3.5 w-3.5 text-red-400" />
-                        Lebensbalken am Token
-                      </label>
-                      {tokenShowHpBar ? (
-                        <p className="font-libre text-[10px] text-gray-500">
-                          Aktuell: {hpCurrent} / {hpMax} TP
-                        </p>
-                      ) : null}
-                      <label className="block">
-                        <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
-                          Größe (D&amp;D 5e)
-                        </span>
-                        <select
-                          value={tokenSizeCategory}
-                          onChange={(e) =>
-                            setTokenSizeCategory(parseNpcTokenSizeCategory(e.target.value))
-                          }
-                          disabled={pending}
-                          className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
-                        >
-                          {(Object.keys(NPC_SIZE_LABELS_DE) as NpcTokenSizeCategory[]).map(
-                            (k) => (
-                              <option key={k} value={k}>
-                                {NPC_SIZE_LABELS_DE[k]} ({NPC_SIZE_CELLS[k]} Feld
-                                {NPC_SIZE_CELLS[k] > 1 ? "er" : ""})
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        disabled={pending || !hasBattlemapToken}
-                        onClick={saveTokenSettings}
-                        className="w-full rounded border border-hero-vibrant bg-hero-vibrant/15 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant disabled:opacity-40"
-                      >
-                        Speichern
-                      </button>
-                    </div>
-                  ) : null}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>,
-          document.body,
-        )
-      : null;
+  const hpCurrent = status?.hpCurrent ?? 0;
+  const hpMax = Math.max(1, status?.hpMax ?? 1);
 
   return (
-    <div ref={rootRef} className="relative flex h-full w-full flex-col items-center">
-      {/* Feste Höhe über dem Avatar → kein CLS beim Einblenden */}
-      <div
-        className={`pointer-events-none absolute bottom-full left-1/2 z-[70] mb-1 flex -translate-x-1/2 items-end justify-center ${
-          compact ? "h-[2.25rem] w-[8rem]" : "h-[3.25rem] w-[14rem]"
-        }`}
-      >
-        <AnimatePresence mode="wait">
-          {speechBubble ? (
-            <motion.div
-              key={speechBubble.key}
-              role="status"
-              aria-live="polite"
-              initial={{ opacity: 0, y: 6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.96 }}
-              transition={{ duration: 0.28, ease: "easeOut" }}
-              className="relative max-w-full"
-            >
-              <div
-                className={`rounded-lg border px-2.5 py-1.5 shadow-lg ${
-                  speechBubble.kind === "dice"
-                    ? "bg-background-dark/95 text-accent-gold"
-                    : "bg-background-card/95 text-gray-100"
-                }`}
-                style={{
-                  borderColor: playerColor,
-                  boxShadow: `0 8px 24px ${playerColorAlpha(playerColor, 0.35)}`,
-                }}
-              >
-                {speechBubble.kind === "dice" &&
-                speechBubble.diceGlyphs &&
-                speechBubble.diceGlyphs.length > 0 ? (
-                  <div className="flex items-center justify-center gap-1.5">
-                    {speechBubble.diceGlyphs.map((g, i) => (
-                      <span
-                        key={`${g.sides}-${g.value}-${i}`}
-                        className="inline-flex items-center gap-0.5 font-barlow text-sm font-extrabold tabular-nums leading-none"
-                      >
-                        <DiceGlyph sides={g.sides} className="h-3.5 w-3.5" />
-                        {g.value}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p
-                    className={`text-center leading-snug ${
-                      speechBubble.kind === "dice"
-                        ? "font-barlow text-xs font-bold uppercase tracking-wide"
-                        : "font-libre text-[11px]"
-                    }`}
-                  >
-                    {speechBubble.text}
-                  </p>
-                )}
-              </div>
-              <span
-                aria-hidden
-                className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[7px] border-x-transparent"
-                style={{ borderTopColor: playerColor }}
-              />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
-
-      <motion.button
-        ref={avatarBtnRef}
-        type="button"
-        disabled={!canInteract || isDummy}
-        onClick={() => {
-          if (!canInteract || isDummy) return;
-          openedFromMapRef.current = false;
-          if (battlemapToken) {
-            setActiveBattlemapTokenId(battlemapToken.id);
-            setTokenShowHpBar(battlemapToken.showHpBar);
-            setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
-          }
-          setMenuOpen((v) => !v);
-          setPanel(null);
-          requestAnimationFrame(() => updateAnchor());
-          void reload();
+    <div ref={menu.rootRef} className="relative flex h-full w-full flex-col items-center">
+      <LiveSessionCharacterAvatarPortrait
+        compact={compact}
+        characterName={characterName}
+        canInteract={canInteract}
+        isDummy={Boolean(isDummy)}
+        className={className}
+        avatarDisplay={avatarDisplay}
+        fallbackAvatarUrl={fallbackAvatarUrl}
+        status={status}
+        rollFx={rollFx}
+        speechBubble={speechBubble}
+        avatarBtnRef={menu.avatarBtnRef}
+        onAvatarClick={menu.handleAvatarClick}
+        showingWebcam={webcam.showingWebcam}
+        webcamModeActive={webcam.webcamModeActive}
+        webcamPhase={webcam.phase}
+        webcamErrorHint={webcam.errorHint}
+        videoRefCallback={webcam.videoRefCallback}
+        canControlWebcam={webcamControl}
+        onToggleWebcam={() => {
+          webcam.toggleDisplayMode();
         }}
-        animate={{
-          scale: isCritFx ? 1.28 : 1,
-          opacity: 1,
-        }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className={`relative z-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-hero-dark shadow-xl ${
-          compact ? "h-14 w-14 border-2" : "h-36 w-36 border-[3px]"
-        } ${
-          isDummy ? "border-dashed border-amber-600/90" : isCritFx ? "border-accent-gold" : ""
-        } ${canInteract && !isDummy ? "cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-accent-gold" : "cursor-default"}`}
-        style={
-          isDummy || isCritFx
-            ? undefined
-            : {
-                borderColor: playerColor,
-                boxShadow: compact
-                  ? `0 0 0 1px ${playerColorAlpha(playerColor, 0.35)}, 0 4px 12px rgba(0,0,0,0.45)`
-                  : `0 0 0 2px ${playerColorAlpha(playerColor, 0.35)}, 0 10px 28px rgba(0,0,0,0.45)`,
-              }
-        }
-        title={canInteract && !isDummy ? `${characterName} — Aktionen` : characterName}
-        aria-label={canInteract && !isDummy ? `Aktionen für ${characterName}` : characterName}
-      >
-        {avatarUrl ? (
-          <div className="absolute inset-0 overflow-hidden rounded-full">
-            <CharacterAvatarImage
-              src={avatarUrl}
-              avatarDisplay={avatarDisplay}
-              className="h-full w-full"
-              alt={characterName}
-            />
-          </div>
-        ) : (
-          <span
-            className={`font-barlow text-accent-gold ${compact ? "text-lg" : "text-4xl"}`}
-          >
-            {characterName[0]?.toUpperCase()}
-          </span>
-        )}
-        {rollFx && !status?.moodTokenUrls?.[rollFx.moodKey] ? (
-          <span
-            className={`pointer-events-none absolute inset-x-1 z-10 rounded bg-black/75 px-1 py-0.5 text-center font-barlow font-bold uppercase leading-tight text-accent-gold ${
-              compact ? "bottom-0.5 text-[6px]" : "bottom-2 text-[8px]"
-            }`}
-          >
-            {fxMoodLabel}
-          </span>
-        ) : null}
-      </motion.button>
+      />
 
-      {!isDummy && !compact ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[-6px] z-20 flex flex-col items-center gap-1 px-2">
-          <p
-            className="max-w-[200px] truncate rounded bg-black/65 px-2 py-0.5 text-center font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold"
-            title={weaponLine}
-          >
-            <Swords className="mr-1 inline h-3 w-3" />
-            {weaponLine}
-          </p>
-          <div className="w-[150px] rounded-full border border-black/40 bg-black/70 p-0.5 shadow-md">
-            <div className="relative h-2.5 overflow-hidden rounded-full bg-red-950/80">
-              <div
-                className={`h-full transition-[width] ${
-                  hpPct > 50 ? "bg-hero-vibrant" : hpPct > 25 ? "bg-amber-500" : "bg-red-500"
-                }`}
-                style={{ width: `${hpPct}%` }}
-              />
-            </div>
-            <p className="mt-0.5 text-center font-barlow text-[8px] font-bold text-white/90">
-              {hpCurrent}/{hpMax}
-              {status && status.hpTemp > 0 ? ` (+${status.hpTemp})` : ""} TP
-            </p>
-          </div>
-        </div>
-      ) : !isDummy && compact ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[-4px] z-20 flex justify-center px-1">
-          <div className="w-[52px] rounded-full border border-black/40 bg-black/70 p-px shadow-md">
-            <div className="relative h-1 overflow-hidden rounded-full bg-red-950/80">
-              <div
-                className={`h-full transition-[width] ${
-                  hpPct > 50 ? "bg-hero-vibrant" : hpPct > 25 ? "bg-amber-500" : "bg-red-500"
-                }`}
-                style={{ width: `${hpPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {overlay}
+      <LiveSessionCharacterAvatarRadialOverlay
+        mounted={menu.mounted}
+        menuOpen={menu.menuOpen}
+        canInteract={canInteract}
+        anchor={menu.anchor}
+        overlayRef={menu.overlayRef}
+        visibleRadial={handlers.visibleRadial}
+        panel={menu.panel}
+        pending={handlers.pending}
+        status={status}
+        isGm={isGm}
+        hpCurrent={hpCurrent}
+        hpMax={hpMax}
+        tokenShowHpBar={menu.tokenShowHpBar}
+        setTokenShowHpBar={menu.setTokenShowHpBar}
+        tokenSizeCategory={menu.tokenSizeCategory}
+        setTokenSizeCategory={menu.setTokenSizeCategory}
+        hasBattlemapToken={handlers.hasBattlemapToken}
+        handleRadialClick={handlers.handleRadialClick}
+        setMenuOpen={menu.setMenuOpen}
+        setPanel={menu.setPanel}
+        saveMood={handlers.saveMood}
+        toggleGmCondition={handlers.toggleGmCondition}
+        setGmExhaustionLevel={handlers.setGmExhaustionLevel}
+        saveTokenSettings={handlers.saveTokenSettings}
+        runAction={handlers.runAction}
+        sessionId={sessionId}
+        characterId={characterId}
+        characterName={characterName}
+      />
     </div>
   );
 });
-
-function ActionList({
-  items,
-  empty,
-  pending,
-}: {
-  items: { id: string; label: string; onClick: () => void; disabled?: boolean }[];
-  empty: string;
-  pending: boolean;
-}) {
-  if (items.length === 0) {
-    return <p className="font-libre text-xs text-gray-500 italic">{empty}</p>;
-  }
-  return (
-    <ul className="max-h-40 space-y-1 overflow-y-auto">
-      {items.map((item) => (
-        <li key={item.id}>
-          <button
-            type="button"
-            disabled={pending || item.disabled}
-            onClick={item.onClick}
-            className="w-full rounded border border-hero-border/40 px-2 py-1.5 text-left font-libre text-xs text-gray-200 hover:bg-hero-dark/50 disabled:opacity-40"
-          >
-            {item.label}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}

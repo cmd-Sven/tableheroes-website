@@ -9,30 +9,20 @@ import { settleSessionParticipationRewards as settleParticipationRewardsImpl } f
 import type { SettleSessionParticipationInput } from "@/src/lib/session-wrap-up/participation-types";
 import { ensureSessionPrepLiveState } from "./session-actions";
 import { resilientUpdateSessionLiveState } from "@/src/lib/session-live-state-resilient";
+import { cloneSessionTableState } from "@/src/lib/session-wrap-up/carry-over-table-state";
 
 function normalizeStringIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map(String).filter((id) => id.length > 0);
 }
 
-export async function getSessionWrapUpPreview(
-  sessionId: string,
-): Promise<SessionWrapUpPreview | null> {
-  return loadSessionWrapUpPreview(sessionId);
-}
-
-export async function settleSessionParticipationRewards(
-  sessionId: string,
-  input: SettleSessionParticipationInput,
-) {
-  return settleParticipationRewardsImpl(sessionId, input);
-}
-
-/** Bühne, Wetter & Szene von einer Session in den nächsten Termin übernehmen. */
-export async function carryOverSessionBoardState(
+async function assertGmCarryOverSessions(
   sourceSessionId: string,
   targetSessionId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; supabase: Awaited<ReturnType<typeof createClient>>; campaignId: string }
+  | { ok: false; error: string }
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -70,6 +60,31 @@ export async function carryOverSessionBoardState(
   if (!isCampaignGm(campaignRaw as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
     return { ok: false, error: "Nur der GM kann Einstellungen übernehmen." };
   }
+
+  return { ok: true, supabase, campaignId: source.campaign_id };
+}
+
+export async function getSessionWrapUpPreview(
+  sessionId: string,
+): Promise<SessionWrapUpPreview | null> {
+  return loadSessionWrapUpPreview(sessionId);
+}
+
+export async function settleSessionParticipationRewards(
+  sessionId: string,
+  input: SettleSessionParticipationInput,
+) {
+  return settleParticipationRewardsImpl(sessionId, input);
+}
+
+/** Bühne, Wetter & Szene von einer Session in den nächsten Termin übernehmen. */
+export async function carryOverSessionBoardState(
+  sourceSessionId: string,
+  targetSessionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = await assertGmCarryOverSessions(sourceSessionId, targetSessionId);
+  if (!auth.ok) return auth;
+  const { supabase, campaignId } = auth;
 
   const { data: sourceLiveRaw } = await (supabase.from("session_live_states") as any)
     .select("*")
@@ -121,7 +136,32 @@ export async function carryOverSessionBoardState(
     return { ok: false, error: error.message ?? "Live-State konnte nicht übernommen werden." };
   }
 
-  revalidatePath(`/dashboard/campaigns/${source.campaign_id}`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  revalidatePath(`/session/${targetSessionId}`);
+  return { ok: true };
+}
+
+/** Tisch / Map-Zustand (Battlemaps, Token, FoW, Zeichnungen, Weltkarten-Overlays) übernehmen. */
+export async function carryOverSessionTableState(
+  sourceSessionId: string,
+  targetSessionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = await assertGmCarryOverSessions(sourceSessionId, targetSessionId);
+  if (!auth.ok) return auth;
+  const { supabase, campaignId } = auth;
+
+  await ensureSessionPrepLiveState(targetSessionId);
+
+  const result = await cloneSessionTableState({
+    supabase,
+    sourceSessionId,
+    targetSessionId,
+    campaignId,
+  });
+
+  if (!result.ok) return result;
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath(`/session/${targetSessionId}`);
   return { ok: true };
 }

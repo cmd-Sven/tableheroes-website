@@ -120,7 +120,7 @@ export function MemberDetailManager({ member, campaignId, onClose }: Props) {
       <div
         className="w-full max-w-3xl rounded-lg border border-hero-dark bg-background-card shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
         onClick={(e) => e.stopPropagation()}

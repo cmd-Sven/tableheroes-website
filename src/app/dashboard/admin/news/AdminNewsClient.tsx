@@ -30,7 +30,7 @@ import {
 import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 
 const NEWS_IMAGE_BASE = "/images/news/";
-const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
+const PLACEHOLDER_IMAGE = "/images/dark-marmor.webp";
 
 type Props = {
   initialPosts: NewsPost[];
@@ -291,7 +291,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -567,7 +567,7 @@ export function AdminNewsClient({ initialPosts, imageOptions = [] }: Props) {
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >

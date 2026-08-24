@@ -7,6 +7,7 @@ import {
   setActiveBattlemap,
   setBattlemapMovementPaused,
 } from "@/src/lib/actions/battlemap-actions";
+import { isEmptyParchmentBattlemap } from "@/src/lib/session/empty-battlemap";
 import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
 
 type Props = {
@@ -130,6 +131,7 @@ export function LiveSessionBattlemapsPanel({
                 {battlemaps.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.title}
+                    {isEmptyParchmentBattlemap(m) ? " · Standard" : ""}
                   </option>
                 ))}
               </select>
@@ -137,12 +139,14 @@ export function LiveSessionBattlemapsPanel({
 
             {battlemaps.length === 0 ? (
               <p className="font-libre text-xs italic text-gray-500">
-                Noch keine Battlemaps für diese Session angelegt.
+                Noch keine Battlemaps — die leere Pergament-Karte wird angelegt, sobald du die
+                Session als SL lädst.
               </p>
             ) : (
               <ul className="space-y-2">
                 {battlemaps.map((m) => {
                   const isActive = m.id === activeBattlemapId;
+                  const isSystemEmpty = isEmptyParchmentBattlemap(m);
                   return (
                     <li
                       key={m.id}
@@ -154,6 +158,11 @@ export function LiveSessionBattlemapsPanel({
                     >
                       <span className="min-w-0 truncate font-barlow text-xs font-bold text-gray-200">
                         {m.title}
+                        {isSystemEmpty ? (
+                          <span className="ml-1.5 text-[9px] font-bold uppercase text-accent-gold">
+                            60×60
+                          </span>
+                        ) : null}
                       </span>
                       {!isActive ? (
                         <button

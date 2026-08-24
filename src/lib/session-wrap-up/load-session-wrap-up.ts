@@ -197,6 +197,85 @@ export async function loadSessionWrapUpPreview(
     weatherLabel !== "Standard (Klar)" ||
     temperatureLabel !== "15 °C";
 
+  const [
+    { count: battlemapCount },
+    { count: tokenCount },
+    { count: propCount },
+    { count: fogCount },
+    { count: effectTplCount },
+    { count: markerCount },
+    { count: trapCount },
+    { count: worldFogCount },
+    { count: worldEffectTplCount },
+    { count: worldMarkerCount },
+    { count: drawingCount },
+  ] = await Promise.all([
+    (supabase as any)
+      .from("session_battlemaps")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_tokens")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_props")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_fog_shapes")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_effect_templates")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_markers")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_battlemap_traps")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_world_map_fog_shapes")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_world_map_effect_templates")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_world_map_effect_markers")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+    (supabase as any)
+      .from("session_map_draw_strokes")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId),
+  ]);
+
+  const overlayCount =
+    Number(propCount ?? 0) +
+    Number(fogCount ?? 0) +
+    Number(effectTplCount ?? 0) +
+    Number(markerCount ?? 0) +
+    Number(trapCount ?? 0) +
+    Number(worldFogCount ?? 0) +
+    Number(worldEffectTplCount ?? 0) +
+    Number(worldMarkerCount ?? 0);
+
+  const hasActiveMap =
+    live.active_battlemap_id != null || live.active_world_map_id != null;
+
+  const hasTableCarryOverContent =
+    Number(tokenCount ?? 0) > 0 ||
+    overlayCount > 0 ||
+    Number(drawingCount ?? 0) > 0 ||
+    hasActiveMap ||
+    Number(battlemapCount ?? 0) > 1;
+
   const recordingActive =
     ts?.status === "recording" || ts?.status === "paused";
 
@@ -363,6 +442,14 @@ export async function loadSessionWrapUpPreview(
       inGameTime:
         live.in_game_time != null ? String(live.in_game_time) : null,
       hasCarryOverContent,
+    },
+    table: {
+      battlemapCount: Number(battlemapCount ?? 0),
+      tokenCount: Number(tokenCount ?? 0),
+      overlayCount,
+      drawingCount: Number(drawingCount ?? 0),
+      hasActiveMap,
+      hasCarryOverContent: hasTableCarryOverContent,
     },
     nextSession: nextSessionRow
       ? {

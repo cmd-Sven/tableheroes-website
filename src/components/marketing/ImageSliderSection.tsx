@@ -11,23 +11,23 @@ type Slide = {
 };
 
 const SLIDES: Slide[] = [
-  { src: "/images/impressions/1.png", alt: "TableHeroes Impression 1" },
-  { src: "/images/impressions/2.jpg", alt: "TableHeroes Impression 2" },
-  { src: "/images/impressions/3.jpeg", alt: "TableHeroes Impression 3" },
-  { src: "/images/impressions/4.jpeg", alt: "TableHeroes Impression 4" },
-  { src: "/images/impressions/5.jpeg", alt: "TableHeroes Impression 5" },
-  { src: "/images/impressions/6.png", alt: "TableHeroes Impression 6" },
-  { src: "/images/impressions/7.png", alt: "TableHeroes Impression 7" },
-  { src: "/images/impressions/8.jpeg", alt: "TableHeroes Impression 8" },
-  { src: "/images/impressions/9.png", alt: "TableHeroes Impression 9" },
-  { src: "/images/impressions/10.jpg", alt: "TableHeroes Impression 10" },
-  { src: "/images/impressions/11.png", alt: "TableHeroes Impression 11" },
-  { src: "/images/impressions/12.png", alt: "TableHeroes Impression 12" },
-  { src: "/images/impressions/13.png", alt: "TableHeroes Impression 13" },
-  { src: "/images/impressions/14.png", alt: "TableHeroes Impression 14" },
-  { src: "/images/impressions/15.jpg", alt: "TableHeroes Impression 15" },
-  { src: "/images/impressions/16.jpg", alt: "TableHeroes Impression 16" },
-  { src: "/images/impressions/20.jpeg", alt: "TableHeroes Impression 20" },
+  { src: "/images/impressions/1.webp", alt: "TableHeroes Impression 1" },
+  { src: "/images/impressions/2.webp", alt: "TableHeroes Impression 2" },
+  { src: "/images/impressions/3.webp", alt: "TableHeroes Impression 3" },
+  { src: "/images/impressions/4.webp", alt: "TableHeroes Impression 4" },
+  { src: "/images/impressions/5.webp", alt: "TableHeroes Impression 5" },
+  { src: "/images/impressions/6.webp", alt: "TableHeroes Impression 6" },
+  { src: "/images/impressions/7.webp", alt: "TableHeroes Impression 7" },
+  { src: "/images/impressions/8.webp", alt: "TableHeroes Impression 8" },
+  { src: "/images/impressions/9.webp", alt: "TableHeroes Impression 9" },
+  { src: "/images/impressions/10.webp", alt: "TableHeroes Impression 10" },
+  { src: "/images/impressions/11.webp", alt: "TableHeroes Impression 11" },
+  { src: "/images/impressions/12.webp", alt: "TableHeroes Impression 12" },
+  { src: "/images/impressions/13.webp", alt: "TableHeroes Impression 13" },
+  { src: "/images/impressions/14.webp", alt: "TableHeroes Impression 14" },
+  { src: "/images/impressions/15.webp", alt: "TableHeroes Impression 15" },
+  { src: "/images/impressions/16.webp", alt: "TableHeroes Impression 16" },
+  { src: "/images/impressions/20.webp", alt: "TableHeroes Impression 20" },
 ];
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
@@ -41,7 +41,7 @@ export function ImageSliderSection() {
       <motion.div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: "url('/images/dragon-town.jpg')",
+          backgroundImage: "url('/images/dragon-town.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",

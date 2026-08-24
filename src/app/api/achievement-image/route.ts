@@ -33,6 +33,7 @@ function findMatchingFile(requestedFilename: string): string | null {
   if (!fs.existsSync(resolvedDir)) return null;
 
   const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
+  const matches: string[] = [];
   for (const e of entries) {
     if (!e.isFile()) continue;
     const entryExt = path.extname(e.name).toLowerCase();
@@ -40,11 +41,16 @@ function findMatchingFile(requestedFilename: string): string | null {
     const baseEntry = path.basename(e.name, entryExt);
     const normalizedEntry = normalizeForMatch(baseEntry);
     if (normalizedEntry === normalizedRequested) {
-      return e.name;
+      matches.push(e.name);
     }
   }
 
-  return null;
+  if (matches.length === 0) return null;
+  return (
+    matches.find((name) => name.toLowerCase().endsWith(".webp")) ??
+    matches[0] ??
+    null
+  );
 }
 
 /**

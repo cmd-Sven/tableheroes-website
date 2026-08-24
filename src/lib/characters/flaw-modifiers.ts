@@ -227,6 +227,185 @@ export function applyFlawModifiers(flaws: CharacterFlawEntry[]): FlawModifiers {
           "Unter Gefrierpunkt: Nachteil auf physische Angriffswürfe; Resistenz Kälteschaden",
         );
         break;
+      case "nervous_tick":
+        addSkillBonus(result.skillBonus, "ins", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Nachteil auf Auftreten, wenn formell beobachtet",
+        );
+        break;
+      case "speech_impediment":
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Nachteil Überzeugen/Auftreten bei Fremden; verbale Zauber W20=1 verschluckt; +2 Überzeugen unter einfachem Volk (situativ)",
+        );
+        break;
+      case "backwoods":
+        addSkillBonus(result.skillBonus, "his", -2);
+        addSkillBonus(result.skillBonus, "rel", -2);
+        addSkillBonus(result.skillBonus, "surv", 2);
+        addSkillBonus(result.skillBonus, "nat", 2);
+        addNote(result.notes, def.id, def.name, "Nachteil auf Etikette-/Hofproben (situativ)");
+        break;
+      case "substance_addiction":
+        addSkillBonus(result.skillBonus, "prc", 1);
+        result.initiative += 1;
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Ohne Dosis (24 h): −1 KON & −1 WEI; nach 48 h ohne Dosis +1 Erschöpfung; unter Einfluss 1×/lange Rast Vorteil gegen Furcht",
+        );
+        break;
+      case "clumsy_motor":
+        addSkillBonus(result.skillBonus, "slt", -2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Nachteil Feinarbeit/Akrobatik-Feinmotorik; +1 Wuchtschaden Nahkampf (situativ)",
+        );
+        break;
+      case "pogonophobia":
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Gegen Bärte: WIS SG 12 oder Furcht/Nachteil sozial; +2 Wahrnehmung Verkleidung (situativ)",
+        );
+        break;
+      case "entomophobia":
+        addSkillBonus(result.skillBonus, "nat", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Bei Insekten: WIS SG 13 oder Furcht/Nachteil Angriffe",
+        );
+        break;
+      case "gambling_addiction":
+        addSkillBonus(result.skillBonus, "slt", 2);
+        addSkillBonus(result.skillBonus, "ins", -2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Am Spieltisch: WIS SG 14 oder riskanter Einsatz",
+        );
+        break;
+      case "pathological_liar":
+        addSkillBonus(result.skillBonus, "dec", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Nachteil Überzeugen, wenn eine Lüge auffliegt (bis lange Rast)",
+        );
+        break;
+      case "blood_rage":
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Unter ¼ max. TP: +2 Angriff; WIS SG 13 — Misslingen: Angriff mit Nachteil; Fehlschlag/kein Ziel: −2 TP",
+        );
+        break;
+      case "kleptomania":
+        addSkillBonus(result.skillBonus, "slt", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "In Läden/Lagern: WIS SG 12 oder stehlen",
+        );
+        break;
+      case "chronic_insomnia":
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Lange Rast: nur halbe TP-Heilung (oder Erschöpfung ohne Schlaf); nachts +2 passive Wahrnehmung (situativ)",
+        );
+        break;
+      case "authority_submissive":
+        addSkillBonus(result.skillBonus, "ins", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Gegen Befehlshaber: Nachteil WIS-Widerstand; +2 Insight Hierarchien (teilweise eingerechnet)",
+        );
+        break;
+      case "megalomania":
+        addSkillBonus(result.skillBonus, "itm", 2);
+        addSkillBonus(result.skillBonus, "prf", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "−2 auf Hilfe-Aktionen für Verbündete; bei Kritik WIS SG 13 oder Eskalation",
+        );
+        break;
+      case "scent_hypersensitive":
+        addSkillBonus(result.skillBonus, "prc", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Bei starkem Gestank: Nachteil Konzentration/Wahrnehmung; +2 Geruchswahrnehmung (eingerechnet in Wahrnehmung)",
+        );
+        break;
+      case "pyromaniac":
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Bei offenem Feuer/Zündgelegenheit: WIS SG 13 oder riskant zünden; +2 Feuerkunde (situativ)",
+        );
+        break;
+      case "narcissist":
+        addAbilityDelta(result.abilityScoreDelta, "cha", 1);
+        addSkillBonus(result.skillBonus, "prf", 2);
+        addSkillBonus(result.skillBonus, "ins", -2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Bei öffentlicher Kritik: WIS SG 13 oder Eskalation",
+        );
+        break;
+      case "narcolepsy":
+        result.initiative -= 1;
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Zugbeginn W20=1: einschlafen bis Ende nächster Zug; +2 gegen magischen Schlaf",
+        );
+        break;
+      case "daydreamer":
+        addSkillBonus(result.skillBonus, "prc", -2);
+        result.initiative -= 2;
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "1×/kurze Rast: Vorteil auf eine Wissensprobe nach Grübeln (situativ)",
+        );
+        break;
+      case "seasick":
+        addSkillBonus(result.skillBonus, "surv", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Auf Schiffen/schwankendem Grund: Nachteil Angriffe & Geschick; +2 Überleben Küste",
+        );
+        break;
       default:
         break;
     }
@@ -294,11 +473,12 @@ export function applyFlawModifiersToDerived(
   }
 
   const initiative = derived.initiative + mods.initiative;
-  const displaySpeed = Math.max(0, baseSpeed + mods.speed);
+  const displaySpeed = Math.max(0, (derived.speed ?? baseSpeed) + mods.speed);
   const passivePerception =
     10 + (skills.prc?.total ?? derived.skills.prc.total) + mods.passivePerception;
 
   const hasFlawAdjustments =
+    mods.notes.length > 0 ||
     mods.initiative !== 0 ||
     mods.speed !== 0 ||
     mods.passivePerception !== 0 ||

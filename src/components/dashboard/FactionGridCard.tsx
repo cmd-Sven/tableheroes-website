@@ -90,7 +90,7 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
           faction.banner_url
             ? imageDisplayBackdropStyle(bannerDisplay)
             : {
-                backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                backgroundImage: "url('/images/grunge-paper-background.webp')",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",

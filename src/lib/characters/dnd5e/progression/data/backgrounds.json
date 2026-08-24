@@ -15,7 +15,13 @@
       "descriptionDe": "Als Akolyth genießt du den Respekt derjenigen, die deinen Glauben teilen. Du und deine Gefährten könnt in einem Tempel oder Schrein deines Glaubens kostenlose Heilung und Versorgung erwarten."
     },
     "equipmentHintEn": "A holy symbol, a prayer book or prayer wheel, 5 sticks of incense, vestments, common clothes, belt pouch with 15 gp.",
-    "equipmentHintDe": "Heiliges Symbol, Gebetbuch oder Gebetsrad, 5 Räucherstäbchen, Gewänder, einfache Kleidung, Gürtelbeutel mit 15 GM."
+    "equipmentHintDe": "Heiliges Symbol, Gebetbuch oder Gebetsrad, 5 Räucherstäbchen, Gewänder, einfache Kleidung, Gürtelbeutel mit 15 GM.",
+    "originFeatId": "magic-initiate-cleric",
+    "abilityBonus": {
+      "cha": 1,
+      "int": 1,
+      "wis": 1
+    }
   },
   {
     "id": "criminal",
@@ -33,7 +39,13 @@
       "descriptionDe": "Du hast einen zuverlässigen Kontakt als Verbindung zu einem Netz anderer Verbrecher. Du weißt, wie Nachrichten auch über große Entfernungen übermittelt werden."
     },
     "equipmentHintEn": "A crowbar, dark common clothes including a hood, belt pouch with 15 gp.",
-    "equipmentHintDe": "Brecheisen, dunkle einfache Kleidung mit Kapuze, Gürtelbeutel mit 15 GM."
+    "equipmentHintDe": "Brecheisen, dunkle einfache Kleidung mit Kapuze, Gürtelbeutel mit 15 GM.",
+    "originFeatId": "alert",
+    "abilityBonus": {
+      "dex": 1,
+      "con": 1,
+      "int": 1
+    }
   },
   {
     "id": "folk-hero",
@@ -51,7 +63,13 @@
       "descriptionDe": "Als einer der einfachen Leute findest du leicht Unterschlupf, Rast oder Erholung bei anderen Gemeinen — solange du dich nicht als Gefahr erwiesen hast."
     },
     "equipmentHintEn": "A set of artisan's tools, a shovel, an iron pot, common clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Handwerkszeug, Schaufel, eiserner Topf, einfache Kleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Handwerkszeug, Schaufel, eiserner Topf, einfache Kleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "tough",
+    "abilityBonus": {
+      "str": 1,
+      "con": 1,
+      "wis": 1
+    }
   },
   {
     "id": "noble",
@@ -70,7 +88,13 @@
       "descriptionDe": "Dank deiner adligen Herkunft denken die Leute das Beste von dir. Du bist in der High Society willkommen, und einfache Leute bemühen sich, dir entgegenzukommen."
     },
     "equipmentHintEn": "Fine clothes, a signet ring, a scroll of pedigree, purse with 25 gp.",
-    "equipmentHintDe": "Feine Kleidung, Siegelring, Stammbaumrolle, Geldbörse mit 25 GM."
+    "equipmentHintDe": "Feine Kleidung, Siegelring, Stammbaumrolle, Geldbörse mit 25 GM.",
+    "originFeatId": "skilled",
+    "abilityBonus": {
+      "str": 1,
+      "int": 1,
+      "cha": 1
+    }
   },
   {
     "id": "sage",
@@ -88,7 +112,13 @@
       "descriptionDe": "Wenn du versuchst, Wissen zu lernen oder abzurufen und es nicht kennst, weißt du oft, wo und von wem du es erhalten kannst."
     },
     "equipmentHintEn": "A bottle of ink, a quill, a small knife, a letter from a dead colleague posing a question, common clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Tintenflasche, Feder, kleines Messer, Brief eines toten Kollegen mit einer Frage, einfache Kleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Tintenflasche, Feder, kleines Messer, Brief eines toten Kollegen mit einer Frage, einfache Kleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "magic-initiate-wizard",
+    "abilityBonus": {
+      "con": 1,
+      "int": 1,
+      "wis": 1
+    }
   },
   {
     "id": "soldier",
@@ -106,7 +136,13 @@
       "descriptionDe": "Du hast einen Militärrang aus deiner Soldatenzeit. Soldaten deiner ehemaligen Organisation erkennen deine Autorität und deinen Einfluss an."
     },
     "equipmentHintEn": "An insignia of rank, a trophy from a fallen enemy, a set of bone dice or deck of cards, common clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Rangabzeichen, Trophäe eines gefallenen Feindes, Würfel oder Kartenspiel, einfache Kleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Rangabzeichen, Trophäe eines gefallenen Feindes, Würfel oder Kartenspiel, einfache Kleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "savage-attacker",
+    "abilityBonus": {
+      "str": 1,
+      "dex": 1,
+      "con": 1
+    }
   },
   {
     "id": "hermit",
@@ -124,7 +160,13 @@
       "descriptionDe": "Die Stille deiner langen Einsiedelei gewährte dir Zugang zu einer einzigartigen, mächtigen Entdeckung. Details legst du mit dem Spielleiter fest."
     },
     "equipmentHintEn": "A scroll case stuffed with notes, a winter blanket, common clothes, herbalism kit, 5 gp.",
-    "equipmentHintDe": "Schriftrollenköcher mit Notizen, Winterdecke, einfache Kleidung, Kräuterkunde-Ausrüstung, 5 GM."
+    "equipmentHintDe": "Schriftrollenköcher mit Notizen, Winterdecke, einfache Kleidung, Kräuterkunde-Ausrüstung, 5 GM.",
+    "originFeatId": "healer",
+    "abilityBonus": {
+      "con": 1,
+      "wis": 1,
+      "cha": 1
+    }
   },
   {
     "id": "entertainer",
@@ -142,7 +184,13 @@
       "descriptionDe": "Du findest immer einen Ort zum Auftreten. Dort erhältst du kostenlose Unterkunft und Verpflegung von bescheidener oder angenehmer Qualität."
     },
     "equipmentHintEn": "A musical instrument, the favor of an admirer, a costume, belt pouch with 15 gp.",
-    "equipmentHintDe": "Musikinstrument, Gunst eines Bewunderers, Kostüm, Gürtelbeutel mit 15 GM."
+    "equipmentHintDe": "Musikinstrument, Gunst eines Bewunderers, Kostüm, Gürtelbeutel mit 15 GM.",
+    "originFeatId": "musician",
+    "abilityBonus": {
+      "str": 1,
+      "dex": 1,
+      "cha": 1
+    }
   },
   {
     "id": "guild-artisan",
@@ -161,7 +209,13 @@
       "descriptionDe": "Als etabliertes Zunftmitglied kannst du mit bestimmten Vorteilen rechnen: Unterkunft und Verpflegung bei Bedarf, und bei Bedarf die Kosten für deine Bestattung."
     },
     "equipmentHintEn": "A set of artisan's tools, a letter of introduction from your guild, traveler's clothes, belt pouch with 15 gp.",
-    "equipmentHintDe": "Handwerkszeug, Empfehlungsschreiben der Zunft, Reisekleidung, Gürtelbeutel mit 15 GM."
+    "equipmentHintDe": "Handwerkszeug, Empfehlungsschreiben der Zunft, Reisekleidung, Gürtelbeutel mit 15 GM.",
+    "originFeatId": "crafter",
+    "abilityBonus": {
+      "str": 1,
+      "dex": 1,
+      "int": 1
+    }
   },
   {
     "id": "outlander",
@@ -180,7 +234,13 @@
       "descriptionDe": "Du hast ein ausgezeichnetes Gedächtnis für Karten und Geografie und kannst dich immer an die grobe Lage von Gelände und Siedlungen erinnern. Außerdem findest du täglich Nahrung und Frischwasser für dich und bis zu fünf weitere Personen."
     },
     "equipmentHintEn": "A staff, a hunting trap, a trophy from an animal you killed, traveler's clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Stab, Tierfalle, Trophäe eines erlegten Tiers, Reisekleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Stab, Tierfalle, Trophäe eines erlegten Tiers, Reisekleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "magic-initiate-druid",
+    "abilityBonus": {
+      "dex": 1,
+      "con": 1,
+      "wis": 1
+    }
   },
   {
     "id": "sailor",
@@ -198,7 +258,13 @@
       "descriptionDe": "Bei Bedarf kannst du für dich und deine Gefährten eine kostenlose Überfahrt auf einem Segelschiff organisieren."
     },
     "equipmentHintEn": "A belaying pin (club), 50 feet of silk rope, a lucky charm, common clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Belegnagel (Keule), 15 m Seidenstrick, Glücksbringer, einfache Kleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Belegnagel (Keule), 15 m Seidenstrick, Glücksbringer, einfache Kleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "tavern-brawler",
+    "abilityBonus": {
+      "str": 1,
+      "dex": 1,
+      "wis": 1
+    }
   },
   {
     "id": "charlatan",
@@ -216,7 +282,13 @@
       "descriptionDe": "Du hast eine zweite Identität geschaffen — mit Papieren, Bekannten und Verkleidungen, die dir erlauben, diese Persona anzunehmen."
     },
     "equipmentHintEn": "A set of fine clothes, a disguise kit, tools of the con of your choice, belt pouch with 15 gp.",
-    "equipmentHintDe": "Feine Kleidung, Verkleidungsset, Werkzeuge deines bevorzugten Schwindels, Gürtelbeutel mit 15 GM."
+    "equipmentHintDe": "Feine Kleidung, Verkleidungsset, Werkzeuge deines bevorzugten Schwindels, Gürtelbeutel mit 15 GM.",
+    "originFeatId": "skilled",
+    "abilityBonus": {
+      "dex": 1,
+      "con": 1,
+      "cha": 1
+    }
   },
   {
     "id": "urchin",
@@ -234,6 +306,12 @@
       "descriptionDe": "Du kennst die geheimen Muster und Flüsse der Städte und findest Wege, die andere übersehen. Außerhalb des Kampfes kannst du (mit Gefährten, die du führst) zwischen zwei Orten in der Stadt doppelt so schnell reisen."
     },
     "equipmentHintEn": "A small knife, a map of the city you grew up in, a pet mouse, a token to remember your parents by, common clothes, belt pouch with 10 gp.",
-    "equipmentHintDe": "Kleines Messer, Stadtplan deiner Heimatstadt, eine Maus als Haustier, Andenken an deine Eltern, einfache Kleidung, Gürtelbeutel mit 10 GM."
+    "equipmentHintDe": "Kleines Messer, Stadtplan deiner Heimatstadt, eine Maus als Haustier, Andenken an deine Eltern, einfache Kleidung, Gürtelbeutel mit 10 GM.",
+    "originFeatId": "lucky",
+    "abilityBonus": {
+      "dex": 1,
+      "wis": 1,
+      "cha": 1
+    }
   }
 ]

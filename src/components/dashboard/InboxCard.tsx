@@ -187,7 +187,7 @@ export function InboxCard({
           <div
             className="relative w-full max-w-lg overflow-hidden rounded-lg border border-hero-dark bg-background-card shadow-2xl"
             style={{
-              backgroundImage: "url('/images/dark-marmor.jpg')",
+              backgroundImage: "url('/images/dark-marmor.webp')",
               backgroundSize: "cover",
             }}
             onClick={(e) => e.stopPropagation()}

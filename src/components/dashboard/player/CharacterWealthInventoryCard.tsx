@@ -109,7 +109,7 @@ export function CharacterWealthInventoryCard({
           aria-label={`Rucksack von ${character.name} öffnen`}
         >
           <Image
-            src="/images/Session_ui/rucksack.png"
+            src="/images/Session_ui/rucksack.webp"
             alt=""
             width={64}
             height={64}

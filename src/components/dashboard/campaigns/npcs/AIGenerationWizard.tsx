@@ -1010,7 +1010,7 @@ export function AIGenerationWizard({
           className="relative w-full max-w-5xl h-[90vh] max-h-[90vh] rounded-lg overflow-hidden flex flex-col shadow-2xl border-2 border-accent-gold/50"
           style={{
             backgroundColor: "#18181b",
-            backgroundImage: "url('/images/scroll-paper.png')",
+            backgroundImage: "url('/images/scroll-paper.webp')",
             backgroundSize: "cover",
             backgroundRepeat: "no-repeat",
             backgroundPosition: "center",

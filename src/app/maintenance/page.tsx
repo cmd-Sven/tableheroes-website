@@ -6,12 +6,12 @@ export default function MaintenancePage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-fixed bg-cover bg-center"
-      style={{ backgroundImage: "url('/images/dark-marmor.jpg')" }}
+      style={{ backgroundImage: "url('/images/dark-marmor.webp')" }}
     >
       <div className="px-4 py-10 sm:px-6 lg:px-8 w-full max-w-xl">
         <div
           className="rounded-xl border-2 border-accent-gold/60 shadow-2xl bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/images/grunge-paper-background.jpg')" }}
+          style={{ backgroundImage: "url('/images/grunge-paper-background.webp')" }}
         >
           <div className="bg-black/40 rounded-xl p-8 sm:p-10 text-center space-y-6">
             <h1 className="font-cinzel font-bold text-2xl sm:text-3xl text-accent-gold">

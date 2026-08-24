@@ -19,7 +19,7 @@ import type { CharacterSheetPayload } from "@/src/lib/characters/dnd5e/types";
 import type { Dnd5eSkillKey } from "@/src/lib/characters/dnd5e/types";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
 import { useDiceSkin } from "@/src/hooks/useDiceSkin";
-import type { DiceSkinId } from "@/src/lib/session/dice-skins";
+import { isGmDiceRollerId, type DiceSkinId } from "@/src/lib/session/dice-skins";
 
 function sheetDerivedForRolls(payload: CharacterSheetPayload) {
   const base = computeDerivedDnd5eSheet(payload.sheet, payload.level);
@@ -27,10 +27,14 @@ function sheetDerivedForRolls(payload: CharacterSheetPayload) {
   return applyFlawModifiersToDerived(base, payload.sheet.combat.speed, flaws).derived;
 }
 
+type DiceRoller = { id: string; name: string };
+
 type UseLiveSessionDiceRollOptions = {
   sessionId: string;
   campaignId: string;
-  currentCharacter: { id: string; name: string } | null;
+  currentCharacter: DiceRoller | null;
+  /** Aktiver Werfer — PC oder SL-Sentinel (__gm__). */
+  roller: DiceRoller | null;
   /** Panel sichtbar — Charakterbogen für Angriff/Fertigkeit laden. */
   active: boolean;
   onActivityPosted?: (entry: SessionActivityEntry) => void;
@@ -44,12 +48,16 @@ export function useLiveSessionDiceRoll({
   sessionId,
   campaignId,
   currentCharacter,
+  roller,
   active,
   onActivityPosted,
   userId = null,
   isGM = false,
   diceSkinId: diceSkinIdProp,
 }: UseLiveSessionDiceRollOptions) {
+  const rollingAsGm = isGmDiceRollerId(roller?.id);
+  const sheetCharacter = rollingAsGm ? null : roller;
+
   const [rollMode, setRollMode] = useState<DiceRollMode>("normal");
   const [selectedSkill, setSelectedSkill] = useState("");
   const [skillBonus, setSkillBonus] = useState(0);
@@ -61,10 +69,19 @@ export function useLiveSessionDiceRoll({
   const skinId = diceSkinIdProp ?? storedSkinId;
 
   useEffect(() => {
-    if (!active || !currentCharacter) return;
+    if (!rollingAsGm) return;
+    setSelectedSkill("");
+    setSkillBonus(0);
+    setSelectedSave("");
+    setSaveBonus(0);
+    setPrimaryAttack(null);
+  }, [rollingAsGm]);
+
+  useEffect(() => {
+    if (!active || !sheetCharacter) return;
     void Promise.all([
-      loadDnd5eCharacterSheet(campaignId, currentCharacter.id),
-      getCharacterEquipmentPayload(currentCharacter.id),
+      loadDnd5eCharacterSheet(campaignId, sheetCharacter.id),
+      getCharacterEquipmentPayload(sheetCharacter.id),
     ]).then(([payload, equip]) => {
       if (!payload) return;
       const derived = sheetDerivedForRolls(payload);
@@ -83,7 +100,7 @@ export function useLiveSessionDiceRoll({
         setSaveBonus(derived.savingThrows[selectedSave]?.total ?? 0);
       }
     });
-  }, [campaignId, currentCharacter, active, selectedSkill, selectedSave]);
+  }, [campaignId, sheetCharacter, active, selectedSkill, selectedSave]);
 
   function postLiveDiceRoll(
     input: Omit<
@@ -91,12 +108,20 @@ export function useLiveSessionDiceRoll({
       "sessionId" | "characterId" | "characterName"
     >,
   ) {
-    if (!currentCharacter) {
-      toast.error("Kein Charakter ausgewählt.");
+    if (!roller) {
+      toast.error("Kein Werfer ausgewählt.");
       return;
     }
-    const characterId = currentCharacter.id;
-    const characterName = currentCharacter.name;
+    if (
+      rollingAsGm &&
+      input.kind !== "dice" &&
+      input.kind !== "damage"
+    ) {
+      toast.error("Als Spielleiter nur Pool-Würfe — kein Bogen nötig.");
+      return;
+    }
+    const characterId = roller.id;
+    const characterName = roller.name;
     startTransition(async () => {
       try {
         let dropNx: number | undefined;
@@ -179,7 +204,11 @@ export function useLiveSessionDiceRoll({
   }
 
   function handleSkillCheck() {
-    if (!currentCharacter || !selectedSkill) return;
+    if (rollingAsGm) {
+      toast.error("Fertigkeitswürfe brauchen einen Charakter — nicht als Spielleiter.");
+      return;
+    }
+    if (!sheetCharacter || !selectedSkill) return;
     const def = DND5E_SKILLS.find((s) => s.key === selectedSkill);
     const label = def?.labelDe ?? selectedSkill;
     postLiveDiceRoll({
@@ -194,7 +223,11 @@ export function useLiveSessionDiceRoll({
   }
 
   function handleSavingThrow() {
-    if (!currentCharacter || !selectedSave) return;
+    if (rollingAsGm) {
+      toast.error("Rettungswürfe brauchen einen Charakter — nicht als Spielleiter.");
+      return;
+    }
+    if (!sheetCharacter || !selectedSave) return;
     postLiveDiceRoll({
       kind: "save",
       dice: 1,
@@ -207,7 +240,11 @@ export function useLiveSessionDiceRoll({
   }
 
   function handleAttackRoll() {
-    if (!currentCharacter) return;
+    if (rollingAsGm) {
+      toast.error("Angriffswürfe brauchen einen Charakter — nicht als Spielleiter.");
+      return;
+    }
+    if (!sheetCharacter) return;
     const bonus = primaryAttack?.attackBonus ?? 0;
     const weaponName = primaryAttack?.name ?? "Waffe";
     postLiveDiceRoll({
@@ -253,11 +290,11 @@ export function useLiveSessionDiceRoll({
 
   function onSkillChange(value: string) {
     setSelectedSkill(value);
-    if (!currentCharacter || !value) {
+    if (!sheetCharacter || !value) {
       setSkillBonus(0);
       return;
     }
-    void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
+    void loadDnd5eCharacterSheet(campaignId, sheetCharacter.id).then((payload) => {
       if (!payload) return;
       const derived = sheetDerivedForRolls(payload);
       setSkillBonus(derived.skills[value as Dnd5eSkillKey]?.total ?? 0);
@@ -266,11 +303,11 @@ export function useLiveSessionDiceRoll({
 
   function onSaveChange(value: AbilityKey | "") {
     setSelectedSave(value);
-    if (!currentCharacter || !value) {
+    if (!sheetCharacter || !value) {
       setSaveBonus(0);
       return;
     }
-    void loadDnd5eCharacterSheet(campaignId, currentCharacter.id).then((payload) => {
+    void loadDnd5eCharacterSheet(campaignId, sheetCharacter.id).then((payload) => {
       if (!payload) return;
       const derived = sheetDerivedForRolls(payload);
       setSaveBonus(derived.savingThrows[value]?.total ?? 0);
@@ -284,8 +321,10 @@ export function useLiveSessionDiceRoll({
     skillBonus,
     selectedSave,
     saveBonus,
-    primaryAttack,
+    primaryAttack: rollingAsGm ? null : primaryAttack,
     pending,
+    rollingAsGm,
+    canRoll: Boolean(roller),
     skinId,
     setSkinId,
     rollDice,

@@ -25,7 +25,7 @@ function textureKey(
   numeral: string,
   pattern: DiceSkinPattern,
 ): string {
-  return `face-v5:${value}:${bg}:${numeral}:${pattern}`;
+  return `face-v6:${value}:${bg}:${numeral}:${pattern}`;
 }
 
 function hashSeed(s: string): number {
@@ -35,6 +35,48 @@ function hashSeed(s: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+function fillVoidSwirlBackground(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  seed: number,
+): void {
+  ctx.fillStyle = "#0a0a0e";
+  ctx.fillRect(0, 0, size, size);
+
+  let rng = seed || 1;
+  const next = () => {
+    rng = (Math.imul(rng, 1664525) + 1013904223) >>> 0;
+    return rng / 0xffffffff;
+  };
+
+  for (let i = 0; i < 6; i++) {
+    const cx = next() * size;
+    const cy = next() * size;
+    const r = size * (0.25 + next() * 0.35);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(${120 + next() * 60},${40 + next() * 30},${220 + next() * 35},${0.35 + next() * 0.25})`);
+    g.addColorStop(0.55, `rgba(${60 + next() * 40},${10 + next() * 20},${120 + next() * 40},${0.2 + next() * 0.15})`);
+    g.addColorStop(1, "rgba(5,5,8,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const x0 = next() * size;
+    const y0 = next() * size;
+    const x1 = next() * size;
+    const y1 = next() * size;
+    const cpx = (x0 + x1) / 2 + (next() - 0.5) * size * 0.5;
+    const cpy = (y0 + y1) / 2 + (next() - 0.5) * size * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cpx, cpy, x1, y1);
+    ctx.strokeStyle = `rgba(${140 + next() * 80},${60 + next() * 50},${255},${0.18 + next() * 0.22})`;
+    ctx.lineWidth = 3 + next() * 8;
+    ctx.stroke();
+  }
 }
 
 function fillMarbleBackground(
@@ -117,37 +159,56 @@ export function getDieFaceTexture(
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, size, size);
     }
+  } else if (pattern === "void-swirl") {
+    try {
+      // Nur Hintergrund — Zahl liegt separat als emissiveMap (bleibt bei Swirl-Animation fix).
+      fillVoidSwirlBackground(ctx, size, hashSeed(`void:${value}:${bgColor}`));
+    } catch {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, size, size);
+    }
   } else {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, size, size);
   }
 
   // Leichter Rand / Facetten-Hint
-  ctx.strokeStyle = pattern === "marble" ? "rgba(40,40,40,0.28)" : "rgba(0,0,0,0.35)";
+  const borderColor =
+    pattern === "marble"
+      ? "rgba(40,40,40,0.28)"
+      : pattern === "void-swirl"
+        ? "rgba(120,80,200,0.22)"
+        : pattern === "chrome"
+          ? "rgba(60,40,10,0.35)"
+          : "rgba(0,0,0,0.35)";
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 8;
   ctx.strokeRect(pad * 0.35, pad * 0.35, size - pad * 0.7, size - pad * 0.7);
 
-  const label = String(value);
-  const fontPx = value >= 10 ? 54 : 68;
-  ctx.font = `800 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
+  // Void: Zahl nicht in die Albedo malen (sonst wandert sie mit map.offset).
+  if (pattern !== "void-swirl") {
+    const label = String(value);
+    const fontPx = value >= 10 ? 54 : 68;
+    ctx.font = `800 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
 
-  const cx = size / 2;
-  const cy = size / 2 + 2;
+    const cx = size / 2;
+    const cy = size / 2 + 2;
 
-  const stroke =
-    numeralColor === "#ffffff" || numeralColor.toLowerCase() === "#fff"
-      ? "#000000"
-      : "rgba(0,0,0,0.55)";
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = stroke;
-  ctx.strokeText(label, cx, cy);
+    const stroke =
+      numeralColor === "#ffffff" || numeralColor.toLowerCase() === "#fff"
+        ? "#000000"
+        : "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = stroke;
+    ctx.strokeText(label, cx, cy);
 
-  ctx.fillStyle = numeralColor;
-  ctx.fillText(label, cx, cy);
+    ctx.fillStyle = numeralColor;
+    ctx.fillText(label, cx, cy);
+  }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -155,6 +216,52 @@ export function getDieFaceTexture(
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.generateMipmaps = true;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.needsUpdate = true;
+  textureCache.set(key, tex);
+  return tex;
+}
+
+/** Weiße Ziffer auf Schwarz — als emissiveMap, UV-Offset bleibt 0 (Zahl steht still). */
+function getDieNumeralEmissiveTexture(value: number): THREE.CanvasTexture {
+  const key = `numeral-emissive-v1:${value}`;
+  const cached = textureCache.get(key);
+  if (cached) return cached;
+
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, size, size);
+
+    const label = String(value);
+    const fontPx = value >= 10 ? 54 : 68;
+    ctx.font = `800 ${fontPx}px Arial Black, Impact, Arial Narrow, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
+    const cx = size / 2;
+    const cy = size / 2 + 2;
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#000000";
+    ctx.strokeText(label, cx, cy);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, cx, cy);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = 8;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   textureCache.set(key, tex);
   return tex;
@@ -164,7 +271,7 @@ function createBlankTexture(
   bgColor: string,
   pattern: DiceSkinPattern,
 ): THREE.CanvasTexture {
-  const key = `blank-v5:${bgColor}:${pattern}`;
+  const key = `blank-v6:${bgColor}:${pattern}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
 
@@ -180,6 +287,13 @@ function createBlankTexture(
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, 64, 64);
       }
+    } else if (pattern === "void-swirl") {
+      try {
+        fillVoidSwirlBackground(ctx, 64, hashSeed(`blank-void:${bgColor}`));
+      } catch {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, 64, 64);
+      }
     } else {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, 64, 64);
@@ -188,6 +302,8 @@ function createBlankTexture(
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   tex.needsUpdate = true;
   textureCache.set(key, tex);
   return tex;
@@ -197,7 +313,40 @@ function createFaceMaterial(
   map: THREE.CanvasTexture,
   sides: number,
   pattern: DiceSkinPattern,
+  opts?: { numeralEmissiveMap?: THREE.CanvasTexture; numeralColor?: string },
 ): THREE.MeshStandardMaterial {
+  if (pattern === "chrome") {
+    return new THREE.MeshStandardMaterial({
+      map,
+      color: "#ffffff",
+      metalness: 0.9,
+      roughness: 0.15,
+      emissive: "#1a1408",
+      emissiveIntensity: 0.08,
+      depthTest: true,
+      depthWrite: true,
+      transparent: false,
+      side: THREE.FrontSide,
+    });
+  }
+
+  if (pattern === "void-swirl") {
+    const hasNumeral = Boolean(opts?.numeralEmissiveMap);
+    return new THREE.MeshStandardMaterial({
+      map,
+      color: "#ffffff",
+      metalness: 0.35,
+      roughness: 0.42,
+      emissive: hasNumeral ? (opts?.numeralColor ?? "#7ec8ff") : "#4a2080",
+      emissiveMap: opts?.numeralEmissiveMap ?? null,
+      emissiveIntensity: hasNumeral ? 0.92 : 0.18,
+      depthTest: true,
+      depthWrite: true,
+      transparent: false,
+      side: THREE.FrontSide,
+    });
+  }
+
   const marble = pattern === "marble";
   return new THREE.MeshStandardMaterial({
     map,
@@ -371,7 +520,11 @@ export function buildDieFaceMesh(
   const materials: THREE.MeshStandardMaterial[] = [];
   for (let v = 1; v <= n; v++) {
     materials.push(
-      createFaceMaterial(getDieFaceTexture(v, bg, numeral, pattern), n, pattern),
+      createFaceMaterial(getDieFaceTexture(v, bg, numeral, pattern), n, pattern, {
+        numeralEmissiveMap:
+          pattern === "void-swirl" ? getDieNumeralEmissiveTexture(v) : undefined,
+        numeralColor: numeral,
+      }),
     );
   }
   const blankIndex = materials.length;
@@ -470,6 +623,7 @@ export function warmCommonDiceFaceTextures(
   for (const sides of COMMON_DIE_SIDES) {
     for (let v = 1; v <= sides; v++) {
       getDieFaceTexture(v, bg, numeral, pattern);
+      if (pattern === "void-swirl") getDieNumeralEmissiveTexture(v);
     }
   }
   createBlankTexture(bg, pattern);

@@ -37,7 +37,7 @@ export function LatestLoreSection() {
         className="pointer-events-none absolute inset-0 z-0 opacity-30"
         aria-hidden
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

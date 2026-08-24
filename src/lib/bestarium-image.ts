@@ -1,5 +1,5 @@
 /** Öffentlicher Platzhalter unter /public */
-export const BESTARIUM_PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
+export const BESTARIUM_PLACEHOLDER_IMAGE = "/images/dark-marmor.webp";
 
 /**
  * Liefert eine für <img> / Next/Image nutzbare URL.

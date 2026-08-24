@@ -4,13 +4,13 @@ import { memo } from "react";
 import Image from "next/image";
 
 const CLOUD_SOURCES = [
-  "/images/clouds/cloud1.png",
-  "/images/clouds/cloud2.png",
-  "/images/clouds/cloud3.png",
-  "/images/clouds/cloud4.png",
-  "/images/clouds/cloud5.png",
-  "/images/clouds/cloud6.png",
-  "/images/clouds/cloud7.png",
+  "/images/clouds/cloud1.webp",
+  "/images/clouds/cloud2.webp",
+  "/images/clouds/cloud3.webp",
+  "/images/clouds/cloud4.webp",
+  "/images/clouds/cloud5.webp",
+  "/images/clouds/cloud6.webp",
+  "/images/clouds/cloud7.webp",
 ];
 
 // Vordefinierte, aber „zufällig“ wirkende Konfigurationen für 8 Wolken

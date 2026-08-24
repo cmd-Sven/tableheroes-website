@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 import type { NewsPost } from "@/src/lib/constants/news";
 
-const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
+const PLACEHOLDER_IMAGE = "/images/dark-marmor.webp";
 
 function resolveNewsImageUrl(url: string | null | undefined): string {
   if (!url?.trim()) return PLACEHOLDER_IMAGE;
@@ -53,7 +53,7 @@ export function NewsSection() {
         className="pointer-events-none absolute inset-0 z-0"
         aria-hidden="true"
         style={{
-          backgroundImage: "url('/images/foggy-forest.jpg')",
+          backgroundImage: "url('/images/foggy-forest.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",
@@ -92,14 +92,14 @@ export function NewsSection() {
 
           .news-mist-layer-1 {
             top: 55%;
-            background-image: url("/images/clouds/cloud3.png");
+            background-image: url("/images/clouds/cloud3.webp");
             animation-duration: 160s;
             animation-delay: -40s;
           }
 
           .news-mist-layer-2 {
             top: 35%;
-            background-image: url("/images/clouds/cloud5.png");
+            background-image: url("/images/clouds/cloud5.webp");
             filter: blur(20px);
             opacity: 0.24;
             animation-duration: 210s;
@@ -108,7 +108,7 @@ export function NewsSection() {
 
           .news-mist-layer-3 {
             top: 15%;
-            background-image: url("/images/clouds/cloud7.png");
+            background-image: url("/images/clouds/cloud7.webp");
             filter: blur(20px);
             opacity: 0.14;
             animation-duration: 260s;
@@ -170,7 +170,7 @@ export function NewsSection() {
                 }}
                 className="rounded-lg border border-hero-border/60 bg-background-card/90 shadow-lg overflow-hidden flex flex-col cursor-pointer transition-opacity hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-hero-vibrant focus:ring-offset-2 focus:ring-offset-background-dark"
                 style={{
-                  backgroundImage: "url('/images/dark-marmor.jpg')",
+                  backgroundImage: "url('/images/dark-marmor.webp')",
                   backgroundSize: "cover",
                 }}
               >
@@ -221,7 +221,7 @@ export function NewsSection() {
             className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-lg border border-hero-dark bg-background-card shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
             style={{
-              backgroundImage: "url('/images/dark-marmor.jpg')",
+              backgroundImage: "url('/images/dark-marmor.webp')",
               backgroundSize: "cover",
             }}
           >
@@ -273,7 +273,7 @@ export function NewsSection() {
         <div
           className="w-full h-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "bottom center",

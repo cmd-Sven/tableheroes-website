@@ -38,7 +38,7 @@ export function CatalogList({ items, totalPoints, userId }: Props) {
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-12 shadow-lg text-center"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -58,7 +58,7 @@ export function CatalogList({ items, totalPoints, userId }: Props) {
     <section
       className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
       }}
     >

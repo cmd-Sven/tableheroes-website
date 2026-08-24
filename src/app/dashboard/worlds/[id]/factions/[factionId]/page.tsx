@@ -206,7 +206,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
         className="rounded-lg p-6 relative overflow-hidden shadow-xl"
         style={{
           border: "2px solid rgba(202, 185, 38, 0.5)",
-          backgroundImage: "url('/images/grunge-paper-background.jpg')",
+          backgroundImage: "url('/images/grunge-paper-background.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",
@@ -250,7 +250,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
               className="rounded-lg p-6 relative overflow-hidden shadow-xl"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/dark-marmor.jpg')",
+                backgroundImage: "url('/images/dark-marmor.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -272,7 +272,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
               className="rounded-lg p-6 relative overflow-hidden shadow-xl"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/dark-marmor.jpg')",
+                backgroundImage: "url('/images/dark-marmor.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -294,7 +294,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
               className="rounded-lg p-6 relative overflow-hidden shadow-xl md:col-span-2"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/dark-marmor.jpg')",
+                backgroundImage: "url('/images/dark-marmor.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -316,7 +316,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
               className="rounded-lg p-6 relative overflow-hidden shadow-xl md:col-span-2"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/scroll-paper.png')",
+                backgroundImage: "url('/images/scroll-paper.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -382,7 +382,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
           className="rounded-lg p-6 relative overflow-hidden shadow-xl"
           style={{
             border: "2px solid rgba(202, 185, 38, 0.5)",
-            backgroundImage: "url('/images/dark-wood.jpg')",
+            backgroundImage: "url('/images/dark-wood.webp')",
             backgroundSize: "cover",
             backgroundRepeat: "no-repeat",
             backgroundPosition: "center",

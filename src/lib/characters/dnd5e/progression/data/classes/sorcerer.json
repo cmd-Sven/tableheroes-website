@@ -4,7 +4,7 @@
   "nameDe": "Zauberer",
   "hitDie": 6,
   "caster": "full",
-  "subclassLevel": 1,
+  "subclassLevel": 3,
   "asiLevels": [
     4,
     8,
@@ -16,8 +16,7 @@
     {
       "level": 1,
       "featureIds": [
-        "spellcasting-sorcerer",
-        "sorcerous-origin"
+        "spellcasting-sorcerer"
       ],
       "spellSlots": {
         "1": 2
@@ -41,6 +40,7 @@
     {
       "level": 3,
       "featureIds": [
+        "sorcerous-origin",
         "metamagic-1"
       ],
       "spellSlots": {
@@ -325,11 +325,11 @@
     },
     {
       "id": "sorcerous-origin",
-      "level": 1,
+      "level": 3,
       "nameEn": "Sorcerous Origin",
       "nameDe": "Zaubererursprung",
-      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 1st level and again at 6th, 14th, and 18th level.",
-      "descriptionDe": "Du wählst den Ursprung deiner Zauberkraft.",
+      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 3rd level and again at 6th, 14th, and 18th level.",
+      "descriptionDe": "Du wählst auf der 3. Stufe den Ursprung deiner Zauberkraft, etwa Drachenblut. Deine Wahl verleiht dir Merkmale auf der 3., 6., 14. und 18. Stufe.",
       "subclass": null
     },
     {
@@ -382,7 +382,7 @@
       "level": 6,
       "nameEn": "Sorcerous Origin feature",
       "nameDe": "Merkmal des Zaubererursprungs",
-      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 1st level and again at 6th, 14th, and 18th level.",
+      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 3rd level and again at 6th, 14th, and 18th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Zaubererursprungs.",
       "subclass": null
     },
@@ -418,7 +418,7 @@
       "level": 14,
       "nameEn": "Sorcerous Origin feature",
       "nameDe": "Merkmal des Zaubererursprungs",
-      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 1st level and again at 6th, 14th, and 18th level.",
+      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 3rd level and again at 6th, 14th, and 18th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Zaubererursprungs.",
       "subclass": null
     },
@@ -445,7 +445,7 @@
       "level": 18,
       "nameEn": "Sorcerous Origin feature",
       "nameDe": "Merkmal des Zaubererursprungs",
-      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 1st level and again at 6th, 14th, and 18th level.",
+      "descriptionEn": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 3rd level and again at 6th, 14th, and 18th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Zaubererursprungs.",
       "subclass": null
     },
@@ -469,20 +469,20 @@
     },
     {
       "id": "dragon-ancestor",
-      "level": 1,
+      "level": 3,
       "nameEn": "Dragon Ancestor",
       "nameDe": "Drachenvorfahre",
-      "descriptionEn": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check.",
-      "descriptionDe": "Auf der 1. Stufe wählst du aus, von welcher Art dein drakonischer Vorfahre war. Die damit zusammenhängende Schadensart wird in den Fähigkeiten angewendet, die du später erlangst.\n\nDrache\nSchadensart\n\nBlau\nBlitz\n\nBronze\nBlitz\n\nGold\nFeuer\n\nGrün\nGift\n\nKupfer\nSäure\n\nMessing\nFeuer\n\nRot\nFeuer\n\nSchwarz\nSäure\n\nSilber\nKälte\n\nWeiß\nKälte\n\nDu kannst Drakonisch lesen, schreiben und sprechen. Außerdem darfst du immer, wenn du einen Charismawurf bei der Interaktion mit einem Drachen ablegen musst, deinen Übungsbonus verdoppeln, wenn er auf diesen Wurf angewendet werden kann.",
+      "descriptionEn": "At 3rd level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check.",
+      "descriptionDe": "Auf der 3. Stufe wählst du aus, von welcher Art dein drakonischer Vorfahre war. Die damit zusammenhängende Schadensart wird in den Fähigkeiten angewendet, die du später erlangst.\n\nDrache\nSchadensart\n\nBlau\nBlitz\n\nBronze\nBlitz\n\nGold\nFeuer\n\nGrün\nGift\n\nKupfer\nSäure\n\nMessing\nFeuer\n\nRot\nFeuer\n\nSchwarz\nSäure\n\nSilber\nKälte\n\nWeiß\nKälte\n\nDu kannst Drakonisch lesen, schreiben und sprechen. Außerdem darfst du immer, wenn du einen Charismawurf bei der Interaktion mit einem Drachen ablegen musst, deinen Übungsbonus verdoppeln, wenn er auf diesen Wurf angewendet werden kann.",
       "subclass": "draconic"
     },
     {
       "id": "draconic-resilience",
-      "level": 1,
+      "level": 3,
       "nameEn": "Draconic Resilience",
       "nameDe": "Drakonische Widerstandskraft",
-      "descriptionEn": "As magic flows through your body, it causes physical traits of your dragon ancestors to emerge. At 1st level, your hit point maximum increases by 1 and increases by 1 again whenever you gain a level in this class.\n\nAdditionally, parts of your skin are covered by a thin sheen of dragon-like scales. When you aren't wearing armor, your AC equals 13 + your Dexterity modifier.",
-      "descriptionDe": "Die dich durchfließende Magie lässt körperliche Anzeichen deiner Abstammung hervortreten. Auf der 1. Stufe erhöht sich dein Trefferpunktemaximum um 1, und auf jeder weiteren Stufe dieser Klasse erneut um 1. Außerdem sind Teile deiner Haut mit einer dünnen Schicht drachenartiger Schuppen bedeckt. Wenn du keine Rüstung trägst, ist deine Rüstungsklasse 13 + deinem Geschicklichkeitsmodifikator.",
+      "descriptionEn": "As magic flows through your body, it causes physical traits of your dragon ancestors to emerge. At 3rd level, your hit point maximum increases by 1 and increases by 1 again whenever you gain a level in this class.\n\nAdditionally, parts of your skin are covered by a thin sheen of dragon-like scales. When you aren't wearing armor, your AC equals 13 + your Dexterity modifier.",
+      "descriptionDe": "Die dich durchfließende Magie lässt körperliche Anzeichen deiner Abstammung hervortreten. Auf der 3. Stufe erhöht sich dein Trefferpunktemaximum um 1, und auf jeder weiteren Stufe dieser Klasse erneut um 1. Außerdem sind Teile deiner Haut mit einer dünnen Schicht drachenartiger Schuppen bedeckt. Wenn du keine Rüstung trägst, ist deine Rüstungsklasse 13 + deinem Geschicklichkeitsmodifikator.",
       "subclass": "draconic"
     },
     {
@@ -521,20 +521,20 @@
       "features": [
         {
           "id": "dragon-ancestor",
-          "level": 1,
+          "level": 3,
           "nameEn": "Dragon Ancestor",
           "nameDe": "Drachenvorfahre",
-          "descriptionEn": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check.",
-          "descriptionDe": "Auf der 1. Stufe wählst du aus, von welcher Art dein drakonischer Vorfahre war. Die damit zusammenhängende Schadensart wird in den Fähigkeiten angewendet, die du später erlangst.\n\nDrache\nSchadensart\n\nBlau\nBlitz\n\nBronze\nBlitz\n\nGold\nFeuer\n\nGrün\nGift\n\nKupfer\nSäure\n\nMessing\nFeuer\n\nRot\nFeuer\n\nSchwarz\nSäure\n\nSilber\nKälte\n\nWeiß\nKälte\n\nDu kannst Drakonisch lesen, schreiben und sprechen. Außerdem darfst du immer, wenn du einen Charismawurf bei der Interaktion mit einem Drachen ablegen musst, deinen Übungsbonus verdoppeln, wenn er auf diesen Wurf angewendet werden kann.",
+          "descriptionEn": "At 3rd level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check.",
+          "descriptionDe": "Auf der 3. Stufe wählst du aus, von welcher Art dein drakonischer Vorfahre war. Die damit zusammenhängende Schadensart wird in den Fähigkeiten angewendet, die du später erlangst.\n\nDrache\nSchadensart\n\nBlau\nBlitz\n\nBronze\nBlitz\n\nGold\nFeuer\n\nGrün\nGift\n\nKupfer\nSäure\n\nMessing\nFeuer\n\nRot\nFeuer\n\nSchwarz\nSäure\n\nSilber\nKälte\n\nWeiß\nKälte\n\nDu kannst Drakonisch lesen, schreiben und sprechen. Außerdem darfst du immer, wenn du einen Charismawurf bei der Interaktion mit einem Drachen ablegen musst, deinen Übungsbonus verdoppeln, wenn er auf diesen Wurf angewendet werden kann.",
           "subclass": "draconic"
         },
         {
           "id": "draconic-resilience",
-          "level": 1,
+          "level": 3,
           "nameEn": "Draconic Resilience",
           "nameDe": "Drakonische Widerstandskraft",
-          "descriptionEn": "As magic flows through your body, it causes physical traits of your dragon ancestors to emerge. At 1st level, your hit point maximum increases by 1 and increases by 1 again whenever you gain a level in this class.\n\nAdditionally, parts of your skin are covered by a thin sheen of dragon-like scales. When you aren't wearing armor, your AC equals 13 + your Dexterity modifier.",
-          "descriptionDe": "Die dich durchfließende Magie lässt körperliche Anzeichen deiner Abstammung hervortreten. Auf der 1. Stufe erhöht sich dein Trefferpunktemaximum um 1, und auf jeder weiteren Stufe dieser Klasse erneut um 1. Außerdem sind Teile deiner Haut mit einer dünnen Schicht drachenartiger Schuppen bedeckt. Wenn du keine Rüstung trägst, ist deine Rüstungsklasse 13 + deinem Geschicklichkeitsmodifikator.",
+          "descriptionEn": "As magic flows through your body, it causes physical traits of your dragon ancestors to emerge. At 3rd level, your hit point maximum increases by 1 and increases by 1 again whenever you gain a level in this class.\n\nAdditionally, parts of your skin are covered by a thin sheen of dragon-like scales. When you aren't wearing armor, your AC equals 13 + your Dexterity modifier.",
+          "descriptionDe": "Die dich durchfließende Magie lässt körperliche Anzeichen deiner Abstammung hervortreten. Auf der 3. Stufe erhöht sich dein Trefferpunktemaximum um 1, und auf jeder weiteren Stufe dieser Klasse erneut um 1. Außerdem sind Teile deiner Haut mit einer dünnen Schicht drachenartiger Schuppen bedeckt. Wenn du keine Rüstung trägst, ist deine Rüstungsklasse 13 + deinem Geschicklichkeitsmodifikator.",
           "subclass": "draconic"
         },
         {

@@ -9,7 +9,7 @@ const NEW_BADGE_STYLE =
   "absolute top-2 right-2 z-10 rounded-full bg-accent-gold/90 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-background-dark shadow-md";
 const NEW_GLOW_STYLE = "shadow-[0_0_15px_rgba(212,175,55,0.5)] animate-pulse";
 const NEWS_IMAGE_BASE = "/images/news/";
-const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
+const PLACEHOLDER_IMAGE = "/images/dark-marmor.webp";
 
 /** Löst image_url auf: absoluter Pfad bleibt, reiner Dateiname wird zu /images/news/[dateiname]. */
 function resolveNewsImageUrl(url: string | null | undefined): string | null {
@@ -44,7 +44,7 @@ export function NewsInfoCard({
           hasNewContent ? NEW_GLOW_STYLE : ""
         }`}
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -117,7 +117,7 @@ export function NewsInfoCard({
             className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-lg border border-hero-dark bg-background-card shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
             style={{
-              backgroundImage: "url('/images/dark-marmor.jpg')",
+              backgroundImage: "url('/images/dark-marmor.webp')",
               backgroundSize: "cover",
             }}
           >

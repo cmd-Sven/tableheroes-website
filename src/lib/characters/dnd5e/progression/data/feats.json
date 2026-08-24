@@ -10,8 +10,8 @@
     "id": "alert",
     "nameEn": "Alert",
     "nameDe": "Wachsam",
-    "descriptionEn": "+5 to initiative; can't be surprised while conscious; hidden attackers don't gain advantage against you.",
-    "descriptionDe": "+5 Initiative; keine Überraschung bei Bewusstsein; versteckte Angreifer erhalten keinen Vorteil gegen dich."
+    "descriptionEn": "+Proficiency Bonus to initiative rolls; can't be surprised while conscious; hidden attackers don't gain advantage against you. At the start of combat, you can swap initiative with a willing ally that you can see and that is within 5 feet of you.",
+    "descriptionDe": "+Übungsbonus auf Initiative-Würfe; du kannst nicht überrascht werden, solange du bei Bewusstsein bist; versteckte Angreifer erhalten keinen Vorteil gegen dich. Zu Beginn des Kampfes kannst du die Initiative mit einem willigen Verbündeten tauschen, den du sehen kannst und der sich innerhalb von 1,50 m zu dir befindet."
   },
   {
     "id": "athlete",
@@ -91,8 +91,8 @@
     "id": "healer",
     "nameEn": "Healer",
     "nameDe": "Heiler",
-    "descriptionEn": "Stabilize with healer's kit restores 1 HP. As action with healer's kit: creature regains 1d6 + 4 + its Hit Dice count HP (once per short/long rest per creature).",
-    "descriptionDe": "Stabilisieren mit Heilerwerkzeug: 1 TP. Aktion mit Heilerwerkzeug: 1W6+4+Trefferwürfel-Anzahl TP (1× pro Rast und Kreatur)."
+    "descriptionEn": "As an action, spend one use from a healer's kit to restore 1d6 + Proficiency Bonus HP to a creature within 5 feet. Once per Short Rest per creature.",
+    "descriptionDe": "Als Aktion: Verbrauche eine Anwendung aus einem Heilerwerkzeug, um einer Kreatur innerhalb von 1,50 m 1W6 + Übungsbonus TP zu heilen. Einmal pro kurze Rast und pro Kreatur."
   },
   {
     "id": "heavily-armored",
@@ -146,8 +146,8 @@
     "id": "lucky",
     "nameEn": "Lucky",
     "nameDe": "Glückspilz",
-    "descriptionEn": "You have 3 luck points. Spend one to roll an additional d20 for an attack, check, or save (or force a reroll against you). Regain on long rest.",
-    "descriptionDe": "3 Glückspunkte. Für Angriff, Probe oder Rettungswurf zusätzlichen W20 würfeln (oder Angreifer neu würfeln lassen). Zurück nach langer Rast."
+    "descriptionEn": "You have 3 Luck Points, regained on a Long Rest. Spend one point to gain Advantage on a d20 test, or impose Disadvantage on an attack roll against you.",
+    "descriptionDe": "Du hast 3 Glückspunkte, die du nach einer langen Rast zurückbekommst. Verbrauche einen Punkt, um für einen W20-Test Vorteil zu erhalten, oder um Nachteil auf einen Angriffswurf gegen dich zu legen."
   },
   {
     "id": "mage-slayer",
@@ -162,6 +162,41 @@
     "nameDe": "Zauberadept",
     "descriptionEn": "Choose a class: bard, cleric, druid, sorcerer, warlock, or wizard. Learn two cantrips and one 1st-level spell from that list (cast 1st-level once per long rest without a slot).",
     "descriptionDe": "Klasse wählen: zwei Zaubertricks + ein Grad-1-Zauber der Liste (Grad 1 1×/lange Rast ohne Slot)."
+  },
+  {
+    "id": "magic-initiate-cleric",
+    "nameEn": "Magic Initiate (Cleric)",
+    "nameDe": "Zauberadept (Kleriker)",
+    "descriptionEn": "You learn two cleric cantrips and one 1st-level cleric spell. Cast the 1st-level spell once per Long Rest without a spell slot. Wisdom is your spellcasting ability.",
+    "descriptionDe": "Du lernst zwei Zaubertricks des Klerikers und einen Grad-1-Zauber des Klerikers. Wirke den Grad-1-Zauber 1× pro lange Rast ohne Zauberplatz. Weisheit ist deine Zauberwirkungsfähigkeit."
+  },
+  {
+    "id": "magic-initiate-druid",
+    "nameEn": "Magic Initiate (Druid)",
+    "nameDe": "Zauberadept (Druide)",
+    "descriptionEn": "You learn two druid cantrips and one 1st-level druid spell. Cast the 1st-level spell once per Long Rest without a spell slot. Wisdom is your spellcasting ability.",
+    "descriptionDe": "Du lernst zwei Zaubertricks des Druiden und einen Grad-1-Zauber des Druiden. Wirke den Grad-1-Zauber 1× pro lange Rast ohne Zauberplatz. Weisheit ist deine Zauberwirkungsfähigkeit."
+  },
+  {
+    "id": "magic-initiate-wizard",
+    "nameEn": "Magic Initiate (Wizard)",
+    "nameDe": "Zauberadept (Magier)",
+    "descriptionEn": "You learn two wizard cantrips and one 1st-level wizard spell. Cast the 1st-level spell once per Long Rest without a spell slot. Intelligence is your spellcasting ability.",
+    "descriptionDe": "Du lernst zwei Zaubertricks des Magiers und einen Grad-1-Zauber des Magiers. Wirke den Grad-1-Zauber 1× pro lange Rast ohne Zauberplatz. Intelligenz ist deine Zauberwirkungsfähigkeit."
+  },
+  {
+    "id": "crafter",
+    "nameEn": "Crafter",
+    "nameDe": "Handwerker",
+    "descriptionEn": "You gain proficiency with three Artisan's Tools. Tools and items you craft cost 20% less. Once per Long Rest, you can craft a small mundane item from materials at hand.",
+    "descriptionDe": "Du erhältst Übung in drei Arten von Handwerkszeug. Werkzeuge und Gegenstände, die du herstellst, kosten 20 % weniger. 1× pro lange Rast kannst du aus den vorhandenen Materialien einen kleinen gewöhnlichen Gegenstand herstellen."
+  },
+  {
+    "id": "musician",
+    "nameEn": "Musician",
+    "nameDe": "Musiker",
+    "descriptionEn": "You gain proficiency with three musical instruments. Spend 10 minutes playing to give up to six allies a Heroic Inspiration die.",
+    "descriptionDe": "Du erhältst Übung in drei Musikinstrumenten. Verbringe 10 Minuten mit Spielen, um bis zu sechs Verbündeten eine heldenhafte Inspiration zu geben."
   },
   {
     "id": "martial-adept",
@@ -287,8 +322,8 @@
     "id": "tavern-brawler",
     "nameEn": "Tavern Brawler",
     "nameDe": "Wirtshausschläger",
-    "descriptionEn": "Strength or Constitution +1. Proficiency with improvised weapons; unarmed 1d4. Bonus action grapple after hitting with unarmed or improvised weapon.",
-    "descriptionDe": "STR oder KO +1. Improvisierte Waffen; waffenlos 1W4. Bonusaktion Festhalten nach Treffer."
+    "descriptionEn": "You can reroll the damage when you deal unarmed strike damage and roll a 1. Unarmed strikes deal d4 + Strength modifier damage. Once per turn, when you hit a creature with an unarmed strike, you can knock it Prone. You treat improvised weapons as if you were proficient with them.",
+    "descriptionDe": "Du kannst den Schadenswurf erneut würfeln, wenn du beim Schaden eines waffenlosen Schlages eine 1 würfelst. Waffenlose Treffer verursachen W4 + Stärkemodifikator Schaden. 1× pro Zug: Wenn du eine Kreatur mit einem waffenlosen Schlag triffst, kannst du sie niederwerfen. Improvisierte Waffen behandelst du, als wärst du damit geübt."
   },
   {
     "id": "tough",

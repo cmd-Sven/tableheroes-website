@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { dieScale } from "@/src/lib/session/dice-3d-math";
 import {
@@ -13,10 +13,10 @@ import {
 } from "@/src/lib/session/dice-physics";
 import {
   dieNatHighlight,
-  natHighlightLabelDe,
   type DieNatHighlight,
 } from "@/src/lib/session/dice-nat-highlight";
 import type { DiceSkinId } from "@/src/lib/session/dice-skins";
+import { getDiceSkin } from "@/src/lib/session/dice-skins";
 import { DieFaceMesh } from "./DieFaceMesh";
 
 type DieMeshProps = {
@@ -32,41 +32,6 @@ type DieMeshProps = {
   skinId?: DiceSkinId | null;
   onSettled?: (index: number) => void;
 };
-
-function DieNatRevealBadge({ kind }: { kind: DieNatHighlight }) {
-  const isCrit = kind === "crit";
-  return (
-    <div
-      className={`pointer-events-none flex flex-col items-center gap-1 ${
-        isCrit ? "animate-pulse" : ""
-      }`}
-      style={{ transform: "translateY(-52px)" }}
-    >
-      <div
-        className={`rounded-full border-2 ${
-          isCrit
-            ? "border-accent-gold bg-accent-gold/15"
-            : "border-accent-blood bg-accent-blood/20"
-        }`}
-        style={{
-          width: 56,
-          height: 56,
-          boxShadow: isCrit
-            ? "0 0 22px rgba(202,185,38,0.75), inset 0 0 12px rgba(202,185,38,0.25)"
-            : "0 0 18px rgba(88,24,13,0.65), inset 0 0 10px rgba(88,24,13,0.3)",
-        }}
-      />
-      <span
-        className={`whitespace-nowrap rounded px-1.5 py-0.5 text-center font-barlow text-[9px] font-bold uppercase tracking-wide drop-shadow-lg ${
-          isCrit ? "text-accent-gold" : "text-accent-blood"
-        }`}
-      >
-        {isCrit ? "⚡ " : "💀 "}
-        {natHighlightLabelDe(kind)}
-      </span>
-    </div>
-  );
-}
 
 function AnimatedDie({
   sides,
@@ -130,11 +95,8 @@ function AnimatedDie({
       {highlight === "fumble" ? (
         <pointLight color="#58180D" intensity={1.6} distance={1.8} decay={2} />
       ) : null}
-      {highlight ? (
-        <Html center distanceFactor={8} style={{ pointerEvents: "none" }}>
-          <DieNatRevealBadge kind={highlight} />
-        </Html>
-      ) : null}
+      {/* Kein drei <Html>: Portal/Suspense kann Next „Rendering…“ und den Canvas blockieren.
+          Crit/Patzer-Feedback läuft über DiceRollMoodFx (DOM) im AnimationLayer. */}
     </group>
   );
 }
@@ -179,6 +141,7 @@ export function DiceRollScene({
   onAllSettledRef.current = onAllSettled;
 
   const rollKey = `${seed}:${faces.join(",")}:${aimX}:${aimZ}:${throwDirX}:${throwDirZ}:${throwStrength}:${isTap}`;
+  const needsChromeEnv = getDiceSkin(skinId).pattern === "chrome";
 
   const { trajectories, durationMs } = useMemo(
     () =>
@@ -226,8 +189,11 @@ export function DiceRollScene({
 
   return (
     <>
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[2, 10, 1]} intensity={1.1} castShadow />
+      {needsChromeEnv ? (
+        <Environment preset="city" environmentIntensity={0.55} />
+      ) : null}
+      <ambientLight intensity={needsChromeEnv ? 0.65 : 0.85} />
+      <directionalLight position={[2, 10, 1]} intensity={needsChromeEnv ? 1.35 : 1.1} castShadow />
       <pointLight position={[-2, 6, -1]} intensity={0.35} color="#cab926" />
       {faces.map((face, i) => {
         const dieS = dieSides?.[i] ?? sides;

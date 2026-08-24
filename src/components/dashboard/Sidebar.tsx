@@ -587,7 +587,7 @@ export function Sidebar({
           isInCampaign
             ? {
                 backgroundColor: "#0d1f0a",
-                backgroundImage: "url('/images/dark-wood.jpg')",
+                backgroundImage: "url('/images/dark-wood.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",

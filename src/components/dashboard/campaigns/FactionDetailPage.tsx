@@ -809,7 +809,7 @@ export function FactionDetailPage({
             className="rounded-lg shadow-xl transition-shadow duration-300 relative"
             style={{
               border: "2px solid rgba(202, 185, 38, 0.5)",
-              backgroundImage: "url('/images/grunge-paper-background.jpg')",
+              backgroundImage: "url('/images/grunge-paper-background.webp')",
               backgroundSize: "cover",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center",
@@ -875,7 +875,7 @@ export function FactionDetailPage({
             className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
             style={{
               border: "2px solid rgba(202, 185, 38, 0.5)",
-              backgroundImage: "url('/images/grunge-paper-background.jpg')",
+              backgroundImage: "url('/images/grunge-paper-background.webp')",
               backgroundSize: "cover",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center",
@@ -954,7 +954,7 @@ export function FactionDetailPage({
                   className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
                   style={{
                     border: "2px solid rgba(202, 185, 38, 0.5)",
-                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundImage: "url('/images/scroll-paper.webp')",
                     backgroundSize: "cover",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
@@ -978,7 +978,7 @@ export function FactionDetailPage({
                   className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
                   style={{
                     border: "2px solid rgba(202, 185, 38, 0.5)",
-                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundImage: "url('/images/scroll-paper.webp')",
                     backgroundSize: "cover",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
@@ -1002,7 +1002,7 @@ export function FactionDetailPage({
                   className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
                   style={{
                     border: "2px solid rgba(202, 185, 38, 0.5)",
-                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundImage: "url('/images/scroll-paper.webp')",
                     backgroundSize: "cover",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
@@ -1026,7 +1026,7 @@ export function FactionDetailPage({
                   className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
                   style={{
                     border: "2px solid rgba(202, 185, 38, 0.5)",
-                    backgroundImage: "url('/images/scroll-paper.png')",
+                    backgroundImage: "url('/images/scroll-paper.webp')",
                     backgroundSize: "cover",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
@@ -1085,7 +1085,7 @@ export function FactionDetailPage({
             className="rounded-lg relative overflow-hidden shadow-xl transition-shadow duration-300"
             style={{
               border: "2px solid rgba(202, 185, 38, 0.5)",
-              backgroundImage: "url('/images/grunge-paper-background.jpg')",
+              backgroundImage: "url('/images/grunge-paper-background.webp')",
               backgroundSize: "cover",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center",
@@ -1140,7 +1140,7 @@ export function FactionDetailPage({
                 className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
                 style={{
                   border: "2px solid rgba(202, 185, 38, 0.5)",
-                  backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                  backgroundImage: "url('/images/grunge-paper-background.webp')",
                   backgroundSize: "cover",
                   backgroundRepeat: "no-repeat",
                   backgroundPosition: "center",
@@ -1195,7 +1195,7 @@ export function FactionDetailPage({
               className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                backgroundImage: "url('/images/grunge-paper-background.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -1261,7 +1261,7 @@ export function FactionDetailPage({
               className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
               style={{
                 border: "2px solid rgba(202, 185, 38, 0.5)",
-                backgroundImage: "url('/images/dark-wood.jpg')",
+                backgroundImage: "url('/images/dark-wood.webp')",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -1331,7 +1331,7 @@ export function FactionDetailPage({
             className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300"
             style={{
               border: "2px solid rgba(202, 185, 38, 0.5)",
-              backgroundImage: "url('/images/dark-wood.jpg')",
+              backgroundImage: "url('/images/dark-wood.webp')",
               backgroundSize: "cover",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center",

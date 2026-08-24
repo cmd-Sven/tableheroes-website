@@ -85,7 +85,7 @@ export function WorldMapCard({ world }: Props) {
       transition={{ duration: 0.3 }}
       className="group relative h-full flex flex-col rounded-lg border-2 border-transparent overflow-hidden transition-all duration-300 ease-in-out hover:scale-[1.02] hover:border-[#C5A572] hover:shadow-xl"
         style={{
-          backgroundImage: "url('/images/grunge-paper-background.jpg')",
+          backgroundImage: "url('/images/grunge-paper-background.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

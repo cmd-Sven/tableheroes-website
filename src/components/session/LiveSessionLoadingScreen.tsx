@@ -1,8 +1,16 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Loader2, Shield, Swords, Map, Users, Dices } from "lucide-react";
-import Image from "next/image";
+/**
+ * LiveSessionLoadingScreen — Cinematic intro video gate before the live board unlocks.
+ */
+
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
+/** Public URL for the session intro cinematic (file lives in `public/videos/`). */
+export const LIVE_SESSION_INTRO_VIDEO_SRC = "/videos/intro-session.mp4";
+
+const OVERLAY_APPEAR_AT_SEC = 7;
 
 export type PreloadStep = {
   id: string;
@@ -11,103 +19,109 @@ export type PreloadStep = {
   status: "pending" | "loading" | "done" | "error";
 };
 
-const STEP_ICONS = {
-  shield: Shield,
-  swords: Swords,
-  map: Map,
-  users: Users,
-  dices: Dices,
-} as const;
-
 type Props = {
-  steps: PreloadStep[];
-  progress: number;
-  message?: string;
+  characterName: string;
+  onContinue: () => void;
 };
 
-export function LiveSessionLoadingScreen({ steps, progress, message }: Props) {
+export function LiveSessionLoadingScreen({ characterName, onContinue }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const overlayShownRef = useRef(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [videoEnded, setVideoEnded] = useState(false);
+
+  const revealOverlay = useCallback(() => {
+    if (overlayShownRef.current) return;
+    overlayShownRef.current = true;
+    setShowOverlay(true);
+  }, []);
+
+  const markVideoFinished = useCallback(() => {
+    revealOverlay();
+    setVideoEnded(true);
+  }, [revealOverlay]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = false;
+    const playAttempt = video.play();
+    if (playAttempt) {
+      void playAttempt.catch(() => {
+        video.muted = true;
+        void video.play().catch(() => {
+          markVideoFinished();
+        });
+      });
+    }
+  }, [markVideoFinished]);
+
+  const handleTimeUpdate = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      if (event.currentTarget.currentTime >= OVERLAY_APPEAR_AT_SEC) {
+        revealOverlay();
+      }
+    },
+    [revealOverlay],
+  );
+
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background-dark">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="flex w-full max-w-md flex-col items-center gap-8 px-6"
-      >
-        <Image
-          src="/images/logo/tableheroes_logo.webp"
-          alt="TableHeroes"
-          width={180}
-          height={60}
-          priority
-          className="opacity-90"
-        />
+    <div className="fixed inset-0 z-[200] overflow-hidden bg-background-dark">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        src={LIVE_SESSION_INTRO_VIDEO_SRC}
+        autoPlay
+        playsInline
+        preload="auto"
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={markVideoFinished}
+        onError={markVideoFinished}
+        aria-label="Session-Intro"
+      />
 
-        <h1 className="font-barlow text-2xl font-extrabold uppercase tracking-wide text-hero-vibrant">
-          Session wird geladen…
-        </h1>
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-black/55 via-transparent to-background-dark/80" />
 
-        {message && (
-          <p className="text-center font-libre text-sm text-gray-400">
-            {message}
-          </p>
-        )}
-
-        {/* Progress bar */}
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-background-card border border-hero-dark">
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-hero-dark to-hero-vibrant"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ type: "spring", damping: 30, stiffness: 120 }}
-          />
+      <div className="absolute inset-0 flex flex-col">
+        <div className="flex flex-1 items-start justify-center px-6 pt-[12vh] sm:pt-[14vh]">
+          <AnimatePresence>
+            {showOverlay ? (
+              <motion.p
+                key="ready-overlay"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="max-w-3xl text-center font-cinzel text-2xl font-bold leading-snug text-accent-gold drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-3xl md:text-4xl"
+              >
+                {characterName}, mach Dich bereit für Dein Abenteuer!
+              </motion.p>
+            ) : null}
+          </AnimatePresence>
         </div>
 
-        {/* Steps */}
-        <ul className="flex w-full flex-col gap-3">
-          {steps.map((step) => {
-            const Icon = STEP_ICONS[step.icon];
-            return (
-              <li
-                key={step.id}
-                className="flex items-center gap-3 font-barlow text-sm uppercase tracking-wide"
+        <div className="flex items-end justify-center px-6 pb-16 sm:pb-20">
+          <AnimatePresence>
+            {videoEnded ? (
+              <motion.button
+                key="continue-btn"
+                type="button"
+                initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: "easeOut" }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onContinue}
+                className="pointer-events-auto rounded border-2 border-accent-gold/80 bg-background-card/90 px-10 py-4 font-cinzel text-lg font-bold tracking-wide text-accent-gold shadow-[0_0_24px_rgba(202,185,38,0.25)] backdrop-blur-sm transition-colors hover:border-accent-gold hover:bg-background-card hover:text-accent-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold sm:text-xl"
               >
-                <span className="flex h-7 w-7 items-center justify-center">
-                  {step.status === "loading" ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-accent-gold" />
-                  ) : (
-                    <Icon
-                      className={`h-5 w-5 ${
-                        step.status === "done"
-                          ? "text-hero-vibrant"
-                          : step.status === "error"
-                            ? "text-red-400"
-                            : "text-gray-600"
-                      }`}
-                    />
-                  )}
-                </span>
-                <span
-                  className={
-                    step.status === "done"
-                      ? "text-gray-200"
-                      : step.status === "loading"
-                        ? "text-accent-gold"
-                        : step.status === "error"
-                          ? "text-red-300"
-                          : "text-gray-600"
-                  }
-                >
-                  {step.label}
-                </span>
-                {step.status === "done" && (
-                  <span className="ml-auto text-hero-vibrant">✓</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </motion.div>
+                Abenteuer fortsetzen
+              </motion.button>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }

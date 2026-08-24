@@ -16,7 +16,7 @@ export function DailyComicCard({ src }: Props) {
       <div
         className="rounded-lg border border-hero-border/40 bg-hero-dark/20 overflow-hidden flex flex-col items-center justify-center min-h-[180px]"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >

@@ -4,7 +4,7 @@
   "nameDe": "Hexer",
   "hitDie": 8,
   "caster": "pact",
-  "subclassLevel": 1,
+  "subclassLevel": 3,
   "asiLevels": [
     4,
     8,
@@ -16,7 +16,6 @@
     {
       "level": 1,
       "featureIds": [
-        "otherworldly-patron",
         "pact-magic"
       ],
       "spellSlots": {
@@ -39,6 +38,7 @@
     {
       "level": 3,
       "featureIds": [
+        "otherworldly-patron",
         "pact-boon"
       ],
       "spellSlots": {
@@ -230,11 +230,11 @@
   "features": [
     {
       "id": "otherworldly-patron",
-      "level": 1,
+      "level": 3,
       "nameEn": "Otherworldly Patron",
       "nameDe": "Andersweltlicher Schutzherr",
-      "descriptionEn": "At 1st level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 1st level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "Auf der 1. Stufe hast du einen Pakt mit einem andersweltlichen Wesen deiner Wahl geschlossen, wie etwa einem Unhold. Deine Wahl verleiht dir auf der 1., 6., 10. und 14. Stufe jeweils ein Merkmal.",
+      "descriptionEn": "At 3rd level, you have struck a bargain with an otherworldly being of your choice, such as the Fiend. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Auf der 3. Stufe hast du einen Pakt mit einem andersweltlichen Wesen deiner Wahl geschlossen, wie etwa einem Unhold. Deine Wahl verleiht dir auf der 3., 6., 10. und 14. Stufe jeweils ein Merkmal.",
       "subclass": null
     },
     {
@@ -383,11 +383,11 @@
     },
     {
       "id": "dark-ones-blessing",
-      "level": 1,
+      "level": 3,
       "nameEn": "Dark One's Blessing",
       "nameDe": "Segen des Dunklen Meisters",
-      "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
-      "descriptionDe": "Reduzierst du ab der 1. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
+      "descriptionEn": "Starting at 3rd level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+      "descriptionDe": "Reduzierst du ab der 3. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
       "subclass": "fiend"
     },
     {
@@ -426,11 +426,11 @@
       "features": [
         {
           "id": "dark-ones-blessing",
-          "level": 1,
+          "level": 3,
           "nameEn": "Dark One's Blessing",
           "nameDe": "Segen des Dunklen Meisters",
-          "descriptionEn": "Starting at 1st level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
-          "descriptionDe": "Reduzierst du ab der 1. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
+          "descriptionEn": "Starting at 3rd level, when you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+          "descriptionDe": "Reduzierst du ab der 3. Stufe eine feindliche Kreatur auf 0 Trefferpunkte, erhältst du temporäre Trefferpunkte in Höhe deines Charismamodifikators + deiner Stufe als Hexenmeister (mindestens 1).",
           "subclass": "fiend"
         },
         {

@@ -72,35 +72,39 @@ export function parseDiceBubbleParts(
   return [];
 }
 
-/** Kurztext für Würfel-Sprechblase aus Activity-Meta. */
+/** Kurztext für Würfel-Sprechblase aus Activity-Meta (inkl. Modifikatoren / Erschöpfung). */
 export function formatDiceSpeechBubbleText(meta: unknown, fallbackText?: string): string {
-  const parts = parseDiceBubbleParts(meta);
-  if (parts.length > 0) {
-    return parts.map((p) => String(p.value)).join(" · ");
-  }
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const row = meta as Record<string, unknown>;
-    const total = typeof row.total === "number" ? row.total : null;
-    const sides = typeof row.sides === "number" ? row.sides : null;
-    const label =
-      typeof row.label === "string" && row.label.trim()
-        ? row.label.trim()
-        : typeof row.weaponName === "string" && row.weaponName.trim()
-          ? row.weaponName.trim()
-          : null;
-
-    if (label && total != null) {
-      return `${label} → ${total}`;
-    }
-    if (sides != null && total != null) {
-      return `W${sides} → ${total}`;
-    }
+    // Chat-Breakdown (z. B. „15 − 2 = 13“) — enthält Erschöpfung & andere Mods
     if (typeof row.display === "string" && row.display.trim()) {
       return row.display.trim();
     }
-    if (typeof row.formula === "string" && row.formula.trim() && total != null) {
-      return `${row.formula.trim()} → ${total}`;
+    const total = typeof row.total === "number" ? row.total : null;
+    const used = typeof row.usedRoll === "number" ? row.usedRoll : null;
+    const mod = typeof row.modifier === "number" ? row.modifier : 0;
+    if (total != null && used != null && mod !== 0) {
+      const modStr = mod > 0 ? ` + ${mod}` : ` − ${Math.abs(mod)}`;
+      return `${used}${modStr} = ${total}`;
     }
+    if (total != null) {
+      const label =
+        typeof row.label === "string" && row.label.trim()
+          ? row.label.trim()
+          : typeof row.weaponName === "string" && row.weaponName.trim()
+            ? row.weaponName.trim()
+            : null;
+      if (label) return `${label} → ${total}`;
+      if (typeof row.formula === "string" && row.formula.trim()) {
+        return `${row.formula.trim()} → ${total}`;
+      }
+      return String(total);
+    }
+  }
+
+  const parts = parseDiceBubbleParts(meta);
+  if (parts.length > 0) {
+    return parts.map((p) => String(p.value)).join(" · ");
   }
 
   if (fallbackText?.trim()) {
@@ -116,7 +120,8 @@ export function chatSpeechBubbleTextFromEntry(entry: {
   type?: string | null;
   text?: string | null;
 }): string | null {
-  if (entry.type !== "player_action") return null;
+  const type = String(entry.type ?? "");
+  if (type !== "player_action" && type !== "chat" && type !== "message") return null;
   const text = (entry.text ?? "").trim();
   if (!text || EQUIPMENT_CHAT_SKIP_RE.test(text)) return null;
 

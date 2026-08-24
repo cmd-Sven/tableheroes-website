@@ -327,7 +327,7 @@ export function SecretsManager({ entityId, entityType, campaignId, isGM, refresh
                         : "border-hero-border group-hover:border-accent-gold group-hover:shadow-lg group-hover:shadow-accent-gold/20"
                     }`}
                     style={{
-                      backgroundImage: "url('/images/grunge-paper-background.jpg')",
+                      backgroundImage: "url('/images/grunge-paper-background.webp')",
                       backgroundSize: "cover",
                       backgroundRepeat: "no-repeat",
                       backgroundPosition: "center",

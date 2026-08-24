@@ -1,36 +1,128 @@
+/**
+ * LiveWorldMapOverlay — Fullscreen world map in live session with FoW/effects/draw/markers.
+ */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { X } from "lucide-react";
+import { toast } from "sonner";
+import { createClient } from "@/src/lib/supabase/client";
 import {
   getWorldMap,
   getWorldMapMarkers,
 } from "@/src/lib/actions/world-map-actions";
+import {
+  clearWorldMapEffectMarkers,
+  clearWorldMapEffectTemplates,
+  clearWorldMapFogShapes,
+  createWorldMapEffectMarker,
+  createWorldMapEffectTemplate,
+  createWorldMapFogShape,
+  listWorldMapEffectMarkers,
+  listWorldMapEffectTemplates,
+  listWorldMapFogShapes,
+  removeWorldMapEffectMarker,
+  removeWorldMapEffectTemplate,
+  removeWorldMapFogShape,
+} from "@/src/lib/actions/world-map-live-actions";
+import {
+  clearMapDrawStrokes,
+  createMapDrawStroke,
+  listMapDrawStrokes,
+  undoLastMapDrawStroke,
+} from "@/src/lib/actions/map-draw-actions";
 import type { WorldMap, WorldMapMarker } from "@/src/lib/world-maps/types";
-import { WorldMapEditor } from "@/src/components/world-maps/WorldMapEditor";
+import type {
+  BattlemapEffectTool,
+  BattlemapFogTool,
+  BattlemapMarkerTool,
+  SessionBattlemapEffectTemplate,
+  SessionBattlemapFogShape,
+  SessionBattlemapMarker,
+} from "@/src/lib/session/battlemap-types";
+import type { MapDrawTool, SessionMapDrawStroke } from "@/src/lib/session/map-draw-types";
+import { WorldMapLiveStage } from "@/src/components/world-maps/WorldMapLiveStage";
 
 type Props = {
   worldMapId: string;
   worldId: string;
   campaignId: string;
+  sessionId: string;
   isGm: boolean;
+  fogTool?: BattlemapFogTool;
+  effectTool?: BattlemapEffectTool;
+  markerTool?: BattlemapMarkerTool;
+  drawTool?: MapDrawTool;
+  drawColor?: string;
+  drawWidth?: number;
   onClose?: () => void;
+  onFogCountChange?: (n: number) => void;
+  onEffectCountChange?: (n: number) => void;
+  onMarkerCountChange?: (n: number) => void;
+  onDrawCountChange?: (n: number) => void;
+  fogClearRequest?: number;
+  effectClearRequest?: number;
+  markerClearRequest?: number;
+  drawUndoRequest?: number;
+  drawClearRequest?: number;
 };
 
-/**
- * Live-Session Force-View: zeigt die aktive Weltkarte fullscreen-ähnlich.
- * Spieler: view-only (isGm=false). GM kann weiter Markierungen bedienen.
- */
 export function LiveWorldMapOverlay({
   worldMapId,
   worldId,
   campaignId,
+  sessionId,
   isGm,
+  fogTool = null,
+  effectTool = null,
+  markerTool = null,
+  drawTool = null,
+  drawColor = "#cab926",
+  drawWidth = 4,
   onClose,
+  onFogCountChange,
+  onEffectCountChange,
+  onMarkerCountChange,
+  onDrawCountChange,
+  fogClearRequest = 0,
+  effectClearRequest = 0,
+  markerClearRequest = 0,
+  drawUndoRequest = 0,
+  drawClearRequest = 0,
 }: Props) {
   const [map, setMap] = useState<WorldMap | null>(null);
   const [markers, setMarkers] = useState<WorldMapMarker[]>([]);
+  const [fogShapes, setFogShapes] = useState<SessionBattlemapFogShape[]>([]);
+  const [effectTemplates, setEffectTemplates] = useState<SessionBattlemapEffectTemplate[]>([]);
+  const [effectMarkers, setEffectMarkers] = useState<SessionBattlemapMarker[]>([]);
+  const [drawStrokes, setDrawStrokes] = useState<SessionMapDrawStroke[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+  const supabase = useRef(createClient()).current;
+
+  const reloadOverlays = useCallback(async () => {
+    const [fog, effects, marks, strokes] = await Promise.all([
+      listWorldMapFogShapes(worldMapId, sessionId),
+      listWorldMapEffectTemplates(worldMapId, sessionId),
+      listWorldMapEffectMarkers(worldMapId, sessionId),
+      listMapDrawStrokes({ sessionId, worldMapId }),
+    ]);
+    setFogShapes(fog);
+    setEffectTemplates(effects);
+    setEffectMarkers(marks);
+    setDrawStrokes(strokes);
+    onFogCountChange?.(fog.length);
+    onEffectCountChange?.(effects.length);
+    onMarkerCountChange?.(marks.length);
+    onDrawCountChange?.(strokes.length);
+  }, [
+    worldMapId,
+    sessionId,
+    onFogCountChange,
+    onEffectCountChange,
+    onMarkerCountChange,
+    onDrawCountChange,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +139,7 @@ export function LiveWorldMapOverlay({
         }
         setMap(m);
         setMarkers(mk);
+        await reloadOverlays();
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Laden fehlgeschlagen.");
@@ -56,7 +149,183 @@ export function LiveWorldMapOverlay({
     return () => {
       cancelled = true;
     };
-  }, [worldMapId]);
+  }, [worldMapId, reloadOverlays]);
+
+  // Realtime: map + markers + overlays
+  useEffect(() => {
+    const channel = supabase
+      .channel(`world_map_live_${worldMapId}_${sessionId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "world_maps", filter: `id=eq.${worldMapId}` },
+        (payload) => {
+          if (payload.new) {
+            void getWorldMap(worldMapId).then((m) => m && setMap(m));
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "world_map_markers",
+          filter: `world_map_id=eq.${worldMapId}`,
+        },
+        () => {
+          void getWorldMapMarkers(worldMapId).then(setMarkers);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_world_map_fog_shapes",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          void listWorldMapFogShapes(worldMapId, sessionId).then((fog) => {
+            setFogShapes(fog);
+            onFogCountChange?.(fog.length);
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_world_map_effect_templates",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          void listWorldMapEffectTemplates(worldMapId, sessionId).then((fx) => {
+            setEffectTemplates(fx);
+            onEffectCountChange?.(fx.length);
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_world_map_effect_markers",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          void listWorldMapEffectMarkers(worldMapId, sessionId).then((mk) => {
+            setEffectMarkers(mk);
+            onMarkerCountChange?.(mk.length);
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_map_draw_strokes",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          void listMapDrawStrokes({ sessionId, worldMapId }).then((st) => {
+            setDrawStrokes(st);
+            onDrawCountChange?.(st.length);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [
+    supabase,
+    worldMapId,
+    sessionId,
+    onFogCountChange,
+    onEffectCountChange,
+    onMarkerCountChange,
+    onDrawCountChange,
+  ]);
+
+  useEffect(() => {
+    if (!isGm || fogClearRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        await clearWorldMapFogShapes(worldMapId, sessionId);
+        setFogShapes([]);
+        onFogCountChange?.(0);
+        toast.success("Fog of War gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [fogClearRequest, isGm, worldMapId, sessionId, onFogCountChange]);
+
+  useEffect(() => {
+    if (!isGm || effectClearRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        await clearWorldMapEffectTemplates(worldMapId, sessionId);
+        setEffectTemplates([]);
+        onEffectCountChange?.(0);
+        toast.success("Effekt-Schablonen gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [effectClearRequest, isGm, worldMapId, sessionId, onEffectCountChange]);
+
+  useEffect(() => {
+    if (!isGm || markerClearRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        await clearWorldMapEffectMarkers(worldMapId, sessionId);
+        setEffectMarkers([]);
+        onMarkerCountChange?.(0);
+        toast.success("Spezialeffekte gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [markerClearRequest, isGm, worldMapId, sessionId, onMarkerCountChange]);
+
+  useEffect(() => {
+    if (!isGm || drawUndoRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        const id = await undoLastMapDrawStroke({ sessionId, worldMapId });
+        if (!id) {
+          toast.message("Keine Zeichnung zum Rückgängigmachen.");
+          return;
+        }
+        setDrawStrokes((prev) => {
+          const next = prev.filter((s) => s.id !== id);
+          queueMicrotask(() => onDrawCountChange?.(next.length));
+          return next;
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Rückgängig fehlgeschlagen.");
+      }
+    });
+  }, [drawUndoRequest, isGm, sessionId, worldMapId, onDrawCountChange]);
+
+  useEffect(() => {
+    if (!isGm || drawClearRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        await clearMapDrawStrokes({ sessionId, worldMapId });
+        setDrawStrokes([]);
+        onDrawCountChange?.(0);
+        toast.success("Alle Zeichnungen gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [drawClearRequest, isGm, sessionId, worldMapId, onDrawCountChange]);
 
   return (
     <div className="absolute inset-0 z-[45] flex flex-col bg-black/95 p-3">
@@ -85,19 +354,141 @@ export function LiveWorldMapOverlay({
         <p className="text-sm text-gray-400 font-libre">Lade Weltkarte…</p>
       )}
       {map && (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <WorldMapEditor
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <WorldMapLiveStage
             map={map}
             markers={markers}
             worldId={worldId}
             campaignId={campaignId}
+            sessionId={sessionId}
             isGm={isGm}
-            linkOptions={{
-              lore: [],
-              npcs: [],
-              factions: [],
-              creatures: [],
-              quests: [],
+            fogShapes={fogShapes}
+            effectTemplates={effectTemplates}
+            effectMarkers={effectMarkers}
+            drawStrokes={drawStrokes}
+            fogTool={isGm ? fogTool : null}
+            effectTool={isGm ? effectTool : null}
+            markerTool={isGm ? markerTool : null}
+            drawTool={isGm ? drawTool : null}
+            drawColor={drawColor}
+            drawWidth={drawWidth}
+            onMapChange={setMap}
+            onMarkersChange={setMarkers}
+            onFogCreate={(input) => {
+              startTransition(async () => {
+                try {
+                  const created = await createWorldMapFogShape({
+                    sessionId,
+                    worldMapId,
+                    ...input,
+                  });
+                  setFogShapes((prev) => {
+                    const next = [...prev, created];
+                    queueMicrotask(() => onFogCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Fog fehlgeschlagen.");
+                }
+              });
+            }}
+            onFogDelete={(id) => {
+              startTransition(async () => {
+                try {
+                  await removeWorldMapFogShape(id, sessionId);
+                  setFogShapes((prev) => {
+                    const next = prev.filter((s) => s.id !== id);
+                    queueMicrotask(() => onFogCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+                }
+              });
+            }}
+            onEffectCreate={(input) => {
+              startTransition(async () => {
+                try {
+                  const created = await createWorldMapEffectTemplate({
+                    sessionId,
+                    worldMapId,
+                    ...input,
+                  });
+                  setEffectTemplates((prev) => {
+                    const next = [...prev, created];
+                    queueMicrotask(() => onEffectCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Effekt fehlgeschlagen.");
+                }
+              });
+            }}
+            onEffectDelete={(id) => {
+              startTransition(async () => {
+                try {
+                  await removeWorldMapEffectTemplate(id, sessionId);
+                  setEffectTemplates((prev) => {
+                    const next = prev.filter((s) => s.id !== id);
+                    queueMicrotask(() => onEffectCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+                }
+              });
+            }}
+            onEffectMarkerCreate={(input) => {
+              startTransition(async () => {
+                try {
+                  const created = await createWorldMapEffectMarker({
+                    sessionId,
+                    worldMapId,
+                    ...input,
+                  });
+                  setEffectMarkers((prev) => {
+                    const next = [...prev, created];
+                    queueMicrotask(() => onMarkerCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Marker fehlgeschlagen.");
+                }
+              });
+            }}
+            onEffectMarkerDelete={(id) => {
+              startTransition(async () => {
+                try {
+                  await removeWorldMapEffectMarker(id, sessionId);
+                  setEffectMarkers((prev) => {
+                    const next = prev.filter((s) => s.id !== id);
+                    queueMicrotask(() => onMarkerCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+                }
+              });
+            }}
+            onDrawStroke={(points) => {
+              startTransition(async () => {
+                try {
+                  const created = await createMapDrawStroke({
+                    sessionId,
+                    worldMapId,
+                    color: drawColor,
+                    strokeWidth: drawWidth,
+                    points,
+                  });
+                  setDrawStrokes((prev) => {
+                    const next = [...prev, created];
+                    queueMicrotask(() => onDrawCountChange?.(next.length));
+                    return next;
+                  });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Zeichnen fehlgeschlagen.");
+                }
+              });
             }}
           />
         </div>

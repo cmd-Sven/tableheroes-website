@@ -22,7 +22,7 @@ export function WorldDashboardCard({
     <div
       className="relative rounded-lg border border-hero-border/60 overflow-hidden flex flex-col min-h-[160px]"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

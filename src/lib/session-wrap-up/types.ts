@@ -35,6 +35,14 @@ export type SessionWrapUpPreview = {
     inGameTime: string | null;
     hasCarryOverContent: boolean;
   };
+  table: {
+    battlemapCount: number;
+    tokenCount: number;
+    overlayCount: number;
+    drawingCount: number;
+    hasActiveMap: boolean;
+    hasCarryOverContent: boolean;
+  };
   nextSession: {
     id: string;
     title: string | null;

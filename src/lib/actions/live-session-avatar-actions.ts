@@ -11,6 +11,7 @@ import {
   withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
 import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
+import { clampExhaustionLevel } from "@/src/lib/characters/dnd5e/exhaustion";
 import { isConsumableItem } from "@/src/lib/characters/dnd5e/inventory-categories";
 import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
 import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
@@ -47,6 +48,8 @@ export type LiveAvatarStatus = {
   hpCurrent: number;
   hpMax: number;
   hpTemp: number;
+  /** 2024 Erschöpfung 0–10 */
+  exhaustionLevel: number;
   displayAvatarUrl: string | null;
   /** Spieler-Gemüt (wird von GM-Zustand visuell überdeckt). */
   moodState: MoodStateKey | null;
@@ -248,6 +251,7 @@ export async function getLiveSessionAvatarStatus(
     hpCurrent: Math.max(0, Math.round(Number(sheet.combat?.hpCurrent) || 0)),
     hpMax: Math.max(1, Math.round(Number(sheet.combat?.hpMax) || 1)),
     hpTemp: Math.max(0, Math.round(Number(sheet.combat?.hpTemp) || 0)),
+    exhaustionLevel: clampExhaustionLevel(sheet.combat?.exhaustionLevel),
     displayAvatarUrl: display.url || ch.avatar_url || null,
     moodState,
     moodTokenUrls,

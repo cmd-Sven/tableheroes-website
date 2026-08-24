@@ -4,7 +4,7 @@
   "nameDe": "Magier",
   "hitDie": 6,
   "caster": "full",
-  "subclassLevel": 2,
+  "subclassLevel": 3,
   "asiLevels": [
     4,
     8,
@@ -26,9 +26,7 @@
     },
     {
       "level": 2,
-      "featureIds": [
-        "arcane-tradition"
-      ],
+      "featureIds": [],
       "spellSlots": {
         "1": 3
       },
@@ -36,7 +34,9 @@
     },
     {
       "level": 3,
-      "featureIds": [],
+      "featureIds": [
+        "arcane-tradition"
+      ],
       "spellSlots": {
         "1": 4,
         "2": 2
@@ -308,11 +308,11 @@
     },
     {
       "id": "arcane-tradition",
-      "level": 2,
+      "level": 3,
       "nameEn": "Arcane Tradition",
       "nameDe": "Arkane Tradition",
-      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "Beim Erreichen der 2. Stufe suchst du dir eine Arkane Tradition aus und orientierst dich dadurch in Richtung einer der acht Schulen der Magie: Bannmagie, Beschwörung, Erkenntnismagie, Verzauberung, Hervorrufung, Illusion, Nekromantie und Verwandlung. Alle werden am Ende dieses Abschnitts ausführlich beschrieben.\n\nDeine Wahl verleiht dir auf der 2., 6., 10. und 14. Stufe jeweils ein Merkmal.",
+      "descriptionEn": "When you reach 3rd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Beim Erreichen der 3. Stufe suchst du dir eine Arkane Tradition aus und orientierst dich dadurch in Richtung einer der acht Schulen der Magie: Bannmagie, Beschwörung, Erkenntnismagie, Verzauberung, Hervorrufung, Illusion, Nekromantie und Verwandlung. Alle werden am Ende dieses Abschnitts ausführlich beschrieben.\n\nDeine Wahl verleiht dir auf der 3., 6., 10. und 14. Stufe jeweils ein Merkmal.",
       "subclass": null
     },
     {
@@ -329,7 +329,7 @@
       "level": 6,
       "nameEn": "Arcane Tradition feature",
       "nameDe": "Merkmal der Arkanen Tradition",
-      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "When you reach 3rd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
@@ -347,7 +347,7 @@
       "level": 10,
       "nameEn": "Arcane Tradition feature",
       "nameDe": "Merkmal der Arkanen Tradition",
-      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "When you reach 3rd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
@@ -365,7 +365,7 @@
       "level": 14,
       "nameEn": "Arcane Tradition feature",
       "nameDe": "Merkmal der Arkanen Tradition",
-      "descriptionEn": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "When you reach 3rd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deiner Arkanen Tradition.",
       "subclass": null
     },
@@ -407,20 +407,20 @@
     },
     {
       "id": "evocation-savant",
-      "level": 2,
+      "level": 3,
       "nameEn": "Evocation Savant",
       "nameDe": "Gelehrter der Hervorrufung",
-      "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
-      "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 2. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszauber in dein Zauberbuch halbiert.",
+      "descriptionEn": "Beginning when you select this school at 3rd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+      "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 3. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszaubern in dein Zauberbuch halbiert.",
       "subclass": "evocation"
     },
     {
       "id": "sculpt-spells",
-      "level": 2,
+      "level": 3,
       "nameEn": "Sculpt Spells",
       "nameDe": "Zauber formen",
-      "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
-      "descriptionDe": "Ab der 2. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
+      "descriptionEn": "Beginning at 3rd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+      "descriptionDe": "Ab der 3. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
       "subclass": "evocation"
     },
     {
@@ -459,20 +459,20 @@
       "features": [
         {
           "id": "evocation-savant",
-          "level": 2,
+          "level": 3,
           "nameEn": "Evocation Savant",
           "nameDe": "Gelehrter der Hervorrufung",
-          "descriptionEn": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
-          "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 2. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszauber in dein Zauberbuch halbiert.",
+          "descriptionEn": "Beginning when you select this school at 3rd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved.",
+          "descriptionDe": "Beginnend mit der Wahl dieser Schule auf der 3. Stufe werden die Geldkosten und der Zeitaufwand für das Kopieren von Hervorrufungszaubern in dein Zauberbuch halbiert.",
           "subclass": "evocation"
         },
         {
           "id": "sculpt-spells",
-          "level": 2,
+          "level": 3,
           "nameEn": "Sculpt Spells",
           "nameDe": "Zauber formen",
-          "descriptionEn": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
-          "descriptionDe": "Ab der 2. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
+          "descriptionEn": "Beginning at 3rd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+          "descriptionDe": "Ab der 3. Stufe hast du die Effekte deiner Hervorrufungszauber so unter Kontrolle, dass du Bereiche in ihnen formen kannst, in denen man vor ihren Auswirkungen sicher ist. Wenn du einen Hervorrufungszauber wirkst, der andere Kreaturen betrifft, die du sehen kannst, darfst du eine Anzahl dieser Kreaturen bestimmen, die 1 + dem Grad des Zaubers entspricht. Die ausgewählten Kreaturen schaffen ihren Rettungswurf gegen deinen Zauber automatisch und erleiden keinen Schaden, auch wenn sie normalerweise bei einem gelungenen Rettungswurf die Hälfte des Schadens erleiden würden.",
           "subclass": "evocation"
         },
         {

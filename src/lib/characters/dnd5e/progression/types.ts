@@ -121,7 +121,9 @@ export type BackgroundDefinition = LocalizedText & {
   feature: LocalizedText & { id: string };
   equipmentHintEn?: string;
   equipmentHintDe?: string;
-  /** Rare — classic PHB backgrounds have none. */
+  /** 2024: Background grants exactly one Origin Feat at level 1. */
+  originFeatId?: string;
+  /** 2024: Ability score increases granted by the background (fixed deltas in our data model). */
   abilityBonus?: Partial<Record<AbilityKeyShort, number>>;
 };
 

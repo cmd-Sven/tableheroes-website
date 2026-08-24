@@ -26,6 +26,7 @@ export function normalizeWorldMap(row: Record<string, unknown>): WorldMap {
         ? Number(row.group_token_grid_y)
         : null,
     group_token_visible: row.group_token_visible !== false,
+    group_token_is_camping: row.group_token_is_camping === true,
     created_at: row.created_at != null ? String(row.created_at) : undefined,
     updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
   };

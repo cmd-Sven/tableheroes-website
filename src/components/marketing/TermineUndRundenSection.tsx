@@ -58,7 +58,7 @@ function SessionCard({ ticket }: { ticket: SessionTicket }) {
     <article
       className="group relative flex h-full min-h-[28rem] w-[min(88vw,22rem)] shrink-0 snap-center flex-col overflow-hidden rounded-xl border border-accent-gold/20 shadow-lg transition-all duration-300 hover:border-accent-gold/60 hover:shadow-[0_0_20px_rgba(202,185,38,0.2)] sm:w-[min(44vw,22rem)] lg:w-[min(30vw,22rem)]"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -176,7 +176,7 @@ function EventCard({ event }: { event: CommunityEvent }) {
           : "border-hero-border/40 bg-background-card/90"
       }`}
       style={{
-        backgroundImage: isPlanning ? undefined : "url('/images/dark-marmor.jpg')",
+        backgroundImage: isPlanning ? undefined : "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -293,7 +293,7 @@ export function TermineUndRundenSection({ events }: Props) {
       id="campaigns"
       className="relative scroll-mt-20 bg-background-dark"
       style={{
-        backgroundImage: "url('/images/dark-wood.jpg')",
+        backgroundImage: "url('/images/dark-wood.webp')",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -398,7 +398,7 @@ export function TermineUndRundenSection({ events }: Props) {
       <div className="pointer-events-none absolute left-4 top-1/2 z-20 hidden -translate-y-1/2 lg:block">
         <div className="relative">
           <Image
-            src="/images/wall-torch.png"
+            src="/images/wall-torch.webp"
             alt=""
             width={192}
             height={384}
@@ -412,7 +412,7 @@ export function TermineUndRundenSection({ events }: Props) {
       <div className="pointer-events-none absolute right-4 top-1/2 z-20 hidden -translate-y-1/2 lg:block">
         <div className="relative">
           <Image
-            src="/images/wall-torch.png"
+            src="/images/wall-torch.webp"
             alt=""
             width={192}
             height={384}
@@ -446,7 +446,7 @@ export function TermineUndRundenSection({ events }: Props) {
         <div
           className="h-full w-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "bottom center",

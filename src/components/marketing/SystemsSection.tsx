@@ -9,23 +9,23 @@ type GameItem = {
 };
 
 const GAME_SYSTEMS: GameItem[] = [
-  { name: "Dungeons & Dragons", logo: "/images/logos/dnd_logo.jpg" },
-  { name: "Call of Cthulhu", logo: "/images/logos/cthulhu-logo.png" },
-  { name: "Pathfinder 2e", logo: "/images/logos/pathfinder2-logo.jpg" },
-  { name: "Shadowrun", logo: "/images/logos/shadowrun-5-logo.png" },
+  { name: "Dungeons & Dragons", logo: "/images/logos/dnd_logo.webp" },
+  { name: "Call of Cthulhu", logo: "/images/logos/cthulhu-logo.webp" },
+  { name: "Pathfinder 2e", logo: "/images/logos/pathfinder2-logo.webp" },
+  { name: "Shadowrun", logo: "/images/logos/shadowrun-5-logo.webp" },
   {
     name: "Vampire: The Masquerade",
-    logo: "/images/logos/vampire-logo.jpg",
+    logo: "/images/logos/vampire-logo.webp",
   },
-  { name: "Star Wars: Edge of the Empire", logo: "/images/logos/star_wars-logo.jpg" },
+  { name: "Star Wars: Edge of the Empire", logo: "/images/logos/star_wars-logo.webp" },
 ];
 
 const TOOLS: GameItem[] = [
   { name: "Dungeon Alchemist", logo: "/images/logos/DungeonAlchemist.webp" },
   { name: "Inkarnate", logo: "/images/logos/inkarnate.webp" },
-  { name: "Foundry VTT", logo: "/images/logos/Foundry.png" },
+  { name: "Foundry VTT", logo: "/images/logos/Foundry.webp" },
   { name: "The Forge", logo: "/images/logos/The Forge.webp" },
-  { name: "Roll20", logo: "/images/logos/roll20-logo.png" },
+  { name: "Roll20", logo: "/images/logos/roll20-logo.webp" },
 ];
 
 const containerVariants: Variants = {
@@ -93,7 +93,7 @@ export function SystemsSection() {
       id="systems"
       className="relative scroll-mt-20 bg-background-dark"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -164,7 +164,7 @@ export function SystemsSection() {
         <div
           className="w-full h-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "bottom center",

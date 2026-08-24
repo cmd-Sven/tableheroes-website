@@ -87,6 +87,8 @@ export type WorldMap = {
   group_token_grid_x: number | null;
   group_token_grid_y: number | null;
   group_token_visible: boolean;
+  /** true = Lagerfeuer-Symbol (Camping) statt Gruppentoken */
+  group_token_is_camping: boolean;
   created_at?: string;
   updated_at?: string;
 };

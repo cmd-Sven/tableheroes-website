@@ -67,7 +67,7 @@ function run() {
   assert.equal(plan5.needsAsi, false);
   assert.ok((plan5.spellcasting?.slotsMax["3"] ?? 0) >= 2);
 
-  // --- subclassLevel catch-up (Cleric/Sorcerer/Warlock = 1) ---
+  // --- subclassLevel catch-up (2024: alle Klassen Stufe 3) ---
   const clericPlan = planLevelUp({
     className: "Kleriker",
     subclass: null,
@@ -76,7 +76,16 @@ function run() {
     sheet: createEmptyDnd5eSheet(1),
   });
   assert.equal(clericPlan.toLevel, 2);
-  assert.equal(clericPlan.needsSubclass, true, "Cleric without domain must pick subclass on level-up");
+  assert.equal(clericPlan.needsSubclass, false, "Cleric domain is chosen at 3rd level (2024)");
+
+  const clericTo3 = planLevelUp({
+    className: "Kleriker",
+    subclass: null,
+    raceName: "Mensch",
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
+  });
+  assert.equal(clericTo3.needsSubclass, true, "Cleric without domain must pick subclass at 3");
 
   const sorcererPlan = planLevelUp({
     className: "Zauberer",
@@ -96,7 +105,7 @@ function run() {
   });
   assert.equal(warlockPlan.needsSubclass, true);
 
-  // Wizard tradition at 2
+  // Wizard tradition at 3 (2024)
   const wizTo2 = planLevelUp({
     className: "Magier",
     subclass: null,
@@ -104,16 +113,26 @@ function run() {
     fromLevel: 1,
     sheet: createEmptyDnd5eSheet(1),
   });
-  assert.equal(wizTo2.needsSubclass, true);
+  assert.equal(wizTo2.needsSubclass, false);
   assert.equal(wizTo2.toLevel, 2);
 
-  // Subclass override merges features (Evocation at 2)
+  const wizTo3 = planLevelUp({
+    className: "Magier",
+    subclass: null,
+    raceName: "Mensch",
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
+  });
+  assert.equal(wizTo3.needsSubclass, true);
+  assert.equal(wizTo3.toLevel, 3);
+
+  // Subclass override merges features (Evocation at 3)
   const wizWithSub = planLevelUp({
     className: "Magier",
     subclass: null,
     raceName: "Mensch",
-    fromLevel: 1,
-    sheet: createEmptyDnd5eSheet(1),
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
     subclassOverride: "evocation",
   });
   assert.ok(
@@ -135,13 +154,13 @@ function run() {
   assert.ok(monkFeatures.length > 0);
 
   // Apply merges subclass features
-  const draftSheet = createEmptyDnd5eSheet(1);
+  const draftSheet = createEmptyDnd5eSheet(2);
   const applied = applyLevelUpDraft(
     draftSheet,
     {
-      plan: wizTo2,
-      hpGain: wizTo2.hpAverage,
-      selectedFeatureIds: wizTo2.features.map((f) => f.id),
+      plan: wizTo3,
+      hpGain: wizTo3.hpAverage,
+      selectedFeatureIds: wizTo3.features.map((f) => f.id),
       selectedRaceFeatureIds: [],
       subclassId: "evocation",
       asi: null,
@@ -151,7 +170,7 @@ function run() {
     },
     0,
   );
-  assert.equal(applied.meta.level, 2);
+  assert.equal(applied.meta.level, 3);
   assert.ok(applied.meta.subclass);
   assert.ok(
     applied.sheet.features.some((f) => /evocation|sculpt|savant/i.test(f.id + (f.nameEn ?? ""))),
@@ -169,7 +188,7 @@ function run() {
 
   // --- Level 1 creation ---
   const l1Cleric = planLevel1Creation({ classId: "cleric" });
-  assert.equal(l1Cleric.needsSubclass, true);
+  assert.equal(l1Cleric.needsSubclass, false);
   assert.equal(l1Cleric.hitDie, 8);
   assert.ok(l1Cleric.spellcasting);
   assert.equal(l1Cleric.spellcasting!.cantripsToLearn, 3);
@@ -196,7 +215,7 @@ function run() {
   };
   const built = buildLevel1Sheet({
     classId: "cleric" as ClassId,
-    subclassId: "life",
+    subclassId: null,
     raceName: "Mensch",
     raceId: "human",
     baseAbilities: base,
@@ -206,46 +225,47 @@ function run() {
   });
   assert.equal(built.meta.level, 1);
   assert.equal(built.meta.className, "Kleriker");
-  assert.ok(built.meta.subclass);
-  assert.equal(built.sheet.abilities.str.score, 16); // 15+1 human
+  assert.equal(built.sheet.abilities.str.score, 15); // 2024: species hat keine festen ASI mehr
   assert.ok(built.sheet.combat.hpMax >= 8);
   assert.ok(built.sheet.features.length > 0);
-  assert.ok(
+  assert.equal(
     (built.sheet.spells ?? []).some((s) => s.id.includes("bless") || /segen/i.test(s.name)),
-    "Life domain grants Bless as always-prepared",
+    false,
+    "Life domain Bless is not granted at level 1 (2024 domain at 3)",
   );
 
-  const builtGrave = buildLevel1Sheet({
-    classId: "cleric",
-    subclassId: "grave",
+  const lifeAt3 = planLevelUp({
+    className: "Kleriker",
+    subclass: null,
     raceName: "Mensch",
-    raceId: "human",
-    baseAbilities: base,
-    applyRacialBonuses: true,
-    spellIds: [],
-    skillKeys: [],
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
+    subclassOverride: "life",
   });
-  assert.ok(/grab/i.test(builtGrave.meta.subclass ?? ""));
   assert.ok(
-    builtGrave.sheet.features.some((f) => f.id === "circle-of-mortality"),
-    "Grave: Circle of Mortality",
+    lifeAt3.features.some((f) => f.id === "life-domain-spells-1"),
+    "Life domain 1st-level spells at subclass catch-up (level 3)",
   );
   assert.ok(
-    builtGrave.sheet.features.some((f) => f.id === "eyes-of-the-grave"),
-    "Grave: Eyes of the Grave",
+    lifeAt3.features.some((f) => f.id === "disciple-of-life"),
+    "Disciple of Life at subclass catch-up",
   );
-  const graveSpells = builtGrave.sheet.spells ?? [];
+
+  const graveAt3 = planLevelUp({
+    className: "Kleriker",
+    subclass: null,
+    raceName: "Mensch",
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
+    subclassOverride: "grave",
+  });
   assert.ok(
-    graveSpells.some((s) => s.id.includes("bane")),
-    "Grave domain grants Bane",
+    graveAt3.features.some((f) => f.id === "circle-of-mortality"),
+    "Grave: Circle of Mortality at 3rd-level catch-up",
   );
   assert.ok(
-    graveSpells.some((s) => s.id.includes("false-life")),
-    "Grave domain grants False Life",
-  );
-  assert.ok(
-    graveSpells.some((s) => s.id.includes("spare-the-dying")),
-    "Grave Circle of Mortality grants Spare the Dying",
+    graveAt3.features.some((f) => f.id === "eyes-of-the-grave"),
+    "Grave: Eyes of the Grave at 3rd-level catch-up",
   );
 
   // Toll the Dead on cleric spell list (picker)
@@ -480,7 +500,7 @@ function run() {
   assert.equal(clearedBg.backgroundId, null);
   assert.ok(!clearedBg.sheet.features.some((f) => f.source === BACKGROUND_SOURCE));
 
-  // --- Subclass change: Cleric Life → Grave ---
+  // --- Subclass change: Cleric Life → Grave (2024: domain at 3) ---
   const lifeBuilt = buildLevel1Sheet({
     classId: "cleric",
     subclassId: "life",
@@ -498,10 +518,18 @@ function run() {
     spellIds: [],
     skillKeys: [],
   });
-  const toGrave = applySubclassChange(lifeBuilt.sheet, {
+  const lifeAt3Sheet = applySubclassChange(lifeBuilt.sheet, {
     className: lifeBuilt.meta.className,
-    level: 1,
-    previousSubclass: lifeBuilt.meta.subclass,
+    level: 3,
+    previousSubclass: null,
+    nextSubclassId: "life",
+    locale: "de",
+  }).sheet;
+  assert.ok(lifeAt3Sheet.features.some((f) => f.id === "disciple-of-life"));
+  const toGrave = applySubclassChange(lifeAt3Sheet, {
+    className: lifeBuilt.meta.className,
+    level: 3,
+    previousSubclass: "Leben",
     nextSubclassId: "grave",
     locale: "de",
   });

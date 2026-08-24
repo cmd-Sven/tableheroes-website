@@ -47,20 +47,13 @@ export const CLASS_SAVE_PROFICIENCIES: Record<ClassId, AbilityKey[]> = {
   wizard: ["int", "wis"],
 };
 
-/** Classic PHB race ability bonuses (SRD race JSONs have no ASI fields). */
+/**
+ * 2024-Rule: Species/Race geben keine festen Ability Score Increases mehr.
+ * (Die ASI kommen stattdessen aus dem Background/Origin Feat.)
+ */
 export const RACE_ABILITY_BONUSES: Partial<
   Record<RaceId, Partial<Record<AbilityKeyShort, number>>>
-> = {
-  dragonborn: { str: 2, cha: 1 },
-  dwarf: { con: 2 },
-  elf: { dex: 2 },
-  gnome: { int: 2 },
-  "half-elf": { cha: 2 },
-  "half-orc": { str: 2, con: 1 },
-  halfling: { dex: 2 },
-  human: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 },
-  tiefling: { int: 1, cha: 2 },
-};
+> = {};
 
 export type Level1CreationPlan = {
   classId: ClassId;

@@ -166,7 +166,7 @@ export function GroupRewardForm({ campaignId, memberCount }: Props) {
           <div
             className="w-full max-w-md rounded-lg border-2 border-accent-gold/40 bg-background-card shadow-2xl overflow-hidden"
             style={{
-              backgroundImage: "url('/images/dark-marmor.jpg')",
+              backgroundImage: "url('/images/dark-marmor.webp')",
               backgroundSize: "cover",
             }}
             onClick={(e) => e.stopPropagation()}

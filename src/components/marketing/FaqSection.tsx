@@ -73,7 +73,7 @@ export function FaqSection() {
       id="faq"
       className="relative scroll-mt-20 bg-background-dark"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -84,7 +84,7 @@ export function FaqSection() {
         <div
           className="w-full h-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "top center",
@@ -128,7 +128,7 @@ export function FaqSection() {
         <div
           className="w-full h-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "bottom center",

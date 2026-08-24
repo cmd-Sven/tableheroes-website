@@ -149,7 +149,7 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
                     aria-label={`Rucksack von ${c.name} öffnen`}
                   >
                     <Image
-                      src="/images/Session_ui/rucksack.png"
+                      src="/images/Session_ui/rucksack.webp"
                       alt=""
                       width={34}
                       height={34}

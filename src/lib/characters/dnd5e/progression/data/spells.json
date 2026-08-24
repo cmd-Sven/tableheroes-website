@@ -297,6 +297,21 @@
     "concentration": false
   },
   {
+    "id": "aura-of-life",
+    "nameEn": "Aura of Life",
+    "nameDe": "Aura des Lebens",
+    "descriptionEn": "Life-preserving energy radiates from you in an aura with a 30-foot radius. Until the spell ends, the aura moves with you, centered on you. Each nonhostile creature in the aura (including you) has resistance to necrotic damage, and its hit point maximum can't be reduced. In addition, a nonhostile, living creature regains 1 hit point when it starts its turn in the aura with 0 hit points.",
+    "descriptionDe": "Lebenserhaltende Energie strahlt von dir in einer Aura mit 9 m Radius aus. Bis der Zauber endet, bewegt sich die Aura mit dir. Jede nicht feindliche Kreatur in der Aura (einschließlich dir) hat Resistenz gegen nekrotischen Schaden, und ihr Trefferpunktemaximum kann nicht gesenkt werden. Außerdem erhält eine nicht feindliche, lebende Kreatur 1 Trefferpunkt zurück, wenn sie ihren Zug in der Aura mit 0 Trefferpunkten beginnt.",
+    "level": 4,
+    "school": "Abjuration",
+    "classes": [
+      "cleric",
+      "paladin"
+    ],
+    "ritual": false,
+    "concentration": true
+  },
+  {
     "id": "awaken",
     "nameEn": "Awaken",
     "nameDe": "Erwecken",

@@ -111,7 +111,7 @@ export function LoreHierarchyManager({ lore, childEntries, isGM, campaignId, orp
     <div 
       className="rounded-lg p-6 relative overflow-hidden shadow-xl transition-shadow duration-300 border-2 border-accent-gold/30"
       style={{
-        backgroundImage: "url('/images/backgrounds/dark-marble.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -271,7 +271,7 @@ export function LoreHierarchyManager({ lore, childEntries, isGM, campaignId, orp
                   className="group relative rounded-lg p-4 transition-all hover:scale-[1.02]"
                   style={{
                     border: "2px solid rgba(202, 185, 38, 0.5)",
-                    backgroundImage: "url('/images/backgrounds/old-paper.jpg')",
+                    backgroundImage: "url('/images/scroll-paper.webp')",
                     backgroundSize: "cover",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",

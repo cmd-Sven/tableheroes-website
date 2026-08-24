@@ -12,7 +12,7 @@ import {
   spellDefinitionToSheetEntry,
 } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
 import { resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
-import { CLASS_NAME_DE } from "@/src/lib/characters/dnd5e/progression/labels-de";
+import { classDisplayName } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
 type Props = {
@@ -92,9 +92,7 @@ export function SpellCatalogPickerModal({
   }
 
   const classLabel = classId
-    ? locale === "de"
-      ? CLASS_NAME_DE[classId]
-      : classId
+    ? classDisplayName(classId, locale)
     : t("spellCatalog.noClass");
 
   return (

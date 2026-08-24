@@ -187,7 +187,7 @@ function MessageDetailModal({
             : "border-hero-dark"
         }`}
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
         onClick={(e) => e.stopPropagation()}

@@ -4,7 +4,7 @@
   "nameDe": "Druide",
   "hitDie": 8,
   "caster": "full",
-  "subclassLevel": 2,
+  "subclassLevel": 3,
   "asiLevels": [
     4,
     8,
@@ -27,8 +27,7 @@
     {
       "level": 2,
       "featureIds": [
-        "wild-shape-cr-1-4-or-below-no-flying-or-swim-speed",
-        "druid-circle"
+        "wild-shape-cr-1-4-or-below-no-flying-or-swim-speed"
       ],
       "spellSlots": {
         "1": 3
@@ -37,7 +36,9 @@
     },
     {
       "level": 3,
-      "featureIds": [],
+      "featureIds": [
+        "druid-circle"
+      ],
       "spellSlots": {
         "1": 4,
         "2": 2
@@ -321,11 +322,11 @@
     },
     {
       "id": "druid-circle",
-      "level": 2,
+      "level": 3,
       "nameEn": "Druid Circle",
       "nameDe": "Druidenzirkel",
-      "descriptionEn": "At 2nd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
-      "descriptionDe": "Mit der 2. Stufe suchst du dir einen Druidenzirkel aus, dem du von nun an angehörst, wie etwa der Zirkel des Landes. Deine Wahl verleiht dir auf der 2., 6., 10. und 14. Stufe jeweils ein Merkmal.",
+      "descriptionEn": "At 3rd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
+      "descriptionDe": "Mit der 3. Stufe suchst du dir einen Druidenzirkel aus, dem du von nun an angehörst, wie etwa der Zirkel des Landes. Deine Wahl verleiht dir auf der 3., 6., 10. und 14. Stufe jeweils ein Merkmal.",
       "subclass": null
     },
     {
@@ -351,7 +352,7 @@
       "level": 6,
       "nameEn": "Druid Circle feature",
       "nameDe": "Merkmal des Druidenkreises",
-      "descriptionEn": "At 2nd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "At 3rd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Druidenkreises.",
       "subclass": null
     },
@@ -378,7 +379,7 @@
       "level": 10,
       "nameEn": "Druid Circle feature",
       "nameDe": "Merkmal des Druidenkreises",
-      "descriptionEn": "At 2nd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "At 3rd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Druidenkreises.",
       "subclass": null
     },
@@ -396,7 +397,7 @@
       "level": 14,
       "nameEn": "Druid Circle feature",
       "nameDe": "Merkmal des Druidenkreises",
-      "descriptionEn": "At 2nd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level.",
+      "descriptionEn": "At 3rd level, you choose to identify with a circle of druids, such as the Circle of the Land. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th level.",
       "descriptionDe": "Du erhältst ein Merkmal deines Druidenkreises.",
       "subclass": null
     },
@@ -447,20 +448,20 @@
     },
     {
       "id": "bonus-cantrip",
-      "level": 2,
+      "level": 3,
       "nameEn": "Bonus Cantrip",
       "nameDe": "Zusätzlicher Zaubertrick (Druide)",
-      "descriptionEn": "When you choose this circle at 2nd level, you learn one additional druid cantrip of your choice.",
-      "descriptionDe": "Bei der Wahl dieses Zirkels auf der 2. Stufe kannst du dir einen beliebigen Zaubertrick aus der Zauberliste des Druiden aussuchen.",
+      "descriptionEn": "When you choose this circle at 3rd level, you learn one additional druid cantrip of your choice.",
+      "descriptionDe": "Bei der Wahl dieses Zirkels auf der 3. Stufe kannst du dir einen beliebigen Zaubertrick aus der Zauberliste des Druiden aussuchen.",
       "subclass": "land"
     },
     {
       "id": "natural-recovery",
-      "level": 2,
+      "level": 3,
       "nameEn": "Natural Recovery",
       "nameDe": "Natürliche Erholung",
-      "descriptionEn": "Starting at 2nd level, you can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest.\n\nFor example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
-      "descriptionDe": "Ab Stufe 2 kannst du ein wenig deiner magischen Energie zurückgewinnen, indem du in Meditation verharrst und deinen Geist mit der Natur vereinst.\n\nIm Rahmen einer kurzen Rast kannst du dir eine gewisse Anzahl verbrauchter Zauberplätze aussuchen, die du wiedererlangst. Die Zauberplätze dürfen zusammengenommen höchstens eine Gradzahl besitzen, die kleiner oder gleich der Hälfte deiner Stufe als Druide ist (abgerundet). Darüber hinaus darf keiner der Zauberplätze Grad 6 oder höher sein. Diese Fähigkeit kannst du erst nach einer langen Rast erneut einsetzen.\n\nBist du beispielsweise ein Druide der 4. Stufe, kannst du bis zu zwei Grade an Zauberplätzen wiedererlangen. Du kannst also entweder zwei Zauberplätze des 1. Grades oder einen Zauberplatz des 2. Grades zurückgewinnen.",
+      "descriptionEn": "Starting at 3rd level, you can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest.\n\nFor example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
+      "descriptionDe": "Ab Stufe 3 kannst du ein wenig deiner magischen Energie zurückgewinnen, indem du in Meditation verharrst und deinen Geist mit der Natur vereinst.\n\nIm Rahmen einer kurzen Rast kannst du dir eine gewisse Anzahl verbrauchter Zauberplätze aussuchen, die du wiedererlangst. Die Zauberplätze dürfen zusammengenommen höchstens eine Gradzahl besitzen, die kleiner oder gleich der Hälfte deiner Stufe als Druide ist (abgerundet). Darüber hinaus darf keiner der Zauberplätze Grad 6 oder höher sein. Diese Fähigkeit kannst du erst nach einer langen Rast erneut einsetzen.\n\nBist du beispielsweise ein Druide der 4. Stufe, kannst du bis zu zwei Grade an Zauberplätzen wiedererlangen. Du kannst also entweder zwei Zauberplätze des 1. Grades oder einen Zauberplatz des 2. Grades zurückgewinnen.",
       "subclass": "land"
     },
     {
@@ -499,20 +500,20 @@
       "features": [
         {
           "id": "bonus-cantrip",
-          "level": 2,
+          "level": 3,
           "nameEn": "Bonus Cantrip",
           "nameDe": "Zusätzlicher Zaubertrick (Druide)",
-          "descriptionEn": "When you choose this circle at 2nd level, you learn one additional druid cantrip of your choice.",
-          "descriptionDe": "Bei der Wahl dieses Zirkels auf der 2. Stufe kannst du dir einen beliebigen Zaubertrick aus der Zauberliste des Druiden aussuchen.",
+          "descriptionEn": "When you choose this circle at 3rd level, you learn one additional druid cantrip of your choice.",
+          "descriptionDe": "Bei der Wahl dieses Zirkels auf der 3. Stufe kannst du dir einen beliebigen Zaubertrick aus der Zauberliste des Druiden aussuchen.",
           "subclass": "land"
         },
         {
           "id": "natural-recovery",
-          "level": 2,
+          "level": 3,
           "nameEn": "Natural Recovery",
           "nameDe": "Natürliche Erholung",
-          "descriptionEn": "Starting at 2nd level, you can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest.\n\nFor example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
-          "descriptionDe": "Ab Stufe 2 kannst du ein wenig deiner magischen Energie zurückgewinnen, indem du in Meditation verharrst und deinen Geist mit der Natur vereinst.\n\nIm Rahmen einer kurzen Rast kannst du dir eine gewisse Anzahl verbrauchter Zauberplätze aussuchen, die du wiedererlangst. Die Zauberplätze dürfen zusammengenommen höchstens eine Gradzahl besitzen, die kleiner oder gleich der Hälfte deiner Stufe als Druide ist (abgerundet). Darüber hinaus darf keiner der Zauberplätze Grad 6 oder höher sein. Diese Fähigkeit kannst du erst nach einer langen Rast erneut einsetzen.\n\nBist du beispielsweise ein Druide der 4. Stufe, kannst du bis zu zwei Grade an Zauberplätzen wiedererlangen. Du kannst also entweder zwei Zauberplätze des 1. Grades oder einen Zauberplatz des 2. Grades zurückgewinnen.",
+          "descriptionEn": "Starting at 3rd level, you can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest.\n\nFor example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
+          "descriptionDe": "Ab Stufe 3 kannst du ein wenig deiner magischen Energie zurückgewinnen, indem du in Meditation verharrst und deinen Geist mit der Natur vereinst.\n\nIm Rahmen einer kurzen Rast kannst du dir eine gewisse Anzahl verbrauchter Zauberplätze aussuchen, die du wiedererlangst. Die Zauberplätze dürfen zusammengenommen höchstens eine Gradzahl besitzen, die kleiner oder gleich der Hälfte deiner Stufe als Druide ist (abgerundet). Darüber hinaus darf keiner der Zauberplätze Grad 6 oder höher sein. Diese Fähigkeit kannst du erst nach einer langen Rast erneut einsetzen.\n\nBist du beispielsweise ein Druide der 4. Stufe, kannst du bis zu zwei Grade an Zauberplätzen wiedererlangen. Du kannst also entweder zwei Zauberplätze des 1. Grades oder einen Zauberplatz des 2. Grades zurückgewinnen.",
           "subclass": "land"
         },
         {

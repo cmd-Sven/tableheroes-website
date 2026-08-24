@@ -151,7 +151,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [srdRaceId, setSrdRaceId] = useState<RaceId>("human");
   const [baseAbilities, setBaseAbilities] =
     useState<Record<AbilityKeyShort, number>>(DEFAULT_ABILITIES);
-  const [applyRacialBonuses, setApplyRacialBonuses] = useState(true);
+  const [applyRacialBonuses, setApplyRacialBonuses] = useState(false);
   const [spellIds, setSpellIds] = useState<string[]>([]);
 
   // Step: Identität
@@ -485,7 +485,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
       <div
         className={`relative w-full rounded-lg border border-accent-gold/30 shadow-2xl flex flex-col overflow-hidden ${isPageMode ? "" : "max-w-4xl max-h-[90vh]"}`}
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

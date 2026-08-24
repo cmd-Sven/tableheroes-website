@@ -112,7 +112,7 @@ export function SecretDetailModal({
       <div
         className="relative z-50 w-full max-w-4xl max-h-[90vh] rounded-xl border-2 border-accent-gold/50 bg-background-card shadow-2xl overflow-hidden flex flex-col"
         style={{
-          backgroundImage: "url('/images/scroll-paper.png')",
+          backgroundImage: "url('/images/scroll-paper.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",

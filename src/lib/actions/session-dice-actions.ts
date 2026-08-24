@@ -1,6 +1,8 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
 import {
   appendSessionActivity,
   type SessionActivityEntry,
@@ -18,7 +20,7 @@ import {
   resolveLiveDiceSheetModifier,
   type LiveDiceRollKind,
 } from "@/src/lib/session/resolve-live-dice-modifier";
-import { parseDiceSkinId } from "@/src/lib/session/dice-skins";
+import { parseDiceSkinId, isGmDiceRollerId } from "@/src/lib/session/dice-skins";
 
 export type RequestLiveDiceRollInput = {
   sessionId: string;
@@ -117,10 +119,40 @@ function buildActivityText(
 export async function requestLiveDiceRoll(
   input: RequestLiveDiceRollInput,
 ): Promise<SessionActivityEntry> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
   const characterId = input.characterId?.trim();
   const characterName = input.characterName?.trim();
   if (!characterId || !characterName) {
     throw new Error("Kein Charakter für den Wurf.");
+  }
+
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("campaign_id")
+    .eq("id", input.sessionId)
+    .maybeSingle();
+  if (!sessionRaw) throw new Error("Session nicht gefunden.");
+
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", String((sessionRaw as { campaign_id: string }).campaign_id))
+    .maybeSingle();
+  const isGm = isCampaignGm(
+    campaignRaw as { gm_id?: string | null; owner_id?: string | null } | null,
+    user.id,
+  );
+
+  if (isGmDiceRollerId(characterId)) {
+    if (!isGm) {
+      throw new Error("Nur der Spielleiter darf als Spielleiter würfeln.");
+    }
+    if (input.kind !== "dice" && input.kind !== "damage") {
+      throw new Error("Als Spielleiter sind nur Pool-Würfe erlaubt.");
+    }
   }
 
   const groups = normalizeDicePool(input.diceGroups ?? []);
@@ -132,6 +164,9 @@ export async function requestLiveDiceRoll(
     ? groups[0]!.sides
     : Math.max(2, Math.min(100, Math.round(input.sides)));
   const mode: DiceRollMode = input.mode ?? "normal";
+  const hasD20 = usePool
+    ? groups.some((g) => g.sides === 20 && g.count > 0)
+    : sides === 20;
 
   const sheetMod = await resolveLiveDiceSheetModifier({
     characterId,
@@ -141,6 +176,7 @@ export async function requestLiveDiceRoll(
     saveAbility: input.saveAbility,
     label: input.label,
     weaponName: input.weaponName,
+    applyExhaustionToD20: hasD20,
   });
 
   const modifier = sheetMod.modifier;

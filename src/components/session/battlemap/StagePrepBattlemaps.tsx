@@ -10,6 +10,7 @@ import {
   updateSessionBattlemapGrid,
 } from "@/src/lib/actions/battlemap-actions";
 import { BattlemapGridOverlay } from "@/src/components/session/battlemap/BattlemapGridOverlay";
+import { isEmptyParchmentBattlemap } from "@/src/lib/session/empty-battlemap";
 import {
   DEFAULT_BATTLEMAP_GRID,
   type BattlemapGridConfig,
@@ -250,6 +251,7 @@ export function StagePrepBattlemaps({
         <h2 className="font-cinzel text-xl text-hero-vibrant">Battlemaps</h2>
         <p className="mt-1 text-sm text-gray-400 font-libre">
           Karten für die Live-Session vorbereiten, Raster kalibrieren und in der Session aktivieren.
+          Die leere Pergament-Karte (60×60) steht immer zur Auswahl bereit.
         </p>
       </div>
 
@@ -292,14 +294,17 @@ export function StagePrepBattlemaps({
 
       {maps.length === 0 ? (
         <p className="text-sm text-gray-500 font-libre italic">
-          Noch keine Battlemaps — lade eine Karte hoch, um das Raster zu kalibrieren.
+          Noch keine Battlemaps — die leere Pergament-Karte erscheint automatisch, sobald die
+          Session geladen wird. Du kannst zusätzlich eigene Karten hochladen.
         </p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
           <div className="space-y-2">
             <p className="font-barlow text-xs font-bold uppercase text-gray-500">Vorhandene Maps</p>
             <ul className="space-y-2">
-              {maps.map((m) => (
+              {maps.map((m) => {
+                const isSystemEmpty = isEmptyParchmentBattlemap(m);
+                return (
                 <li key={m.id}>
                   <button
                     type="button"
@@ -322,7 +327,13 @@ export function StagePrepBattlemaps({
                     </div>
                     <span className="min-w-0 flex-1 truncate font-cinzel text-sm text-white">
                       {m.title}
+                      {isSystemEmpty ? (
+                        <span className="ml-2 font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold">
+                          Standard · 60×60
+                        </span>
+                      ) : null}
                     </span>
+                    {isSystemEmpty ? null : (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -334,9 +345,11 @@ export function StagePrepBattlemaps({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
+                    )}
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
 
@@ -347,7 +360,9 @@ export function StagePrepBattlemaps({
                   Raster kalibrieren — {selected.title}
                 </p>
                 <p className="mt-1 font-libre text-xs text-gray-400">
-                  Schieberegler bewegen — das Raster aktualisiert sich live auf der Vorschau.
+                  {isEmptyParchmentBattlemap(selected)
+                    ? "Standardkarte: festes 60×60-Raster auf Pergament. Raster kann bei Bedarf angepasst werden."
+                    : "Schieberegler bewegen — das Raster aktualisiert sich live auf der Vorschau."}{" "}
                   Bild: {previewSize.width}×{previewSize.height}px
                 </p>
               </div>

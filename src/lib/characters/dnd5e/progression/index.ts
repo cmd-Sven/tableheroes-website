@@ -58,6 +58,7 @@ export {
   syncSpellSlotsFromClass,
   canLearnSpellFromCatalog,
   catalogSpellsForPicker,
+  classDisplayName,
   enrichItemDescriptionFromCatalog,
   matchSheetFeatureToFeat,
 } from "./catalog-bridge";

@@ -112,7 +112,7 @@ export function LoreGallery({ lore: initialLore, isGM, onUpdate }: Props) {
         className="rounded-lg p-6 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.8)] transition-shadow duration-300"
         style={{
           border: "3px solid #B8860B",
-          backgroundImage: "url('/images/backgrounds/dark-marble.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

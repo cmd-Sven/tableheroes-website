@@ -4,7 +4,7 @@
   "nameDe": "Kleriker",
   "hitDie": 8,
   "caster": "full",
-  "subclassLevel": 1,
+  "subclassLevel": 3,
   "asiLevels": [
     4,
     8,
@@ -16,9 +16,7 @@
     {
       "level": 1,
       "featureIds": [
-        "spellcasting-cleric",
-        "divine-domain",
-        "domain-spells-1"
+        "spellcasting-cleric"
       ],
       "spellSlots": {
         "1": 2
@@ -40,6 +38,8 @@
     {
       "level": 3,
       "featureIds": [
+        "domain-spells-1",
+        "divine-domain",
         "domain-spells-2"
       ],
       "spellSlots": {
@@ -319,16 +319,16 @@
     },
     {
       "id": "divine-domain",
-      "level": 1,
+      "level": 3,
       "nameEn": "Divine Domain",
       "nameDe": "Göttliche Domänen",
-      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
-      "descriptionDe": "Suche dir eine Domäne aus, die in Verbindung mit deiner Gottheit steht, wie etwa Leben oder Grab. Schon auf Stufe 1 erhältst du durch deine Wahl Domänenzauber und andere Fähigkeiten. Ab Stufe 2 kannst du das Merkmal Göttliche Macht je nach Domäne unterschiedlich einsetzen. Außerdem erlangst du weitere Vorzüge auf den Stufen 6, 8 und 17.\n\nDomänenzauber\n\nZu jeder Domäne gehört eine Liste von Domänenzaubern, die du auf bestimmten Klerikerstufen erhältst. Domänenzauber gelten immer als vorbereitet und zählen nicht in Bezug auf die maximale Anzahl deiner vorbereiteten Zauber.\n\nFalls du einen Domänenzauber lernst, der nicht in der Zauberliste für Kleriker aufgeführt ist, gilt er für dich trotzdem als Klerikerzauber.",
+      "descriptionEn": "Choose one domain related to your deity. Your domain grants you domain spells and other features when you choose it at 3rd level (2024). Additional benefits typically follow at 6th, 8th, and 17th levels. If you take a 2014-legacy domain, you gain all of that domain's features of 3rd level or lower when you choose it.",
+      "descriptionDe": "Wähle eine Domäne, die zu deiner Gottheit passt. Du erhältst Domänenzauber und Domänenmerkmale, wenn du sie auf der 3. Stufe wählst (2024). Weitere Vorzüge folgen typischerweise auf den Stufen 6, 8 und 17. Bei einer 2014-Legacy-Domäne erhältst du beim Wählen alle Merkmale der Stufe 3 oder niedriger.",
       "subclass": null
     },
     {
       "id": "domain-spells-1",
-      "level": 1,
+      "level": 3,
       "nameEn": "Domain Spells",
       "nameDe": "Bereichszauber",
       "descriptionEn": "Each domain has a list of spells--its domain spells--that you gain at the cleric levels noted in the domain description. Once you gain a domain spell, you always have it prepared, and it doesn't count against the number of spells you can prepare each day.\n\nIf you have a domain spell that doesn't appear on the cleric spell list, the spell is nonetheless a cleric spell for you.",
@@ -358,7 +358,7 @@
       "level": 2,
       "nameEn": "Divine Domain feature",
       "nameDe": "Merkmal des Göttlichen Bereichs",
-      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
+      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 3rd level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
       "descriptionDe": "Du erhältst ein Merkmal deines Göttlichen Bereichs.",
       "subclass": null
     },
@@ -412,7 +412,7 @@
       "level": 6,
       "nameEn": "Divine Domain feature",
       "nameDe": "Merkmal des Göttlichen Bereichs",
-      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
+      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 3rd level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
       "descriptionDe": "Du erhältst ein Merkmal deines Göttlichen Bereichs.",
       "subclass": null
     },
@@ -448,7 +448,7 @@
       "level": 8,
       "nameEn": "Divine Domain feature",
       "nameDe": "Merkmal des Göttlichen Bereichs",
-      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
+      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 3rd level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
       "descriptionDe": "Du erhältst ein Merkmal deines Göttlichen Bereichs.",
       "subclass": null
     },
@@ -520,7 +520,7 @@
       "level": 17,
       "nameEn": "Divine Domain feature",
       "nameDe": "Merkmal des Göttlichen Bereichs",
-      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
+      "descriptionEn": "Choose one domain related to your deity, such as Knowledge, Life, Light, Nature, Tempest, Trickery, or War. Only the Life domain is detailed in the Open Game Licensed SRD. Additional Domains are described in the official rulebooks or products from other publishers.\n\nYour domain grants you domain spells and other features when you choose it at 3rd level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels.",
       "descriptionDe": "Du erhältst ein Merkmal deines Göttlichen Bereichs.",
       "subclass": null
     },
@@ -553,29 +553,29 @@
     },
     {
       "id": "bonus-proficiency",
-      "level": 1,
+      "level": 3,
       "nameEn": "Bonus Proficiency",
       "nameDe": "Zusätzliche Übung",
-      "descriptionEn": "When you choose this domain at 1st level, you gain proficiency with heavy armor.",
-      "descriptionDe": "Du erhältst eine zusätzliche Übung gemäß deiner Klasse oder Unterklasse.",
+      "descriptionEn": "When you choose this domain, you do not gain extra heavy-armor proficiency from the domain (2024). Martial training instead comes from the Cleric Divine Order (Protector).",
+      "descriptionDe": "Wenn du diese Domäne wählst, erhältst du durch die Domäne keine zusätzliche Übung mit schwerer Rüstung (2024). Kampfausbildung kommt über die göttliche Ordnung (Beschützer) der Kleriker-Klasse.",
       "subclass": "life"
     },
     {
       "id": "disciple-of-life",
-      "level": 1,
+      "level": 3,
       "nameEn": "Disciple of Life",
       "nameDe": "Jünger des Lebens",
-      "descriptionEn": "Also starting at 1st level, your healing spells are more effective. Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional hit points equal to 2 + the spell's level.",
-      "descriptionDe": "Ebenfalls mit der 1. Stufe werden deine Heilzauber effektiver. Immer wenn du einen Zauber des 1. Grades oder höher wirkst, der bei einer Kreatur Trefferpunkte wiederherstellt, erhält diese zusätzliche Trefferpunkte in Höhe von 2 + dem Grad des Zaubers zurück.",
+      "descriptionEn": "Your healing spells are more effective. Whenever you restore Hit Points to a creature with a spell of 1st level or higher, that creature also regains additional Hit Points equal to 2 plus the spell's level on the turn you cast the spell.",
+      "descriptionDe": "Deine Heilzauber sind wirksamer. Immer wenn du einer Kreatur mit einem Zauber des 1. Grades oder höher Trefferpunkte zurückgibst, erhält sie in dem Zug, in dem du den Zauber wirkst, zusätzlich 2 + Zaubergrad Trefferpunkte.",
       "subclass": "life"
     },
     {
       "id": "channel-divinity-preserve-life",
-      "level": 2,
+      "level": 3,
       "nameEn": "Channel Divinity: Preserve Life",
       "nameDe": "Göttliche Macht fokussieren: Leben erhalten",
-      "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to heal the badly injured.\n\nAs an action, you present your holy symbol and evoke healing energy that can restore a number of hit points equal to five times your cleric level.\n\nChoose any creatures within 30 feet of you, and divide those hit points among them. This feature can restore a creature to no more than half of its hit point maximum. You can't use this feature on an undead or a construct.",
-      "descriptionDe": "Von der 2. Stufe an kannst du eine Welle göttlicher Macht hervorrufen, die schwerste Verletzungen zu heilen vermag.\n\nAls Aktion zeigst du dein heiliges Symbol und setzt dein Merkmal Göttliche Macht fokussieren ein, um eine Anzahl von Trefferpunkten in Höhe deine Stufe als Kleriker mal 5 wiederherzustellen.\n\nAls Ziel bestimmst du innerhalb von 9 m beliebig viele Kreaturen, unter denen du die Trefferpunkte aufteilst. Diese Fähigkeit kann keine Trefferpunkte über die Hälfte des Trefferpunktemaximums hinaus zurückgeben und wirkt nicht bei Konstrukten und Untoten.",
+      "descriptionEn": "You can use Channel Divinity to heal the badly injured. As a Magic action, present your Holy Symbol and expend a use of Channel Divinity to restore Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet and divide those Hit Points among them. This can restore a creature to no more than half its Hit Point maximum. Works on Undead and Constructs; Bloodied targets only (2024).",
+      "descriptionDe": "Du kannst Göttliche Macht nutzen, um Schwerverletzte zu heilen. Als Magieaktion zeigst du dein heiliges Symbol und gibst eine Anwendung aus, um Trefferpunkte in Höhe des Fünffachen deiner Klerikerstufe zu verteilen. Wähle blutige Kreaturen (weniger als die Hälfte ihrer Trefferpunkte) im Umkreis von 9 m. Keine Kreatur kann über die Hälfte ihres Maximums hinaus geheilt werden. Wirkt auch auf Untote und Konstrukte; nur blutige Ziele (2024).",
       "subclass": "life"
     },
     {
@@ -607,7 +607,7 @@
     },
     {
       "id": "life-domain-spells-1",
-      "level": 1,
+      "level": 3,
       "nameEn": "Domain Spells (1st)",
       "nameDe": "Domänenzauber (1. Grad)",
       "descriptionEn": "You always have the following spells prepared: Bless, Cure Wounds. They don't count against your number of prepared spells.",
@@ -623,12 +623,12 @@
       "level": 3,
       "nameEn": "Domain Spells (2nd)",
       "nameDe": "Domänenzauber (2. Grad)",
-      "descriptionEn": "You always have the following spells prepared: Lesser Restoration, Spiritual Weapon.",
-      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Geringe Wiederherstellung, Geistige Waffe.",
+      "descriptionEn": "You always have the following spells prepared: Lesser Restoration, Aid. They don't count against your number of prepared spells.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Geringe Wiederherstellung, Hilfe. Sie zählen nicht gegen deine vorbereiteten Zauber.",
       "subclass": "life",
       "grantedSpellIds": [
         "lesser-restoration",
-        "spiritual-weapon"
+        "aid"
       ]
     },
     {
@@ -636,11 +636,11 @@
       "level": 5,
       "nameEn": "Domain Spells (3rd)",
       "nameDe": "Domänenzauber (3. Grad)",
-      "descriptionEn": "You always have the following spells prepared: Beacon of Hope, Revivify.",
-      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Hoffnungsschimmer, Wiederbeleben.",
+      "descriptionEn": "You always have the following spells prepared: Mass Healing Word, Revivify.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Massen-Heilendes Wort, Wiederbeleben.",
       "subclass": "life",
       "grantedSpellIds": [
-        "beacon-of-hope",
+        "mass-healing-word",
         "revivify"
       ]
     },
@@ -649,12 +649,12 @@
       "level": 7,
       "nameEn": "Domain Spells (4th)",
       "nameDe": "Domänenzauber (4. Grad)",
-      "descriptionEn": "You always have the following spells prepared: Death Ward, Guardian of Faith.",
-      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Todesschutz, Glaubenswächter.",
+      "descriptionEn": "You always have the following spells prepared: Aura of Life, Death Ward.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Aura des Lebens, Todesschutz.",
       "subclass": "life",
       "grantedSpellIds": [
-        "death-ward",
-        "guardian-of-faith"
+        "aura-of-life",
+        "death-ward"
       ]
     },
     {
@@ -662,30 +662,30 @@
       "level": 9,
       "nameEn": "Domain Spells (5th)",
       "nameDe": "Domänenzauber (5. Grad)",
-      "descriptionEn": "You always have the following spells prepared: Mass Cure Wounds, Raise Dead.",
-      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Massen-Wunden heilen, Tote erwecken.",
+      "descriptionEn": "You always have the following spells prepared: Greater Restoration, Mass Cure Wounds.",
+      "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Höhere Wiederherstellung, Massen-Wunden heilen.",
       "subclass": "life",
       "grantedSpellIds": [
-        "mass-cure-wounds",
-        "raise-dead"
+        "greater-restoration",
+        "mass-cure-wounds"
       ]
     },
     {
       "id": "grave-armor",
-      "level": 1,
+      "level": 3,
       "nameEn": "Grave Domain Armor",
       "nameDe": "Rüstung der Grab-Domäne",
-      "descriptionEn": "When you choose this domain at 1st level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
-      "descriptionDe": "Wenn du diese Domäne auf der 1. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
+      "descriptionEn": "When you choose this domain at 3rd level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
+      "descriptionDe": "Wenn du diese Domäne auf der 3. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
       "subclass": "grave"
     },
     {
       "id": "circle-of-mortality",
-      "level": 1,
+      "level": 3,
       "nameEn": "Circle of Mortality",
       "nameDe": "Kreis des Sterbens",
-      "descriptionEn": "At 1st level, you gain the ability to manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
-      "descriptionDe": "Auf der 1. Stufe kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m (30 Fuß), und du kannst ihn als Bonusaktion wirken.",
+      "descriptionEn": "When you choose this domain (2014 Grave / legacy, gained at 3rd level), you can manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
+      "descriptionDe": "Wenn du diese Domäne wählst (Grab 2014/Legacy; Merkmale der Stufe 3 oder niedriger werden nachgeholt), kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m, und du kannst ihn als Bonusaktion wirken.",
       "subclass": "grave",
       "grantedSpellIds": [
         "spare-the-dying"
@@ -693,16 +693,16 @@
     },
     {
       "id": "eyes-of-the-grave",
-      "level": 1,
+      "level": 3,
       "nameEn": "Eyes of the Grave",
       "nameDe": "Auge des Grabes",
-      "descriptionEn": "At 1st level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
-      "descriptionDe": "Auf der 1. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m (60 Fuß), der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+      "descriptionEn": "At 3rd level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+      "descriptionDe": "Auf der 3. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m, der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
       "subclass": "grave"
     },
     {
       "id": "grave-domain-spells-1",
-      "level": 1,
+      "level": 3,
       "nameEn": "Domain Spells (1st)",
       "nameDe": "Domänenzauber (1. Grad)",
       "descriptionEn": "You always have the following spells prepared: Bane, False Life. They don't count against your number of prepared spells and are cleric spells for you.",
@@ -715,11 +715,11 @@
     },
     {
       "id": "channel-divinity-path-to-the-grave",
-      "level": 2,
+      "level": 3,
       "nameEn": "Channel Divinity: Path to the Grave",
       "nameDe": "Göttliche Macht fokussieren: Pfad zum Grab",
-      "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
-      "descriptionDe": "Ab der 2. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
+      "descriptionEn": "Starting at 3rd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
+      "descriptionDe": "Ab der 3. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
       "subclass": "grave"
     },
     {
@@ -810,29 +810,29 @@
       "features": [
         {
           "id": "bonus-proficiency",
-          "level": 1,
+          "level": 3,
           "nameEn": "Bonus Proficiency",
           "nameDe": "Zusätzliche Übung",
-          "descriptionEn": "When you choose this domain at 1st level, you gain proficiency with heavy armor.",
-          "descriptionDe": "Du erhältst eine zusätzliche Übung gemäß deiner Klasse oder Unterklasse.",
+          "descriptionEn": "When you choose this domain, you do not gain extra heavy-armor proficiency from the domain (2024). Martial training instead comes from the Cleric Divine Order (Protector).",
+          "descriptionDe": "Wenn du diese Domäne wählst, erhältst du durch die Domäne keine zusätzliche Übung mit schwerer Rüstung (2024). Kampfausbildung kommt über die göttliche Ordnung (Beschützer) der Kleriker-Klasse.",
           "subclass": "life"
         },
         {
           "id": "disciple-of-life",
-          "level": 1,
+          "level": 3,
           "nameEn": "Disciple of Life",
           "nameDe": "Jünger des Lebens",
-          "descriptionEn": "Also starting at 1st level, your healing spells are more effective. Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional hit points equal to 2 + the spell's level.",
-          "descriptionDe": "Ebenfalls mit der 1. Stufe werden deine Heilzauber effektiver. Immer wenn du einen Zauber des 1. Grades oder höher wirkst, der bei einer Kreatur Trefferpunkte wiederherstellt, erhält diese zusätzliche Trefferpunkte in Höhe von 2 + dem Grad des Zaubers zurück.",
+          "descriptionEn": "Your healing spells are more effective. Whenever you restore Hit Points to a creature with a spell of 1st level or higher, that creature also regains additional Hit Points equal to 2 plus the spell's level on the turn you cast the spell.",
+          "descriptionDe": "Deine Heilzauber sind wirksamer. Immer wenn du einer Kreatur mit einem Zauber des 1. Grades oder höher Trefferpunkte zurückgibst, erhält sie in dem Zug, in dem du den Zauber wirkst, zusätzlich 2 + Zaubergrad Trefferpunkte.",
           "subclass": "life"
         },
         {
           "id": "channel-divinity-preserve-life",
-          "level": 2,
+          "level": 3,
           "nameEn": "Channel Divinity: Preserve Life",
           "nameDe": "Göttliche Macht fokussieren: Leben erhalten",
-          "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to heal the badly injured.\n\nAs an action, you present your holy symbol and evoke healing energy that can restore a number of hit points equal to five times your cleric level.\n\nChoose any creatures within 30 feet of you, and divide those hit points among them. This feature can restore a creature to no more than half of its hit point maximum. You can't use this feature on an undead or a construct.",
-          "descriptionDe": "Von der 2. Stufe an kannst du eine Welle göttlicher Macht hervorrufen, die schwerste Verletzungen zu heilen vermag.\n\nAls Aktion zeigst du dein heiliges Symbol und setzt dein Merkmal Göttliche Macht fokussieren ein, um eine Anzahl von Trefferpunkten in Höhe deine Stufe als Kleriker mal 5 wiederherzustellen.\n\nAls Ziel bestimmst du innerhalb von 9 m beliebig viele Kreaturen, unter denen du die Trefferpunkte aufteilst. Diese Fähigkeit kann keine Trefferpunkte über die Hälfte des Trefferpunktemaximums hinaus zurückgeben und wirkt nicht bei Konstrukten und Untoten.",
+          "descriptionEn": "You can use Channel Divinity to heal the badly injured. As a Magic action, present your Holy Symbol and expend a use of Channel Divinity to restore Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet and divide those Hit Points among them. This can restore a creature to no more than half its Hit Point maximum. Works on Undead and Constructs; Bloodied targets only (2024).",
+          "descriptionDe": "Du kannst Göttliche Macht nutzen, um Schwerverletzte zu heilen. Als Magieaktion zeigst du dein heiliges Symbol und gibst eine Anwendung aus, um Trefferpunkte in Höhe des Fünffachen deiner Klerikerstufe zu verteilen. Wähle blutige Kreaturen (weniger als die Hälfte ihrer Trefferpunkte) im Umkreis von 9 m. Keine Kreatur kann über die Hälfte ihres Maximums hinaus geheilt werden. Wirkt auch auf Untote und Konstrukte; nur blutige Ziele (2024).",
           "subclass": "life"
         },
         {
@@ -864,7 +864,7 @@
         },
         {
           "id": "life-domain-spells-1",
-          "level": 1,
+          "level": 3,
           "nameEn": "Domain Spells (1st)",
           "nameDe": "Domänenzauber (1. Grad)",
           "descriptionEn": "You always have the following spells prepared: Bless, Cure Wounds. They don't count against your number of prepared spells.",
@@ -880,12 +880,12 @@
           "level": 3,
           "nameEn": "Domain Spells (2nd)",
           "nameDe": "Domänenzauber (2. Grad)",
-          "descriptionEn": "You always have the following spells prepared: Lesser Restoration, Spiritual Weapon.",
-          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Geringe Wiederherstellung, Geistige Waffe.",
+          "descriptionEn": "You always have the following spells prepared: Lesser Restoration, Aid. They don't count against your number of prepared spells.",
+          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Geringe Wiederherstellung, Hilfe. Sie zählen nicht gegen deine vorbereiteten Zauber.",
           "subclass": "life",
           "grantedSpellIds": [
             "lesser-restoration",
-            "spiritual-weapon"
+            "aid"
           ]
         },
         {
@@ -893,11 +893,11 @@
           "level": 5,
           "nameEn": "Domain Spells (3rd)",
           "nameDe": "Domänenzauber (3. Grad)",
-          "descriptionEn": "You always have the following spells prepared: Beacon of Hope, Revivify.",
-          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Hoffnungsschimmer, Wiederbeleben.",
+          "descriptionEn": "You always have the following spells prepared: Mass Healing Word, Revivify.",
+          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Massen-Heilendes Wort, Wiederbeleben.",
           "subclass": "life",
           "grantedSpellIds": [
-            "beacon-of-hope",
+            "mass-healing-word",
             "revivify"
           ]
         },
@@ -906,12 +906,12 @@
           "level": 7,
           "nameEn": "Domain Spells (4th)",
           "nameDe": "Domänenzauber (4. Grad)",
-          "descriptionEn": "You always have the following spells prepared: Death Ward, Guardian of Faith.",
-          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Todesschutz, Glaubenswächter.",
+          "descriptionEn": "You always have the following spells prepared: Aura of Life, Death Ward.",
+          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Aura des Lebens, Todesschutz.",
           "subclass": "life",
           "grantedSpellIds": [
-            "death-ward",
-            "guardian-of-faith"
+            "aura-of-life",
+            "death-ward"
           ]
         },
         {
@@ -919,12 +919,12 @@
           "level": 9,
           "nameEn": "Domain Spells (5th)",
           "nameDe": "Domänenzauber (5. Grad)",
-          "descriptionEn": "You always have the following spells prepared: Mass Cure Wounds, Raise Dead.",
-          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Massen-Wunden heilen, Tote erwecken.",
+          "descriptionEn": "You always have the following spells prepared: Greater Restoration, Mass Cure Wounds.",
+          "descriptionDe": "Du hast stets die folgenden Zauber vorbereitet: Höhere Wiederherstellung, Massen-Wunden heilen.",
           "subclass": "life",
           "grantedSpellIds": [
-            "mass-cure-wounds",
-            "raise-dead"
+            "greater-restoration",
+            "mass-cure-wounds"
           ]
         }
       ]
@@ -936,11 +936,11 @@
       "features": [
         {
           "id": "circle-of-mortality",
-          "level": 1,
+          "level": 3,
           "nameEn": "Circle of Mortality",
           "nameDe": "Kreis des Sterbens",
-          "descriptionEn": "At 1st level, you gain the ability to manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
-          "descriptionDe": "Auf der 1. Stufe kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m (30 Fuß), und du kannst ihn als Bonusaktion wirken.",
+          "descriptionEn": "When you choose this domain (2014 Grave / legacy, gained at 3rd level), you can manipulate the line between life and death. When you would normally roll one or more dice to restore hit points with a spell to a creature at 0 hit points, you instead use the highest number possible for each die.\n\nIn addition, you learn the Spare the Dying cantrip, which doesn't count against the number of cleric cantrips you know. For you, it has a range of 30 feet, and you can cast it as a bonus action.",
+          "descriptionDe": "Wenn du diese Domäne wählst (Grab 2014/Legacy; Merkmale der Stufe 3 oder niedriger werden nachgeholt), kannst du die Grenze zwischen Leben und Tod beeinflussen. Würfelst du normalerweise mit einem oder mehreren Würfeln, um einer Kreatur mit 0 Trefferpunkten durch einen Zauber Trefferpunkte wiederherzustellen, verwendest du stattdessen für jeden Würfel das höchstmögliche Ergebnis.\n\nAußerdem erlernst du den Zaubertrick Sterbende schonen, der nicht gegen die Anzahl deiner bekannten Kleriker-Zaubertricks zählt. Für dich hat er eine Reichweite von 9 m, und du kannst ihn als Bonusaktion wirken.",
           "subclass": "grave",
           "grantedSpellIds": [
             "spare-the-dying"
@@ -948,25 +948,25 @@
         },
         {
           "id": "eyes-of-the-grave",
-          "level": 1,
+          "level": 3,
           "nameEn": "Eyes of the Grave",
           "nameDe": "Auge des Grabes",
-          "descriptionEn": "At 1st level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
-          "descriptionDe": "Auf der 1. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m (60 Fuß), der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
+          "descriptionEn": "At 3rd level, you can occasionally sense the presence of the undead. As an action, you open your awareness to magically detect undead. Until the end of your next turn, you know the location of any undead within 60 feet of you that isn't behind total cover and that isn't protected from divination magic. This sense doesn't tell you anything about a creature's capabilities or identity.\n\nYou can use this feature a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+          "descriptionDe": "Auf der 3. Stufe kannst du gelegentlich die Anwesenheit von Untoten spüren. Als Aktion öffnest du deine Wahrnehmung, um Untote magisch wahrzunehmen. Bis zum Ende deines nächsten Zuges kennst du den Aufenthaltsort jedes Untoten innerhalb von 18 m, der sich nicht hinter vollständiger Deckung befindet und nicht vor Wahrsagungsmagie geschützt ist. Dieser Sinn verrät dir nichts über Fähigkeiten oder Identität der Kreatur.\n\nDu kannst dieses Merkmal so oft einsetzen, wie dein Weisheitsmodifikator angibt (mindestens einmal). Alle verbrauchten Anwendungen erhältst du nach einer langen Rast zurück.",
           "subclass": "grave"
         },
         {
           "id": "grave-armor",
-          "level": 1,
+          "level": 3,
           "nameEn": "Grave Domain Armor",
           "nameDe": "Rüstung der Grab-Domäne",
-          "descriptionEn": "When you choose this domain at 1st level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
-          "descriptionDe": "Wenn du diese Domäne auf der 1. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
+          "descriptionEn": "When you choose this domain at 3rd level, you do not gain proficiency with heavy armor. You remain proficient with light armor, medium armor, and shields (as a cleric).",
+          "descriptionDe": "Wenn du diese Domäne auf der 3. Stufe wählst, erhältst du keine Übung mit schwerer Rüstung. Wie alle Kleriker bist du in leichter und mittlerer Rüstung sowie mit Schilden geübt.",
           "subclass": "grave"
         },
         {
           "id": "grave-domain-spells-1",
-          "level": 1,
+          "level": 3,
           "nameEn": "Domain Spells (1st)",
           "nameDe": "Domänenzauber (1. Grad)",
           "descriptionEn": "You always have the following spells prepared: Bane, False Life. They don't count against your number of prepared spells and are cleric spells for you.",
@@ -979,11 +979,11 @@
         },
         {
           "id": "channel-divinity-path-to-the-grave",
-          "level": 2,
+          "level": 3,
           "nameEn": "Channel Divinity: Path to the Grave",
           "nameDe": "Göttliche Macht fokussieren: Pfad zum Grab",
-          "descriptionEn": "Starting at 2nd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
-          "descriptionDe": "Ab der 2. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m (30 Fuß) sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
+          "descriptionEn": "Starting at 3rd level, you can use your Channel Divinity to mark another creature's life force for termination.\n\nAs an action, you choose one creature you can see within 30 feet of you, cursing it until the end of your next turn. The next time you or an ally of yours hits the cursed creature with an attack, the creature has vulnerability to all of that attack's damage, and then the curse ends.",
+          "descriptionDe": "Ab der 3. Stufe kannst du Göttliche Macht fokussieren, um die Lebenskraft einer Kreatur für das Ende zu markieren.\n\nAls Aktion wählst du eine Kreatur, die du innerhalb von 9 m sehen kannst, und verfluchst sie bis zum Ende deines nächsten Zuges. Triffst du oder ein Verbündeter die verfluchte Kreatur das nächste Mal mit einem Angriff, ist sie verwundbar gegen den gesamten Schaden dieses Angriffs; danach endet der Fluch.",
           "subclass": "grave"
         },
         {

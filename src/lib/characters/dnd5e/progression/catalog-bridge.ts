@@ -22,7 +22,7 @@ import {
   spellsKnownForThirdCaster,
 } from "./spell-slots";
 import { resolveClassId } from "./class-ids";
-import { CLASS_NAME_DE } from "./labels-de";
+import { CLASS_NAME_DE, CLASS_NAME_EN } from "./labels-de";
 import {
   getClassProgression,
   getFeatById,
@@ -355,8 +355,7 @@ export function catalogSpellsForPicker(
 }
 
 export function classDisplayName(classId: ClassId, locale: "de" | "en"): string {
-  if (locale === "de") return CLASS_NAME_DE[classId];
-  return classId.charAt(0).toUpperCase() + classId.slice(1);
+  return locale === "de" ? CLASS_NAME_DE[classId] : CLASS_NAME_EN[classId];
 }
 
 function shopEntryToMeta(entry: ShopCatalogItem): Dnd5eItemMeta {

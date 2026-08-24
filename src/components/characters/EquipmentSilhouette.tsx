@@ -60,7 +60,7 @@ const GENERAL_SLOT_LABEL_KEYS: Record<
   misc: "equipment.uiMisc",
 };
 
-const BG_SRC = "/images/characters/equipment-silhouette-bg.png";
+const BG_SRC = "/images/characters/equipment-silhouette-bg.webp";
 
 type Props = {
   slots: Partial<Record<Dnd5eEquipmentSlot, string | null>>;

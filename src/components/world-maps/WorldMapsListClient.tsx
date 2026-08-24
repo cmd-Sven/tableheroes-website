@@ -3,15 +3,18 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Globe2, Plus, Trash2 } from "lucide-react";
+import { Globe2, Grid3X3, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   createWorldMap,
   deleteWorldMap,
+  updateWorldMap,
 } from "@/src/lib/actions/world-map-actions";
 import { uploadWorldMapImage, PROFILE_MEDIA_ACCEPT_MIME } from "@/src/lib/profile-media";
 import type { WorldMap } from "@/src/lib/world-maps/types";
+import type { BattlemapGridConfig } from "@/src/lib/session/battlemap-types";
+import { WorldMapGridModal } from "@/src/components/world-maps/WorldMapGridModal";
 
 type Props = {
   worldId: string;
@@ -19,6 +22,12 @@ type Props = {
   maps: WorldMap[];
   isGm: boolean;
   basePath: string;
+};
+
+type PendingUpload = {
+  title: string;
+  imageUrl: string;
+  imageStoragePath: string;
 };
 
 export function WorldMapsListClient({
@@ -34,8 +43,10 @@ export function WorldMapsListClient({
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
+  const [editGridMap, setEditGridMap] = useState<WorldMap | null>(null);
 
-  function handleCreate() {
+  function handlePrepareUpload() {
     if (!title.trim()) {
       toast.error("Bitte einen Titel angeben.");
       return;
@@ -51,20 +62,53 @@ export function WorldMapsListClient({
           toast.error(upload.error);
           return;
         }
-        const created = await createWorldMap({
-          worldId,
+        setPendingUpload({
           title: title.trim(),
           imageUrl: upload.publicUrl,
           imageStoragePath: upload.path,
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Upload fehlgeschlagen.");
+      }
+    });
+  }
+
+  function handleConfirmCreate(grid: BattlemapGridConfig) {
+    if (!pendingUpload) return;
+    startTransition(async () => {
+      try {
+        const created = await createWorldMap({
+          worldId,
+          title: pendingUpload.title,
+          imageUrl: pendingUpload.imageUrl,
+          imageStoragePath: pendingUpload.imageStoragePath,
+          gridConfig: grid,
         });
         setMaps((prev) => [...prev, created]);
         setTitle("");
         setFile(null);
         setCreating(false);
+        setPendingUpload(null);
         toast.success("Weltkarte angelegt.");
         router.push(`${basePath}/${created.id}`);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Anlegen fehlgeschlagen.");
+      }
+    });
+  }
+
+  function handleSaveGrid(grid: BattlemapGridConfig) {
+    if (!editGridMap) return;
+    startTransition(async () => {
+      try {
+        const updated = await updateWorldMap(editGridMap.id, worldId, {
+          gridConfig: grid,
+        });
+        setMaps((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        setEditGridMap(null);
+        toast.success("Raster gespeichert.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
       }
     });
   }
@@ -116,17 +160,18 @@ export function WorldMapsListClient({
           <button
             type="button"
             disabled={pending}
-            onClick={handleCreate}
+            onClick={handlePrepareUpload}
             className="rounded bg-hero-vibrant px-4 py-2 font-barlow text-sm font-bold uppercase text-black disabled:opacity-50"
           >
-            Anlegen & öffnen
+            Weiter: Raster einstellen
           </button>
         </div>
       )}
 
       {maps.length === 0 ? (
         <p className="font-libre text-gray-500 italic">
-          Noch keine Weltkarten. {isGm ? "Lege die erste Karte an und setze Markierungen vor der Session." : ""}
+          Noch keine Weltkarten.{" "}
+          {isGm ? "Lege die erste Karte an und setze Markierungen vor der Session." : ""}
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -152,30 +197,62 @@ export function WorldMapsListClient({
                 </div>
               </Link>
               {isGm && (
-                <button
-                  type="button"
-                  className="absolute right-2 top-2 rounded bg-black/70 p-1.5 text-red-400 hover:text-red-300"
-                  title="Löschen"
-                  onClick={() => {
-                    if (!confirm(`„${m.title}" wirklich löschen?`)) return;
-                    startTransition(async () => {
-                      try {
-                        await deleteWorldMap(m.id, worldId);
-                        setMaps((prev) => prev.filter((x) => x.id !== m.id));
-                        toast.success("Gelöscht.");
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-                      }
-                    });
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="absolute right-2 top-2 flex gap-1">
+                  <button
+                    type="button"
+                    className="rounded bg-black/70 p-1.5 text-accent-gold hover:text-white"
+                    title="Raster bearbeiten"
+                    onClick={() => setEditGridMap(m)}
+                  >
+                    <Grid3X3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded bg-black/70 p-1.5 text-red-400 hover:text-red-300"
+                    title="Löschen"
+                    onClick={() => {
+                      if (!confirm(`„${m.title}" wirklich löschen?`)) return;
+                      startTransition(async () => {
+                        try {
+                          await deleteWorldMap(m.id, worldId);
+                          setMaps((prev) => prev.filter((x) => x.id !== m.id));
+                          toast.success("Gelöscht.");
+                        } catch (e) {
+                          toast.error(
+                            e instanceof Error ? e.message : "Löschen fehlgeschlagen.",
+                          );
+                        }
+                      });
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               )}
             </li>
           ))}
         </ul>
       )}
+
+      <WorldMapGridModal
+        open={pendingUpload != null}
+        title={pendingUpload?.title ?? ""}
+        imageUrl={pendingUpload?.imageUrl ?? ""}
+        confirmLabel="Anlegen & öffnen"
+        pending={pending}
+        onCancel={() => setPendingUpload(null)}
+        onConfirm={handleConfirmCreate}
+      />
+
+      <WorldMapGridModal
+        open={editGridMap != null}
+        title={editGridMap?.title ?? ""}
+        imageUrl={editGridMap?.image_url ?? ""}
+        initialGrid={editGridMap?.grid_config}
+        pending={pending}
+        onCancel={() => setEditGridMap(null)}
+        onConfirm={handleSaveGrid}
+      />
     </div>
   );
 }

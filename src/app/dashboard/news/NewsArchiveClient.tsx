@@ -4,7 +4,7 @@ import React from "react";
 import type { NewsPost } from "@/src/lib/constants/news";
 import { NEWS_CATEGORIES } from "@/src/lib/constants/news";
 
-const PLACEHOLDER_IMAGE = "/images/dark-marmor.jpg";
+const PLACEHOLDER_IMAGE = "/images/dark-marmor.webp";
 
 function resolveNewsImageUrl(url: string | null | undefined): string {
   if (!url?.trim()) return PLACEHOLDER_IMAGE;
@@ -100,7 +100,7 @@ export function NewsArchiveClient({ posts }: Props) {
                 key={post.id}
                 className="rounded-lg border border-hero-border bg-background-card shadow-lg overflow-hidden flex flex-col"
                 style={{
-                  backgroundImage: "url('/images/dark-marmor.jpg')",
+                  backgroundImage: "url('/images/dark-marmor.webp')",
                   backgroundSize: "cover",
                 }}
               >

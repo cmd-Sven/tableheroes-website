@@ -58,7 +58,7 @@ export function BestariumGridCard({
           : "border-hero-border/40 opacity-80 hover:opacity-100"
       }`}
       style={{
-        backgroundImage: "url('/images/grunge-paper-background.jpg')",
+        backgroundImage: "url('/images/grunge-paper-background.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}

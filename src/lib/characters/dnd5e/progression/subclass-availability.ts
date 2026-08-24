@@ -12,6 +12,7 @@ export type SubclassAvailabilityEntry = {
 export type ClassSubclassAvailability = {
   /** z. B. „Unterklasse typischerweise ab Stufe 3.“ */
   unlockNoteDe: string;
+  unlockNoteEn: string;
   entries: SubclassAvailabilityEntry[];
 };
 
@@ -24,6 +25,7 @@ export const SUBCLASS_AVAILABILITY: Partial<
 > = {
   rogue: {
     unlockNoteDe: "Unterklasse typischerweise ab Stufe 3.",
+    unlockNoteEn: "Subclass typically from level 3.",
     entries: [
       { id: "thief", nameDe: "Dieb", nameEn: "Thief", inSystem: true },
       { id: "assassin", nameDe: "Assassine", nameEn: "Assassin", inSystem: false },
@@ -42,7 +44,10 @@ export const SUBCLASS_AVAILABILITY: Partial<
     ],
   },
   cleric: {
-    unlockNoteDe: "Göttliche Domäne ab Stufe 1.",
+    unlockNoteDe:
+      "Göttliche Domäne ab Stufe 3 (2024). Legacy-Domänen wie Grab erhalten beim Wählen alle Merkmale der Stufe 3 oder niedriger.",
+    unlockNoteEn:
+      "Divine Domain from level 3 (2024). Legacy domains such as Grave gain all of that domain's features of 3rd level or lower when you choose it.",
     entries: [
       { id: "life", nameDe: "Leben", nameEn: "Life", inSystem: true },
       { id: "light", nameDe: "Licht", nameEn: "Light", inSystem: false },

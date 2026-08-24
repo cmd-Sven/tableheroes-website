@@ -58,8 +58,8 @@ export function WorldLocationsListClient({ locations, worldId, worldName }: Prop
           </Link>
           <GraphicButton
             href={`/dashboard/worlds/${worldId}/locations/new`}
-            imagePath="/images/button-green-wood.png"
-            hoverImagePath="/images/button-green-wood_hover.png"
+            imagePath="/images/button-green-wood.webp"
+            hoverImagePath="/images/button-green-wood_hover.webp"
             width={192}
             height={68}
           >

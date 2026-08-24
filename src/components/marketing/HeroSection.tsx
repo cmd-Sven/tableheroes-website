@@ -21,35 +21,35 @@ interface ParallaxLayer {
 
 const PARALLAX_LAYERS: ParallaxLayer[] = [
   {
-    src: "/images/paralax/layer-e-himmel.png",
+    src: "/images/paralax/layer-e-himmel.webp",
     alt: "Himmel Hintergrund",
     yRange: [0, -4], // kaum Bewegung
     zIndex: 1,
     blurClass: "blur-[1px]",
   },
   {
-    src: "/images/paralax/layer-d-vulkan.png",
+    src: "/images/paralax/layer-d-vulkan.webp",
     alt: "Vulkan Ebene",
     yRange: [0, -10],
     zIndex: 2,
     blurClass: "blur-[1.5px]",
   },
   {
-    src: "/images/paralax/layer-c-huegel-schloss.png",
+    src: "/images/paralax/layer-c-huegel-schloss.webp",
     alt: "Hügel und Schloss",
     yRange: [0, -18],
     zIndex: 3,
     blurClass: "",
   },
   {
-    src: "/images/paralax/layer-b-felsen-baum.png",
+    src: "/images/paralax/layer-b-felsen-baum.webp",
     alt: "Felsen und Bäume",
     yRange: [0, -26],
     zIndex: 4,
     blurClass: "",
   },
   {
-    src: "/images/paralax/layer-a-felsen.png",
+    src: "/images/paralax/layer-a-felsen.webp",
     alt: "Felsen Vordergrund",
     // Vordergrund soll sich spürbar bewegen, aber im Bild bleiben
     yRange: [0, -34],
@@ -352,7 +352,7 @@ export function HeroSection() {
               }}
             >
               <Image
-                src="/images/feder-frei.png"
+                src="/images/feder-frei.webp"
                 alt=""
                 width={90}
                 height={90}
@@ -446,7 +446,7 @@ export function HeroSection() {
             className="relative w-24 h-24"
           >
             <Image
-              src="/images/logos/dice1.png"
+              src="/images/logos/dice1.webp"
               alt="Würfel"
               fill
               className="object-contain"

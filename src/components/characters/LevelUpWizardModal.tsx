@@ -387,10 +387,15 @@ export function LevelUpWizardModal({
                   <ul className="space-y-1.5">
                     {plan.features.map((f) => (
                       <li key={f.id} className="font-libre text-sm text-gray-200">
-                        <span className="text-gray-500">St. {f.level}: </span>
+                        <span className="text-gray-500">
+                          {t("levelUp.levelAbbrev", { level: f.level })}:{" "}
+                        </span>
                         {locName(f.nameEn, f.nameDe)}
                         {f.subclass ? (
-                          <span className="text-accent-gold/80"> · Unterklasse</span>
+                          <span className="text-accent-gold/80">
+                            {" "}
+                            · {t("levelUp.subclassTag")}
+                          </span>
                         ) : null}
                       </li>
                     ))}
@@ -537,7 +542,8 @@ export function LevelUpWizardModal({
                       .filter((f) => f.subclass)
                       .map((f) => (
                         <li key={f.id} className="font-libre text-sm text-gray-300">
-                          St. {f.level}: {locName(f.nameEn, f.nameDe)}
+                          {t("levelUp.levelAbbrev", { level: f.level })}:{" "}
+                          {locName(f.nameEn, f.nameDe)}
                         </li>
                       ))}
                   </ul>
@@ -569,8 +575,8 @@ export function LevelUpWizardModal({
                         <p className="font-cinzel font-bold text-accent-gold">
                           {locName(f.nameEn, f.nameDe)}
                           <span className="ml-2 font-barlow text-xs font-bold uppercase text-gray-500">
-                            St. {f.level}
-                            {f.subclass ? " · UK" : ""}
+                            {t("levelUp.levelAbbrev", { level: f.level })}
+                            {f.subclass ? ` · ${t("levelUp.subclassAbbrev")}` : ""}
                           </span>
                         </p>
                         <p className="mt-1 whitespace-pre-wrap font-libre text-sm text-gray-300">

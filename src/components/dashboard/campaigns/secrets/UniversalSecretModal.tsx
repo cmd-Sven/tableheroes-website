@@ -247,7 +247,7 @@ export function UniversalSecretModal({
       <div
         className="relative z-50 w-full max-w-3xl rounded-xl border-2 border-accent-gold/50 bg-background-card shadow-2xl overflow-hidden"
         style={{
-          backgroundImage: "url('/images/scroll-paper.png')",
+          backgroundImage: "url('/images/scroll-paper.webp')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",
@@ -471,7 +471,7 @@ export function UniversalSecretModal({
                         key={secret.id}
                         className="relative rounded-lg border-2 p-4 transition-all"
                         style={{
-                          backgroundImage: "url('/images/scroll-paper.png')",
+                          backgroundImage: "url('/images/scroll-paper.webp')",
                           backgroundSize: "cover",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",

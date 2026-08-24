@@ -5,6 +5,8 @@
 
 export const DICE_SKIN_IDS = [
   "gm-marble",
+  "gm-void",
+  "gm-chrome",
   "red",
   "blue",
   "green",
@@ -17,7 +19,7 @@ export const DICE_SKIN_IDS = [
 
 export type DiceSkinId = (typeof DICE_SKIN_IDS)[number];
 
-export type DiceSkinPattern = "solid" | "marble";
+export type DiceSkinPattern = "solid" | "marble" | "void-swirl" | "chrome";
 
 export type DiceSkinDef = {
   id: DiceSkinId;
@@ -27,9 +29,17 @@ export type DiceSkinDef = {
   bodyColor: string;
   numeralColor: string;
   pattern: DiceSkinPattern;
-  /** SL-Voreinstellung / Marmor-Preset. */
+  /** SL-Voreinstellung / nur in der GM-Palette hervorgehoben. */
   gmPreset?: boolean;
 };
+
+/** Sentinel-Charakter-Id für SL-Würfe ohne PC. */
+export const GM_DICE_ROLLER_ID = "__gm__";
+export const GM_DICE_ROLLER_NAME = "Spielleiter";
+
+export function isGmDiceRollerId(characterId: string | null | undefined): boolean {
+  return characterId === GM_DICE_ROLLER_ID;
+}
 
 export const DICE_SKINS: readonly DiceSkinDef[] = [
   {
@@ -40,6 +50,26 @@ export const DICE_SKINS: readonly DiceSkinDef[] = [
     bodyColor: "#d4d4d0",
     numeralColor: "#c41e1e",
     pattern: "marble",
+    gmPreset: true,
+  },
+  {
+    id: "gm-void",
+    labelDe: "SL Void",
+    swatch:
+      "radial-gradient(circle at 30% 30%, #9b59ff 0%, #2a0a3d 45%, #050508 100%)",
+    bodyColor: "#0a0a0e",
+    numeralColor: "#7ec8ff",
+    pattern: "void-swirl",
+    gmPreset: true,
+  },
+  {
+    id: "gm-chrome",
+    labelDe: "SL Chrom",
+    swatch:
+      "linear-gradient(135deg, #fff8e7 0%, #e8c547 35%, #8a7020 70%, #f5e6a8 100%)",
+    bodyColor: "#c9a227",
+    numeralColor: "#3d2914",
+    pattern: "chrome",
     gmPreset: true,
   },
   {
@@ -130,6 +160,12 @@ export function getDiceSkin(id: DiceSkinId | null | undefined): DiceSkinDef {
   return SKIN_BY_ID.get("green")!;
 }
 
+/** Skins für die Palette — SL-Presets nur für Spielleiter. */
+export function diceSkinsForPalette(isGM: boolean): readonly DiceSkinDef[] {
+  if (isGM) return DICE_SKINS;
+  return DICE_SKINS.filter((s) => !s.gmPreset);
+}
+
 export function diceSkinStorageKey(userId: string): string {
   return `th:dice-skin:${userId}`;
 }
@@ -149,7 +185,10 @@ export function readStoredDiceSkin(
   if (!userId || typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(diceSkinStorageKey(userId));
-    return parseDiceSkinId(raw) ?? fallback;
+    const parsed = parseDiceSkinId(raw);
+    if (!parsed) return fallback;
+    if (!isGM && getDiceSkin(parsed).gmPreset) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }

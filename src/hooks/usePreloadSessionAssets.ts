@@ -38,12 +38,12 @@ function uniqueUrls(urls: string[]): string[] {
 }
 
 const WEATHER_ICON_PATHS = [
-  "/images/Session_ui/weather/sun.png",
-  "/images/Session_ui/weather/clouds.png",
-  "/images/Session_ui/weather/rain.png",
-  "/images/Session_ui/weather/storm.png",
-  "/images/Session_ui/weather/snow.png",
-  "/images/Session_ui/weather/fog.png",
+  "/images/Session_ui/Wetter_icons/sonne.webp",
+  "/images/Session_ui/Wetter_icons/nur_wolken.webp",
+  "/images/Session_ui/Wetter_icons/Regen.webp",
+  "/images/Session_ui/Wetter_icons/Gewitter.webp",
+  "/images/Session_ui/Wetter_icons/Schnee.webp",
+  "/images/Session_ui/Wetter_icons/Blizzard.webp",
 ];
 
 async function warmDiceRuntime(): Promise<void> {

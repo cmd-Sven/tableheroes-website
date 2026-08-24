@@ -55,7 +55,7 @@ export function PointsPageClient({
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -108,7 +108,7 @@ export function PointsPageClient({
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >
@@ -143,7 +143,7 @@ export function PointsPageClient({
       <section
         className="rounded-lg border border-hero-dark bg-background-card p-6 shadow-lg"
         style={{
-          backgroundImage: "url('/images/dark-marmor.jpg')",
+          backgroundImage: "url('/images/dark-marmor.webp')",
           backgroundSize: "cover",
         }}
       >

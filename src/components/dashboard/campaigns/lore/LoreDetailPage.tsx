@@ -731,7 +731,7 @@ export function LoreDetailPage({
             className="rounded-lg p-6 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.8)] transition-shadow duration-300"
             style={{
               border: "3px solid #B8860B",
-              backgroundImage: "url('/images/backgrounds/dark-wood.jpg')",
+              backgroundImage: "url('/images/dark-wood.webp')",
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}

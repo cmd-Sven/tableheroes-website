@@ -13,6 +13,11 @@ import { ABILITY_KEYS } from "@/src/lib/characters/dnd5e/types";
 import { DND5E_SKILL_BY_KEY } from "@/src/lib/characters/dnd5e/skills";
 import { parseCharacterFlaws } from "@/src/lib/characters/character-flaws";
 import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
+import {
+  clampExhaustionLevel,
+  exhaustionD20Penalty,
+} from "@/src/lib/characters/dnd5e/exhaustion";
+import { isGmDiceRollerId } from "@/src/lib/session/dice-skins";
 import type { CharacterItem, InventoryCategory } from "@/src/types/inventory";
 import { INVENTORY_CATEGORIES } from "@/src/types/inventory";
 
@@ -25,6 +30,7 @@ export type ResolvedSheetModifier = {
   damage?: string | null;
   attackBonus?: number;
   source: "sheet" | "client" | "none";
+  exhaustionLevel?: number;
 };
 
 const SKILL_KEYS = new Set(Object.keys(DND5E_SKILL_BY_KEY));
@@ -55,12 +61,18 @@ export async function resolveLiveDiceSheetModifier(input: {
   saveAbility?: string;
   label?: string;
   weaponName?: string;
+  /** true = freier Pool enthält einen W20 → Erschöpfung anwenden */
+  applyExhaustionToD20?: boolean;
 }): Promise<ResolvedSheetModifier> {
   const clientMod = Number.isFinite(input.clientModifier)
     ? Math.round(input.clientModifier!)
     : 0;
 
-  if (input.kind === "dice" || input.kind === "damage") {
+  if (isGmDiceRollerId(input.characterId)) {
+    return { modifier: clientMod, source: "none", label: input.label };
+  }
+
+  if (input.kind === "damage") {
     return { modifier: clientMod, source: "client", label: input.label };
   }
 
@@ -76,15 +88,36 @@ export async function resolveLiveDiceSheetModifier(input: {
 
   const level = Math.max(1, Math.floor(Number(chRaw.level) || 1));
   const sheet = parseSheetData(chRaw.sheet_data) ?? createEmptyDnd5eSheet(level);
+  const exhaustionLevel = clampExhaustionLevel(sheet.combat?.exhaustionLevel);
+  const exhaustionPenalty = exhaustionD20Penalty(exhaustionLevel);
   const flaws = parseCharacterFlaws(chRaw.character_flaws);
   const baseDerived = computeDerivedDnd5eSheet(sheet, level);
   const adjusted = applyFlawModifiersToDerived(baseDerived, sheet.combat.speed, flaws);
   const derived = adjusted.derived;
 
+  if (input.kind === "dice") {
+    // Freie Würfe: Erschöpfung nur auf W20-Proben (nicht auf reinen Schaden-Pools).
+    const mod =
+      input.applyExhaustionToD20 !== false && exhaustionPenalty !== 0
+        ? clientMod + exhaustionPenalty
+        : clientMod;
+    return {
+      modifier: mod,
+      source: "client",
+      label: input.label,
+      exhaustionLevel,
+    };
+  }
+
   if (input.kind === "skill") {
     const key = input.skillKey?.trim() ?? "";
     if (!isSkillKey(key)) {
-      return { modifier: clientMod, source: "client", label: input.label };
+      return {
+        modifier: clientMod + exhaustionPenalty,
+        source: "client",
+        label: input.label,
+        exhaustionLevel,
+      };
     }
     const total = derived.skills[key]?.total ?? 0;
     const def = DND5E_SKILL_BY_KEY[key];
@@ -92,19 +125,26 @@ export async function resolveLiveDiceSheetModifier(input: {
       modifier: Math.round(total),
       label: input.label ?? def.labelDe,
       source: "sheet",
+      exhaustionLevel,
     };
   }
 
   if (input.kind === "save") {
     const key = input.saveAbility?.trim() ?? "";
     if (!isAbilityKey(key)) {
-      return { modifier: clientMod, source: "client", label: input.label };
+      return {
+        modifier: clientMod + exhaustionPenalty,
+        source: "client",
+        label: input.label,
+        exhaustionLevel,
+      };
     }
     const total = derived.savingThrows[key]?.total ?? 0;
     return {
       modifier: Math.round(total),
       label: input.label,
       source: "sheet",
+      exhaustionLevel,
     };
   }
 
@@ -140,15 +180,22 @@ export async function resolveLiveDiceSheetModifier(input: {
       level,
     );
     const primary = attacks[0] ?? null;
-    const bonus = primary?.attackBonus ?? 0;
+    // Angriffswurf ist ein W20-Test → Erschöpfung abziehen (equipment-Bonus enthält sie nicht).
+    const bonus = (primary?.attackBonus ?? 0) + exhaustionPenalty;
     return {
       modifier: Math.round(bonus),
       attackBonus: Math.round(bonus),
       weaponName: primary?.name ?? input.weaponName ?? "Waffe",
       damage: primary?.damage ?? null,
       source: primary ? "sheet" : "client",
+      exhaustionLevel,
     };
   }
 
-  return { modifier: clientMod, source: "client", label: input.label };
+  return {
+    modifier: clientMod,
+    source: "client",
+    label: input.label,
+    exhaustionLevel,
+  };
 }

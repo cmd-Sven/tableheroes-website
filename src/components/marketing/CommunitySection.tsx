@@ -75,7 +75,7 @@ export function CommunitySection() {
       {/* Oben Links: Dragon */}
       <div className="absolute top-0 left-0 -z-[5] pointer-events-none hidden md:block">
         <Image
-          src="/images/corner-dragon-only.png"
+          src="/images/corner-dragon-only.webp"
           alt=""
           width={100}
           height={100}
@@ -87,7 +87,7 @@ export function CommunitySection() {
       {/* Unten Links: Skull (horizontal gespiegelt) */}
       <div className="absolute bottom-0 left-0 -z-[5] pointer-events-none hidden md:block">
         <Image
-          src="/images/skull-corner-only.png"
+          src="/images/skull-corner-only.webp"
           alt=""
           width={70}
           height={70}
@@ -99,7 +99,7 @@ export function CommunitySection() {
       {/* Oben Rechts: Skull (vertikal gespiegelt) */}
       <div className="absolute top-0 right-0 -z-[5] pointer-events-none hidden md:block">
         <Image
-          src="/images/skull-corner-only.png"
+          src="/images/skull-corner-only.webp"
           alt=""
           width={70}
           height={70}
@@ -111,7 +111,7 @@ export function CommunitySection() {
       {/* Unten Rechts: Claw (horizontal gespiegelt) */}
       <div className="absolute bottom-0 right-0 -z-[5] pointer-events-none hidden md:block">
         <Image
-          src="/images/corner-claw-only.png"
+          src="/images/corner-claw-only.webp"
           alt=""
           width={100}
           height={100}
@@ -267,7 +267,7 @@ export function CommunitySection() {
         <div
           className="w-full h-full"
           style={{
-            backgroundImage: "url('/images/border_top-bottom_gold.png')",
+            backgroundImage: "url('/images/border_top-bottom_gold.webp')",
             backgroundSize: "100px auto",
             backgroundRepeat: "repeat-x",
             backgroundPosition: "bottom center",

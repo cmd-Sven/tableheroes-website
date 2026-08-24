@@ -43,7 +43,7 @@ type PresetMeta = {
 export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   blizzard: {
     label: "Blizzard",
-    iconFilename: "Blizzard.png",
+    iconFilename: "Blizzard.webp",
     levels: [
       "Schneeböen",
       "Blizzard",
@@ -58,7 +58,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   storm: {
     label: "Gewitter",
-    iconFilename: "Gewitter.png",
+    iconFilename: "Gewitter.webp",
     levels: ["Fernes Gewitter", "Unwetter zieht auf", "Schweres Gewitter"],
     effects: [
       ["Donner in der Ferne", "Leichte Unruhe bei Reittieren"],
@@ -69,7 +69,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   heavy_wind: {
     label: "Heftiger Wind",
-    iconFilename: "heftiger_wind.png",
+    iconFilename: "heftiger_wind.webp",
     levels: ["Starke Böen", "Sturmwind", "Orkanböen"],
     effects: [
       ["Geräusche werden verweht", "Lose Gegenstände bewegen sich"],
@@ -80,7 +80,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   clouds: {
     label: "Nur Wolken",
-    iconFilename: "nur_wolken.png",
+    iconFilename: "nur_wolken.webp",
     levels: ["Leicht bewölkt", "Stark bewölkt", "Düstere Wolkendecke"],
     effects: [
       ["Weiche Beleuchtung", "Normale Sicht"],
@@ -91,7 +91,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   rain: {
     label: "Regen",
-    iconFilename: "Regen.png",
+    iconFilename: "Regen.webp",
     levels: ["Leichter Regen", "Starker Regen", "Extremer Starkregen"],
     effects: [
       ["Leichte Sichtbeeinträchtigung", "Boden wird glatt"],
@@ -102,7 +102,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   snow: {
     label: "Schnee",
-    iconFilename: "Schnee.png",
+    iconFilename: "Schnee.webp",
     levels: ["Leichter Schneefall", "Starker Schneefall", "Blizzard / Schneesturm"],
     effects: [
       ["Leichte Sichtbeeinträchtigung", "Kälte spürbar"],
@@ -117,7 +117,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   sun: {
     label: "Sonne",
-    iconFilename: "sonne.png",
+    iconFilename: "sonne.webp",
     levels: ["Leicht sonnig", "Sonnig / warm", "Extreme Hitze / Glutsonne"],
     effects: [
       ["Angenehme Wärme"],
@@ -128,7 +128,7 @@ export const WEATHER_PRESETS: Record<WeatherPresetId, PresetMeta> = {
   },
   sun_clouds: {
     label: "Sonne & Wolken",
-    iconFilename: "sonne_wolken.png",
+    iconFilename: "sonne_wolken.webp",
     levels: ["Aufgelockerte Wolken", "Wechselhaft", "Schnell ziehende Wolken"],
     effects: [
       ["Freundliche Bedingungen", "Normale Sicht"],

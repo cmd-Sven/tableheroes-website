@@ -1,4 +1,5 @@
 import type { AbilityKey, Dnd5eClassResource, Dnd5eSheetData } from "./types";
+import { reduceExhaustionOnLongRest } from "./exhaustion";
 
 export type ParsedHitDice = {
   total: number;
@@ -188,9 +189,8 @@ export function applyLongRest(
 
   const parsed = parseHitDiceString(next.combat.hitDice);
   const total = parsed?.total ?? 0;
-  const remaining = getHitDiceRemaining(next);
-  const recovered = Math.max(1, Math.floor(total / 2));
-  const newRemaining = Math.min(total, remaining + recovered);
+  // 2024-Rule: Long Rest restores ALL hit dice.
+  const newRemaining = total;
 
   if (next.classResources?.length) {
     next = {
@@ -208,6 +208,7 @@ export function applyLongRest(
       hitDiceRemaining: newRemaining,
       deathSaveSuccesses: 0,
       deathSaveFailures: 0,
+      exhaustionLevel: reduceExhaustionOnLongRest(next.combat.exhaustionLevel ?? 0),
     },
   };
 }

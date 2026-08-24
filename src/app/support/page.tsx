@@ -73,7 +73,7 @@ export default async function SupportPage() {
     <div
       className="min-h-screen bg-background-dark"
       style={{
-        backgroundImage: "url('/images/dark-marmor.jpg')",
+        backgroundImage: "url('/images/dark-marmor.webp')",
         backgroundSize: "cover",
         backgroundAttachment: "fixed",
         backgroundPosition: "center",

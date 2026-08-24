@@ -10,6 +10,16 @@ import {
   type CharacterConditionKey,
 } from "@/src/lib/characters/condition-tokens";
 import {
+  createEmptyDnd5eSheet,
+  mergeSheetWithDefaults,
+  parseSheetData,
+} from "@/src/lib/characters/dnd5e/defaults";
+import {
+  clampExhaustionLevel,
+  EXHAUSTION_MAX,
+  isDeadFromExhaustion,
+} from "@/src/lib/characters/dnd5e/exhaustion";
+import {
   buildMoodTokenEditPrompt,
   getMoodDefinition,
   MOOD_STATE_KEYS,
@@ -32,6 +42,7 @@ type CharacterStateRow = {
   mood_state: string | null;
   mood_tokens: unknown;
   active_conditions: unknown;
+  sheet_data?: unknown;
 };
 
 async function assertCharacterStateAccess(
@@ -62,7 +73,7 @@ async function assertCharacterStateAccess(
 
   const { data: charRaw } = await (supabase.from("characters") as any)
     .select(
-      "id, user_id, campaign_id, name, avatar_url, token_url, mood_state, mood_tokens, active_conditions",
+      "id, user_id, campaign_id, name, avatar_url, token_url, mood_state, mood_tokens, active_conditions, sheet_data",
     )
     .eq("id", characterId)
     .eq("campaign_id", campaignId)
@@ -476,6 +487,74 @@ export async function addCharacterActiveCondition(input: {
       success: false,
       activeConditions: [],
       error: e instanceof Error ? e.message : "Zustand konnte nicht gesetzt werden.",
+    };
+  }
+}
+
+/**
+ * SL setzt Erschöpfungsstufe (2024: 0–10) auf dem Charakterbogen.
+ * Stufe 10 → LP auf 0 (Tod).
+ */
+export async function setCharacterExhaustionLevel(input: {
+  campaignId: string;
+  characterId: string;
+  level: number;
+}): Promise<{ success: boolean; exhaustionLevel: number; error?: string }> {
+  try {
+    const { supabase, character, isGm, actorUserId, storageOwnerId } =
+      await assertCharacterStateAccess(input.campaignId, input.characterId);
+
+    if (!isGm) {
+      throw new Error("Nur der Spielleiter kann Erschöpfung setzen.");
+    }
+
+    const level = clampExhaustionLevel(input.level);
+    const parsed = parseSheetData(character.sheet_data);
+    const sheet = parsed
+      ? mergeSheetWithDefaults(parsed)
+      : createEmptyDnd5eSheet(1);
+
+    sheet.combat = {
+      ...sheet.combat,
+      exhaustionLevel: level,
+    };
+    if (isDeadFromExhaustion(level)) {
+      sheet.combat.hpCurrent = 0;
+    }
+
+    const writeClient = resolveWriteClient(supabase, isGm, actorUserId, storageOwnerId);
+    const { error } = await (writeClient.from("characters") as any)
+      .update({ sheet_data: sheet })
+      .eq("id", character.id);
+    if (error) throw new Error(error.message);
+
+    // Visueller Zustands-Token: bei Stufe > 0 Erschöpfung aktiv, sonst entfernen
+    const conditions = parseActiveConditions(character.active_conditions);
+    const hasExhaustion = conditions.includes("exhaustion");
+    if (level > 0 && !hasExhaustion) {
+      await setCharacterActiveConditions({
+        campaignId: input.campaignId,
+        characterId: input.characterId,
+        conditions: ["exhaustion", ...conditions],
+      });
+    } else if (level <= 0 && hasExhaustion) {
+      await setCharacterActiveConditions({
+        campaignId: input.campaignId,
+        characterId: input.characterId,
+        conditions: conditions.filter((k) => k !== "exhaustion"),
+      });
+    }
+
+    revalidateCharacterPaths(input.campaignId, input.characterId);
+    return { success: true, exhaustionLevel: level };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      exhaustionLevel: 0,
+      error:
+        e instanceof Error
+          ? e.message
+          : `Erschöpfung (max. ${EXHAUSTION_MAX}) konnte nicht gespeichert werden.`,
     };
   }
 }

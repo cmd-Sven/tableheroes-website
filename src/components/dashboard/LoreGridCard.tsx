@@ -103,7 +103,7 @@ export function LoreGridCard({ lore, campaignId, isGM = false, onDelete, onToggl
         !lore.is_revealed && isGM ? "opacity-75 grayscale" : ""
       }`}
       style={{
-        backgroundImage: "url('/images/grunge-paper-background.jpg')",
+        backgroundImage: "url('/images/grunge-paper-background.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

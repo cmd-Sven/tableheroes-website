@@ -161,6 +161,11 @@ export type Dnd5eSheetData = {
     initiativeOverride?: number | null;
     deathSaveSuccesses?: number;
     deathSaveFailures?: number;
+    /**
+     * 2024 exhaustion (0–10). Each level: −1 on d20 tests, −5 ft speed.
+     * Level 10 is death. A Long Rest reduces the level by 1.
+     */
+    exhaustionLevel?: number;
   };
   proficiencies: {
     armor: string[];
@@ -201,6 +206,11 @@ export type Dnd5eDerivedSheet = {
   initiative: number;
   spellSaveDc: number | null;
   spellAttackBonus: number | null;
+  /** Effective walking speed after exhaustion (and before flaw display overlay). */
+  speed: number;
+  exhaustionLevel: number;
+  /** Negative modifier applied to d20 tests from exhaustion. */
+  exhaustionPenalty: number;
 };
 
 export type CharacterSheetPayload = {

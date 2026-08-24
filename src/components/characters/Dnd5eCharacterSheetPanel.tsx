@@ -55,6 +55,7 @@ import {
 } from "@/src/lib/characters/dnd5e/spellcasting";
 import {
   applyClassBasicsFromCatalog,
+  classDisplayName,
   matchSheetFeatureToFeat,
   featDefinitionToFeatureEntry,
 } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
@@ -79,7 +80,6 @@ import {
   matchSubclassOption,
   resolveClassId,
 } from "@/src/lib/characters/dnd5e/progression/class-ids";
-import { CLASS_NAME_DE } from "@/src/lib/characters/dnd5e/progression/labels-de";
 import {
   findBackgroundByName,
   getClassProgression,
@@ -517,7 +517,14 @@ export function Dnd5eCharacterSheetPanel({
     const features = [...sheet.features];
     features[index] = featDefinitionToFeatureEntry(matched);
     setSheet({ ...sheet, features });
-    toast.success(t("featCatalog.matched", { name: matched.nameDe || matched.nameEn }));
+    toast.success(
+      t("featCatalog.matched", {
+        name:
+          locale === "de"
+            ? matched.nameDe || matched.nameEn
+            : matched.nameEn || matched.nameDe,
+      }),
+    );
   }
 
   function setClassFromCatalog(classId: string) {
@@ -1149,7 +1156,7 @@ export function Dnd5eCharacterSheetPanel({
                       <option value="">{t("field.classPlaceholder")}</option>
                       {CLASS_IDS.map((id) => (
                         <option key={id} value={id}>
-                          {locale === "de" ? CLASS_NAME_DE[id] : id}
+                          {classDisplayName(id, locale)}
                         </option>
                       ))}
                     </select>
@@ -1695,6 +1702,26 @@ export function Dnd5eCharacterSheetPanel({
                       )}
                     </div>
                   </div>
+                  <label className="mt-3 block space-y-1">
+                    <span className="font-barlow text-[10px] uppercase text-gray-500">
+                      {t("combat.exhaustion")}
+                    </span>
+                    {readOnly ? (
+                      <p className="font-barlow text-xl font-bold text-white">
+                        {sheet.combat.exhaustionLevel ?? 0}
+                      </p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.exhaustionLevel ?? 0}
+                        min={0}
+                        max={10}
+                        onChange={(v) => updateCombat("exhaustionLevel", v)}
+                      />
+                    )}
+                    <p className="font-libre text-[9px] text-gray-500 leading-snug">
+                      {t("combat.exhaustionHint")}
+                    </p>
+                  </label>
                 </div>
               </section>
             </div>

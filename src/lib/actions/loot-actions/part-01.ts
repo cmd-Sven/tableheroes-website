@@ -1,0 +1,459 @@
+/**
+ * loot-actions — part 1: publishLootToSession, takeAllLootGoldFromContainer, claimLootItemFromContainer, requestLootItemIdentify.
+ */
+"use server";
+
+import { addCharacterWealthGpSp } from "@/src/lib/character-gold";
+import { createClient } from "@/src/lib/supabase/server";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
+import {
+  autoPackItemToContainer,
+  buildLootCharacterItemInsert,
+  inferLootInventoryCategory,
+  normalizeLootInventoryCategory,
+} from "@/src/lib/characters/dnd5e/loot-to-inventory";
+import { normalizeEquipmentState } from "@/src/lib/characters/dnd5e/equipment";
+import { parseSheetData } from "@/src/lib/characters/dnd5e/defaults";
+import { saveCharacterEquipment } from "@/src/lib/actions/character-inventory-actions";
+import type { CharacterItem } from "@/src/types/inventory";
+import type { Json } from "@/src/lib/database.types";
+import {
+  disguisedLootTitle,
+  lootItemToJson,
+  LOOT_UNIDENTIFIED_DESC_FALLBACK,
+  LOOT_UNIDENTIFIED_NAME_FALLBACK,
+  parseIdentifyRequests,
+  parseLootItemRow,
+  type LootDraftPayload,
+  type LootIdentifyRequestRow,
+  type LootItemRow,
+} from "@/src/lib/loot/loot-item-model";
+
+export type { LootDraftPayload, LootIdentifyRequestRow, LootItemRow } from "@/src/lib/loot/loot-item-model";
+
+async function loadSessionCampaign(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+): Promise<{ campaignId: string } | null> {
+  const { data: s, error } = await supabase
+    .from("sessions")
+    .select("campaign_id")
+    .eq("id", sessionId)
+    .single();
+  if (error || !s) return null;
+  return { campaignId: String((s as { campaign_id: string }).campaign_id) };
+}
+
+async function assertLiveLootMatches(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  containerId: string,
+): Promise<boolean> {
+  const { data: live } = await (supabase as any)
+    .from("session_live_states")
+    .select("current_loot_id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  const cur = (live as { current_loot_id?: string | null } | null)?.current_loot_id;
+  return cur != null && String(cur) === String(containerId);
+}
+
+export async function publishLootToSession(
+  sessionId: string,
+  campaignId: string,
+  draft: LootDraftPayload,
+): Promise<{ ok: true; containerId: string } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: camp } = await supabase.from("campaigns").select("id, gm_id, owner_id").eq("id", campaignId).single();
+    if (!camp || !isCampaignGm(camp as { gm_id?: string | null; owner_id?: string | null }, user.id)) {
+      return { ok: false, error: "Nur der Spielleiter kann Beute freigeben." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== campaignId) {
+      return { ok: false, error: "Session passt nicht zur Kampagne." };
+    }
+
+    const gp = Math.max(0, Math.round(draft.gp));
+    const sp = Math.max(0, Math.round(draft.sp));
+    const itemsJson = draft.items.map((it) => {
+      const isMagical = Boolean(it.isMagical);
+      const mundaneName =
+        (it.mundaneName ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_NAME_FALLBACK : it.name);
+      const mundaneDesc =
+        (it.mundaneDesc ?? "").trim() || (isMagical ? LOOT_UNIDENTIFIED_DESC_FALLBACK : it.desc);
+      const inventoryCategory = normalizeLootInventoryCategory(
+        it.inventoryCategory,
+        inferLootInventoryCategory(it.name, it.desc, isMagical, it.kind),
+      );
+      return lootItemToJson({
+        ...it,
+        mundaneName: mundaneName.slice(0, 160),
+        mundaneDesc: mundaneDesc.slice(0, 800),
+        inventoryCategory,
+        identified: !isMagical,
+      });
+    });
+
+    const { data: ins, error: insErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .insert({
+        campaign_id: campaignId,
+        name: draft.name.trim().slice(0, 160),
+        gp_remaining: gp,
+        sp_remaining: sp,
+        items_json: itemsJson as unknown as Json,
+        chest_opened: false,
+      })
+      .select("id")
+      .single();
+
+    if (insErr || !ins) {
+      return { ok: false, error: insErr?.message ?? "Beute-Container konnte nicht angelegt werden." };
+    }
+
+    const containerId = String((ins as { id: string }).id);
+
+    const { error: upErr } = await (supabase as any)
+      .from("session_live_states")
+      .update({ current_loot_id: containerId, loot_hide_npcs: true })
+      .eq("session_id", sessionId);
+
+    if (upErr) {
+      await (supabase as any).from("campaign_loot_containers").delete().eq("id", containerId);
+      return { ok: false, error: upErr.message ?? "Live-State konnte nicht verknüpft werden." };
+    }
+
+    try {
+      await createSystemLog(
+        sessionId,
+        "loot_publish",
+        `Loot-Gun: „${draft.name.trim()}“ erscheint auf der Bühne (${itemsJson.length} Gegenstände${gp || sp ? `, ${gp} gp / ${sp} sp` : ""}).`,
+      );
+    } catch (logErr) {
+      console.warn("[publishLootToSession] System-Log:", logErr);
+    }
+
+    return { ok: true, containerId };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function takeAllLootGoldFromContainer(
+  sessionId: string,
+  characterId: string,
+  containerId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const { data: ch, error: chErr } = await supabase
+      .from("characters")
+      .select("id, user_id, campaign_id")
+      .eq("id", characterId)
+      .single();
+    if (chErr || !ch) return { ok: false, error: "Charakter nicht gefunden." };
+    const chRow = ch as { user_id: string | null; campaign_id: string };
+    if (chRow.user_id !== user.id) {
+      return { ok: false, error: "Nur der Spielercharakter kann Gold nehmen." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== chRow.campaign_id) {
+      return { ok: false, error: "Session/Kampagne ungültig." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, gp_remaining, sp_remaining")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; gp_remaining: number; sp_remaining: number };
+    if (b.campaign_id !== chRow.campaign_id) {
+      return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+    }
+
+    const takeGp = Math.max(0, Math.round(Number(b.gp_remaining ?? 0)));
+    const takeSp = Math.max(0, Math.round(Number(b.sp_remaining ?? 0)));
+
+    if (takeGp === 0 && takeSp === 0) {
+      return { ok: true };
+    }
+
+    await addCharacterWealthGpSp(supabase, characterId, takeGp, takeSp);
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({ gp_remaining: 0, sp_remaining: 0 })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Gold konnte nicht geleert werden." };
+
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function claimLootItemFromContainer(
+  sessionId: string,
+  characterId: string,
+  containerId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const id = String(itemId).trim();
+    if (id.length < 8) return { ok: false, error: "Ungültiges Item." };
+
+    const { data: ch, error: chErr } = await supabase
+      .from("characters")
+      .select("id, user_id, campaign_id")
+      .eq("id", characterId)
+      .single();
+    if (chErr || !ch) return { ok: false, error: "Charakter nicht gefunden." };
+    const chRow = ch as { user_id: string | null; campaign_id: string };
+    if (chRow.user_id !== user.id) {
+      return { ok: false, error: "Nur der Spielercharakter kann Items nehmen." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== chRow.campaign_id) {
+      return { ok: false, error: "Session/Kampagne ungültig." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, items_json, identify_requests")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
+    if (b.campaign_id !== chRow.campaign_id) {
+      return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+    }
+
+    const arr = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const idx = arr.findIndex((it) => String(it.id) === id);
+    if (idx < 0) return { ok: false, error: "Item ist bereits weg." };
+
+    const [picked] = arr.splice(idx, 1);
+    const p = picked;
+
+    const knownMagical = Boolean(p.isMagical) && Boolean(p.identified);
+    const useMundane = Boolean(p.isMagical) && !p.identified;
+    const invName = (useMundane ? (p.mundaneName?.trim() || LOOT_UNIDENTIFIED_NAME_FALLBACK) : p.name).slice(0, 160);
+    const mundaneBody = (p.mundaneDesc && p.mundaneDesc.trim()) || LOOT_UNIDENTIFIED_DESC_FALLBACK;
+    const descBody = useMundane ? mundaneBody : p.desc;
+    const extraLines = [
+      !useMundane && p.rarity ? `Seltenheit: ${p.rarity}` : useMundane ? `Seltenheit (geschätzt): ${p.rarity}` : null,
+      p.price ? `Geschätzter Wert: ${p.price} gp` : null,
+    ].filter(Boolean) as string[];
+
+    const lootCategory = normalizeLootInventoryCategory(
+      p.inventoryCategory,
+      inferLootInventoryCategory(p.name, p.desc, knownMagical || p.isMagical, p.kind),
+    );
+
+    const insertPayload = buildLootCharacterItemInsert({
+      name: invName,
+      desc: descBody,
+      rarity: p.rarity,
+      price: p.price,
+      isMagical: knownMagical,
+      inventoryCategory: lootCategory,
+      kind: p.kind,
+      weightLb: p.weightLb,
+      referenceId: p.referenceId,
+      attunement: p.attunement,
+      damage: p.damage,
+      damageType: p.damageType,
+      properties: p.properties,
+      rangeMeters: p.rangeMeters,
+      acFormula: p.acFormula,
+      strRequirement: p.strRequirement,
+      isShield: p.isShield,
+      effect: p.effect,
+      extraUserLines: extraLines,
+    });
+
+    const { data: inserted, error: insErr } = await (supabase as any)
+      .from("character_items")
+      .insert({
+        character_id: characterId,
+        name: invName,
+        description: insertPayload.description,
+        category: insertPayload.category,
+        icon_type: insertPayload.icon_type,
+        target_fap: 0,
+        current_fap: 0,
+        is_deleted: false,
+      })
+      .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+      .single();
+
+    if (insErr || !inserted) {
+      return { ok: false, error: insErr?.message ?? "Item konnte nicht ins Inventar." };
+    }
+
+    const newItem = inserted as CharacterItem;
+    const { data: chSheet } = await supabase
+      .from("characters")
+      .select("sheet_data")
+      .eq("id", characterId)
+      .single();
+    const sheet = parseSheetData((chSheet as { sheet_data?: unknown } | null)?.sheet_data);
+    const equipment = normalizeEquipmentState(sheet?.equipment);
+    const { data: allItems } = await (supabase as any)
+      .from("character_items")
+      .select("id, character_id, name, description, category, icon_type, is_deleted, target_fap, current_fap")
+      .eq("character_id", characterId)
+      .eq("is_deleted", false);
+    const itemRows = ((allItems ?? []) as CharacterItem[]).map((row) => ({
+      ...row,
+      category: row.category ?? "Equipment",
+    }));
+    const packed = autoPackItemToContainer(equipment, newItem.id, itemRows);
+    if (packed !== equipment) {
+      try {
+        await saveCharacterEquipment(characterId, packed);
+      } catch (packErr) {
+        console.warn("[claimLootItemFromContainer] auto-pack:", packErr);
+      }
+    }
+
+    const nextRequests = parseIdentifyRequests(b.identify_requests).filter((r) => r.item_id !== id);
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({
+        items_json: arr.map(lootItemToJson) as unknown as Json,
+        identify_requests: nextRequests as unknown as Json,
+      })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Container konnte nicht aktualisiert werden." };
+
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function requestLootItemIdentify(
+  sessionId: string,
+  characterId: string,
+  containerId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Nicht authentifiziert." };
+
+    const id = String(itemId).trim();
+    if (id.length < 8) return { ok: false, error: "Ungültiges Item." };
+
+    const { data: ch, error: chErr } = await supabase
+      .from("characters")
+      .select("id, user_id, campaign_id, name")
+      .eq("id", characterId)
+      .single();
+    if (chErr || !ch) return { ok: false, error: "Charakter nicht gefunden." };
+    const chRow = ch as { user_id: string | null; campaign_id: string; name: string | null };
+    if (chRow.user_id !== user.id) {
+      return { ok: false, error: "Nur mit dem eigenen Charakter anfragbar." };
+    }
+
+    const sc = await loadSessionCampaign(supabase, sessionId);
+    if (!sc || sc.campaignId !== chRow.campaign_id) {
+      return { ok: false, error: "Session/Kampagne ungültig." };
+    }
+
+    const match = await assertLiveLootMatches(supabase, sessionId, containerId);
+    if (!match) return { ok: false, error: "Diese Truhe ist gerade nicht aktiv." };
+
+    const { data: box, error: boxErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .select("id, campaign_id, items_json, identify_requests")
+      .eq("id", containerId)
+      .single();
+
+    if (boxErr || !box) return { ok: false, error: "Beute nicht gefunden." };
+    const b = box as { campaign_id: string; items_json: unknown; identify_requests?: unknown };
+    if (b.campaign_id !== chRow.campaign_id) {
+      return { ok: false, error: "Beute gehört nicht zu dieser Kampagne." };
+    }
+
+    const items = Array.isArray(b.items_json)
+      ? (b.items_json as unknown[]).map(parseLootItemRow).filter((x): x is LootItemRow => x != null)
+      : [];
+    const item = items.find((it) => it.id === id);
+    if (!item) return { ok: false, error: "Item nicht mehr auf der Bühne." };
+    if (!item.isMagical) return { ok: false, error: "Nur magische Gegenstände müssen identifiziert werden." };
+    if (item.identified) return { ok: false, error: "Bereits identifiziert." };
+
+    let pending = parseIdentifyRequests(b.identify_requests);
+    if (pending.some((r) => r.character_id === characterId && r.item_id === id)) {
+      return { ok: true };
+    }
+
+    const reqId = crypto.randomUUID();
+    const itemLabel = disguisedLootTitle(item).slice(0, 160);
+    pending = [
+      ...pending,
+      {
+        id: reqId,
+        character_id: characterId,
+        character_name: String(chRow.name ?? "Spieler").slice(0, 120),
+        item_id: id,
+        item_label: itemLabel,
+        created_at: new Date().toISOString(),
+      },
+    ].slice(-24);
+
+    const { error: upErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .update({ identify_requests: pending as unknown as Json })
+      .eq("id", containerId);
+
+    if (upErr) return { ok: false, error: upErr.message ?? "Anfrage konnte nicht gesendet werden." };
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}

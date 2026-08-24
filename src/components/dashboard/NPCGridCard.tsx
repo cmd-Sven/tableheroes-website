@@ -153,7 +153,7 @@ export function NPCGridCard({
             : "border-transparent hover:border-[#C5A572]"
       } ${!npc.is_revealed && isGM ? "opacity-75 grayscale" : ""}`}
       style={{
-        backgroundImage: "url('/images/grunge-paper-background.jpg')",
+        backgroundImage: "url('/images/grunge-paper-background.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

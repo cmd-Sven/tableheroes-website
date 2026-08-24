@@ -41,7 +41,7 @@ export function HeroButton({
   const buttonContent = (
     <div className={`relative ${sizeClasses}`}>
       <Image
-        src="/images/button-green-wood.png"
+        src="/images/button-green-wood.webp"
         alt=""
         width={260}
         height={80}
@@ -50,7 +50,7 @@ export function HeroButton({
         style={{ height: "auto" }}
       />
       <Image
-        src="/images/button-green-wood_hover.png"
+        src="/images/button-green-wood_hover.webp"
         alt=""
         width={260}
         height={80}

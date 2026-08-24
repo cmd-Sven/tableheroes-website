@@ -39,7 +39,7 @@ export function NPCCarousel({ residents, isGM, campaignId, title }: any) {
     <section 
       className="mt-8 p-6 rounded-xl border-2 border-accent-gold/30 shadow-2xl relative overflow-hidden"
       style={{ 
-        backgroundImage: "url('/images/backgrounds/dark-marble.jpg')", 
+        backgroundImage: "url('/images/dark-marmor.webp')", 
         backgroundSize: 'cover',
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center',
@@ -70,7 +70,7 @@ export function NPCCarousel({ residents, isGM, campaignId, title }: any) {
                 key={npc.id} 
                 className="min-w-[200px] snap-start group relative rounded-lg border-2 border-accent-gold/50 p-4 transition-all hover:scale-105 shrink-0"
                 style={{ 
-                  backgroundImage: "url('/images/backgrounds/old-paper.jpg')", 
+                  backgroundImage: "url('/images/scroll-paper.webp')", 
                   backgroundSize: 'cover',
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'center',

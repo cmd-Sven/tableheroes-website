@@ -28,6 +28,7 @@ export type CharacterDisplaySnapshot = {
   activeConditions: string[];
   hpCurrent: number;
   hpMax: number;
+  exhaustionLevel?: number;
   moodTokenUrls?: Record<string, string>;
 };
 

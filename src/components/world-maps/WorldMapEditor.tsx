@@ -10,6 +10,7 @@ import {
 import {
   Eye,
   EyeOff,
+  Grid3X3,
   Minus,
   Plus,
   Trash2,
@@ -39,8 +40,12 @@ import {
   getWorldMapMarkerNotes,
   setWorldMapGroupToken,
   toggleWorldMapMarkerVisibility,
+  updateWorldMap,
   upsertWorldMapMarker,
 } from "@/src/lib/actions/world-map-actions";
+import { WorldMapGroupToken } from "@/src/components/world-maps/WorldMapGroupToken";
+import { WorldMapGridModal } from "@/src/components/world-maps/WorldMapGridModal";
+import type { BattlemapGridConfig } from "@/src/lib/session/battlemap-types";
 
 type LinkOpt = { id: string; name: string; type?: string | null };
 type QuestOpt = { id: string; title: string };
@@ -108,6 +113,7 @@ export function WorldMapEditor({
   const [modalMarker, setModalMarker] = useState<WorldMapMarker | null>(null);
   const [notes, setNotes] = useState<WorldMapMarkerNote[]>([]);
   const [noteBody, setNoteBody] = useState("");
+  const [gridModalOpen, setGridModalOpen] = useState(false);
 
   const config = map.grid_config;
   const visibleMarkers = useMemo(
@@ -281,6 +287,14 @@ export function WorldMapEditor({
             <Users className="h-3.5 w-3.5" />
             Gruppentoken
           </button>
+          <button
+            type="button"
+            onClick={() => setGridModalOpen(true)}
+            className="inline-flex items-center gap-1 rounded border border-hero-border px-3 py-1.5 font-barlow text-xs font-bold uppercase text-gray-300 hover:border-accent-gold hover:text-accent-gold"
+          >
+            <Grid3X3 className="h-3.5 w-3.5" />
+            Raster
+          </button>
           {placeMode === "marker" && (
             <div className="flex flex-wrap gap-1">
               {WORLD_MAP_ICON_KEYS.filter((k) => k !== "marker").map((key) => {
@@ -398,16 +412,60 @@ export function WorldMapEditor({
               })}
 
               {groupPixel && (isGm || map.group_token_visible) && (
-                <div
-                  className="pointer-events-none absolute z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-accent-gold bg-hero-dark text-accent-gold"
-                  style={{
-                    left: groupPixel.x + config.cellSizePx / 2,
-                    top: groupPixel.y + config.cellSizePx / 2,
+                <WorldMapGroupToken
+                  left={groupPixel.x + config.cellSizePx / 2}
+                  top={groupPixel.y + config.cellSizePx / 2}
+                  cellSize={config.cellSizePx}
+                  isCamping={map.group_token_is_camping}
+                  isGm={isGm}
+                  onToggleCamping={(next) => {
+                    startTransition(async () => {
+                      try {
+                        const updated = await setWorldMapGroupToken({
+                          mapId: map.id,
+                          worldId,
+                          gridX: map.group_token_grid_x,
+                          gridY: map.group_token_grid_y,
+                          visible: map.group_token_visible,
+                          isCamping: next,
+                        });
+                        setMap(updated);
+                        toast.success(
+                          next ? "Gruppe kampiert." : "Gruppe ist wieder unterwegs.",
+                        );
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Camping konnte nicht gesetzt werden.",
+                        );
+                      }
+                    });
                   }}
-                  title="Gruppe"
-                >
-                  <Users className="h-4 w-4" />
-                </div>
+                  onMoveToPixel={(clientX, clientY) => {
+                    if (!mapRef.current) return;
+                    const rect = mapRef.current.getBoundingClientRect();
+                    const scaleX = mapSize.width / Math.max(1, rect.width);
+                    const scaleY = mapSize.height / Math.max(1, rect.height);
+                    const px = (clientX - rect.left) * scaleX;
+                    const py = (clientY - rect.top) * scaleY;
+                    const cell = pixelToGrid(px, py, config);
+                    if (!cell) return;
+                    startTransition(async () => {
+                      try {
+                        const updated = await setWorldMapGroupToken({
+                          mapId: map.id,
+                          worldId,
+                          gridX: cell.gridX,
+                          gridY: cell.gridY,
+                          visible: true,
+                          isCamping: map.group_token_is_camping,
+                        });
+                        setMap(updated);
+                      } catch {
+                        /* drag jitter — ignore transient errors */
+                      }
+                    });
+                  }}
+                />
               )}
 
               {pendingCell && (
@@ -759,6 +817,29 @@ export function WorldMapEditor({
           </div>
         </div>
       )}
+
+      <WorldMapGridModal
+        open={gridModalOpen}
+        title={map.title}
+        imageUrl={map.image_url}
+        initialGrid={map.grid_config}
+        pending={pending}
+        onCancel={() => setGridModalOpen(false)}
+        onConfirm={(grid: BattlemapGridConfig) => {
+          startTransition(async () => {
+            try {
+              const updated = await updateWorldMap(map.id, worldId, {
+                gridConfig: grid,
+              });
+              setMap(updated);
+              setGridModalOpen(false);
+              toast.success("Raster gespeichert.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+            }
+          });
+        }}
+      />
     </div>
   );
 }

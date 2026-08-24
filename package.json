@@ -14,7 +14,10 @@
     "catalog:dnd5e:patch": "node scripts/dnd5e-patches/apply-catalog-patches.mjs",
     "test:progression": "npx tsx src/lib/characters/dnd5e/progression/progression.selftest.ts",
     "test:dice-faces": "npx tsx src/lib/session/dice-face-mapping.selftest.ts",
-    "test:dice-physics": "npx tsx src/lib/session/dice-physics.selftest.ts"
+    "test:dice-physics": "npx tsx src/lib/session/dice-physics.selftest.ts",
+    "images:webp": "node scripts/convert-images-to-webp.mjs --apply",
+    "images:webp:refs": "node scripts/convert-images-to-webp.mjs --apply --update-refs",
+    "images:webp:dry": "node scripts/convert-images-to-webp.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

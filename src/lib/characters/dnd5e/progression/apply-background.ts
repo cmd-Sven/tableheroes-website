@@ -12,6 +12,7 @@ import type {
 import type { AbilityKeyShort, BackgroundDefinition } from "./types";
 import {
   findBackgroundByName,
+  getFeatById,
   getBackgroundById,
   getBackgrounds,
 } from "./catalog";
@@ -21,6 +22,7 @@ import {
 } from "./proficiencies-catalog";
 
 export const BACKGROUND_SOURCE = "srd-background";
+const BACKGROUND_ORIGIN_FEAT_SOURCE = "srd-background-origin-feat";
 
 function normalizeMatch(s: string): string {
   return s
@@ -153,6 +155,14 @@ export function removeBackgroundGrants(
         if (delta) applyAbilityDelta(next, ab as AbilityKeyShort, -delta);
       }
     }
+
+    if (bg.originFeatId) {
+      const originFeatFeatureId = `feat-${bg.originFeatId}`;
+      next.features = (next.features ?? []).filter((f) => {
+        if (f.id !== originFeatFeatureId) return true;
+        return f.source !== BACKGROUND_ORIGIN_FEAT_SOURCE;
+      });
+    }
   }
 
   return next;
@@ -226,6 +236,26 @@ export function applyBackgroundGrants(
 
   if (!next.features.some((f) => f.id === mainFeature.id)) {
     next.features.push(mainFeature);
+  }
+
+  if (bg.originFeatId) {
+    const feat = getFeatById(bg.originFeatId);
+    if (feat) {
+      const originFeatFeatureId = `feat-${feat.id}`;
+      const alreadyHas = next.features.some((f) => f.id === originFeatFeatureId);
+      if (!alreadyHas) {
+        next.features.push({
+          id: originFeatFeatureId,
+          name: feat.nameDe || feat.nameEn,
+          nameDe: feat.nameDe,
+          nameEn: feat.nameEn,
+          description: feat.descriptionDe || feat.descriptionEn || null,
+          descriptionDe: feat.descriptionDe ?? null,
+          descriptionEn: feat.descriptionEn ?? null,
+          source: BACKGROUND_ORIGIN_FEAT_SOURCE,
+        });
+      }
+    }
   }
 
   const equipHint =

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Shield, Swords, X } from "lucide-react";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import { ABILITY_LABELS_DE, type AbilityKey } from "@/src/lib/characters/dnd5e/types";
@@ -10,6 +10,11 @@ import {
   type DicePoolGroup,
   type DiceRollMode,
 } from "@/src/lib/session/dice-roll";
+import {
+  GM_DICE_ROLLER_ID,
+  GM_DICE_ROLLER_NAME,
+  isGmDiceRollerId,
+} from "@/src/lib/session/dice-skins";
 import { useLiveSessionDiceRoll } from "@/src/components/session/useLiveSessionDiceRoll";
 import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
 import { DiceSkinPalette } from "@/src/components/session/dice/DiceSkinPalette";
@@ -51,10 +56,35 @@ export function LiveSessionDicePanel({
   userId = null,
   isGM = false,
 }: Props) {
+  const [rollerId, setRollerId] = useState<string>(() =>
+    currentCharacter?.id ??
+    prepTestCharacterId ??
+    (isGM ? GM_DICE_ROLLER_ID : ""),
+  );
+
+  useEffect(() => {
+    if (!isGM && currentCharacter) {
+      setRollerId(currentCharacter.id);
+    }
+  }, [currentCharacter?.id, isGM]);
+
+  const roller = useMemo(() => {
+    if (isGmDiceRollerId(rollerId)) {
+      return { id: GM_DICE_ROLLER_ID, name: GM_DICE_ROLLER_NAME };
+    }
+    if (currentCharacter && rollerId === currentCharacter.id) {
+      return currentCharacter;
+    }
+    const prepPc = prepTestCharacters?.find((pc) => pc.id === rollerId);
+    if (prepPc) return prepPc;
+    return null;
+  }, [rollerId, currentCharacter, prepTestCharacters]);
+
   const dice = useLiveSessionDiceRoll({
     sessionId,
     campaignId,
     currentCharacter,
+    roller,
     active: open,
     onActivityPosted,
     userId,
@@ -123,7 +153,28 @@ export function LiveSessionDicePanel({
           <p className="font-libre text-[10px] text-gray-500">
             {isPrepMode ? "Vorbereitung · Würfe testen" : "Pool mischen & würfeln"}
           </p>
-          {prepTestCharacters && prepTestCharacters.length > 0 ? (
+          {isGM ? (
+            <select
+              value={rollerId}
+              onChange={(e) => {
+                const next = e.target.value;
+                setRollerId(next);
+                if (isGmDiceRollerId(next)) return;
+                onPrepTestCharacterChange?.(next);
+              }}
+              className="mt-1 w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
+            >
+              <option value={GM_DICE_ROLLER_ID}>Als Spielleiter</option>
+              {currentCharacter ? (
+                <option value={currentCharacter.id}>{currentCharacter.name}</option>
+              ) : null}
+              {prepTestCharacters?.map((pc) => (
+                <option key={pc.id} value={pc.id}>
+                  Test als: {pc.name}
+                </option>
+              ))}
+            </select>
+          ) : prepTestCharacters && prepTestCharacters.length > 0 ? (
             <select
               value={prepTestCharacterId ?? prepTestCharacters[0]?.id ?? ""}
               onChange={(e) => onPrepTestCharacterChange?.(e.target.value)}
@@ -165,7 +216,7 @@ export function LiveSessionDicePanel({
               <button
                 key={s}
                 type="button"
-                disabled={!currentCharacter || dice.pending || poolCount >= MAX_POOL}
+                disabled={!dice.canRoll || dice.pending || poolCount >= MAX_POOL}
                 onClick={() => addDie(s)}
                 title={`W${s} hinzufügen`}
                 className={`relative flex flex-col items-center gap-0.5 rounded border px-1 py-1.5 text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40 ${
@@ -256,7 +307,7 @@ export function LiveSessionDicePanel({
 
         <button
           type="button"
-          disabled={!currentCharacter || dice.pending || groups.length === 0}
+          disabled={!dice.canRoll || dice.pending || groups.length === 0}
           onClick={rollPool}
           className="flex w-full items-center justify-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/15 px-2 py-1.5 font-barlow text-[11px] font-bold uppercase text-hero-vibrant disabled:opacity-40"
         >
@@ -278,7 +329,12 @@ export function LiveSessionDicePanel({
           </select>
           <button
             type="button"
-            disabled={!dice.selectedSkill || !currentCharacter || dice.pending}
+            disabled={
+              !dice.selectedSkill ||
+              dice.rollingAsGm ||
+              !dice.canRoll ||
+              dice.pending
+            }
             onClick={dice.handleSkillCheck}
             title="Fertigkeit würfeln"
             className="rounded border border-hero-vibrant px-2 py-1 text-hero-vibrant disabled:opacity-40"
@@ -302,7 +358,12 @@ export function LiveSessionDicePanel({
           </select>
           <button
             type="button"
-            disabled={!dice.selectedSave || !currentCharacter || dice.pending}
+            disabled={
+              !dice.selectedSave ||
+              dice.rollingAsGm ||
+              !dice.canRoll ||
+              dice.pending
+            }
             onClick={dice.handleSavingThrow}
             title="Rettungswurf würfeln"
             className="rounded border border-accent-gold/70 px-2 py-1 text-accent-gold disabled:opacity-40"
@@ -314,7 +375,7 @@ export function LiveSessionDicePanel({
         {dice.primaryAttack ? (
           <button
             type="button"
-            disabled={!currentCharacter || dice.pending}
+            disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
             onClick={dice.handleAttackRoll}
             className="flex w-full items-center justify-center gap-1 rounded border border-accent-blood/50 bg-accent-blood/10 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
           >
@@ -323,9 +384,13 @@ export function LiveSessionDicePanel({
           </button>
         ) : null}
 
-        {!currentCharacter ? (
+        {!dice.canRoll ? (
           <p className="font-libre text-[10px] italic text-gray-500">
             Charakter wählen, um zu würfeln.
+          </p>
+        ) : dice.rollingAsGm ? (
+          <p className="font-libre text-[10px] italic text-gray-500">
+            Als Spielleiter — Pool-Würfe ohne Charakterbogen.
           </p>
         ) : null}
       </div>

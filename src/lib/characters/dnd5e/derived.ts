@@ -16,12 +16,19 @@ import {
   spellAttackBonus,
   spellSaveDc,
 } from "./formulas";
+import {
+  clampExhaustionLevel,
+  exhaustionD20Penalty,
+  exhaustionSpeedPenaltyFeet,
+} from "./exhaustion";
 
 export function computeDerivedDnd5eSheet(
   sheet: Dnd5eSheetData,
   totalLevel: number,
 ): Dnd5eDerivedSheet {
   const pb = proficiencyBonus(totalLevel);
+  const exhaustionLevel = clampExhaustionLevel(sheet.combat.exhaustionLevel);
+  const exhaustionPenalty = exhaustionD20Penalty(exhaustionLevel);
 
   const abilities = {} as Dnd5eDerivedSheet["abilities"];
   const abilityMods = {} as Record<AbilityKey, number>;
@@ -39,7 +46,7 @@ export function computeDerivedDnd5eSheet(
     savingThrows[key] = {
       modifier,
       proficient,
-      total: savingThrowTotal(modifier, proficient, pb),
+      total: savingThrowTotal(modifier, proficient, pb) + exhaustionPenalty,
     };
   }
 
@@ -53,15 +60,20 @@ export function computeDerivedDnd5eSheet(
       ability,
       modifier: mod,
       proficient: entry.proficient,
-      total: skillTotalModifier(mod, entry, pb),
+      total: skillTotalModifier(mod, entry, pb) + exhaustionPenalty,
     };
   }
 
   const ac = armorClassValue(sheet.combat.ac, sheet.combat.acOverride);
-  const initiative = initiativeTotal(
-    abilityMods.dex,
-    sheet.combat.initiativeBonus ?? 0,
-    sheet.combat.initiativeOverride,
+  const initiative =
+    initiativeTotal(
+      abilityMods.dex,
+      sheet.combat.initiativeBonus ?? 0,
+      sheet.combat.initiativeOverride,
+    ) + exhaustionPenalty;
+  const speed = Math.max(
+    0,
+    (sheet.combat.speed ?? 0) - exhaustionSpeedPenaltyFeet(exhaustionLevel),
   );
 
   let derivedSpellSaveDc: number | null = null;
@@ -69,16 +81,16 @@ export function computeDerivedDnd5eSheet(
   if (sheet.spellcasting) {
     const castAbility = sheet.spellcasting.ability ?? "int";
     const castMod = abilityMods[castAbility];
-    derivedSpellSaveDc = spellSaveDc(
-      pb,
-      castMod,
-      sheet.spellcasting.spellSaveDcOverride,
-    );
-    derivedSpellAttackBonus = spellAttackBonus(
-      pb,
-      castMod,
-      sheet.spellcasting.spellAttackBonusOverride,
-    );
+    // 2024: Exhaustion also reduces spell save DCs; spell attacks are d20 tests.
+    derivedSpellSaveDc =
+      spellSaveDc(pb, castMod, sheet.spellcasting.spellSaveDcOverride) +
+      exhaustionPenalty;
+    derivedSpellAttackBonus =
+      spellAttackBonus(
+        pb,
+        castMod,
+        sheet.spellcasting.spellAttackBonusOverride,
+      ) + exhaustionPenalty;
   }
 
   return {
@@ -90,5 +102,8 @@ export function computeDerivedDnd5eSheet(
     initiative,
     spellSaveDc: derivedSpellSaveDc,
     spellAttackBonus: derivedSpellAttackBonus,
+    speed,
+    exhaustionLevel,
+    exhaustionPenalty,
   };
 }
