@@ -1626,7 +1626,17 @@ export function Dnd5eCharacterSheetPanel({
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
                     <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">{t("combat.ac")}</p>
-                    <p className="font-barlow text-4xl font-bold text-white mt-1">{displayAc}</p>
+                    {readOnly ? (
+                      <p className="font-barlow text-4xl font-bold text-white mt-1">{displayAc}</p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.combat.acOverride ?? displayAc}
+                        min={0}
+                        className="mt-1 !text-2xl !font-bold"
+                        aria-label={t("combat.ac")}
+                        onChange={(v) => updateCombat("acOverride", v)}
+                      />
+                    )}
                     <p className="mt-1 font-libre text-[9px] text-gray-500 leading-tight">
                       {sheet.combat.acOverride != null
                         ? t("combat.acOverrideHint")
