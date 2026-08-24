@@ -31,6 +31,16 @@ import {
   type AvatarWebcamModeDetail,
 } from "@/src/lib/session/avatar-webcam-bridge";
 import {
+  WEBCAM_PUBLISH_BROADCAST,
+  WEBCAM_SIGNAL_BROADCAST,
+  WEBCAM_UNPUBLISH_BROADCAST,
+  dispatchWebcamPublish,
+  dispatchWebcamSignal,
+  dispatchWebcamUnpublish,
+  type WebcamPublishDetail,
+  type WebcamSignalDetail,
+} from "@/src/lib/session/avatar-webcam-webrtc";
+import {
   mapBattlemapTokenRow,
   upsertBattlemapToken,
 } from "@/src/lib/session/battlemap-realtime-map";
@@ -211,6 +221,43 @@ export function useLiveSessionRealtime({
         dispatchAvatarWebcamMaster({
           enabled: raw.enabled !== false,
           senderId: raw.senderId != null ? String(raw.senderId) : null,
+          remote: true,
+        });
+      })
+      .on("broadcast", { event: WEBCAM_SIGNAL_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as WebcamSignalDetail;
+        if (!raw.streamKey || !raw.senderId || !raw.targetId) return;
+        if (String(raw.senderId) === userId) return;
+        if (String(raw.targetId) !== userId) return;
+        dispatchWebcamSignal({
+          type: raw.type,
+          streamKey: String(raw.streamKey),
+          senderId: String(raw.senderId),
+          targetId: String(raw.targetId),
+          sdp: raw.sdp,
+          candidate: raw.candidate,
+          remote: true,
+        });
+      })
+      .on("broadcast", { event: WEBCAM_PUBLISH_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as WebcamPublishDetail;
+        const streamKey = raw.streamKey != null ? String(raw.streamKey) : "";
+        if (!streamKey) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        dispatchWebcamPublish({
+          streamKey,
+          senderId: raw.senderId != null ? String(raw.senderId) : "",
+          remote: true,
+        });
+      })
+      .on("broadcast", { event: WEBCAM_UNPUBLISH_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as WebcamPublishDetail;
+        const streamKey = raw.streamKey != null ? String(raw.streamKey) : "";
+        if (!streamKey) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        dispatchWebcamUnpublish({
+          streamKey,
+          senderId: raw.senderId != null ? String(raw.senderId) : "",
           remote: true,
         });
       })

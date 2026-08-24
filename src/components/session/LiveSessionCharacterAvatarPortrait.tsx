@@ -256,7 +256,7 @@ export function LiveSessionCharacterAvatarPortrait({
             }}
             aria-label={`${characterName} Webcam-Platzhalter`}
           >
-            {/* Mirrored “live cam” stand-in so GM/players see webcam mode without a remote stream */}
+            {/* Remote viewers see live feed once WebRTC stream arrives; placeholder until then. */}
             <span
               className={`flex items-center justify-center rounded-full border-2 border-accent-gold/70 bg-background-dark/80 text-accent-gold shadow-[0_0_18px_rgba(202,185,38,0.35)] ${
                 compact ? "h-7 w-7" : "h-14 w-14"

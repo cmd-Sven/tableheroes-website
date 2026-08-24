@@ -156,11 +156,11 @@ export function useLiveSessionCharacterAvatarHandlers({
   );
 
   function openSheetTab() {
-    window.open(
-      `/dashboard/campaigns/${campaignId}/characters/${characterId}/player-view`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    const sheetHash = "#character-dnd5e-sheet";
+    const url = isGm
+      ? `/dashboard/campaigns/${campaignId}/characters/${characterId}/player-view${sheetHash}`
+      : `/dashboard/characters/${characterId}${sheetHash}`;
+    window.open(url, "_blank", "noopener,noreferrer");
     setMenuOpen(false);
     setPanel(null);
   }

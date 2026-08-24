@@ -5,9 +5,11 @@
  */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvatarWebcamDisplayMode } from "@/src/lib/session/avatar-webcam-bridge";
+import { characterStreamKey } from "@/src/lib/session/avatar-webcam-webrtc";
 import { usePlayerAvatarCamSessionOptional } from "./PlayerAvatarCamSessionProvider";
+import { useLiveSessionWebcamOptional } from "./LiveSessionWebcamProvider";
 
 export type PlayerAvatarCamPhase =
   | "idle"
@@ -30,6 +32,7 @@ export function usePlayerAvatarCam({
   canControl,
 }: UsePlayerAvatarCamOptions) {
   const session = usePlayerAvatarCamSessionOptional();
+  const webrtc = useLiveSessionWebcamOptional();
   const [phase, setPhase] = useState<PlayerAvatarCamPhase>("idle");
   const [errorHint, setErrorHint] = useState<string | null>(null);
 
@@ -41,15 +44,28 @@ export function usePlayerAvatarCam({
     ? session.getMode(characterId)
     : "avatar";
 
-  const attachVideo = useCallback((el: HTMLVideoElement | null) => {
-    videoRef.current = el;
-    if (el && streamRef.current) {
-      el.srcObject = streamRef.current;
-      void el.play().catch(() => {
-        /* autoplay may need a gesture; stream still live */
-      });
-    }
-  }, []);
+  const streamKey = characterStreamKey(characterId);
+  const remoteStreamVersion = webrtc?.remoteStreamVersion ?? 0;
+  const remoteStream = useMemo(() => {
+    if (isCameraOwner || !webrtc || displayMode !== "webcam") return null;
+    return webrtc.getRemoteStream(streamKey);
+  }, [displayMode, isCameraOwner, remoteStreamVersion, streamKey, webrtc]);
+
+  const attachVideo = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoRef.current = el;
+      const stream = isCameraOwner ? streamRef.current : remoteStream;
+      if (el && stream) {
+        el.srcObject = stream;
+        void el.play().catch(() => {
+          /* autoplay may need a gesture; stream still live */
+        });
+      } else if (el) {
+        el.srcObject = null;
+      }
+    },
+    [isCameraOwner, remoteStream],
+  );
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -152,6 +168,24 @@ export function usePlayerAvatarCam({
     }
   }, [displayMode, isCameraOwner, startCamera, stopCamera]);
 
+  // Re-bind video element when local or remote stream becomes available.
+  useEffect(() => {
+    attachVideo(videoRef.current);
+  }, [attachVideo, phase, remoteStream]);
+
+  // Owner publishes local stream to other session participants.
+  useEffect(() => {
+    if (!webrtc || !isCameraOwner) return;
+    if (displayMode === "webcam" && phase === "active" && streamRef.current) {
+      webrtc.publishStream(streamKey, streamRef.current);
+    } else {
+      webrtc.unpublishStream(streamKey);
+    }
+    return () => {
+      webrtc.unpublishStream(streamKey);
+    };
+  }, [displayMode, isCameraOwner, phase, streamKey, webrtc]);
+
   useEffect(() => {
     return () => {
       stopStream();
@@ -159,7 +193,8 @@ export function usePlayerAvatarCam({
   }, [stopStream]);
 
   const showingWebcam =
-    isCameraOwner && displayMode === "webcam" && phase === "active";
+    displayMode === "webcam" &&
+    (isCameraOwner ? phase === "active" : remoteStream !== null);
 
   /** Webcam mode requested for this slot (owner may still be connecting / remote viewers). */
   const webcamModeActive = displayMode === "webcam";

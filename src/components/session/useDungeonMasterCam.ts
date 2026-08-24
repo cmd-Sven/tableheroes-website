@@ -1,7 +1,7 @@
 /**
  * useDungeonMasterCam — Local webcam MediaStream lifecycle for the GM Overlord-Cam.
  * Keeps the stream alive across view switches; cleans up only on unmount / disable.
- * Stream is exposed for a future WebRTC broadcast path (not wired yet).
+ * Stream is published to other session participants via LiveSessionWebcamProvider (WebRTC).
  */
 "use client";
 
