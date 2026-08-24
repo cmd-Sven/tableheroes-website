@@ -13,24 +13,26 @@ type Props = {
 };
 
 export function DungeonMasterCamWebRtcSync({ userId }: Props) {
-  const dmCam = useDungeonMasterCamContext();
+  const { phase, getStream } = useDungeonMasterCamContext();
   const webrtc = useLiveSessionWebcamOptional();
+  const publishStream = webrtc?.publishStream;
+  const unpublishStream = webrtc?.unpublishStream;
 
   useEffect(() => {
-    if (!webrtc || !userId) return;
+    if (!publishStream || !unpublishStream || !userId) return;
     const key = dmStreamKey(userId);
-    if (dmCam.phase === "active") {
-      const stream = dmCam.getStream();
+    if (phase === "active") {
+      const stream = getStream();
       if (stream) {
-        webrtc.publishStream(key, stream);
+        publishStream(key, stream);
       }
     } else {
-      webrtc.unpublishStream(key);
+      unpublishStream(key);
     }
     return () => {
-      webrtc.unpublishStream(key);
+      unpublishStream(key);
     };
-  }, [dmCam.phase, dmCam.getStream, userId, webrtc]);
+  }, [getStream, phase, publishStream, unpublishStream, userId]);
 
   return null;
 }

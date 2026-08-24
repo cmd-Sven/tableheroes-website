@@ -175,16 +175,18 @@ export function usePlayerAvatarCam({
 
   // Owner publishes local stream to other session participants.
   useEffect(() => {
-    if (!webrtc || !isCameraOwner) return;
+    const publishStream = webrtc?.publishStream;
+    const unpublishStream = webrtc?.unpublishStream;
+    if (!publishStream || !unpublishStream || !isCameraOwner) return;
     if (displayMode === "webcam" && phase === "active" && streamRef.current) {
-      webrtc.publishStream(streamKey, streamRef.current);
+      publishStream(streamKey, streamRef.current);
     } else {
-      webrtc.unpublishStream(streamKey);
+      unpublishStream(streamKey);
     }
     return () => {
-      webrtc.unpublishStream(streamKey);
+      unpublishStream(streamKey);
     };
-  }, [displayMode, isCameraOwner, phase, streamKey, webrtc]);
+  }, [displayMode, isCameraOwner, phase, streamKey, webrtc?.publishStream, webrtc?.unpublishStream]);
 
   useEffect(() => {
     return () => {

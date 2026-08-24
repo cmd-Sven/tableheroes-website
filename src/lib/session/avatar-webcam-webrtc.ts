@@ -5,10 +5,12 @@
 export const WEBCAM_SIGNAL_BROADCAST = "webcam_signal";
 export const WEBCAM_PUBLISH_BROADCAST = "webcam_publish";
 export const WEBCAM_UNPUBLISH_BROADCAST = "webcam_unpublish";
+export const WEBCAM_PULL_BROADCAST = "webcam_pull";
 
 export const WEBCAM_SIGNAL_EVENT = "th:webcam-signal";
 export const WEBCAM_PUBLISH_EVENT = "th:webcam-publish";
 export const WEBCAM_UNPUBLISH_EVENT = "th:webcam-unpublish";
+export const WEBCAM_PULL_EVENT = "th:webcam-pull";
 
 export type WebcamSignalType = "offer" | "answer" | "ice";
 
@@ -26,6 +28,12 @@ export type WebcamSignalDetail = {
 export type WebcamPublishDetail = {
   streamKey: string;
   senderId: string;
+  remote?: boolean;
+};
+
+export type WebcamPullDetail = {
+  streamKey: string;
+  requesterId: string;
   remote?: boolean;
 };
 
@@ -55,4 +63,9 @@ export function dispatchWebcamPublish(detail: WebcamPublishDetail): void {
 export function dispatchWebcamUnpublish(detail: WebcamPublishDetail): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(WEBCAM_UNPUBLISH_EVENT, { detail }));
+}
+
+export function dispatchWebcamPull(detail: WebcamPullDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WEBCAM_PULL_EVENT, { detail }));
 }

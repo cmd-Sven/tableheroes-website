@@ -32,12 +32,15 @@ import {
 } from "@/src/lib/session/avatar-webcam-bridge";
 import {
   WEBCAM_PUBLISH_BROADCAST,
+  WEBCAM_PULL_BROADCAST,
   WEBCAM_SIGNAL_BROADCAST,
   WEBCAM_UNPUBLISH_BROADCAST,
   dispatchWebcamPublish,
+  dispatchWebcamPull,
   dispatchWebcamSignal,
   dispatchWebcamUnpublish,
   type WebcamPublishDetail,
+  type WebcamPullDetail,
   type WebcamSignalDetail,
 } from "@/src/lib/session/avatar-webcam-webrtc";
 import {
@@ -247,6 +250,18 @@ export function useLiveSessionRealtime({
         dispatchWebcamPublish({
           streamKey,
           senderId: raw.senderId != null ? String(raw.senderId) : "",
+          remote: true,
+        });
+      })
+      .on("broadcast", { event: WEBCAM_PULL_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as WebcamPullDetail;
+        const streamKey = raw.streamKey != null ? String(raw.streamKey) : "";
+        const requesterId = raw.requesterId != null ? String(raw.requesterId) : "";
+        if (!streamKey || !requesterId) return;
+        if (requesterId === userId) return;
+        dispatchWebcamPull({
+          streamKey,
+          requesterId,
           remote: true,
         });
       })

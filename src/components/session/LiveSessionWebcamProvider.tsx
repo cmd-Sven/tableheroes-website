@@ -19,11 +19,15 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   DEFAULT_ICE_SERVERS,
   WEBCAM_PUBLISH_BROADCAST,
+  WEBCAM_PUBLISH_EVENT,
+  WEBCAM_PULL_BROADCAST,
+  WEBCAM_PULL_EVENT,
   WEBCAM_SIGNAL_BROADCAST,
   WEBCAM_SIGNAL_EVENT,
   WEBCAM_UNPUBLISH_BROADCAST,
   WEBCAM_UNPUBLISH_EVENT,
   type WebcamPublishDetail,
+  type WebcamPullDetail,
   type WebcamSignalDetail,
 } from "@/src/lib/session/avatar-webcam-webrtc";
 
@@ -267,6 +271,32 @@ export function LiveSessionWebcamProvider({
     [closePc, removeRemoteStream, userId],
   );
 
+  const handleRemotePublish = useCallback(
+    (detail: WebcamPublishDetail) => {
+      const { streamKey, senderId } = detail;
+      if (!streamKey || senderId === userId) return;
+      if (remoteStreamsRef.current[streamKey]) return;
+      if (publishedRef.current.has(streamKey)) return;
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: WEBCAM_PULL_BROADCAST,
+        payload: { streamKey, requesterId: userId } satisfies WebcamPullDetail,
+      });
+    },
+    [liveChannelRef, userId],
+  );
+
+  const handlePullRequest = useCallback(
+    (detail: WebcamPullDetail) => {
+      const { streamKey, requesterId } = detail;
+      if (!streamKey || !requesterId || requesterId === userId) return;
+      const stream = publishedRef.current.get(streamKey);
+      if (!stream) return;
+      void createPublisherPc(streamKey, requesterId, stream);
+    },
+    [createPublisherPc, userId],
+  );
+
   useEffect(() => {
     const onSignal = (ev: Event) => {
       const detail = (ev as CustomEvent<WebcamSignalDetail>).detail;
@@ -286,13 +316,39 @@ export function LiveSessionWebcamProvider({
       handleRemoteUnpublish(detail);
     };
 
+    const onPublish = (ev: Event) => {
+      const detail = (ev as CustomEvent<WebcamPublishDetail>).detail;
+      if (!detail?.streamKey) return;
+      if (detail.remote && detail.senderId === userId) return;
+      handleRemotePublish(detail);
+    };
+
+    const onPull = (ev: Event) => {
+      const detail = (ev as CustomEvent<WebcamPullDetail>).detail;
+      if (!detail?.streamKey || !detail.requesterId) return;
+      if (detail.remote && detail.requesterId === userId) return;
+      handlePullRequest(detail);
+    };
+
     window.addEventListener(WEBCAM_SIGNAL_EVENT, onSignal);
     window.addEventListener(WEBCAM_UNPUBLISH_EVENT, onUnpublish);
+    window.addEventListener(WEBCAM_PUBLISH_EVENT, onPublish);
+    window.addEventListener(WEBCAM_PULL_EVENT, onPull);
     return () => {
       window.removeEventListener(WEBCAM_SIGNAL_EVENT, onSignal);
       window.removeEventListener(WEBCAM_UNPUBLISH_EVENT, onUnpublish);
+      window.removeEventListener(WEBCAM_PUBLISH_EVENT, onPublish);
+      window.removeEventListener(WEBCAM_PULL_EVENT, onPull);
     };
-  }, [handleAnswer, handleIce, handleOffer, handleRemoteUnpublish, userId]);
+  }, [
+    handleAnswer,
+    handleIce,
+    handleOffer,
+    handlePullRequest,
+    handleRemotePublish,
+    handleRemoteUnpublish,
+    userId,
+  ]);
 
   // Offer streams to newly present participants.
   useEffect(() => {
@@ -335,20 +391,27 @@ export function LiveSessionWebcamProvider({
     };
   }, [closePc]);
 
+  const getRemoteStream = useCallback(
+    (streamKey: string) => remoteStreamsRef.current[streamKey] ?? null,
+    [],
+  );
+
+  const getRemoteStreamByPrefix = useCallback((prefix: string) => {
+    for (const [key, stream] of Object.entries(remoteStreamsRef.current)) {
+      if (key.startsWith(prefix)) return stream;
+    }
+    return null;
+  }, []);
+
   const api = useMemo<LiveSessionWebcamApi>(
     () => ({
       publishStream,
       unpublishStream,
-      getRemoteStream: (streamKey: string) => remoteStreams[streamKey] ?? null,
-      getRemoteStreamByPrefix: (prefix: string) => {
-        for (const [key, stream] of Object.entries(remoteStreams)) {
-          if (key.startsWith(prefix)) return stream;
-        }
-        return null;
-      },
+      getRemoteStream,
+      getRemoteStreamByPrefix,
       remoteStreamVersion,
     }),
-    [publishStream, remoteStreamVersion, remoteStreams, unpublishStream],
+    [getRemoteStream, getRemoteStreamByPrefix, publishStream, remoteStreamVersion, unpublishStream],
   );
 
   return (

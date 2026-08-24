@@ -194,6 +194,8 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
     };
   }, [stopStream]);
 
+  const getStream = useCallback(() => streamRef.current, []);
+
   return {
     phase,
     errorHint,
@@ -204,7 +206,7 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
     prefsReady,
     /** Live local preview stream — ready for a future peer broadcast adapter. */
     stream: streamRef.current,
-    getStream: () => streamRef.current,
+    getStream,
     videoRefCallback: attachVideo,
     startCamera,
     stopCamera,
