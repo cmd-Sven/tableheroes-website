@@ -20,7 +20,11 @@ import {
   type BattlemapTokensChangedDetail,
   type CharacterDisplayChangedDetail,
 } from "@/src/lib/session/character-radial-bridge";
-import { mapBattlemapTokenRow, upsertBattlemapToken } from "@/src/lib/session/battlemap-realtime-map";
+import {
+  applyBattlemapTokenUpdate,
+  mapBattlemapTokenRow,
+  mergeBattlemapTokenLists,
+} from "@/src/lib/session/battlemap-realtime-map";
 import type {
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
@@ -104,8 +108,11 @@ export function useLiveSessionBattlemapSync({
         .eq("battlemap_id", activeBattlemapId)
         .order("created_at", { ascending: true });
       if (!cancelled && !error) {
-        setBattlemapTokens(
-          (data ?? []).map((row: Record<string, unknown>) => mapBattlemapTokenRow(row)),
+        setBattlemapTokens((prev) =>
+          mergeBattlemapTokenLists(
+            prev,
+            (data ?? []).map((row: Record<string, unknown>) => mapBattlemapTokenRow(row)),
+          ),
         );
       }
     }
@@ -142,7 +149,7 @@ export function useLiveSessionBattlemapSync({
             return;
           }
           const token = mapBattlemapTokenRow(row);
-          setBattlemapTokens((prev) => upsertBattlemapToken(prev, token));
+          setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, token));
         },
       )
       .subscribe();

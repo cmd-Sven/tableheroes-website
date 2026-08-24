@@ -59,6 +59,7 @@ export function normalizeToken(row: Record<string, unknown>): SessionBattlemapTo
     is_visible_to_players: row.is_visible_to_players !== false,
     token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
     show_hp_bar: row.show_hp_bar === true,
+    updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
   };
 }
 

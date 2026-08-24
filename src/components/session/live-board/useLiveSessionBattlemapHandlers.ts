@@ -18,7 +18,13 @@ import {
   movementCellsForBurst,
 } from "@/src/lib/session/battlemap-movement";
 import { isCellBlockedByTokens } from "@/src/lib/session/battlemap-grid";
-import { upsertBattlemapToken, upsertBattlemapTrap } from "@/src/lib/session/battlemap-realtime-map";
+import {
+  applyBattlemapTokenUpdate,
+  clearPendingBattlemapTokenMove,
+  registerPendingBattlemapTokenMove,
+  upsertBattlemapToken,
+  upsertBattlemapTrap,
+} from "@/src/lib/session/battlemap-realtime-map";
 import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
 import type { CampaignNpc, LiveState } from "./live-session-types";
 import type { LiveSessionBattlemapState } from "./useLiveSessionBattlemapState";
@@ -46,6 +52,7 @@ type Params = {
   sessionId: string;
   campaignId: string;
   isGM: boolean;
+  ownCharacterId?: string | null;
   liveState: LiveState | null;
   liveStateRef: React.MutableRefObject<LiveState | null>;
   setLiveState: React.Dispatch<React.SetStateAction<LiveState | null>>;
@@ -59,6 +66,7 @@ export function useLiveSessionBattlemapHandlers({
   sessionId,
   campaignId,
   isGM,
+  ownCharacterId,
   liveState,
   liveStateRef,
   setLiveState,
@@ -304,6 +312,7 @@ export function useLiveSessionBattlemapHandlers({
       if (token.grid_x === gridX && token.grid_y === gridY) return;
 
       const originGrid = { grid_x: token.grid_x, grid_y: token.grid_y };
+      registerPendingBattlemapTokenMove(token.id, gridX, gridY);
       const applyLocalMove = (gx: number, gy: number) => {
         setBattlemapTokens((prev) =>
           prev.map((t) => (t.id === token.id ? { ...t, grid_x: gx, grid_y: gy } : t)),
@@ -330,13 +339,14 @@ export function useLiveSessionBattlemapHandlers({
                 ? tokenPlacement.useDash
                 : false,
             });
-            setBattlemapTokens((prev) => upsertBattlemapToken(prev, placed));
+            setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, placed));
             notifyBattlemapTokensChanged({ op: "upsert", token: placed });
             if (!tokenPlacement || tokenPlacement.characterId !== characterId) {
               toast.success(`Token für ${characterName} bewegt.`);
             }
             void runTrapEnterCheck(characterId, gridX, gridY);
           } catch (e) {
+            clearPendingBattlemapTokenMove(token.id);
             applyLocalMove(originGrid.grid_x, originGrid.grid_y);
             toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
           }
@@ -362,10 +372,11 @@ export function useLiveSessionBattlemapHandlers({
             label: token.label,
             imageUrl: token.image_url,
           });
-          setBattlemapTokens((prev) => upsertBattlemapToken(prev, placed));
+          setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, placed));
           notifyBattlemapTokensChanged({ op: "upsert", token: placed });
           toast.success("Token verschoben.");
         } catch (e) {
+          clearPendingBattlemapTokenMove(token.id);
           applyLocalMove(originGrid.grid_x, originGrid.grid_y);
           toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
         }

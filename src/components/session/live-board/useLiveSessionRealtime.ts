@@ -44,8 +44,9 @@ import {
   type WebcamSignalDetail,
 } from "@/src/lib/session/avatar-webcam-webrtc";
 import {
+  applyBattlemapTokenUpdate,
   mapBattlemapTokenRow,
-  upsertBattlemapToken,
+  mergeBattlemapTokenLists,
 } from "@/src/lib/session/battlemap-realtime-map";
 import { npcReputationSmileyFromScore } from "@/src/lib/npc-reputation-smiley";
 import type {
@@ -294,7 +295,7 @@ export function useLiveSessionRealtime({
 
         if (op === "upsert" && raw.token && typeof raw.token === "object") {
           const token = mapBattlemapTokenRow(raw.token as Record<string, unknown>);
-          setBattlemapTokens((prev) => upsertBattlemapToken(prev, token));
+          setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, token));
           return;
         }
 
@@ -305,8 +306,11 @@ export function useLiveSessionRealtime({
             .eq("battlemap_id", battlemapId)
             .order("created_at", { ascending: true });
           if (error || !data) return;
-          setBattlemapTokens(
-            (data as Record<string, unknown>[]).map((row) => mapBattlemapTokenRow(row)),
+          setBattlemapTokens((prev) =>
+            mergeBattlemapTokenLists(
+              prev,
+              (data as Record<string, unknown>[]).map((row) => mapBattlemapTokenRow(row)),
+            ),
           );
         })();
       })

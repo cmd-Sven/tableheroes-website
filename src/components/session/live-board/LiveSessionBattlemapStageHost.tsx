@@ -436,13 +436,13 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       onToggleTokenVisibility={(tokenId, visible) => {
         startTransition(async () => {
           try {
-            await toggleBattlemapTokenVisibility(tokenId, sessionId, visible);
+            const updated = await toggleBattlemapTokenVisibility(tokenId, sessionId, visible);
             setBattlemapTokens((prev) =>
               prev.map((t) =>
-                t.id === tokenId ? { ...t, is_visible_to_players: visible } : t,
+                t.id === tokenId ? { ...t, ...updated } : t,
               ),
             );
-            notifyBattlemapTokensChanged({ op: "refresh" });
+            notifyBattlemapTokensChanged({ op: "upsert", token: updated });
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Sichtbarkeit fehlgeschlagen.");
           }

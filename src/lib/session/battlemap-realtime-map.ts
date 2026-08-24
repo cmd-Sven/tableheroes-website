@@ -7,6 +7,61 @@ import type {
   SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
 
+/** In-flight drag/move — protects optimistic grid position from stale realtime rows. */
+const pendingTokenMoves = new Map<
+  string,
+  { gridX: number; gridY: number; since: number }
+>();
+
+export function registerPendingBattlemapTokenMove(
+  tokenId: string,
+  gridX: number,
+  gridY: number,
+): void {
+  pendingTokenMoves.set(tokenId, { gridX, gridY, since: Date.now() });
+}
+
+export function clearPendingBattlemapTokenMove(tokenId: string): void {
+  pendingTokenMoves.delete(tokenId);
+}
+
+function tokenUpdatedAtMs(token: SessionBattlemapToken): number | null {
+  if (!token.updated_at) return null;
+  const ms = Date.parse(token.updated_at);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isStaleTokenUpdate(
+  current: SessionBattlemapToken,
+  incoming: SessionBattlemapToken,
+): boolean {
+  const curMs = tokenUpdatedAtMs(current);
+  const incMs = tokenUpdatedAtMs(incoming);
+  if (curMs != null && incMs != null && incMs < curMs) return true;
+  return false;
+}
+
+function shouldRejectPendingRevert(
+  tokenId: string,
+  current: SessionBattlemapToken,
+  incoming: SessionBattlemapToken,
+): boolean {
+  const pending = pendingTokenMoves.get(tokenId);
+  if (!pending) return false;
+
+  const currentAtPending =
+    current.grid_x === pending.gridX && current.grid_y === pending.gridY;
+  const incomingAtPending =
+    incoming.grid_x === pending.gridX && incoming.grid_y === pending.gridY;
+
+  if (incomingAtPending) {
+    pendingTokenMoves.delete(tokenId);
+    return false;
+  }
+
+  return currentAtPending;
+}
+
 /** Pure row → token mapping for realtime / optimistic sync (client-safe). */
 export function mapBattlemapTokenRow(
   row: Record<string, unknown>,
@@ -26,6 +81,7 @@ export function mapBattlemapTokenRow(
     is_visible_to_players: row.is_visible_to_players !== false,
     token_side: (row.token_side as SessionBattlemapToken["token_side"]) ?? "party",
     show_hp_bar: row.show_hp_bar === true,
+    updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
   };
 }
 
@@ -56,12 +112,51 @@ export function upsertBattlemapToken(
   prev: SessionBattlemapToken[],
   token: SessionBattlemapToken,
 ): SessionBattlemapToken[] {
-  const idx = prev.findIndex((t) => t.id === token.id);
-  if (idx < 0) return [...prev, token];
-  if (battlemapTokensEqual(prev[idx]!, token)) return prev;
+  return applyBattlemapTokenUpdate(prev, token);
+}
+
+/** Apply one remote/local token row — ignores stale or pending-reverting updates. */
+export function applyBattlemapTokenUpdate(
+  prev: SessionBattlemapToken[],
+  incoming: SessionBattlemapToken,
+): SessionBattlemapToken[] {
+  const idx = prev.findIndex((t) => t.id === incoming.id);
+  if (idx < 0) return [...prev, incoming];
+
+  const current = prev[idx]!;
+  if (shouldRejectPendingRevert(incoming.id, current, incoming)) return prev;
+  if (isStaleTokenUpdate(current, incoming)) return prev;
+  if (battlemapTokensEqual(current, incoming)) return prev;
+
   const next = [...prev];
-  next[idx] = token;
+  next[idx] = incoming;
   return next;
+}
+
+/** Merge a full server list without clobbering newer in-flight local moves. */
+export function mergeBattlemapTokenLists(
+  prev: SessionBattlemapToken[],
+  remote: SessionBattlemapToken[],
+): SessionBattlemapToken[] {
+  const prevById = new Map(prev.map((t) => [t.id, t]));
+  const merged: SessionBattlemapToken[] = [];
+  const seen = new Set<string>();
+
+  for (const remoteToken of remote) {
+    seen.add(remoteToken.id);
+    const current = prevById.get(remoteToken.id);
+    if (!current) {
+      merged.push(remoteToken);
+      continue;
+    }
+    merged.push(...applyBattlemapTokenUpdate([current], remoteToken));
+  }
+
+  for (const token of prev) {
+    if (!seen.has(token.id)) merged.push(token);
+  }
+
+  return merged;
 }
 
 export function mapBattlemapPropRow(
