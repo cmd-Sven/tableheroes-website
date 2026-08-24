@@ -105,7 +105,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
   const [playerMoveMaxCells, setPlayerMoveMaxCells] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isGM || !currentPlayerCharacterId) {
+    if (!currentPlayerCharacterId) {
       setPlayerMoveMaxCells(null);
       return;
     }
@@ -120,7 +120,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     return () => {
       cancelled = true;
     };
-  }, [currentPlayerCharacterId, isGM]);
+  }, [currentPlayerCharacterId]);
 
   const reloadDraw = useCallback(async () => {
     if (!activeBattlemapId) {

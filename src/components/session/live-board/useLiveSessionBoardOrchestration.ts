@@ -118,6 +118,11 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
 
   const [isUpdating, startTransition] = useTransition();
 
+  const ownCharacterId = useMemo(
+    () => partyCharacters.find((pc) => pc.playerUserId === userId)?.id ?? null,
+    [partyCharacters, userId],
+  );
+
   const battlemap = useLiveSessionBattlemap({
     sessionId,
     campaignId,
@@ -125,6 +130,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     isGuest,
     isGM,
     userId,
+    ownCharacterId,
     supabase,
     liveState,
     liveStateRef,

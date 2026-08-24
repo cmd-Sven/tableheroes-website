@@ -21,6 +21,7 @@ type Params = {
   isGuest: boolean;
   isGM: boolean;
   userId: string;
+  ownCharacterId?: string | null;
   supabase: SupabaseClient;
   liveState: LiveState | null;
   liveStateRef: React.MutableRefObject<LiveState | null>;
@@ -51,6 +52,7 @@ export function useLiveSessionBattlemap(params: Params) {
     sessionId: params.sessionId,
     campaignId: params.campaignId,
     isGM: params.isGM,
+    ownCharacterId: params.ownCharacterId,
     liveState: params.liveState,
     liveStateRef: params.liveStateRef,
     setLiveState: params.setLiveState,

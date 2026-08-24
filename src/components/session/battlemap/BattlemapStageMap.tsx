@@ -35,7 +35,7 @@ import { BattlemapFogLayer } from "./BattlemapFogLayer";
 import { BattlemapMarkerLayer } from "./BattlemapMarkerLayer";
 import { BattlemapTrapOverlayLayer } from "./BattlemapTrapOverlayLayer";
 import { BattlemapTokenDragOverlay } from "./BattlemapTokenDragOverlay";
-import { isMarkerPlaceKind } from "./battlemap-stage-utils";
+import { canUserDragBattlemapToken, isMarkerPlaceKind } from "./battlemap-stage-utils";
 import { buildBattlemapLayerSelectHandlers } from "./battlemap-stage-map-selection";
 import type { EffectDraft, FogDraft } from "./useBattlemapShapeDrawing";
 
@@ -473,11 +473,14 @@ export function BattlemapStageMap({
             onTokenContextMenu={
               placementActive || shapeSelectActive ? undefined : onTokenContextMenu
             }
-            canDragToken={(token) => {
-              if (placementActive || shapeSelectActive) return false;
-              if (isGm) return true;
-              return Boolean(ownCharacterId && token.character_id === ownCharacterId);
-            }}
+            canDragToken={(token) =>
+              canUserDragBattlemapToken(token, {
+                isGm,
+                ownCharacterId,
+                placementActive,
+                shapeSelectActive,
+              })
+            }
             onTokenDragPreview={(token, clientX, clientY) => {
               const el = mapRef.current;
               if (!el) return;

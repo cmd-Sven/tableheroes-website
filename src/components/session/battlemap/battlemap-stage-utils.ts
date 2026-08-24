@@ -30,6 +30,26 @@ export function isMarkerPlaceKind(
   );
 }
 
+/** Spieler/SL: eigenen Charakter-Token ziehen; SL zusätzlich NPC-/Gegner-Token. */
+export function canUserDragBattlemapToken(
+  token: SessionBattlemapToken,
+  opts: {
+    isGm: boolean;
+    ownCharacterId?: string | null;
+    placementActive?: boolean;
+    shapeSelectActive?: boolean;
+  },
+): boolean {
+  if (opts.placementActive || opts.shapeSelectActive) return false;
+
+  if (token.character_id) {
+    if (opts.ownCharacterId && token.character_id === opts.ownCharacterId) return true;
+    return opts.isGm;
+  }
+
+  return opts.isGm;
+}
+
 /** Space/hotkeys müssen Textfelder nicht abfangen (z. B. Trap-Wizard). */
 export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;

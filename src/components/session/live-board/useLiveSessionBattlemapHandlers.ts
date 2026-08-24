@@ -320,9 +320,15 @@ export function useLiveSessionBattlemapHandlers({
       };
 
       if (token.character_id) {
-        if (!isGM && liveState?.battlemap_movement_paused) {
-          toast.error("Bewegung ist pausiert — warte auf den Spielleiter.");
-          return;
+        if (!isGM) {
+          if (liveState?.battlemap_movement_paused) {
+            toast.error("Bewegung ist pausiert — warte auf den Spielleiter.");
+            return;
+          }
+          if (!ownCharacterId || token.character_id !== ownCharacterId) {
+            toast.error("Du darfst nur deinen eigenen Token bewegen.");
+            return;
+          }
         }
         const characterId = token.character_id;
         const characterName = token.label ?? "Charakter";
@@ -385,6 +391,7 @@ export function useLiveSessionBattlemapHandlers({
     [
       activeBattlemapId,
       isGM,
+      ownCharacterId,
       liveState?.battlemap_movement_paused,
       notifyBattlemapTokensChanged,
       runTrapEnterCheck,
