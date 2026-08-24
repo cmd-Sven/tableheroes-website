@@ -184,7 +184,16 @@ export async function placeBattlemapCharacterTokenClient(
     p_use_dash: input.useDash === true,
   });
 
-  if (error) throw new Error(error.message || "Token konnte nicht gesetzt werden.");
+  if (error) {
+    console.error("[placeBattlemapCharacterTokenClient] RPC failed:", error.message, {
+      sessionId: input.sessionId,
+      battlemapId: input.battlemapId,
+      characterId: input.characterId,
+      gridX: input.gridX,
+      gridY: input.gridY,
+    });
+    throw new Error(error.message || "Token konnte nicht gesetzt werden.");
+  }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error("Token konnte nicht gesetzt werden.");
   return mapBattlemapTokenRow(row as Record<string, unknown>);
