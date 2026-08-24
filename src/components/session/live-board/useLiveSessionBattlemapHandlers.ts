@@ -318,7 +318,7 @@ export function useLiveSessionBattlemapHandlers({
         const characterId = token.character_id;
         const characterName = token.label ?? "Charakter";
         applyLocalMove(gridX, gridY);
-        startTransition(async () => {
+        void (async () => {
           try {
             const placed = await placeBattlemapCharacterToken({
               sessionId,
@@ -326,23 +326,27 @@ export function useLiveSessionBattlemapHandlers({
               characterId,
               gridX,
               gridY,
-              useDash: false,
+              useDash: tokenPlacement?.characterId === characterId
+                ? tokenPlacement.useDash
+                : false,
             });
             setBattlemapTokens((prev) => upsertBattlemapToken(prev, placed));
             notifyBattlemapTokensChanged({ op: "upsert", token: placed });
-            toast.success(`Token für ${characterName} bewegt.`);
+            if (!tokenPlacement || tokenPlacement.characterId !== characterId) {
+              toast.success(`Token für ${characterName} bewegt.`);
+            }
             void runTrapEnterCheck(characterId, gridX, gridY);
           } catch (e) {
             applyLocalMove(originGrid.grid_x, originGrid.grid_y);
             toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
           }
-        });
+        })();
         return;
       }
 
       if (!isGM) return;
       applyLocalMove(gridX, gridY);
-      startTransition(async () => {
+      void (async () => {
         try {
           const placed = await placeBattlemapGmToken({
             sessionId,
@@ -365,7 +369,7 @@ export function useLiveSessionBattlemapHandlers({
           applyLocalMove(originGrid.grid_x, originGrid.grid_y);
           toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
         }
-      });
+      })();
     },
     [
       activeBattlemapId,
@@ -374,7 +378,7 @@ export function useLiveSessionBattlemapHandlers({
       notifyBattlemapTokensChanged,
       runTrapEnterCheck,
       sessionId,
-      startTransition,
+      tokenPlacement,
     ],
   );
 

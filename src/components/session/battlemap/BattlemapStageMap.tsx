@@ -5,6 +5,7 @@
 
 import type { RefObject } from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import {
   TransformWrapper,
   TransformComponent,
@@ -493,11 +494,28 @@ export function BattlemapStageMap({
             }}
             onTokenDragEnd={(token, clientX, clientY) => {
               const el = mapRef.current;
+              const preview =
+                tokenDragPreview?.tokenId === token.id ? tokenDragPreview : null;
               setTokenDragPreview(null);
               if (!el || !onTokenMove) return;
-              const cell = cellFromClient(clientX, clientY, el);
-              if (!cell) return;
+
+              const pointerCell = cellFromClient(clientX, clientY, el);
+              const cell = preview
+                ? { gridX: preview.targetGridX, gridY: preview.targetGridY }
+                : pointerCell;
+              if (!cell) {
+                toast.error("Token konnte nicht platziert werden — Ziel liegt außerhalb der Karte.");
+                return;
+              }
+
               const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
+              if (
+                sourceToken.grid_x === cell.gridX &&
+                sourceToken.grid_y === cell.gridY
+              ) {
+                return;
+              }
+
               if (
                 !isCellReachable(
                   cell.gridX,
@@ -506,17 +524,14 @@ export function BattlemapStageMap({
                   sourceToken.id,
                 )
               ) {
+                toast.error("Diese Zelle ist nicht erreichbar.");
                 return;
               }
-              if (
-                sourceToken.grid_x === cell.gridX &&
-                sourceToken.grid_y === cell.gridY
-              ) {
-                return;
-              }
+
               onTokenMove(sourceToken, cell.gridX, cell.gridY);
             }}
             onTokenDragCancel={() => setTokenDragPreview(null)}
+            tokenDragPreview={tokenDragPreview}
           />
           <BattlemapTokenDragOverlay
             tokenDragPreview={tokenDragPreview}

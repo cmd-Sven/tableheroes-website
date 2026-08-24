@@ -76,6 +76,7 @@ export function BattlemapStage({
   ownCharacterId,
   characterDisplayUrlById,
   characterConditionsById,
+  playerMoveMaxCells,
   onTokenContextMenu,
   drawTool = null,
   drawColor = "#cab926",
@@ -193,6 +194,15 @@ export function BattlemapStage({
   const gmPlacementSize =
     gmTokenPlacement?.sizeCells ?? movingGmToken?.size_cells ?? 1;
 
+  const tokenDragMoveContext =
+    tokenDragPreview && !isGm && !characterPlacement && playerMoveMaxCells != null
+      ? {
+          originGridX: tokenDragPreview.originGridX,
+          originGridY: tokenDragPreview.originGridY,
+          maxCells: playerMoveMaxCells,
+        }
+      : null;
+
   const {
     fogDraft,
     setFogDraft,
@@ -235,6 +245,7 @@ export function BattlemapStage({
     tokens,
     isGm,
     characterPlacement,
+    tokenDragMoveContext,
     gmMoveTokenId,
     gmPlacementSize,
     placementActive,

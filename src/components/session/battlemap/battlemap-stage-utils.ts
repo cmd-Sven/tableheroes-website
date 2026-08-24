@@ -124,6 +124,8 @@ export type BattlemapStageProps = {
   characterDisplayUrlById?: Record<string, string | null | undefined>;
   /** characterId → aktive SL-Zustände */
   characterConditionsById?: Record<string, CharacterConditionKey[] | undefined>;
+  /** Spieler-Bewegungsreichweite (Zellen) für Drag-Moves ohne Placement-Modus */
+  playerMoveMaxCells?: number | null;
   onTokenContextMenu?: (
     token: SessionBattlemapToken,
     clientX: number,

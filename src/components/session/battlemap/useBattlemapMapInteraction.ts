@@ -19,12 +19,19 @@ import type {
 } from "@/src/lib/session/battlemap-types";
 import { clientToMapPixels, isMarkerPlaceKind } from "./battlemap-stage-utils";
 
+type TokenDragMoveContext = {
+  originGridX: number;
+  originGridY: number;
+  maxCells: number;
+};
+
 type Args = {
   config: BattlemapGridConfig;
   mapSize: { width: number; height: number };
   tokens: SessionBattlemapToken[];
   isGm: boolean;
   characterPlacement?: CharacterTokenPlacement | null;
+  tokenDragMoveContext?: TokenDragMoveContext | null;
   gmMoveTokenId?: string | null;
   gmPlacementSize: number;
   placementActive: boolean;
@@ -57,6 +64,7 @@ export function useBattlemapMapInteraction({
   tokens,
   isGm,
   characterPlacement,
+  tokenDragMoveContext,
   gmMoveTokenId,
   gmPlacementSize,
   placementActive,
@@ -132,11 +140,31 @@ export function useBattlemapMapInteraction({
         ) {
           return false;
         }
+      } else if (tokenDragMoveContext) {
+        if (
+          !isWithinMovementRange(
+            tokenDragMoveContext.originGridX,
+            tokenDragMoveContext.originGridY,
+            gridX,
+            gridY,
+            tokenDragMoveContext.maxCells,
+          )
+        ) {
+          return false;
+        }
       }
 
       return true;
     },
-    [characterPlacement, config.columns, config.rows, gmMoveTokenId, movementMaxCells, tokens],
+    [
+      characterPlacement,
+      config.columns,
+      config.rows,
+      gmMoveTokenId,
+      movementMaxCells,
+      tokenDragMoveContext,
+      tokens,
+    ],
   );
 
   const handleContentClick = useCallback(

@@ -69,6 +69,11 @@ type Props = {
   onTokenDragPreview?: (token: SessionBattlemapToken, clientX: number, clientY: number) => void;
   onTokenDragEnd?: (token: SessionBattlemapToken, clientX: number, clientY: number) => void;
   onTokenDragCancel?: () => void;
+  tokenDragPreview?: {
+    tokenId: string;
+    targetGridX: number;
+    targetGridY: number;
+  } | null;
 };
 
 export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
@@ -88,6 +93,7 @@ export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
   onTokenDragPreview,
   onTokenDragEnd,
   onTokenDragCancel,
+  tokenDragPreview,
 }: Props) {
   const dragRef = useRef<{
     token: SessionBattlemapToken;
@@ -119,6 +125,7 @@ export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
           onTokenDragPreview={onTokenDragPreview}
           onTokenDragEnd={onTokenDragEnd}
           onTokenDragCancel={onTokenDragCancel}
+          tokenDragPreview={tokenDragPreview}
         />
       ))}
     </>
@@ -149,6 +156,11 @@ type AnimatedTokenProps = {
   onTokenDragPreview?: (token: SessionBattlemapToken, clientX: number, clientY: number) => void;
   onTokenDragEnd?: (token: SessionBattlemapToken, clientX: number, clientY: number) => void;
   onTokenDragCancel?: () => void;
+  tokenDragPreview?: {
+    tokenId: string;
+    targetGridX: number;
+    targetGridY: number;
+  } | null;
 };
 
 const AnimatedToken = memo(function AnimatedToken({
@@ -169,8 +181,21 @@ const AnimatedToken = memo(function AnimatedToken({
   onTokenDragPreview,
   onTokenDragEnd,
   onTokenDragCancel,
+  tokenDragPreview,
 }: AnimatedTokenProps) {
-  const { x, y, size } = gridToPixel(token.grid_x, token.grid_y, config);
+  const [isDraggingLocal, setIsDraggingLocal] = useState(false);
+  const isDragging = isDraggingLocal;
+  const dragTargetGrid =
+    isDragging &&
+    tokenDragPreview?.tokenId === token.id
+      ? {
+          gridX: tokenDragPreview.targetGridX,
+          gridY: tokenDragPreview.targetGridY,
+        }
+      : null;
+  const displayGridX = dragTargetGrid?.gridX ?? token.grid_x;
+  const displayGridY = dragTargetGrid?.gridY ?? token.grid_y;
+  const { x, y, size } = gridToPixel(displayGridX, displayGridY, config);
   const pxSize = size * token.size_cells;
 
   const visualPosRef = useRef({ x, y });
@@ -179,8 +204,14 @@ const AnimatedToken = memo(function AnimatedToken({
   const [visualPos, setVisualPos] = useState({ x, y });
   const [isAnimating, setIsAnimating] = useState(false);
   const [moveDurationMs, setMoveDurationMs] = useState(TOKEN_MOVE_MIN_MS);
-  const [isDraggingLocal, setIsDraggingLocal] = useState(false);
-  const isDragging = isDraggingLocal;
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const next = { x, y };
+    visualPosRef.current = next;
+    setVisualPos(next);
+    setIsAnimating(false);
+  }, [isDragging, x, y]);
 
   useEffect(() => {
     visualPosRef.current = { x, y };

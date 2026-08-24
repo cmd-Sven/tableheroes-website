@@ -10,6 +10,7 @@ import {
   createBattlemapEffectTemplate,
   createBattlemapFogShape,
   createBattlemapMarker,
+  getCharacterMovementRange,
   removeBattlemapProp,
   removeBattlemapToken,
   toggleBattlemapTokenVisibility,
@@ -101,6 +102,25 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
 
   const [drawStrokes, setDrawStrokes] = useState<SessionMapDrawStroke[]>([]);
   const [, localStart] = useTransition();
+  const [playerMoveMaxCells, setPlayerMoveMaxCells] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isGM || !currentPlayerCharacterId) {
+      setPlayerMoveMaxCells(null);
+      return;
+    }
+    let cancelled = false;
+    void getCharacterMovementRange(currentPlayerCharacterId)
+      .then((range) => {
+        if (!cancelled) setPlayerMoveMaxCells(range.maxCells);
+      })
+      .catch(() => {
+        if (!cancelled) setPlayerMoveMaxCells(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPlayerCharacterId, isGM]);
 
   const reloadDraw = useCallback(async () => {
     if (!activeBattlemapId) {
@@ -460,6 +480,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       hpByRef={battlemapTokenHpByRef}
       activeTurnHighlight={activeTurnHighlight}
       ownCharacterId={currentPlayerCharacterId}
+      playerMoveMaxCells={playerMoveMaxCells}
       characterDisplayUrlById={characterDisplayUrlById}
       characterConditionsById={characterConditionsById}
       onTokenContextMenu={(token, x, y) => {
