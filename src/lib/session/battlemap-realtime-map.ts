@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseTrapStatusEffect } from "@/src/lib/characters/condition-tokens";
 import type {
   BattlemapTrapDifficulty,
@@ -38,6 +39,15 @@ function isStaleTokenUpdate(
   const curMs = tokenUpdatedAtMs(current);
   const incMs = tokenUpdatedAtMs(incoming);
   if (curMs != null && incMs != null && incMs < curMs) return true;
+  // Optimistic local grid without updated_at — reject older server rows reverting position.
+  if (
+    curMs == null &&
+    incMs != null &&
+    !pendingTokenMoves.has(incoming.id) &&
+    (current.grid_x !== incoming.grid_x || current.grid_y !== incoming.grid_y)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -126,11 +136,58 @@ export function applyBattlemapTokenUpdate(
   const current = prev[idx]!;
   if (shouldRejectPendingRevert(incoming.id, current, incoming)) return prev;
   if (isStaleTokenUpdate(current, incoming)) return prev;
-  if (battlemapTokensEqual(current, incoming)) return prev;
+  if (battlemapTokensEqual(current, incoming)) {
+    if (incoming.updated_at && incoming.updated_at !== current.updated_at) {
+      const next = [...prev];
+      next[idx] = { ...current, updated_at: incoming.updated_at };
+      return next;
+    }
+    return prev;
+  }
 
   const next = [...prev];
   next[idx] = incoming;
   return next;
+}
+
+/** Apply authoritative server row after a confirmed move/placement (bypasses equal-grid skip). */
+export function applyConfirmedBattlemapTokenUpdate(
+  prev: SessionBattlemapToken[],
+  incoming: SessionBattlemapToken,
+): SessionBattlemapToken[] {
+  clearPendingBattlemapTokenMove(incoming.id);
+  const idx = prev.findIndex((t) => t.id === incoming.id);
+  if (idx < 0) return [...prev, incoming];
+  const next = [...prev];
+  next[idx] = incoming;
+  return next;
+}
+
+/** Player token move via browser Supabase session (same auth context as Realtime). */
+export async function placeBattlemapCharacterTokenClient(
+  supabase: SupabaseClient,
+  input: {
+    sessionId: string;
+    battlemapId: string;
+    characterId: string;
+    gridX: number;
+    gridY: number;
+    useDash?: boolean;
+  },
+): Promise<SessionBattlemapToken> {
+  const { data, error } = await (supabase as any).rpc("place_battlemap_character_token", {
+    p_session_id: input.sessionId,
+    p_battlemap_id: input.battlemapId,
+    p_character_id: input.characterId,
+    p_grid_x: input.gridX,
+    p_grid_y: input.gridY,
+    p_use_dash: input.useDash === true,
+  });
+
+  if (error) throw new Error(error.message || "Token konnte nicht gesetzt werden.");
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Token konnte nicht gesetzt werden.");
+  return mapBattlemapTokenRow(row as Record<string, unknown>);
 }
 
 /** Merge a full server list without clobbering newer in-flight local moves. */

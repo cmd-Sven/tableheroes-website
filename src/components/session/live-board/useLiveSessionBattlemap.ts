@@ -53,6 +53,7 @@ export function useLiveSessionBattlemap(params: Params) {
     campaignId: params.campaignId,
     isGM: params.isGM,
     ownCharacterId: params.ownCharacterId,
+    supabase: params.supabase,
     liveState: params.liveState,
     liveStateRef: params.liveStateRef,
     setLiveState: params.setLiveState,

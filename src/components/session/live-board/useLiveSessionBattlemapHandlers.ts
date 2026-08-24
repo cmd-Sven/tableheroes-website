@@ -4,10 +4,10 @@
 "use client";
 
 import { useCallback, type TransitionStartFunction } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import {
   getCharacterMovementRange,
-  placeBattlemapCharacterToken,
   placeBattlemapGmToken,
 } from "@/src/lib/actions/battlemap-actions";
 import {
@@ -19,8 +19,9 @@ import {
 } from "@/src/lib/session/battlemap-movement";
 import { isCellBlockedByTokens } from "@/src/lib/session/battlemap-grid";
 import {
-  applyBattlemapTokenUpdate,
+  applyConfirmedBattlemapTokenUpdate,
   clearPendingBattlemapTokenMove,
+  placeBattlemapCharacterTokenClient,
   registerPendingBattlemapTokenMove,
   upsertBattlemapToken,
   upsertBattlemapTrap,
@@ -53,6 +54,7 @@ type Params = {
   campaignId: string;
   isGM: boolean;
   ownCharacterId?: string | null;
+  supabase: SupabaseClient;
   liveState: LiveState | null;
   liveStateRef: React.MutableRefObject<LiveState | null>;
   setLiveState: React.Dispatch<React.SetStateAction<LiveState | null>>;
@@ -67,6 +69,7 @@ export function useLiveSessionBattlemapHandlers({
   campaignId,
   isGM,
   ownCharacterId,
+  supabase,
   liveState,
   liveStateRef,
   setLiveState,
@@ -229,7 +232,7 @@ export function useLiveSessionBattlemapHandlers({
 
       startTransition(async () => {
         try {
-          const placed = await placeBattlemapCharacterToken({
+          const placed = await placeBattlemapCharacterTokenClient(supabase, {
             sessionId,
             battlemapId: activeBattlemapId,
             characterId: tokenPlacement.characterId,
@@ -237,7 +240,7 @@ export function useLiveSessionBattlemapHandlers({
             gridY,
             useDash: tokenPlacement.useDash,
           });
-          setBattlemapTokens((prev) => upsertBattlemapToken(prev, placed));
+          setBattlemapTokens((prev) => applyConfirmedBattlemapTokenUpdate(prev, placed));
           notifyBattlemapTokensChanged({ op: "upsert", token: placed });
           toast.success(
             tokenPlacement.isFirstPlacement
@@ -259,6 +262,7 @@ export function useLiveSessionBattlemapHandlers({
       liveState?.battlemap_movement_paused,
       notifyBattlemapTokensChanged,
       sessionId,
+      supabase,
       startTransition,
       tokenPlacement,
     ],
@@ -335,7 +339,7 @@ export function useLiveSessionBattlemapHandlers({
         applyLocalMove(gridX, gridY);
         void (async () => {
           try {
-            const placed = await placeBattlemapCharacterToken({
+            const placed = await placeBattlemapCharacterTokenClient(supabase, {
               sessionId,
               battlemapId: activeBattlemapId,
               characterId,
@@ -345,7 +349,7 @@ export function useLiveSessionBattlemapHandlers({
                 ? tokenPlacement.useDash
                 : false,
             });
-            setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, placed));
+            setBattlemapTokens((prev) => applyConfirmedBattlemapTokenUpdate(prev, placed));
             notifyBattlemapTokensChanged({ op: "upsert", token: placed });
             if (!tokenPlacement || tokenPlacement.characterId !== characterId) {
               toast.success(`Token für ${characterName} bewegt.`);
@@ -378,7 +382,7 @@ export function useLiveSessionBattlemapHandlers({
             label: token.label,
             imageUrl: token.image_url,
           });
-          setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, placed));
+          setBattlemapTokens((prev) => applyConfirmedBattlemapTokenUpdate(prev, placed));
           notifyBattlemapTokensChanged({ op: "upsert", token: placed });
           toast.success("Token verschoben.");
         } catch (e) {
@@ -396,6 +400,7 @@ export function useLiveSessionBattlemapHandlers({
       notifyBattlemapTokensChanged,
       runTrapEnterCheck,
       sessionId,
+      supabase,
       tokenPlacement,
     ],
   );

@@ -487,12 +487,21 @@ export function BattlemapStageMap({
               const cell = cellFromClient(clientX, clientY, el);
               if (!cell) return;
               const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
-              setTokenDragPreview({
-                tokenId: token.id,
-                originGridX: sourceToken.grid_x,
-                originGridY: sourceToken.grid_y,
-                targetGridX: cell.gridX,
-                targetGridY: cell.gridY,
+              setTokenDragPreview((prev) => {
+                if (prev?.tokenId === token.id) {
+                  return {
+                    ...prev,
+                    targetGridX: cell.gridX,
+                    targetGridY: cell.gridY,
+                  };
+                }
+                return {
+                  tokenId: token.id,
+                  originGridX: sourceToken.grid_x,
+                  originGridY: sourceToken.grid_y,
+                  targetGridX: cell.gridX,
+                  targetGridY: cell.gridY,
+                };
               });
             }}
             onTokenDragEnd={(token, clientX, clientY) => {
