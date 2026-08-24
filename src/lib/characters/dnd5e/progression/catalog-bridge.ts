@@ -172,7 +172,7 @@ export function matchSheetFeatureToFeat(
   );
 }
 
-/** Höchster Zaubergrad mit Slot-max > 0 */
+/** Höchster Zaubergrad mit Slot-max > 0 (Sheet-Zustand). */
 export function maxSlotLevelFromSheet(sheet: Dnd5eSheetData): number {
   const slots = sheet.spellcasting?.slots ?? {};
   let max = 0;
@@ -181,6 +181,35 @@ export function maxSlotLevelFromSheet(sheet: Dnd5eSheetData): number {
     if ((v?.max ?? 0) > 0) max = Math.max(max, Number(k) || 0);
   }
   return max;
+}
+
+/** Höchster Zaubergrad laut Klassenprogression (unabhängig vom Sheet). */
+export function maxSlotLevelFromClass(
+  className: string | null,
+  characterLevel: number,
+  subclass?: string | null,
+): number {
+  const classId = resolveClassId(className);
+  const slots = slotsForClassLevel(classId, characterLevel, subclass);
+  let max = 0;
+  for (const [k, v] of Object.entries(slots)) {
+    if (k === "pact") continue;
+    if ((v ?? 0) > 0) max = Math.max(max, Number(k) || 0);
+  }
+  return max;
+}
+
+/** Sheet-Slots und Klassenprogression zusammenführen (für Katalog/Anzeige). */
+export function effectiveMaxSlotLevel(
+  sheet: Dnd5eSheetData,
+  className: string | null,
+  characterLevel: number,
+  subclass?: string | null,
+): number {
+  return Math.max(
+    maxSlotLevelFromSheet(sheet),
+    maxSlotLevelFromClass(className, characterLevel, subclass),
+  );
 }
 
 export function countSpellsOfLevel(
@@ -194,6 +223,32 @@ export function slotMaxForLevel(sheet: Dnd5eSheetData, level: number): number {
   if (level <= 0) return Number.POSITIVE_INFINITY;
   const key = String(level);
   return sheet.spellcasting?.slots?.[key]?.max ?? 0;
+}
+
+/** Slot-Maximum für einen Grad: Sheet oder Klassenprogression (jeweils höherer Wert). */
+export function effectiveSlotMaxForLevel(
+  sheet: Dnd5eSheetData,
+  className: string | null,
+  characterLevel: number,
+  spellLevel: number,
+  subclass?: string | null,
+): number {
+  if (spellLevel <= 0) return Number.POSITIVE_INFINITY;
+  const fromSheet = slotMaxForLevel(sheet, spellLevel);
+  const classId = resolveClassId(className);
+  const key = String(spellLevel) as keyof ReturnType<typeof slotsForClassLevel>;
+  const fromClass = slotsForClassLevel(classId, characterLevel, subclass)[key] ?? 0;
+  return Math.max(fromSheet, fromClass);
+}
+
+/** Prepared casters: spellbook/list is not capped by slot count. */
+function isPreparedCasterClass(classId: ClassId | null): boolean {
+  return (
+    classId === "wizard" ||
+    classId === "cleric" ||
+    classId === "druid" ||
+    classId === "paladin"
+  );
 }
 
 /** Sync spell slot maxima from class + level (keeps used capped). */
@@ -306,7 +361,7 @@ export function canLearnSpellFromCatalog(
     return { ok: false, reason: "duplicate" };
   }
 
-  const maxSlot = maxSlotLevelFromSheet(sheet);
+  const maxSlot = effectiveMaxSlotLevel(sheet, className, characterLevel, subclass);
   if (def.level > 0 && def.level > maxSlot) {
     return { ok: false, reason: "level-too-high" };
   }
@@ -324,8 +379,20 @@ export function canLearnSpellFromCatalog(
     return { ok: true };
   }
 
-  const slotMax = slotMaxForLevel(sheet, def.level);
+  const slotMax = effectiveSlotMaxForLevel(
+    sheet,
+    className,
+    characterLevel,
+    def.level,
+    subclass,
+  );
   if (slotMax <= 0) return { ok: false, reason: "no-slots" };
+
+  // Wizard/Cleric/Druid/Paladin: spellbook or class list is not capped by slot count.
+  if (isPreparedCasterClass(classId) && !third) {
+    return { ok: true };
+  }
+
   const atLevel = countSpellsOfLevel(existing, def.level);
   if (atLevel >= slotMax) return { ok: false, reason: "slot-limit" };
 
@@ -340,16 +407,24 @@ export function canLearnSpellFromCatalog(
   return { ok: true };
 }
 
+/**
+ * Klassenliste für den Katalog-Picker.
+ * Filtert nach verfügbarem Slot-Grad (Sheet ODER Klassenstufe), inkl. Cantrips.
+ */
 export function catalogSpellsForPicker(
   className: string | null,
   sheet: Dnd5eSheetData,
   subclass?: string | null,
+  characterLevel?: number,
 ): SpellDefinition[] {
   const classId = resolveClassId(className);
   if (!classId) return [];
   const listClassId = spellListClassIdForSubclass(classId, subclass) ?? classId;
-  const maxLvl = Math.max(0, maxSlotLevelFromSheet(sheet));
-  return getSpellsForClass(listClassId, maxLvl || undefined).sort(
+  const level = Math.max(1, Math.floor(characterLevel ?? 1));
+  const maxLvl = effectiveMaxSlotLevel(sheet, className, level, subclass);
+  // Cantrips always; leveled spells only up to available slot grade.
+  // If somehow maxLvl is 0 (non-caster / L1 before slots), still show cantrips.
+  return getSpellsForClass(listClassId, maxLvl > 0 ? maxLvl : 0).sort(
     (a, b) => a.level - b.level || a.nameEn.localeCompare(b.nameEn),
   );
 }

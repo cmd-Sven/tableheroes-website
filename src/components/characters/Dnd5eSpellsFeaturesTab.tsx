@@ -23,12 +23,12 @@ import {
   defaultSpellAbilityForClass,
   getSpellPreparationStyle,
   groupSpellsByLevel,
+  isCasterClass,
   localizedFeatureDescription,
   localizedFeatureName,
   localizedSpellDescription,
   localizedSpellName,
   preparedSpellLimit,
-  slotRemaining,
   spellDamageTypeLabel,
   spellRequiresPreparation,
   spellSchoolLabel,
@@ -39,8 +39,13 @@ import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context"
 import type { CharacterSheetT } from "@/src/lib/i18n/character-sheet";
 import { SpellEditorModal } from "@/src/components/characters/SpellEditorModal";
 import { SpellCatalogPickerModal } from "@/src/components/characters/SpellCatalogPickerModal";
-import { applyClassBasicsFromCatalog } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import {
+  applyClassBasicsFromCatalog,
+  syncSpellSlotsFromClass,
+} from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
 import { resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
+import { slotsForClassLevel } from "@/src/lib/characters/dnd5e/progression/spell-slots";
+import type { SlotKey } from "@/src/lib/characters/dnd5e/progression/types";
 
 type Props = {
   sheet: Dnd5eSheetData;
@@ -275,13 +280,15 @@ export function Dnd5eSpellsFeaturesTab({
   const prepStyle = getSpellPreparationStyle(characterClass, characterSubclass);
   const spells = sheet.spells ?? [];
   const features = sheet.features ?? [];
-  const slots = sheet.spellcasting?.slots;
+  const sheetSlots = sheet.spellcasting?.slots;
   const castAbility = (sheet.spellcasting?.ability ??
     defaultSpellAbilityForClass(characterClass)) as AbilityKey;
   const abilityMod = derived.abilities[castAbility]?.modifier ?? 0;
   const [editorSpell, setEditorSpell] = useState<Dnd5eSpellEntry | null | "new">(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const classId = resolveClassId(characterClass);
+  const canBrowseCatalog =
+    Boolean(classId) && isCasterClass(characterClass, characterSubclass);
 
   const grouped = useMemo(() => groupSpellsByLevel(spells), [spells]);
 
@@ -291,14 +298,35 @@ export function Dnd5eSpellsFeaturesTab({
 
   const prepLimit = preparedSpellLimit(characterClass, level, abilityMod);
 
-  const slotKeys = useMemo(() => {
-    const keys: string[] = [];
-    for (const lvl of SPELL_SLOT_LEVEL_KEYS) {
-      if (slots?.[lvl]?.max) keys.push(lvl);
+  /** Anzeige-Slots: Klassenprogression + verbrauchte Slots vom Sheet. */
+  const displaySlots = useMemo(() => {
+    const fromClass = classId
+      ? slotsForClassLevel(classId, level, characterSubclass)
+      : {};
+    const keys = new Set<string>();
+    for (const k of SPELL_SLOT_LEVEL_KEYS) {
+      if ((fromClass[k as SlotKey] ?? 0) > 0 || (sheetSlots?.[k]?.max ?? 0) > 0) {
+        keys.add(k);
+      }
     }
-    if (slots?.pact?.max) keys.push("pact");
-    return keys;
-  }, [slots]);
+    if ((fromClass.pact ?? 0) > 0 || (sheetSlots?.pact?.max ?? 0) > 0) {
+      keys.add("pact");
+    }
+    const ordered = [
+      ...SPELL_SLOT_LEVEL_KEYS.filter((k) => keys.has(k)),
+      ...(keys.has("pact") ? (["pact"] as const) : []),
+    ];
+    return ordered.map((key) => {
+      const classMax =
+        key === "pact"
+          ? (fromClass.pact ?? 0)
+          : (fromClass[key as SlotKey] ?? 0);
+      const sheetMax = sheetSlots?.[key]?.max ?? 0;
+      const max = Math.max(classMax, sheetMax);
+      const used = Math.min(sheetSlots?.[key]?.used ?? 0, max);
+      return { key, max, used, remaining: Math.max(0, max - used) };
+    });
+  }, [classId, level, characterSubclass, sheetSlots]);
 
   function ensureSpellcasting(next: Dnd5eSheetData): Dnd5eSheetData {
     if (next.spellcasting) return next;
@@ -322,15 +350,25 @@ export function Dnd5eSpellsFeaturesTab({
   }
 
   function adjustSlotUsed(key: string, delta: number) {
-    if (readOnly || !sheet.spellcasting?.slots?.[key]) return;
-    const block = sheet.spellcasting.slots[key];
+    if (readOnly) return;
+    let base = sheet;
+    if (!base.spellcasting?.slots?.[key]?.max) {
+      base = syncSpellSlotsFromClass(
+        ensureSpellcasting(base),
+        characterClass,
+        level,
+        characterSubclass,
+      );
+    }
+    const block = base.spellcasting?.slots?.[key];
+    if (!block?.max) return;
     const used = Math.max(0, Math.min(block.max, block.used + delta));
     onSheetChange({
-      ...sheet,
+      ...base,
       spellcasting: {
-        ...sheet.spellcasting,
+        ...base.spellcasting!,
         slots: {
-          ...sheet.spellcasting.slots,
+          ...base.spellcasting!.slots,
           [key]: { ...block, used },
         },
       },
@@ -351,7 +389,12 @@ export function Dnd5eSpellsFeaturesTab({
   function addFromCatalog(spell: Dnd5eSpellEntry) {
     let next = ensureSpellcasting({ ...sheet });
     if (!next.spellcasting?.slots || Object.keys(next.spellcasting.slots).length === 0) {
-      next = applyClassBasicsFromCatalog(next, characterClass, level);
+      next = applyClassBasicsFromCatalog(
+        next,
+        characterClass,
+        level,
+        characterSubclass,
+      );
     }
     const existing = next.spells ?? [];
     if (existing.some((s) => s.id === spell.id)) return;
@@ -408,24 +451,30 @@ export function Dnd5eSpellsFeaturesTab({
                   ) : null}
                 </div>
               ) : null}
-              {!readOnly ? (
+              {canBrowseCatalog || !readOnly ? (
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCatalogOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
-                  >
-                    <BookMarked className="h-3.5 w-3.5" />
-                    {t("spellCatalog.open")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditorSpell("new")}
-                    className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("spellEditor.addCustom")}
-                  </button>
+                  {canBrowseCatalog ? (
+                    <button
+                      type="button"
+                      onClick={() => setCatalogOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                    >
+                      <BookMarked className="h-3.5 w-3.5" />
+                      {readOnly
+                        ? t("spellCatalog.openBrowse")
+                        : t("spellCatalog.open")}
+                    </button>
+                  ) : null}
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditorSpell("new")}
+                      className="inline-flex items-center gap-1.5 rounded border border-hero-vibrant/60 bg-hero-vibrant/10 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("spellEditor.addCustom")}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -440,6 +489,9 @@ export function Dnd5eSpellsFeaturesTab({
             </p>
           ) : null}
 
+          {prepStyle === "prepared" ? (
+            <p className="font-libre text-xs text-gray-400">{t("spells.preparedHint")}</p>
+          ) : null}
           {prepStyle === "known" ? (
             <p className="font-libre text-xs text-gray-400">{t("spells.knownHint")}</p>
           ) : null}
@@ -447,50 +499,58 @@ export function Dnd5eSpellsFeaturesTab({
             <p className="font-libre text-xs text-gray-400">{t("spells.pactHint")}</p>
           ) : null}
 
-          {slotKeys.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {slotKeys.map((key) => {
-                const block = slots![key];
-                const remaining = slotRemaining(slots, key);
-                const label =
-                  key === "pact" ? t("spells.pactSlot") : t("spells.slotLevel", { level: key });
-                return (
-                  <div
-                    key={key}
-                    className="flex min-w-[5.5rem] flex-col items-center rounded border border-hero-border/50 bg-background-card px-2 py-2"
-                  >
-                    <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                      {label}
-                    </span>
-                    <span className="font-barlow text-lg font-extrabold text-hero-vibrant">
-                      {remaining}
-                      <span className="text-sm text-gray-500">/{block.max}</span>
-                    </span>
-                    {!readOnly ? (
-                      <div className="mt-1 flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => adjustSlotUsed(key, 1)}
-                          disabled={block.used >= block.max}
-                          className="rounded px-1.5 font-barlow text-[10px] font-bold text-gray-400 hover:bg-hero-dark hover:text-white disabled:opacity-30"
-                          aria-label={t("spells.useSlot")}
-                        >
-                          −
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustSlotUsed(key, -1)}
-                          disabled={block.used <= 0}
-                          className="rounded px-1.5 font-barlow text-[10px] font-bold text-gray-400 hover:bg-hero-dark hover:text-white disabled:opacity-30"
-                          aria-label={t("spells.restoreSlot")}
-                        >
-                          +
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+          {displaySlots.length > 0 ? (
+            <div className="space-y-2">
+              <h3 className="font-cinzel text-sm font-bold text-accent-gold">
+                {t("spells.slotsTitle")}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {displaySlots.map(({ key, max, used, remaining }) => {
+                  const label =
+                    key === "pact"
+                      ? t("spells.pactSlot")
+                      : t("spells.slotLevel", { level: key });
+                  return (
+                    <div
+                      key={key}
+                      className="flex min-w-[5.5rem] flex-col items-center rounded border border-hero-border/50 bg-background-card px-2 py-2"
+                    >
+                      <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                        {label}
+                      </span>
+                      <span className="font-barlow text-lg font-extrabold text-hero-vibrant">
+                        {remaining}
+                        <span className="text-sm text-gray-500">/{max}</span>
+                      </span>
+                      <span className="font-libre text-[9px] text-gray-600">
+                        {t("spells.slotsRemaining")}
+                      </span>
+                      {!readOnly ? (
+                        <div className="mt-1 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => adjustSlotUsed(key, 1)}
+                            disabled={used >= max}
+                            className="rounded px-1.5 font-barlow text-[10px] font-bold text-gray-400 hover:bg-hero-dark hover:text-white disabled:opacity-30"
+                            aria-label={t("spells.useSlot")}
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustSlotUsed(key, -1)}
+                            disabled={used <= 0}
+                            className="rounded px-1.5 font-barlow text-[10px] font-bold text-gray-400 hover:bg-hero-dark hover:text-white disabled:opacity-30"
+                            aria-label={t("spells.restoreSlot")}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
 
@@ -501,7 +561,9 @@ export function Dnd5eSpellsFeaturesTab({
           ) : null}
 
           {spells.length === 0 ? (
-            <p className="font-libre text-sm text-gray-500">{t("spells.emptyEditable")}</p>
+            <p className="font-libre text-sm text-gray-500">
+              {readOnly ? t("spells.empty") : t("spells.emptyEditable")}
+            </p>
           ) : (
             <div className="space-y-5">
               {[...grouped.entries()].map(([lvl, list]) => (
@@ -565,6 +627,7 @@ export function Dnd5eSpellsFeaturesTab({
           characterClass={characterClass}
           characterSubclass={characterSubclass}
           level={level}
+          browseOnly={readOnly}
           onClose={() => setCatalogOpen(false)}
           onAdd={addFromCatalog}
         />

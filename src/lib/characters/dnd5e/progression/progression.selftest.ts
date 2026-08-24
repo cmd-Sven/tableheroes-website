@@ -8,7 +8,7 @@ import { slotsForClassLevel, cantripsKnownForClass, spellsKnownForClass, isThird
 import { planLevelUp, featuresForLevel, subclassFeaturesUpToLevel } from "./engine";
 import { applyLevelUpDraft } from "./apply";
 import { matchSubclassOption, normalizeSubclassKey } from "./class-ids";
-import { getAllClassProgressions, getClassProgression, getSpellsForClass } from "./catalog";
+import { getAllClassProgressions, getClassProgression, getSpells, getSpellsForClass } from "./catalog";
 import { buildLevel1Sheet, planLevel1Creation, STANDARD_ARRAY } from "./character-create";
 import { getSubclassAvailability } from "./subclass-availability";
 import { createEmptyDnd5eSheet } from "../defaults";
@@ -20,6 +20,13 @@ import {
 import { applySubclassChange } from "./apply-subclass-change";
 import { applyClassChange } from "./apply-class-change";
 import { getBackgrounds } from "./catalog";
+import {
+  canLearnSpellFromCatalog,
+  catalogSpellsForPicker,
+  effectiveSlotMaxForLevel,
+  maxSlotLevelFromClass,
+  spellDefinitionToSheetEntry,
+} from "./catalog-bridge";
 import {
   localizedFeatureDescription,
   localizedFeatureName,
@@ -776,6 +783,59 @@ function run() {
     ),
     "Trickreiche Magierhand",
   );
+
+  // --- Wizard / Cleric spell catalog browse (empty sheet slots still uses class level) ---
+  const emptyCasterSheet = createEmptyDnd5eSheet();
+  const wizCatalogL5 = catalogSpellsForPicker("wizard", emptyCasterSheet, null, 5);
+  assert.ok(wizCatalogL5.some((s) => s.level === 0), "wizard catalog includes cantrips");
+  assert.ok(wizCatalogL5.some((s) => s.level === 3), "wizard L5 sees 3rd-level spells");
+  assert.ok(!wizCatalogL5.some((s) => s.level === 4), "wizard L5 has no 4th-level slots yet");
+  assert.ok(
+    wizCatalogL5.every((s) => s.classes.includes("wizard")),
+    "wizard catalog only wizard-list spells",
+  );
+  assert.ok(
+    wizCatalogL5.every((s) => (s.descriptionDe?.trim() || s.descriptionEn?.trim())),
+    "wizard catalog spells have bilingual descriptions",
+  );
+
+  const clericCatalogL3 = catalogSpellsForPicker("cleric", emptyCasterSheet, "life", 3);
+  assert.ok(clericCatalogL3.some((s) => s.level === 2), "cleric L3 sees 2nd-level spells");
+  assert.ok(
+    clericCatalogL3.every((s) => s.classes.includes("cleric")),
+    "cleric catalog only cleric-list spells",
+  );
+
+  const fireball = getSpells().find((s) => s.id === "fireball");
+  assert.ok(fireball);
+  const learnFireball = canLearnSpellFromCatalog(
+    emptyCasterSheet,
+    fireball!,
+    "wizard",
+    5,
+    null,
+  );
+  assert.equal(learnFireball.ok, true, "wizard can add fireball at L5 without sheet slots");
+
+  // Prepared casters are not capped by slot count for spellbook size
+  let book = emptyCasterSheet;
+  for (let i = 0; i < 5; i++) {
+    const pick = wizCatalogL5.find(
+      (s) =>
+        s.level === 1 &&
+        canLearnSpellFromCatalog(book, s, "wizard", 5, null).ok,
+    );
+    assert.ok(pick, `wizard can keep adding 1st-level spells (${i})`);
+    book = {
+      ...book,
+      spells: [...(book.spells ?? []), spellDefinitionToSheetEntry(pick!)],
+    };
+  }
+  assert.ok((book.spells ?? []).filter((s) => s.level === 1).length >= 5);
+
+  assert.equal(maxSlotLevelFromClass("wizard", 5, null), 3);
+  assert.equal(maxSlotLevelFromClass("cleric", 9, null), 5);
+  assert.equal(effectiveSlotMaxForLevel(emptyCasterSheet, "wizard", 5, 3, null), 2);
 
   console.log("progression.selftest: OK");
 }

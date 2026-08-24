@@ -61,6 +61,12 @@ export {
   classDisplayName,
   enrichItemDescriptionFromCatalog,
   matchSheetFeatureToFeat,
+  maxSlotLevelFromSheet,
+  maxSlotLevelFromClass,
+  effectiveMaxSlotLevel,
+  effectiveSlotMaxForLevel,
+  slotMaxForLevel,
+  countSpellsOfLevel,
 } from "./catalog-bridge";
 export {
   setCharacterBackground,
