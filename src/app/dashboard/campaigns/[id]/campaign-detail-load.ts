@@ -13,7 +13,10 @@ import { getFactionsWithMembers } from "./factions-queries";
 import { getLoreEntries, getLoreLocationOptions } from "./lore-queries";
 import { isLocationType, TYPE_MAPPING } from "@/src/lib/lore-types";
 import { getQuests } from "./quest-queries";
-import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
+import {
+  isOnSessionRsvpRoster,
+  isPlayerReadyForSessionStart,
+} from "./session-rsvp-readiness";
 import { getCampaignGalleryImages } from "./gallery-queries";
 import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
@@ -261,7 +264,7 @@ export async function loadCampaignDetailPageData(
     if (scheduledIds.length > 0) {
       const [membersRes, rsvpsRes] = await Promise.all([
         (supabase.from("campaign_members") as any)
-          .select("user_id")
+          .select("user_id, character_id")
           .eq("campaign_id", id)
           .in("status", ["Approved", "Active"]),
         (supabase.from("session_rsvps") as any)
@@ -269,7 +272,15 @@ export async function loadCampaignDetailPageData(
           .in("session_id", scheduledIds),
       ]);
       const memberIds = new Set(
-        ((membersRes.data as any[]) || []).map((m: any) => m.user_id),
+        ((membersRes.data as any[]) || [])
+          .filter((m: any) =>
+            isOnSessionRsvpRoster({
+              memberUserId: m.user_id,
+              gmUserId: userId,
+              hasCharacter: Boolean(m.character_id),
+            }),
+          )
+          .map((m: any) => String(m.user_id)),
       );
       const acceptedRsvpsBySession = new Map<string, boolean>();
       gmSessionRsvpRows = ((rsvpsRes.data as any[]) || []).map((r: any) => ({
@@ -291,7 +302,7 @@ export async function loadCampaignDetailPageData(
           return { ...s, canStart: false, pendingCount: 0, hasAcceptedRsvps: false };
         const sessionRows = rowsBySession.get(s.id) ?? [];
         const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
-        const playerIds = [...memberIds].filter((uid) => uid !== userId);
+        const playerIds = [...memberIds];
         const pendingCount = playerIds.filter(
           (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
         ).length;
@@ -578,17 +589,28 @@ export async function loadCampaignDetailPageData(
       const allowGmConfirm = isSessionStatusScheduled(featured.status);
 
       const players: GmTerminePayload["players"] = acceptedMembers
-        .filter((m: any) => m.user_id && m.user_id !== userId)
+        .filter((m: any) =>
+          isOnSessionRsvpRoster({
+            memberUserId: m.user_id,
+            gmUserId: userId,
+            hasCharacter: Boolean(m.character?.id || m.character_id),
+          }),
+        )
         .map((m: any) => {
           const row = byUser.get(m.user_id);
           const ready = isPlayerReadyForSessionStart(row);
           const st = row?.rsvp_status;
+          const username = String(m.user?.username ?? "Spieler");
+          const characterName = m.character?.name
+            ? String(m.character.name)
+            : null;
 
           if (ready) {
             if (st === "Zusage") {
               return {
                 userId: m.user_id,
-                username: String(m.user?.username ?? "Spieler"),
+                username,
+                characterName,
                 status: "zusage" as const,
                 label: "Termin angenommen",
                 canGmManuallyConfirm: false,
@@ -597,7 +619,8 @@ export async function loadCampaignDetailPageData(
             if (st === "Via Online") {
               return {
                 userId: m.user_id,
-                username: String(m.user?.username ?? "Spieler"),
+                username,
+                characterName,
                 status: "via_online" as const,
                 label: "Online dabei",
                 canGmManuallyConfirm: false,
@@ -606,7 +629,8 @@ export async function loadCampaignDetailPageData(
             if (st === "Absage" && row?.gm_confirmed) {
               return {
                 userId: m.user_id,
-                username: String(m.user?.username ?? "Spieler"),
+                username,
+                characterName,
                 status: "gm_override" as const,
                 label: "Abgesagt · vom GM für Start freigegeben",
                 canGmManuallyConfirm: false,
@@ -614,7 +638,8 @@ export async function loadCampaignDetailPageData(
             }
             return {
               userId: m.user_id,
-              username: String(m.user?.username ?? "Spieler"),
+              username,
+              characterName,
               status: "zusage" as const,
               label: "Vom GM als dabei markiert",
               canGmManuallyConfirm: false,
@@ -624,7 +649,8 @@ export async function loadCampaignDetailPageData(
           if (st === "Absage") {
             return {
               userId: m.user_id,
-              username: String(m.user?.username ?? "Spieler"),
+              username,
+              characterName,
               status: "absage" as const,
               label: "Abgesagt",
               canGmManuallyConfirm: allowGmConfirm,
@@ -632,7 +658,8 @@ export async function loadCampaignDetailPageData(
           }
           return {
             userId: m.user_id,
-            username: String(m.user?.username ?? "Spieler"),
+            username,
+            characterName,
             status: "offen" as const,
             label: "Noch keine Rückmeldung",
             canGmManuallyConfirm: allowGmConfirm,

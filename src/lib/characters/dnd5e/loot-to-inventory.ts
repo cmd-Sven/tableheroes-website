@@ -11,7 +11,7 @@ import {
   normalizeEquipmentState,
   placeItemInContainer,
 } from "./equipment";
-import type { Dnd5eEquipmentContainer, Dnd5eEquipmentState } from "./equipment-types";
+import type { Dnd5eEquipmentState } from "./equipment-types";
 import {
   buildItemDescription,
   CUSTOM_DND5E_TAG,
@@ -24,6 +24,7 @@ import {
   lootMechanicsToMetaFields,
 } from "./loot-mechanics";
 import { buildCatalogTag } from "./item-resolve";
+import { createDefaultBackpackContainer } from "./ensure-starting-backpack";
 
 export type { InventoryDisplayCategory };
 
@@ -306,16 +307,6 @@ export function buildLootCharacterItemInsert(input: {
     category: metaToInventoryCategory(meta),
     description,
     icon_type: iconTypeForDisplayCategory(inventoryCategory),
-  };
-}
-
-function createDefaultBackpackContainer(): Dnd5eEquipmentContainer {
-  return {
-    id: crypto.randomUUID(),
-    kind: "backpack",
-    label: "Rucksack",
-    linkedItemId: null,
-    itemIds: [],
   };
 }
 

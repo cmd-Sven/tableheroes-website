@@ -31,7 +31,7 @@ export const SUBCLASS_AVAILABILITY: Partial<
       { id: "assassin", nameDe: "Assassine", nameEn: "Assassin", inSystem: false },
       {
         id: "arcane-trickster",
-        nameDe: "Arkaner Trickser",
+        nameDe: "Arkaner Trickster",
         nameEn: "Arcane Trickster",
         inSystem: true,
       },
@@ -57,6 +57,40 @@ export const SUBCLASS_AVAILABILITY: Partial<
       { id: "trickery", nameDe: "Täuschung", nameEn: "Trickery", inSystem: false },
       { id: "war", nameDe: "Krieg", nameEn: "War", inSystem: false },
       { id: "grave", nameDe: "Grab", nameEn: "Grave", inSystem: true },
+    ],
+  },
+  wizard: {
+    unlockNoteDe: "Arkane Tradition / Unterklasse ab Stufe 3 (2024).",
+    unlockNoteEn: "Arcane tradition / subclass from level 3 (2024).",
+    entries: [
+      { id: "evocation", nameDe: "Hervorrufung", nameEn: "Evocation", inSystem: true },
+      { id: "abjuration", nameDe: "Bannmagie", nameEn: "Abjuration", inSystem: false },
+      { id: "conjuration", nameDe: "Beschwörung", nameEn: "Conjuration", inSystem: false },
+      { id: "divination", nameDe: "Erkenntnismagie", nameEn: "Divination", inSystem: false },
+      { id: "enchantment", nameDe: "Verzauberung", nameEn: "Enchantment", inSystem: false },
+      { id: "illusion", nameDe: "Illusion", nameEn: "Illusion", inSystem: false },
+      { id: "necromancy", nameDe: "Nekromantie", nameEn: "Necromancy", inSystem: false },
+      { id: "transmutation", nameDe: "Verwandlung", nameEn: "Transmutation", inSystem: false },
+    ],
+  },
+  barbarian: {
+    unlockNoteDe: "Barbaren-Unterklasse ab Stufe 3 (2024).",
+    unlockNoteEn: "Barbarian subclass from level 3 (2024).",
+    entries: [
+      { id: "berserker", nameDe: "Berserker", nameEn: "Berserker", inSystem: true },
+      {
+        id: "wild-heart",
+        nameDe: "Wildes Herz",
+        nameEn: "Wild Heart",
+        inSystem: false,
+      },
+      {
+        id: "world-tree",
+        nameDe: "Weltenbaum",
+        nameEn: "World Tree",
+        inSystem: false,
+      },
+      { id: "zealot", nameDe: "Eiferer", nameEn: "Zealot", inSystem: false },
     ],
   },
 };

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, User, Shield, Users, ExternalLink } from "lucide-react";
 import { DiscoverySlider } from "@/src/components/dashboard/player/DiscoverySlider";
 import { PartyOverview } from "@/src/components/dashboard/player/PartyOverview";
+import { PlayerDashboardPreviewBanner } from "@/src/components/dashboard/PlayerDashboardPreviewBanner";
 import { getLoreEntries } from "../lore-queries";
 import { getNPCs } from "../npc-queries";
 import { getFactionsWithMembers } from "../factions-queries";
@@ -12,6 +13,7 @@ import { fetchAvatarDisplayMapForCampaign } from "@/src/lib/characters/fetch-ava
 
 type Props = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ preview?: string }>;
 };
 
 export type DiscoveryItem = {
@@ -35,8 +37,9 @@ export type PartyMember = {
   avatar_display?: unknown | null;
 };
 
-export default async function PlayerDashboardPage({ params }: Props) {
+export default async function PlayerDashboardPage({ params, searchParams }: Props) {
   const { id: campaignId } = await params;
+  const { preview } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -45,21 +48,38 @@ export default async function PlayerDashboardPage({ params }: Props) {
   if (!user) redirect("/");
 
   const { data: campaign, error: campaignError } = await (supabase.from("campaigns") as any)
-    .select("id, name, gm_id")
+    .select("id, name, gm_id, owner_id")
     .eq("id", campaignId)
     .single();
 
   if (campaignError || !campaign) notFound();
-  const isGM = (campaign as { gm_id: string }).gm_id === user.id;
-  if (isGM) redirect(`/dashboard/campaigns/${campaignId}`);
+
+  const { data: profileRow } = await (supabase.from("users") as any)
+    .select("primary_role")
+    .eq("id", user.id)
+    .maybeSingle();
+  const primaryRole = String((profileRow as { primary_role?: string } | null)?.primary_role ?? "");
+  const isPlatformStaff = primaryRole === "Admin" || primaryRole === "GameMaster";
+  const isCampaignGm =
+    (campaign as { gm_id?: string }).gm_id === user.id ||
+    (campaign as { owner_id?: string }).owner_id === user.id;
+  const isPreview = preview === "1" && (isCampaignGm || isPlatformStaff);
+
+  // SL/Admin ohne Preview-Flag → Kampagnen-Übersicht (wie bisher)
+  if (isCampaignGm && !isPreview) {
+    redirect(`/dashboard/campaigns/${campaignId}`);
+  }
 
   const { data: membership } = await (supabase.from("campaign_members") as any)
     .select("id, status, character_id, characters(id, name, class, race, level, biography, status)")
     .eq("campaign_id", campaignId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!membership || !["Approved", "Active"].includes(membership.status)) {
+  if (
+    !isPreview &&
+    (!membership || !["Approved", "Active"].includes(String(membership.status)))
+  ) {
     redirect(`/dashboard/campaigns/${campaignId}`);
   }
 
@@ -219,12 +239,21 @@ export default async function PlayerDashboardPage({ params }: Props) {
 
   return (
     <div className="container mx-auto max-w-6xl space-y-10 p-6">
+      {isPreview ? (
+        <PlayerDashboardPreviewBanner
+          exitHref={`/dashboard/campaigns/${campaignId}`}
+        />
+      ) : null}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-barlow font-extrabold text-4xl uppercase tracking-wide text-hero-vibrant">
             {campaign.name}
           </h1>
-          <p className="font-libre text-gray-400 mt-1">Dein Kampagnen-Dashboard</p>
+          <p className="font-libre text-gray-400 mt-1">
+            {isPreview
+              ? "Kampagnen-Hub in Spieler-Ansicht (Vorschau)"
+              : "Dein Kampagnen-Dashboard"}
+          </p>
         </div>
         <Link
           href={`/dashboard/campaigns/${campaignId}`}

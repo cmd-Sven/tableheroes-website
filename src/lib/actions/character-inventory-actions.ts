@@ -13,7 +13,8 @@ export {
   deleteCharacterItem,
   updateCharacterWealth,
   getCampaignPartyCharacters,
-  transferItemToCharacter
+  transferItemToCharacter,
+  ensureCharacterStartingBackpackWithClient,
 } from "./character-inventory-actions/part-01";
 export {
   transferContainerToCharacter

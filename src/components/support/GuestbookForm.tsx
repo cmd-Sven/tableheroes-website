@@ -9,19 +9,23 @@ export function GuestbookForm() {
   const [hoveredStar, setHoveredStar] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit() {
     setError(null);
-    setSuccess(false);
+    setSuccessMessage(null);
 
     startTransition(async () => {
       const result = await addGuestbookEntry(rating, comment);
       if (result.success) {
-        setSuccess(true);
+        setSuccessMessage(
+          (result.pointsAwarded ?? 0) > 0
+            ? `Danke für deine Nachricht! Dir wurden einmalig ${result.pointsAwarded} Punkte gutgeschrieben.`
+            : "Danke für deine Nachricht!",
+        );
         setComment("");
-        setTimeout(() => setSuccess(false), 4000);
+        setTimeout(() => setSuccessMessage(null), 5000);
       } else {
         setError(result.error ?? "Etwas ist schiefgelaufen.");
       }
@@ -33,8 +37,12 @@ export function GuestbookForm() {
   return (
     <div className="rounded-lg border border-accent-gold/20 bg-black/30 p-6 space-y-4">
       <h3 className="font-cinzel font-bold text-lg text-accent-gold">
-        Hinterlasse eine Nachricht
+        Deine Bewertung abgeben
       </h3>
+      <p className="font-libre text-sm text-gray-400 leading-relaxed">
+        Schreib einen passenden Kommentar, vergib Sterne – und erhalte einmalig{" "}
+        <strong className="text-accent-gold">100 Punkte</strong> auf dein Konto.
+      </p>
 
       {/* Stars */}
       <div>
@@ -91,10 +99,10 @@ export function GuestbookForm() {
           <p className="font-barlow font-bold text-xs text-red-400">{error}</p>
         </div>
       )}
-      {success && (
+      {successMessage && (
         <div className="rounded border border-hero-border/50 bg-hero-vibrant/10 px-3 py-2">
           <p className="font-barlow font-bold text-xs text-hero-vibrant">
-            Danke für deine Nachricht!
+            {successMessage}
           </p>
         </div>
       )}

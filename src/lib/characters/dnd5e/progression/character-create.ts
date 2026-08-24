@@ -231,18 +231,17 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
     raceTraitsRaw: draft.loreRaceTraitsRaw,
   });
   const useLoreAbi =
-    draft.applyRacialBonuses &&
     Boolean(loreSpec?.abilityBonuses) &&
     (draft.preferLoreAbilityBonuses !== false);
 
   let scores: Record<AbilityKeyShort, number>;
-  if (!draft.applyRacialBonuses) {
-    scores = { ...draft.baseAbilities };
-  } else if (useLoreAbi) {
-    // Lore-ASI statt SRD — keine doppelten Boni
+  if (useLoreAbi) {
+    // Kampagnen-Lore-ASI unabhängig von optionalen 2014-SRD-Rassenboni
     scores = applyLoreAbilityBonusesToScores(draft.baseAbilities, loreSpec);
-  } else {
+  } else if (draft.applyRacialBonuses) {
     scores = applyRacialBonuses(draft.baseAbilities, plan.raceId);
+  } else {
+    scores = { ...draft.baseAbilities };
   }
 
   let sheet = createEmptyDnd5eSheet(1);

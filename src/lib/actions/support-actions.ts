@@ -1,7 +1,10 @@
 "use server";
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+
+const GUESTBOOK_POINTS = 100;
+const GUESTBOOK_POINTS_REASON = "Unterstützung: Kommentar & Sterne";
 
 // ============================================================================
 // Types
@@ -87,7 +90,7 @@ export async function getBackers(): Promise<BackerHero[]> {
 export async function addGuestbookEntry(
   rating: number,
   comment: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; pointsAwarded?: number }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -113,7 +116,6 @@ export async function addGuestbookEntry(
     .limit(1);
 
   if (existing && (existing as any[]).length > 0) {
-    // Update statt Insert
     const { error } = await (supabase.from("guestbook") as any)
       .update({
         rating,
@@ -125,20 +127,60 @@ export async function addGuestbookEntry(
       console.error("[addGuestbookEntry:update]", error);
       return { success: false, error: error.message };
     }
-  } else {
-    const { error } = await (supabase.from("guestbook") as any).insert({
-      user_id: user.id,
-      rating,
-      comment: comment.trim(),
-      is_visible: true,
+
+    revalidatePath("/support");
+    return { success: true, pointsAwarded: 0 };
+  }
+
+  const { error } = await (supabase.from("guestbook") as any).insert({
+    user_id: user.id,
+    rating,
+    comment: comment.trim(),
+    is_visible: true,
+  });
+
+  if (error) {
+    console.error("[addGuestbookEntry:insert]", error);
+    return { success: false, error: error.message };
+  }
+
+  const pointsAwarded = await awardGuestbookPointsOnce(user.id);
+  revalidatePath("/support");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/points");
+  return { success: true, pointsAwarded };
+}
+
+async function awardGuestbookPointsOnce(userId: string): Promise<number> {
+  try {
+    const admin = createAdminClient();
+    const { data: existingAward } = await (admin.from("points_log") as any)
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reason", GUESTBOOK_POINTS_REASON)
+      .limit(1);
+
+    if (existingAward && (existingAward as any[]).length > 0) {
+      return 0;
+    }
+
+    const { error } = await (admin as any).rpc("award_points_safe", {
+      target_user_id: userId,
+      points_amount: GUESTBOOK_POINTS,
+      award_reason: GUESTBOOK_POINTS_REASON,
+      awarded_by: null,
+      related_campaign_id: null,
+      catalog_id: null,
     });
 
     if (error) {
-      console.error("[addGuestbookEntry:insert]", error);
-      return { success: false, error: error.message };
+      console.error("[addGuestbookEntry:points]", error);
+      return 0;
     }
-  }
 
-  revalidatePath("/support");
-  return { success: true };
+    return GUESTBOOK_POINTS;
+  } catch (err) {
+    console.error("[addGuestbookEntry:points]", err);
+    return 0;
+  }
 }

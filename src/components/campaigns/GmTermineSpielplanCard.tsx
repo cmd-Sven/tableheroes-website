@@ -38,6 +38,7 @@ import { APP_TIMEZONE } from "@/src/lib/datetime/berlin";
 export type GmTerminePlayerRsvp = {
   userId: string;
   username: string;
+  characterName?: string | null;
   status: "zusage" | "via_online" | "absage" | "offen" | "gm_override";
   label: string;
   /** GM kann Spieler ohne Zusage (oder nach Absage) für den Start freigeben */
@@ -466,7 +467,15 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                   >
                     <RsvpIcon status={p.status} />
                     <span className="font-barlow text-sm text-white truncate min-w-0 flex-1 basis-[40%]">
-                      {p.username}
+                      {p.characterName?.trim() || p.username}
+                      {p.characterName?.trim() &&
+                      p.username &&
+                      p.characterName.trim() !== p.username ? (
+                        <span className="font-libre text-xs text-gray-500">
+                          {" "}
+                          · {p.username}
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={`font-libre text-xs shrink-0 ${

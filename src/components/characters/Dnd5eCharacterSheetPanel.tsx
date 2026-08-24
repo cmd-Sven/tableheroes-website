@@ -33,11 +33,12 @@ import type { CharacterFlawEntry } from "@/src/lib/characters/character-flaws";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
 import {
   computeArmorClassPreview,
+  hasBackpackContainer,
   normalizeEquipmentState,
   withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
 import {
-  getCharacterInventory,
+  getCharacterEquipmentPayload,
   saveCharacterEquipment,
 } from "@/src/lib/actions/character-inventory-actions";
 import type { CharacterItem } from "@/src/types/inventory";
@@ -354,8 +355,19 @@ export function Dnd5eCharacterSheetPanel({
 
   const reloadInventoryItems = useCallback(async () => {
     try {
-      const data = await getCharacterInventory(characterId);
+      // Lazy-Ensure: legt fehlenden Start-Rucksack an und liefert aktuelle Items/Equipment
+      const data = await getCharacterEquipmentPayload(characterId);
       setInventoryItems((data.items ?? []).filter((item) => !item.is_deleted));
+      setSheet((prev) => {
+        if (!prev) return prev;
+        const current = normalizeEquipmentState(prev.equipment);
+        const nextEq = normalizeEquipmentState(data.equipment);
+        if (hasBackpackContainer(current) || nextEq.containers.length === 0) {
+          return prev;
+        }
+        if (current.containers.length > 0) return prev;
+        return { ...prev, equipment: nextEq };
+      });
     } catch {
       setInventoryItems([]);
     }

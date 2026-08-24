@@ -144,10 +144,29 @@ export function Dnd5eEquipmentTab({
         const payload = await getCharacterEquipmentPayload(characterId);
         const party = await getCampaignPartyCharacters(payload.campaignId, characterId);
         setPartyCharacters(party);
+        if (sharedInventoryItems == null) {
+          setInventory({
+            items: payload.items,
+            wealth: payload.wealth,
+            sleep_debt_fap: payload.sleep_debt_fap,
+            rations_count: payload.rations_count,
+            starvation_days: payload.starvation_days,
+          });
+        }
+        const current = normalizeEquipmentState(sheet.equipment);
+        if (
+          current.containers.length === 0 &&
+          payload.equipment.containers.length > 0 &&
+          !readOnly
+        ) {
+          onEquipmentChange(normalizeEquipmentState(payload.equipment));
+        }
       } catch {
         setPartyCharacters([]);
       }
     })();
+    // Nur bei Charakterwechsel neu laden; Sheet-Sync ist einmalig für Lazy-Ensure
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount/characterId
   }, [characterId]);
 
   const items = useMemo(() => {

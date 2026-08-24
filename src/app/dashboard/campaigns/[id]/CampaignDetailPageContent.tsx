@@ -427,6 +427,26 @@ export function CampaignDetailPageContent({
             </Link>
           </div>
         )}
+
+        {/* SL/Admin: Kampagnen-Hub wie Spieler prüfen */}
+        {isGM && (
+          <div className="rounded-lg border border-accent-gold/40 bg-background-card p-6">
+            <h3 className="font-cinzel font-bold text-lg text-accent-gold mb-3">
+              Spieler-Ansicht testen
+            </h3>
+            <p className="font-libre text-sm text-gray-400 mb-4">
+              Öffne den Kampagnen-Hub so, wie ihn Spieler sehen (Discovery, Party,
+              Charakterbereich — ohne eigenen PC oft leer).
+            </p>
+            <Link
+              href={`/dashboard/campaigns/${id}/player-dashboard?preview=1`}
+              className="inline-flex items-center gap-2 rounded border border-accent-gold/70 bg-accent-gold/10 px-4 py-2.5 font-barlow font-bold uppercase text-sm text-accent-gold hover:bg-accent-gold/20 transition-colors"
+            >
+              <Eye className="h-4 w-4" />
+              Kampagnen-Hub als Spieler
+            </Link>
+          </div>
+        )}
       </div>
       </div>
     </div>

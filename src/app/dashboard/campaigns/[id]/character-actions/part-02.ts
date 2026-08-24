@@ -16,6 +16,7 @@ import {
 } from "@/src/lib/foundry-sync/progression-lock-server";
 import { setCharacterGoldGp } from "@/src/lib/character-gold";
 import { recordPlayerCharacterEditAdmin } from "@/src/lib/characters/player-character-edit-alerts";
+import { ensureCharacterStartingBackpackWithClient } from "@/src/lib/actions/character-inventory-actions/part-01";
 
 /**
  * GM: Charakter eines Spielers laden (user_id + campaign_id) für Ruf-Verwaltung.
@@ -247,6 +248,16 @@ export async function createCharacterWithRelations(data: {
           "Charakter wurde erstellt, aber Beziehungen konnten nicht gespeichert werden.",
         );
       }
+    }
+
+    // 3e. Start-Rucksack (Inventar-Item + ausgerüsteter Behälter)
+    try {
+      await ensureCharacterStartingBackpackWithClient(supabase, character.id);
+    } catch (backpackErr) {
+      console.error("[createCharacterWithRelations] starting backpack:", backpackErr);
+      console.warn(
+        "Charakter wurde erstellt, aber der Start-Rucksack konnte nicht angelegt werden.",
+      );
     }
 
     revalidatePath(`/dashboard/campaigns/${data.campaign_id}`);

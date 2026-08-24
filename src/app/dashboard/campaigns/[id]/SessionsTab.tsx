@@ -662,7 +662,7 @@ export function SessionsTab({
                         </button>
                       ) : live && !canJoinSession && sessionSupportsLiveBoard(focusSession.type) ? (
                         <span className="font-libre text-xs text-gray-500 italic">
-                          Freischaltung ausstehend (Charakter Status Active).
+                          Live-Beitritt erst mit Charakterstatus „Active“ möglich.
                         </span>
                       ) : null}
                       {scheduled && isGM ? renderScheduledGmControls(focusSession) : null}

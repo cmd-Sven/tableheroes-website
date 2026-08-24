@@ -172,8 +172,9 @@ export function CharacterCreateRulesPanel({
           Klasse (Stufe 1)
         </h3>
         <p className="font-libre text-sm text-gray-400">
-          Wähle eine D&amp;D-5e-Klasse aus dem Katalog. Features, Trefferwürfel und
-          Zauberregeln kommen aus dem SRD-Katalog.
+          Wähle eine D&amp;D-2024-Klasse aus dem Katalog. Features, Trefferwürfel und
+          Zauberregeln kommen aus dem Progression-Katalog. Unterklassen (z.&nbsp;B. Arkaner
+          Trickster, Hervorrufung, Berserker) werden typischerweise ab Stufe 3 gewählt.
         </p>
         <div>
           <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
@@ -325,7 +326,7 @@ export function CharacterCreateRulesPanel({
               onChange={(e) => onApplyRacialBonuses(e.target.checked)}
               className="accent-accent-gold"
             />
-            2014-Rassenboni anwenden
+            Optionale 2014-SRD-Rassen-ASI (2024-Species haben keine festen ASI)
           </label>
         </div>
         <div>

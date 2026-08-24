@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, ArrowRight, Sparkles, Crown, Shield } from "lucide-react";
+import { ArrowRight, Sparkles, Crown, Shield, Star } from "lucide-react";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
@@ -87,29 +87,27 @@ export function SupportCard({ isBacker, backerSince }: Props) {
   // ── Standard-Ansicht (kein Backer) ──
   return (
     <div className="flex flex-col items-center text-center gap-4 p-6">
-      {/* Icon */}
       <div className="grid h-14 w-14 place-items-center rounded-full border-2 border-accent-gold/30 bg-accent-gold/10">
-        <Heart className="h-7 w-7 text-red-400" />
+        <Star className="h-7 w-7 fill-accent-gold text-accent-gold" />
       </div>
 
-      {/* Text */}
       <div className="space-y-1.5">
         <h3 className="font-cinzel font-bold text-base text-accent-gold flex items-center justify-center gap-1.5">
           <Sparkles className="h-4 w-4" />
-          Unterstütze das Projekt
+          Unterstütze Table Heroes
         </h3>
         <p className="font-libre text-sm text-gray-400 leading-relaxed max-w-xs mx-auto">
-          Table Heroes ist kostenlos. Hilf mit, die Server am Laufen zu halten
-          und erhalte das exklusive Backer-Achievement.
+          Unterstütze Table Heroes mit einem coolen und passenden Kommentar
+          und gib ein paar Sterne ab. Dafür erhält jeder einmalig{" "}
+          <strong className="text-accent-gold">100 Punkte</strong> für sein Konto.
         </p>
       </div>
 
-      {/* CTA */}
       <Link
         href="/support"
         className="inline-flex items-center gap-2 rounded-md border border-accent-gold/40 bg-accent-gold/10 px-5 py-2.5 font-barlow font-bold uppercase text-xs text-accent-gold transition-all hover:bg-accent-gold/20 hover:border-accent-gold/60"
       >
-        Mehr erfahren
+        Unterstütze Table Heroes
         <ArrowRight className="h-3.5 w-3.5" />
       </Link>
     </div>

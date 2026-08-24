@@ -1,7 +1,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
 import { isSessionStatusScheduled } from "@/src/lib/session-status";
-import { isPlayerReadyForSessionStart } from "./session-rsvp-readiness";
+import {
+  isOnSessionRsvpRoster,
+  isPlayerReadyForSessionStart,
+} from "./session-rsvp-readiness";
 import { sessionSupportsLiveBoard } from "@/src/lib/session-type";
 
 export type SessionTabRow = Record<string, unknown> & {
@@ -57,7 +60,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
   if (scheduledIds.length > 0) {
     const [membersRes, rsvpsRes] = await Promise.all([
       (supabase.from("campaign_members") as any)
-        .select("user_id")
+        .select("user_id, character_id")
         .eq("campaign_id", campaignId)
         .in("status", ["Approved", "Active"]),
       (supabase.from("session_rsvps") as any)
@@ -65,7 +68,15 @@ export async function loadUpcomingSessionsWithRsvpForGm(
         .in("session_id", scheduledIds),
     ]);
     const memberIds = new Set(
-      ((membersRes.data as any[]) || []).map((m: any) => m.user_id),
+      ((membersRes.data as any[]) || [])
+        .filter((m: any) =>
+          isOnSessionRsvpRoster({
+            memberUserId: m.user_id,
+            gmUserId: gmUserId,
+            hasCharacter: Boolean(m.character_id),
+          }),
+        )
+        .map((m: any) => String(m.user_id)),
     );
     const acceptedRsvpsBySession = new Map<string, boolean>();
     type RsvpRow = {
@@ -95,7 +106,7 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       const isGameSession = sessionSupportsLiveBoard(s.type);
       const sessionRows = rowsBySession.get(s.id) ?? [];
       const byUser = new Map(sessionRows.map((r) => [r.user_id, r]));
-      const playerIds = [...memberIds].filter((uid) => uid !== gmUserId);
+      const playerIds = [...memberIds];
       const pendingCount = playerIds.filter(
         (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
       ).length;

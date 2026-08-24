@@ -9,6 +9,10 @@ import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { parseSheetData, mergeSheetWithDefaults } from "@/src/lib/characters/dnd5e/defaults";
 import { normalizeEquipmentState, withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
 import type { Dnd5eEquipmentState } from "@/src/lib/characters/dnd5e/equipment-types";
+import {
+  equipCreatedBackpackItem,
+  planEnsureStartingBackpack,
+} from "@/src/lib/characters/dnd5e/ensure-starting-backpack";
 import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import {
   INVENTORY_CATEGORIES,
@@ -149,12 +153,104 @@ export async function assertCharacterInventoryAccess(
   return { campaignId, isGm };
 }
 
+/**
+ * Stellt sicher, dass der Charakter einen nutzbaren Rucksack-Behälter hat
+ * (Item in character_items + Container in sheet_data.equipment).
+ * Idempotent — für Create-Pfad und Lazy-Ensure beim Inventar-Laden.
+ */
+export async function ensureCharacterStartingBackpackWithClient(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  characterId: string,
+): Promise<{
+  equipment: Dnd5eEquipmentState;
+  items: CharacterItem[];
+  changed: boolean;
+}> {
+  assertUuidLike(characterId, "Charakter");
+
+  const items = await loadCharacterItemsForSheetSync(supabase, characterId);
+
+  const { data: chRaw, error: sheetErr } = await supabase
+    .from("characters")
+    .select("sheet_data")
+    .eq("id", characterId)
+    .single();
+
+  if (sheetErr || !chRaw) {
+    throw new Error(sheetErr?.message || "Charakter nicht gefunden.");
+  }
+
+  const parsed = parseSheetData((chRaw as { sheet_data?: unknown }).sheet_data);
+  const plan = planEnsureStartingBackpack(
+    normalizeEquipmentState(parsed?.equipment),
+    items,
+  );
+
+  if (!plan.itemToCreate && !plan.equipmentChanged) {
+    return { equipment: plan.equipment, items, changed: false };
+  }
+
+  let nextItems = items;
+  let nextEquipment = plan.equipment;
+
+  if (plan.itemToCreate) {
+    const { data: inserted, error: insertErr } = await (supabase as any)
+      .from("character_items")
+      .insert({
+        character_id: characterId,
+        name: plan.itemToCreate.name,
+        description: plan.itemToCreate.description,
+        category: plan.itemToCreate.category,
+        icon_type: plan.itemToCreate.icon_type,
+        target_fap: 0,
+        current_fap: 0,
+        is_deleted: false,
+      })
+      .select(CHARACTER_ITEM_SELECT)
+      .single();
+
+    if (insertErr || !inserted) {
+      throw new Error(insertErr?.message || "Start-Rucksack konnte nicht angelegt werden.");
+    }
+
+    const newItem = mapCharacterItemRow(inserted as Record<string, unknown>);
+    nextItems = [newItem, ...items];
+    nextEquipment = equipCreatedBackpackItem(plan.equipment, newItem);
+  }
+
+  const merged = mergeSheetWithDefaults({
+    ...(parsed ?? {}),
+    equipment: normalizeEquipmentState(nextEquipment),
+  });
+
+  const { error: upErr } = await (supabase as any)
+    .from("characters")
+    .update({ sheet_data: merged, sheet_source: "manual" })
+    .eq("id", characterId);
+
+  if (upErr) {
+    throw new Error(upErr.message || "Start-Rucksack konnte nicht ausgerüstet werden.");
+  }
+
+  return { equipment: nextEquipment, items: nextItems, changed: true };
+}
+
 export async function getCharacterEquipmentPayload(
   characterId: string,
 ): Promise<CharacterEquipmentPayload> {
   assertUuidLike(characterId, "Charakter");
   const { supabase, user } = await requireUser();
   const { campaignId } = await assertCharacterInventoryAccess(supabase, user.id, characterId);
+
+  let ensuredEquipment: Dnd5eEquipmentState | null = null;
+  let ensuredItems: CharacterItem[] | null = null;
+  try {
+    const ensured = await ensureCharacterStartingBackpackWithClient(supabase, characterId);
+    ensuredEquipment = ensured.equipment;
+    ensuredItems = ensured.items;
+  } catch (err) {
+    console.warn("[getCharacterEquipmentPayload] ensure starting backpack:", err);
+  }
 
   const inventory = await getCharacterInventory(characterId);
 
@@ -170,10 +266,12 @@ export async function getCharacterEquipmentPayload(
 
   const ch = chRaw as { sheet_data?: unknown; sheet_locale?: string | null };
   const sheet = parseSheetData(ch.sheet_data);
-  const equipment = normalizeEquipmentState(sheet?.equipment);
+  const equipment =
+    ensuredEquipment ?? normalizeEquipmentState(sheet?.equipment);
 
   return {
     ...inventory,
+    items: ensuredItems ?? inventory.items,
     campaignId,
     equipment,
     sheetLocale: normalizeCharacterSheetLocale(ch.sheet_locale),

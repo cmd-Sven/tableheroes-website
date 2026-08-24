@@ -152,7 +152,7 @@ export function Footer({ showStarrySection = true }: FooterProps) {
                   className="flex items-center gap-2 font-libre text-gray-400 text-sm hover:text-accent-gold transition-colors"
                 >
                   <Heart className="h-4 w-4" />
-                  Unterstützung
+                  Unterstützer und Kommentare
                 </Link>
               </li>
             </ul>

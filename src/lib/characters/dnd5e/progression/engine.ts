@@ -100,7 +100,11 @@ export function featuresForLevel(
       const f = prog.features.find((x) => x.id === id);
       if (!f) continue;
       // Skip ASI placeholder features — handled by ASI step
-      if (/ability-score|asi/i.test(f.id) || /ability score improvement/i.test(f.nameEn)) {
+      // Note: do not match bare "asi" (false positive on "evasion").
+      if (
+        /ability-score-improvement|(^|-)asi($|-)/i.test(f.id) ||
+        /ability score improvement/i.test(f.nameEn)
+      ) {
         continue;
       }
       if (f.subclass) {

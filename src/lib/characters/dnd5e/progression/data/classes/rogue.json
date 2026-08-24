@@ -5,136 +5,92 @@
   "hitDie": 8,
   "caster": "none",
   "subclassLevel": 3,
-  "asiLevels": [
-    4,
-    8,
-    10,
-    12,
-    16,
-    19
-  ],
+  "asiLevels": [4, 8, 10, 12, 16, 19],
   "levels": [
     {
       "level": 1,
       "featureIds": [
         "rogue-expertise-1",
         "sneak-attack",
-        "thieves-cant"
+        "thieves-cant",
+        "rogue-weapon-mastery"
       ]
     },
     {
       "level": 2,
-      "featureIds": [
-        "cunning-action"
-      ]
+      "featureIds": ["cunning-action"]
     },
     {
       "level": 3,
-      "featureIds": [
-        "roguish-archetype"
-      ]
+      "featureIds": ["roguish-archetype", "steady-aim"]
     },
     {
       "level": 4,
-      "featureIds": [
-        "rogue-ability-score-improvement-1"
-      ]
+      "featureIds": ["rogue-ability-score-improvement-1"]
     },
     {
       "level": 5,
-      "featureIds": [
-        "uncanny-dodge"
-      ]
+      "featureIds": ["cunning-strike", "uncanny-dodge"]
     },
     {
       "level": 6,
-      "featureIds": [
-        "rogue-expertise-2"
-      ]
+      "featureIds": ["rogue-expertise-2"]
     },
     {
       "level": 7,
-      "featureIds": [
-        "rogue-evasion"
-      ]
+      "featureIds": ["rogue-evasion", "reliable-talent"]
     },
     {
       "level": 8,
-      "featureIds": [
-        "rogue-ability-score-improvement-2"
-      ]
+      "featureIds": ["rogue-ability-score-improvement-2"]
     },
     {
       "level": 9,
-      "featureIds": [
-        "roguish-archetype-improvement-1"
-      ]
+      "featureIds": ["roguish-archetype-improvement-1"]
     },
     {
       "level": 10,
-      "featureIds": [
-        "rogue-ability-score-improvement-3"
-      ]
+      "featureIds": ["rogue-ability-score-improvement-3"]
     },
     {
       "level": 11,
-      "featureIds": [
-        "reliable-talent"
-      ]
+      "featureIds": ["improved-cunning-strike"]
     },
     {
       "level": 12,
-      "featureIds": [
-        "rogue-ability-score-improvement-4"
-      ]
+      "featureIds": ["rogue-ability-score-improvement-4"]
     },
     {
       "level": 13,
-      "featureIds": [
-        "roguish-archetype-improvement-2"
-      ]
+      "featureIds": ["roguish-archetype-improvement-2"]
     },
     {
       "level": 14,
-      "featureIds": [
-        "blindsense"
-      ]
+      "featureIds": ["devious-strikes"]
     },
     {
       "level": 15,
-      "featureIds": [
-        "slippery-mind"
-      ]
+      "featureIds": ["slippery-mind"]
     },
     {
       "level": 16,
-      "featureIds": [
-        "rogue-ability-score-improvement-5"
-      ]
+      "featureIds": ["rogue-ability-score-improvement-5"]
     },
     {
       "level": 17,
-      "featureIds": [
-        "roguish-archetype-improvement-3"
-      ]
+      "featureIds": ["roguish-archetype-improvement-3"]
     },
     {
       "level": 18,
-      "featureIds": [
-        "elusive"
-      ]
+      "featureIds": ["elusive"]
     },
     {
       "level": 19,
-      "featureIds": [
-        "rogue-ability-score-improvement-6"
-      ]
+      "featureIds": ["rogue-epic-boon"]
     },
     {
       "level": 20,
-      "featureIds": [
-        "stroke-of-luck"
-      ]
+      "featureIds": ["stroke-of-luck"]
     }
   ],
   "features": [
@@ -143,8 +99,8 @@
       "level": 1,
       "nameEn": "Expertise",
       "nameDe": "Expertise",
-      "descriptionEn": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
-      "descriptionDe": "Auf der 1. Stufe wählst du zwei deiner geübten Fertigkeiten oder eine geübte Fertigkeit und deine Übung mit Diebeswerkzeug. Dein Übungsbonus wird bei allen Attributswürfen verdoppelt, die eine der gewählten Übungen verwenden.\n\nAuf der 6. Stufe kannst du zwei weitere deiner Übungen (Fertigkeiten oder Diebeswerkzeug) für diesen Vorzug wählen.",
+      "descriptionEn": "You gain Expertise in two of your skill proficiencies of your choice. Sleight of Hand and Stealth are recommended if you have proficiency in them.\n\nAt Rogue level 6, you gain Expertise in two more of your skill proficiencies of your choice.",
+      "descriptionDe": "Du erhältst Expertise in zwei Fertigkeitsübungen deiner Wahl. Fingerfertigkeit und Heimlichkeit sind empfehlenswert, falls du darin geübt bist.\n\nAuf Schurkenstufe 6 erhältst du Expertise in zwei weiteren Fertigkeitsübungen deiner Wahl.",
       "subclass": null
     },
     {
@@ -152,8 +108,8 @@
       "level": 1,
       "nameEn": "Sneak Attack",
       "nameDe": "Hinterhältiger Angriff",
-      "descriptionEn": "Beginning at 1st level, you know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon.\n\nYou don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll.\n\nThe amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table.",
-      "descriptionDe": "Beginnend ab Stufe 1 weißt du, wie man die Ablenkung eines Feindes ausnutzt, um gezielt zuzuschlagen. Einmal pro Zug kannst du einer Kreatur, die du triffst, zusätzlich 1W6 Schaden zufügen, falls du bei dem Angriffswurf im Vorteil bist. Der Angriff muss mit einer Fernkampfwaffe oder einer Waffe mit der Eigenschaft Finesse ausgeführt werden.\n\nDu musst bei dem Angriffswurf nicht im Vorteil sein, wenn sich ein anderer Gegner des Ziels innerhalb von 1,50 m um dieses befindet, dieser Gegner nicht kampfunfähig ist und du bei dem Angriffswurf nicht im Nachteil bist.",
+      "descriptionEn": "You know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's type.\n\nYou don't need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn't have the Incapacitated condition, and you don't have Disadvantage on the attack roll.\n\nThe extra damage increases as you gain Rogue levels, as shown in the Sneak Attack column of the Rogue Features table.",
+      "descriptionDe": "Du weißt, wie man subtil zuschlägt und die Ablenkung eines Feindes ausnutzt. Einmal pro Zug kannst du einer Kreatur, die du mit einem Angriffswurf triffst, zusätzlich 1W6 Schaden zufügen, wenn du beim Wurf Vorteil hast und der Angriff eine Finesse- oder Fernkampfwaffe nutzt. Der zusätzliche Schaden hat denselben Typ wie die Waffe.\n\nDu brauchst keinen Vorteil, wenn sich mindestens ein Verbündeter innerhalb von 1,50 m um das Ziel befindet, der Verbündete nicht kampfunfähig ist und du keinen Nachteil hast.\n\nDer zusätzliche Schaden steigt mit deinen Schurkenstufen (siehe Spalte Hinterhältiger Angriff).",
       "subclass": null
     },
     {
@@ -161,8 +117,17 @@
       "level": 1,
       "nameEn": "Thieves' Cant",
       "nameDe": "Diebessprache",
-      "descriptionEn": "During your rogue training you learned thieves' cant, a secret mix of dialect, jargon, and code that allows you to hide messages in seemingly normal conversation. Only another creature that knows thieves' cant understands such messages. It takes four times longer to convey such a message than it does to speak the same idea plainly.\n\nIn addition, you understand a set of secret signs and symbols used to convey short, simple messages, such as whether an area is dangerous or the territory of a thieves' guild, whether loot is nearby, or whether the people in an area are easy marks or will provide a safe house for thieves on the run.",
-      "descriptionDe": "Während deiner Ausbildung zum Schurken hast du die Diebessprache erlernt. Diese geheime Mischung aus Dialekt, Jargon und Codes erlaubt es dir in einer scheinbar gewöhnlichen Unterhaltung Botschaften zu verstecken. Nur eine andere Kreatur, die ebenfalls die Diebessprache beherrschst, kann diese Botschaften verstehen. Das Mitteilen einer solchen Nachricht dauert vier Mal so lange, als wenn man deren Inhalt direkt formulieren würde.\n\nAußerdem ist dir ein Satz geheimer Zeichen und Symbole bekannt, mit denen du einfache, kurze Informationen übermitteln kannst, etwa ob ein Gebiet sicher ist oder ob es zum Territorium einer Diebesgilde gehört. Auch ob man in der Nähe Beute machen kann, ob die Bevölkerung hier ein leichtes Ziel abgibt oder ob es einen Unterschlupf für Diebe auf der Flucht gibt.",
+      "descriptionEn": "You picked up various languages in the communities where you plied your roguish talents. You know Thieves' Cant and one other language of your choice.",
+      "descriptionDe": "In den Gemeinschaften, in denen du deine schurkischen Talente ausgeübt hast, hast du verschiedene Sprachen aufgegriffen. Du kennst die Diebessprache und eine weitere Sprache deiner Wahl.",
+      "subclass": null
+    },
+    {
+      "id": "rogue-weapon-mastery",
+      "level": 1,
+      "nameEn": "Weapon Mastery",
+      "nameDe": "Waffenmeisterschaft",
+      "descriptionEn": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency, such as Daggers and Shortbows.\n\nWhenever you finish a Long Rest, you can change the kinds of weapons you chose.",
+      "descriptionDe": "Dein Training erlaubt dir, die Meisterschaftseigenschaften von zwei Waffenarten deiner Wahl zu nutzen, in denen du geübt bist (z. B. Dolche und Kurzbögen).\n\nNach einer langen Rast kannst du die gewählten Waffenarten ändern.",
       "subclass": null
     },
     {
@@ -170,17 +135,26 @@
       "level": 2,
       "nameEn": "Cunning Action",
       "nameDe": "Raffinierte Aktion",
-      "descriptionEn": "Starting at 2nd level, your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action.",
-      "descriptionDe": "Ab der 2. Stufe erlauben dir deine geistige und körperliche Agilität, schnell Entscheidungen zu treffen und dich rasch zu bewegen und zu handeln. Du kannst in jedem deiner Züge eine Bonusaktion verwenden, um damit die Spurten-, Rückzugs- oder Versteckenaktion auszuführen.",
+      "descriptionEn": "Your quick thinking and agility allow you to move and act quickly. On your turn, you can take one of the following actions as a Bonus Action: Dash, Disengage, or Hide.",
+      "descriptionDe": "Dein schnelles Denken und deine Gewandtheit erlauben dir, dich rasch zu bewegen und zu handeln. In deinem Zug kannst du als Bonusaktion eine der folgenden Aktionen ausführen: Spurten, Rückzug oder Verstecken.",
       "subclass": null
     },
     {
       "id": "roguish-archetype",
       "level": 3,
-      "nameEn": "Roguish Archetype",
-      "nameDe": "Schurkenarchetyp",
-      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
-      "descriptionDe": "Auf der 3. Stufe wählst du einen Archetyp, dem du in der Ausübung deiner Fähigkeiten nacheiferst und der deinen Weg als Schurke bestimmt, wie etwa den Dieb. Deine Wahl verleiht dir auf den Stufen 3, 9, 13 und 17 jeweils ein Merkmal.",
+      "nameEn": "Rogue Subclass",
+      "nameDe": "Schurken-Unterklasse",
+      "descriptionEn": "You gain a Rogue subclass of your choice. A subclass is a specialization that grants you features at certain Rogue levels. For the rest of your career, you gain each of your subclass's features that are of your Rogue level or lower.",
+      "descriptionDe": "Du erhältst eine Schurken-Unterklasse deiner Wahl. Eine Unterklasse ist eine Spezialisierung, die dir Merkmale auf bestimmten Schurkenstufen verleiht. Fortan erhältst du jedes Merkmal deiner Unterklasse, dessen Stufe gleich oder niedriger als deine Schurkenstufe ist.",
+      "subclass": null
+    },
+    {
+      "id": "steady-aim",
+      "level": 3,
+      "nameEn": "Steady Aim",
+      "nameDe": "Ruhiges Zielen",
+      "descriptionEn": "As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven't moved during this turn, and after you use it, your Speed is 0 until the end of the current turn.",
+      "descriptionDe": "Als Bonusaktion gibst du dir selbst Vorteil auf deinen nächsten Angriffswurf in diesem Zug. Du kannst dieses Merkmal nur nutzen, wenn du dich in diesem Zug noch nicht bewegt hast; danach ist deine Bewegungsrate bis zum Ende des aktuellen Zuges 0.",
       "subclass": null
     },
     {
@@ -188,8 +162,17 @@
       "level": 4,
       "nameEn": "Ability Score Improvement",
       "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "descriptionEn": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Rogue levels 8, 10, 12, and 16.",
+      "descriptionDe": "Du erhältst das Talent Attributswerterhöhung oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst. Du erhältst dieses Merkmal erneut auf den Schurkenstufen 8, 10, 12 und 16.",
+      "subclass": null
+    },
+    {
+      "id": "cunning-strike",
+      "level": 5,
+      "nameEn": "Cunning Strike",
+      "nameDe": "Raffinierter Schlag",
+      "descriptionEn": "You've developed cunning ways to use your Sneak Attack. When you deal Sneak Attack damage, you can add one of the following Cunning Strike effects. Each effect has a die cost, which is the number of Sneak Attack damage dice you must forgo to add the effect. You remove the die before rolling, and the effect occurs immediately after the attack's damage is dealt.\n\nIf a Cunning Strike effect requires a saving throw, the DC equals 8 + your Dexterity modifier + your Proficiency Bonus.\n\nPoison (Cost: 1d6). You add a toxin to your strike, forcing the target to make a Constitution saving throw. On a failed save, the target has the Poisoned condition for 1 minute. At the end of each of its turns, the Poisoned target repeats the save, ending the effect on itself on a success. To use this effect, you must have a Poisoner's Kit on your person.\n\nTrip (Cost: 1d6). If the target is Large or smaller, it must succeed on a Dexterity saving throw or have the Prone condition.\n\nWithdraw (Cost: 1d6). Immediately after the attack, you move up to half your Speed without provoking Opportunity Attacks.",
+      "descriptionDe": "Du hast raffinierte Wege entwickelt, deinen Hinterhältigen Angriff zu nutzen. Wenn du Hinterhältigen-Angriff-Schaden zufügst, kannst du einen der folgenden Effekte hinzufügen. Jeder Effekt hat Würfelkosten: so viele Schadenswürfel des Hinterhältigen Angriffs musst du opfern (vor dem Würfeln entfernen). Der Effekt tritt unmittelbar nach dem Schaden ein.\n\nRettungswurf-SG = 8 + Geschicklichkeitsmodifikator + Übungsbonus.\n\nGift (Kosten: 1W6). Das Ziel muss einen Konstitutionsrettungswurf schaffen oder ist 1 Minute vergiftet. Am Ende jedes seiner Züge wiederholt es den Rettungswurf und beendet den Effekt bei Erfolg. Du brauchst ein Giftmischerwerkzeug bei dir.\n\nZu Fall bringen (Kosten: 1W6). Ist das Ziel Groß oder kleiner, muss es einen Geschicklichkeitsrettungswurf schaffen oder ist liegend.\n\nRückzug (Kosten: 1W6). Unmittelbar nach dem Angriff bewegst du dich um bis zur Hälfte deiner Bewegungsrate, ohne Gelegenheitsangriffe auszulösen.",
       "subclass": null
     },
     {
@@ -197,8 +180,8 @@
       "level": 5,
       "nameEn": "Uncanny Dodge",
       "nameDe": "Unglaubliches Ausweichen",
-      "descriptionEn": "Starting at 5th level, when an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.",
-      "descriptionDe": "Trifft dich ab Stufe 5 der Angriff einer Kreatur, die du sehen kannst, darfst du deine Reaktion aufwenden, um den Schaden des Angriffs zu halbieren.",
+      "descriptionEn": "When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack's damage against you (round down).",
+      "descriptionDe": "Trifft dich ein Angreifer, den du sehen kannst, mit einem Angriffswurf, kannst du als Reaktion den Schaden gegen dich halbieren (abrunden).",
       "subclass": null
     },
     {
@@ -206,8 +189,8 @@
       "level": 6,
       "nameEn": "Expertise",
       "nameDe": "Expertise",
-      "descriptionEn": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit",
-      "descriptionDe": "Auf der 1. Stufe wählst du zwei deiner geübten Fertigkeiten oder eine geübte Fertigkeit und deine Übung mit Diebeswerkzeug. Dein Übungsbonus wird bei allen Attributswürfen verdoppelt, die eine der gewählten Übungen verwenden.\n\nAuf der 6. Stufe kannst du zwei weitere deiner Übungen (Fertigkeiten oder Diebeswerkzeug) für diesen Vorzug wählen.",
+      "descriptionEn": "You gain Expertise in two more of your skill proficiencies of your choice.",
+      "descriptionDe": "Du erhältst Expertise in zwei weiteren Fertigkeitsübungen deiner Wahl.",
       "subclass": null
     },
     {
@@ -215,8 +198,17 @@
       "level": 7,
       "nameEn": "Evasion",
       "nameDe": "Entrinnen",
-      "descriptionEn": "Beginning at 7th level, you can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
-      "descriptionDe": "Ab der 7. Stufe kannst du dich dank deiner instinktiven Gewandheit dem Wirkungsbereich bestimmter Effekte entziehen, wie etwa dem Blitzodem eines blauen Drachen oder dem Zauber Feuerball. Bist du einem Effekt ausgesetzt, der einen Geschicklichkeitsrettungswurf erlaubt, um den Schaden zu halbieren, nimmst du bei einem erfolgreichen Rettungswurf gar keinen Schaden und bei einem Misserfolg lediglich die Hälfte des Schadens.",
+      "descriptionEn": "You can nimbly dodge out of the way of certain dangers. When you're subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail. You can't use this feature if you have the Incapacitated condition.",
+      "descriptionDe": "Du kannst bestimmten Gefahren geschickt ausweichen. Bist du einem Effekt ausgesetzt, der einen Geschicklichkeitsrettungswurf erlaubt, um den Schaden zu halbieren, nimmst du bei Erfolg gar keinen Schaden und bei Misserfolg nur die Hälfte. Du kannst dieses Merkmal nicht nutzen, wenn du kampfunfähig bist.",
+      "subclass": null
+    },
+    {
+      "id": "reliable-talent",
+      "level": 7,
+      "nameEn": "Reliable Talent",
+      "nameDe": "Verlässliches Talent",
+      "descriptionEn": "Whenever you make an ability check that uses one of your skill or tool proficiencies, you can treat a d20 roll of 9 or lower as a 10.",
+      "descriptionDe": "Immer wenn du einen Attributswurf machst, der eine deiner Fertigkeits- oder Werkzeugübungen nutzt, kannst du bei einem W20-Ergebnis von 9 oder niedriger die 10 verwenden.",
       "subclass": null
     },
     {
@@ -224,17 +216,17 @@
       "level": 8,
       "nameEn": "Ability Score Improvement",
       "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "descriptionEn": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify.",
+      "descriptionDe": "Du erhältst das Talent Attributswerterhöhung oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst.",
       "subclass": null
     },
     {
       "id": "roguish-archetype-improvement-1",
       "level": 9,
-      "nameEn": "Roguish Archetype feature",
-      "nameDe": "Merkmal des Schurkenarchetyps",
-      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
-      "descriptionDe": "Du erhältst ein Merkmal deines Schurkenarchetyps.",
+      "nameEn": "Subclass Feature",
+      "nameDe": "Unterklassenmerkmal",
+      "descriptionEn": "You gain a feature from your Rogue subclass.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Schurken-Unterklasse.",
       "subclass": null
     },
     {
@@ -242,17 +234,17 @@
       "level": 10,
       "nameEn": "Ability Score Improvement",
       "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "descriptionEn": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify.",
+      "descriptionDe": "Du erhältst das Talent Attributswerterhöhung oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst.",
       "subclass": null
     },
     {
-      "id": "reliable-talent",
+      "id": "improved-cunning-strike",
       "level": 11,
-      "nameEn": "Reliable Talent",
-      "nameDe": "Verlässliches Talent",
-      "descriptionEn": "By 11th level, you have refined your chosen skills until they approach perfection. Whenever you make an ability check that lets you add your proficiency bonus, you can treat a d20 roll of 9 or lower as a 10.",
-      "descriptionDe": "Auf Stufe 11 beherrschst du deine geübten Fertigkeiten schon beinahe bis zur Perfektion. Immer wenn du einen Fertigkeitswurf ablegst, der dich deinen Übungsbonus verwenden lässt, kannst du bei einem Würfelergebnis von 9 oder niedriger die 10 verwenden.",
+      "nameEn": "Improved Cunning Strike",
+      "nameDe": "Verbesserter Raffinierter Schlag",
+      "descriptionEn": "You can use up to two Cunning Strike effects when you deal Sneak Attack damage, paying the die cost for each effect.",
+      "descriptionDe": "Wenn du Hinterhältigen-Angriff-Schaden zufügst, kannst du bis zu zwei Effekte des Raffinierten Schlags nutzen und zahlst die Würfelkosten für jeden Effekt.",
       "subclass": null
     },
     {
@@ -260,26 +252,26 @@
       "level": 12,
       "nameEn": "Ability Score Improvement",
       "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "descriptionEn": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify.",
+      "descriptionDe": "Du erhältst das Talent Attributswerterhöhung oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst.",
       "subclass": null
     },
     {
       "id": "roguish-archetype-improvement-2",
       "level": 13,
-      "nameEn": "Roguish Archetype feature",
-      "nameDe": "Merkmal des Schurkenarchetyps",
-      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
-      "descriptionDe": "Du erhältst ein Merkmal deines Schurkenarchetyps.",
+      "nameEn": "Subclass Feature",
+      "nameDe": "Unterklassenmerkmal",
+      "descriptionEn": "You gain a feature from your Rogue subclass.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Schurken-Unterklasse.",
       "subclass": null
     },
     {
-      "id": "blindsense",
+      "id": "devious-strikes",
       "level": 14,
-      "nameEn": "Blindsense",
-      "nameDe": "Blindgespür",
-      "descriptionEn": "Starting at 14th level, if you are able to hear, you are aware of the location of any hidden or invisible creature within 10 feet of you.",
-      "descriptionDe": "Angefangen mit der 14. Stufe bist du fähig, mit deinen scharfen Sinnen den Aufenthaltsort einer versteckten oder unsichtbaren Kreatur, die du hören kannst, innerhalb von 3 m festzustellen.",
+      "nameEn": "Devious Strikes",
+      "nameDe": "Verschlagene Schläge",
+      "descriptionEn": "You've practiced new ways to use your Sneak Attack. The following effects are now among your Cunning Strike options.\n\nDaze (Cost: 2d6). The target must succeed on a Constitution saving throw, or on its next turn it can do only one of the following: move or take an Action or a Bonus Action.\n\nKnock Out (Cost: 6d6). The target must succeed on a Constitution saving throw, or it has the Unconscious condition for 1 minute or until it takes any damage. The Unconscious target repeats the save at the end of each of its turns, ending the effect on itself on a success.\n\nObscure (Cost: 3d6). The target must succeed on a Dexterity saving throw, or it has the Blinded condition until the end of its next turn.",
+      "descriptionDe": "Du hast neue Wege für deinen Hinterhältigen Angriff geübt. Folgende Effekte gehören nun zu deinen Optionen des Raffinierten Schlags.\n\nBetäuben (Kosten: 2W6). Das Ziel muss einen Konstitutionsrettungswurf schaffen, sonst kann es in seinem nächsten Zug nur eines tun: sich bewegen oder eine Aktion oder Bonusaktion ausführen.\n\nNiederschlagen (Kosten: 6W6). Das Ziel muss einen Konstitutionsrettungswurf schaffen oder ist 1 Minute bewusstlos oder bis es Schaden nimmt. Am Ende jedes seiner Züge wiederholt es den Rettungswurf und beendet den Effekt bei Erfolg.\n\nVernebeln (Kosten: 3W6). Das Ziel muss einen Geschicklichkeitsrettungswurf schaffen oder ist bis zum Ende seines nächsten Zuges geblendet.",
       "subclass": null
     },
     {
@@ -287,8 +279,8 @@
       "level": 15,
       "nameEn": "Slippery Mind",
       "nameDe": "Entschlüpfender Geist",
-      "descriptionEn": "By 15th level, you have acquired greater mental strength. You gain proficiency in Wisdom saving throws.",
-      "descriptionDe": "Auf der 15. Stufe hast du große mentale Stärke erreicht. Du bist jetzt geübt in Weisheitsrettungswürfen.",
+      "descriptionEn": "Your cunning mind is exceptionally difficult to control. You gain proficiency in Wisdom and Charisma saving throws.",
+      "descriptionDe": "Dein gerissener Geist ist besonders schwer zu kontrollieren. Du bist geübt in Weisheits- und Charisma-Rettungswürfen.",
       "subclass": null
     },
     {
@@ -296,17 +288,17 @@
       "level": 16,
       "nameEn": "Ability Score Improvement",
       "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "descriptionEn": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify.",
+      "descriptionDe": "Du erhältst das Talent Attributswerterhöhung oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst.",
       "subclass": null
     },
     {
       "id": "roguish-archetype-improvement-3",
       "level": 17,
-      "nameEn": "Roguish Archetype feature",
-      "nameDe": "Merkmal des Schurkenarchetyps",
-      "descriptionEn": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level.",
-      "descriptionDe": "Du erhältst ein Merkmal deines Schurkenarchetyps.",
+      "nameEn": "Subclass Feature",
+      "nameDe": "Unterklassenmerkmal",
+      "descriptionEn": "You gain a feature from your Rogue subclass.",
+      "descriptionDe": "Du erhältst ein Merkmal deiner Schurken-Unterklasse.",
       "subclass": null
     },
     {
@@ -314,17 +306,17 @@
       "level": 18,
       "nameEn": "Elusive",
       "nameDe": "Schwer zu fassen",
-      "descriptionEn": "Beginning at 18th level, you are so evasive that attackers rarely gain the upper hand against you. No attack roll has advantage against you while you aren't incapacitated.",
-      "descriptionDe": "Beginnend mit der 18. Stufe hast du deine Fähigkeit auszuweichen so perfektioniert, dass Angreifer kaum die Oberhand über dich gewinnen. Kein Angriffswurf gegen dich ist im Vorteil, solange du nicht kampfunfähig bist.",
+      "descriptionEn": "You're so evasive that attackers rarely gain the upper hand against you. No attack roll can have Advantage against you unless you have the Incapacitated condition.",
+      "descriptionDe": "Du bist so schwer zu fassen, dass Angreifer selten die Oberhand gewinnen. Kein Angriffswurf gegen dich hat Vorteil, solange du nicht kampfunfähig bist.",
       "subclass": null
     },
     {
-      "id": "rogue-ability-score-improvement-6",
+      "id": "rogue-epic-boon",
       "level": 19,
-      "nameEn": "Ability Score Improvement",
-      "nameDe": "Attributswerterhöhung",
-      "descriptionEn": "When you reach 4th level, and again at 8th, 10th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. As normal, you can't increase an ability score above 20 using this feature.",
-      "descriptionDe": "Beim Erreichen der 4. Stufe und dann wieder auf der 8., 12., 16. und 19. Stufe kannst du einen Attributswert deiner Wahl um 2 Punkte erhöhen. Du kannst stattdessen auch zwei Attributswerte um jeweils 1 Punkt erhöhen. Kein Attribut darf auf diese Weise über einen Wert von 20 steigen.",
+      "nameEn": "Epic Boon",
+      "nameDe": "Epische Gabe",
+      "descriptionEn": "You gain an Epic Boon feat or another feat of your choice for which you qualify. Boon of the Night Spirit is recommended.",
+      "descriptionDe": "Du erhältst eine Epische Gabe oder ein anderes Talent deiner Wahl, für das du die Voraussetzungen erfüllst. Die Gabe des Nachtgeistes wird empfohlen.",
       "subclass": null
     },
     {
@@ -332,8 +324,8 @@
       "level": 20,
       "nameEn": "Stroke of Luck",
       "nameDe": "Glückstreffer",
-      "descriptionEn": "At 20th level, you have an uncanny knack for succeeding when you need to. If your attack misses a target within range, you can turn the miss into a hit. Alternatively, if you fail an ability check, you can treat the d20 roll as a 20.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
-      "descriptionDe": "Ab Stufe 20 besitzt du das unglaubliche Talent, immer dann Erfolg zu haben, wenn es nötig ist. Verfehlt dein Angriff ein Ziel innerhalb deiner Reichweite, kannst du den misslungenen Wurf in einen Treffer verwandeln. Alternativ kannst du auch einen fehlgeschlagenen Attributswurf so behandeln, als hättest du eine 20 gewürfelt.\n\nHast du diese Fähigkeit einmal eingesetzt, musst du eine kurze oder lange Rast beenden, bevor du sie erneut anwenden kannst.",
+      "descriptionEn": "You have a marvelous knack for succeeding when you need to. If you fail a D20 Test, you can turn the roll into a 20.\n\nOnce you use this feature, you can't use it again until you finish a Short or Long Rest.",
+      "descriptionDe": "Du hast das wunderbare Talent, genau dann Erfolg zu haben, wenn es nötig ist. Scheiterst du an einem W20-Test, kannst du das Ergebnis in eine 20 verwandeln.\n\nEinmal eingesetzt, kannst du dieses Merkmal erst nach einer kurzen oder langen Rast erneut nutzen.",
       "subclass": null
     },
     {
@@ -342,7 +334,7 @@
       "nameEn": "Fast Hands",
       "nameDe": "Flinke Finger",
       "descriptionEn": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
-      "descriptionDe": "Ab der 3. Stufe kannst du die Bonusaktion, die dir durch dein Merkmal @Compendium[dnd5e.classfeatures.01pcLg6PRu5zGrsb]{Raffinierte Aktion} zukommt, auch auf folgende Arten verwenden: um einen Wurf auf Geschicklichkeit (Fingerfertigkeit) abzulegen, dein Diebeswerkzeug einzusetzen, ein Schloss zu öffnen, eine Falle zu entschärfen oder die Aktion Objekt benutzen auszuführen.",
+      "descriptionDe": "Ab der 3. Stufe kannst du die Bonusaktion deiner Raffinierten Aktion auch nutzen, um einen Wurf auf Geschicklichkeit (Fingerfertigkeit) abzulegen, Diebeswerkzeug einzusetzen, ein Schloss zu öffnen, eine Falle zu entschärfen oder die Aktion Objekt benutzen auszuführen.",
       "subclass": "thief"
     },
     {
@@ -351,16 +343,16 @@
       "nameEn": "Second-Story Work",
       "nameDe": "Kletteraffe",
       "descriptionEn": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
-      "descriptionDe": "Mit der Wahl dieses Archetyps auf der 3. Stufe erhältst du die Fähigkeit, schneller als normal zu klettern. Klettern kostet dich ab sofort keine zusätzliche Bewegung mehr.\n\nAußerdem springst du aus dem Lauf 0,30 m pro Punkt deines Geschicklichkeitsmodifikators weiter als gewöhnlich.",
+      "descriptionDe": "Mit der Wahl dieses Archetyps auf der 3. Stufe kostet Klettern dich keine zusätzliche Bewegung mehr.\n\nAußerdem springst du aus dem Lauf 0,30 m pro Punkt deines Geschicklichkeitsmodifikators weiter als gewöhnlich.",
       "subclass": "thief"
     },
     {
       "id": "supreme-sneak",
       "level": 9,
       "nameEn": "Supreme Sneak",
-      "nameDe": "Ausserordentliches Schleichen",
+      "nameDe": "Außerordentliches Schleichen",
       "descriptionEn": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
-      "descriptionDe": "Angefangen mit der 9. Stufe bist du bei Würfen auf Geschicklichkeit (Heimlichkeit) im Vorteil, wenn du dich in diesem Zug nicht weiter als deine halbe Bewegungsrate fortbewegst.",
+      "descriptionDe": "Ab der 9. Stufe hast du bei Würfen auf Geschicklichkeit (Heimlichkeit) Vorteil, wenn du dich in diesem Zug nicht weiter als deine halbe Bewegungsrate fortbewegst.",
       "subclass": "thief"
     },
     {
@@ -369,7 +361,7 @@
       "nameEn": "Use Magic Device",
       "nameDe": "Magischen Gegenstand benutzen",
       "descriptionEn": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
-      "descriptionDe": "Ab der 13. Stufe hast du so viel über das Wesen der Magie gelernt, dass du beim Gebrauch von magischen Gegenständen improvisieren kannst. Du darfst jetzt sogar Gegenstände einsetzen, die nicht für dich gedacht sind. Ignoriere alle Anforderungen für Volk, Klasse und Stufe beim Benutzen von magischen Gegenständen.",
+      "descriptionDe": "Ab der 13. Stufe ignorierst du alle Anforderungen an Klasse, Volk und Stufe beim Benutzen magischer Gegenstände.",
       "subclass": "thief"
     },
     {
@@ -378,7 +370,7 @@
       "nameEn": "Thief's Reflexes",
       "nameDe": "Die Reflexe des Diebes",
       "descriptionEn": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
-      "descriptionDe": "Mit Erreichen von Stufe 17 bist du außerordentlich geschickt geworden im Legen von Hinterhalten und blitzschnell beim Vermeiden einer Gefahr. Im ersten Initiativedurchgang jedes Kampfes darfst du zwei Züge ausführen. Den ersten Zug spielst du regulär, wie es deine Initiative anzeigt, und den zweiten zu dem Zeitpunkt, wenn deine Initiative -10 an der Reihe wäre. Du kannst diese Fähigkeit nicht einsetzen, wenn du überrascht bist.",
+      "descriptionDe": "Ab Stufe 17 darfst du im ersten Initiativedurchgang jedes Kampfes zwei Züge ausführen. Den ersten Zug spielst du regulär, den zweiten bei Initiative −10. Nicht nutzbar, wenn du überrascht bist.",
       "subclass": "thief"
     },
     {
@@ -386,38 +378,36 @@
       "level": 3,
       "nameEn": "Spellcasting",
       "nameDe": "Zauberwirken",
-      "descriptionEn": "When you reach 3rd level, you gain the ability to cast spells. Intelligence is your spellcasting ability for your wizard spells.\n\nCantrips: You learn the Mage Hand cantrip and two other cantrips of your choice from the wizard spell list. Mage Hand doesn't count against the two cantrips you choose.\n\nSpell Slots & Spells Known: You are a third-caster. You know a number of wizard spells and have spell slots as shown on the Arcane Trickster Spellcasting table (same progression as Eldritch Knight).\n\nSpells of 1st level and higher must be from the Illusion or Enchantment schools, except that at 3rd, 8th, 14th, and 20th level you may learn one wizard spell of any school.",
-      "descriptionDe": "Ab der 3. Stufe kannst du Zauber wirken. Deine Zauberfähigkeit ist Intelligenz.\n\nZaubertricks: Du lernst den Zaubertrick Magierhand plus zwei weitere Zaubertricks deiner Wahl aus der Magier-Zauberliste.\n\nZauberplätze & bekannte Zauber: Du bist ein Drittel-Zauberer. Bekannte Zauber und Zauberplätze folgen der Tabelle des Arkanen Tricksers (wie beim Mystischen Ritter).\n\nSchulen: Neue Magierzauber müssen fast immer aus den Schulen Illusion oder Verzauberung stammen. Ausnahme: Auf den Stufen 3, 8, 14 und 20 darfst du jeweils einen Zauber aus einer beliebigen Magieschule wählen.",
+      "descriptionEn": "You have learned to cast spells. Intelligence is your Spellcasting ability for your Wizard spells. You can use an Arcane Focus as a Spellcasting Focus for these spells.\n\nCantrips. You know three cantrips: Mage Hand and two other Wizard cantrips of your choice (Mind Sliver and Minor Illusion recommended). Whenever you gain a Rogue level, you can replace one cantrip except Mage Hand. At Rogue level 10, you learn another Wizard cantrip.\n\nSpell Slots. The Arcane Trickster Spellcasting table shows your spell slots for level 1+ spells. You regain all expended slots when you finish a Long Rest.\n\nPrepared Spells of Level 1+. You prepare a list of Wizard spells of level 1+. To start, choose three level 1 Wizard spells (Charm Person, Disguise Self, and Fog Cloud recommended). The number of prepared spells increases as shown on the Arcane Trickster Spellcasting table. Whenever you gain a Rogue level, you can replace one prepared spell with another Wizard spell for which you have spell slots.\n\nUnlike the 2014 rules, these spells are not limited to the Illusion and Enchantment schools.",
+      "descriptionDe": "Du hast gelernt, Zauber zu wirken. Intelligenz ist deine Zauberfähigkeit für Magierzauber. Du kannst einen Arkanen Fokus als Zauberfokus verwenden.\n\nZaubertricks. Du kennst drei Zaubertricks: Magierhand und zwei weitere Magier-Zaubertricks deiner Wahl (Gedankensplitter und Kleine Illusion empfohlen). Bei jedem Schurkenstufenaufstieg kannst du einen Zaubertrick außer Magierhand ersetzen. Auf Schurkenstufe 10 lernst du einen weiteren Magier-Zaubertrick.\n\nZauberplätze. Die Tabelle Zauberwirken des Arkanen Tricksters zeigt deine Zauberplätze für Zauber Grad 1+. Nach einer langen Rast erhältst du alle verbrauchten Plätze zurück.\n\nVorbereitete Zauber Grad 1+. Du bereitest eine Liste von Magierzaubern Grad 1+ vor. Zu Beginn wählst du drei Magierzauber Grad 1 (Freundschaft erzwingen, Sich Verkleiden und Nebelwolke empfohlen). Die Anzahl steigt laut Tabelle. Bei jedem Schurkenstufenaufstieg kannst du einen vorbereiteten Zauber durch einen anderen Magierzauber ersetzen, für den du Plätze hast.\n\nIm Gegensatz zu den Regeln von 2014 sind diese Zauber nicht auf die Schulen Illusion und Verzauberung beschränkt.",
       "subclass": "arcane-trickster",
-      "grantedSpellIds": [
-        "mage-hand"
-      ]
+      "grantedSpellIds": ["mage-hand"]
     },
     {
       "id": "mage-hand-legerdemain",
       "level": 3,
       "nameEn": "Mage Hand Legerdemain",
       "nameDe": "Trickreiche Magierhand",
-      "descriptionEn": "Starting at 3rd level, when you cast Mage Hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:\n\n• You can stow one object the hand is holding in a container worn or carried by another creature.\n• You can retrieve an object in a container worn or carried by another creature.\n• You can use thieves' tools to pick locks and disarm traps at range.\n\nYou can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check.\n\nIn addition, you can use the bonus action granted by your Cunning Action to control the hand.",
-      "descriptionDe": "Ab der 3. Stufe kannst du beim Wirken von Magierhand die Hand unsichtbar machen. Zudem kannst du mit deiner Bonusaktion (über deine Raffinierte Aktion) folgende Diebesaktionen über die Hand ausführen:\n\n• Einen Gegenstand in einen Behälter stecken, den eine andere Kreatur trägt oder hält.\n• Einen Gegenstand aus einem Behälter einer anderen Kreatur stehlen.\n• Diebeswerkzeug benutzen, um Schlösser zu knacken oder Fallen zu entschärfen – aus sicherer Entfernung (bis zu 9 m).\n\nHeimlichkeit: Du kannst diese Aufgaben unbemerkt erledigen, wenn du einen Wurf auf Geschicklichkeit (Fingerfertigkeit) gegen die Weisheit (Wahrnehmung) der Kreatur gewinnst.",
+      "descriptionEn": "When you cast Mage Hand, you can cast it as a Bonus Action, and you can make the spectral hand Invisible. You can control the hand as a Bonus Action, and through it, you can make Dexterity (Sleight of Hand) checks.",
+      "descriptionDe": "Wenn du Magierhand wirkst, kannst du ihn als Bonusaktion wirken und die spektrale Hand unsichtbar machen. Du kannst die Hand als Bonusaktion steuern und damit Würfe auf Geschicklichkeit (Fingerfertigkeit) ablegen.",
       "subclass": "arcane-trickster"
     },
     {
       "id": "magical-ambusher",
       "level": 9,
-      "nameEn": "Magical Ambusher",
+      "nameEn": "Magical Ambush",
       "nameDe": "Magischer Hinterhalt",
-      "descriptionEn": "Starting at 9th level, if you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn.",
-      "descriptionDe": "Ab der 9. Stufe: Wenn du vor einer Kreatur versteckt bist, während du einen Zauber wirkst, der von ihr einen Rettungswurf verlangt, hat die Kreatur bei diesem Rettungswurf in diesem Zug Nachteil.",
+      "descriptionEn": "If you have the Invisible condition when you cast a spell on a creature, it has Disadvantage on any saving throw it makes against the spell on the same turn.",
+      "descriptionDe": "Hast du den Zustand Unsichtbar, wenn du einen Zauber auf eine Kreatur wirkst, hat sie bei jedem Rettungswurf gegen den Zauber in demselben Zug Nachteil.",
       "subclass": "arcane-trickster"
     },
     {
       "id": "versatile-trickster",
       "level": 13,
       "nameEn": "Versatile Trickster",
-      "nameDe": "Vielseitiger Trickser",
-      "descriptionEn": "At 13th level, you gain the ability to distract targets with your Mage Hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by your Mage Hand feature. Doing so gives you advantage on attack rolls against that creature until the end of the turn.",
-      "descriptionDe": "Ab der 13. Stufe kannst du als Bonusaktion eine Kreatur im Umkreis von 1,50 m um deine Magierhand bestimmen. Bis zum Ende deines aktuellen Zuges hast du bei allen Angriffswürfen gegen diese Kreatur Vorteil.",
+      "nameDe": "Vielseitiger Trickster",
+      "descriptionEn": "You gain the ability to distract targets with your Mage Hand. When you use the Trip option of your Cunning Strike on a creature, you can also use that option on another creature within 5 feet of the spectral hand.",
+      "descriptionDe": "Du kannst Ziele mit deiner Magierhand ablenken. Wenn du die Option Zu Fall bringen deines Raffinierten Schlags gegen eine Kreatur nutzt, kannst du dieselbe Option auch gegen eine weitere Kreatur innerhalb von 1,50 m um die spektrale Hand anwenden.",
       "subclass": "arcane-trickster"
     },
     {
@@ -425,8 +415,8 @@
       "level": 17,
       "nameEn": "Spell Thief",
       "nameDe": "Zauberdieb",
-      "descriptionEn": "At 17th level, you gain the ability to magically steal the knowledge of how to cast a spell from another spellcaster.\n\nImmediately after a creature casts a spell that targets you or includes you in its area of effect, you can use your reaction to force the creature to make a saving throw with its spellcasting ability modifier. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least 1st level and of a level you can cast. For the next 8 hours, you know the spell and can cast it using your spell slots. The creature can't cast that spell until the 8 hours have passed.\n\nOnce you successfully use this feature, you can't use it again until you finish a long rest.",
-      "descriptionDe": "Ab der 17. Stufe: Wenn eine Kreatur einen Zauber wirkt, der dich betrifft oder einschließt, kannst du deine Reaktion nutzen, um den Zauberer zu zwingen, einen Rettungswurf mit seinem Zauberattribut gegen deinen eigenen Zauberrettungswurf-SG zu machen.\n\nBei Erfolg des Diebstahls: Der Zauber hat für dich keinerlei Auswirkungen. Wenn der Zauber mindestens Grad 1 hat und von einem Grad ist, den du selbst wirken kannst, stiehlst du das Wissen über den Zauber. Für die nächsten 8 Stunden kennst du diesen Zauber und kannst ihn mit deinen eigenen Zauberplätzen wirken. Der ursprüngliche Zauberer verliert für diese 8 Stunden die Fähigkeit, diesen spezifischen Zauber zu wirken.\n\nSobald du diese Fähigkeit erfolgreich eingesetzt hast, kannst du sie erst nach einer langen Rast erneut nutzen.",
+      "descriptionEn": "Immediately after a creature casts a spell that targets you or includes you in its area of effect, you can take a Reaction to force the creature to make an Intelligence saving throw. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least level 1 and of a level you can cast (it doesn't need to be a Wizard spell). For the next 8 hours, you have the spell prepared. The creature can't cast it until 8 hours have passed.\n\nOnce you steal a spell with this feature, you can't use this feature again until you finish a Long Rest.",
+      "descriptionDe": "Unmittelbar nachdem eine Kreatur einen Zauber wirkt, der dich trifft oder dich in seinem Wirkungsbereich einschließt, kannst du als Reaktion die Kreatur zu einem Intelligenzrettungswurf zwingen (SG = dein Zauberrettungswurf-SG). Bei Misserfolg negierst du den Effekt des Zaubers gegen dich und stiehlst das Wissen über den Zauber, falls er mindestens Grad 1 hat und von einem Grad ist, den du wirken kannst (kein Magierzauber nötig). Für die nächsten 8 Stunden hast du den Zauber vorbereitet. Die Kreatur kann ihn 8 Stunden lang nicht wirken.\n\nNach einem erfolgreichen Diebstahl kannst du dieses Merkmal erst nach einer langen Rast erneut nutzen.",
       "subclass": "arcane-trickster"
     }
   ],
@@ -442,7 +432,7 @@
           "nameEn": "Fast Hands",
           "nameDe": "Flinke Finger",
           "descriptionEn": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
-          "descriptionDe": "Ab der 3. Stufe kannst du die Bonusaktion, die dir durch dein Merkmal @Compendium[dnd5e.classfeatures.01pcLg6PRu5zGrsb]{Raffinierte Aktion} zukommt, auch auf folgende Arten verwenden: um einen Wurf auf Geschicklichkeit (Fingerfertigkeit) abzulegen, dein Diebeswerkzeug einzusetzen, ein Schloss zu öffnen, eine Falle zu entschärfen oder die Aktion Objekt benutzen auszuführen.",
+          "descriptionDe": "Ab der 3. Stufe kannst du die Bonusaktion deiner Raffinierten Aktion auch nutzen, um einen Wurf auf Geschicklichkeit (Fingerfertigkeit) abzulegen, Diebeswerkzeug einzusetzen, ein Schloss zu öffnen, eine Falle zu entschärfen oder die Aktion Objekt benutzen auszuführen.",
           "subclass": "thief"
         },
         {
@@ -451,16 +441,16 @@
           "nameEn": "Second-Story Work",
           "nameDe": "Kletteraffe",
           "descriptionEn": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier.",
-          "descriptionDe": "Mit der Wahl dieses Archetyps auf der 3. Stufe erhältst du die Fähigkeit, schneller als normal zu klettern. Klettern kostet dich ab sofort keine zusätzliche Bewegung mehr.\n\nAußerdem springst du aus dem Lauf 0,30 m pro Punkt deines Geschicklichkeitsmodifikators weiter als gewöhnlich.",
+          "descriptionDe": "Mit der Wahl dieses Archetyps auf der 3. Stufe kostet Klettern dich keine zusätzliche Bewegung mehr.\n\nAußerdem springst du aus dem Lauf 0,30 m pro Punkt deines Geschicklichkeitsmodifikators weiter als gewöhnlich.",
           "subclass": "thief"
         },
         {
           "id": "supreme-sneak",
           "level": 9,
           "nameEn": "Supreme Sneak",
-          "nameDe": "Ausserordentliches Schleichen",
+          "nameDe": "Außerordentliches Schleichen",
           "descriptionEn": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn.",
-          "descriptionDe": "Angefangen mit der 9. Stufe bist du bei Würfen auf Geschicklichkeit (Heimlichkeit) im Vorteil, wenn du dich in diesem Zug nicht weiter als deine halbe Bewegungsrate fortbewegst.",
+          "descriptionDe": "Ab der 9. Stufe hast du bei Würfen auf Geschicklichkeit (Heimlichkeit) Vorteil, wenn du dich in diesem Zug nicht weiter als deine halbe Bewegungsrate fortbewegst.",
           "subclass": "thief"
         },
         {
@@ -469,7 +459,7 @@
           "nameEn": "Use Magic Device",
           "nameDe": "Magischen Gegenstand benutzen",
           "descriptionEn": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
-          "descriptionDe": "Ab der 13. Stufe hast du so viel über das Wesen der Magie gelernt, dass du beim Gebrauch von magischen Gegenständen improvisieren kannst. Du darfst jetzt sogar Gegenstände einsetzen, die nicht für dich gedacht sind. Ignoriere alle Anforderungen für Volk, Klasse und Stufe beim Benutzen von magischen Gegenständen.",
+          "descriptionDe": "Ab der 13. Stufe ignorierst du alle Anforderungen an Klasse, Volk und Stufe beim Benutzen magischer Gegenstände.",
           "subclass": "thief"
         },
         {
@@ -478,7 +468,7 @@
           "nameEn": "Thief's Reflexes",
           "nameDe": "Die Reflexe des Diebes",
           "descriptionEn": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
-          "descriptionDe": "Mit Erreichen von Stufe 17 bist du außerordentlich geschickt geworden im Legen von Hinterhalten und blitzschnell beim Vermeiden einer Gefahr. Im ersten Initiativedurchgang jedes Kampfes darfst du zwei Züge ausführen. Den ersten Zug spielst du regulär, wie es deine Initiative anzeigt, und den zweiten zu dem Zeitpunkt, wenn deine Initiative -10 an der Reihe wäre. Du kannst diese Fähigkeit nicht einsetzen, wenn du überrascht bist.",
+          "descriptionDe": "Ab Stufe 17 darfst du im ersten Initiativedurchgang jedes Kampfes zwei Züge ausführen. Den ersten Zug spielst du regulär, den zweiten bei Initiative −10. Nicht nutzbar, wenn du überrascht bist.",
           "subclass": "thief"
         }
       ]
@@ -486,45 +476,43 @@
     {
       "id": "arcane-trickster",
       "nameEn": "Arcane Trickster",
-      "nameDe": "Arkaner Trickser",
+      "nameDe": "Arkaner Trickster",
       "features": [
         {
           "id": "spellcasting-arcane-trickster",
           "level": 3,
           "nameEn": "Spellcasting",
           "nameDe": "Zauberwirken",
-          "descriptionEn": "When you reach 3rd level, you gain the ability to cast spells. Intelligence is your spellcasting ability for your wizard spells.\n\nCantrips: You learn the Mage Hand cantrip and two other cantrips of your choice from the wizard spell list. Mage Hand doesn't count against the two cantrips you choose.\n\nSpell Slots & Spells Known: You are a third-caster. You know a number of wizard spells and have spell slots as shown on the Arcane Trickster Spellcasting table (same progression as Eldritch Knight).\n\nSpells of 1st level and higher must be from the Illusion or Enchantment schools, except that at 3rd, 8th, 14th, and 20th level you may learn one wizard spell of any school.",
-          "descriptionDe": "Ab der 3. Stufe kannst du Zauber wirken. Deine Zauberfähigkeit ist Intelligenz.\n\nZaubertricks: Du lernst den Zaubertrick Magierhand plus zwei weitere Zaubertricks deiner Wahl aus der Magier-Zauberliste.\n\nZauberplätze & bekannte Zauber: Du bist ein Drittel-Zauberer. Bekannte Zauber und Zauberplätze folgen der Tabelle des Arkanen Tricksers (wie beim Mystischen Ritter).\n\nSchulen: Neue Magierzauber müssen fast immer aus den Schulen Illusion oder Verzauberung stammen. Ausnahme: Auf den Stufen 3, 8, 14 und 20 darfst du jeweils einen Zauber aus einer beliebigen Magieschule wählen.",
+          "descriptionEn": "You have learned to cast spells. Intelligence is your Spellcasting ability for your Wizard spells. You can use an Arcane Focus as a Spellcasting Focus for these spells.\n\nCantrips. You know three cantrips: Mage Hand and two other Wizard cantrips of your choice (Mind Sliver and Minor Illusion recommended). Whenever you gain a Rogue level, you can replace one cantrip except Mage Hand. At Rogue level 10, you learn another Wizard cantrip.\n\nSpell Slots. The Arcane Trickster Spellcasting table shows your spell slots for level 1+ spells. You regain all expended slots when you finish a Long Rest.\n\nPrepared Spells of Level 1+. You prepare a list of Wizard spells of level 1+. To start, choose three level 1 Wizard spells (Charm Person, Disguise Self, and Fog Cloud recommended). The number of prepared spells increases as shown on the Arcane Trickster Spellcasting table. Whenever you gain a Rogue level, you can replace one prepared spell with another Wizard spell for which you have spell slots.\n\nUnlike the 2014 rules, these spells are not limited to the Illusion and Enchantment schools.",
+          "descriptionDe": "Du hast gelernt, Zauber zu wirken. Intelligenz ist deine Zauberfähigkeit für Magierzauber. Du kannst einen Arkanen Fokus als Zauberfokus verwenden.\n\nZaubertricks. Du kennst drei Zaubertricks: Magierhand und zwei weitere Magier-Zaubertricks deiner Wahl (Gedankensplitter und Kleine Illusion empfohlen). Bei jedem Schurkenstufenaufstieg kannst du einen Zaubertrick außer Magierhand ersetzen. Auf Schurkenstufe 10 lernst du einen weiteren Magier-Zaubertrick.\n\nZauberplätze. Die Tabelle Zauberwirken des Arkanen Tricksters zeigt deine Zauberplätze für Zauber Grad 1+. Nach einer langen Rast erhältst du alle verbrauchten Plätze zurück.\n\nVorbereitete Zauber Grad 1+. Du bereitest eine Liste von Magierzaubern Grad 1+ vor. Zu Beginn wählst du drei Magierzauber Grad 1 (Freundschaft erzwingen, Sich Verkleiden und Nebelwolke empfohlen). Die Anzahl steigt laut Tabelle. Bei jedem Schurkenstufenaufstieg kannst du einen vorbereiteten Zauber durch einen anderen Magierzauber ersetzen, für den du Plätze hast.\n\nIm Gegensatz zu den Regeln von 2014 sind diese Zauber nicht auf die Schulen Illusion und Verzauberung beschränkt.",
           "subclass": "arcane-trickster",
-          "grantedSpellIds": [
-            "mage-hand"
-          ]
+          "grantedSpellIds": ["mage-hand"]
         },
         {
           "id": "mage-hand-legerdemain",
           "level": 3,
           "nameEn": "Mage Hand Legerdemain",
           "nameDe": "Trickreiche Magierhand",
-          "descriptionEn": "Starting at 3rd level, when you cast Mage Hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:\n\n• You can stow one object the hand is holding in a container worn or carried by another creature.\n• You can retrieve an object in a container worn or carried by another creature.\n• You can use thieves' tools to pick locks and disarm traps at range.\n\nYou can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check.\n\nIn addition, you can use the bonus action granted by your Cunning Action to control the hand.",
-          "descriptionDe": "Ab der 3. Stufe kannst du beim Wirken von Magierhand die Hand unsichtbar machen. Zudem kannst du mit deiner Bonusaktion (über deine Raffinierte Aktion) folgende Diebesaktionen über die Hand ausführen:\n\n• Einen Gegenstand in einen Behälter stecken, den eine andere Kreatur trägt oder hält.\n• Einen Gegenstand aus einem Behälter einer anderen Kreatur stehlen.\n• Diebeswerkzeug benutzen, um Schlösser zu knacken oder Fallen zu entschärfen – aus sicherer Entfernung (bis zu 9 m).\n\nHeimlichkeit: Du kannst diese Aufgaben unbemerkt erledigen, wenn du einen Wurf auf Geschicklichkeit (Fingerfertigkeit) gegen die Weisheit (Wahrnehmung) der Kreatur gewinnst.",
+          "descriptionEn": "When you cast Mage Hand, you can cast it as a Bonus Action, and you can make the spectral hand Invisible. You can control the hand as a Bonus Action, and through it, you can make Dexterity (Sleight of Hand) checks.",
+          "descriptionDe": "Wenn du Magierhand wirkst, kannst du ihn als Bonusaktion wirken und die spektrale Hand unsichtbar machen. Du kannst die Hand als Bonusaktion steuern und damit Würfe auf Geschicklichkeit (Fingerfertigkeit) ablegen.",
           "subclass": "arcane-trickster"
         },
         {
           "id": "magical-ambusher",
           "level": 9,
-          "nameEn": "Magical Ambusher",
+          "nameEn": "Magical Ambush",
           "nameDe": "Magischer Hinterhalt",
-          "descriptionEn": "Starting at 9th level, if you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn.",
-          "descriptionDe": "Ab der 9. Stufe: Wenn du vor einer Kreatur versteckt bist, während du einen Zauber wirkst, der von ihr einen Rettungswurf verlangt, hat die Kreatur bei diesem Rettungswurf in diesem Zug Nachteil.",
+          "descriptionEn": "If you have the Invisible condition when you cast a spell on a creature, it has Disadvantage on any saving throw it makes against the spell on the same turn.",
+          "descriptionDe": "Hast du den Zustand Unsichtbar, wenn du einen Zauber auf eine Kreatur wirkst, hat sie bei jedem Rettungswurf gegen den Zauber in demselben Zug Nachteil.",
           "subclass": "arcane-trickster"
         },
         {
           "id": "versatile-trickster",
           "level": 13,
           "nameEn": "Versatile Trickster",
-          "nameDe": "Vielseitiger Trickser",
-          "descriptionEn": "At 13th level, you gain the ability to distract targets with your Mage Hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by your Mage Hand feature. Doing so gives you advantage on attack rolls against that creature until the end of the turn.",
-          "descriptionDe": "Ab der 13. Stufe kannst du als Bonusaktion eine Kreatur im Umkreis von 1,50 m um deine Magierhand bestimmen. Bis zum Ende deines aktuellen Zuges hast du bei allen Angriffswürfen gegen diese Kreatur Vorteil.",
+          "nameDe": "Vielseitiger Trickster",
+          "descriptionEn": "You gain the ability to distract targets with your Mage Hand. When you use the Trip option of your Cunning Strike on a creature, you can also use that option on another creature within 5 feet of the spectral hand.",
+          "descriptionDe": "Du kannst Ziele mit deiner Magierhand ablenken. Wenn du die Option Zu Fall bringen deines Raffinierten Schlags gegen eine Kreatur nutzt, kannst du dieselbe Option auch gegen eine weitere Kreatur innerhalb von 1,50 m um die spektrale Hand anwenden.",
           "subclass": "arcane-trickster"
         },
         {
@@ -532,8 +520,8 @@
           "level": 17,
           "nameEn": "Spell Thief",
           "nameDe": "Zauberdieb",
-          "descriptionEn": "At 17th level, you gain the ability to magically steal the knowledge of how to cast a spell from another spellcaster.\n\nImmediately after a creature casts a spell that targets you or includes you in its area of effect, you can use your reaction to force the creature to make a saving throw with its spellcasting ability modifier. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least 1st level and of a level you can cast. For the next 8 hours, you know the spell and can cast it using your spell slots. The creature can't cast that spell until the 8 hours have passed.\n\nOnce you successfully use this feature, you can't use it again until you finish a long rest.",
-          "descriptionDe": "Ab der 17. Stufe: Wenn eine Kreatur einen Zauber wirkt, der dich betrifft oder einschließt, kannst du deine Reaktion nutzen, um den Zauberer zu zwingen, einen Rettungswurf mit seinem Zauberattribut gegen deinen eigenen Zauberrettungswurf-SG zu machen.\n\nBei Erfolg des Diebstahls: Der Zauber hat für dich keinerlei Auswirkungen. Wenn der Zauber mindestens Grad 1 hat und von einem Grad ist, den du selbst wirken kannst, stiehlst du das Wissen über den Zauber. Für die nächsten 8 Stunden kennst du diesen Zauber und kannst ihn mit deinen eigenen Zauberplätzen wirken. Der ursprüngliche Zauberer verliert für diese 8 Stunden die Fähigkeit, diesen spezifischen Zauber zu wirken.\n\nSobald du diese Fähigkeit erfolgreich eingesetzt hast, kannst du sie erst nach einer langen Rast erneut nutzen.",
+          "descriptionEn": "Immediately after a creature casts a spell that targets you or includes you in its area of effect, you can take a Reaction to force the creature to make an Intelligence saving throw. The DC equals your spell save DC. On a failed save, you negate the spell's effect against you, and you steal the knowledge of the spell if it is at least level 1 and of a level you can cast (it doesn't need to be a Wizard spell). For the next 8 hours, you have the spell prepared. The creature can't cast it until 8 hours have passed.\n\nOnce you steal a spell with this feature, you can't use this feature again until you finish a Long Rest.",
+          "descriptionDe": "Unmittelbar nachdem eine Kreatur einen Zauber wirkt, der dich trifft oder dich in seinem Wirkungsbereich einschließt, kannst du als Reaktion die Kreatur zu einem Intelligenzrettungswurf zwingen (SG = dein Zauberrettungswurf-SG). Bei Misserfolg negierst du den Effekt des Zaubers gegen dich und stiehlst das Wissen über den Zauber, falls er mindestens Grad 1 hat und von einem Grad ist, den du wirken kannst (kein Magierzauber nötig). Für die nächsten 8 Stunden hast du den Zauber vorbereitet. Die Kreatur kann ihn 8 Stunden lang nicht wirken.\n\nNach einem erfolgreichen Diebstahl kannst du dieses Merkmal erst nach einer langen Rast erneut nutzen.",
           "subclass": "arcane-trickster"
         }
       ]

@@ -18,6 +18,7 @@ import {
 import { getPointsLog } from "@/src/lib/queries/point-queries";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
 import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
+import { PlayerDashboardPreviewBanner } from "@/src/components/dashboard/PlayerDashboardPreviewBanner";
 import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
 
 type UserProfile = {
@@ -48,13 +49,19 @@ type UserProfile = {
   player_dashboard_tutorial_dismissed?: boolean | null;
 };
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams: Promise<{ view?: string }>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return null;
+
+  const { view: viewParam } = await searchParams;
 
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select("*")
@@ -64,6 +71,7 @@ export default async function DashboardPage() {
   const profile = profileRaw as unknown as UserProfile | null;
   const isGM =
     profile?.primary_role === "GameMaster" || profile?.primary_role === "Admin";
+  const forcePlayerView = isGM && viewParam === "player";
 
   const totalPoints = Number(profile?.total_points) || 0;
   const lifetimePoints = Number(profile?.lifetime_points) || 0;
@@ -74,7 +82,7 @@ export default async function DashboardPage() {
     icon?: string | null;
   }[] = [];
 
-  if (!isGM) {
+  if (!isGM || forcePlayerView) {
     const playerData = await loadPlayerDashboardData(user.id);
     const achievementMode = profile?.profile_achievement_mode ?? "newest";
     const favAchievementId = profile?.selected_achievement_id ?? null;
@@ -110,6 +118,7 @@ export default async function DashboardPage() {
     };
     return (
       <div className="space-y-8">
+        {forcePlayerView ? <PlayerDashboardPreviewBanner /> : null}
         <DashboardClient
           profileHeader={profileHeader}
           dashboardLayout={
@@ -145,6 +154,7 @@ export default async function DashboardPage() {
           openCampaignsParticipantIds={playerData.openCampaignsParticipantIds}
           activePolls={playerData.activePolls}
           playerDashboardTutorialDismissed={
+            forcePlayerView ||
             !!profile?.player_dashboard_tutorial_dismissed
           }
         />

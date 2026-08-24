@@ -447,10 +447,11 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           sheet_data: sheetData,
         });
         if (mode === "page") {
-          router.push(`/dashboard/campaigns/${campaignId}`);
+          // Direkt zum Charakterblatt — volle Pflege ohne weiteren Gate
+          router.push(`/dashboard/campaigns/${campaignId}?tab=character`);
         } else {
           onClose();
-          window.location.reload();
+          window.location.href = `/dashboard/campaigns/${campaignId}?tab=character`;
         }
       } catch (error: any) {
         alert(error.message || "Fehler beim Erstellen des Charakters.");

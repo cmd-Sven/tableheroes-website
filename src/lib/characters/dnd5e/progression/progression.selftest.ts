@@ -20,6 +20,12 @@ import {
 import { applySubclassChange } from "./apply-subclass-change";
 import { applyClassChange } from "./apply-class-change";
 import { getBackgrounds } from "./catalog";
+import {
+  localizedFeatureDescription,
+  localizedFeatureName,
+} from "../spellcasting";
+import type { Dnd5eFeatureEntry } from "../types";
+import type { ProgressionFeature } from "./types";
 
 function run() {
   assert.deepEqual(asiLevelsForClass("wizard"), [4, 8, 12, 16, 19]);
@@ -186,6 +192,18 @@ function run() {
     assert.ok(c.asiLevels.length > 0, c.id);
   }
 
+  const l1Rogue = planLevel1Creation({ classId: "rogue" });
+  assert.equal(l1Rogue.needsSubclass, false, "Rogue subclass at 3 (2024)");
+  assert.ok(l1Rogue.subclassOptions.some((s) => s.id === "arcane-trickster"));
+  assert.ok(l1Rogue.classFeatures.some((f) => f.id === "rogue-weapon-mastery"));
+  const l1Wiz = planLevel1Creation({ classId: "wizard" });
+  assert.equal(l1Wiz.needsSubclass, false, "Wizard tradition at 3 (2024)");
+  assert.ok(l1Wiz.subclassOptions.some((s) => s.id === "evocation"));
+  assert.ok(l1Wiz.classFeatures.some((f) => f.id === "ritual-adept"));
+  const l1Barb = planLevel1Creation({ classId: "barbarian" });
+  assert.equal(l1Barb.needsSubclass, false, "Barbarian path at 3 (2024)");
+  assert.ok(l1Barb.subclassOptions.some((s) => s.id === "berserker"));
+
   // --- Level 1 creation ---
   const l1Cleric = planLevel1Creation({ classId: "cleric" });
   assert.equal(l1Cleric.needsSubclass, false);
@@ -213,6 +231,20 @@ function run() {
     wis: STANDARD_ARRAY[4],
     cha: STANDARD_ARRAY[5],
   };
+  const barbBuilt = buildLevel1Sheet({
+    classId: "barbarian",
+    subclassId: null,
+    raceName: "Mensch",
+    raceId: "human",
+    baseAbilities: base,
+    applyRacialBonuses: false,
+    spellIds: [],
+    skillKeys: [],
+  });
+  assert.equal(barbBuilt.meta.subclass, null);
+  assert.ok(barbBuilt.sheet.features.some((f) => f.id === "barbarian-weapon-mastery"));
+  assert.ok(barbBuilt.sheet.features.some((f) => f.id === "rage"));
+
   const built = buildLevel1Sheet({
     classId: "cleric" as ClassId,
     subclassId: null,
@@ -309,6 +341,27 @@ function run() {
   assert.ok(atFeatures13.some((f) => f.id === "versatile-trickster"));
   const atFeatures17 = featuresForLevel("rogue", 17, "arcane-trickster");
   assert.ok(atFeatures17.some((f) => f.id === "spell-thief"));
+
+  // Rogue 2024 base progression
+  const rogueL1 = featuresForLevel("rogue", 1, null);
+  assert.ok(rogueL1.some((f) => f.id === "rogue-weapon-mastery"));
+  assert.ok(rogueL1.some((f) => f.id === "thieves-cant"));
+  const rogueL3Base = featuresForLevel("rogue", 3, null);
+  assert.ok(rogueL3Base.some((f) => f.id === "steady-aim"));
+  const rogueL5 = featuresForLevel("rogue", 5, null);
+  assert.ok(rogueL5.some((f) => f.id === "cunning-strike"));
+  assert.ok(rogueL5.some((f) => f.id === "uncanny-dodge"));
+  const rogueL7 = featuresForLevel("rogue", 7, null);
+  assert.ok(rogueL7.some((f) => f.id === "reliable-talent"));
+  assert.ok(rogueL7.some((f) => f.id === "rogue-evasion"));
+  const rogueL11 = featuresForLevel("rogue", 11, null);
+  assert.ok(rogueL11.some((f) => f.id === "improved-cunning-strike"));
+  assert.ok(!rogueL11.some((f) => f.id === "reliable-talent"));
+  const rogueL14 = featuresForLevel("rogue", 14, null);
+  assert.ok(rogueL14.some((f) => f.id === "devious-strikes"));
+  assert.ok(!rogueL14.some((f) => f.id === "blindsense"));
+  const rogueL19 = featuresForLevel("rogue", 19, null);
+  assert.ok(rogueL19.some((f) => f.id === "rogue-epic-boon"));
 
   const rogueTo3 = planLevelUp({
     className: "Schurke",
@@ -457,6 +510,57 @@ function run() {
   assert.ok(clericAvail.entries.some((e) => e.id === "life" && e.inSystem));
   assert.ok(clericAvail.entries.some((e) => e.id === "grave" && e.inSystem));
   assert.ok(clericAvail.entries.some((e) => e.id === "light" && !e.inSystem));
+  const wizardAvail = getSubclassAvailability("wizard")!;
+  assert.ok(wizardAvail.entries.some((e) => e.id === "evocation" && e.inSystem));
+  assert.ok(wizardAvail.entries.some((e) => e.id === "illusion" && !e.inSystem));
+  const barbAvail = getSubclassAvailability("barbarian")!;
+  assert.ok(barbAvail.entries.some((e) => e.id === "berserker" && e.inSystem));
+  assert.ok(barbAvail.entries.some((e) => e.id === "zealot" && !e.inSystem));
+
+  // Wizard 2024 base + Evocation
+  const wizL1 = featuresForLevel("wizard", 1, null);
+  assert.ok(wizL1.some((f) => f.id === "ritual-adept"));
+  assert.ok(wizL1.some((f) => f.id === "arcane-recovery"));
+  const wizL2 = featuresForLevel("wizard", 2, null);
+  assert.ok(wizL2.some((f) => f.id === "wizard-scholar"));
+  const wizL5 = featuresForLevel("wizard", 5, null);
+  assert.ok(wizL5.some((f) => f.id === "memorize-spell"));
+  const wizEv3 = featuresForLevel("wizard", 3, "evocation");
+  assert.ok(wizEv3.some((f) => f.id === "evocation-savant"));
+  assert.ok(wizEv3.some((f) => f.id === "potent-cantrip"));
+  const wizEv6 = featuresForLevel("wizard", 6, "evocation");
+  assert.ok(wizEv6.some((f) => f.id === "sculpt-spells"));
+  assert.ok(!featuresForLevel("wizard", 2, "evocation").some((f) => f.id === "sculpt-spells"));
+  const wizL19 = featuresForLevel("wizard", 19, null);
+  assert.ok(wizL19.some((f) => f.id === "wizard-epic-boon"));
+
+  // Barbarian 2024 base + Berserker
+  const barbL1 = featuresForLevel("barbarian", 1, null);
+  assert.ok(barbL1.some((f) => f.id === "barbarian-weapon-mastery"));
+  assert.ok(barbL1.some((f) => f.id === "rage"));
+  const barbL3 = featuresForLevel("barbarian", 3, null);
+  assert.ok(barbL3.some((f) => f.id === "primal-knowledge"));
+  const barbL7 = featuresForLevel("barbarian", 7, null);
+  assert.ok(barbL7.some((f) => f.id === "instinctive-pounce"));
+  const barbL9 = featuresForLevel("barbarian", 9, null);
+  assert.ok(barbL9.some((f) => f.id === "brutal-strike"));
+  assert.ok(!barbL9.some((f) => /brutal-critical/i.test(f.id)));
+  const berserk3 = featuresForLevel("barbarian", 3, "berserker");
+  assert.ok(berserk3.some((f) => f.id === "frenzy"));
+  const berserk10 = featuresForLevel("barbarian", 10, "berserker");
+  assert.ok(berserk10.some((f) => f.id === "retaliation"));
+  const berserk14 = featuresForLevel("barbarian", 14, "berserker");
+  assert.ok(berserk14.some((f) => f.id === "intimidating-presence"));
+  const barbTo3 = planLevelUp({
+    className: "Barbar",
+    subclass: null,
+    raceName: "Mensch",
+    fromLevel: 2,
+    sheet: createEmptyDnd5eSheet(2),
+    subclassOverride: "berserker",
+  });
+  assert.equal(barbTo3.needsSubclass, true);
+  assert.ok(barbTo3.features.some((f) => f.id === "frenzy"));
 
   // --- Background apply / remove / replace ---
   assert.ok(getBackgrounds().length >= 13, "PHB-style backgrounds catalog");
@@ -601,6 +705,77 @@ function run() {
   assert.equal(toFighter.sheet.savingThrows.con?.proficient, true);
   assert.equal(toFighter.sheet.savingThrows.int?.proficient, false);
   assert.match(toFighter.sheet.combat.hitDice, /d10/i);
+
+  // --- Localization: 2024 Rogue / Wizard / Barbarian bilingual catalog ---
+  function assertLocalizedFeature(f: ProgressionFeature, ctx: string) {
+    assert.ok(f.nameDe?.trim(), `${ctx} ${f.id}: missing nameDe`);
+    assert.ok(f.nameEn?.trim(), `${ctx} ${f.id}: missing nameEn`);
+    if (f.descriptionEn?.trim() || f.descriptionDe?.trim()) {
+      assert.ok(f.descriptionDe?.trim(), `${ctx} ${f.id}: missing descriptionDe`);
+      assert.notEqual(
+        f.descriptionDe!.trim(),
+        f.descriptionEn!.trim(),
+        `${ctx} ${f.id}: descriptionDe must not be an English copy`,
+      );
+    }
+  }
+
+  function toSheetFeature(f: ProgressionFeature): Dnd5eFeatureEntry {
+    return {
+      id: f.id,
+      name: f.nameDe || f.nameEn,
+      nameDe: f.nameDe,
+      nameEn: f.nameEn,
+      description: f.descriptionDe || f.descriptionEn || null,
+      descriptionDe: f.descriptionDe ?? null,
+      descriptionEn: f.descriptionEn ?? null,
+      source: "level-up",
+    };
+  }
+
+  for (const classId of ["rogue", "wizard", "barbarian"] as const) {
+    const prog = getClassProgression(classId)!;
+    assert.ok(prog.nameDe && prog.nameDe !== prog.nameEn, `${classId} class nameDe`);
+    for (const f of prog.features) assertLocalizedFeature(f, classId);
+    for (const sub of prog.subclasses ?? []) {
+      assert.ok(sub.nameDe?.trim(), `${classId}/${sub.id}: subclass nameDe`);
+      for (const f of sub.features) assertLocalizedFeature(f, `${classId}/${sub.id}`);
+    }
+  }
+
+  const mageHandFeat = toSheetFeature(
+    featuresForLevel("rogue", 3, "arcane-trickster").find(
+      (f) => f.id === "mage-hand-legerdemain",
+    )!,
+  );
+  assert.equal(localizedFeatureName(mageHandFeat, "de"), "Trickreiche Magierhand");
+  assert.equal(localizedFeatureName(mageHandFeat, "en"), "Mage Hand Legerdemain");
+  assert.ok((localizedFeatureDescription(mageHandFeat, "de") ?? "").includes("Magierhand"));
+  assert.ok(
+    (localizedFeatureDescription(mageHandFeat, "en") ?? "").toLowerCase().includes("mage hand"),
+  );
+
+  const evocationSavant = toSheetFeature(
+    featuresForLevel("wizard", 3, "evocation").find((f) => f.id === "evocation-savant")!,
+  );
+  assert.match(localizedFeatureName(evocationSavant, "de"), /Hervorrufung/i);
+  assert.match(localizedFeatureName(evocationSavant, "en"), /Evocation/i);
+
+  const frenzy = toSheetFeature(
+    featuresForLevel("barbarian", 3, "berserker").find((f) => f.id === "frenzy")!,
+  );
+  assert.equal(localizedFeatureName(frenzy, "de"), "Raserei");
+  assert.equal(localizedFeatureName(frenzy, "en"), "Frenzy");
+
+  // Applied sheets keep bilingual fields for the locale switch
+  assert.ok(atApplied.sheet.features.some((f) => f.id === "mage-hand-legerdemain" && f.nameDe && f.nameEn));
+  assert.equal(
+    localizedFeatureName(
+      atApplied.sheet.features.find((f) => f.id === "mage-hand-legerdemain")!,
+      "de",
+    ),
+    "Trickreiche Magierhand",
+  );
 
   console.log("progression.selftest: OK");
 }

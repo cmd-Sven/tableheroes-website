@@ -42,6 +42,7 @@ import {
   PawPrint,
   Scale,
   Globe2,
+  Eye,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -80,6 +81,8 @@ export function Sidebar({
   const [worldHasBlueprint, setWorldHasBlueprint] = useState<boolean | null>(null);
   /** Spieler ohne Charakter: Sessions-Link nicht nutzbar (GM der Kampagne ausgenommen). */
   const [sessionsNavLocked, setSessionsNavLocked] = useState<boolean | null>(null);
+  /** Spieler mit Charakter in dieser Kampagne: Nav „Mein Charakter“ anzeigen. */
+  const [hasCampaignCharacter, setHasCampaignCharacter] = useState(false);
   /** Anzeigename der aktuellen Kampagne (Pfad /dashboard/campaigns/[id]/…) */
   const [campaignScopeName, setCampaignScopeName] = useState<string | null>(null);
   const pathname = usePathname();
@@ -130,6 +133,7 @@ export function Sidebar({
     const uid = user?.id;
     if (!campaignId || !uid) {
       setSessionsNavLocked(null);
+      setHasCampaignCharacter(false);
       return;
     }
     const supabase = createBrowserSupabaseClient();
@@ -143,6 +147,7 @@ export function Sidebar({
       if (cancelled) return;
       if ((camp as { gm_id?: string } | null)?.gm_id === uid) {
         setSessionsNavLocked(false);
+        setHasCampaignCharacter(false);
         return;
       }
       const { data: m } = await supabase
@@ -161,9 +166,15 @@ export function Sidebar({
           .maybeSingle();
         hasChar = !!ch;
       }
-      if (!cancelled) setSessionsNavLocked(!hasChar);
+      if (!cancelled) {
+        setSessionsNavLocked(!hasChar);
+        setHasCampaignCharacter(hasChar);
+      }
     })().catch(() => {
-      if (!cancelled) setSessionsNavLocked(false);
+      if (!cancelled) {
+        setSessionsNavLocked(false);
+        setHasCampaignCharacter(false);
+      }
     });
     return () => {
       cancelled = true;
@@ -271,6 +282,15 @@ export function Sidebar({
   // Mode A: General Dashboard Navigation (Default)
   const generalNav = [
     { href: "/dashboard", label: "Mein Dashboard", icon: Home },
+    ...(role === "GameMaster" || role === "Admin"
+      ? [
+          {
+            href: "/dashboard?view=player",
+            label: "Spieler-Ansicht testen",
+            icon: Eye,
+          },
+        ]
+      : []),
     { href: "/dashboard/my-campaigns", label: "Meine Kampagnen", icon: Map },
     { href: "/dashboard/sessions", label: "Termine", icon: Calendar },
     ...(role === "GameMaster" || role === "Admin"
@@ -358,6 +378,16 @@ export function Sidebar({
           icon: Home,
           tab: "overview",
         },
+        ...(hasCampaignCharacter
+          ? [
+              {
+                href: `/dashboard/campaigns/${campaignId}?tab=character`,
+                label: "Mein Charakter",
+                icon: User,
+                tab: "character",
+              },
+            ]
+          : []),
         {
           href: `/dashboard/campaigns/${campaignId}?tab=sessions`,
           label: "Sessions",
@@ -696,16 +726,30 @@ export function Sidebar({
                     Navigation
                   </p>
                 )}
-                {generalNav.map((item) => (
-                  <NavItem
-                    key={item.href}
-                    href={item.href}
-                    label={item.label}
-                    icon={item.icon}
-                    isActive={pathname === item.href}
-                    badge={"badge" in item && typeof item.badge === "number" ? item.badge : undefined}
-                  />
-                ))}
+                {generalNav.map((item) => {
+                  const viewParam = searchParams.get("view");
+                  const isPlayerPreviewLink = item.href.includes("view=player");
+                  const active =
+                    item.href === "/dashboard"
+                      ? pathname === "/dashboard" && viewParam !== "player"
+                      : isPlayerPreviewLink
+                        ? pathname === "/dashboard" && viewParam === "player"
+                        : pathname === item.href;
+                  return (
+                    <NavItem
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      icon={item.icon}
+                      isActive={active}
+                      badge={
+                        "badge" in item && typeof item.badge === "number"
+                          ? item.badge
+                          : undefined
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
 
