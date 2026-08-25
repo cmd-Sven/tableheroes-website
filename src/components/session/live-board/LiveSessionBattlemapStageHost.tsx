@@ -3,7 +3,8 @@
  */
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { createClient } from "@/src/lib/supabase/client";
 import { toast } from "sonner";
 import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
 import {
@@ -103,6 +104,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
   const [drawStrokes, setDrawStrokes] = useState<SessionMapDrawStroke[]>([]);
   const [, localStart] = useTransition();
   const [playerMoveMaxCells, setPlayerMoveMaxCells] = useState<number | null>(null);
+  const supabase = useRef(createClient()).current;
 
   useEffect(() => {
     if (!currentPlayerCharacterId) {
@@ -143,6 +145,30 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
   useEffect(() => {
     void reloadDraw();
   }, [reloadDraw]);
+
+  useEffect(() => {
+    if (!activeBattlemapId || activeWorldMapId) return;
+
+    const channel = supabase
+      .channel(`session_battlemap_draw_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_map_draw_strokes",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        () => {
+          void reloadDraw();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeBattlemapId, activeWorldMapId, supabase, reloadDraw]);
 
   useEffect(() => {
     if (!isGM || activeWorldMapId || drawUndoReq <= 0 || !activeBattlemapId) return;
