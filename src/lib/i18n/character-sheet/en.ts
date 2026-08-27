@@ -658,6 +658,34 @@ export const characterSheetMessagesEn = {
   "levelUp.ability.int": "Intelligence",
   "levelUp.ability.wis": "Wisdom",
   "levelUp.ability.cha": "Charisma",
+
+  "ability.help.aria": "Help: {name}",
+  "ability.help.whatLabel": "What is it?",
+  "ability.help.usedForLabel": "Typical uses",
+  "ability.help.str.what":
+    "Physical power — muscle, lifting, shoving, and raw force. A higher score makes your hero stronger in melee and strength checks.",
+  "ability.help.str.usedFor":
+    "Athletics; melee attacks & damage with Strength weapons; Strength saving throws; carrying & lifting; some class features.",
+  "ability.help.dex.what":
+    "Agility, reflexes, and hand-eye coordination. Dexterity measures how quick and precise your hero is.",
+  "ability.help.dex.usedFor":
+    "Acrobatics, Sleight of Hand, Stealth; initiative; AC (light/medium armor); ranged & finesse weapons; Dexterity saving throws.",
+  "ability.help.con.what":
+    "Stamina, health, and toughness. Constitution keeps you standing in battle and under strain.",
+  "ability.help.con.usedFor":
+    "Hit points (CON mod per level); concentration checks; saving throws vs poison, disease, and similar effects.",
+  "ability.help.int.what":
+    "Reasoning, learning, and analysis. Intelligence measures how well your hero recalls facts and solves problems.",
+  "ability.help.int.usedFor":
+    "Arcana, History, Investigation, Nature, Religion; spellcasting ability (e.g. Wizard, Artificer); Intelligence saving throws.",
+  "ability.help.wis.what":
+    "Awareness, instinct, and willpower. Wisdom is gut feeling, attention, and inner clarity.",
+  "ability.help.wis.usedFor":
+    "Insight, Medicine, Perception, Survival, Animal Handling; passive Perception; spellcasting (Cleric, Druid, Ranger); Wisdom saving throws.",
+  "ability.help.cha.what":
+    "Presence, personality, and force of will. Charisma shapes how others respond to your hero.",
+  "ability.help.cha.usedFor":
+    "Performance, Intimidation, Deception, Persuasion; spellcasting (Bard, Paladin, Warlock, Sorcerer); Charisma saving throws.",
 } as const satisfies Record<
   import("./de").CharacterSheetMessageKey,
   string

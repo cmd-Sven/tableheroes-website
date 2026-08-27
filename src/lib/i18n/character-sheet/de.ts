@@ -659,6 +659,34 @@ export const characterSheetMessagesDe = {
   "levelUp.ability.int": "Intelligenz",
   "levelUp.ability.wis": "Weisheit",
   "levelUp.ability.cha": "Charisma",
+
+  "ability.help.aria": "Hilfe: {name}",
+  "ability.help.whatLabel": "Was ist das?",
+  "ability.help.usedForLabel": "Typische Verwendung",
+  "ability.help.str.what":
+    "Körperliche Kraft — Muskeln, Heben, Stoßen und rohe Gewalt. Je höher der Wert, desto stärker wirkt dein Held in Nahkampf und Kraftproben.",
+  "ability.help.str.usedFor":
+    "Athletik; Nahkampfangriffe & Schaden mit Stärkewaffen; Athletik-Rettungswürfe; Tragen & Stemmen; manche Klassenmerkmale.",
+  "ability.help.dex.what":
+    "Gewandtheit, Reflexe und Hand-Auge-Koordination. Geschick bestimmt, wie flink und präzise dein Held agiert.",
+  "ability.help.dex.usedFor":
+    "Akrobatik, Fingerfertigkeit, Heimlichkeit; Initiative; RK (leichte/mittlere Rüstung); Fernkampf & Finesse-Waffen; Geschick-Rettungswürfe.",
+  "ability.help.con.what":
+    "Ausdauer, Gesundheit und Widerstandskraft. Konstitution hält dich im Kampf und bei Anstrengung standhaft.",
+  "ability.help.con.usedFor":
+    "Trefferpunkte (KON-Mod je Stufe); Konzentrationswürfe; Rettungswürfe gegen Gift, Krankheit und ähnliche Effekte.",
+  "ability.help.int.what":
+    "Verstand, Bildung und analytisches Denken. Intelligenz misst, wie gut dein Held lernt, erinnert und schlussfolgert.",
+  "ability.help.int.usedFor":
+    "Arkane Kunde, Geschichte, Untersuchung, Natur, Religion; Zauberattribut (z. B. Magier, Artificer); Intelligenz-Rettungswürfe.",
+  "ability.help.wis.what":
+    "Wahrnehmung, Instinkt und Willenskraft. Weisheit ist Bauchgefühl, Aufmerksamkeit und innere Klarheit.",
+  "ability.help.wis.usedFor":
+    "Einblick, Medizin, Wahrnehmung, Überlebenskunst, Tierkunde; passive Wahrnehmung; Zauberattribut (Kleriker, Druide, Ranger); Weisheits-Rettungswürfe.",
+  "ability.help.cha.what":
+    "Ausstrahlung, Persönlichkeit und Überzeugungskraft. Charisma prägt, wie andere auf deinen Helden reagieren.",
+  "ability.help.cha.usedFor":
+    "Auftreten, Einschüchtern, Täuschen, Überzeugen; Zauberattribut (Barde, Paladin, Hexenmeister, Zauberer); Charisma-Rettungswürfe.",
 } as const;
 
 export type CharacterSheetMessageKey = keyof typeof characterSheetMessagesDe;

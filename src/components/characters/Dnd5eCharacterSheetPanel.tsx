@@ -5,7 +5,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Loader2, Save, ScrollText, Shield, Backpack, BookOpen, Wand2, TrendingUp } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  ScrollText,
+  Shield,
+  Backpack,
+  BookOpen,
+  Wand2,
+  TrendingUp,
+  Dumbbell,
+  Wind,
+  HeartPulse,
+  Brain,
+  Eye,
+  Sparkles,
+  HelpCircle,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   loadDnd5eCharacterSheet,
@@ -128,6 +146,96 @@ const LEVEL_EDIT_HINT_KEYS: Record<LevelEditHintId, CharacterSheetMessageKey> = 
   spellSlots: "levelEdit.hint.spellSlots",
   wizardRecommend: "levelEdit.hint.wizardRecommend",
 };
+
+const ABILITY_ICONS: Record<AbilityKey, LucideIcon> = {
+  str: Dumbbell,
+  dex: Wind,
+  con: HeartPulse,
+  int: Brain,
+  wis: Eye,
+  cha: Sparkles,
+};
+
+const ABILITY_HELP_WHAT: Record<AbilityKey, CharacterSheetMessageKey> = {
+  str: "ability.help.str.what",
+  dex: "ability.help.dex.what",
+  con: "ability.help.con.what",
+  int: "ability.help.int.what",
+  wis: "ability.help.wis.what",
+  cha: "ability.help.cha.what",
+};
+
+const ABILITY_HELP_USED_FOR: Record<AbilityKey, CharacterSheetMessageKey> = {
+  str: "ability.help.str.usedFor",
+  dex: "ability.help.dex.usedFor",
+  con: "ability.help.con.usedFor",
+  int: "ability.help.int.usedFor",
+  wis: "ability.help.wis.usedFor",
+  cha: "ability.help.cha.usedFor",
+};
+
+function AbilityHelpModal({
+  abilityKey,
+  onClose,
+}: {
+  abilityKey: AbilityKey;
+  onClose: () => void;
+}) {
+  const { t, abilityLabel } = useCharacterSheetLocale();
+  const Icon = ABILITY_ICONS[abilityKey];
+  const name = abilityLabel(abilityKey);
+
+  return (
+    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`ability-help-${abilityKey}`}
+        className="w-full max-w-md rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-hero-border/60 bg-hero-dark/50 text-accent-gold">
+              <Icon className="h-5 w-5" aria-hidden />
+            </span>
+            <h3
+              id={`ability-help-${abilityKey}`}
+              className="font-cinzel text-lg font-bold text-accent-gold truncate"
+            >
+              {name}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:text-white"
+            aria-label={t("sheet.closeAria")}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("ability.help.whatLabel")}
+            </p>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed">
+              {t(ABILITY_HELP_WHAT[abilityKey])}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("ability.help.usedForLabel")}
+            </p>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed">
+              {t(ABILITY_HELP_USED_FOR[abilityKey])}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ToggleSwitch({
   checked,
@@ -346,6 +454,7 @@ export function Dnd5eCharacterSheetPanel({
   });
   const [editMode, setEditMode] = useState(false);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [abilityHelpKey, setAbilityHelpKey] = useState<AbilityKey | null>(null);
   const [featPicker, setFeatPicker] = useState<null | "add" | number>(null);
   const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
   const [loading, setLoading] = useState(true);
@@ -1159,10 +1268,11 @@ export function Dnd5eCharacterSheetPanel({
             <FoundryProgressionLockNotice message={payload.progressionLockMessage} />
           ) : null}
 
-          {/* Kopfzeile wie PHB-Bogen */}
-          <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-            <div className="grid gap-3 lg:grid-cols-12">
-              <label className="lg:col-span-4 space-y-1">
+          {/* Kopfzeile — klar gruppiert */}
+          <section className="rounded-lg border border-hero-dark bg-background-card p-4 md:p-5 space-y-5">
+            {/* Name + Übungsbonus / Aufstieg */}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <label className="min-w-0 flex-1 space-y-1.5">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.characterName")}
                 </span>
@@ -1170,14 +1280,41 @@ export function Dnd5eCharacterSheetPanel({
                   value={meta.name}
                   disabled={readOnly}
                   onChange={(v) => setMeta({ ...meta, name: v })}
-                  className="text-lg font-bold"
+                  className="font-barlow text-xl font-extrabold uppercase tracking-wide text-hero-vibrant"
                 />
               </label>
-              <label className="lg:col-span-3 space-y-1">
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  {t("field.classLevel")}
-                </span>
-                <div className="flex gap-2">
+              <div className="flex shrink-0 flex-wrap items-end gap-3">
+                <div className="min-w-[5.5rem] rounded border border-hero-border/60 bg-hero-dark/40 px-3 py-2 text-center">
+                  <p className="font-barlow text-[10px] uppercase text-gray-500">
+                    {t("field.proficiencyBonus")}
+                  </p>
+                  <p className="font-barlow text-2xl font-bold text-accent-gold">
+                    {formatSigned(derived.proficiencyBonus)}
+                  </p>
+                </div>
+                {canEdit && meta.level < 20 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editMode) setEditMode(true);
+                      setLevelUpOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-3 py-2.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    {t("levelUp.open")}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Klasse, Stufe, Unterklasse */}
+            <div className="rounded-md border border-hero-border/30 bg-hero-dark/20 p-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,1.4fr)_5.5rem_minmax(0,1fr)]">
+                <label className="space-y-1">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    {t("field.classLevel")}
+                  </span>
                   {readOnly ? (
                     <TextInput
                       value={[
@@ -1188,7 +1325,6 @@ export function Dnd5eCharacterSheetPanel({
                         .join(" ")}
                       disabled
                       onChange={() => {}}
-                      className="flex-1"
                     />
                   ) : (
                     <select
@@ -1201,7 +1337,7 @@ export function Dnd5eCharacterSheetPanel({
                         }
                         setClassFromCatalog(id);
                       }}
-                      className="flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-barlow text-sm uppercase text-white outline-none focus:border-hero-vibrant"
+                      className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-barlow text-sm uppercase text-white outline-none focus:border-hero-vibrant"
                     >
                       <option value="">{t("field.classPlaceholder")}</option>
                       {CLASS_IDS.map((id) => (
@@ -1211,6 +1347,11 @@ export function Dnd5eCharacterSheetPanel({
                       ))}
                     </select>
                   )}
+                </label>
+                <label className="space-y-1 sm:w-[5.5rem]">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    {t("sheet.level")}
+                  </span>
                   <NumberInput
                     value={meta.level}
                     min={1}
@@ -1219,48 +1360,14 @@ export function Dnd5eCharacterSheetPanel({
                     onChange={(v) =>
                       setLevelWithCatalogSync(Math.min(20, Math.max(1, v)))
                     }
-                    className="!w-16"
+                    className="!w-full"
                   />
-                </div>
-                {!readOnly && levelEditHints.length > 0 ? (
-                  <ul className="mt-1 space-y-0.5">
-                    {levelEditHints.map((hint) => (
-                      <li
-                        key={hint.id}
-                        className={`font-libre text-[10px] leading-snug ${
-                          hint.id === "wizardRecommend"
-                            ? "text-accent-gold"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {t(LEVEL_EDIT_HINT_KEYS[hint.id], hint.params)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {!readOnly && resolvedClassId ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!sheet) return;
-                      setSheet(
-                        applyClassBasicsFromCatalog(
-                          sheet,
-                          meta.className,
-                          meta.level,
-                          meta.subclass || null,
-                          locale,
-                        ),
-                      );
-                      toast.success(t("classCatalog.synced"));
-                    }}
-                    className="mt-1 font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
-                  >
-                    {t("classCatalog.sync")}
-                  </button>
-                ) : null}
-                {!readOnly ? (
-                  <div className="mt-1 space-y-1">
+                </label>
+                <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    {t("field.subclassPlaceholder")}
+                  </span>
+                  {!readOnly ? (
                     <select
                       value={matchedSubclassId}
                       disabled={subclassSelectDisabled}
@@ -1274,21 +1381,76 @@ export function Dnd5eCharacterSheetPanel({
                         </option>
                       ))}
                     </select>
-                    {subclassOptions.length === 0 ? (
-                      <p className="font-libre text-[10px] text-gray-500">
-                        {t("subclassCatalog.none")}
-                      </p>
-                    ) : subclassUnlockLevel != null && meta.level < subclassUnlockLevel ? (
-                      <p className="font-libre text-[10px] text-gray-500">
-                        {t("subclassCatalog.lockedUntil", { level: subclassUnlockLevel })}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : meta.subclass ? (
-                  <p className="mt-1 font-libre text-xs text-gray-300">{meta.subclass}</p>
-                ) : null}
-              </label>
-              <label className="lg:col-span-2 space-y-1">
+                  ) : meta.subclass ? (
+                    <p className="rounded border border-hero-border/40 bg-hero-dark/40 px-3 py-1.5 font-libre text-sm text-gray-200">
+                      {meta.subclass}
+                    </p>
+                  ) : (
+                    <p className="rounded border border-transparent px-3 py-1.5 font-libre text-sm text-gray-500">
+                      —
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!readOnly && levelEditHints.length > 0 ? (
+                <ul className="space-y-0.5">
+                  {levelEditHints.map((hint) => (
+                    <li
+                      key={hint.id}
+                      className={`font-libre text-[10px] leading-snug ${
+                        hint.id === "wizardRecommend"
+                          ? "text-accent-gold"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {t(LEVEL_EDIT_HINT_KEYS[hint.id], hint.params)}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {!readOnly && subclassOptions.length === 0 ? (
+                <p className="font-libre text-[10px] text-gray-500">
+                  {t("subclassCatalog.none")}
+                </p>
+              ) : !readOnly &&
+                subclassUnlockLevel != null &&
+                meta.level < subclassUnlockLevel ? (
+                <p className="font-libre text-[10px] text-gray-500">
+                  {t("subclassCatalog.lockedUntil", { level: subclassUnlockLevel })}
+                </p>
+              ) : null}
+              {!readOnly && resolvedClassId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!sheet) return;
+                    setSheet(
+                      applyClassBasicsFromCatalog(
+                        sheet,
+                        meta.className,
+                        meta.level,
+                        meta.subclass || null,
+                        locale,
+                      ),
+                    );
+                    toast.success(t("classCatalog.synced"));
+                  }}
+                  className="font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
+                >
+                  {t("classCatalog.sync")}
+                </button>
+              ) : null}
+            </div>
+
+            {/* Herkunft: Hintergrund, Kultur, Volk, Gesinnung */}
+            <div
+              className={`grid gap-3 sm:grid-cols-2 ${
+                biographyCulture && biographyCulture.cultureOptions.length > 0
+                  ? "lg:grid-cols-4"
+                  : "lg:grid-cols-3"
+              }`}
+            >
+              <label className="space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.background")}
                 </span>
@@ -1325,7 +1487,7 @@ export function Dnd5eCharacterSheetPanel({
                 )}
               </label>
               {biographyCulture && biographyCulture.cultureOptions.length > 0 ? (
-                <label className="lg:col-span-3 space-y-1">
+                <label className="space-y-1">
                   <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                     {t("biography.culture")}
                   </span>
@@ -1344,7 +1506,7 @@ export function Dnd5eCharacterSheetPanel({
                   </select>
                 </label>
               ) : null}
-              <label className="lg:col-span-3 space-y-1">
+              <label className="space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.race")}
                 </span>
@@ -1390,7 +1552,7 @@ export function Dnd5eCharacterSheetPanel({
                   </p>
                 ) : null}
               </label>
-              <label className="lg:col-span-3 space-y-1">
+              <label className="space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {t("field.alignment")}
                 </span>
@@ -1415,37 +1577,16 @@ export function Dnd5eCharacterSheetPanel({
                   </select>
                 )}
               </label>
-              <label className="lg:col-span-3 space-y-1">
-                <XpProgressBar
-                  currentXp={meta.experiencePoints}
-                  level={meta.level}
-                  editMode={editMode}
-                  readOnly={readOnly}
-                  onChange={(v) => setMeta({ ...meta, experiencePoints: v })}
-                />
-              </label>
-              <div className="lg:col-span-2 flex flex-col justify-end gap-2">
-                <div className="w-full rounded border border-hero-border/60 bg-hero-dark/40 px-3 py-2 text-center">
-                  <p className="font-barlow text-[10px] uppercase text-gray-500">{t("field.proficiencyBonus")}</p>
-                  <p className="font-barlow text-2xl font-bold text-accent-gold">
-                    {formatSigned(derived.proficiencyBonus)}
-                  </p>
-                </div>
-                {canEdit && meta.level < 20 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!editMode) setEditMode(true);
-                      setLevelUpOpen(true);
-                    }}
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-accent-gold/60 bg-accent-gold/10 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20"
-                  >
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    {t("levelUp.open")}
-                  </button>
-                ) : null}
-              </div>
             </div>
+
+            {/* XP */}
+            <XpProgressBar
+              currentXp={meta.experiencePoints}
+              level={meta.level}
+              editMode={editMode}
+              readOnly={readOnly}
+              onChange={(v) => setMeta({ ...meta, experiencePoints: v })}
+            />
           </section>
 
           <div className="grid gap-4 xl:grid-cols-12">
@@ -1466,34 +1607,53 @@ export function Dnd5eCharacterSheetPanel({
               ) : null}
               <section className="rounded-lg border border-hero-dark bg-background-card p-3">
                 <div className="space-y-2">
-                  {ABILITY_KEYS.map((key) => (
-                    <div
-                      key={key}
-                      className="flex items-center gap-3 rounded border border-hero-border/40 bg-hero-dark/30 px-2 py-1.5"
-                    >
-                      <div className="w-10 text-center">
-                        <p className="font-barlow text-xl font-bold text-accent-gold leading-none">
-                          {formatSigned(displayDerived.abilities[key].modifier)}
-                        </p>
+                  {ABILITY_KEYS.map((key) => {
+                    const AbilityIcon = ABILITY_ICONS[key];
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 rounded border border-hero-border/40 bg-hero-dark/30 px-2 py-1.5"
+                      >
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-hero-border/50 bg-hero-dark/60 text-accent-gold"
+                          aria-hidden
+                        >
+                          <AbilityIcon className="h-4 w-4" />
+                        </span>
+                        <div className="w-10 text-center shrink-0">
+                          <p className="font-barlow text-xl font-bold text-accent-gold leading-none">
+                            {formatSigned(displayDerived.abilities[key].modifier)}
+                          </p>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-barlow text-[10px] font-bold uppercase text-gray-400 truncate">
+                            {abilityLabel(key)}
+                          </p>
+                          {readOnly ? (
+                            <p className="font-barlow text-xs text-gray-500">
+                              {sheet.abilities[key].score}
+                            </p>
+                          ) : (
+                            <NumberInput
+                              value={sheet.abilities[key].score}
+                              min={1}
+                              max={30}
+                              className="!py-0.5 !text-xs"
+                              onChange={(v) => updateAbility(key, v)}
+                            />
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAbilityHelpKey(key)}
+                          className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                          aria-label={t("ability.help.aria", { name: abilityLabel(key) })}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-barlow text-[10px] font-bold uppercase text-gray-400 truncate">
-                                                    {abilityLabel(key)}
-                        </p>
-                        {readOnly ? (
-                          <p className="font-barlow text-xs text-gray-500">{sheet.abilities[key].score}</p>
-                        ) : (
-                          <NumberInput
-                            value={sheet.abilities[key].score}
-                            min={1}
-                            max={30}
-                            className="!py-0.5 !text-xs"
-                            onChange={(v) => updateAbility(key, v)}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 
@@ -2323,6 +2483,13 @@ export function Dnd5eCharacterSheetPanel({
           onClose={() => setFeatPicker(null)}
           onPick={applyFeatPick}
           excludeIds={(sheet?.features ?? []).map((f) => f.id)}
+        />
+      ) : null}
+
+      {abilityHelpKey ? (
+        <AbilityHelpModal
+          abilityKey={abilityHelpKey}
+          onClose={() => setAbilityHelpKey(null)}
         />
       ) : null}
       </div>
