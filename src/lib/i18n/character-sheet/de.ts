@@ -25,7 +25,7 @@ export const characterSheetMessagesDe = {
   "sheet.unknownClass": "Unbekannt",
   "sheet.closeAria": "Charakterblatt schließen",
   "sheet.modalAria": "Charakterblatt von {name}",
-  "sheet.level": "Level",
+  "sheet.level": "Stufe",
 
   "tab.attributes": "Attribute",
   "tab.equipment": "Ausrüstung",
@@ -33,8 +33,9 @@ export const characterSheetMessagesDe = {
   "tab.biography": "Biografie & Kultur",
 
   "field.characterName": "Charaktername",
-  "field.classLevel": "Klasse & Stufe",
-  "field.classPlaceholder": "Klasse",
+  "field.class": "Klasse",
+  "field.classPlaceholder": "Klasse wählen",
+  "field.subclass": "Unterklasse",
   "field.subclassPlaceholder": "Unterklasse (optional)",
   "field.background": "Hintergrund",
   "field.race": "Volk",

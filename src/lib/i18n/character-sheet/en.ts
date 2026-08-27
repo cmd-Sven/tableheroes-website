@@ -33,8 +33,9 @@ export const characterSheetMessagesEn = {
   "tab.biography": "Biography & Culture",
 
   "field.characterName": "Character Name",
-  "field.classLevel": "Class & Level",
-  "field.classPlaceholder": "Class",
+  "field.class": "Class",
+  "field.classPlaceholder": "Select class",
+  "field.subclass": "Subclass",
   "field.subclassPlaceholder": "Subclass (optional)",
   "field.background": "Background",
   "field.race": "Species",

@@ -1308,21 +1308,20 @@ export function Dnd5eCharacterSheetPanel({
               </div>
             </div>
 
-            {/* Klasse, Stufe, Unterklasse */}
+            {/* Klasse, Stufe, Unterklasse — getrennt, ohne Doppelung */}
             <div className="rounded-md border border-hero-border/30 bg-hero-dark/20 p-3 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,1.4fr)_5.5rem_minmax(0,1fr)]">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1.4fr)_5.5rem_minmax(0,1fr)]">
                 <label className="space-y-1">
                   <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    {t("field.classLevel")}
+                    {t("field.class")}
                   </span>
                   {readOnly ? (
                     <TextInput
-                      value={[
-                        meta.className,
-                        meta.subclass ? `(${meta.subclass})` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
+                      value={
+                        resolvedClassId
+                          ? classDisplayName(resolvedClassId, locale)
+                          : meta.className || "—"
+                      }
                       disabled
                       onChange={() => {}}
                     />
@@ -1348,7 +1347,7 @@ export function Dnd5eCharacterSheetPanel({
                     </select>
                   )}
                 </label>
-                <label className="space-y-1 sm:w-[5.5rem]">
+                <label className="space-y-1">
                   <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                     {t("sheet.level")}
                   </span>
@@ -1363,9 +1362,9 @@ export function Dnd5eCharacterSheetPanel({
                     className="!w-full"
                   />
                 </label>
-                <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+                <div className="space-y-1">
                   <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    {t("field.subclassPlaceholder")}
+                    {t("field.subclass")}
                   </span>
                   {!readOnly ? (
                     <select
