@@ -33,6 +33,7 @@ import {
   skillTotalModifier,
 } from "./formulas";
 import {
+  BACKGROUND_SOURCE,
   classFeaturesUpToLevel,
   getClassProgression,
   matchSubclassOption,
@@ -952,8 +953,8 @@ export function buildDeterministicFeatureFindings(
   const bullet = listed
     .map((m) =>
       locale === "en"
-        ? `• Level ${m.level}: ${m.displayName}`
-        : `• Stufe ${m.level}: ${m.displayName}`,
+        ? `• Level ${m.level}: ${m.displayName}${m.subclassScoped ? " [subclass]" : ""}`
+        : `• Stufe ${m.level}: ${m.displayName}${m.subclassScoped ? " [Unterklasse]" : ""}`,
     )
     .join("\n");
   const moreLine =
@@ -963,14 +964,20 @@ export function buildDeterministicFeatureFindings(
         : `\n… und ${more} weitere.`
       : "";
 
+  const scopeNote =
+    locale === "en"
+      ? `Always verified against class${checklist.subclassDisplayName ? ` + subclass ${checklist.subclassDisplayName}` : ""} at level ${checklist.level}.`
+      : `Immer geprüft gegen Klasse${checklist.subclassDisplayName ? ` + Unterklasse ${checklist.subclassDisplayName}` : ""} auf Stufe ${checklist.level}.`;
+
   if (locale === "en") {
     findings.push({
       id: "det-features-missing",
       severity: "warning",
       category: "features",
-      title: `Missing expected class features (${checklist.missing.length})`,
+      title: `Missing expected class/subclass features (${checklist.missing.length})`,
       detail: [
         checklist.noteEn,
+        scopeNote,
         "Compared against the D&D 2024 progression catalog for this class, subclass, and level.",
         "Missing:",
         bullet + moreLine,
@@ -984,9 +991,10 @@ export function buildDeterministicFeatureFindings(
       id: "det-features-missing",
       severity: "warning",
       category: "features",
-      title: `Fehlende erwartete Klassenmerkmale (${checklist.missing.length})`,
+      title: `Fehlende erwartete Klassen-/Unterklassenmerkmale (${checklist.missing.length})`,
       detail: [
         checklist.noteDe,
+        scopeNote,
         "Verglichen mit dem D&D-2024-Progressionskatalog für diese Klasse, Unterklasse und Stufe.",
         "Es fehlen:",
         bullet + moreLine,
@@ -1000,7 +1008,285 @@ export function buildDeterministicFeatureFindings(
   return findings;
 }
 
-/** Alle deterministischen TÜV-Findings (Ausrüstung, Fertigkeitsmathe, Merkmale). */
+/** True wenn previousAnswers bereits eine Erklärung zu diesem Feldpfad haben. */
+export function hasPreviousAnswerForField(
+  snapshot: CharacterTuvSheetSnapshot,
+  fieldPath: string,
+): boolean {
+  const prev = snapshot.previousAnswers ?? {};
+  return Boolean((prev[`field:${fieldPath}`] ?? "").trim());
+}
+
+/**
+ * D&D 2024: Background (Herkunft) ist Pflicht.
+ * Erkennung: leeres meta.background UND kein angewandtes Background-Feature auf dem Blatt.
+ */
+export function isCharacterBackgroundMissing(
+  snapshot: CharacterTuvSheetSnapshot,
+): boolean {
+  const metaBg =
+    typeof snapshot.meta.background === "string"
+      ? snapshot.meta.background.trim()
+      : "";
+  if (metaBg.length > 0) return false;
+
+  const features = Array.isArray(snapshot.sheet.features)
+    ? snapshot.sheet.features
+    : [];
+  for (const f of features) {
+    const source = typeof f.source === "string" ? f.source : "";
+    if (source === BACKGROUND_SOURCE) return false;
+    const id = typeof f.id === "string" ? f.id : "";
+    if (/^bg-[a-z0-9-]+-(feature|equipment)$/i.test(id)) return false;
+  }
+  return true;
+}
+
+export function buildDeterministicBackgroundFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  if (!isCharacterBackgroundMissing(snapshot)) return [];
+  const locale = snapshot.locale ?? "de";
+  if (locale === "en") {
+    return [
+      {
+        id: "det-background-missing",
+        severity: "warning",
+        category: "level",
+        title: "Background missing — required in D&D 2024",
+        detail:
+          "In Dungeons & Dragons 2024 (Player's Handbook 2024) every character needs a Background (Herkunft). None is set on this sheet (meta.background empty and no background feature found). Please choose a background in the character header.",
+        fieldPath: "meta.background",
+        resolved: false,
+      },
+    ];
+  }
+  return [
+    {
+      id: "det-background-missing",
+      severity: "warning",
+      category: "level",
+      title: "Background (Herkunft) fehlt — in D&D 2024 Pflicht",
+      detail:
+        "In Dungeons & Dragons 2024 (Player's Handbook 2024) braucht jeder Charakter einen Background (Herkunft). Auf diesem Blatt ist keiner gesetzt (meta.background leer und kein Background-Merkmal gefunden). Bitte im Charakterkopf einen Background wählen.",
+      fieldPath: "meta.background",
+      resolved: false,
+    },
+  ];
+}
+
+type ManualBonusHit = {
+  kind: "skill" | "save" | "skillOverride";
+  key: string;
+  displayName: string;
+  value: number;
+  fieldPath: string;
+  findingId: string;
+};
+
+function collectManualBonusHits(
+  snapshot: CharacterTuvSheetSnapshot,
+): ManualBonusHit[] {
+  const locale = snapshot.locale ?? "de";
+  const hits: ManualBonusHit[] = [];
+
+  const skillsRaw = asRecord(snapshot.sheet).skills;
+  const skillRows: Array<Record<string, unknown>> = Array.isArray(skillsRaw)
+    ? skillsRaw.map((r) => asRecord(r))
+    : Object.entries(asRecord(skillsRaw)).map(([key, v]) => ({
+        ...asRecord(v),
+        key,
+      }));
+
+  for (const row of skillRows) {
+    const key = String(row.key ?? "");
+    if (!key || !DND5E_SKILL_BY_KEY[key as Dnd5eSkillKey]) continue;
+    const displayName =
+      typeof row.displayName === "string" && row.displayName.trim()
+        ? row.displayName
+        : skillDisplayName(key as Dnd5eSkillKey, locale);
+    const manualBonus = readFiniteNumber(row.manualBonus, 0);
+    if (manualBonus !== 0) {
+      hits.push({
+        kind: "skill",
+        key,
+        displayName,
+        value: manualBonus,
+        fieldPath: `skills.${key}.manualBonus`,
+        findingId: `det-manual-bonus-skill-${key}`,
+      });
+    }
+    const overrideRaw = row.bonusOverride;
+    if (
+      overrideRaw != null &&
+      overrideRaw !== "" &&
+      Number.isFinite(Number(overrideRaw))
+    ) {
+      const ov = Math.round(Number(overrideRaw));
+      hits.push({
+        kind: "skillOverride",
+        key,
+        displayName,
+        value: ov,
+        fieldPath: `skills.${key}.bonusOverride`,
+        findingId: `det-bonus-override-skill-${key}`,
+      });
+    }
+  }
+
+  const savesRaw = asRecord(snapshot.sheet).savingThrows;
+  const saveRows: Array<Record<string, unknown>> = Array.isArray(savesRaw)
+    ? savesRaw.map((r) => asRecord(r))
+    : Object.entries(asRecord(savesRaw)).map(([key, v]) => ({
+        ...asRecord(v),
+        key,
+      }));
+
+  for (const row of saveRows) {
+    const key = String(row.key ?? "") as AbilityKey;
+    if (!ABILITY_KEYS.includes(key)) continue;
+    const displayName =
+      typeof row.displayName === "string" && row.displayName.trim()
+        ? row.displayName
+        : abilityDisplayName(key, locale);
+    const manualBonus = readFiniteNumber(row.manualBonus, 0);
+    if (manualBonus !== 0) {
+      hits.push({
+        kind: "save",
+        key,
+        displayName,
+        value: manualBonus,
+        fieldPath: `savingThrows.${key}.manualBonus`,
+        findingId: `det-manual-bonus-save-${key}`,
+      });
+    }
+  }
+
+  return hits;
+}
+
+/**
+ * Jeder manuelle Bonus / Override ≠ 0 braucht Finding + Pflichtfrage
+ * (außer previousAnswers erklären den fieldPath bereits).
+ */
+export function buildDeterministicManualBonusFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  const locale = snapshot.locale ?? "de";
+  const hits = collectManualBonusHits(snapshot).slice(0, 10);
+  return hits.map((hit) => {
+    const answered = hasPreviousAnswerForField(snapshot, hit.fieldPath);
+    const signed = formatSigned(hit.value);
+    if (locale === "en") {
+      const what =
+        hit.kind === "skillOverride"
+          ? `manual total override ${signed}`
+          : `manual bonus ${signed} in the bonus column`;
+      const where =
+        hit.kind === "save"
+          ? `saving throw ${hit.displayName}`
+          : `skill ${hit.displayName}`;
+      return {
+        id: hit.findingId,
+        severity: "warning" as const,
+        category: hit.kind === "save" ? "saves" : "overrides",
+        title: `Unexplained ${hit.kind === "skillOverride" ? "override" : "manual bonus"} — ${hit.displayName}`,
+        detail: [
+          `The sheet has ${what} for ${where}.`,
+          "Please explain the source (item, class/subclass feature, feat, spell, or other rule).",
+          "Bonuses from items or features are fine once explained.",
+        ].join(" "),
+        fieldPath: hit.fieldPath,
+        resolved: answered,
+      };
+    }
+    const what =
+      hit.kind === "skillOverride"
+        ? `manueller Gesamt-Override ${signed}`
+        : `manueller Bonus ${signed} in der Bonus-Spalte`;
+    const where =
+      hit.kind === "save"
+        ? `Rettungswurf ${hit.displayName}`
+        : `Fertigkeit ${hit.displayName}`;
+    return {
+      id: hit.findingId,
+      severity: "warning" as const,
+      category: hit.kind === "save" ? "saves" : "overrides",
+      title: `Ungeklärter ${hit.kind === "skillOverride" ? "Override" : "manueller Bonus"} — ${hit.displayName}`,
+      detail: [
+        `Auf dem Blatt steht ${what} bei ${where}.`,
+        "Bitte die Quelle erklären (Gegenstand, Klassen-/Unterklassenmerkmal, Talent, Zauber oder andere Regel).",
+        "Boni durch Gegenstände oder Merkmale sind in Ordnung, sobald sie erklärt sind.",
+      ].join(" "),
+      fieldPath: hit.fieldPath,
+      resolved: answered,
+    };
+  });
+}
+
+export function buildDeterministicBackgroundQuestions(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvQuestion[] {
+  if (!isCharacterBackgroundMissing(snapshot)) return [];
+  // Bereits beantwortet → keine erneute Frage; Finding bleibt bis Background gesetzt ist
+  if (hasPreviousAnswerForField(snapshot, "meta.background")) return [];
+  const locale = snapshot.locale ?? "de";
+  return [
+    {
+      id: "q-det-background-missing",
+      // Kein findingId: Antwort allein löst das Finding nicht auf — nur gesetzter Background
+      findingId: null,
+      prompt:
+        locale === "en"
+          ? "Which Background (Herkunft) should this character have? Please set one in the character header (required in D&D 2024)."
+          : "Welchen Background (Herkunft) soll dieser Charakter haben? Bitte im Charakterkopf einen setzen (in D&D 2024 Pflicht).",
+      fieldPath: "meta.background",
+      required: true,
+    },
+  ];
+}
+
+export function buildDeterministicManualBonusQuestions(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvQuestion[] {
+  const locale = snapshot.locale ?? "de";
+  const hits = collectManualBonusHits(snapshot).slice(0, 10);
+  const questions: CharacterTuvQuestion[] = [];
+  for (const hit of hits) {
+    if (hasPreviousAnswerForField(snapshot, hit.fieldPath)) continue;
+    const signed = formatSigned(hit.value);
+    if (locale === "en") {
+      questions.push({
+        id: `q-${hit.findingId}`,
+        findingId: hit.findingId,
+        prompt:
+          hit.kind === "skillOverride"
+            ? `Where does the manual total override ${signed} for skill ${hit.displayName} come from? (item, feature, feat, …)`
+            : hit.kind === "save"
+              ? `Where does the manual bonus ${signed} for saving throw ${hit.displayName} come from? (item, feature, feat, …)`
+              : `Where does the manual bonus ${signed} in the bonus column for skill ${hit.displayName} come from? (item, feature, feat, …)`,
+        fieldPath: hit.fieldPath,
+        required: true,
+      });
+    } else {
+      questions.push({
+        id: `q-${hit.findingId}`,
+        findingId: hit.findingId,
+        prompt:
+          hit.kind === "skillOverride"
+            ? `Woher kommt der manuelle Gesamt-Override ${signed} bei der Fertigkeit ${hit.displayName}? (Gegenstand, Merkmal, Talent, …)`
+            : hit.kind === "save"
+              ? `Woher kommt der manuelle Bonus ${signed} beim Rettungswurf ${hit.displayName}? (Gegenstand, Merkmal, Talent, …)`
+              : `Woher kommt der manuelle Bonus ${signed} in der Bonus-Spalte bei der Fertigkeit ${hit.displayName}? (Gegenstand, Merkmal, Talent, …)`,
+        fieldPath: hit.fieldPath,
+        required: true,
+      });
+    }
+  }
+  return questions;
+}
+
+/** Alle deterministischen TÜV-Findings (Ausrüstung, Mathe, Merkmale, Background, manuelle Boni). */
 export function buildDeterministicCharacterTuvFindings(
   snapshot: CharacterTuvSheetSnapshot,
 ): CharacterTuvFinding[] {
@@ -1009,6 +1295,18 @@ export function buildDeterministicCharacterTuvFindings(
     ...buildDeterministicAbilityFindings(snapshot),
     ...buildDeterministicSkillMathFindings(snapshot),
     ...buildDeterministicFeatureFindings(snapshot),
+    ...buildDeterministicBackgroundFindings(snapshot),
+    ...buildDeterministicManualBonusFindings(snapshot),
+  ];
+}
+
+/** Pflichtfragen aus deterministischen Checks (Background, manuelle Boni). */
+export function buildDeterministicCharacterTuvQuestions(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvQuestion[] {
+  return [
+    ...buildDeterministicBackgroundQuestions(snapshot),
+    ...buildDeterministicManualBonusQuestions(snapshot),
   ];
 }
 
@@ -1402,6 +1700,17 @@ export function filterFalsePositiveAiFindings(
           blob,
         );
       if (playstyleNag && !hardRule) return false;
+    }
+
+    // Background fehlt: deterministische Prüfung hat Vorrang — KI-Duplikate droppen
+    if (
+      isCharacterBackgroundMissing(snapshot) &&
+      /background|herkunft/i.test(blob) &&
+      /(fehlt|missing|leer|empty|nicht\s+gesetzt|not\s+set|pflicht|required)/i.test(
+        blob,
+      )
+    ) {
+      return false;
     }
 
     return true;

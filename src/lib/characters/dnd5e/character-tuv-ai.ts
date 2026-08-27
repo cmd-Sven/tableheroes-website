@@ -4,6 +4,7 @@
 import OpenAI from "openai";
 import {
   buildDeterministicCharacterTuvFindings,
+  buildDeterministicCharacterTuvQuestions,
   dedupeEquipmentFindingsAgainstDeterministic,
   filterFalsePositiveAiFindings,
   humanizeCharacterTuvFinding,
@@ -82,14 +83,21 @@ PRÜFBEREICHE (priorisiert):
    - equipmentSummary.noTorsoArmorEquipped / torsoSlot.empty: Torso-Slot leer → keine Rüstung in der RK-Rechnung. Deterministische System-Hinweise dazu existieren bereits — DU musst denselben Hinweis NICHT noch einmal als Finding erzeugen; du darfst die Auswirkung in anderen RK-Findings erwähnen.
 6) Initiative: initiativeOverride / initiativeBonus — bei Override immer begründen lassen.
 7) Geschwindigkeit: speedOverride vs. Basis — bei Override begründen lassen.
-8) Skill/Save manualBonus und bonusOverride — jedes nicht-null/nicht-0 manuelle Feld braucht Erklärung oder Finding.
-9) Klassenmerkmale (features):
-   - Nutze featureChecklist im Snapshot (Katalog Klasse + Unterklasse + Stufe).
+8) Skill/Save manualBonus und bonusOverride (PFLICHT):
+   - Jedes manualBonus ≠ 0 und jedes gesetzte bonusOverride MUSS eine required-Frage bekommen: „Woher kommt dieser manuelle Bonus?“
+   - Erklärungen über Gegenstände (Items) oder Merkmale/Fähigkeiten (Features) sind in Ordnung — sobald previousAnswers das glaubwürdig erklären, keine neue Frage.
+   - Deterministische Findings/Fragen dazu existieren bereits — KEINE Doppelungen erzeugen.
+9) Klassenmerkmale (features) — IMMER Klasse + Unterklasse zur aktuellen Stufe:
+   - Nutze featureChecklist im Snapshot (Katalog Klasse + Unterklasse + Stufe). Diese Prüfung läuft immer.
    - Fehlende Merkmale NUR mit konkreten DE/EN-Namen nennen (wie in featureChecklist.missing).
    - NIEMALS vage „bitte prüfen, ob Stufe-X-Merkmale korrekt sind“ ohne Namen.
    - Deterministische Findings zu fehlenden Merkmalen existieren bereits — keine Doppelungen.
    - Eigene/manuelle Extra-Merkmale sind erlaubt und kein Fehler.
-10) Zauberwirken (NUR bei echten Zauberwirkern):
+10) Background / Herkunft (PFLICHT in D&D 2024):
+   - Jeder Charakter braucht einen Background (Herkunft).
+   - Wenn meta.background leer/fehlt und kein Background-Merkmal auf dem Blatt → Finding + required-Frage „Bitte Background setzen“.
+   - Deterministische Findings dazu existieren bereits — keine Doppelungen.
+11) Zauberwirken (NUR bei echten Zauberwirkern):
    - Volle/halbe Zauberklassen: Magier/Wizard, Kleriker/Cleric, Druide/Druid, Barde/Bard, Zauberer/Sorcerer, Hexer/Warlock, Paladin, Waldläufer/Ranger, Artificer.
    - Teilzauberer erst ab Unterklasse: Schurke/Rogue mit Arcane Trickster (Arkaner Trickser), Kämpfer/Fighter mit Eldritch Knight (Mystischer Ritter). Mönch nur mit zauberwirkender Unterklasse.
    - Bei diesen: Spell Save DC / Attack Bonus Overrides prüfen; Zauberplätze grob zur Stufe; fehlende Zauber bei erwartetem Spellcasting.
@@ -97,8 +105,8 @@ PRÜFBEREICHE (priorisiert):
      - KEINE Findings, Hinweise, info-Meldungen oder Rückfragen zu fehlenden Zaubern, leerer Zauberliste oder fehlendem Spellcasting.
      - NICHT vorschlagen, „keine Zauber“ in den Notizen zu erwähnen.
      - Leere spells[] ist bei diesen Klassen normal und völlig unerwähnt zu lassen.
-11) derived.* mit sheet.* vergleichen — Widersprüche melden. Bei Kampfmathe (Rüstungsklasse, Trefferpunkte, Initiative) immer den Rechenweg im detail mitliefern.
-12) Ausrüstung (equipmentSummary):
+12) derived.* mit sheet.* vergleichen — Widersprüche melden. Bei Kampfmathe (Rüstungsklasse, Trefferpunkte, Initiative) immer den Rechenweg im detail mitliefern.
+13) Ausrüstung (equipmentSummary):
    - Leerer Torso und fehlende Waffen werden vom System deterministisch gemeldet — KEINE doppelten Findings dazu erzeugen.
    - Andere Ausrüstungs-Auffälligkeiten nur als hint, wenn klar regelrelevant.
    - equippedMagicalItems beachten bei Attribut-/Kampfwerten.
@@ -282,12 +290,43 @@ function mergeAndHumanizeResults(
 } {
   const locale = snapshot.locale ?? "de";
   const deterministic = buildDeterministicCharacterTuvFindings(snapshot);
+  const detQuestions = buildDeterministicCharacterTuvQuestions(snapshot);
   const detIds = new Set(deterministic.map((f) => f.id));
+  const detFieldPaths = new Set(
+    [
+      ...deterministic.map((f) => f.fieldPath).filter(Boolean),
+      ...detQuestions.map((q) => q.fieldPath).filter(Boolean),
+    ] as string[],
+  );
   const aiDeduped = dedupeEquipmentFindingsAgainstDeterministic(
     parsed.findings,
     detIds,
   );
-  const aiFiltered = filterFalsePositiveAiFindings(snapshot, aiDeduped);
+  const aiFiltered = filterFalsePositiveAiFindings(snapshot, aiDeduped).filter(
+    (f) => {
+      // Keine KI-Doppelungen zu deterministischen Feldpfaden (Background, manualBonus, Features, …)
+      if (f.fieldPath && detFieldPaths.has(f.fieldPath)) return false;
+      const blob = `${f.title} ${f.detail}`.toLowerCase();
+      if (
+        detIds.has("det-background-missing") &&
+        /background|herkunft/.test(blob) &&
+        /(fehlt|missing|leer|empty|nicht\s+gesetzt|not\s+set|pflicht|required)/i.test(
+          blob,
+        )
+      ) {
+        return false;
+      }
+      if (
+        detIds.has("det-features-missing") &&
+        /(fehlende?\s+(erwartete\s+)?(klassen|unterklassen)?merkmale|missing\s+(expected\s+)?(class|subclass)\s+features)/i.test(
+          blob,
+        )
+      ) {
+        return false;
+      }
+      return true;
+    },
+  );
 
   // Deterministische Findings zuerst (bereits klar formuliert), dann KI (humanisiert)
   const mergedFindings = [
@@ -300,9 +339,31 @@ function mergeAndHumanizeResults(
       .filter((f) => !aiFiltered.some((k) => k.id === f.id))
       .map((f) => f.id),
   );
-  const questions = parsed.questions
-    .filter((q) => !q.findingId || !aiDroppedIds.has(q.findingId))
+  const aiQuestions = parsed.questions
+    .filter((q) => {
+      if (q.findingId && aiDroppedIds.has(q.findingId)) return false;
+      if (q.fieldPath && detFieldPaths.has(q.fieldPath)) return false;
+      // Doppelte Background-/Manual-Bonus-Fragen ohne fieldPath
+      const prompt = q.prompt.toLowerCase();
+      if (
+        detIds.has("det-background-missing") &&
+        /background|herkunft/.test(prompt)
+      ) {
+        return false;
+      }
+      if (
+        /manualbonus|manueller\s+bonus|bonus-?spalte|bonus\s+column|bonusoverride/i.test(
+          `${q.fieldPath ?? ""} ${q.prompt}`,
+        ) &&
+        [...detFieldPaths].some((p) => /manualBonus|bonusOverride/.test(p))
+      ) {
+        return false;
+      }
+      return true;
+    })
     .map((q) => humanizeCharacterTuvQuestion(q, locale));
+
+  const questions = [...detQuestions, ...aiQuestions].slice(0, 12);
 
   const summary = parsed.summary
     ? humanizeCharacterTuvText(parsed.summary, locale).slice(0, 600)
