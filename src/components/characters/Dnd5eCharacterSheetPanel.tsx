@@ -5,6 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import {
   Loader2,
   Save,
@@ -176,6 +177,16 @@ const ABILITY_HELP_USED_FOR: Record<AbilityKey, CharacterSheetMessageKey> = {
   cha: "ability.help.cha.usedFor",
 };
 
+/** Local help illustrations under public/images/abilities/ (full names — Windows reserves CON). */
+const ABILITY_HELP_IMAGES: Record<AbilityKey, string> = {
+  str: "/images/abilities/strength.jpg",
+  dex: "/images/abilities/dexterity.jpg",
+  con: "/images/abilities/constitution.jpg",
+  int: "/images/abilities/intelligence.jpg",
+  wis: "/images/abilities/wisdom.jpg",
+  cha: "/images/abilities/charisma.jpg",
+};
+
 const SKILL_HELP_WHAT: Record<Dnd5eSkillKey, CharacterSheetMessageKey> = {
   acr: "skill.help.acr.what",
   ani: "skill.help.ani.what",
@@ -228,6 +239,8 @@ function AbilityHelpModal({
   const { t, abilityLabel } = useCharacterSheetLocale();
   const Icon = ABILITY_ICONS[abilityKey];
   const name = abilityLabel(abilityKey);
+  const imageSrc = ABILITY_HELP_IMAGES[abilityKey];
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
@@ -235,45 +248,64 @@ function AbilityHelpModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`ability-help-${abilityKey}`}
-        className="w-full max-w-md rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-xl border border-hero-border bg-background-card shadow-2xl"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-hero-border/60 bg-hero-dark/50 text-accent-gold">
-              <Icon className="h-5 w-5" aria-hidden />
-            </span>
-            <h3
-              id={`ability-help-${abilityKey}`}
-              className="font-cinzel text-lg font-bold text-accent-gold truncate"
+        {imageSrc && !imageFailed ? (
+          <div className="relative aspect-[16/10] w-full bg-background-dark">
+            <Image
+              src={imageSrc}
+              alt=""
+              fill
+              sizes="(max-width: 448px) 100vw, 448px"
+              className="object-cover object-center"
+              onError={() => setImageFailed(true)}
+              priority
+            />
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background-card to-transparent"
+              aria-hidden
+            />
+          </div>
+        ) : null}
+        <div className="p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-hero-border/60 bg-hero-dark/50 text-accent-gold">
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <h3
+                id={`ability-help-${abilityKey}`}
+                className="font-cinzel text-lg font-bold text-accent-gold truncate"
+              >
+                {name}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-gray-400 hover:text-white"
+              aria-label={t("sheet.closeAria")}
             >
-              {name}
-            </h3>
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:text-white"
-            aria-label={t("sheet.closeAria")}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-              {t("ability.help.whatLabel")}
-            </p>
-            <p className="font-libre text-sm text-gray-200 leading-relaxed">
-              {t(ABILITY_HELP_WHAT[abilityKey])}
-            </p>
-          </div>
-          <div>
-            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-              {t("ability.help.usedForLabel")}
-            </p>
-            <p className="font-libre text-sm text-gray-200 leading-relaxed">
-              {t(ABILITY_HELP_USED_FOR[abilityKey])}
-            </p>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                {t("ability.help.whatLabel")}
+              </p>
+              <p className="font-libre text-sm text-gray-200 leading-relaxed">
+                {t(ABILITY_HELP_WHAT[abilityKey])}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                {t("ability.help.usedForLabel")}
+              </p>
+              <p className="font-libre text-sm text-gray-200 leading-relaxed">
+                {t(ABILITY_HELP_USED_FOR[abilityKey])}
+              </p>
+            </div>
           </div>
         </div>
       </div>
