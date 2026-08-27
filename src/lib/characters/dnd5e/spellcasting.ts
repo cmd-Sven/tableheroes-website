@@ -1,5 +1,6 @@
 import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSpellEntry, Dnd5eSpellSlots } from "./types";
+import { stripFoundryEnrichers } from "./foundry-enrichers";
 
 /** Wie die Klasse Zauber handhabt (Vorbereitung vs. bekannt vs. Pakt). */
 export type SpellPreparationStyle = "prepared" | "known" | "pact" | "none";
@@ -107,20 +108,19 @@ export function localizedFeatureDescription(
   feature: Dnd5eFeatureEntry,
   locale: CharacterSheetLocale,
 ): string | null {
-  if (locale === "de") {
-    return (
-      feature.descriptionDe?.trim() ||
-      feature.description?.trim() ||
-      feature.descriptionEn?.trim() ||
-      null
-    );
-  }
-  return (
-    feature.descriptionEn?.trim() ||
-    feature.description?.trim() ||
-    feature.descriptionDe?.trim() ||
-    null
-  );
+  const raw =
+    locale === "de"
+      ? feature.descriptionDe?.trim() ||
+        feature.description?.trim() ||
+        feature.descriptionEn?.trim() ||
+        null
+      : feature.descriptionEn?.trim() ||
+        feature.description?.trim() ||
+        feature.descriptionDe?.trim() ||
+        null;
+  if (!raw) return null;
+  const cleaned = stripFoundryEnrichers(raw);
+  return cleaned || null;
 }
 
 const SCHOOL_LABELS: Record<string, { de: string; en: string }> = {

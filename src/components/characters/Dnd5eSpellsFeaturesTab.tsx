@@ -5,11 +5,13 @@ import {
   BookMarked,
   ChevronDown,
   ChevronRight,
+  HelpCircle,
   Pencil,
   Plus,
   Sparkles,
   Trash2,
   Wand2,
+  X,
 } from "lucide-react";
 import type {
   AbilityKey,
@@ -239,31 +241,55 @@ function SpellCard({
 }
 
 function FeatureCard({ feature }: { feature: Dnd5eFeatureEntry }) {
-  const { locale } = useCharacterSheetLocale();
-  const [open, setOpen] = useState(false);
+  const { locale, t } = useCharacterSheetLocale();
+  const [helpOpen, setHelpOpen] = useState(false);
   const name = localizedFeatureName(feature, locale);
   const description = localizedFeatureDescription(feature, locale);
 
   return (
-    <div className="rounded border border-hero-border/40 bg-hero-dark/20 p-3">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-2 text-left"
-      >
-        <span className="min-w-0 flex-1 font-barlow text-sm font-bold text-white">{name}</span>
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-        )}
-      </button>
-      {open && description ? (
-        <p className="mt-2 border-t border-hero-dark/60 pt-2 font-libre text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">
-          {description}
-        </p>
+    <>
+      <div className="flex items-start justify-between gap-2 rounded border border-hero-border/40 bg-hero-dark/20 p-3">
+        <p className="min-w-0 flex-1 font-barlow text-sm font-bold text-white">{name}</p>
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+          aria-label={t("features.help.aria", { name })}
+        >
+          <HelpCircle className="h-4 w-4" />
+        </button>
+      </div>
+      {helpOpen ? (
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`feature-help-${feature.id}`}
+            className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <h3
+                id={`feature-help-${feature.id}`}
+                className="font-cinzel text-lg font-bold text-accent-gold"
+              >
+                {name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(false)}
+                className="shrink-0 rounded p-1 text-gray-400 hover:text-white"
+                aria-label={t("sheet.closeAria")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+              {description?.trim() ? description : t("features.help.empty")}
+            </p>
+          </div>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 

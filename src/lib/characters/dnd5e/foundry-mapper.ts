@@ -17,6 +17,7 @@ import { normalizeEquipmentState } from "./equipment";
 import { sanitizeActorDisplayLabel } from "@/src/lib/foundry-sync/actor-display-labels";
 import { defaultSpellAbilityForClass } from "./spellcasting";
 import { normalizeProficiencyList } from "./progression/proficiencies-catalog";
+import { stripFoundryEnrichers } from "./foundry-enrichers";
 
 type FoundryAbilityBlock = {
   value?: number;
@@ -334,7 +335,8 @@ function mapFoundrySkills(
 function stripHtml(html: string | null | undefined): string | null {
   if (!html || typeof html !== "string") return null;
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  return text || null;
+  const cleaned = stripFoundryEnrichers(text);
+  return cleaned || null;
 }
 
 function readOptionalString(value: unknown): string | null {
@@ -388,8 +390,12 @@ function mapFoundryFeats(items: unknown): Dnd5eFeatureEntry[] {
         nameDe: bilingual.nameDe,
         nameEn: bilingual.nameEn,
         description,
-        descriptionDe: bilingual.descriptionDe,
-        descriptionEn: bilingual.descriptionEn,
+        descriptionDe: bilingual.descriptionDe
+          ? stripFoundryEnrichers(bilingual.descriptionDe) || null
+          : null,
+        descriptionEn: bilingual.descriptionEn
+          ? stripFoundryEnrichers(bilingual.descriptionEn) || null
+          : null,
         source: "foundry",
       } satisfies Dnd5eFeatureEntry;
     })

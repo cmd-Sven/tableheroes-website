@@ -175,6 +175,48 @@ const ABILITY_HELP_USED_FOR: Record<AbilityKey, CharacterSheetMessageKey> = {
   cha: "ability.help.cha.usedFor",
 };
 
+const SKILL_HELP_WHAT: Record<Dnd5eSkillKey, CharacterSheetMessageKey> = {
+  acr: "skill.help.acr.what",
+  ani: "skill.help.ani.what",
+  arc: "skill.help.arc.what",
+  ath: "skill.help.ath.what",
+  dec: "skill.help.dec.what",
+  his: "skill.help.his.what",
+  ins: "skill.help.ins.what",
+  itm: "skill.help.itm.what",
+  inv: "skill.help.inv.what",
+  med: "skill.help.med.what",
+  nat: "skill.help.nat.what",
+  prc: "skill.help.prc.what",
+  prf: "skill.help.prf.what",
+  per: "skill.help.per.what",
+  rel: "skill.help.rel.what",
+  slt: "skill.help.slt.what",
+  ste: "skill.help.ste.what",
+  surv: "skill.help.surv.what",
+};
+
+const SKILL_HELP_EXAMPLES: Record<Dnd5eSkillKey, CharacterSheetMessageKey> = {
+  acr: "skill.help.acr.examples",
+  ani: "skill.help.ani.examples",
+  arc: "skill.help.arc.examples",
+  ath: "skill.help.ath.examples",
+  dec: "skill.help.dec.examples",
+  his: "skill.help.his.examples",
+  ins: "skill.help.ins.examples",
+  itm: "skill.help.itm.examples",
+  inv: "skill.help.inv.examples",
+  med: "skill.help.med.examples",
+  nat: "skill.help.nat.examples",
+  prc: "skill.help.prc.examples",
+  prf: "skill.help.prf.examples",
+  per: "skill.help.per.examples",
+  rel: "skill.help.rel.examples",
+  slt: "skill.help.slt.examples",
+  ste: "skill.help.ste.examples",
+  surv: "skill.help.surv.examples",
+};
+
 function AbilityHelpModal({
   abilityKey,
   onClose,
@@ -233,6 +275,112 @@ function AbilityHelpModal({
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillHelpModal({
+  skillKey,
+  onClose,
+}: {
+  skillKey: Dnd5eSkillKey;
+  onClose: () => void;
+}) {
+  const { t, skillLabel } = useCharacterSheetLocale();
+  const name = skillLabel(skillKey);
+  const examples = t(SKILL_HELP_EXAMPLES[skillKey])
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`skill-help-${skillKey}`}
+        className="w-full max-w-md rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3
+            id={`skill-help-${skillKey}`}
+            className="font-cinzel text-lg font-bold text-accent-gold truncate"
+          >
+            {name}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:text-white"
+            aria-label={t("sheet.closeAria")}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("skill.help.whatLabel")}
+            </p>
+            <p className="font-libre text-sm text-gray-200 leading-relaxed">
+              {t(SKILL_HELP_WHAT[skillKey])}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              {t("skill.help.examplesLabel")}
+            </p>
+            <ul className="list-disc space-y-1.5 pl-5 font-libre text-sm text-gray-200 leading-relaxed">
+              {examples.map((example) => (
+                <li key={example}>{example}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureHelpModal({
+  title,
+  description,
+  onClose,
+}: {
+  title: string;
+  description: string | null;
+  onClose: () => void;
+}) {
+  const { t } = useCharacterSheetLocale();
+
+  return (
+    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feature-help-title"
+        className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3
+            id="feature-help-title"
+            className="font-cinzel text-lg font-bold text-accent-gold"
+          >
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded p-1 text-gray-400 hover:text-white"
+            aria-label={t("sheet.closeAria")}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+          {description?.trim() ? description : t("features.help.empty")}
+        </p>
       </div>
     </div>
   );
@@ -456,6 +604,11 @@ export function Dnd5eCharacterSheetPanel({
   const [editMode, setEditMode] = useState(false);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
   const [abilityHelpKey, setAbilityHelpKey] = useState<AbilityKey | null>(null);
+  const [skillHelpKey, setSkillHelpKey] = useState<Dnd5eSkillKey | null>(null);
+  const [featureHelp, setFeatureHelp] = useState<{
+    title: string;
+    description: string | null;
+  } | null>(null);
   const [featPicker, setFeatPicker] = useState<null | "add" | number>(null);
   const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
   const [loading, setLoading] = useState(true);
@@ -1768,7 +1921,7 @@ export function Dnd5eCharacterSheetPanel({
                             </span>
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {!readOnly ? (
                             <NumberInput
                               value={entry.manualBonus ?? 0}
@@ -1780,6 +1933,14 @@ export function Dnd5eCharacterSheetPanel({
                           <span className="font-barlow text-sm text-accent-gold w-8 text-right">
                             {formatSigned(skillDerived.total)}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setSkillHelpKey(def.key)}
+                            className="rounded p-0.5 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                            aria-label={t("skill.help.aria", { name: skillLabel(def.key) })}
+                          >
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -2086,27 +2247,39 @@ export function Dnd5eCharacterSheetPanel({
                       const catalogMatch = matchSheetFeatureToFeat(feat);
                       const isCatalog =
                         feat.source === "srd-feat" || Boolean(catalogMatch);
+                      const featName = localizedFeatureName(feat, locale);
+                      const featDescription = localizedFeatureDescription(feat, locale);
                       return (
                       <div
                         key={feat.id}
                         className="rounded border border-hero-border/40 bg-hero-dark/20 p-2.5"
                       >
                         {readOnly ? (
-                          <>
-                            <p className="font-barlow text-sm font-bold text-white">
-                              {localizedFeatureName(feat, locale)}
-                            </p>
-                            {isCatalog ? (
-                              <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
-                                {t("featCatalog.matchedBadge")}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-barlow text-sm font-bold text-white">
+                                {featName}
                               </p>
-                            ) : null}
-                            {localizedFeatureDescription(feat, locale) ? (
-                              <p className="mt-1 font-libre text-xs text-gray-400 whitespace-pre-wrap line-clamp-4">
-                                {localizedFeatureDescription(feat, locale)}
-                              </p>
-                            ) : null}
-                          </>
+                              {isCatalog ? (
+                                <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
+                                  {t("featCatalog.matchedBadge")}
+                                </p>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFeatureHelp({
+                                  title: featName,
+                                  description: featDescription,
+                                })
+                              }
+                              className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                              aria-label={t("features.help.aria", { name: featName })}
+                            >
+                              <HelpCircle className="h-4 w-4" />
+                            </button>
+                          </div>
                         ) : (
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
@@ -2115,6 +2288,21 @@ export function Dnd5eCharacterSheetPanel({
                                 onChange={(v) => updateFeature(index, { name: v })}
                                 className="flex-1 !text-sm"
                               />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFeatureHelp({
+                                    title: featName || feat.name,
+                                    description: featDescription,
+                                  })
+                                }
+                                className="rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                                aria-label={t("features.help.aria", {
+                                  name: featName || feat.name,
+                                })}
+                              >
+                                <HelpCircle className="h-4 w-4" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => removeFeature(index)}
@@ -2509,6 +2697,21 @@ export function Dnd5eCharacterSheetPanel({
         <AbilityHelpModal
           abilityKey={abilityHelpKey}
           onClose={() => setAbilityHelpKey(null)}
+        />
+      ) : null}
+
+      {skillHelpKey ? (
+        <SkillHelpModal
+          skillKey={skillHelpKey}
+          onClose={() => setSkillHelpKey(null)}
+        />
+      ) : null}
+
+      {featureHelp ? (
+        <FeatureHelpModal
+          title={featureHelp.title}
+          description={featureHelp.description}
+          onClose={() => setFeatureHelp(null)}
         />
       ) : null}
       </div>

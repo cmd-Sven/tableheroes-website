@@ -688,6 +688,85 @@ export const characterSheetMessagesEn = {
   "ability.help.cha.usedFor":
     "Performance, Intimidation, Deception, Persuasion; spellcasting (Bard, Paladin, Warlock, Sorcerer); Charisma saving throws.",
 
+  "skill.help.aria": "Help: {name}",
+  "skill.help.whatLabel": "What is it for?",
+  "skill.help.examplesLabel": "Examples",
+  "skill.help.acr.what":
+    "Dexterity checks for balance, tumbles, and body control under pressure.",
+  "skill.help.acr.examples":
+    "Walk a narrow ledge\nSlip free of bonds or a net\nBreak a fall or stick a landing on a rooftop",
+  "skill.help.ani.what":
+    "Wisdom checks to calm, guide, or read the behavior of animals.",
+  "skill.help.ani.examples":
+    "Calm a spooked horse\nStop a dog from attacking\nTell whether an animal is sick or aggressive",
+  "skill.help.arc.what":
+    "Intelligence checks about magic, artifacts, arcane traditions, and occult lore.",
+  "skill.help.arc.examples":
+    "Identify a magical effect or rune\nRecall lore about elementals or schools of magic\nRecognize a spell formula in an old tome",
+  "skill.help.ath.what":
+    "Strength checks for climbing, jumping, swimming, and feats of physical power.",
+  "skill.help.ath.examples":
+    "Scale a wall\nForce open a door or shove someone aside\nSwim against a strong current",
+  "skill.help.dec.what":
+    "Charisma checks to lie, bluff, or sell a false identity convincingly.",
+  "skill.help.dec.examples":
+    "Talk a guard out of stopping you with a fake story\nPass as a merchant or noble\nSell a forged contract as genuine",
+  "skill.help.his.what":
+    "Intelligence checks about historical events, legends, dynasties, and ancient realms.",
+  "skill.help.his.examples":
+    "Recognize a coat of arms or monument\nRecall an old war or treaty\nLink a ruin to a known culture",
+  "skill.help.ins.what":
+    "Wisdom checks to read intentions, lies, and emotional cues in others.",
+  "skill.help.ins.examples":
+    "Tell whether someone is lying\nSense the real mood in a negotiation\nSpot a potential traitor in the group",
+  "skill.help.itm.what":
+    "Charisma checks to influence others through threats, presence, or fear.",
+  "skill.help.itm.examples":
+    "Force a bandit to stand down\nExtract information with a threat\nScare a crowd into backing off",
+  "skill.help.inv.what":
+    "Intelligence checks to find clues, deduce facts, and piece evidence together.",
+  "skill.help.inv.examples":
+    "Search a crime scene for traces\nFind a hidden door or trap\nExpose a code or forged letter",
+  "skill.help.med.what":
+    "Wisdom checks to diagnose wounds, give first aid, and assess illness or injury.",
+  "skill.help.med.examples":
+    "Determine cause of death\nStabilize or treat a wound\nRecognize a disease or poisoning",
+  "skill.help.nat.what":
+    "Intelligence checks about terrain, plants, weather, and natural creatures.",
+  "skill.help.nat.examples":
+    "Tell a poisonous plant from a healing one\nRead wolf or bear tracks\nPredict an incoming storm",
+  "skill.help.prc.what":
+    "Wisdom checks to notice details by sight, hearing, or gut awareness before others do.",
+  "skill.help.prc.examples":
+    "Spot a hidden archer\nHear whispering behind a door\nNotice a trap or ambush early",
+  "skill.help.prf.what":
+    "Charisma checks for music, acting, dance, or other performances before an audience.",
+  "skill.help.prf.examples":
+    "Perform in a tavern and earn tips\nSell a role while disguised\nTurn a crowd's mood with music",
+  "skill.help.per.what":
+    "Charisma checks to persuade politely, negotiate, or build trust.",
+  "skill.help.per.examples":
+    "Talk a merchant into a discount\nAsk an official for help\nBroker a compromise between rivals",
+  "skill.help.rel.what":
+    "Intelligence checks about deities, rites, holy symbols, and religious organizations.",
+  "skill.help.rel.examples":
+    "Identify a cult symbol or altar\nRecall a god's tenets or rites\nRecognize a curse or blessing as divine in nature",
+  "skill.help.slt.what":
+    "Dexterity checks for pickpocketing, slight tricks, and subtle handiwork.",
+  "skill.help.slt.examples":
+    "Lift someone's purse\nSwap an item unnoticed\nPick a lock or mark a card",
+  "skill.help.ste.what":
+    "Dexterity checks to hide, move quietly, or stay unnoticed.",
+  "skill.help.ste.examples":
+    "Sneak past a guard\nHide in shadows or underbrush\nFollow a target without being seen",
+  "skill.help.surv.what":
+    "Wisdom checks for wilderness survival: tracking, navigation, camps, and foraging.",
+  "skill.help.surv.examples":
+    "Track footprints through the woods\nFind a safe campsite\nForage edible plants or get your bearings",
+
+  "features.help.aria": "Explain: {name}",
+  "features.help.empty": "No description available.",
+
   "tuv.title": "Character Inspection",
   "tuv.subtitle":
     "AI checks attributes, modifiers, HP, features, and manual overrides (e.g. AC override) against D&D 2024.",

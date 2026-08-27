@@ -689,6 +689,85 @@ export const characterSheetMessagesDe = {
   "ability.help.cha.usedFor":
     "Auftreten, Einschüchtern, Täuschen, Überzeugen; Zauberattribut (Barde, Paladin, Hexenmeister, Zauberer); Charisma-Rettungswürfe.",
 
+  "skill.help.aria": "Hilfe: {name}",
+  "skill.help.whatLabel": "Wofür?",
+  "skill.help.examplesLabel": "Beispiele",
+  "skill.help.acr.what":
+    "Geschicklichkeitsprüfungen für Balance, Saltos und Körperkontrolle unter Druck.",
+  "skill.help.acr.examples":
+    "Über einen schmalen Grat laufen\nSich aus Fesseln oder Netzen winden\nEinen Sturz abfangen oder auf dem Dach landen",
+  "skill.help.ani.what":
+    "Weisheitsprüfungen, um Tiere zu beruhigen, zu lenken oder ihr Verhalten einzuschätzen.",
+  "skill.help.ani.examples":
+    "Ein scheues Pferd beruhigen\nEinen Hund von einem Angriff abbringen\nErkennen, ob ein Tier krank oder aggressiv ist",
+  "skill.help.arc.what":
+    "Intelligenzprüfungen zu Magie, Artefakten, magischen Traditionen und okkultem Wissen.",
+  "skill.help.arc.examples":
+    "Einen magischen Effekt oder eine Rune identifizieren\nWissen über Elementare oder Magieschulen abrufen\nEine Zauberformel in einem alten Buch erkennen",
+  "skill.help.ath.what":
+    "Stärkeprüfungen für Klettern, Springen, Schwimmen und körperliche Kraftakte.",
+  "skill.help.ath.examples":
+    "Eine Mauer hochklettern\nEine Tür aufbrechen oder jemanden wegstemmen\nGegen die Strömung schwimmen",
+  "skill.help.dec.what":
+    "Charisma-Prüfungen, um zu lügen, zu bluffen oder eine falsche Identität glaubhaft zu machen.",
+  "skill.help.dec.examples":
+    "Eine Wache mit einer erfundenen Geschichte abwimmeln\nAls Händler oder Adliger auftreten\nEinen gefälschten Vertrag glaubhaft verkaufen",
+  "skill.help.his.what":
+    "Intelligenzprüfungen zu historischen Ereignissen, Legenden, Herrscherhäusern und alten Reichen.",
+  "skill.help.his.examples":
+    "Die Herkunft eines Wappens oder Denkmals erkennen\nSich an einen alten Krieg oder Vertrag erinnern\nEine Ruine einer bekannten Kultur zuordnen",
+  "skill.help.ins.what":
+    "Weisheitsprüfungen, um Absichten, Lügen und emotionale Zustände anderer zu durchschauen.",
+  "skill.help.ins.examples":
+    "Erkennen, ob jemand lügt\nDie wahre Stimmung in einer Verhandlung spüren\nEinen Verräter in der Gruppe verdächtigen",
+  "skill.help.itm.what":
+    "Charisma-Prüfungen, um durch Drohungen, Präsenz oder Furcht Einfluss zu nehmen.",
+  "skill.help.itm.examples":
+    "Einen Banditen zur Aufgabe zwingen\nInformationen durch Drohung erzwingen\nEine Meute einschüchtern, damit sie zurückweicht",
+  "skill.help.inv.what":
+    "Intelligenzprüfungen zum Suchen von Hinweisen, Deduktion und logischem Zusammensetzen von Fakten.",
+  "skill.help.inv.examples":
+    "Einen Tatort nach Spuren absuchen\nEine versteckte Tür oder Falle finden\nEinen Code oder gefälschten Brief entlarven",
+  "skill.help.med.what":
+    "Weisheitsprüfungen zur Diagnose, Ersten Hilfe und Einschätzung von Verletzungen oder Krankheiten.",
+  "skill.help.med.examples":
+    "Feststellen, woran jemand gestorben ist\nEine Wunde stabilisieren oder behandeln\nEine Krankheit oder Vergiftung erkennen",
+  "skill.help.nat.what":
+    "Intelligenzprüfungen zu Gelände, Pflanzen, Wetter und natürlichen Kreaturen.",
+  "skill.help.nat.examples":
+    "Eine giftige Pflanze von einer heilenden unterscheiden\nSpuren eines Wolfes oder Bären deuten\nVorhersagen, ob ein Unwetter aufzieht",
+  "skill.help.prc.what":
+    "Weisheitsprüfungen, um Details zu sehen, zu hören oder zu bemerken, bevor andere sie entdecken.",
+  "skill.help.prc.examples":
+    "Einen versteckten Bogenschützen entdecken\nFlüstern hinter der Tür hören\nEine Falle oder ein Ambush frühzeitig bemerken",
+  "skill.help.prf.what":
+    "Charisma-Prüfungen für Musik, Schauspiel, Tanz oder andere Darbietungen vor Publikum.",
+  "skill.help.prf.examples":
+    "In einer Taverne auftreten und Trinkgeld verdienen\nEine Rolle in einer Verkleidung glaubhaft spielen\nMit Musik die Stimmung einer Menge wenden",
+  "skill.help.per.what":
+    "Charisma-Prüfungen, um höflich zu überzeugen, zu verhandeln oder Vertrauen aufzubauen.",
+  "skill.help.per.examples":
+    "Einen Händler zu einem Rabatt überreden\nEinen Beamten um Hilfe bitten\nZwei Streitparteien zu einem Kompromiss bewegen",
+  "skill.help.rel.what":
+    "Intelligenzprüfungen zu Gottheiten, Riten, heiligen Symbolen und religiösen Organisationen.",
+  "skill.help.rel.examples":
+    "Ein Kultsymbol oder einen Altar identifizieren\nWissen über einen Gott oder dessen Gebote abrufen\nEinen Fluch oder Segen als religiösen Effekt erkennen",
+  "skill.help.slt.what":
+    "Geschicklichkeitsprüfungen für Taschendiebstahl, kleine Tricks und unauffällige Handgriffe.",
+  "skill.help.slt.examples":
+    "Jemandem die Börse entwenden\nEinen Gegenstand unbemerkt austauschen\nEin Schloss knacken oder eine Karte markieren",
+  "skill.help.ste.what":
+    "Geschicklichkeitsprüfungen, um sich zu verstecken, leise zu bewegen oder unbemerkt zu bleiben.",
+  "skill.help.ste.examples":
+    "An einer Wache vorbeischleichen\nSich in Schatten oder Gebüsch verstecken\nLeise einem Ziel folgen, ohne entdeckt zu werden",
+  "skill.help.surv.what":
+    "Weisheitsprüfungen zum Überleben in der Wildnis: Spuren, Orientierung, Lager und Jagd.",
+  "skill.help.surv.examples":
+    "Spuren durch den Wald verfolgen\nEinen sicheren Lagerplatz finden\nEssbare Pflanzen sammeln oder sich orientieren",
+
+  "features.help.aria": "Erklärung: {name}",
+  "features.help.empty": "Keine Beschreibung hinterlegt.",
+
   "tuv.title": "Charakter-TÜV",
   "tuv.subtitle":
     "KI prüft Attribute, Modifikatoren, HP, Merkmale und manuelle Overrides (z. B. RK-Override) nach D&D 2024.",
