@@ -43,8 +43,19 @@ import {
   resolveClassId,
 } from "./progression";
 import type { ProgressionFeature } from "./progression/types";
+import { stripFoundryEnrichers } from "./foundry-enrichers";
 
 export type CharacterTuvFindingSeverity = "error" | "warning" | "hint" | "info";
+
+/** Interaktive Hilfe-Einträge (z. B. fehlende Klassenmerkmale im TÜV). */
+export type CharacterTuvFindingHelpItem = {
+  id: string;
+  title: string;
+  /** Kurze Erklärung (eine Zeile / erster Satz) */
+  summary?: string | null;
+  /** Vollständige, bereinigte Beschreibung für das Hilfe-Modal */
+  description?: string | null;
+};
 
 export type CharacterTuvFinding = {
   id: string;
@@ -56,6 +67,8 @@ export type CharacterTuvFinding = {
   /** Pfad im Sheet, z. B. combat.acOverride */
   fieldPath?: string | null;
   resolved?: boolean;
+  /** Optionale Hilfe-Einträge (Titel + Kurztext + Modal-Beschreibung) */
+  helpItems?: CharacterTuvFindingHelpItem[];
 };
 
 export type CharacterTuvQuestion = {
@@ -214,6 +227,10 @@ export type CharacterTuvFeatureChecklistEntry = {
   displayName: string;
   present: boolean;
   subclassScoped: boolean;
+  /** Kurze Erklärung aus dem Progressionskatalog (ohne Foundry-Markup) */
+  summary: string | null;
+  /** Vollständige Beschreibung aus dem Katalog (ohne Foundry-Markup) */
+  description: string | null;
 };
 
 export type CharacterTuvFeatureChecklist = {
@@ -422,6 +439,36 @@ function featureDisplayName(
     return nameDe && nameDe !== nameEn ? `${nameEn} (${nameDe})` : nameEn;
   }
   return nameEn && nameEn !== nameDe ? `${nameDe} (${nameEn})` : nameDe;
+}
+
+/** Katalogbeschreibung für Locale wählen und Foundry-Enricher entfernen. */
+function cleanedFeatureDescription(
+  f: ProgressionFeature,
+  locale: "de" | "en",
+): string | null {
+  const raw =
+    locale === "en"
+      ? f.descriptionEn?.trim() || f.descriptionDe?.trim() || ""
+      : f.descriptionDe?.trim() || f.descriptionEn?.trim() || "";
+  if (!raw) return null;
+  const cleaned = stripFoundryEnrichers(raw);
+  return cleaned || null;
+}
+
+/** Erster Satz / erste Zeile als Kurztext für die TÜV-Liste. */
+function featureDescriptionSummary(
+  full: string | null | undefined,
+  maxLen = 160,
+): string | null {
+  if (!full?.trim()) return null;
+  const text = full.trim();
+  const firstLine = text.split(/\n+/)[0]?.trim() || text;
+  const sentenceMatch = firstLine.match(/^(.+?[.!?])(?:\s|$)/);
+  let summary = (sentenceMatch?.[1] ?? firstLine).trim();
+  if (summary.length > maxLen) {
+    summary = `${summary.slice(0, Math.max(1, maxLen - 1)).trimEnd()}…`;
+  }
+  return summary || null;
 }
 
 /** ASI / Epic Boon / generische Unterklassen-Platzhalter — keine prüfbaren Kernmerkmale. */
@@ -733,6 +780,7 @@ export function buildCharacterTuvFeatureChecklist(
       const present = sheetFeatures.some((entry) =>
         sheetFeatureMatchesProgression(entry, f),
       );
+      const description = cleanedFeatureDescription(f, locale);
       return {
         id: f.id,
         level: f.level,
@@ -741,6 +789,8 @@ export function buildCharacterTuvFeatureChecklist(
         displayName: featureDisplayName(f.nameDe, f.nameEn, locale),
         present,
         subclassScoped: Boolean(f.subclass),
+        summary: featureDescriptionSummary(description),
+        description,
       };
     },
   );
@@ -1002,19 +1052,29 @@ export function buildDeterministicFeatureFindings(
     checklist.missing.length > listed.length
       ? checklist.missing.length - listed.length
       : 0;
-  const bullet = listed
-    .map((m) =>
+
+  const classLabel = checklist.classDisplayName ?? "";
+  const helpItems: CharacterTuvFindingHelpItem[] = listed.map((m) => {
+    const scopeTag =
       locale === "en"
-        ? `• Level ${m.level}: ${m.displayName}${m.subclassScoped ? " [subclass]" : ""}`
-        : `• Stufe ${m.level}: ${m.displayName}${m.subclassScoped ? " [Unterklasse]" : ""}`,
-    )
-    .join("\n");
-  const moreLine =
-    more > 0
-      ? locale === "en"
-        ? `\n… and ${more} more.`
-        : `\n… und ${more} weitere.`
-      : "";
+        ? m.subclassScoped
+          ? " [subclass]"
+          : ""
+        : m.subclassScoped
+          ? " [Unterklasse]"
+          : "";
+    const levelLabel =
+      locale === "en" ? `Level ${m.level}` : `Stufe ${m.level}`;
+    const title = classLabel
+      ? `${classLabel} – ${levelLabel}: ${m.displayName}${scopeTag}`
+      : `${levelLabel}: ${m.displayName}${scopeTag}`;
+    return {
+      id: m.id,
+      title,
+      summary: m.summary,
+      description: m.description,
+    };
+  });
 
   const scopeNote =
     locale === "en"
@@ -1031,12 +1091,14 @@ export function buildDeterministicFeatureFindings(
         checklist.noteEn,
         scopeNote,
         "Compared against the D&D 2024 progression catalog for this class, subclass, and level.",
-        "Missing:",
-        bullet + moreLine,
+        more > 0 ? `… and ${more} further features not listed here.` : null,
         "Custom/manual features beyond the catalog are allowed and not flagged as errors.",
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       fieldPath: "features",
       resolved: false,
+      helpItems,
     });
   } else {
     findings.push({
@@ -1048,12 +1110,14 @@ export function buildDeterministicFeatureFindings(
         checklist.noteDe,
         scopeNote,
         "Verglichen mit dem D&D-2024-Progressionskatalog für diese Klasse, Unterklasse und Stufe.",
-        "Es fehlen:",
-        bullet + moreLine,
+        more > 0 ? `… und ${more} weitere Merkmale nicht in dieser Liste.` : null,
         "Eigene/manuelle Merkmale außerhalb des Katalogs sind erlaubt und werden nicht als Fehler gemeldet.",
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       fieldPath: "features",
       resolved: false,
+      helpItems,
     });
   }
 
@@ -1532,6 +1596,15 @@ export function humanizeCharacterTuvFinding(
     ...finding,
     title: humanizeCharacterTuvText(finding.title, locale),
     detail: humanizeCharacterTuvText(finding.detail, locale),
+    helpItems: finding.helpItems?.map((item) => ({
+      ...item,
+      title: humanizeCharacterTuvText(item.title, locale),
+      summary: item.summary
+        ? humanizeCharacterTuvText(item.summary, locale)
+        : item.summary,
+      // Katalogtexte bleiben unverändert (bereits DE/EN, kein Key-Ersatz nötig)
+      description: item.description,
+    })),
   };
 }
 

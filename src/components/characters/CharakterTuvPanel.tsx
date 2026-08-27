@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import {
   BadgeCheck,
   ClipboardCheck,
+  HelpCircle,
   Loader2,
   MessageCircleQuestion,
   ShieldAlert,
@@ -22,10 +23,12 @@ import {
   withAnswersApplied,
   withFindingResolved,
   type CharacterTuvFinding,
+  type CharacterTuvFindingHelpItem,
   type CharacterTuvState,
 } from "@/src/lib/characters/dnd5e/character-tuv";
 import type { Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
 import type { CharacterItem } from "@/src/types/inventory";
+import { FeatureHelpModal } from "@/src/components/characters/FeatureHelpModal";
 
 type Meta = {
   name: string;
@@ -76,6 +79,9 @@ export function CharakterTuvPanel({
   const { t, locale } = useCharacterSheetLocale();
   const [busy, setBusy] = useState(false);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
+  const [featureHelp, setFeatureHelp] = useState<CharacterTuvFindingHelpItem | null>(
+    null,
+  );
 
   const tuv: CharacterTuvState = useMemo(() => {
     return (
@@ -265,9 +271,42 @@ export function CharakterTuvPanel({
                           {f.title}
                           {f.resolved ? ` · ${t("tuv.resolved")}` : ""}
                         </p>
-                        <p className="mt-1 font-libre text-sm text-gray-300 leading-relaxed">
+                        <p className="mt-1 font-libre text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
                           {f.detail}
                         </p>
+                        {f.helpItems && f.helpItems.length > 0 ? (
+                          <ul className="mt-2 space-y-2">
+                            {f.helpItems.map((item) => (
+                              <li
+                                key={item.id}
+                                className="rounded border border-hero-dark/50 bg-background-dark/40 px-2.5 py-2"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-barlow text-xs font-bold uppercase tracking-wide text-gray-100">
+                                      {item.title}
+                                    </p>
+                                    {item.summary ? (
+                                      <p className="mt-0.5 font-libre text-sm text-gray-400 leading-relaxed">
+                                        {item.summary}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFeatureHelp(item)}
+                                    className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                                    aria-label={t("features.help.aria", {
+                                      name: item.title,
+                                    })}
+                                  >
+                                    <HelpCircle className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                       {!f.resolved && !readOnly && f.severity !== "info" ? (
                         <button
@@ -350,6 +389,14 @@ export function CharakterTuvPanel({
           {t("tuv.emptyHint")}
         </p>
       )}
+
+      {featureHelp ? (
+        <FeatureHelpModal
+          title={featureHelp.title}
+          description={featureHelp.description ?? null}
+          onClose={() => setFeatureHelp(null)}
+        />
+      ) : null}
     </section>
   );
 }

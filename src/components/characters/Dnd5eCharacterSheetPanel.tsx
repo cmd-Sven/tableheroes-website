@@ -71,6 +71,7 @@ import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPan
 import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
 import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
 import { CharakterTuvPanel } from "@/src/components/characters/CharakterTuvPanel";
+import { FeatureHelpModal } from "@/src/components/characters/FeatureHelpModal";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
 import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
@@ -371,49 +372,6 @@ function SkillHelpModal({
             </ul>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function FeatureHelpModal({
-  title,
-  description,
-  onClose,
-}: {
-  title: string;
-  description: string | null;
-  onClose: () => void;
-}) {
-  const { t } = useCharacterSheetLocale();
-
-  return (
-    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="feature-help-title"
-        className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl border border-hero-border bg-background-card p-5 shadow-2xl"
-      >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3
-            id="feature-help-title"
-            className="font-cinzel text-lg font-bold text-accent-gold"
-          >
-            {title}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded p-1 text-gray-400 hover:text-white"
-            aria-label={t("sheet.closeAria")}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="font-libre text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-          {description?.trim() ? description : t("features.help.empty")}
-        </p>
       </div>
     </div>
   );
