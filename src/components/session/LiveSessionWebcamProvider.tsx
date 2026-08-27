@@ -1,6 +1,7 @@
 /**
- * LiveSessionWebcamProvider — WebRTC mesh for sharing avatar and GM webcam streams in live sessions.
- * Uses Supabase Realtime broadcast for signaling; video tracks flow peer-to-peer.
+ * LiveSessionWebcamProvider — Die Gesichter am virtuellen Tisch.
+ * WebRTC-Mesh für Avatar- und SL-Webcams; Signaling über Realtime-Broadcast,
+ * Video läuft Peer-to-Peer — wer den Überblick verliert, sieht nur noch Schatten.
  */
 "use client";
 
@@ -122,6 +123,16 @@ export function LiveSessionWebcamProvider({
     async (streamKey: string, targetUserId: string, stream: MediaStream) => {
       if (targetUserId === userId) return;
       const key = pcKey(streamKey, targetUserId);
+      const existing = pcsRef.current.get(key);
+      // Avoid reconnect storms when presence syncs with unchanged membership.
+      if (
+        existing &&
+        (existing.connectionState === "connected" ||
+          existing.connectionState === "connecting" ||
+          existing.connectionState === "new")
+      ) {
+        return;
+      }
       closePc(key);
 
       const pc = new RTCPeerConnection({ iceServers: DEFAULT_ICE_SERVERS });

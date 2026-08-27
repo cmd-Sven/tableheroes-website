@@ -1,3 +1,7 @@
+/**
+ * Dnd5eCharacterSheetPanel — Der Charakterbogen in digitaler Pergamentform.
+ * Attribute, Zauber, Overrides und Exhaustion — alles, was ein Held zwischen den Sessions braucht.
+ */
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";

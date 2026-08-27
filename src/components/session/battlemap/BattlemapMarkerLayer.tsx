@@ -1,3 +1,7 @@
+/**
+ * BattlemapMarkerLayer — Pins auf dem Schlachtfeld: Feuer, Eis, Falle, Interesse.
+ * Kleine Zeichen mit großer Bedeutung — wer sie liest, weiß, wohin die Gruppe schauen soll.
+ */
 "use client";
 
 import type { CSSProperties } from "react";

@@ -123,3 +123,35 @@ export function isViableLiveState(row: unknown, expectedSessionId: string): bool
   if (!sid || !exp) return false;
   return sid.toLowerCase() === exp.toLowerCase();
 }
+
+/**
+ * Cheap fingerprint for guest poll — skip setState when nothing at the table changed.
+ * Covers stage-critical fields that drive board re-renders.
+ */
+export function liveStatePollFingerprint(state: LiveState): string {
+  return [
+    state.active_battlemap_id ?? "",
+    state.active_world_map_id ?? "",
+    state.active_scene_media_id ?? "",
+    state.background_url ?? "",
+    state.current_location ?? "",
+    state.current_time ?? "",
+    state.weather ?? "",
+    String(state.is_combat_mode ?? false),
+    String(state.combat_started ?? false),
+    String(state.current_turn_index ?? ""),
+    String(state.combat_round ?? ""),
+    String(state.battlemap_movement_paused ?? false),
+    String(state.downtime_active ?? false),
+    String(state.downtime_current_day ?? ""),
+    state.current_loot_id ?? "",
+    (state.visible_npc_ids ?? []).join(","),
+    (state.visible_faction_ids ?? []).join(","),
+    (state.visible_creature_ids ?? []).join(","),
+    (state.hand_raises ?? []).map((h) => `${h.userId}:${h.at}`).join("|"),
+    (state.system_logs ?? []).map((l) => l.id).join("|"),
+    (state.fate_coins ?? []).map((c) => `${c.id}:${c.side}`).join("|"),
+    String(state.destroyed_fate_coins ?? 0),
+    (state.physically_present_user_ids ?? []).join(","),
+  ].join("\u001f");
+}

@@ -1,9 +1,10 @@
 /**
- * BattlemapStageMap — Transformable map canvas: image, layers, drag overlays, and placement hover.
+ * BattlemapStageMap — Die Tafel selbst: Bild, Raster, Figuren und der Zoom des Spielleiters.
+ * Hier liegen Layer übereinander wie Folien auf dem Tisch; wer pannt und zoomt, hält den Überblick.
  */
 "use client";
 
-import type { RefObject } from "react";
+import { useCallback, type RefObject } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -259,6 +260,98 @@ export function BattlemapStageMap({
     onStrokeComplete: (points) => onDrawStroke?.(points),
   });
 
+  const canDragToken = useCallback(
+    (token: SessionBattlemapToken) =>
+      canUserDragBattlemapToken(token, {
+        isGm,
+        ownCharacterId,
+        placementActive,
+        shapeSelectActive,
+      }),
+    [isGm, ownCharacterId, placementActive, shapeSelectActive],
+  );
+
+  const handleTokenDragPreview = useCallback(
+    (token: SessionBattlemapToken, clientX: number, clientY: number) => {
+      const el = mapRef.current;
+      if (!el) return;
+      const cell = cellFromClient(clientX, clientY, el);
+      if (!cell) return;
+      const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
+      setTokenDragPreview((prev) => {
+        if (prev?.tokenId === token.id) {
+          return {
+            ...prev,
+            targetGridX: cell.gridX,
+            targetGridY: cell.gridY,
+          };
+        }
+        return {
+          tokenId: token.id,
+          originGridX: sourceToken.grid_x,
+          originGridY: sourceToken.grid_y,
+          targetGridX: cell.gridX,
+          targetGridY: cell.gridY,
+        };
+      });
+    },
+    [mapRef, cellFromClient, tokens, setTokenDragPreview],
+  );
+
+  const handleTokenDragEnd = useCallback(
+    (token: SessionBattlemapToken, clientX: number, clientY: number) => {
+      const el = mapRef.current;
+      const preview =
+        tokenDragPreview?.tokenId === token.id ? tokenDragPreview : null;
+      setTokenDragPreview(null);
+      if (!el || !onTokenMove) return;
+
+      const pointerCell = cellFromClient(clientX, clientY, el);
+      const cell = preview
+        ? { gridX: preview.targetGridX, gridY: preview.targetGridY }
+        : pointerCell;
+      if (!cell) {
+        toast.error("Token konnte nicht platziert werden — Ziel liegt außerhalb der Karte.");
+        return;
+      }
+
+      const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
+      if (
+        sourceToken.grid_x === cell.gridX &&
+        sourceToken.grid_y === cell.gridY
+      ) {
+        return;
+      }
+
+      if (
+        !isCellReachable(
+          cell.gridX,
+          cell.gridY,
+          sourceToken.size_cells,
+          sourceToken.id,
+        )
+      ) {
+        toast.error("Diese Zelle ist nicht erreichbar.");
+        return;
+      }
+
+      onTokenMove(sourceToken, cell.gridX, cell.gridY);
+    },
+    [
+      mapRef,
+      tokenDragPreview,
+      setTokenDragPreview,
+      onTokenMove,
+      cellFromClient,
+      tokens,
+      isCellReachable,
+    ],
+  );
+
+  const handleTokenDragCancel = useCallback(() => {
+    setTokenDragPreview(null);
+  }, [setTokenDragPreview]);
+
   return (
     <TransformWrapper
       key={`${battlemap.id}-${mapSize.width}x${mapSize.height}`}
@@ -473,76 +566,10 @@ export function BattlemapStageMap({
             onTokenContextMenu={
               placementActive || shapeSelectActive ? undefined : onTokenContextMenu
             }
-            canDragToken={(token) =>
-              canUserDragBattlemapToken(token, {
-                isGm,
-                ownCharacterId,
-                placementActive,
-                shapeSelectActive,
-              })
-            }
-            onTokenDragPreview={(token, clientX, clientY) => {
-              const el = mapRef.current;
-              if (!el) return;
-              const cell = cellFromClient(clientX, clientY, el);
-              if (!cell) return;
-              const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
-              setTokenDragPreview((prev) => {
-                if (prev?.tokenId === token.id) {
-                  return {
-                    ...prev,
-                    targetGridX: cell.gridX,
-                    targetGridY: cell.gridY,
-                  };
-                }
-                return {
-                  tokenId: token.id,
-                  originGridX: sourceToken.grid_x,
-                  originGridY: sourceToken.grid_y,
-                  targetGridX: cell.gridX,
-                  targetGridY: cell.gridY,
-                };
-              });
-            }}
-            onTokenDragEnd={(token, clientX, clientY) => {
-              const el = mapRef.current;
-              const preview =
-                tokenDragPreview?.tokenId === token.id ? tokenDragPreview : null;
-              setTokenDragPreview(null);
-              if (!el || !onTokenMove) return;
-
-              const pointerCell = cellFromClient(clientX, clientY, el);
-              const cell = preview
-                ? { gridX: preview.targetGridX, gridY: preview.targetGridY }
-                : pointerCell;
-              if (!cell) {
-                toast.error("Token konnte nicht platziert werden — Ziel liegt außerhalb der Karte.");
-                return;
-              }
-
-              const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
-              if (
-                sourceToken.grid_x === cell.gridX &&
-                sourceToken.grid_y === cell.gridY
-              ) {
-                return;
-              }
-
-              if (
-                !isCellReachable(
-                  cell.gridX,
-                  cell.gridY,
-                  sourceToken.size_cells,
-                  sourceToken.id,
-                )
-              ) {
-                toast.error("Diese Zelle ist nicht erreichbar.");
-                return;
-              }
-
-              onTokenMove(sourceToken, cell.gridX, cell.gridY);
-            }}
-            onTokenDragCancel={() => setTokenDragPreview(null)}
+            canDragToken={canDragToken}
+            onTokenDragPreview={handleTokenDragPreview}
+            onTokenDragEnd={handleTokenDragEnd}
+            onTokenDragCancel={handleTokenDragCancel}
             tokenDragPreview={tokenDragPreview}
           />
           <BattlemapTokenDragOverlay

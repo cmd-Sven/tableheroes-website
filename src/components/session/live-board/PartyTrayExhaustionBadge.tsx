@@ -1,3 +1,7 @@
+/**
+ * PartyTrayExhaustionBadge — Live-Sync der Erschöpfung auf der Heldenleiste.
+ * Lauscht auf Display-Änderungen, damit alle am Tisch denselben Erschöpfungsstand sehen.
+ */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";

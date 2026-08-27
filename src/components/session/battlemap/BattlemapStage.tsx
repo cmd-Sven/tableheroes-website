@@ -1,5 +1,7 @@
 /**
- * BattlemapStage — Interactive battlemap viewport: zoom/pan, layers, placement, and GM selection tools.
+ * BattlemapStage — Die Arena des Live-Tischs.
+ * Zoom, Pan, Platzierung und SL-Werkzeuge: hier wird die Battlemap zur Bühne,
+ * auf der Tokens und Schablonen die Geschichte vorantreiben.
  */
 "use client";
 

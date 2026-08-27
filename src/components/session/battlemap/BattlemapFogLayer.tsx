@@ -1,3 +1,8 @@
+/**
+ * BattlemapFogLayer — Der Schleier, den nur der Spielleiter hebt.
+ * Fog-Polygone verbergen, was die Helden noch nicht sehen sollen —
+ * wie der Vorhang vor dem nächsten Raum im Dungeon.
+ */
 import type { CSSProperties } from "react";
 import type {
   BattlemapGridConfig,

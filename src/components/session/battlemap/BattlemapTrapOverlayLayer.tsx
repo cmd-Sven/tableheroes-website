@@ -1,3 +1,7 @@
+/**
+ * BattlemapTrapOverlayLayer — Die Fallen, die man erst sieht, wenn es zu spät ist.
+ * Trigger-Felder und AoE-Hinweise für den SL; Spieler sehen nur, was ausgelöst wurde.
+ */
 "use client";
 
 import type { CSSProperties } from "react";

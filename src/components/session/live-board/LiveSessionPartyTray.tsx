@@ -1,5 +1,6 @@
 /**
- * LiveSessionPartyTray — Bottom hero avatar strip with combat turn and inventory shortcuts.
+ * LiveSessionPartyTray — Die Heldenleiste am unteren Rand.
+ * Avatare, Initiative und Schnellzugriff — die Party sitzt hier wie am physischen Tisch.
  */
 "use client";
 

@@ -1,5 +1,6 @@
 /**
- * LiveSessionCharacterAvatar — Party-tray character portrait with radial menu and optional webcam.
+ * LiveSessionCharacterAvatar — Portrait eines Helden am Tisch.
+ * Radialmenü, Webcam und Status — das Gesicht, hinter dem die Figur lebt.
  */
 "use client";
 

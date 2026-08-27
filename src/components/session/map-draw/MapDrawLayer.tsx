@@ -1,5 +1,6 @@
 /**
- * MapDrawLayer — SVG freehand strokes for battlemap / world map overlays.
+ * MapDrawLayer — Freihändige Tinte auf der Schlachtkarte.
+ * SVG-Striche wie Kreide auf der Folie — der SL zeichnet, die Gruppe folgt dem Fingerzeig.
  */
 "use client";
 

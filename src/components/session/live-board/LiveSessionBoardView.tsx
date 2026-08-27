@@ -1,5 +1,6 @@
 /**
- * LiveSessionBoardView — Renders the live session layout tree from board orchestration context.
+ * LiveSessionBoardView — Das Layout des Live-Tischs von oben.
+ * Webcam-Provider, Bühne und Overlays — die Komposition, in der die Session atmet.
  */
 "use client";
 

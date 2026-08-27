@@ -1,5 +1,7 @@
 /**
- * useLiveSessionRealtime — Supabase live channel, guest polling, and presence tracking.
+ * useLiveSessionRealtime — Der unsichtbare Bote zwischen den Plätzen am Tisch.
+ * Presence, Broadcasts und Guest-Polling halten Tokens, Fog und Webcam-Signale in Sync —
+ * ohne dass jede Atembewegung die ganze Tafel neu zeichnet.
  */
 "use client";
 
@@ -54,7 +56,7 @@ import type {
   SessionBattlemapFogShape,
 } from "@/src/lib/session/battlemap-types";
 import type { LiveState } from "./live-session-types";
-import { normalizeLiveRow, normalizeStageVisibilityPatch } from "./live-session-normalize";
+import { normalizeLiveRow, normalizeStageVisibilityPatch, liveStatePollFingerprint } from "./live-session-normalize";
 import type { LiveSessionBattlemapState } from "./useLiveSessionBattlemapState";
 
 type Params = {
@@ -113,6 +115,10 @@ export function useLiveSessionRealtime({
         const data = (await res.json()) as { ok?: boolean; live_state?: unknown };
         if (data.ok && data.live_state) {
           const next = normalizeLiveRow(data.live_state);
+          const prev = liveStateRef.current;
+          if (prev && liveStatePollFingerprint(prev) === liveStatePollFingerprint(next)) {
+            return;
+          }
           liveStateRef.current = next;
           setLiveState(next);
           setBackgroundUrl(next.background_url || null);
@@ -409,7 +415,19 @@ export function useLiveSessionRealtime({
       .on("presence", { event: "sync" }, () => {
         const st = channel.presenceState();
         const ids = new Set(Object.keys(st));
-        setPresentUserIds(ids);
+        setPresentUserIds((prev) => {
+          if (prev.size === ids.size) {
+            let same = true;
+            for (const id of ids) {
+              if (!prev.has(id)) {
+                same = false;
+                break;
+              }
+            }
+            if (same) return prev;
+          }
+          return ids;
+        });
         if (!isGM && ids.has(userId)) {
           void registerSessionOnlinePresence(sessionId);
         }

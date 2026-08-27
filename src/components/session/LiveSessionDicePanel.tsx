@@ -1,3 +1,7 @@
+/**
+ * LiveSessionDicePanel — Der Würfelbecher am digitalen Tisch.
+ * Angriffe, Checks, Saves — hier fallen die Knochen, bevor das Schicksal spricht.
+ */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

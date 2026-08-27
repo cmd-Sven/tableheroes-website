@@ -1,3 +1,7 @@
+/**
+ * ExhaustionBadge — Erschöpfung als Zahl am Rand des Avatars (DnD 2024).
+ * Je höher die Stufe, desto düsterer die Farbe — wer rastet, atmet auf.
+ */
 "use client";
 
 import {

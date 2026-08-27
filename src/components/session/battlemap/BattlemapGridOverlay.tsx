@@ -1,3 +1,7 @@
+/**
+ * BattlemapGridOverlay — Das Raster unter den Figuren.
+ * Fünf-Fuß-Schritte in Pixel gegossen — die unsichtbare Geometrie jedes Kampfes.
+ */
 "use client";
 
 import type { BattlemapGridConfig } from "@/src/lib/session/battlemap-types";

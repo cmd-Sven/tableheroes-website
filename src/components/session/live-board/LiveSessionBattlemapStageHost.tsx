@@ -1,10 +1,11 @@
 /**
- * LiveSessionBattlemapStageHost — BattlemapStage wiring and GM tool callbacks for the live board.
+ * LiveSessionBattlemapStageHost — Der Spielleiter hält den Faden der Schlachtkarte.
+ * Verdrahtet Tokens, Fog, Effekte, Marker und den Zeichenstift mit der Live-Bühne —
+ * hier entscheidet sich, was die Helden sehen und wohin die Figuren ziehen.
  */
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { createClient } from "@/src/lib/supabase/client";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BattlemapStage } from "@/src/components/session/battlemap/BattlemapStage";
 import {
@@ -20,15 +21,9 @@ import {
   updateBattlemapMarker,
   updateBattlemapProp,
 } from "@/src/lib/actions/battlemap-actions";
-import {
-  clearMapDrawStrokes,
-  createMapDrawStroke,
-  listMapDrawStrokes,
-  undoLastMapDrawStroke,
-} from "@/src/lib/actions/map-draw-actions";
 import { dispatchOpenCharacterRadial } from "@/src/lib/session/character-radial-bridge";
-import type { SessionMapDrawStroke } from "@/src/lib/session/map-draw-types";
 import type { LiveSessionBattlemapPaneProps } from "./LiveSessionBattlemapPane.types";
+import { useBattlemapDrawSync } from "./useBattlemapDrawSync";
 
 export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPaneProps) {
   const {
@@ -101,10 +96,19 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     drawClearReq,
   } = props;
 
-  const [drawStrokes, setDrawStrokes] = useState<SessionMapDrawStroke[]>([]);
-  const [, localStart] = useTransition();
   const [playerMoveMaxCells, setPlayerMoveMaxCells] = useState<number | null>(null);
-  const supabase = useRef(createClient()).current;
+  const { drawStrokes, handleDrawStroke } = useBattlemapDrawSync({
+    sessionId,
+    activeBattlemapId,
+    activeWorldMapId,
+    isGM,
+    drawColor,
+    drawWidth,
+    drawUndoReq,
+    drawClearReq,
+    setDrawStrokeCount,
+    startTransition,
+  });
 
   useEffect(() => {
     if (!currentPlayerCharacterId) {
@@ -123,103 +127,6 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       cancelled = true;
     };
   }, [currentPlayerCharacterId]);
-
-  const reloadDraw = useCallback(async () => {
-    if (!activeBattlemapId) {
-      setDrawStrokes([]);
-      if (!activeWorldMapId) setDrawStrokeCount(0);
-      return;
-    }
-    try {
-      const list = await listMapDrawStrokes({
-        sessionId,
-        battlemapId: activeBattlemapId,
-      });
-      setDrawStrokes(list);
-      if (!activeWorldMapId) setDrawStrokeCount(list.length);
-    } catch {
-      setDrawStrokes([]);
-    }
-  }, [activeBattlemapId, activeWorldMapId, sessionId, setDrawStrokeCount]);
-
-  useEffect(() => {
-    void reloadDraw();
-  }, [reloadDraw]);
-
-  useEffect(() => {
-    if (!activeBattlemapId || activeWorldMapId) return;
-
-    const channel = supabase
-      .channel(`session_battlemap_draw_${activeBattlemapId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "session_map_draw_strokes",
-          filter: `battlemap_id=eq.${activeBattlemapId}`,
-        },
-        () => {
-          void reloadDraw();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [activeBattlemapId, activeWorldMapId, supabase, reloadDraw]);
-
-  useEffect(() => {
-    if (!isGM || activeWorldMapId || drawUndoReq <= 0 || !activeBattlemapId) return;
-    localStart(async () => {
-      try {
-        const id = await undoLastMapDrawStroke({
-          sessionId,
-          battlemapId: activeBattlemapId,
-        });
-        if (!id) {
-          toast.message("Keine Zeichnung zum Rückgängigmachen.");
-          return;
-        }
-        setDrawStrokes((prev) => {
-          const next = prev.filter((s) => s.id !== id);
-          queueMicrotask(() => setDrawStrokeCount(next.length));
-          return next;
-        });
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Rückgängig fehlgeschlagen.");
-      }
-    });
-  }, [
-    drawUndoReq,
-    isGM,
-    activeWorldMapId,
-    activeBattlemapId,
-    sessionId,
-    setDrawStrokeCount,
-  ]);
-
-  useEffect(() => {
-    if (!isGM || activeWorldMapId || drawClearReq <= 0 || !activeBattlemapId) return;
-    localStart(async () => {
-      try {
-        await clearMapDrawStrokes({ sessionId, battlemapId: activeBattlemapId });
-        setDrawStrokes([]);
-        setDrawStrokeCount(0);
-        toast.success("Alle Zeichnungen gelöscht.");
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-      }
-    });
-  }, [
-    drawClearReq,
-    isGM,
-    activeWorldMapId,
-    activeBattlemapId,
-    sessionId,
-    setDrawStrokeCount,
-  ]);
 
   if (!activeBattlemap) return null;
 
@@ -247,24 +154,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       drawColor={drawColor}
       drawWidth={drawWidth}
       drawStrokes={drawStrokes}
-      onDrawStroke={(points) => {
-        if (!activeBattlemapId || !isGM) return;
-        startTransition(async () => {
-          try {
-            const created = await createMapDrawStroke({
-              sessionId,
-              battlemapId: activeBattlemapId,
-              color: drawColor,
-              strokeWidth: drawWidth,
-              points,
-            });
-            setDrawStrokes((prev) => [...prev, created]);
-            setDrawStrokeCount((n) => n + 1);
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Zeichnen fehlgeschlagen.");
-          }
-        });
-      }}
+      onDrawStroke={handleDrawStroke}
       disableSpacePan={Boolean(trapWizardCell)}
       selectedEffectTemplateId={selectedEffectTemplateId}
       selectedMarkerId={selectedMarkerId}

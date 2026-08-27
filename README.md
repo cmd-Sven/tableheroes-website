@@ -6,37 +6,31 @@ Live: [table-heroes.de](https://table-heroes.de) · Repo: [cmd-Sven/tableheroes-
 
 ---
 
-## Neuestes Update (August 2026) — Battlemap-Marker, Fallen & Combat-Feinschliff
+## Neuestes Update (August 2026) — Sync-Feinschliff, Sheet-Overrides & Live-Performance
 
-Weiterer Ausbau des **Live-Session-Tisches**: Spezialeffekte, Fallen und präzisere Fog-/Schablonen-Bedienung — plus Stabilitätsfixes für Initiative.
+Weiterer Ausbau des **Live-Session-Tisches**: zuverlässigere Token-/Zeichen-Sync, Webcams, Exhaustion und Charakterbogen-Overrides — plus Cleanup und Performance-Fixes für Sessions mit mehreren Spielern.
 
-### Battlemap: Spezialeffekte & Marker
-- **Spezialeffekte-Marker** auf der Karte: Feuer, Eis, Geröll, Riss, Gefahr, Interessant, Falle-Icon
-- Marker gezielt platzieren und **Alle löschen** für den Schnell-Reset
+### Live-Session & Battlemap
+- **Token-Bewegung**: Persistenz und Just-in-Time-Sync (Broadcast + Realtime); Spieler- und SL-Tokens zuverlässig bewegbar
+- **Freihändige Map-Zeichnungen** (`session_map_draw_strokes`): inkrementelle Realtime-Patches statt Full-Reload
+- **Webcam WebRTC**: Avatar- und SL-Kameras Peer-to-Peer; Presence-Stabilität gegen Reconnect-Stürme
+- Fog of War, Effekt-Schablonen, Spezialeffekte-Marker, Trap-System (Wizard manuell/KI)
+- Combat: Initiative-HUD, Active-Turn-Highlight, Kampfstart-Video
 
-### Fog of War & Effekt-Schablonen
-- **Auswählen** mit goldenem Rahmen (Fog-Polygone und Schablonen)
-- **Alle löschen** für Fog bzw. Effekt-Schablonen
-- Menüs klappen weiterhin seitlich aus der linken Leiste auf; Schablonen (Rechteck / Kreis / Kegel)
+### Charakterbogen (DnD5e)
+- **Spell Catalog** / Zauberwahl am Sheet
+- **Exhaustion (2024)** am Sheet, Radialmenü und Party-Tray-Badge
+- **Sheet Overrides**: manuelle Overrides für AC, Initiative und Bewegung
+- Rest / Erschöpfung-Integration
 
-### Trap-System
-- **Trap-Wizard** (manuell oder **KI** mit World-Lore): Fallen anlegen und konfigurieren
-- **1 Trigger-Feld**; Passive Perception / Detection; **Bewegungspause** beim Betreten
-- **AoE erst nach Auslösen** (nicht schon beim Platzieren)
-- Bei fehlgeschlagenem Save: **Status-Effekt** über das bestehende Zustands-/Avatar-System
-- Wizard-Fixes: **Leerzeichen in Freitextfeldern**; robusterer **OpenAI-JSON-Prompt**
+### Stabilität
+- Dead-Code-Cleanup (verwaiste Session-Toolbars/Modals)
+- Live-Board-Hooks strukturiert (u. a. Draw-Sync extrahiert); Token-Layer-Memo wirksam
 
-### Combat & Initiative
-- **Active-Turn**: nur Border-Glow / leichte Rotation — das Tokenbild bleibt unverändert
-- **Initiative-Seed Race-Condition** behoben: Combat-Teilnehmer bleiben sichtbar
-- Weiterhin: Initiative-HUD, würfeln → Kampf starten, Kampfstart-Video, Zugsteuerung
-
-### Datenbank
-- Migrationen: `session_battlemap_markers`, `session_battlemap_traps` (+ Status-Effekt-Spalte); zuvor u. a. `combat_started`, Effekt-Schablonen
-
-> Production-Build (`npm run build`) vor dem Deploy erfolgreich.
+> Production-Build (`npm run build`) vor dem Deploy empfohlen.
 
 ---
+
 ## Produkt (Was ist Table Heroes?)
 
 Heute verbindet Table Heroes drei Dinge:
@@ -45,7 +39,7 @@ Heute verbindet Table Heroes drei Dinge:
 2. **Kampagnen- & Weltbau-Tool** — Welten, NPCs, Fraktionen, Lore, Orte, Bestarium, Quests, Shops, Charakterbögen (u. a. DnD5e)
 3. **Live-Session / Session Board** — gemeinsame Session-Oberfläche mit Kampf, Würfeln, Battlemap, Chronist (Audio→Text), Loot, Handheben u. v. m.
 
-**Vision / Roadmap:** den Live-Tisch so ausbauen, dass Table Heroes als **VTT-Alternative zu Roll20 und Foundry** nutzbar ist (eigene Battlemap, Tokens, Combat, Medien, Sync) — parallel bleibt die Integration mit Foundry über das Bridge-Modul und die Sync-API erhalten.
+**Vision:** den Live-Tisch so ausbauen, dass Table Heroes als **VTT-Alternative zu Roll20 und Foundry** nutzbar ist — parallel bleibt die Integration mit Foundry über das Bridge-Modul und die Sync-API erhalten.
 
 > **Hinweis:** Was unter „Bereits umgesetzt“ und im Block **Neuestes Update** steht, basiert auf dem aktuellen Code. Ein kompletter Foundry-/Roll20-Ersatz bleibt **Roadmap**.
 
@@ -55,15 +49,15 @@ Heute verbindet Table Heroes drei Dinge:
 
 | Bereich | Technik |
 |--------|---------|
-| Framework | **Next.js 16** (App Router), **React 19**, **TypeScript** |
-| Styling / UI | **Tailwind CSS 4**, Lucide Icons, Framer Motion, Sonner |
+| Framework | **Next.js** (App Router), **React**, **TypeScript** |
+| Styling / UI | **Tailwind CSS**, Lucide Icons, Framer Motion, Sonner |
 | Backend / Auth / DB | **Supabase** (`@supabase/ssr`, `@supabase/supabase-js`), Postgres-Migrationen unter `supabase/migrations/` |
-| Realtime | Supabase Realtime (`postgres_changes` + Session-**Broadcast**-Snapshots) |
+| Realtime | Supabase Realtime (`postgres_changes` + Session-**Broadcast**-Snapshots) + **WebRTC** (Webcam-Signaling) |
 | Editor | **TipTap** (Rich Text / Markdown) |
 | 3D-Würfel | **Three.js** + **React Three Fiber** / Drei |
 | Battlemap | Stage + **react-zoom-pan-pinch**, Overlay-Navigation (Pan/Zoom %) |
 | Markdown | **react-markdown** (u. a. KI-/News-Text) |
-| KI | **OpenAI** (u. a. Lore/NPC-Hilfe, Bildmodelle, Session-Chronik) |
+| KI | **OpenAI** (u. a. Lore/NPC-Hilfe, Bildmodelle, Session-Chronik, Trap-Wizard) |
 | E-Mail | **Resend** (Cron: tägliche Notification-Mails via Vercel) |
 | Deploy | **Vercel** (`vercel.json` mit Cron) |
 | Optional | **Foundry VTT**-Modul `foundry-module/tableheroes-bridge` + REST unter `/api/v1/foundry-sync` |
@@ -109,6 +103,9 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 ### Charaktere
 - Charakterverwaltung und Detailseiten
 - DnD5e-Charakterbogen / Sheet-Daten (Progression-Katalog, DE-Patches)
+- **Spell Catalog** / Zauberwahl
+- **Exhaustion (2024)** inkl. Live-Badges
+- **Sheet Overrides** (AC, Initiative, Bewegung)
 - Bedingungen / Mood-Zustände / Biography & Flaws
 - Ausrüstung, Gold/XP, Token-Generierung (inkl. KI-Bild)
 - Spieler-Edit-Alerts
@@ -117,20 +114,21 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 - Live-Session-Seite `/session/[sessionId]` und Gast-Join `/session/join/[token]`
 - **Linkes Dock** + **Top-Toolbar** (Ort, Fate Coins, SL-Werkzeuge); Würfel als eigenes Panel
 - **Avatar-Leiste** als Overlay über der Bühne (Voll / Mini / Aus)
+- **Webcam WebRTC** (Avatar-Cams + SL-Cam, Master-Mute im Party-Slot)
 - **Battlemap** (Stand siehe [`BATTLEMAP.md`](./BATTLEMAP.md)):
   - Session-Maps, Grid, Charakter-/NSC-/Kreatur-Tokens, Props
   - Overlay-Navigation (Pfeile / Zoom % / Einpassen)
   - Bewegung inkl. Dash & Pause (animiert); Token-Einstellungen (HP-Balken, Größe, Sichtbarkeit)
   - Spieler-Token: gleiches Radialmenü wie Avatar (Gemüt, SL-Zustand, Waffen, …)
-  - Zustands-Badge + Tooltip; Live-Bild nach Gemüt/Zustand
+  - Zustands-Badge + Tooltip; Live-Bild nach Gemüt/Zustand; Exhaustion-Badge
   - **Just-in-Time-Sync** für Bewegung, Einstellungen und Zustände (Broadcast-Snapshots + Realtime)
-  - **Fog of War** (manuell zeichnen, Auswählen, Alle löschen) + **Effekt-Schablonen** (Flyouts, goldene Auswahl, Alle löschen)
-  - **Spezialeffekte-Marker** und **Trap-System** (Wizard manuell/KI, Trigger, AoE nach Auslösen, Status bei Save-Fail)
+  - **Fog of War** + **Effekt-Schablonen** + **Spezialeffekte-Marker** + **Trap-System**
+  - **Freihändige Map-Zeichnungen** (SL zeichnet, Realtime an alle Clients)
 - **Combat**: Initiative-HUD, Active-Turn nur Border-Glow, Video-Intro, Zugsteuerung
 - **3D-Würfel** (R3F) inkl. Roll-Sound und Reveal erst nach Landung
 - Handheben (Hand Raise)
-- Szenen-Karten, Beast Cards, Loot (Chest, Draft, GM-Modals)
-- Travel / Downtime
+- Szenen-Karten, Beast Cards, Loot (Draft / Side-Panel)
+- Travel / Downtime (bestehende Grundzüge)
 - Fate Coins, Tagesphase
 - Session Wrap-up / Teilnahme-Belohnungen
 - **Chronist**: Audio-Chunks, Transcription-APIs, Zusammenfassungen (OpenAI)
@@ -141,19 +139,35 @@ Weitere Scripts: DnD5e-Katalog-Build (`catalog:dnd5e*`), Selftests für Progress
 
 ---
 
-## Vision: VTT-Alternative (Roadmap)
+## Roadmap — Was als Nächstes auf den Tisch kommt
 
-**Ziel:** Table Heroes soll langfristig als **Virtual Tabletop** neben Roll20 und Foundry stehen — browserbasiert, kampagnenzentriert, mit eigener Live-Tisch-Erfahrung.
+Die Roadmap hält den Kurs Richtung vollwertigem VTT und tieferer Kampagnen-Simulation. Ton: klar, immersiv, professionell.
+
+### 1. Multiklassen-Feature (Charakterbogen)
+Helden, die mehr als einen Pfad gehen: Multiklassen-Unterstützung am DnD5e-Bogen — Stufenverteilung, Features und Progression über mehrere Klassen hinweg, ohne den Bogen zu sprengen.
+
+### 2. Städtesimulation
+Die Instanz **„Stadt“** wird lebendig: Wirtschaft, Konflikte und Unruhen, Ruf, Religion, Bevölkerungsdichte, Kulturen und Ereignisse beeinflussen die Siedlung. Die Entwicklung passt sich an die Aktionen der Spieler an. Der Spielleiter sieht Statistiken und KPIs, erhält KI-Hinweise, Warnungen und Empfehlungen — die KI assistiert den SL, ersetzt ihn nicht.
+
+### 3. Ping & Marker auf der Battlemap
+Jeder Spieler kann Dinge markieren und anpingen, sodass **alle** es sehen. Cursor-Markierungen für die Gruppe — „Schaut hier!“ ohne den Chat zu fluten. Ergänzt die bestehenden SL-Spezialeffekt-Marker um Spieler-Pings.
+
+### 4. Reise- und Rastfeature
+Kurze und lange Rast sowie längere Reisen: Reisedauer, Biome / Flora / Fauna, Wetter, Ereignisse und Begegnungen, Rationen, Nachtwache beim Freicamping u. a. — Informationen für Spieler und SL, damit die Straße zwischen den Städten ebenso spannend wird wie der Dungeon.
+
+### Weiter (VTT-Feinschliff)
+- Fog/Effekte/Initiative weiter verfeinern
+- Weitere Tisch-Features Richtung vollwertigem VTT
 
 | Status | Themen |
 |--------|--------|
-| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync), **Fog of War**, **Effekt-Schablonen**, **Marker**, **Fallen**, Combat-HUD + Kampfstart-Video, Würfel (Sound/Reveal), Dock/Toolbar, Medien/Szenen, Chronist, Foundry-Bridge, NPC-Token/Kampfwerte |
-| **Geplant (VTT)** | Fog/Effekte weiter verfeinern, Initiative-Fokus auf dem Tisch, weitere Tisch-Features Richtung vollwertigem VTT |
+| **Done / stark ausgebaut** | Session Board, Battlemap (Maps, Tokens, Bewegung, Overlay-Nav, Token-UI, JIT-Sync, Freehand-Draw), Fog / Effekte / Marker / Fallen, Combat-HUD, Würfel, Webcam WebRTC, Exhaustion, Spell Catalog, Sheet Overrides, Dock/Toolbar, Medien/Szenen, Chronist, Foundry-Bridge |
+| **Geplant** | Multiklassen, Städtesimulation, Ping & Marker, Reise & Rast (siehe oben) |
 | **Bewusst nicht** (aktuell laut `BATTLEMAP.md`) | Sync des SL-Viewports (Zoom/Pan bleibt lokal pro Client) |
 
 Details zur Battlemap: [`BATTLEMAP.md`](./BATTLEMAP.md). Weitere Fach-Docs: `FACTIONS_SYSTEM_README.md`, `WORLD_LORE_SYSTEM.md`, `PLAYER_VIEW_UPDATE.md`, `PROJECT_STRUCTURE.md`.
 
-**Roadmap auf GitHub:** Milestone [VTT-Alternative (Roll20 / Foundry)](https://github.com/cmd-Sven/tableheroes-website/milestone/1) — bestehende Features als geschlossene Issues (`status:done`), geplante VTT-Meilensteine als offene Issues (`status:planned`).
+**Roadmap auf GitHub:** Milestone [VTT-Alternative (Roll20 / Foundry)](https://github.com/cmd-Sven/tableheroes-website/milestone/1).
 
 ---
 

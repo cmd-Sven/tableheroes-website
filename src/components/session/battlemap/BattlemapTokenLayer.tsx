@@ -1,3 +1,8 @@
+/**
+ * BattlemapTokenLayer — Die Figuren auf dem Schlachtfeld.
+ * Hier stehen Helden und Monster wie auf dem Tisch; ziehen, auswählen, HP-Balken —
+ * wer hier den Überblick verliert, verliert den Kampf.
+ */
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";

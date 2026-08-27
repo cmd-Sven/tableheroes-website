@@ -1,3 +1,8 @@
+/**
+ * BattlemapEffectLayer — Flächenzauber und Gefahrenzonen auf der Karte.
+ * Rechtecke, Kreise, Kegel — die Schablonen, mit denen der SL den Raum markiert,
+ * bevor die Würfel fallen.
+ */
 import type { CSSProperties } from "react";
 import type {
   BattlemapGridConfig,
