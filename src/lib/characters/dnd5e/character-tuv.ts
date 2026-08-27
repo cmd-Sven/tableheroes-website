@@ -7,15 +7,38 @@ import {
   ABILITY_LABELS_DE,
   ABILITY_LABELS_EN,
   type AbilityKey,
+  type Dnd5eSkillEntry,
   type Dnd5eSkillKey,
   type SkillProficiency,
 } from "./types";
 import { DND5E_SKILLS, DND5E_SKILL_BY_KEY } from "./skills";
 import type { Dnd5eEquipmentState, Dnd5eEquipmentSlot } from "./equipment-types";
 import {
+  DND5E_EQUIPMENT_SLOTS,
+  DND5E_GENERAL_EQUIPMENT_SLOTS,
   EQUIPMENT_SLOT_LABELS_DE,
   EQUIPMENT_SLOT_LABELS_EN,
+  GENERAL_SLOT_LABELS_DE,
+  GENERAL_SLOT_LABELS_EN,
 } from "./equipment-types";
+import { parseDnd5eMetaFromDescription, stripMachineTags } from "./item-meta";
+import { resolveCharacterItemStats } from "./item-resolve";
+import type { CharacterItem } from "@/src/types/inventory";
+import { clampExhaustionLevel, exhaustionD20Penalty } from "./exhaustion";
+import {
+  abilityModifier,
+  formatSigned,
+  proficiencyBonus,
+  skillProficiencyBonus,
+  skillTotalModifier,
+} from "./formulas";
+import {
+  classFeaturesUpToLevel,
+  getClassProgression,
+  matchSubclassOption,
+  resolveClassId,
+} from "./progression";
+import type { ProgressionFeature } from "./progression/types";
 
 export type CharacterTuvFindingSeverity = "error" | "warning" | "hint" | "info";
 
@@ -124,6 +147,87 @@ export type CharacterTuvEquipmentSummary = {
     empty: boolean;
     itemId: string | null;
   }>;
+  /** Angelegte Gegenstände (Slots + Gürtel + General), inkl. Magie-Hinweis für Attributprüfung */
+  equippedItems: CharacterTuvEquippedItemSummary[];
+  /** Nur magische angelegte Gegenstände */
+  equippedMagicalItems: CharacterTuvEquippedItemSummary[];
+  abilityGearNoteDe: string;
+  abilityGearNoteEn: string;
+};
+
+export type CharacterTuvEquippedItemSummary = {
+  itemId: string;
+  slotKey: string;
+  slotLabelDe: string;
+  slotLabelEn: string;
+  name: string;
+  isMagical: boolean;
+  attunement: boolean;
+  attuned: boolean;
+  effect: string | null;
+  acBonus: number | null;
+  magicalBonus: number | null;
+  rarity: string | null;
+};
+
+/** Deterministische Nachrechnung einer Fertigkeit (Gesamt ≠ Übungsbonus allein). */
+export type CharacterTuvSkillMathEntry = {
+  key: Dnd5eSkillKey;
+  displayName: string;
+  abilityKey: AbilityKey;
+  abilityDisplayName: string;
+  abilityScore: number;
+  abilityMod: number;
+  proficiency: SkillProficiency;
+  proficiencyDisplay: string;
+  proficiencyBonusApplied: number;
+  flatBonus: number;
+  manualBonus: number;
+  bonusOverride: number | null;
+  exhaustionPenalty: number;
+  expectedTotal: number;
+  displayedTotal: number | null;
+  mathOk: boolean;
+  /** Klartext-Rechnung für KI / Findings */
+  breakdown: string;
+};
+
+export type CharacterTuvSkillMathAudit = {
+  proficiencyBonus: number;
+  exhaustionPenalty: number;
+  allMathOk: boolean;
+  /** Verbindliche Formel — Gesamt niemals mit Übungsbonus allein vergleichen */
+  formulaNoteDe: string;
+  formulaNoteEn: string;
+  skills: CharacterTuvSkillMathEntry[];
+};
+
+export type CharacterTuvFeatureChecklistEntry = {
+  id: string;
+  level: number;
+  nameDe: string;
+  nameEn: string;
+  displayName: string;
+  present: boolean;
+  subclassScoped: boolean;
+};
+
+export type CharacterTuvFeatureChecklist = {
+  classId: string | null;
+  classDisplayName: string | null;
+  subclassId: string | null;
+  subclassDisplayName: string | null;
+  level: number;
+  subclassRequired: boolean;
+  subclassMissing: boolean;
+  catalogAvailable: boolean;
+  expectedCount: number;
+  presentCount: number;
+  missing: CharacterTuvFeatureChecklistEntry[];
+  /** Alle erwarteten Merkmale (inkl. vorhanden) — für die KI */
+  expected: CharacterTuvFeatureChecklistEntry[];
+  noteDe: string;
+  noteEn: string;
 };
 
 function slotItemId(
@@ -134,8 +238,84 @@ function slotItemId(
   return typeof id === "string" && id.trim() ? id : null;
 }
 
+function summarizeEquippedItems(
+  equipment: Dnd5eEquipmentState | null | undefined,
+  inventoryItems: Array<Pick<CharacterItem, "id" | "name" | "description">> | undefined,
+): CharacterTuvEquippedItemSummary[] {
+  if (!equipment || !inventoryItems?.length) return [];
+  const byId = new Map(inventoryItems.map((i) => [i.id, i]));
+  const attuned = new Set(equipment.attunedItemIds ?? []);
+  const seen = new Set<string>();
+  const out: CharacterTuvEquippedItemSummary[] = [];
+
+  const push = (
+    itemId: string | null | undefined,
+    slotKey: string,
+    slotLabelDe: string,
+    slotLabelEn: string,
+  ) => {
+    if (!itemId || seen.has(itemId)) return;
+    const item = byId.get(itemId);
+    if (!item) return;
+    seen.add(itemId);
+    const stats = resolveCharacterItemStats(item as CharacterItem);
+    const meta = parseDnd5eMetaFromDescription(item.description);
+    const effectRaw =
+      stats.effect?.trim() ||
+      (item.description ? stripMachineTags(item.description).trim() : "") ||
+      null;
+    const effect =
+      effectRaw && effectRaw.length > 220
+        ? `${effectRaw.slice(0, 217)}…`
+        : effectRaw;
+    out.push({
+      itemId,
+      slotKey,
+      slotLabelDe,
+      slotLabelEn,
+      name: item.name,
+      isMagical: Boolean(stats.isMagical),
+      attunement: Boolean(stats.attunement),
+      attuned: attuned.has(itemId),
+      effect,
+      acBonus: stats.acBonus,
+      magicalBonus: stats.magicalBonus,
+      rarity: meta?.rarity ?? null,
+    });
+  };
+
+  for (const slot of DND5E_EQUIPMENT_SLOTS) {
+    push(
+      slotItemId(equipment, slot),
+      slot,
+      slot === "chest" ? "Torso" : EQUIPMENT_SLOT_LABELS_DE[slot],
+      EQUIPMENT_SLOT_LABELS_EN[slot],
+    );
+  }
+  for (const slot of DND5E_GENERAL_EQUIPMENT_SLOTS) {
+    const id = equipment.generalSlots?.[slot];
+    push(
+      typeof id === "string" ? id : null,
+      slot,
+      GENERAL_SLOT_LABELS_DE[slot],
+      GENERAL_SLOT_LABELS_EN[slot],
+    );
+  }
+  (equipment.belt ?? []).forEach((id, idx) => {
+    push(
+      id,
+      `belt:${idx}`,
+      `Gürtel ${idx + 1}`,
+      `Belt ${idx + 1}`,
+    );
+  });
+
+  return out;
+}
+
 export function buildCharacterTuvEquipmentSummary(
   equipment: Dnd5eEquipmentState | null | undefined,
+  inventoryItems?: Array<Pick<CharacterItem, "id" | "name" | "description">>,
 ): CharacterTuvEquipmentSummary {
   const chestId = slotItemId(equipment, "chest");
   const mainId = slotItemId(equipment, "mainHand");
@@ -172,6 +352,9 @@ export function buildCharacterTuvEquipmentSummary(
     };
   });
 
+  const equippedItems = summarizeEquippedItems(equipment, inventoryItems);
+  const equippedMagicalItems = equippedItems.filter((i) => i.isMagical);
+
   return {
     torsoSlot: {
       slotKey: "chest",
@@ -196,7 +379,637 @@ export function buildCharacterTuvEquipmentSummary(
     noWeaponsEquipped,
     noTorsoArmorEquipped,
     slotsOverview,
+    equippedItems,
+    equippedMagicalItems,
+    abilityGearNoteDe:
+      "Angelegte magische Gegenstände (equipmentSummary.equippedMagicalItems) können Attributwerte erhöhen oder senken. Werte wie Geschicklichkeit 13 bei einem Barbaren sind völlig gültig — keine Build-/Meta-Kritik.",
+    abilityGearNoteEn:
+      "Equipped magical items (equipmentSummary.equippedMagicalItems) can raise or lower ability scores. Scores like Dexterity 13 on a Barbarian are fully valid — never criticize builds or meta.",
   };
+}
+
+function readFiniteNumber(value: unknown, fallback = 0): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeFeatureMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function parseSkillProficiency(raw: unknown): SkillProficiency {
+  const s = String(raw ?? "none");
+  if (s === "half" || s === "proficient" || s === "expertise" || s === "none") {
+    return s;
+  }
+  return "none";
+}
+
+function featureDisplayName(
+  nameDe: string,
+  nameEn: string,
+  locale: "de" | "en",
+): string {
+  if (locale === "en") {
+    return nameDe && nameDe !== nameEn ? `${nameEn} (${nameDe})` : nameEn;
+  }
+  return nameEn && nameEn !== nameDe ? `${nameDe} (${nameEn})` : nameDe;
+}
+
+/** ASI / Epic Boon / generische Unterklassen-Platzhalter — keine prüfbaren Kernmerkmale. */
+function isNonCheckableProgressionFeature(f: ProgressionFeature): boolean {
+  if (
+    /ability-score-improvement|(^|-)asi($|-)|epic-boon/i.test(f.id) ||
+    /ability score improvement|epic boon/i.test(f.nameEn)
+  ) {
+    return true;
+  }
+  if (
+    /^subclass feature$/i.test(f.nameEn.trim()) ||
+    /^unterklassenmerkmal$/i.test(f.nameDe.trim()) ||
+    /barbarian subclass|rogue subclass|wizard subclass|cleric subclass|fighter subclass|monk subclass|paladin subclass|ranger subclass|bard subclass|druid subclass|sorcerer subclass|warlock subclass/i.test(
+      f.nameEn,
+    ) ||
+    /-path-improvement-|primal-path$|subclass$/i.test(f.id)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function sheetFeatureMatchesProgression(
+  entry: {
+    id?: string | null;
+    name?: string | null;
+    nameDe?: string | null;
+    nameEn?: string | null;
+  },
+  f: ProgressionFeature,
+): boolean {
+  if (entry.id && entry.id === f.id) return true;
+  if (entry.nameEn && entry.nameEn === f.nameEn) return true;
+  if (entry.nameDe && entry.nameDe === f.nameDe) return true;
+  const names = [entry.name, entry.nameDe, entry.nameEn].filter(
+    (n): n is string => typeof n === "string" && n.trim().length > 0,
+  );
+  for (const name of names) {
+    if (name === f.nameDe || name === f.nameEn) return true;
+    const norm = normalizeFeatureMatch(name);
+    if (
+      norm === normalizeFeatureMatch(f.nameDe) ||
+      norm === normalizeFeatureMatch(f.nameEn)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Deterministische Fertigkeits-Nachrechnung.
+ * Gesamt = Attributmod + Übungsanteil + Flat-/Manuell-Bonus (+ Erschöpfung), nicht Übungsbonus allein.
+ */
+export function buildCharacterTuvSkillMathAudit(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvSkillMathAudit {
+  const locale = snapshot.locale ?? "de";
+  const level = Math.max(1, Math.floor(Number(snapshot.meta.level) || 1));
+  const pb = proficiencyBonus(level);
+  const combat = asRecord(asRecord(snapshot.sheet).combat);
+  const exhaustionLevel = clampExhaustionLevel(combat.exhaustionLevel);
+  const exhaustionPenalty = exhaustionD20Penalty(exhaustionLevel);
+
+  const abilitiesRaw = asRecord(snapshot.sheet).abilities;
+  const abilityScores: Record<AbilityKey, number> = {
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+  };
+  if (Array.isArray(abilitiesRaw)) {
+    for (const row of abilitiesRaw) {
+      const r = asRecord(row);
+      const key = String(r.key ?? "") as AbilityKey;
+      if (ABILITY_KEYS.includes(key)) {
+        abilityScores[key] = readFiniteNumber(r.score, 10);
+      }
+    }
+  } else {
+    const map = asRecord(abilitiesRaw);
+    for (const key of ABILITY_KEYS) {
+      abilityScores[key] = readFiniteNumber(asRecord(map[key]).score, 10);
+    }
+  }
+
+  const sheetSkillsRaw = asRecord(snapshot.sheet).skills;
+  const sheetSkillByKey = new Map<string, Record<string, unknown>>();
+  if (Array.isArray(sheetSkillsRaw)) {
+    for (const row of sheetSkillsRaw) {
+      const r = asRecord(row);
+      if (r.key) sheetSkillByKey.set(String(r.key), r);
+    }
+  } else {
+    const map = asRecord(sheetSkillsRaw);
+    for (const key of Object.keys(map)) {
+      sheetSkillByKey.set(key, asRecord(map[key]));
+    }
+  }
+
+  const derivedSkillsRaw = asRecord(snapshot.derived).skills;
+  const derivedTotalByKey = new Map<string, number>();
+  if (Array.isArray(derivedSkillsRaw)) {
+    for (const row of derivedSkillsRaw) {
+      const r = asRecord(row);
+      if (r.key != null && typeof r.total === "number") {
+        derivedTotalByKey.set(String(r.key), Math.round(r.total));
+      }
+    }
+  } else {
+    const map = asRecord(derivedSkillsRaw);
+    for (const key of Object.keys(map)) {
+      const total = asRecord(map[key]).total;
+      if (typeof total === "number") {
+        derivedTotalByKey.set(key, Math.round(total));
+      }
+    }
+  }
+
+  const formulaNoteDe =
+    "Fertigkeitsgesamtwert = Attributmodifikator + Übungsanteil (0 / halber / voller / doppelter Übungsbonus) + Flat-Bonus + manueller Bonus + Erschöpfungsabzug. Niemals den Gesamtwert mit dem Übungsbonus allein vergleichen.";
+  const formulaNoteEn =
+    "Skill total = ability modifier + proficiency portion (0 / half / full / double proficiency bonus) + flat bonus + manual bonus + exhaustion penalty. Never compare the skill total to the proficiency bonus alone.";
+
+  const skills: CharacterTuvSkillMathEntry[] = DND5E_SKILLS.map((def) => {
+    const entryRaw = sheetSkillByKey.get(def.key) ?? {};
+    const proficiency = parseSkillProficiency(
+      entryRaw.proficient ?? entryRaw.proficiency,
+    );
+    const flatBonus = readFiniteNumber(entryRaw.flatBonus, 0);
+    const manualBonus = readFiniteNumber(entryRaw.manualBonus, 0);
+    const overrideRaw = entryRaw.bonusOverride;
+    const bonusOverride =
+      overrideRaw != null && overrideRaw !== "" && Number.isFinite(Number(overrideRaw))
+        ? Math.round(Number(overrideRaw))
+        : null;
+    const abilityScore = abilityScores[def.ability];
+    const abilityMod = abilityModifier(abilityScore);
+    const proficiencyBonusApplied = skillProficiencyBonus(proficiency, pb);
+    const skillEntry: Dnd5eSkillEntry = {
+      proficient: proficiency,
+      flatBonus,
+      manualBonus,
+      bonusOverride,
+    };
+    const expectedTotal =
+      skillTotalModifier(abilityMod, skillEntry, pb) + exhaustionPenalty;
+    const displayedTotal = derivedTotalByKey.has(def.key)
+      ? (derivedTotalByKey.get(def.key) as number)
+      : null;
+    const mathOk =
+      displayedTotal == null ? true : displayedTotal === expectedTotal;
+
+    const abilityName = abilityDisplayName(def.ability, locale);
+    const skillName = skillDisplayName(def.key, locale);
+    let breakdown: string;
+    if (bonusOverride != null) {
+      breakdown =
+        locale === "en"
+          ? `${skillName}: manual override ${formatSigned(bonusOverride)}` +
+            (exhaustionPenalty
+              ? ` + exhaustion ${formatSigned(exhaustionPenalty)}`
+              : "") +
+            ` = ${formatSigned(expectedTotal)}`
+          : `${skillName}: manueller Override ${formatSigned(bonusOverride)}` +
+            (exhaustionPenalty
+              ? ` + Erschöpfung ${formatSigned(exhaustionPenalty)}`
+              : "") +
+            ` = ${formatSigned(expectedTotal)}`;
+    } else {
+      const parts =
+        locale === "en"
+          ? [
+              `${abilityName} modifier ${formatSigned(abilityMod)}`,
+              `proficiency portion ${formatSigned(proficiencyBonusApplied)} (${skillProficiencyDisplay(proficiency, locale)})`,
+            ]
+          : [
+              `${abilityName}-Modifikator ${formatSigned(abilityMod)}`,
+              `Übungsanteil ${formatSigned(proficiencyBonusApplied)} (${skillProficiencyDisplay(proficiency, locale)})`,
+            ];
+      if (flatBonus) {
+        parts.push(
+          locale === "en"
+            ? `flat bonus ${formatSigned(flatBonus)}`
+            : `Flat-Bonus ${formatSigned(flatBonus)}`,
+        );
+      }
+      if (manualBonus) {
+        parts.push(
+          locale === "en"
+            ? `manual bonus ${formatSigned(manualBonus)}`
+            : `manueller Bonus ${formatSigned(manualBonus)}`,
+        );
+      }
+      if (exhaustionPenalty) {
+        parts.push(
+          locale === "en"
+            ? `exhaustion ${formatSigned(exhaustionPenalty)}`
+            : `Erschöpfung ${formatSigned(exhaustionPenalty)}`,
+        );
+      }
+      breakdown = `${skillName}: ${parts.join(" + ")} = ${formatSigned(expectedTotal)}`;
+    }
+
+    return {
+      key: def.key,
+      displayName: skillName,
+      abilityKey: def.ability,
+      abilityDisplayName: abilityName,
+      abilityScore,
+      abilityMod,
+      proficiency,
+      proficiencyDisplay: skillProficiencyDisplay(proficiency, locale),
+      proficiencyBonusApplied,
+      flatBonus,
+      manualBonus,
+      bonusOverride,
+      exhaustionPenalty,
+      expectedTotal,
+      displayedTotal,
+      mathOk,
+      breakdown,
+    };
+  });
+
+  return {
+    proficiencyBonus: pb,
+    exhaustionPenalty,
+    allMathOk: skills.every((s) => s.mathOk),
+    formulaNoteDe,
+    formulaNoteEn,
+    skills,
+  };
+}
+
+/**
+ * Erwartete Klassen-/Unterklassenmerkmale aus dem Progressionskatalog vs. Blatt.
+ */
+export function buildCharacterTuvFeatureChecklist(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFeatureChecklist {
+  const locale = snapshot.locale ?? "de";
+  const level = Math.max(1, Math.floor(Number(snapshot.meta.level) || 1));
+  const classId = resolveClassId(snapshot.meta.class);
+  const prog = classId ? getClassProgression(classId) : null;
+
+  const emptyNoteDe =
+    "Kein passender Klassenkatalog — Merkmale können nicht deterministisch geprüft werden.";
+  const emptyNoteEn =
+    "No matching class catalog — features cannot be verified deterministically.";
+
+  if (!classId || !prog) {
+    return {
+      classId: null,
+      classDisplayName: null,
+      subclassId: null,
+      subclassDisplayName: null,
+      level,
+      subclassRequired: false,
+      subclassMissing: false,
+      catalogAvailable: false,
+      expectedCount: 0,
+      presentCount: 0,
+      missing: [],
+      expected: [],
+      noteDe: emptyNoteDe,
+      noteEn: emptyNoteEn,
+    };
+  }
+
+  const classDisplayName =
+    locale === "en"
+      ? `${prog.nameEn} (${prog.nameDe})`
+      : `${prog.nameDe} (${prog.nameEn})`;
+
+  const subclassOpt = matchSubclassOption(
+    snapshot.meta.subclass,
+    prog.subclasses ?? [],
+  );
+  const subclassRequired = level >= prog.subclassLevel;
+  const subclassMissing = subclassRequired && !subclassOpt;
+  const subclassId = subclassOpt?.id ?? null;
+  const subclassDisplayName = subclassOpt
+    ? locale === "en"
+      ? `${subclassOpt.nameEn} (${subclassOpt.nameDe})`
+      : `${subclassOpt.nameDe} (${subclassOpt.nameEn})`
+    : null;
+
+  const sheetFeatures = Array.isArray(snapshot.sheet.features)
+    ? snapshot.sheet.features
+    : [];
+
+  const expectedRaw = classFeaturesUpToLevel(
+    classId,
+    level,
+    subclassId ?? snapshot.meta.subclass,
+  ).filter((f) => !isNonCheckableProgressionFeature(f));
+
+  // Ohne Unterklasse: keine unterklassenspezifischen Merkmale verlangen
+  const expectedFiltered = subclassOpt
+    ? expectedRaw
+    : expectedRaw.filter((f) => !f.subclass);
+
+  const expected: CharacterTuvFeatureChecklistEntry[] = expectedFiltered.map(
+    (f) => {
+      const present = sheetFeatures.some((entry) =>
+        sheetFeatureMatchesProgression(entry, f),
+      );
+      return {
+        id: f.id,
+        level: f.level,
+        nameDe: f.nameDe,
+        nameEn: f.nameEn,
+        displayName: featureDisplayName(f.nameDe, f.nameEn, locale),
+        present,
+        subclassScoped: Boolean(f.subclass),
+      };
+    },
+  );
+
+  const missing = expected.filter((e) => !e.present);
+  const presentCount = expected.filter((e) => e.present).length;
+
+  const noteDe = subclassMissing
+    ? `Klasse ${classDisplayName}, Stufe ${level}: Unterklasse fehlt — nur Basisklassenmerkmale geprüft. Bitte Unterklasse setzen, damit Merkmale ab Stufe ${prog.subclassLevel} vollständig geprüft werden.`
+    : `Klasse ${classDisplayName}${subclassDisplayName ? `, Unterklasse ${subclassDisplayName}` : ""}, Stufe ${level}: ${presentCount}/${expected.length} erwartete Katalogmerkmale gefunden.`;
+  const noteEn = subclassMissing
+    ? `Class ${classDisplayName}, level ${level}: subclass missing — only base class features checked. Set a subclass so features from level ${prog.subclassLevel} can be fully verified.`
+    : `Class ${classDisplayName}${subclassDisplayName ? `, subclass ${subclassDisplayName}` : ""}, level ${level}: ${presentCount}/${expected.length} expected catalog features found.`;
+
+  return {
+    classId,
+    classDisplayName,
+    subclassId,
+    subclassDisplayName,
+    level,
+    subclassRequired,
+    subclassMissing,
+    catalogAvailable: true,
+    expectedCount: expected.length,
+    presentCount,
+    missing,
+    expected,
+    noteDe,
+    noteEn,
+  };
+}
+
+export function buildDeterministicSkillMathFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  const locale = snapshot.locale ?? "de";
+  const audit = snapshot.skillMathAudit ?? buildCharacterTuvSkillMathAudit(snapshot);
+  const mismatches = audit.skills.filter((s) => !s.mathOk);
+  if (mismatches.length === 0) return [];
+
+  const findings: CharacterTuvFinding[] = [];
+  for (const s of mismatches.slice(0, 8)) {
+    const displayed =
+      s.displayedTotal == null ? "—" : formatSigned(s.displayedTotal);
+    if (locale === "en") {
+      findings.push({
+        id: `det-skill-math-${s.key}`,
+        severity: "error",
+        category: "skills",
+        title: `System issue: skill total mismatch — ${s.displayName}`,
+        detail: [
+          "This is a system calculation/display issue, not a player rule mistake.",
+          `Expected ${formatSigned(s.expectedTotal)}, sheet shows ${displayed}.`,
+          s.breakdown,
+          audit.formulaNoteEn,
+        ].join(" "),
+        fieldPath: `skills.${s.key}`,
+        resolved: false,
+      });
+    } else {
+      findings.push({
+        id: `det-skill-math-${s.key}`,
+        severity: "error",
+        category: "skills",
+        title: `Systemproblem: Fertigkeitsgesamtwert weicht ab — ${s.displayName}`,
+        detail: [
+          "Das ist ein System-/Berechnungsproblem, kein Spielerfehler bei den Regeln.",
+          `Erwartet ${formatSigned(s.expectedTotal)}, auf dem Blatt steht ${displayed}.`,
+          s.breakdown,
+          audit.formulaNoteDe,
+        ].join(" "),
+        fieldPath: `skills.${s.key}`,
+        resolved: false,
+      });
+    }
+  }
+  return findings;
+}
+
+/** Harte Attributregeln: Wertebereich + Modifikator-Mathe — keine Build-Kritik. */
+export function buildDeterministicAbilityFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  const locale = snapshot.locale ?? "de";
+  const derivedMap = asRecord(snapshot.derived);
+  const derivedAbs = derivedMap.abilities;
+  const derivedByKey = new Map<string, { score?: number; modifier?: number }>();
+  if (Array.isArray(derivedAbs)) {
+    for (const row of derivedAbs) {
+      const r = asRecord(row);
+      if (r.key) derivedByKey.set(String(r.key), r as { score?: number; modifier?: number });
+    }
+  } else {
+    const map = asRecord(derivedAbs);
+    for (const key of ABILITY_KEYS) {
+      derivedByKey.set(key, asRecord(map[key]) as { score?: number; modifier?: number });
+    }
+  }
+
+  const sheetAbs = asRecord(snapshot.sheet).abilities;
+  const scores: Record<AbilityKey, number> = {
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+  };
+  if (Array.isArray(sheetAbs)) {
+    for (const row of sheetAbs) {
+      const r = asRecord(row);
+      const key = String(r.key ?? "") as AbilityKey;
+      if (ABILITY_KEYS.includes(key)) scores[key] = readFiniteNumber(r.score, 10);
+    }
+  } else {
+    const map = asRecord(sheetAbs);
+    for (const key of ABILITY_KEYS) {
+      scores[key] = readFiniteNumber(asRecord(map[key]).score, 10);
+    }
+  }
+
+  const findings: CharacterTuvFinding[] = [];
+  for (const key of ABILITY_KEYS) {
+    const score = scores[key];
+    const expectedMod = abilityModifier(score);
+    const displayName = abilityDisplayName(key, locale);
+    const derived = derivedByKey.get(key);
+    const derivedMod =
+      derived && typeof derived.modifier === "number"
+        ? Math.round(derived.modifier)
+        : null;
+
+    if (score < 1 || score > 30) {
+      findings.push({
+        id: `det-ability-range-${key}`,
+        severity: "error",
+        category: "attributes",
+        title:
+          locale === "en"
+            ? `Ability score out of range — ${displayName}`
+            : `Attributwert außerhalb des erlaubten Bereichs — ${displayName}`,
+        detail:
+          locale === "en"
+            ? `${displayName} is ${score}. Valid sheet values are 1–30 (magic items may explain high scores — check equippedMagicalItems).`
+            : `${displayName} ist ${score}. Erlaubte Blattwerte sind 1–30 (magische Gegenstände können hohe Werte erklären — siehe equippedMagicalItems).`,
+        fieldPath: `abilities.${key}.score`,
+        resolved: false,
+      });
+    }
+
+    if (derivedMod != null && derivedMod !== expectedMod) {
+      findings.push({
+        id: `det-ability-mod-${key}`,
+        severity: "error",
+        category: "attributes",
+        title:
+          locale === "en"
+            ? `System issue: ability modifier mismatch — ${displayName}`
+            : `Systemproblem: Attributmodifikator weicht ab — ${displayName}`,
+        detail:
+          locale === "en"
+            ? `This is a system calculation issue. Score ${score} → expected modifier ${formatSigned(expectedMod)}, sheet shows ${formatSigned(derivedMod)}.`
+            : `Das ist ein System-/Berechnungsproblem. Wert ${score} → erwarteter Modifikator ${formatSigned(expectedMod)}, auf dem Blatt steht ${formatSigned(derivedMod)}.`,
+        fieldPath: `abilities.${key}`,
+        resolved: false,
+      });
+    }
+  }
+  return findings;
+}
+
+export function buildDeterministicFeatureFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  const locale = snapshot.locale ?? "de";
+  const checklist =
+    snapshot.featureChecklist ?? buildCharacterTuvFeatureChecklist(snapshot);
+  if (!checklist.catalogAvailable) return [];
+
+  const findings: CharacterTuvFinding[] = [];
+
+  if (checklist.subclassMissing) {
+    if (locale === "en") {
+      findings.push({
+        id: "det-features-subclass-missing",
+        severity: "warning",
+        category: "features",
+        title: "Subclass missing — subclass features cannot be fully verified",
+        detail: checklist.noteEn,
+        fieldPath: "meta.subclass",
+        resolved: false,
+      });
+    } else {
+      findings.push({
+        id: "det-features-subclass-missing",
+        severity: "warning",
+        category: "features",
+        title: "Unterklasse fehlt — Unterklassenmerkmale nicht vollständig prüfbar",
+        detail: checklist.noteDe,
+        fieldPath: "meta.subclass",
+        resolved: false,
+      });
+    }
+  }
+
+  if (checklist.missing.length === 0) return findings;
+
+  const listed = checklist.missing.slice(0, 12);
+  const more =
+    checklist.missing.length > listed.length
+      ? checklist.missing.length - listed.length
+      : 0;
+  const bullet = listed
+    .map((m) =>
+      locale === "en"
+        ? `• Level ${m.level}: ${m.displayName}`
+        : `• Stufe ${m.level}: ${m.displayName}`,
+    )
+    .join("\n");
+  const moreLine =
+    more > 0
+      ? locale === "en"
+        ? `\n… and ${more} more.`
+        : `\n… und ${more} weitere.`
+      : "";
+
+  if (locale === "en") {
+    findings.push({
+      id: "det-features-missing",
+      severity: "warning",
+      category: "features",
+      title: `Missing expected class features (${checklist.missing.length})`,
+      detail: [
+        checklist.noteEn,
+        "Compared against the D&D 2024 progression catalog for this class, subclass, and level.",
+        "Missing:",
+        bullet + moreLine,
+        "Custom/manual features beyond the catalog are allowed and not flagged as errors.",
+      ].join("\n"),
+      fieldPath: "features",
+      resolved: false,
+    });
+  } else {
+    findings.push({
+      id: "det-features-missing",
+      severity: "warning",
+      category: "features",
+      title: `Fehlende erwartete Klassenmerkmale (${checklist.missing.length})`,
+      detail: [
+        checklist.noteDe,
+        "Verglichen mit dem D&D-2024-Progressionskatalog für diese Klasse, Unterklasse und Stufe.",
+        "Es fehlen:",
+        bullet + moreLine,
+        "Eigene/manuelle Merkmale außerhalb des Katalogs sind erlaubt und werden nicht als Fehler gemeldet.",
+      ].join("\n"),
+      fieldPath: "features",
+      resolved: false,
+    });
+  }
+
+  return findings;
+}
+
+/** Alle deterministischen TÜV-Findings (Ausrüstung, Fertigkeitsmathe, Merkmale). */
+export function buildDeterministicCharacterTuvFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+): CharacterTuvFinding[] {
+  return [
+    ...buildDeterministicEquipmentFindings(snapshot),
+    ...buildDeterministicAbilityFindings(snapshot),
+    ...buildDeterministicSkillMathFindings(snapshot),
+    ...buildDeterministicFeatureFindings(snapshot),
+  ];
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -505,6 +1318,96 @@ export function dedupeEquipmentFindingsAgainstDeterministic(
   });
 }
 
+/**
+ * Entfernt KI-False-Positives zu Fertigkeitsgesamtwerten vs. Übungsbonus allein,
+ * sowie vage „bitte Stufe-X-Merkmale prüfen“-Hinweise ohne konkrete Namen.
+ */
+export function filterFalsePositiveAiFindings(
+  snapshot: CharacterTuvSheetSnapshot,
+  aiFindings: CharacterTuvFinding[],
+): CharacterTuvFinding[] {
+  const skillAudit =
+    snapshot.skillMathAudit ?? buildCharacterTuvSkillMathAudit(snapshot);
+  const featureChecklist =
+    snapshot.featureChecklist ?? buildCharacterTuvFeatureChecklist(snapshot);
+  const hasDetFeatures = featureChecklist.catalogAvailable;
+
+  return aiFindings.filter((f) => {
+    const blob = `${f.category} ${f.title} ${f.detail}`;
+    const lower = blob.toLowerCase();
+
+    // Skill total vs proficiency bonus alone — only drop when math is correct
+    if (skillAudit.allMathOk) {
+      const skillish =
+        /skills?|fertigkeit|einschüchtern|intimidation|nachforschung|investigation|wahrnehmung|perception|überreden|persuasion|athletik|acrobatics/i.test(
+          blob,
+        ) || f.category.toLowerCase() === "skills";
+      const comparesTotalToPbAlone =
+        skillish &&
+        /(übungsbonus|proficiency\s*bonus|(?<![a-zäöü])pb(?![a-zäöü]))/i.test(
+          blob,
+        ) &&
+        /(gesamt|total|modifikator|modifier)/i.test(blob) &&
+        /(nicht\s+(überein)?stimm|passen\s+nicht|don'?t\s+match|does\s+not\s+match|abweich|fehler|error|mismatch|mögliche[rn]?\s+berechnung)/i.test(
+          blob,
+        );
+      if (comparesTotalToPbAlone) return false;
+    }
+
+    // Vague "verify level X features" without naming what's missing
+    if (hasDetFeatures && (f.category.toLowerCase() === "features" || /merkmal|feature|kernmerkmal/i.test(blob))) {
+      const vagueVerify =
+        /(sollte\s+)?(prüfen|verify|check|überprüfen).{0,40}(stufe|level)\s*\d+/i.test(
+          blob,
+        ) ||
+        /(stufe|level)\s*\d+.{0,40}(prüfen|verify|check|korrekt|richtig|vollständig)/i.test(
+          blob,
+        ) ||
+        /fehlende\s+kernmerkmale/i.test(lower) ||
+        /missing\s+core\s+features/i.test(lower) ||
+        /should\s+verify\s+whether/i.test(lower);
+      const namesConcreteMissing =
+        featureChecklist.missing.length > 0 &&
+        featureChecklist.missing.some(
+          (m) =>
+            lower.includes(m.nameDe.toLowerCase()) ||
+            lower.includes(m.nameEn.toLowerCase()),
+        );
+      // Drop vague feature nags; deterministic findings already list concrete names
+      if (vagueVerify && !namesConcreteMissing) return false;
+      // Also drop generic "features present but verify…" when checklist has no missing
+      if (
+        featureChecklist.missing.length === 0 &&
+        !featureChecklist.subclassMissing &&
+        /(kernmerkmal|core\s+feature|klassenmerkmal|class\s+feature)/i.test(blob) &&
+        /(prüfen|verify|check|sollte|should)/i.test(blob)
+      ) {
+        return false;
+      }
+    }
+
+    // Build/playstyle/optimization nags about ability scores — never keep
+    const abilityish =
+      f.category.toLowerCase() === "attributes" ||
+      /attribut|ability\s*score|stärke|strength|geschick|dexterity|konstitution|constitution|intelligenz|intelligence|weisheit|wisdom|charisma/i.test(
+        blob,
+      );
+    if (abilityish) {
+      const playstyleNag =
+        /untypisch|atypical|unplausibel|implausible|suboptimal|nicht\s+optimal|playstyle|spielstil|oft\s+höher|usually\s+higher|typically\s+higher|dump\s+stat|archetyp|meta\b|build\b|für\s+einen\s+barbar|for\s+a\s+barbarian|für\s+einen\s+(kämpfer|magier|schurken|waldläufer|paladin|mönch|barde|kleriker|druiden|hexer|zauberer)|affect\s+playstyle|beeinflussen\s+den\s+spielstil|könnte\s+den\s+spielstil/i.test(
+          blob,
+        );
+      const hardRule =
+        /modifikator\s*(stimmt\s+nicht|weicht|falsch)|modifier\s*(mismatch|wrong|incorrect)|außerhalb|out\s+of\s+range|unter\s+1|über\s+30|below\s+1|above\s+30|floor\s*\(\s*\(\s*wert/i.test(
+          blob,
+        );
+      if (playstyleNag && !hardRule) return false;
+    }
+
+    return true;
+  });
+}
+
 export function createEmptyCharacterTuvState(): CharacterTuvState {
   return {
     checkedAt: null,
@@ -629,7 +1532,13 @@ export type CharacterTuvSheetSnapshot = {
     skills: unknown;
     combat: unknown;
     proficiencies: unknown;
-    features: Array<{ name: string; source?: string | null }>;
+    features: Array<{
+      id?: string | null;
+      name: string;
+      nameDe?: string | null;
+      nameEn?: string | null;
+      source?: string | null;
+    }>;
     spells?: Array<{ name: string; level: number; prepared?: boolean }>;
     attacks: unknown;
     spellcasting?: unknown;
@@ -638,6 +1547,10 @@ export type CharacterTuvSheetSnapshot = {
   };
   /** Ausrüstungsslots (Torso/Waffen) — für deterministische Hinweise */
   equipmentSummary?: CharacterTuvEquipmentSummary;
+  /** Deterministische Fertigkeits-Nachrechnung (Gesamt ≠ Übungsbonus allein) */
+  skillMathAudit?: CharacterTuvSkillMathAudit;
+  /** Erwartete Klassenmerkmale vs. Blatt */
+  featureChecklist?: CharacterTuvFeatureChecklist;
   /** Kurze Legende: interne Keys → Anzeigenamen (Fallback für die KI) */
   labelLegend?: {
     skills: Array<{ key: string; labelDe: string; labelEn: string; displayName: string }>;
@@ -670,6 +1583,7 @@ export function buildCharacterTuvSnapshot(input: {
     combat: unknown;
     proficiencies: unknown;
     features: Array<{
+      id?: string | null;
       name: string;
       nameDe?: string | null;
       nameEn?: string | null;
@@ -686,6 +1600,8 @@ export function buildCharacterTuvSnapshot(input: {
     notes?: string | null;
     equipment?: Dnd5eEquipmentState | null;
   };
+  /** Inventar für angelegte Magiegegenstände im Snapshot */
+  inventoryItems?: Array<Pick<CharacterItem, "id" | "name" | "description">>;
   derived: unknown;
   previousAnswers?: Record<string, string>;
   previousFindings?: CharacterTuvFinding[];
@@ -694,9 +1610,10 @@ export function buildCharacterTuvSnapshot(input: {
   const locale = input.locale;
   const equipmentSummary = buildCharacterTuvEquipmentSummary(
     input.sheet.equipment ?? null,
+    input.inventoryItems,
   );
 
-  return {
+  const base: CharacterTuvSheetSnapshot = {
     meta: {
       name: input.name,
       class: input.className,
@@ -713,7 +1630,10 @@ export function buildCharacterTuvSnapshot(input: {
       combat: input.sheet.combat,
       proficiencies: input.sheet.proficiencies,
       features: input.sheet.features.map((f) => ({
+        id: f.id ?? null,
         name: f.nameDe || f.nameEn || f.name,
+        nameDe: f.nameDe ?? null,
+        nameEn: f.nameEn ?? null,
         source: f.source ?? null,
       })),
       spells: (input.sheet.spells ?? []).map((s) => ({
@@ -753,5 +1673,11 @@ export function buildCharacterTuvSnapshot(input: {
     previousAnswers: input.previousAnswers,
     previousFindings: input.previousFindings,
     locale,
+  };
+
+  return {
+    ...base,
+    skillMathAudit: buildCharacterTuvSkillMathAudit(base),
+    featureChecklist: buildCharacterTuvFeatureChecklist(base),
   };
 }

@@ -3,8 +3,9 @@
  */
 import OpenAI from "openai";
 import {
-  buildDeterministicEquipmentFindings,
+  buildDeterministicCharacterTuvFindings,
   dedupeEquipmentFindingsAgainstDeterministic,
+  filterFalsePositiveAiFindings,
   humanizeCharacterTuvFinding,
   humanizeCharacterTuvQuestion,
   humanizeCharacterTuvText,
@@ -25,6 +26,12 @@ const SYSTEM_PROMPT = `Du bist der „Charakter-TÜV“ von TableHeroes — ein 
 AUFGABE:
 Prüfe den gelieferten Charakterbogen-Snapshot (JSON) auf Regelkonsistenz und unklare manuelle Eingaben.
 Antworte AUSSCHLIESSLICH als JSON-Objekt gemäß Schema. Sprache der Texte: wie im Feld "locale" (de oder en).
+
+ROLLE (sehr wichtig):
+- Du prüfst REGELN und BLATT-KONSISTENZ — du bist KEIN Build-Berater, Meta-Optimierer oder Spielstil-Coach.
+- NIEMALS Attributwerte als „untypisch für die Klasse“, „suboptimal“, „oft höher“, „beeinflusst den Spielstil“ oder ähnlich kritisieren.
+- Gültige Builds (z. B. Barbar mit Geschicklichkeit 13) sind KEIN Finding.
+- Magische Gegenstände können Attributwerte verändern — nutze equipmentSummary.equippedMagicalItems / abilityGearNoteDe.
 
 SPRACHE & VERSTÄNDLICHKEIT (sehr wichtig):
 - Schreibe einfach und klar — so, dass auch Anfänger ohne Regelkenntnis verstehen, was gemeint ist.
@@ -51,9 +58,18 @@ INTERNE KEYS & ÜBUNGSSTATUS (streng verboten in Texten):
 - Alle Rechnungen (Fertigkeiten, Rettungswürfe, Rüstungsklasse, …) in Klartext mit ausgeschriebenen Namen erklären.
 
 PRÜFBEREICHE (priorisiert):
-1) Attribute (Ability Scores / Attributwerte): plausible Werte (typisch 8–20 vor magischen Gegenständen), Modifikator = floor((Wert-10)/2).
+1) Attribute (Ability Scores / Attributwerte):
+   - NUR harte Regeln: Modifikator = floor((Wert-10)/2); Werte klar außerhalb 1–30.
+   - KEINE Build-/Klassen-Meta-Kritik. KEINE „unplausibel für Barbar“-Findings.
+   - Wenn Werte hoch wirken: zuerst equipmentSummary.equippedMagicalItems prüfen (Effekt-Text).
 2) Übungsbonus (Proficiency Bonus) passend zur Stufe: Stufen 1–4 → +2, 5–8 → +3, 9–12 → +4, 13–16 → +5, 17–20 → +6.
-3) Fertigkeiten & Rettungswürfe: Gesamtwert aus Attribut-Modifikator + Übungsbonus (bei Übung/Expertise) + manueller Bonus; Expertise = doppelter Übungsbonus.
+3) Fertigkeiten & Rettungswürfe:
+   - Formel: Gesamtwert = Attribut-Modifikator + Übungsanteil + Flat-Bonus + manueller Bonus (+ Erschöpfung falls in derived).
+   - Übungsanteil: keine Übung → 0; geübt → voller Übungsbonus; Expertise → doppelter Übungsbonus; halbe Übung → floor(Übungsbonus/2).
+   - NIEMALS Fertigkeitsgesamtwert mit dem Übungsbonus allein vergleichen.
+     Beispiel: Attribut 8 → Modifikator −1, Übungsbonus +3, geübt → Gesamtwert +2 ist KORREKT — kein Fehler.
+   - skillMathAudit im Snapshot: wenn allMathOk=true, KEINE Findings zu Fertigkeitsgesamtwerten erzeugen.
+   - Nur bei echtem Widerspruch (angezeigter total ≠ erwartete Formel) melden und als mögliches Systemproblem kennzeichnen.
 4) Kampfwerte: maximale Trefferpunkte vs. Klasse/Stufe/Konstitution plausibel; aktuelle Trefferpunkte ≤ Maximum + temporäre; Trefferwürfel-Format.
 5) Rüstungsklasse (Armor Class):
    - Wenn combat.acOverride gesetzt ist → MUSS Rückfrage „Woher kommt dieser manuell gesetzte Wert?“ (außer previousAnswers erklären ihn bereits).
@@ -67,7 +83,12 @@ PRÜFBEREICHE (priorisiert):
 6) Initiative: initiativeOverride / initiativeBonus — bei Override immer begründen lassen.
 7) Geschwindigkeit: speedOverride vs. Basis — bei Override begründen lassen.
 8) Skill/Save manualBonus und bonusOverride — jedes nicht-null/nicht-0 manuelle Feld braucht Erklärung oder Finding.
-9) Klassenmerkmale (features) vs. Klasse/Unterklasse/Stufe — fehlende Kernmerkmale oder Merkmale über Stufe hinaus als Hinweis.
+9) Klassenmerkmale (features):
+   - Nutze featureChecklist im Snapshot (Katalog Klasse + Unterklasse + Stufe).
+   - Fehlende Merkmale NUR mit konkreten DE/EN-Namen nennen (wie in featureChecklist.missing).
+   - NIEMALS vage „bitte prüfen, ob Stufe-X-Merkmale korrekt sind“ ohne Namen.
+   - Deterministische Findings zu fehlenden Merkmalen existieren bereits — keine Doppelungen.
+   - Eigene/manuelle Extra-Merkmale sind erlaubt und kein Fehler.
 10) Zauberwirken (NUR bei echten Zauberwirkern):
    - Volle/halbe Zauberklassen: Magier/Wizard, Kleriker/Cleric, Druide/Druid, Barde/Bard, Zauberer/Sorcerer, Hexer/Warlock, Paladin, Waldläufer/Ranger, Artificer.
    - Teilzauberer erst ab Unterklasse: Schurke/Rogue mit Arcane Trickster (Arkaner Trickser), Kämpfer/Fighter mit Eldritch Knight (Mystischer Ritter). Mönch nur mit zauberwirkender Unterklasse.
@@ -80,6 +101,11 @@ PRÜFBEREICHE (priorisiert):
 12) Ausrüstung (equipmentSummary):
    - Leerer Torso und fehlende Waffen werden vom System deterministisch gemeldet — KEINE doppelten Findings dazu erzeugen.
    - Andere Ausrüstungs-Auffälligkeiten nur als hint, wenn klar regelrelevant.
+   - equippedMagicalItems beachten bei Attribut-/Kampfwerten.
+
+SYSTEM vs. SPIELER:
+- Wenn die Blattmathe (derived) zur Formel passt → kein Rechenfehler-Finding.
+- Wenn derived ≠ erwartete Formel → Finding als Systemproblem kennzeichnen (nicht als Spielerfehler).
 
 MANUELLE OVERRIDES (wichtig):
 - acOverride, initiativeOverride, speedOverride, skill.bonusOverride, skill.manualBonus, save.manualBonus, spellSaveDcOverride, spellAttackBonusOverride sind SPIELER-EINGABEN.
@@ -163,7 +189,7 @@ function filterNonCasterSpellNoise(
         // Kategorie spells ohne Override-Bezug → bei Nicht-Castem oft Rauschen
         if (
           f.category.toLowerCase() === "spells" &&
-          !/override|bonus|schwierigkeitsgrad|difficulty\s*class|angriffsbonus|attack\s*bonus/i.test(
+          !/override|bonus|schwierigkeitsgrad|difficulty\s*class|angriffsbonus|attack\s+bonus/i.test(
             blob,
           )
         ) {
@@ -255,22 +281,29 @@ function mergeAndHumanizeResults(
   questions: CharacterTuvQuestion[];
 } {
   const locale = snapshot.locale ?? "de";
-  const deterministic = buildDeterministicEquipmentFindings(snapshot);
+  const deterministic = buildDeterministicCharacterTuvFindings(snapshot);
   const detIds = new Set(deterministic.map((f) => f.id));
   const aiDeduped = dedupeEquipmentFindingsAgainstDeterministic(
     parsed.findings,
     detIds,
   );
+  const aiFiltered = filterFalsePositiveAiFindings(snapshot, aiDeduped);
 
   // Deterministische Findings zuerst (bereits klar formuliert), dann KI (humanisiert)
   const mergedFindings = [
     ...deterministic,
-    ...aiDeduped.map((f) => humanizeCharacterTuvFinding(f, locale)),
+    ...aiFiltered.map((f) => humanizeCharacterTuvFinding(f, locale)),
   ].slice(0, 18);
 
-  const questions = parsed.questions.map((q) =>
-    humanizeCharacterTuvQuestion(q, locale),
+  const aiDroppedIds = new Set(
+    parsed.findings
+      .filter((f) => !aiFiltered.some((k) => k.id === f.id))
+      .map((f) => f.id),
   );
+  const questions = parsed.questions
+    .filter((q) => !q.findingId || !aiDroppedIds.has(q.findingId))
+    .map((q) => humanizeCharacterTuvQuestion(q, locale));
+
   const summary = parsed.summary
     ? humanizeCharacterTuvText(parsed.summary, locale).slice(0, 600)
     : null;

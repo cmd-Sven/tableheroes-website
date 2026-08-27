@@ -25,6 +25,7 @@ import {
   type CharacterTuvState,
 } from "@/src/lib/characters/dnd5e/character-tuv";
 import type { Dnd5eSheetData } from "@/src/lib/characters/dnd5e/types";
+import type { CharacterItem } from "@/src/types/inventory";
 
 type Meta = {
   name: string;
@@ -45,6 +46,8 @@ type Props = {
   onSheetChange: (sheet: Dnd5eSheetData) => void;
   /** Persistiert sheet inkl. characterInspection (silent save). Sheet-Override vermeidet Stale-State. */
   onPersist?: (nextSheet: Dnd5eSheetData) => void;
+  /** Für angelegte Magiegegenstände im TÜV-Snapshot */
+  inventoryItems?: CharacterItem[];
 };
 
 function severityClass(severity: CharacterTuvFinding["severity"]): string {
@@ -68,6 +71,7 @@ export function CharakterTuvPanel({
   readOnly,
   onSheetChange,
   onPersist,
+  inventoryItems,
 }: Props) {
   const { t, locale } = useCharacterSheetLocale();
   const [busy, setBusy] = useState(false);
@@ -103,6 +107,11 @@ export function CharakterTuvPanel({
         level: meta.level,
         experiencePoints: meta.experiencePoints,
         sheet,
+        inventoryItems: inventoryItems?.map((i) => ({
+          id: i.id,
+          name: i.name,
+          description: i.description,
+        })),
         derived,
         previousAnswers: {
           ...tuv.answers,

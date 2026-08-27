@@ -2677,6 +2677,7 @@ export function Dnd5eCharacterSheetPanel({
             level: meta.level,
             experiencePoints: meta.experiencePoints,
           }}
+          inventoryItems={inventoryItems}
           readOnly={readOnly}
           onSheetChange={setSheet}
           onPersist={(nextSheet) => handleSave(true, nextSheet)}
