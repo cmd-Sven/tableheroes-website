@@ -6,6 +6,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  bindWebcamVideoElement,
+  GM_WEBCAM_VIDEO_CONSTRAINTS,
+} from "@/src/lib/session/avatar-webcam-webrtc";
 
 export type DungeonMasterCamPhase =
   | "idle"
@@ -67,20 +71,13 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
 
   const attachVideo = useCallback((el: HTMLVideoElement | null) => {
     videoRef.current = el;
-    if (el && streamRef.current) {
-      el.srcObject = streamRef.current;
-      void el.play().catch(() => {
-        /* autoplay may be blocked until user gesture; stream still live */
-      });
-    }
+    bindWebcamVideoElement(el, streamRef.current);
   }, []);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    bindWebcamVideoElement(videoRef.current, null);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -98,11 +95,7 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
+        video: GM_WEBCAM_VIDEO_CONSTRAINTS,
         audio: false,
       });
 

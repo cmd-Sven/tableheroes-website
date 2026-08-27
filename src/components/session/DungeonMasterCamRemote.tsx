@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Camera } from "lucide-react";
+import { bindWebcamVideoElement } from "@/src/lib/session/avatar-webcam-webrtc";
 import { useLiveSessionWebcamOptional } from "./LiveSessionWebcamProvider";
 
 export function DungeonMasterCamRemote() {
@@ -15,16 +16,7 @@ export function DungeonMasterCamRemote() {
   const remoteStream = webrtc?.getRemoteStreamByPrefix("dm:") ?? null;
 
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    if (remoteStream) {
-      el.srcObject = remoteStream;
-      void el.play().catch(() => {
-        /* autoplay may be blocked */
-      });
-    } else {
-      el.srcObject = null;
-    }
+    bindWebcamVideoElement(videoRef.current, remoteStream);
   }, [remoteStream, remoteStreamVersion]);
 
   if (!remoteStream) return null;

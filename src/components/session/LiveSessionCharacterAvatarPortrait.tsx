@@ -236,18 +236,50 @@ export function LiveSessionCharacterAvatarPortrait({
         title={canInteract && !isDummy ? `${characterName} — Aktionen` : characterName}
         aria-label={canInteract && !isDummy ? `Aktionen für ${characterName}` : characterName}
       >
-        {showingWebcam ? (
+        {showingWebcam || webcamPhase === "starting" ? (
           <div className="absolute inset-0 overflow-hidden rounded-full bg-background-dark">
+            {/* Keep <video> mounted through starting→active so srcObject is not lost on remount. */}
             <video
               ref={videoRefCallback}
               autoPlay
               playsInline
               muted
-              className="h-full w-full scale-x-[-1] object-cover"
-              aria-label={`${characterName} Webcam`}
+              className={`h-full w-full scale-x-[-1] object-cover ${
+                showingWebcam ? "opacity-100" : "opacity-0"
+              }`}
+              aria-label={showingWebcam ? `${characterName} Webcam` : undefined}
+              aria-hidden={!showingWebcam}
             />
+            {!showingWebcam ? (
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+                style={{
+                  background:
+                    "radial-gradient(circle at 35% 30%, rgba(55,152,6,0.35) 0%, rgba(19,46,27,0.95) 45%, rgba(10,31,16,1) 100%)",
+                }}
+                aria-label={`${characterName} Webcam-Platzhalter`}
+              >
+                <span
+                  className={`flex items-center justify-center rounded-full border-2 border-accent-gold/70 bg-background-dark/80 text-accent-gold shadow-[0_0_18px_rgba(202,185,38,0.35)] ${
+                    compact ? "h-7 w-7" : "h-14 w-14"
+                  }`}
+                  aria-hidden
+                >
+                  <Camera className={compact ? "h-3.5 w-3.5" : "h-7 w-7"} />
+                </span>
+                {!compact ? (
+                  <span className="px-2 text-center font-barlow text-[9px] font-extrabold uppercase tracking-wide text-accent-gold">
+                    Kamera…
+                  </span>
+                ) : (
+                  <span className="font-barlow text-[6px] font-extrabold uppercase tracking-wide text-accent-gold">
+                    Cam
+                  </span>
+                )}
+              </div>
+            ) : null}
           </div>
-        ) : webcamModeActive || webcamPhase === "starting" ? (
+        ) : webcamModeActive ? (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-full"
             style={{
@@ -267,7 +299,7 @@ export function LiveSessionCharacterAvatarPortrait({
             </span>
             {!compact ? (
               <span className="px-2 text-center font-barlow text-[9px] font-extrabold uppercase tracking-wide text-accent-gold">
-                {webcamPhase === "starting" ? "Kamera…" : "Live-Cam"}
+                Live-Cam
               </span>
             ) : (
               <span className="font-barlow text-[6px] font-extrabold uppercase tracking-wide text-accent-gold">
@@ -288,17 +320,6 @@ export function LiveSessionCharacterAvatarPortrait({
               >
                 Kamera fehlt
               </span>
-            ) : null}
-            {/* Keep video element mounted for the owner while connecting */}
-            {videoRefCallback && webcamPhase === "starting" ? (
-              <video
-                ref={videoRefCallback}
-                autoPlay
-                playsInline
-                muted
-                className="pointer-events-none absolute h-px w-px opacity-0"
-                aria-hidden
-              />
             ) : null}
           </div>
         ) : avatarUrl ? (

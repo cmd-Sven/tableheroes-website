@@ -18,7 +18,11 @@ import {
 } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
+  applyOutboundVideoParams,
   DEFAULT_ICE_SERVERS,
+  GM_WEBCAM_MAX_BITRATE,
+  isDmStreamKey,
+  PLAYER_WEBCAM_MAX_BITRATE,
   WEBCAM_PUBLISH_BROADCAST,
   WEBCAM_PUBLISH_EVENT,
   WEBCAM_PULL_BROADCAST,
@@ -65,11 +69,10 @@ export function LiveSessionWebcamProvider({
 
   const publishedRef = useRef<Map<string, MediaStream>>(new Map());
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  // Keep ref in sync during render so version-bump consumers never read a stale map.
   const remoteStreamsRef = useRef(remoteStreams);
-
-  useEffect(() => {
-    remoteStreamsRef.current = remoteStreams;
-  }, [remoteStreams]);
+  remoteStreamsRef.current = remoteStreams;
 
   const bumpRemote = useCallback(() => {
     setRemoteStreamVersion((v) => v + 1);
@@ -94,6 +97,20 @@ export function LiveSessionWebcamProvider({
       pc.onconnectionstatechange = null;
       pc.close();
       pcsRef.current.delete(key);
+    }
+    pendingIceRef.current.delete(key);
+  }, []);
+
+  const flushPendingIce = useCallback(async (key: string, pc: RTCPeerConnection) => {
+    const pending = pendingIceRef.current.get(key);
+    if (!pending?.length) return;
+    pendingIceRef.current.delete(key);
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch {
+        /* ignore stale candidates */
+      }
     }
   }, []);
 
@@ -141,6 +158,11 @@ export function LiveSessionWebcamProvider({
       for (const track of stream.getTracks()) {
         pc.addTrack(track, stream);
       }
+
+      const maxBitrate = isDmStreamKey(streamKey)
+        ? GM_WEBCAM_MAX_BITRATE
+        : PLAYER_WEBCAM_MAX_BITRATE;
+      void applyOutboundVideoParams(pc, maxBitrate);
 
       pc.onicecandidate = (ev) => {
         if (!ev.candidate) return;
@@ -198,6 +220,12 @@ export function LiveSessionWebcamProvider({
 
       pc.ontrack = (ev) => {
         const stream = ev.streams[0] ?? new MediaStream([ev.track]);
+        // Remote tracks often start muted until first packets — bump again on unmute
+        // so portraits re-bind after frames actually arrive.
+        if (ev.track) {
+          const onUnmute = () => bumpRemote();
+          ev.track.addEventListener("unmute", onUnmute, { once: true });
+        }
         setRemoteStreams((prev) => {
           if (prev[streamKey] === stream) return prev;
           return { ...prev, [streamKey]: stream };
@@ -225,6 +253,7 @@ export function LiveSessionWebcamProvider({
 
       try {
         await pc.setRemoteDescription(sdp);
+        await flushPendingIce(key, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sendSignal({
@@ -237,7 +266,7 @@ export function LiveSessionWebcamProvider({
         closePc(key);
       }
     },
-    [bumpRemote, closePc, removeRemoteStream, sendSignal, userId],
+    [bumpRemote, closePc, flushPendingIce, removeRemoteStream, sendSignal, userId],
   );
 
   const handleAnswer = useCallback(
@@ -249,11 +278,12 @@ export function LiveSessionWebcamProvider({
       if (!pc) return;
       try {
         await pc.setRemoteDescription(sdp);
+        await flushPendingIce(key, pc);
       } catch {
         closePc(key);
       }
     },
-    [closePc, userId],
+    [closePc, flushPendingIce, userId],
   );
 
   const handleIce = useCallback(
@@ -262,11 +292,22 @@ export function LiveSessionWebcamProvider({
       if (!candidate || senderId === userId) return;
       const key = pcKey(streamKey, senderId);
       const pc = pcsRef.current.get(key);
-      if (!pc) return;
+      if (!pc) {
+        const queue = pendingIceRef.current.get(key) ?? [];
+        queue.push(candidate);
+        pendingIceRef.current.set(key, queue);
+        return;
+      }
+      if (!pc.remoteDescription) {
+        const queue = pendingIceRef.current.get(key) ?? [];
+        queue.push(candidate);
+        pendingIceRef.current.set(key, queue);
+        return;
+      }
       try {
         await pc.addIceCandidate(candidate);
       } catch {
-        /* ICE may arrive before remote description — ignore */
+        /* ignore failed ICE adds */
       }
     },
     [userId],

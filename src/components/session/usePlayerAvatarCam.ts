@@ -7,7 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvatarWebcamDisplayMode } from "@/src/lib/session/avatar-webcam-bridge";
-import { characterStreamKey } from "@/src/lib/session/avatar-webcam-webrtc";
+import {
+  bindWebcamVideoElement,
+  characterStreamKey,
+  PLAYER_WEBCAM_VIDEO_CONSTRAINTS,
+} from "@/src/lib/session/avatar-webcam-webrtc";
 import { usePlayerAvatarCamSessionOptional } from "./PlayerAvatarCamSessionProvider";
 import { useLiveSessionWebcamOptional } from "./LiveSessionWebcamProvider";
 
@@ -39,6 +43,10 @@ export function usePlayerAvatarCam({
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startInFlightRef = useRef(false);
+  const publishStreamRef = useRef(webrtc?.publishStream);
+  const unpublishStreamRef = useRef(webrtc?.unpublishStream);
+  publishStreamRef.current = webrtc?.publishStream;
+  unpublishStreamRef.current = webrtc?.unpublishStream;
 
   const displayMode: AvatarWebcamDisplayMode = session
     ? session.getMode(characterId)
@@ -55,14 +63,7 @@ export function usePlayerAvatarCam({
     (el: HTMLVideoElement | null) => {
       videoRef.current = el;
       const stream = isCameraOwner ? streamRef.current : remoteStream;
-      if (el && stream) {
-        el.srcObject = stream;
-        void el.play().catch(() => {
-          /* autoplay may need a gesture; stream still live */
-        });
-      } else if (el) {
-        el.srcObject = null;
-      }
+      bindWebcamVideoElement(el, stream);
     },
     [isCameraOwner, remoteStream],
   );
@@ -70,9 +71,7 @@ export function usePlayerAvatarCam({
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    bindWebcamVideoElement(videoRef.current, null);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -90,11 +89,7 @@ export function usePlayerAvatarCam({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 480 },
-          height: { ideal: 480 },
-        },
+        video: PLAYER_WEBCAM_VIDEO_CONSTRAINTS,
         audio: false,
       });
 
@@ -171,22 +166,23 @@ export function usePlayerAvatarCam({
   // Re-bind video element when local or remote stream becomes available.
   useEffect(() => {
     attachVideo(videoRef.current);
-  }, [attachVideo, phase, remoteStream]);
+  }, [attachVideo, phase, remoteStream, remoteStreamVersion]);
 
   // Owner publishes local stream to other session participants.
+  // Use refs for publish/unpublish so presence-driven callback identity changes
+  // do not tear down and re-offer the mesh (unpublish race / black flicker).
   useEffect(() => {
-    const publishStream = webrtc?.publishStream;
-    const unpublishStream = webrtc?.unpublishStream;
-    if (!publishStream || !unpublishStream || !isCameraOwner) return;
+    if (!isCameraOwner) return;
+    const key = streamKey;
     if (displayMode === "webcam" && phase === "active" && streamRef.current) {
-      publishStream(streamKey, streamRef.current);
+      publishStreamRef.current?.(key, streamRef.current);
     } else {
-      unpublishStream(streamKey);
+      unpublishStreamRef.current?.(key);
     }
     return () => {
-      unpublishStream(streamKey);
+      unpublishStreamRef.current?.(key);
     };
-  }, [displayMode, isCameraOwner, phase, streamKey, webrtc?.publishStream, webrtc?.unpublishStream]);
+  }, [displayMode, isCameraOwner, phase, streamKey]);
 
   useEffect(() => {
     return () => {

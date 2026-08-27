@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDungeonMasterCamContext } from "./DungeonMasterCamProvider";
 import { useLiveSessionWebcamOptional } from "./LiveSessionWebcamProvider";
 import { dmStreamKey } from "@/src/lib/session/avatar-webcam-webrtc";
@@ -15,24 +15,26 @@ type Props = {
 export function DungeonMasterCamWebRtcSync({ userId }: Props) {
   const { phase, getStream } = useDungeonMasterCamContext();
   const webrtc = useLiveSessionWebcamOptional();
-  const publishStream = webrtc?.publishStream;
-  const unpublishStream = webrtc?.unpublishStream;
+  const publishStreamRef = useRef(webrtc?.publishStream);
+  const unpublishStreamRef = useRef(webrtc?.unpublishStream);
+  publishStreamRef.current = webrtc?.publishStream;
+  unpublishStreamRef.current = webrtc?.unpublishStream;
 
   useEffect(() => {
-    if (!publishStream || !unpublishStream || !userId) return;
+    if (!userId) return;
     const key = dmStreamKey(userId);
     if (phase === "active") {
       const stream = getStream();
       if (stream) {
-        publishStream(key, stream);
+        publishStreamRef.current?.(key, stream);
       }
     } else {
-      unpublishStream(key);
+      unpublishStreamRef.current?.(key);
     }
     return () => {
-      unpublishStream(key);
+      unpublishStreamRef.current?.(key);
     };
-  }, [getStream, phase, publishStream, unpublishStream, userId]);
+  }, [getStream, phase, userId]);
 
   return null;
 }
