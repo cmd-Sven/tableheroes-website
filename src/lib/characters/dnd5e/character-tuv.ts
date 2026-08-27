@@ -1,5 +1,8 @@
 /**
- * Charakter-TÜV — Typen & Hilfen für KI-gestützte Blattprüfung (D&D 2024).
+ * Charakter-TÜV — Typen & Hilfen für KI-gestützte Blattprüfung.
+ * Ausschließlich Regeln der D&D-Version 2024 (PHB 2024); Progressionskatalog
+ * unter progression/data ist die maßgebliche Klassen-/Unterklassen-Referenz.
+ * Keine 2014-/SRD-5.1-Regelauslegung in Findings oder Questions.
  */
 
 import {
@@ -746,11 +749,11 @@ export function buildCharacterTuvFeatureChecklist(
   const presentCount = expected.filter((e) => e.present).length;
 
   const noteDe = subclassMissing
-    ? `Klasse ${classDisplayName}, Stufe ${level}: Unterklasse fehlt — nur Basisklassenmerkmale geprüft. Bitte Unterklasse setzen, damit Merkmale ab Stufe ${prog.subclassLevel} vollständig geprüft werden.`
-    : `Klasse ${classDisplayName}${subclassDisplayName ? `, Unterklasse ${subclassDisplayName}` : ""}, Stufe ${level}: ${presentCount}/${expected.length} erwartete Katalogmerkmale gefunden.`;
+    ? `D&D 2024: Klasse ${classDisplayName}, Stufe ${level}: Unterklasse fehlt — nur Basisklassenmerkmale aus dem 2024-Progressionskatalog geprüft. Bitte Unterklasse setzen, damit Merkmale ab Stufe ${prog.subclassLevel} vollständig geprüft werden.`
+    : `D&D 2024: Klasse ${classDisplayName}${subclassDisplayName ? `, Unterklasse ${subclassDisplayName}` : ""}, Stufe ${level}: ${presentCount}/${expected.length} erwartete Katalogmerkmale (PHB 2024 / progression catalog) gefunden.`;
   const noteEn = subclassMissing
-    ? `Class ${classDisplayName}, level ${level}: subclass missing — only base class features checked. Set a subclass so features from level ${prog.subclassLevel} can be fully verified.`
-    : `Class ${classDisplayName}${subclassDisplayName ? `, subclass ${subclassDisplayName}` : ""}, level ${level}: ${presentCount}/${expected.length} expected catalog features found.`;
+    ? `D&D 2024: Class ${classDisplayName}, level ${level}: subclass missing — only base class features from the 2024 progression catalog checked. Set a subclass so features from level ${prog.subclassLevel} can be fully verified.`
+    : `D&D 2024: Class ${classDisplayName}${subclassDisplayName ? `, subclass ${subclassDisplayName}` : ""}, level ${level}: ${presentCount}/${expected.length} expected catalog features (PHB 2024 / progression catalog) found.`;
 
   return {
     classId,
@@ -782,6 +785,55 @@ export function buildDeterministicSkillMathFindings(
   for (const s of mismatches.slice(0, 8)) {
     const displayed =
       s.displayedTotal == null ? "—" : formatSigned(s.displayedTotal);
+    const proof =
+      locale === "en"
+        ? [
+            `Proof for ${s.displayName}:`,
+            `• Ability score ${s.abilityDisplayName}: ${s.abilityScore} → modifier ${formatSigned(s.abilityMod)}`,
+            `• Proficiency Bonus (Übungsbonus) for this level: ${formatSigned(audit.proficiencyBonus)}`,
+            `• Proficiency state: ${s.proficiencyDisplay} → proficiency portion ${formatSigned(s.proficiencyBonusApplied)}`,
+            s.flatBonus
+              ? `• Flat bonus: ${formatSigned(s.flatBonus)}`
+              : "• Flat bonus: +0",
+            s.manualBonus
+              ? `• Manual bonus (bonus column): ${formatSigned(s.manualBonus)}`
+              : "• Manual bonus (bonus column): +0",
+            s.bonusOverride != null
+              ? `• Manual total override: ${formatSigned(s.bonusOverride)}`
+              : null,
+            s.exhaustionPenalty
+              ? `• Exhaustion penalty: ${formatSigned(s.exhaustionPenalty)}`
+              : null,
+            `• Expected total: ${formatSigned(s.expectedTotal)}`,
+            `• Sheet shows: ${displayed}`,
+            `• Arithmetic: ${s.breakdown}`,
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : [
+            `Rechennachweis für ${s.displayName}:`,
+            `• Attributswert ${s.abilityDisplayName}: ${s.abilityScore} → Modifikator ${formatSigned(s.abilityMod)}`,
+            `• Übungsbonus (Proficiency Bonus) für diese Stufe: ${formatSigned(audit.proficiencyBonus)}`,
+            `• Übungsstatus: ${s.proficiencyDisplay} → Übungsanteil ${formatSigned(s.proficiencyBonusApplied)}`,
+            s.flatBonus
+              ? `• Flat-Bonus: ${formatSigned(s.flatBonus)}`
+              : "• Flat-Bonus: +0",
+            s.manualBonus
+              ? `• Manueller Bonus (Bonus-Spalte): ${formatSigned(s.manualBonus)}`
+              : "• Manueller Bonus (Bonus-Spalte): +0",
+            s.bonusOverride != null
+              ? `• Manueller Gesamt-Override: ${formatSigned(s.bonusOverride)}`
+              : null,
+            s.exhaustionPenalty
+              ? `• Erschöpfungsabzug: ${formatSigned(s.exhaustionPenalty)}`
+              : null,
+            `• Erwarteter Gesamtwert: ${formatSigned(s.expectedTotal)}`,
+            `• Auf dem Blatt steht: ${displayed}`,
+            `• Rechnung: ${s.breakdown}`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+
     if (locale === "en") {
       findings.push({
         id: `det-skill-math-${s.key}`,
@@ -790,10 +842,10 @@ export function buildDeterministicSkillMathFindings(
         title: `System issue: skill total mismatch — ${s.displayName}`,
         detail: [
           "This is a system calculation/display issue, not a player rule mistake.",
-          `Expected ${formatSigned(s.expectedTotal)}, sheet shows ${displayed}.`,
-          s.breakdown,
+          `Expected ${formatSigned(s.expectedTotal)}, sheet shows ${displayed} — they do not match.`,
+          proof,
           audit.formulaNoteEn,
-        ].join(" "),
+        ].join("\n"),
         fieldPath: `skills.${s.key}`,
         resolved: false,
       });
@@ -805,10 +857,10 @@ export function buildDeterministicSkillMathFindings(
         title: `Systemproblem: Fertigkeitsgesamtwert weicht ab — ${s.displayName}`,
         detail: [
           "Das ist ein System-/Berechnungsproblem, kein Spielerfehler bei den Regeln.",
-          `Erwartet ${formatSigned(s.expectedTotal)}, auf dem Blatt steht ${displayed}.`,
-          s.breakdown,
+          `Erwartet ${formatSigned(s.expectedTotal)}, auf dem Blatt steht ${displayed} — die Werte stimmen nicht überein.`,
+          proof,
           audit.formulaNoteDe,
-        ].join(" "),
+        ].join("\n"),
         fieldPath: `skills.${s.key}`,
         resolved: false,
       });
@@ -1617,7 +1669,8 @@ export function dedupeEquipmentFindingsAgainstDeterministic(
 }
 
 /**
- * Entfernt KI-False-Positives zu Fertigkeitsgesamtwerten vs. Übungsbonus allein,
+ * Entfernt KI-False-Positives zu Fertigkeitsgesamtwerten,
+ * widersprüchliche „korrekt aber falsch“-Hinweise ohne Rechennachweis,
  * sowie vage „bitte Stufe-X-Merkmale prüfen“-Hinweise ohne konkrete Namen.
  */
 export function filterFalsePositiveAiFindings(
@@ -1629,27 +1682,57 @@ export function filterFalsePositiveAiFindings(
   const featureChecklist =
     snapshot.featureChecklist ?? buildCharacterTuvFeatureChecklist(snapshot);
   const hasDetFeatures = featureChecklist.catalogAvailable;
+  const hasDetSkillMismatch = skillAudit.skills.some((s) => !s.mathOk);
 
   return aiFindings.filter((f) => {
     const blob = `${f.category} ${f.title} ${f.detail}`;
     const lower = blob.toLowerCase();
 
-    // Skill total vs proficiency bonus alone — only drop when math is correct
-    if (skillAudit.allMathOk) {
-      const skillish =
-        /skills?|fertigkeit|einschüchtern|intimidation|nachforschung|investigation|wahrnehmung|perception|überreden|persuasion|athletik|acrobatics/i.test(
-          blob,
-        ) || f.category.toLowerCase() === "skills";
-      const comparesTotalToPbAlone =
-        skillish &&
-        /(übungsbonus|proficiency\s*bonus|(?<![a-zäöü])pb(?![a-zäöü]))/i.test(
+    const skillish =
+      f.category.toLowerCase() === "skills" ||
+      /skills?|fertigkeit|animal\s*handling|mit\s+tieren|einschüchtern|intimidation|nachforschung|investigation|wahrnehmung|perception|überreden|persuasion|athletik|acrobatics|überleb|survival|heimlichkeit|stealth|täuschung|deception|medizin|medicine|religions?|arcana|natur|nature|einblick|insight|auftreten|performance|handwerk|sleight|fingerfertigkeit|history|geschichte/i.test(
+        blob,
+      );
+
+    const skillInconsistencyNag =
+      skillish &&
+      /(inkonsistent|inconsistent|stimmt\s+nicht|weicht\s+ab|mismatch|nicht\s+(überein)?stimm|don'?t\s+match|does\s+not\s+match|fehler|error|überprüfen|needs?\s+review|might\s+need|könnte\s+.{0,20}prüf|übungsbonus.{0,40}(nicht|falsch|incorrect)|proficiency.{0,40}(not|incorrect|wrong)|bonus\s+(wurde\s+)?nicht\s+(korrekt\s+)?angelegt|not\s+applied\s+correctly|gesamtwert|skill\s+total|fertigkeitsgesamtwert|totals?\s+inkonsistent)/i.test(
+        blob,
+      );
+
+    // Wenn die deterministische Mathe stimmt → keinerlei Fertigkeits-Inkonsistenz-Findings
+    if (skillAudit.allMathOk && skillInconsistencyNag) {
+      return false;
+    }
+
+    // Widerspruch: „Gesamtwert ist korrekt“ UND gleichzeitig „Bonus falsch / prüfen“
+    const saysCorrect =
+      /(is\s+correct|which\s+is\s+correct|stimmt|korrekt|richtig|korrekt\s+berechnet|total\s+\d+[^.!?]{0,40}(correct|korrekt|richtig))/i.test(
+        blob,
+      );
+    const saysWrong =
+      /(not\s+applied\s+correctly|nicht\s+(korrekt\s+)?(angelegt|angewendet|verrechnet)|needs?\s+review|might\s+need|überprüfen|falsch|incorrect|inkonsistent|inconsistent)/i.test(
+        blob,
+      );
+    if (skillish && saysCorrect && saysWrong) {
+      return false;
+    }
+
+    // Deterministische Skill-Mathe-Findings haben Vorrang inkl. Rechennachweis
+    if (hasDetSkillMismatch && skillInconsistencyNag) {
+      return false;
+    }
+
+    // Ohne Rechennachweis (Attribut → Mod, erwarteter vs. angezeigter Wert) keine KI-Mathe-Kritik
+    if (skillInconsistencyNag) {
+      const hasProof =
+        /(attribut|ability\s*score|modifikator|modifier).{0,80}(übungs|proficiency)/i.test(
           blob,
         ) &&
-        /(gesamt|total|modifikator|modifier)/i.test(blob) &&
-        /(nicht\s+(überein)?stimm|passen\s+nicht|don'?t\s+match|does\s+not\s+match|abweich|fehler|error|mismatch|mögliche[rn]?\s+berechnung)/i.test(
+        /(erwartet|expected).{0,60}(blatt|sheet|angezeigt|displayed|actual|steht)/i.test(
           blob,
         );
-      if (comparesTotalToPbAlone) return false;
+      if (!hasProof) return false;
     }
 
     // Vague "verify level X features" without naming what's missing
@@ -1707,6 +1790,19 @@ export function filterFalsePositiveAiFindings(
       isCharacterBackgroundMissing(snapshot) &&
       /background|herkunft/i.test(blob) &&
       /(fehlt|missing|leer|empty|nicht\s+gesetzt|not\s+set|pflicht|required)/i.test(
+        blob,
+      )
+    ) {
+      return false;
+    }
+
+    // 2014-/SRD-5.1-Regelauslegung: TÜV prüft ausschließlich D&D 2024
+    if (
+      /\b2014\b|phb\s*2014|player'?s\s+handbook\s*2014|srd\s*5\.?1|5e\s*2014|legacy\s+5e|alte[rn]?\s+regeln?\s*2014/i.test(
+        blob,
+      ) ||
+      /(domäne|domain).{0,40}(stufe\s*1|level\s*1|1\.\s*stufe)/i.test(blob) ||
+      /(rassen?-?(asi|attribut)|racial\s+(asi|ability)|feste[rn]?\s+rassenboni|species.{0,30}(muss|must).{0,20}(stärke|strength|geschick|dexterity))/i.test(
         blob,
       )
     ) {
@@ -1834,6 +1930,10 @@ export type CharacterTuvSheetSnapshot = {
     background: string | null;
     level: number;
     experiencePoints: number;
+    /** Immer dnd-2024 — Kampagne/Sheet nutzen ausschließlich PHB 2024. */
+    rulesEdition: "dnd-2024";
+    rulesNoteDe: string;
+    rulesNoteEn: string;
   };
   sheet: {
     abilities: unknown;
@@ -1931,6 +2031,11 @@ export function buildCharacterTuvSnapshot(input: {
       background: input.background,
       level: input.level,
       experiencePoints: input.experiencePoints,
+      rulesEdition: "dnd-2024",
+      rulesNoteDe:
+        "Ausschließlich Regeln der D&D-Version 2024 (Player's Handbook 2024). Keine 2014-/SRD-5.1-Auslegung. Klassen-/Unterklassenmerkmale kommen aus dem 2024-Progressionskatalog.",
+      rulesNoteEn:
+        "Exclusively D&D 2024 rules (Player's Handbook 2024). Do not apply 2014 / SRD 5.1. Class/subclass features come from the 2024 progression catalog.",
     },
     sheet: {
       abilities: enrichAbilityMap(input.sheet.abilities, locale),
