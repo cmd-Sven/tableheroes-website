@@ -687,6 +687,28 @@ export const characterSheetMessagesEn = {
     "Presence, personality, and force of will. Charisma shapes how others respond to your hero.",
   "ability.help.cha.usedFor":
     "Performance, Intimidation, Deception, Persuasion; spellcasting (Bard, Paladin, Warlock, Sorcerer); Charisma saving throws.",
+
+  "tuv.title": "Character Inspection",
+  "tuv.subtitle":
+    "AI checks attributes, modifiers, HP, features, and manual overrides (e.g. AC override) against D&D 2024.",
+  "tuv.checkButton": "Inspect character",
+  "tuv.checking": "Inspecting…",
+  "tuv.checkingHint": "Inspection is running — you can keep editing the sheet.",
+  "tuv.checkDone": "Inspection done: {count} open hints",
+  "tuv.error": "Character inspection failed.",
+  "tuv.hintCount": "{count} hints",
+  "tuv.findings": "Findings",
+  "tuv.questions": "Follow-up questions",
+  "tuv.openQuestions": "{count} open",
+  "tuv.answerPlaceholder": "Your explanation…",
+  "tuv.saveAnswers": "Save answers",
+  "tuv.answersSaved": "Answers saved.",
+  "tuv.markResolved": "Done",
+  "tuv.resolved": "done",
+  "tuv.noFindings": "No issues found — the sheet looks consistent.",
+  "tuv.expand": "Details",
+  "tuv.collapse": "Collapse",
+  "tuv.lastChecked": "Last checked",
 } as const satisfies Record<
   import("./de").CharacterSheetMessageKey,
   string

@@ -68,6 +68,7 @@ import { CharacterSheetLanguageToggle } from "@/src/components/characters/Charac
 import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPanel";
 import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
 import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
+import { CharakterTuvPanel } from "@/src/components/characters/CharakterTuvPanel";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
 import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
@@ -926,10 +927,11 @@ export function Dnd5eCharacterSheetPanel({
     };
   }, []);
 
-  function handleSave(silent = false) {
-    if (!sheet || !payload) return;
+  function handleSave(silent = false, sheetOverride?: Dnd5eSheetData) {
+    const activeSheet = sheetOverride ?? sheet;
+    if (!activeSheet || !payload) return;
     startTransition(async () => {
-      let sheetToSave = sheet;
+      let sheetToSave = activeSheet;
       if (inventoryItems.length > 0) {
         sheetToSave = withSyncedArmorClass(
           sheetToSave,
@@ -943,8 +945,8 @@ export function Dnd5eCharacterSheetPanel({
           .map((id) => biographyCulture.languageOptions.find((l) => l.id === id)?.name)
           .filter((n): n is string => Boolean(n?.trim()));
         sheetToSave = {
-          ...sheet,
-          proficiencies: { ...sheet.proficiencies, languages: names },
+          ...sheetToSave,
+          proficiencies: { ...sheetToSave.proficiencies, languages: names },
         };
       }
       if (biographyCulture) {
@@ -2380,6 +2382,24 @@ export function Dnd5eCharacterSheetPanel({
               </section>
 
               <CharacterAchievementsPanel achievements={payload.achievements ?? []} />
+
+              <CharakterTuvPanel
+                campaignId={campaignId}
+                characterId={characterId}
+                sheet={sheet}
+                meta={{
+                  name: meta.name,
+                  className: meta.className,
+                  subclass: meta.subclass,
+                  race: meta.race,
+                  background: meta.background,
+                  level: meta.level,
+                  experiencePoints: meta.experiencePoints,
+                }}
+                readOnly={readOnly}
+                onSheetChange={setSheet}
+                onPersist={(nextSheet) => handleSave(true, nextSheet)}
+              />
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-2">

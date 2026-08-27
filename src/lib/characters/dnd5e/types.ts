@@ -1,5 +1,6 @@
 import type { Dnd5eEquipmentState } from "./equipment-types";
 import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
+import type { CharacterTuvState } from "./character-tuv";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
@@ -199,6 +200,8 @@ export type Dnd5eSheetData = {
   /** Klassenspezifische Ressourcen — werden bei Rast zurückgesetzt */
   classResources?: Dnd5eClassResource[];
   notes?: string | null;
+  /** KI-Charakter-TÜV: Findings, Rückfragen, Antworten */
+  characterInspection?: CharacterTuvState | null;
 };
 
 export type Dnd5eSheetOverrides = Record<string, boolean | number | null>;

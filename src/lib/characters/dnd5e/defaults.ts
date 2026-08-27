@@ -92,5 +92,10 @@ export function mergeSheetWithDefaults(partial: Partial<Dnd5eSheetData>): Dnd5eS
         }
       : base.spellcasting,
     classResources: partial.classResources ?? base.classResources,
+    notes: partial.notes ?? base.notes,
+    characterInspection:
+      partial.characterInspection !== undefined
+        ? partial.characterInspection
+        : base.characterInspection ?? null,
   };
 }

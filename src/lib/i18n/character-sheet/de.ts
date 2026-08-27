@@ -688,6 +688,28 @@ export const characterSheetMessagesDe = {
     "Ausstrahlung, Persönlichkeit und Überzeugungskraft. Charisma prägt, wie andere auf deinen Helden reagieren.",
   "ability.help.cha.usedFor":
     "Auftreten, Einschüchtern, Täuschen, Überzeugen; Zauberattribut (Barde, Paladin, Hexenmeister, Zauberer); Charisma-Rettungswürfe.",
+
+  "tuv.title": "Charakter-TÜV",
+  "tuv.subtitle":
+    "KI prüft Attribute, Modifikatoren, HP, Merkmale und manuelle Overrides (z. B. RK-Override) nach D&D 2024.",
+  "tuv.checkButton": "Charakter prüfen",
+  "tuv.checking": "Prüfe…",
+  "tuv.checkingHint": "Die Prüfung läuft — du kannst den Bogen weiter bearbeiten.",
+  "tuv.checkDone": "Prüfung fertig: {count} offene Hinweise",
+  "tuv.error": "Charakter-TÜV fehlgeschlagen.",
+  "tuv.hintCount": "{count} Hinweise",
+  "tuv.findings": "Hinweise",
+  "tuv.questions": "Rückfragen",
+  "tuv.openQuestions": "{count} offen",
+  "tuv.answerPlaceholder": "Deine Erklärung…",
+  "tuv.saveAnswers": "Antworten speichern",
+  "tuv.answersSaved": "Antworten übernommen.",
+  "tuv.markResolved": "Erledigt",
+  "tuv.resolved": "erledigt",
+  "tuv.noFindings": "Keine Beanstandungen — der Bogen wirkt stimmig.",
+  "tuv.expand": "Details",
+  "tuv.collapse": "Einklappen",
+  "tuv.lastChecked": "Zuletzt geprüft",
 } as const;
 
 export type CharacterSheetMessageKey = keyof typeof characterSheetMessagesDe;
