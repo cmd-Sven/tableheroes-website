@@ -9,6 +9,7 @@ import {
   type CharacterTuvSheetSnapshot,
   type CharacterTuvState,
 } from "./character-tuv";
+import { isCasterClass } from "./spellcasting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -39,13 +40,27 @@ PRÜFBEREICHE (priorisiert):
 2) Übungsbonus (Proficiency Bonus) passend zur Stufe: Stufen 1–4 → +2, 5–8 → +3, 9–12 → +4, 13–16 → +5, 17–20 → +6.
 3) Fertigkeiten & Rettungswürfe: Gesamtwert aus Attribut-Modifikator + Übungsbonus (bei Übung/Expertise) + manueller Bonus; Expertise = doppelter Übungsbonus.
 4) Kampfwerte: maximale Trefferpunkte vs. Klasse/Stufe/Konstitution plausibel; aktuelle Trefferpunkte ≤ Maximum + temporäre; Trefferwürfel-Format.
-5) Rüstungsklasse (Armor Class): Wenn combat.acOverride gesetzt ist → MUSS Rückfrage „Woher kommt dieser manuell gesetzte Wert?“ (außer previousAnswers erklären ihn bereits).
+5) Rüstungsklasse (Armor Class):
+   - Wenn combat.acOverride gesetzt ist → MUSS Rückfrage „Woher kommt dieser manuell gesetzte Wert?“ (außer previousAnswers erklären ihn bereits).
+   - Bei JEDEM Finding zur Rüstungsklasse (Armor Class) — besonders wenn keine Rüstung angelegt ist oder Unarmored Defense / Ungepanzerte Verteidigung greift — MUSST du die Rechnung im detail ausgeschrieben zeigen, damit der Spieler nachrechnen kann.
+     Beispiele:
+     - Barbar ohne Rüstung: „10 + Geschicklichkeitsmodifikator (+X) + Konstitutionsmodifikator (+Y) = Z (Unarmored Defense / Ungepanzerte Verteidigung). Keine Rüstung angelegt.“
+     - Mönch ohne Rüstung: „10 + Geschicklichkeitsmodifikator (+X) + Weisheitsmodifikator (+Y) = Z (Unarmored Defense / Ungepanzerte Verteidigung). Keine Rüstung angelegt.“
+     - Mit Rüstung: Basiswert der Rüstung + erlaubter Geschicklichkeitsmodifikator (+ Schild/Boni falls vorhanden) = Ergebnis.
+   - Nutze die Attributmodifikatoren aus sheet.abilities / derived.abilities. Schreibe Zahlen aus, keine Kürzel.
 6) Initiative: initiativeOverride / initiativeBonus — bei Override immer begründen lassen.
 7) Geschwindigkeit: speedOverride vs. Basis — bei Override begründen lassen.
 8) Skill/Save manualBonus und bonusOverride — jedes nicht-null/nicht-0 manuelle Feld braucht Erklärung oder Finding.
 9) Klassenmerkmale (features) vs. Klasse/Unterklasse/Stufe — fehlende Kernmerkmale oder Merkmale über Stufe hinaus als Hinweis.
-10) Zauberwirken: Spell Save DC / Attack Bonus Overrides prüfen; Zauberplätze grob zur Stufe.
-11) derived.* mit sheet.* vergleichen — Widersprüche melden.
+10) Zauberwirken (NUR bei echten Zauberwirkern):
+   - Volle/halbe Zauberklassen: Magier/Wizard, Kleriker/Cleric, Druide/Druid, Barde/Bard, Zauberer/Sorcerer, Hexer/Warlock, Paladin, Waldläufer/Ranger, Artificer.
+   - Teilzauberer erst ab Unterklasse: Schurke/Rogue mit Arcane Trickster (Arkaner Trickser), Kämpfer/Fighter mit Eldritch Knight (Mystischer Ritter). Mönch nur mit zauberwirkender Unterklasse.
+   - Bei diesen: Spell Save DC / Attack Bonus Overrides prüfen; Zauberplätze grob zur Stufe; fehlende Zauber bei erwartetem Spellcasting.
+   - NICHT-Zauberwirker (Barbar/Barbarian, Kämpfer/Fighter ohne Eldritch Knight, Schurke/Rogue ohne Arcane Trickster, Mönch/Monk ohne Casting-Unterklasse, und jede Klasse ohne Spellcasting):
+     - KEINE Findings, Hinweise, info-Meldungen oder Rückfragen zu fehlenden Zaubern, leerer Zauberliste oder fehlendem Spellcasting.
+     - NICHT vorschlagen, „keine Zauber“ in den Notizen zu erwähnen.
+     - Leere spells[] ist bei diesen Klassen normal und völlig unerwähnt zu lassen.
+11) derived.* mit sheet.* vergleichen — Widersprüche melden. Bei Kampfmathe (Rüstungsklasse, Trefferpunkte, Initiative) immer den Rechenweg im detail mitliefern.
 
 MANUELLE OVERRIDES (wichtig):
 - acOverride, initiativeOverride, speedOverride, skill.bonusOverride, skill.manualBonus, save.manualBonus, spellSaveDcOverride, spellAttackBonusOverride sind SPIELER-EINGABEN.
@@ -57,6 +72,7 @@ FINDINGS vs. QUESTIONS:
 - questions: gezielte Rückfragen an den Spieler (required=true wenn Override/Bonus ohne Erklärung).
 - Jede Override-Frage sollte findingId eines zugehörigen Findings setzen.
 - Maximal 18 findings und 12 questions. Kurz, klar, ohne Floskeln — aber ohne Abkürzungen.
+- Kampf-/Rüstungsklasse-Findings: detail enthält immer die ausgeschriebene Rechnung.
 
 SCHEMA (exakt diese Keys):
 {
@@ -94,6 +110,74 @@ function normalizeSeverity(v: unknown): CharacterTuvFinding["severity"] {
   return "hint";
 }
 
+/** Fehlende Zauber / leere Spellliste — False Positives bei Nicht-Zauberwirkern. */
+const MISSING_SPELLS_TEXT_RE =
+  /keine[nm]?\s+zauber|zauber\s+(nicht\s+)?vorhanden|zauberliste\s+(ist\s+)?leer|leere?\s+zauberliste|kein\s+zauberwirken|fehlt.*zauber|zauber.*fehlt|ohne\s+zauber|no\s+spells?|without\s+spells?|empty\s+spell|lacks?\s+spells?|missing\s+spells?|spellcasting\s+(fehlt|missing|absent|none)|notizen.*(keine\s+)?zauber|notes.*(?:no\s+)?spells?/i;
+
+function isMissingSpellsNoise(text: string): boolean {
+  return MISSING_SPELLS_TEXT_RE.test(text);
+}
+
+/**
+ * Entfernt „keine Zauber“-Findings/Fragen bei Klassen ohne Spellcasting
+ * (Barbar, Fighter ohne EK, Rogue ohne AT, Monk ohne Casting-Unterklasse, …).
+ */
+function filterNonCasterSpellNoise(
+  snapshot: CharacterTuvSheetSnapshot,
+  findings: CharacterTuvFinding[],
+  questions: CharacterTuvQuestion[],
+  summary: string | null,
+): {
+  findings: CharacterTuvFinding[];
+  questions: CharacterTuvQuestion[];
+  summary: string | null;
+} {
+  if (isCasterClass(snapshot.meta.class, snapshot.meta.subclass)) {
+    return { findings, questions, summary };
+  }
+
+  const dropFindingIds = new Set(
+    findings
+      .filter((f) => {
+        const blob = `${f.category} ${f.title} ${f.detail}`;
+        if (isMissingSpellsNoise(blob)) return true;
+        // Kategorie spells ohne Override-Bezug → bei Nicht-Castem oft Rauschen
+        if (
+          f.category.toLowerCase() === "spells" &&
+          !/override|bonus|schwierigkeitsgrad|difficulty\s*class|angriffsbonus|attack\s*bonus/i.test(
+            blob,
+          )
+        ) {
+          return true;
+        }
+        return false;
+      })
+      .map((f) => f.id),
+  );
+
+  const nextFindings = findings.filter((f) => !dropFindingIds.has(f.id));
+  const nextQuestions = questions.filter((q) => {
+    if (q.findingId && dropFindingIds.has(q.findingId)) return false;
+    if (isMissingSpellsNoise(q.prompt)) return false;
+    return true;
+  });
+
+  let nextSummary = summary;
+  if (nextSummary && isMissingSpellsNoise(nextSummary)) {
+    // Nur den „keine Zauber“-Satz entfernen, Rest behalten wenn möglich
+    nextSummary = nextSummary
+      .replace(
+        /[^.!?\n]*(?:keine[nm]?\s+zauber|no\s+spells?|leere?\s+zauberliste|empty\s+spell)[^.!?\n]*[.!?]?/gi,
+        " ",
+      )
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (!nextSummary) nextSummary = null;
+  }
+
+  return { findings: nextFindings, questions: nextQuestions, summary: nextSummary };
+}
+
 function parseAiResult(raw: unknown): {
   summary: string | null;
   findings: CharacterTuvFinding[];
@@ -110,7 +194,7 @@ function parseAiResult(raw: unknown): {
       severity: normalizeSeverity(f.severity),
       category: String(f.category ?? "other").slice(0, 40),
       title: String(f.title ?? "Hinweis").slice(0, 160),
-      detail: String(f.detail ?? "").slice(0, 800),
+      detail: String(f.detail ?? "").slice(0, 1200),
       fieldPath: f.fieldPath != null ? String(f.fieldPath).slice(0, 120) : null,
       resolved: false,
     };
@@ -169,7 +253,13 @@ export async function runCharacterTuvInspection(
     throw new Error("KI-Antwort war kein gültiges JSON.");
   }
 
-  const { summary, findings, questions } = parseAiResult(parsedJson);
+  const parsed = parseAiResult(parsedJson);
+  const { summary, findings, questions } = filterNonCasterSpellNoise(
+    snapshot,
+    parsed.findings,
+    parsed.questions,
+    parsed.summary,
+  );
   const prevAnswers = snapshot.previousAnswers ?? {};
   const answers: Record<string, string> = {};
   // Übernehme frühere Antworten zu gleichem fieldPath (Keys: field:<path> oder Frage-ID).
