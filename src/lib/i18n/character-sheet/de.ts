@@ -31,6 +31,7 @@ export const characterSheetMessagesDe = {
   "tab.equipment": "Ausrüstung",
   "tab.spells": "Zauberbuch & Fähigkeiten",
   "tab.biography": "Biografie & Kultur",
+  "tab.tuv": "Charakter-TÜV",
 
   "field.characterName": "Charaktername",
   "field.class": "Klasse",
@@ -671,15 +672,15 @@ export const characterSheetMessagesDe = {
   "ability.help.dex.what":
     "Gewandtheit, Reflexe und Hand-Auge-Koordination. Geschick bestimmt, wie flink und präzise dein Held agiert.",
   "ability.help.dex.usedFor":
-    "Akrobatik, Fingerfertigkeit, Heimlichkeit; Initiative; RK (leichte/mittlere Rüstung); Fernkampf & Finesse-Waffen; Geschick-Rettungswürfe.",
+    "Akrobatik, Fingerfertigkeit, Heimlichkeit; Initiative; Rüstungsklasse bei leichter oder mittlerer Rüstung; Fernkampf und Finesse-Waffen (Geschicklichkeitswaffen); Geschick-Rettungswürfe.",
   "ability.help.con.what":
     "Ausdauer, Gesundheit und Widerstandskraft. Konstitution hält dich im Kampf und bei Anstrengung standhaft.",
   "ability.help.con.usedFor":
-    "Trefferpunkte (KON-Mod je Stufe); Konzentrationswürfe; Rettungswürfe gegen Gift, Krankheit und ähnliche Effekte.",
+    "Trefferpunkte (Konstitutions-Modifikator je Stufe); Konzentrationswürfe; Rettungswürfe gegen Gift, Krankheit und ähnliche Effekte.",
   "ability.help.int.what":
     "Verstand, Bildung und analytisches Denken. Intelligenz misst, wie gut dein Held lernt, erinnert und schlussfolgert.",
   "ability.help.int.usedFor":
-    "Arkane Kunde, Geschichte, Untersuchung, Natur, Religion; Zauberattribut (z. B. Magier, Artificer); Intelligenz-Rettungswürfe.",
+    "Arkane Kunde, Geschichte, Untersuchung, Natur, Religion; Zauberattribut (z. B. Magier, Artificer / Magietechniker); Intelligenz-Rettungswürfe.",
   "ability.help.wis.what":
     "Wahrnehmung, Instinkt und Willenskraft. Weisheit ist Bauchgefühl, Aufmerksamkeit und innere Klarheit.",
   "ability.help.wis.usedFor":
@@ -770,7 +771,7 @@ export const characterSheetMessagesDe = {
 
   "tuv.title": "Charakter-TÜV",
   "tuv.subtitle":
-    "KI prüft Attribute, Modifikatoren, HP, Merkmale und manuelle Overrides (z. B. RK-Override) nach D&D 2024.",
+    "Die KI prüft Attribute, Modifikatoren, Trefferpunkte, Merkmale und manuell geänderte Werte (zum Beispiel eine geänderte Rüstungsklasse) nach den Regeln von Dungeons & Dragons 2024.",
   "tuv.checkButton": "Charakter prüfen",
   "tuv.checking": "Prüfe…",
   "tuv.checkingHint": "Die Prüfung läuft — du kannst den Bogen weiter bearbeiten.",
@@ -786,6 +787,8 @@ export const characterSheetMessagesDe = {
   "tuv.markResolved": "Erledigt",
   "tuv.resolved": "erledigt",
   "tuv.noFindings": "Keine Beanstandungen — der Bogen wirkt stimmig.",
+  "tuv.emptyHint":
+    "Noch keine Prüfung. Starte den Charakter-TÜV, um Hinweise und Rückfragen zu Attributen, Kampfwerten und manuellen Korrekturen zu sehen.",
   "tuv.expand": "Details",
   "tuv.collapse": "Einklappen",
   "tuv.lastChecked": "Zuletzt geprüft",

@@ -13,6 +13,7 @@ import {
   Backpack,
   BookOpen,
   Wand2,
+  ClipboardCheck,
   TrendingUp,
   Dumbbell,
   Wind,
@@ -138,7 +139,7 @@ import {
   normalizeAlignmentValue,
 } from "@/src/lib/characters/dnd5e-alignments";
 
-type SheetTab = "attributes" | "equipment" | "spells" | "biography";
+type SheetTab = "attributes" | "equipment" | "spells" | "biography" | "tuv";
 
 const LEVEL_EDIT_HINT_KEYS: Record<LevelEditHintId, CharacterSheetMessageKey> = {
   subclassUnlock: "levelEdit.hint.subclassUnlock",
@@ -1389,6 +1390,18 @@ export function Dnd5eCharacterSheetPanel({
           <BookOpen className="h-3.5 w-3.5" />
           {t("tab.biography")}
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("tuv")}
+          className={`inline-flex items-center gap-2 px-4 py-2 font-barlow text-xs font-bold uppercase border-b-2 transition-colors ${
+            activeTab === "tuv"
+              ? "border-hero-vibrant text-hero-vibrant"
+              : "border-transparent text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          <ClipboardCheck className="h-3.5 w-3.5" />
+          {t("tab.tuv")}
+        </button>
       </div>
 
       {activeTab === "equipment" ? (
@@ -2571,24 +2584,6 @@ export function Dnd5eCharacterSheetPanel({
 
               <CharacterAchievementsPanel achievements={payload.achievements ?? []} />
 
-              <CharakterTuvPanel
-                campaignId={campaignId}
-                characterId={characterId}
-                sheet={sheet}
-                meta={{
-                  name: meta.name,
-                  className: meta.className,
-                  subclass: meta.subclass,
-                  race: meta.race,
-                  background: meta.background,
-                  level: meta.level,
-                  experiencePoints: meta.experiencePoints,
-                }}
-                readOnly={readOnly}
-                onSheetChange={setSheet}
-                onPersist={(nextSheet) => handleSave(true, nextSheet)}
-              />
-
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-2 mb-2">
                   {t("field.notes")}
@@ -2665,6 +2660,26 @@ export function Dnd5eCharacterSheetPanel({
             biographyCulture.onLanguagesChange?.(ids);
             setSheet(syncLanguageNamesToSheet(sheet, ids));
           }}
+        />
+      ) : null}
+
+      {activeTab === "tuv" ? (
+        <CharakterTuvPanel
+          campaignId={campaignId}
+          characterId={characterId}
+          sheet={sheet}
+          meta={{
+            name: meta.name,
+            className: meta.className,
+            subclass: meta.subclass,
+            race: meta.race,
+            background: meta.background,
+            level: meta.level,
+            experiencePoints: meta.experiencePoints,
+          }}
+          readOnly={readOnly}
+          onSheetChange={setSheet}
+          onPersist={(nextSheet) => handleSave(true, nextSheet)}
         />
       ) : null}
 

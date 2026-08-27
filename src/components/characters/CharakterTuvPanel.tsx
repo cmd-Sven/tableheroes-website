@@ -1,5 +1,6 @@
 /**
  * Charakter-TÜV — KI-Prüfung des D&D-2024-Charakterbogens mit Rückfragen.
+ * Eigener Sheet-Tab mit Platz für alle Hinweise und Rückfragen.
  */
 "use client";
 
@@ -71,7 +72,6 @@ export function CharakterTuvPanel({
   const { t, locale } = useCharacterSheetLocale();
   const [busy, setBusy] = useState(false);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
-  const [expanded, setExpanded] = useState(false);
 
   const tuv: CharacterTuvState = useMemo(() => {
     return (
@@ -92,7 +92,6 @@ export function CharakterTuvPanel({
   async function runInspection() {
     if (readOnly || busy) return;
     setBusy(true);
-    setExpanded(true);
     try {
       const derived = computeDerivedDnd5eSheet(sheet, meta.level);
       const snapshot = buildCharacterTuvSnapshot({
@@ -179,14 +178,14 @@ export function CharakterTuvPanel({
   });
 
   return (
-    <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
+    <section className="rounded-lg border border-hero-dark bg-background-card p-4 md:p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-3xl">
           <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-1 flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 shrink-0" />
             {t("tuv.title")}
           </h3>
-          <p className="font-libre text-xs text-gray-400 leading-relaxed">
+          <p className="font-libre text-sm text-gray-400 leading-relaxed">
             {t("tuv.subtitle")}
           </p>
         </div>
@@ -220,15 +219,6 @@ export function CharakterTuvPanel({
             )}
             {busy ? t("tuv.checking") : t("tuv.checkButton")}
           </button>
-          {hasRun ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="font-barlow text-[10px] font-bold uppercase text-gray-400 hover:text-gray-200"
-            >
-              {expanded ? t("tuv.collapse") : t("tuv.expand")}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -239,10 +229,10 @@ export function CharakterTuvPanel({
         </p>
       ) : null}
 
-      {expanded && hasRun ? (
-        <div className="space-y-4 border-t border-hero-dark pt-3">
+      {hasRun ? (
+        <div className="space-y-5 border-t border-hero-dark pt-4">
           {tuv.summary ? (
-            <p className="font-libre text-sm text-gray-200 leading-relaxed">
+            <p className="font-libre text-sm text-gray-200 leading-relaxed max-w-4xl">
               {tuv.summary}
             </p>
           ) : null}
@@ -256,24 +246,19 @@ export function CharakterTuvPanel({
                 {tuv.findings.map((f) => (
                   <li
                     key={f.id}
-                    className={`rounded border px-3 py-2 ${severityClass(f.severity)} ${
+                    className={`rounded border px-3 py-2.5 ${severityClass(f.severity)} ${
                       f.resolved ? "opacity-50" : ""
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-barlow text-xs font-bold uppercase tracking-wide">
                           {f.title}
                           {f.resolved ? ` · ${t("tuv.resolved")}` : ""}
                         </p>
-                        <p className="mt-1 font-libre text-xs text-gray-300 leading-relaxed">
+                        <p className="mt-1 font-libre text-sm text-gray-300 leading-relaxed">
                           {f.detail}
                         </p>
-                        {f.fieldPath ? (
-                          <p className="mt-1 font-mono text-[10px] text-gray-500">
-                            {f.fieldPath}
-                          </p>
-                        ) : null}
                       </div>
                       {!f.resolved && !readOnly && f.severity !== "info" ? (
                         <button
@@ -308,7 +293,7 @@ export function CharakterTuvPanel({
                 const value = draftAnswers[q.id] ?? tuv.answers[q.id] ?? "";
                 return (
                   <label key={q.id} className="block space-y-1.5">
-                    <span className="font-libre text-sm text-gray-200">
+                    <span className="font-libre text-sm text-gray-200 leading-relaxed">
                       {q.prompt}
                       {q.required ? (
                         <span className="ml-1 text-accent-gold">*</span>
@@ -317,7 +302,7 @@ export function CharakterTuvPanel({
                     <textarea
                       value={value}
                       disabled={readOnly}
-                      rows={2}
+                      rows={3}
                       onChange={(e) =>
                         setDraftAnswers((prev) => ({
                           ...prev,
@@ -351,7 +336,11 @@ export function CharakterTuvPanel({
             </p>
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        <p className="font-libre text-sm text-gray-500 leading-relaxed max-w-3xl">
+          {t("tuv.emptyHint")}
+        </p>
+      )}
     </section>
   );
 }

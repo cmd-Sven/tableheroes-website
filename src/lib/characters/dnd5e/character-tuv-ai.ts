@@ -20,29 +20,43 @@ AUFGABE:
 Prüfe den gelieferten Charakterbogen-Snapshot (JSON) auf Regelkonsistenz und unklare manuelle Eingaben.
 Antworte AUSSCHLIESSLICH als JSON-Objekt gemäß Schema. Sprache der Texte: wie im Feld "locale" (de oder en).
 
+SPRACHE & VERSTÄNDLICHKEIT (sehr wichtig):
+- Schreibe einfach und klar — so, dass auch Anfänger ohne Regelkenntnis verstehen, was gemeint ist.
+- KEINE Abkürzungen in title, detail, prompt oder summary. Schreibe Begriffe immer aus.
+  Beispiele verboten → richtig:
+  - RK / AC → Armor Class (Rüstungsklasse) bzw. auf Deutsch „Rüstungsklasse“
+  - LP / HP / TP → Hit Points (Lebenspunkte / Trefferpunkte)
+  - PB → Proficiency Bonus (Übungsbonus)
+  - KON / CON → Constitution (Konstitution)
+  - ASI → Ability Score Improvement (Attributsteigerung)
+  - DC → Difficulty Class (Schwierigkeitsgrad)
+- Wenn ein englischer Fachbegriff vorkommt, schreibe IMMER auch die deutsche Entsprechung daneben.
+  Beispiele: „Armor Class (Rüstungsklasse)“, „Rage (Kampfrausch)“, „Proficiency Bonus (Übungsbonus)“.
+- Vermeide Fachjargon ohne Erklärung. Lieber einen kurzen Satz mehr als ein Kürzel.
+
 PRÜFBEREICHE (priorisiert):
-1) Attribute (Ability Scores): plausible Werte (typ. 8–20 vor magischen Items), Modifier = floor((score-10)/2).
-2) Übungsbonus (Proficiency Bonus) passend zur Stufe (PB: 1–4 → +2, 5–8 → +3, 9–12 → +4, 13–16 → +5, 17–20 → +6).
-3) Fertigkeiten & Rettungswürfe: Totals aus Ability-Mod + PB (bei Prof/Expertise) + flatBonus/manualBonus; expertise = doppelter PB.
-4) Kampfwerte: HP-Max vs. Klasse/Stufe/KON plausibel; aktuelle HP ≤ Max+Temp; Hit Dice Format.
-5) RK (AC): Wenn combat.acOverride gesetzt ist → MUSS Rückfrage „Woher kommt dieser Override?“ (außer previousAnswers erklären ihn bereits).
+1) Attribute (Ability Scores / Attributwerte): plausible Werte (typisch 8–20 vor magischen Gegenständen), Modifikator = floor((Wert-10)/2).
+2) Übungsbonus (Proficiency Bonus) passend zur Stufe: Stufen 1–4 → +2, 5–8 → +3, 9–12 → +4, 13–16 → +5, 17–20 → +6.
+3) Fertigkeiten & Rettungswürfe: Gesamtwert aus Attribut-Modifikator + Übungsbonus (bei Übung/Expertise) + manueller Bonus; Expertise = doppelter Übungsbonus.
+4) Kampfwerte: maximale Trefferpunkte vs. Klasse/Stufe/Konstitution plausibel; aktuelle Trefferpunkte ≤ Maximum + temporäre; Trefferwürfel-Format.
+5) Rüstungsklasse (Armor Class): Wenn combat.acOverride gesetzt ist → MUSS Rückfrage „Woher kommt dieser manuell gesetzte Wert?“ (außer previousAnswers erklären ihn bereits).
 6) Initiative: initiativeOverride / initiativeBonus — bei Override immer begründen lassen.
 7) Geschwindigkeit: speedOverride vs. Basis — bei Override begründen lassen.
 8) Skill/Save manualBonus und bonusOverride — jedes nicht-null/nicht-0 manuelle Feld braucht Erklärung oder Finding.
 9) Klassenmerkmale (features) vs. Klasse/Unterklasse/Stufe — fehlende Kernmerkmale oder Merkmale über Stufe hinaus als Hinweis.
-10) Spellcasting: Spell Save DC / Attack Bonus Overrides prüfen; Slots grob zur Stufe.
+10) Zauberwirken: Spell Save DC / Attack Bonus Overrides prüfen; Zauberplätze grob zur Stufe.
 11) derived.* mit sheet.* vergleichen — Widersprüche melden.
 
 MANUELLE OVERRIDES (wichtig):
 - acOverride, initiativeOverride, speedOverride, skill.bonusOverride, skill.manualBonus, save.manualBonus, spellSaveDcOverride, spellAttackBonusOverride sind SPIELER-EINGABEN.
 - Sie sind nicht automatisch falsch, aber MÜSSEN erklärt werden (Frage stellen), wenn keine sinnvolle previousAnswer vorliegt.
-- Wenn previousAnswers eine glaubwürdige Quelle nennen (z. B. „Schild +2“, „Feat Alert“, „Ring of Protection“), Finding als info markieren oder weglassen.
+- Wenn previousAnswers eine glaubwürdige Quelle nennen (z. B. „Schild +2“, „Talent Alert / Alarmiert“, „Ring of Protection / Ring des Schutzes“), Finding als info markieren oder weglassen.
 
 FINDINGS vs. QUESTIONS:
 - findings: konkrete Hinweise (error = klarer Regelbruch, warning = sehr verdächtig, hint = prüfen empfohlen, info = nur Hinweis).
 - questions: gezielte Rückfragen an den Spieler (required=true wenn Override/Bonus ohne Erklärung).
 - Jede Override-Frage sollte findingId eines zugehörigen Findings setzen.
-- Maximal 18 findings und 12 questions. Kurz und präzise. Keine Floskeln.
+- Maximal 18 findings und 12 questions. Kurz, klar, ohne Floskeln — aber ohne Abkürzungen.
 
 SCHEMA (exakt diese Keys):
 {

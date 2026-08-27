@@ -31,6 +31,7 @@ export const characterSheetMessagesEn = {
   "tab.equipment": "Equipment",
   "tab.spells": "Spellbook & Features",
   "tab.biography": "Biography & Culture",
+  "tab.tuv": "Character Inspection",
 
   "field.characterName": "Character Name",
   "field.class": "Class",
@@ -670,15 +671,15 @@ export const characterSheetMessagesEn = {
   "ability.help.dex.what":
     "Agility, reflexes, and hand-eye coordination. Dexterity measures how quick and precise your hero is.",
   "ability.help.dex.usedFor":
-    "Acrobatics, Sleight of Hand, Stealth; initiative; AC (light/medium armor); ranged & finesse weapons; Dexterity saving throws.",
+    "Acrobatics, Sleight of Hand, Stealth; initiative; Armor Class / Rüstungsklasse (light/medium armor); ranged & finesse weapons; Dexterity saving throws.",
   "ability.help.con.what":
     "Stamina, health, and toughness. Constitution keeps you standing in battle and under strain.",
   "ability.help.con.usedFor":
-    "Hit points (CON mod per level); concentration checks; saving throws vs poison, disease, and similar effects.",
+    "Hit points / Trefferpunkte (Constitution modifier per level); concentration checks; saving throws vs poison, disease, and similar effects.",
   "ability.help.int.what":
     "Reasoning, learning, and analysis. Intelligence measures how well your hero recalls facts and solves problems.",
   "ability.help.int.usedFor":
-    "Arcana, History, Investigation, Nature, Religion; spellcasting ability (e.g. Wizard, Artificer); Intelligence saving throws.",
+    "Arcana, History, Investigation, Nature, Religion; spellcasting ability (e.g. Wizard, Artificer / Magietechniker); Intelligence saving throws.",
   "ability.help.wis.what":
     "Awareness, instinct, and willpower. Wisdom is gut feeling, attention, and inner clarity.",
   "ability.help.wis.usedFor":
@@ -769,7 +770,7 @@ export const characterSheetMessagesEn = {
 
   "tuv.title": "Character Inspection",
   "tuv.subtitle":
-    "AI checks attributes, modifiers, HP, features, and manual overrides (e.g. AC override) against D&D 2024.",
+    "AI checks attributes, modifiers, hit points (Trefferpunkte), features, and manually changed values (for example a changed Armor Class / Rüstungsklasse) against Dungeons & Dragons 2024.",
   "tuv.checkButton": "Inspect character",
   "tuv.checking": "Inspecting…",
   "tuv.checkingHint": "Inspection is running — you can keep editing the sheet.",
@@ -785,6 +786,8 @@ export const characterSheetMessagesEn = {
   "tuv.markResolved": "Done",
   "tuv.resolved": "done",
   "tuv.noFindings": "No issues found — the sheet looks consistent.",
+  "tuv.emptyHint":
+    "No inspection yet. Start Character Inspection to see hints and follow-up questions about attributes, combat values, and manual changes.",
   "tuv.expand": "Details",
   "tuv.collapse": "Collapse",
   "tuv.lastChecked": "Last checked",
