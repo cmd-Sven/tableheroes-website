@@ -3,6 +3,11 @@
  */
 import OpenAI from "openai";
 import {
+  buildDeterministicEquipmentFindings,
+  dedupeEquipmentFindingsAgainstDeterministic,
+  humanizeCharacterTuvFinding,
+  humanizeCharacterTuvQuestion,
+  humanizeCharacterTuvText,
   withAnswersApplied,
   type CharacterTuvFinding,
   type CharacterTuvQuestion,
@@ -35,6 +40,16 @@ SPRACHE & VERSTÄNDLICHKEIT (sehr wichtig):
   Beispiele: „Armor Class (Rüstungsklasse)“, „Rage (Kampfrausch)“, „Proficiency Bonus (Übungsbonus)“.
 - Vermeide Fachjargon ohne Erklärung. Lieber einen kurzen Satz mehr als ein Kürzel.
 
+INTERNE KEYS & ÜBUNGSSTATUS (streng verboten in Texten):
+- NIEMALS interne Kurz-Keys ausgeben: itm, inv, prc, acr, ath, ste, str, dex, con, int, wis, cha, usw.
+- Skills/Fertigkeiten und Attribute kommen im Snapshot als Arrays mit displayName, labelDe, labelEn.
+  Nutze IMMER displayName bzw. „Deutscher Name (English Name)“ — z. B. „Einschüchtern (Intimidation)“, „Nachforschungen (Investigation)“, „Wahrnehmung (Perception)“.
+- Übungsstatus NIEMALS roh als „proficient“, „expertise“, „half“, „none“ schreiben.
+  Stattdessen: „geübt (proficient)“, „Expertise / doppelt geübt (expertise)“, „halbe Übung (half proficiency)“, „keine Übung (none)“.
+  Feld proficiencyDisplay im Snapshot ist die bevorzugte Formulierung.
+- labelLegend im Snapshot ist die verbindliche Übersetzungstabelle.
+- Alle Rechnungen (Fertigkeiten, Rettungswürfe, Rüstungsklasse, …) in Klartext mit ausgeschriebenen Namen erklären.
+
 PRÜFBEREICHE (priorisiert):
 1) Attribute (Ability Scores / Attributwerte): plausible Werte (typisch 8–20 vor magischen Gegenständen), Modifikator = floor((Wert-10)/2).
 2) Übungsbonus (Proficiency Bonus) passend zur Stufe: Stufen 1–4 → +2, 5–8 → +3, 9–12 → +4, 13–16 → +5, 17–20 → +6.
@@ -47,7 +62,8 @@ PRÜFBEREICHE (priorisiert):
      - Barbar ohne Rüstung: „10 + Geschicklichkeitsmodifikator (+X) + Konstitutionsmodifikator (+Y) = Z (Unarmored Defense / Ungepanzerte Verteidigung). Keine Rüstung angelegt.“
      - Mönch ohne Rüstung: „10 + Geschicklichkeitsmodifikator (+X) + Weisheitsmodifikator (+Y) = Z (Unarmored Defense / Ungepanzerte Verteidigung). Keine Rüstung angelegt.“
      - Mit Rüstung: Basiswert der Rüstung + erlaubter Geschicklichkeitsmodifikator (+ Schild/Boni falls vorhanden) = Ergebnis.
-   - Nutze die Attributmodifikatoren aus sheet.abilities / derived.abilities. Schreibe Zahlen aus, keine Kürzel.
+   - Nutze die Attributmodifikatoren aus sheet.abilities / derived.abilities (displayName). Schreibe Zahlen aus, keine Kürzel.
+   - equipmentSummary.noTorsoArmorEquipped / torsoSlot.empty: Torso-Slot leer → keine Rüstung in der RK-Rechnung. Deterministische System-Hinweise dazu existieren bereits — DU musst denselben Hinweis NICHT noch einmal als Finding erzeugen; du darfst die Auswirkung in anderen RK-Findings erwähnen.
 6) Initiative: initiativeOverride / initiativeBonus — bei Override immer begründen lassen.
 7) Geschwindigkeit: speedOverride vs. Basis — bei Override begründen lassen.
 8) Skill/Save manualBonus und bonusOverride — jedes nicht-null/nicht-0 manuelle Feld braucht Erklärung oder Finding.
@@ -61,6 +77,9 @@ PRÜFBEREICHE (priorisiert):
      - NICHT vorschlagen, „keine Zauber“ in den Notizen zu erwähnen.
      - Leere spells[] ist bei diesen Klassen normal und völlig unerwähnt zu lassen.
 11) derived.* mit sheet.* vergleichen — Widersprüche melden. Bei Kampfmathe (Rüstungsklasse, Trefferpunkte, Initiative) immer den Rechenweg im detail mitliefern.
+12) Ausrüstung (equipmentSummary):
+   - Leerer Torso und fehlende Waffen werden vom System deterministisch gemeldet — KEINE doppelten Findings dazu erzeugen.
+   - Andere Ausrüstungs-Auffälligkeiten nur als hint, wenn klar regelrelevant.
 
 MANUELLE OVERRIDES (wichtig):
 - acOverride, initiativeOverride, speedOverride, skill.bonusOverride, skill.manualBonus, save.manualBonus, spellSaveDcOverride, spellAttackBonusOverride sind SPIELER-EINGABEN.
@@ -71,7 +90,7 @@ FINDINGS vs. QUESTIONS:
 - findings: konkrete Hinweise (error = klarer Regelbruch, warning = sehr verdächtig, hint = prüfen empfohlen, info = nur Hinweis).
 - questions: gezielte Rückfragen an den Spieler (required=true wenn Override/Bonus ohne Erklärung).
 - Jede Override-Frage sollte findingId eines zugehörigen Findings setzen.
-- Maximal 18 findings und 12 questions. Kurz, klar, ohne Floskeln — aber ohne Abkürzungen.
+- Maximal 18 findings und 12 questions. Kurz, klar, ohne Floskeln — aber ohne Abkürzungen und ohne interne Keys.
 - Kampf-/Rüstungsklasse-Findings: detail enthält immer die ausgeschriebene Rechnung.
 
 SCHEMA (exakt diese Keys):
@@ -223,6 +242,42 @@ function parseAiResult(raw: unknown): {
   };
 }
 
+function mergeAndHumanizeResults(
+  snapshot: CharacterTuvSheetSnapshot,
+  parsed: {
+    summary: string | null;
+    findings: CharacterTuvFinding[];
+    questions: CharacterTuvQuestion[];
+  },
+): {
+  summary: string | null;
+  findings: CharacterTuvFinding[];
+  questions: CharacterTuvQuestion[];
+} {
+  const locale = snapshot.locale ?? "de";
+  const deterministic = buildDeterministicEquipmentFindings(snapshot);
+  const detIds = new Set(deterministic.map((f) => f.id));
+  const aiDeduped = dedupeEquipmentFindingsAgainstDeterministic(
+    parsed.findings,
+    detIds,
+  );
+
+  // Deterministische Findings zuerst (bereits klar formuliert), dann KI (humanisiert)
+  const mergedFindings = [
+    ...deterministic,
+    ...aiDeduped.map((f) => humanizeCharacterTuvFinding(f, locale)),
+  ].slice(0, 18);
+
+  const questions = parsed.questions.map((q) =>
+    humanizeCharacterTuvQuestion(q, locale),
+  );
+  const summary = parsed.summary
+    ? humanizeCharacterTuvText(parsed.summary, locale).slice(0, 600)
+    : null;
+
+  return { summary, findings: mergedFindings, questions };
+}
+
 export async function runCharacterTuvInspection(
   snapshot: CharacterTuvSheetSnapshot,
 ): Promise<CharacterTuvState> {
@@ -254,11 +309,15 @@ export async function runCharacterTuvInspection(
   }
 
   const parsed = parseAiResult(parsedJson);
-  const { summary, findings, questions } = filterNonCasterSpellNoise(
+  const filtered = filterNonCasterSpellNoise(
     snapshot,
     parsed.findings,
     parsed.questions,
     parsed.summary,
+  );
+  const { summary, findings, questions } = mergeAndHumanizeResults(
+    snapshot,
+    filtered,
   );
   const prevAnswers = snapshot.previousAnswers ?? {};
   const answers: Record<string, string> = {};
