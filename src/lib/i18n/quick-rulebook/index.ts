@@ -33,6 +33,8 @@ const CATEGORY_KEYS: Record<QuickRuleCategory, QuickRuleCategoryMessageKey> = {
   condition: "category.condition",
   item: "category.item",
   "class-feature": "category.class-feature",
+  feat: "category.feat",
+  spell: "category.spell",
   environment: "category.environment",
   general: "category.general",
 };

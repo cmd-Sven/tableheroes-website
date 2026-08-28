@@ -1,5 +1,6 @@
-import type { QuickRuleEntry } from "./types";
+import type { QuickRuleEntry, QuickRuleCategory } from "./types";
 import { DND_2024_RULES_EDITION } from "./types";
+import { buildCatalogQuickRules } from "./build-catalog-quick-rules";
 
 const SOURCE = "PHB 2024";
 
@@ -14,7 +15,7 @@ function rule(
 }
 
 /** Curated D&D 2024 quick-reference entries — no 2014/SRD legacy rules. */
-export const QUICK_RULEBOOK_ENTRIES: QuickRuleEntry[] = [
+const CURATED_QUICK_RULEBOOK_ENTRIES: QuickRuleEntry[] = [
   rule({
     id: "fall-damage",
     category: "environment",
@@ -557,4 +558,32 @@ export const QUICK_RULEBOOK_ENTRIES: QuickRuleEntry[] = [
   }),
 ];
 
+const CATALOG_QUICK_RULEBOOK_ENTRIES = buildCatalogQuickRules(
+  CURATED_QUICK_RULEBOOK_ENTRIES.map((entry) => entry.id),
+);
+
+/** Curated core rules plus all class features, feats, and spells from the 2024 catalog. */
+export const QUICK_RULEBOOK_ENTRIES: QuickRuleEntry[] = [
+  ...CURATED_QUICK_RULEBOOK_ENTRIES,
+  ...CATALOG_QUICK_RULEBOOK_ENTRIES,
+];
+
 export const QUICK_RULEBOOK_ENTRY_COUNT = QUICK_RULEBOOK_ENTRIES.length;
+
+export const QUICK_RULEBOOK_COUNTS: Record<QuickRuleCategory, number> = QUICK_RULEBOOK_ENTRIES.reduce(
+  (acc, entry) => {
+    acc[entry.category] = (acc[entry.category] ?? 0) + 1;
+    return acc;
+  },
+  {
+    combat: 0,
+    action: 0,
+    condition: 0,
+    item: 0,
+    "class-feature": 0,
+    feat: 0,
+    spell: 0,
+    environment: 0,
+    general: 0,
+  } satisfies Record<QuickRuleCategory, number>,
+);

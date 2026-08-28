@@ -116,6 +116,7 @@ export function LiveSessionBoardDockPanelsLayer() {
       setNpcSearchModalOpen,
       beastSearchModalOpen,
       setBeastSearchModalOpen,
+      setQuickRulebookModalOpen,
       creatureStates,
       setCreatureStates,
       beastLootCreatureId,
@@ -413,6 +414,8 @@ export function LiveSessionBoardDockPanelsLayer() {
         chronistSettingsFlowRef={chronistSettingsFlowRef}
         allCampaignNpcs={allCampaignNpcs}
         isUpdating={isUpdating}
+        showDnd5eSheet={showDnd5eSheet}
+        setQuickRulebookModalOpen={setQuickRulebookModalOpen}
       />
 
       <LiveSessionSidePanelsHost

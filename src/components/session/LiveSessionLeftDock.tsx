@@ -75,6 +75,7 @@ type Props = {
   diceOpen?: boolean;
   onToggleDice?: () => void;
   diceContent?: ReactNode;
+  onOpenQuickRulebook?: () => void;
 };
 
 export function LiveSessionLeftDock({
@@ -131,6 +132,7 @@ export function LiveSessionLeftDock({
   diceOpen = false,
   onToggleDice,
   diceContent,
+  onOpenQuickRulebook,
 }: Props) {
   const timeLabel = SESSION_DAY_PHASE_META[dayPhase].label;
   const showPanel =
@@ -185,6 +187,7 @@ export function LiveSessionLeftDock({
           showDice={showDice}
           diceOpen={diceOpen}
           onToggleDice={onToggleDice}
+          onOpenQuickRulebook={onOpenQuickRulebook}
           anchorRefs={anchorRefs}
         />
       ) : (

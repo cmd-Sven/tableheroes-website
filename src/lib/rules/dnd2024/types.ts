@@ -6,6 +6,8 @@ export type QuickRuleCategory =
   | "condition"
   | "item"
   | "class-feature"
+  | "feat"
+  | "spell"
   | "environment"
   | "general";
 

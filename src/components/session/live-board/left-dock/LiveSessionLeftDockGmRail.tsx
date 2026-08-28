@@ -6,6 +6,7 @@
 import type { ReactNode, RefObject } from "react";
 import {
   Armchair,
+  BookOpen,
   Bomb,
   Cloud,
   Dices,
@@ -58,6 +59,7 @@ type Props = {
   showDice: boolean;
   diceOpen: boolean;
   onToggleDice?: () => void;
+  onOpenQuickRulebook?: () => void;
   anchorRefs: LeftDockToolAnchorRefs;
 };
 
@@ -87,6 +89,7 @@ export function LiveSessionLeftDockGmRail({
   showDice,
   diceOpen,
   onToggleDice,
+  onOpenQuickRulebook,
   anchorRefs,
 }: Props) {
   const TimeIcon = SESSION_DAY_PHASE_META[dayPhase].Icon;
@@ -227,6 +230,16 @@ export function LiveSessionLeftDockGmRail({
             className="h-11"
           >
             <Dices className="h-5 w-5" />
+          </RailButton>
+        ) : null}
+        {onOpenQuickRulebook ? (
+          <RailButton
+            label="Schnell-Regelwerk (D&D 2024)"
+            active={false}
+            onClick={onOpenQuickRulebook}
+            className="h-11"
+          >
+            <BookOpen className="h-5 w-5 text-accent-gold" />
           </RailButton>
         ) : null}
       </div>

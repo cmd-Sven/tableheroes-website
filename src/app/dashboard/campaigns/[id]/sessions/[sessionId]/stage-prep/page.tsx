@@ -13,6 +13,7 @@ import {
   getWorldMaps,
 } from "@/src/lib/actions/world-map-actions";
 import { getBestariumCreaturesForCampaign } from "@/src/app/dashboard/campaigns/[id]/bestarium-queries";
+import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 
 type Props = {
   params: Promise<{ id: string; sessionId: string }>;
@@ -62,13 +63,14 @@ export default async function SessionStagePrepPage({ params }: Props) {
   }
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("gm_id, owner_id, world_id")
+    .select("gm_id, owner_id, world_id, system")
     .eq("id", campaignId)
     .single();
   const campaign = campaignRaw as {
     gm_id?: string | null;
     owner_id?: string | null;
     world_id?: string | null;
+    system?: string | null;
   } | null;
   if (!isCampaignGm(campaign, user.id)) {
     redirect(`/dashboard/campaigns/${campaignId}`);
@@ -194,6 +196,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       sessionWorldMaps={serializeForClient(
         await getSessionWorldMaps(sessionId).catch(() => []),
       )}
+      showDnd5eSheet={isDnd5eCampaignSystem(campaign?.system)}
     />
   );
 }

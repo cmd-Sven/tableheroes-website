@@ -135,6 +135,8 @@ export type LiveSessionLeftDockSessionProps = {
   chronistSettingsFlowRef: MutableRefObject<(() => void) | null>;
   allCampaignNpcs: import("./live-session-types").CampaignNpc[];
   isUpdating: boolean;
+  showDnd5eSheet: boolean;
+  setQuickRulebookModalOpen: (open: boolean) => void;
 };
 
 export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
@@ -238,6 +240,8 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     chronistSettingsFlowRef,
     allCampaignNpcs,
     isUpdating,
+    showDnd5eSheet,
+    setQuickRulebookModalOpen,
   } = p;
 
   return (
@@ -253,6 +257,11 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
           setLeftPanel(null);
           setTopPanel(null);
         }}
+        onOpenQuickRulebook={
+          isPrepMode && isGM && !forcePlayerView && showDnd5eSheet
+            ? () => setQuickRulebookModalOpen(true)
+            : undefined
+        }
         diceContent={
           !isGuest ? (
             <LiveSessionDicePanel

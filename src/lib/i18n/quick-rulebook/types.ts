@@ -21,6 +21,8 @@ export type QuickRulebookMessageKey =
   | "category.condition"
   | "category.item"
   | "category.class-feature"
+  | "category.feat"
+  | "category.spell"
   | "category.environment"
   | "category.general"
   | "edition.badge"
@@ -34,5 +36,7 @@ export type QuickRuleCategoryMessageKey =
   | "category.condition"
   | "category.item"
   | "category.class-feature"
+  | "category.feat"
+  | "category.spell"
   | "category.environment"
   | "category.general";

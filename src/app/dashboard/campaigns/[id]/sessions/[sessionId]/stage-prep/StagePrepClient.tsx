@@ -4,9 +4,10 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Save, ScrollText } from "lucide-react";
+import { ArrowLeft, BookOpen, Loader2, Save, ScrollText } from "lucide-react";
 import { updateSessionStageDeck } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { SessionChronistModeControl } from "@/src/components/session/SessionChronistModeControl";
+import { GmQuickRulebookModal } from "@/src/components/session/GmQuickRulebookModal";
 import { StagePrepSceneMedia } from "@/src/components/session/StagePrepSceneMedia";
 import { StagePrepBattlemaps } from "@/src/components/session/battlemap/StagePrepBattlemaps";
 import type { CampaignSceneMedia } from "@/src/lib/scene-media-types";
@@ -57,6 +58,7 @@ type Props = {
   initialBattlemaps: SessionBattlemap[];
   availableWorldMaps?: WorldMap[];
   sessionWorldMaps?: SessionWorldMap[];
+  showDnd5eSheet?: boolean;
 };
 
 const marblePanelStyle: CSSProperties = {
@@ -94,9 +96,11 @@ export function StagePrepClient({
   initialBattlemaps,
   availableWorldMaps = [],
   sessionWorldMaps = [],
+  showDnd5eSheet = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [quickRulebookOpen, setQuickRulebookOpen] = useState(false);
   const [npcDeckAll, setNpcDeckAll] = useState(stageDeckNpcIds == null);
   const [factionDeckAll, setFactionDeckAll] = useState(stageDeckFactionIds == null);
   const [creatureDeckAll, setCreatureDeckAll] = useState(stageDeckCreatureIds == null);
@@ -251,13 +255,26 @@ export function StagePrepClient({
               Kampagne
             </Link>
           </div>
-          <div>
-            <h1 className="font-barlow font-extrabold text-xl uppercase tracking-wide text-hero-vibrant">
-              Bühnenvorbereitung
-            </h1>
-            <p className="font-libre text-sm text-gray-400 mt-0.5">
-              {sessionTitle?.trim() || "Session"} · {sessionStatus}
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="font-barlow font-extrabold text-xl uppercase tracking-wide text-hero-vibrant">
+                Bühnenvorbereitung
+              </h1>
+              <p className="font-libre text-sm text-gray-400 mt-0.5">
+                {sessionTitle?.trim() || "Session"} · {sessionStatus}
+              </p>
+            </div>
+            {showDnd5eSheet ? (
+              <button
+                type="button"
+                onClick={() => setQuickRulebookOpen(true)}
+                title="Schnell-Regelwerk (D&D 2024)"
+                aria-label="Schnell-Regelwerk (D&D 2024)"
+                className="relative grid h-11 w-11 shrink-0 place-items-center border border-accent-gold/50 text-accent-gold transition-colors hover:bg-accent-gold/15"
+              >
+                <BookOpen className="h-5 w-5" />
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -540,6 +557,13 @@ export function StagePrepClient({
           </a>
         </div>
       </main>
+
+      {showDnd5eSheet ? (
+        <GmQuickRulebookModal
+          open={quickRulebookOpen}
+          onClose={() => setQuickRulebookOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

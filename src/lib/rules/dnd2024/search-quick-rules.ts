@@ -84,6 +84,8 @@ export function getQuickRuleCategories(): QuickRuleEntry["category"][] {
     "condition",
     "item",
     "class-feature",
+    "feat",
+    "spell",
     "environment",
     "general",
   ];

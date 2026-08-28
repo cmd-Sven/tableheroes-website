@@ -177,7 +177,9 @@ export function LiveSessionTopToolbarHost({
       onOpenNpcs={() => setNpcSearchModalOpen(true)}
       onOpenBeasts={() => setBeastSearchModalOpen(true)}
       onOpenQuickRulebook={
-        showDnd5eSheet ? () => setQuickRulebookModalOpen(true) : undefined
+        isGM && !forcePlayerView && showDnd5eSheet
+          ? () => setQuickRulebookModalOpen(true)
+          : undefined
       }
       stageRosterOpen={stageDeckHandOpen}
       stageRosterCount={inHandNpcsCount + inHandFactionsCount + inHandScenesCount}
