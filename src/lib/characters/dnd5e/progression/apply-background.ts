@@ -20,6 +20,11 @@ import {
   getProficiencyById,
   proficiencyLabel,
 } from "./proficiencies-catalog";
+import {
+  getSheetCampaignLore,
+  setSheetCampaignLore,
+  type LoreRaceAbilityBonuses,
+} from "@/src/lib/lore-race-bonuses";
 
 export const BACKGROUND_SOURCE = "srd-background";
 const BACKGROUND_ORIGIN_FEAT_SOURCE = "srd-background-origin-feat";
@@ -74,6 +79,28 @@ function applyAbilityDelta(
     ...sheet.abilities[key],
     score: Math.min(20, Math.max(1, current + delta)),
   };
+}
+
+function applyTrackedAbilityDelta(
+  sheet: Dnd5eSheetData,
+  delta: LoreRaceAbilityBonuses,
+  sign: 1 | -1,
+): void {
+  for (const [ab, value] of Object.entries(delta)) {
+    if (value) applyAbilityDelta(sheet, ab as AbilityKeyShort, sign * value);
+  }
+}
+
+function catalogAbilityBonus(bg: BackgroundDefinition): LoreRaceAbilityBonuses {
+  const out: LoreRaceAbilityBonuses = {};
+  for (const [ab, delta] of Object.entries(bg.abilityBonus ?? {})) {
+    if (delta) out[ab as AbilityKeyShort] = delta;
+  }
+  return out;
+}
+
+function sheetHasBackgroundFeature(sheet: Dnd5eSheetData, bg: BackgroundDefinition): boolean {
+  return (sheet.features ?? []).some((f) => f.id === featureIdForBackground(bg));
 }
 
 function removeMatchingLabels(list: string[], toRemove: string[]): string[] {
@@ -150,10 +177,12 @@ export function removeBackgroundGrants(
       tools: removeMatchingLabels(next.proficiencies.tools, tools),
     };
 
-    if (bg.abilityBonus) {
-      for (const [ab, delta] of Object.entries(bg.abilityBonus)) {
-        if (delta) applyAbilityDelta(next, ab as AbilityKeyShort, -delta);
-      }
+    const lore = getSheetCampaignLore(next);
+    const tracked = lore.appliedBackgroundAbilityBonuses;
+    if (tracked && Object.keys(tracked).length > 0) {
+      applyTrackedAbilityDelta(next, tracked, -1);
+    } else if (sheetHasBackgroundFeature(next, bg) && bg.abilityBonus) {
+      applyTrackedAbilityDelta(next, catalogAbilityBonus(bg), -1);
     }
 
     if (bg.originFeatId) {
@@ -165,7 +194,11 @@ export function removeBackgroundGrants(
     }
   }
 
-  return next;
+  return setSheetCampaignLore(next, {
+    ...getSheetCampaignLore(next),
+    appliedBackgroundId: null,
+    appliedBackgroundAbilityBonuses: undefined,
+  });
 }
 
 export function applyBackgroundGrants(
@@ -192,10 +225,9 @@ export function applyBackgroundGrants(
     tools: mergeLabels(next.proficiencies.tools, tools),
   };
 
-  if (bg.abilityBonus) {
-    for (const [ab, delta] of Object.entries(bg.abilityBonus)) {
-      if (delta) applyAbilityDelta(next, ab as AbilityKeyShort, delta);
-    }
+  const appliedAbility = catalogAbilityBonus(bg);
+  if (Object.keys(appliedAbility).length > 0) {
+    applyTrackedAbilityDelta(next, appliedAbility, 1);
   }
 
   const featureName = locale === "de" ? bg.feature.nameDe || bg.feature.nameEn : bg.feature.nameEn;
@@ -281,7 +313,12 @@ export function applyBackgroundGrants(
     }
   }
 
-  return next;
+  return setSheetCampaignLore(next, {
+    ...getSheetCampaignLore(next),
+    appliedBackgroundId: bg.id,
+    appliedBackgroundAbilityBonuses:
+      Object.keys(appliedAbility).length > 0 ? appliedAbility : undefined,
+  });
 }
 
 export type AppliedBackground = {
@@ -324,6 +361,60 @@ export function setCharacterBackground(
     backgroundLabel: locale === "de" ? bg.nameDe || bg.nameEn : bg.nameEn,
     backgroundId: bg.id,
   };
+}
+
+/**
+ * Stellt sicher, dass Katalog-Hintergrund-Boni (Features, Skills, ASI) im Blatt
+ * angewendet sind — z. B. nach Laden, wenn nur meta.background gesetzt war.
+ */
+export function ensureBackgroundGrantsSynced(
+  sheet: Dnd5eSheetData,
+  backgroundMeta?: string | null,
+  locale: "de" | "en" = "de",
+): Dnd5eSheetData {
+  const bgId =
+    resolveAppliedBackgroundId(sheet, backgroundMeta) ??
+    (backgroundMeta?.trim() ? findBackgroundByName(backgroundMeta)?.id : null);
+  if (!bgId) return sheet;
+
+  const bg = getBackgroundById(bgId);
+  if (!bg) return sheet;
+
+  const lore = getSheetCampaignLore(sheet);
+  const hasFeature = sheetHasBackgroundFeature(sheet, bg);
+  const trackedId = lore.appliedBackgroundId ?? null;
+  const trackedBonuses = lore.appliedBackgroundAbilityBonuses;
+
+  if (
+    hasFeature &&
+    trackedId === bg.id &&
+    (trackedBonuses || !bg.abilityBonus || Object.keys(bg.abilityBonus).length === 0)
+  ) {
+    return sheet;
+  }
+
+  if (hasFeature && trackedId !== bg.id) {
+    return setCharacterBackground(sheet, bg.id, {
+      previousBackgroundMeta: backgroundMeta,
+      locale,
+    }).sheet;
+  }
+
+  if (hasFeature && !trackedBonuses && bg.abilityBonus) {
+    const appliedAbility = catalogAbilityBonus(bg);
+    if (Object.keys(appliedAbility).length === 0) return sheet;
+    return setSheetCampaignLore(sheet, {
+      ...lore,
+      appliedBackgroundId: bg.id,
+      appliedBackgroundAbilityBonuses: appliedAbility,
+    });
+  }
+
+  if (!hasFeature) {
+    return applyBackgroundGrants(sheet, bg.id, locale);
+  }
+
+  return sheet;
 }
 
 export function listBackgroundOptions(locale: "de" | "en" = "de"): Array<{

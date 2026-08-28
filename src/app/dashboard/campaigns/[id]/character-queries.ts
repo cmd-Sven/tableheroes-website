@@ -11,6 +11,7 @@ export type WizardRaceOption = {
   name: string;
   culture_id: string | null;
   race_traits: string | null;
+  race_subtypes: string | null;
 };
 
 export type WizardCultureOption = {
@@ -51,7 +52,9 @@ export async function getCharacterWizardLoreData(campaignId: string) {
   const revealedIds = new Set(((visRows as any[]) ?? []).map((v: any) => v.entity_id as string));
 
   const { data: loreRows } = await (supabase.from("world_lore") as any)
-    .select("id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits")
+    .select(
+      "id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits, race_subtypes",
+    )
     .eq("world_id", worldId)
     .in("type", ["Rasse", "Kultur", "Sprache", "Religion"]);
 
@@ -67,6 +70,7 @@ export async function getCharacterWizardLoreData(campaignId: string) {
       name: String(l.name ?? "").trim(),
       culture_id: l.culture_id != null ? String(l.culture_id) : null,
       race_traits: l.race_traits != null ? String(l.race_traits) : null,
+      race_subtypes: l.race_subtypes != null ? String(l.race_subtypes) : null,
     }));
 
   const cultures = all
@@ -139,7 +143,9 @@ export async function getCharacterEditorLoreOptionsForGm(campaignId: string) {
 
   const [{ data: loreRows }, { data: factionRows }] = await Promise.all([
     (supabase.from("world_lore") as any)
-      .select("id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits")
+      .select(
+        "id, name, type, culture_id, race_ids, language_ids, religion_ids, race_traits, race_subtypes",
+      )
       .eq("world_id", worldId)
       .in("type", [
         "Kultur",
@@ -177,6 +183,7 @@ export async function getCharacterEditorLoreOptionsForGm(campaignId: string) {
       name: String(l.name ?? "").trim() || "Ohne Namen",
       culture_id: l.culture_id != null ? String(l.culture_id) : null,
       race_traits: l.race_traits != null ? String(l.race_traits) : null,
+      race_subtypes: l.race_subtypes != null ? String(l.race_subtypes) : null,
     }));
 
   const languages = all

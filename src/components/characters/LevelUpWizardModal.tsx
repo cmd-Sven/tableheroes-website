@@ -147,6 +147,12 @@ export function LevelUpWizardModal({
   }, [plan.features, plan.raceFeatures]);
 
   useEffect(() => {
+    if (plan.isEpicBoonLevel) {
+      setAsiMode("feat");
+    }
+  }, [plan.isEpicBoonLevel, plan.toLevel]);
+
+  useEffect(() => {
     setStepIndex(0);
     setSubclassId(null);
   }, [plan.fromLevel, plan.toLevel, plan.classId, plan.raceId]);
@@ -207,7 +213,7 @@ export function LevelUpWizardModal({
 
   function buildAsi(): AsiChoice | null {
     if (!plan.needsAsi) return null;
-    if (asiMode === "feat") {
+    if (plan.isEpicBoonLevel || asiMode === "feat") {
       if (useCustomFeat) {
         return {
           type: "feat",
@@ -631,34 +637,42 @@ export function LevelUpWizardModal({
           {step === "asi" ? (
             <div className="space-y-4">
               <p className="font-barlow text-sm uppercase text-accent-gold">
-                {t("levelUp.asiTitle")}
+                {plan.isEpicBoonLevel
+                  ? t("levelUp.epicBoonTitle")
+                  : t("levelUp.asiTitle")}
               </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAsiMode("asi")}
-                  className={`rounded border px-3 py-2 font-barlow text-xs font-bold uppercase ${
-                    asiMode === "asi"
-                      ? "border-hero-vibrant text-hero-vibrant"
-                      : "border-hero-dark text-gray-400"
-                  }`}
-                >
-                  {t("levelUp.asiOption")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAsiMode("feat")}
-                  className={`rounded border px-3 py-2 font-barlow text-xs font-bold uppercase ${
-                    asiMode === "feat"
-                      ? "border-hero-vibrant text-hero-vibrant"
-                      : "border-hero-dark text-gray-400"
-                  }`}
-                >
-                  {t("levelUp.featOption")}
-                </button>
-              </div>
+              {plan.isEpicBoonLevel ? (
+                <p className="font-libre text-sm text-gray-400">
+                  {t("levelUp.epicBoonHint")}
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAsiMode("asi")}
+                    className={`rounded border px-3 py-2 font-barlow text-xs font-bold uppercase ${
+                      asiMode === "asi"
+                        ? "border-hero-vibrant text-hero-vibrant"
+                        : "border-hero-dark text-gray-400"
+                    }`}
+                  >
+                    {t("levelUp.asiOption")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAsiMode("feat")}
+                    className={`rounded border px-3 py-2 font-barlow text-xs font-bold uppercase ${
+                      asiMode === "feat"
+                        ? "border-hero-vibrant text-hero-vibrant"
+                        : "border-hero-dark text-gray-400"
+                    }`}
+                  >
+                    {t("levelUp.featOption")}
+                  </button>
+                </div>
+              )}
 
-              {asiMode === "asi" ? (
+              {!plan.isEpicBoonLevel && asiMode === "asi" ? (
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <button
@@ -717,7 +731,11 @@ export function LevelUpWizardModal({
                     type="search"
                     value={featQuery}
                     onChange={(e) => setFeatQuery(e.target.value)}
-                    placeholder={t("levelUp.featSearch")}
+                    placeholder={
+                      plan.isEpicBoonLevel
+                        ? t("levelUp.epicBoonSearch")
+                        : t("levelUp.featSearch")
+                    }
                     className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white"
                   />
                   <div className="max-h-56 space-y-2 overflow-y-auto">
@@ -858,7 +876,13 @@ export function LevelUpWizardModal({
                   ),
                 })}
               </p>
-              {plan.needsAsi ? <p>{t("levelUp.summaryAsi")}</p> : null}
+              {plan.needsAsi ? (
+                <p>
+                  {plan.isEpicBoonLevel
+                    ? t("levelUp.summaryEpicBoon")
+                    : t("levelUp.summaryAsi")}
+                </p>
+              ) : null}
               <p>
                 {t("levelUp.summarySpells", { count: String(newSpellIds.length) })}
               </p>

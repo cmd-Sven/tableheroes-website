@@ -117,6 +117,8 @@ export function LiveSessionBoardModalsLayer() {
       setNpcSearchModalOpen,
       beastSearchModalOpen,
       setBeastSearchModalOpen,
+      quickRulebookModalOpen,
+      setQuickRulebookModalOpen,
       creatureStates,
       setCreatureStates,
       beastLootCreatureId,
@@ -305,6 +307,8 @@ export function LiveSessionBoardModalsLayer() {
         onPlaceNpc={(id) => placeOnStage("npc", id)}
         beastSearchModalOpen={beastSearchModalOpen}
         setBeastSearchModalOpen={setBeastSearchModalOpen}
+        quickRulebookModalOpen={quickRulebookModalOpen}
+        setQuickRulebookModalOpen={setQuickRulebookModalOpen}
         gmBeastSearchRows={gmBeastSearchRows}
         stageDeckCreatureIds={stageDeckCreatureIds}
         activeCreatureIds={activeCreatureIds}

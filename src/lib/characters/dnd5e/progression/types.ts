@@ -153,6 +153,8 @@ export type LevelUpPlan = {
   features: ProgressionFeature[];
   raceFeatures: ProgressionFeature[];
   needsAsi: boolean;
+  /** D&D 2024: Stufe 19 — Epic Boon statt Attributsteigerung */
+  isEpicBoonLevel: boolean;
   needsSubclass: boolean;
   subclassOptions: Array<{ id: string; nameEn: string; nameDe: string }>;
   spellcasting: {

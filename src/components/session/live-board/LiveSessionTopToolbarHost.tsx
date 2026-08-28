@@ -35,6 +35,7 @@ export type LiveSessionTopToolbarHostProps = {
   writeSystemLog: (type: string, text: string) => void;
   setNpcSearchModalOpen: (open: boolean) => void;
   setBeastSearchModalOpen: (open: boolean) => void;
+  setQuickRulebookModalOpen: (open: boolean) => void;
   stageDeckHandOpen: boolean;
   setStageDeckHandOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   inHandNpcsCount: number;
@@ -57,6 +58,7 @@ export type LiveSessionTopToolbarHostProps = {
   sessionStatus: string;
   chronistTableMode: boolean;
   topBarTranscriptionStatus: TranscriptionStatus | null;
+  showDnd5eSheet: boolean;
 };
 
 export function LiveSessionTopToolbarHost({
@@ -82,6 +84,7 @@ export function LiveSessionTopToolbarHost({
   writeSystemLog,
   setNpcSearchModalOpen,
   setBeastSearchModalOpen,
+  setQuickRulebookModalOpen,
   stageDeckHandOpen,
   setStageDeckHandOpen,
   inHandNpcsCount,
@@ -104,6 +107,7 @@ export function LiveSessionTopToolbarHost({
   sessionStatus,
   chronistTableMode,
   topBarTranscriptionStatus,
+  showDnd5eSheet,
 }: LiveSessionTopToolbarHostProps) {
   return (
     <LiveSessionTopToolbar
@@ -172,6 +176,9 @@ export function LiveSessionTopToolbarHost({
       }}
       onOpenNpcs={() => setNpcSearchModalOpen(true)}
       onOpenBeasts={() => setBeastSearchModalOpen(true)}
+      onOpenQuickRulebook={
+        showDnd5eSheet ? () => setQuickRulebookModalOpen(true) : undefined
+      }
       stageRosterOpen={stageDeckHandOpen}
       stageRosterCount={inHandNpcsCount + inHandFactionsCount + inHandScenesCount}
       onToggleStageRoster={() => setStageDeckHandOpen((v) => !v)}

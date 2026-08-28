@@ -15,6 +15,7 @@ import { createEmptyDnd5eSheet } from "../defaults";
 import type { AbilityKeyShort, ClassId, LevelUpDraft } from "./types";
 import {
   setCharacterBackground,
+  ensureBackgroundGrantsSynced,
   BACKGROUND_SOURCE,
 } from "./apply-background";
 import { applySubclassChange } from "./apply-subclass-change";
@@ -33,6 +34,16 @@ import {
 } from "../spellcasting";
 import type { Dnd5eFeatureEntry } from "../types";
 import type { ProgressionFeature } from "./types";
+import {
+  applyLoreRaceBonusesToSheet,
+  filterWizardRaceOptions,
+  formatLoreRaceBonusesForDisplay,
+  formatRaceSelectionLabel,
+  resolveLoreRaceBonuses,
+  setSheetCampaignLore,
+  stripLegacyRaceAbilityBonuses,
+  getSheetCampaignLore,
+} from "@/src/lib/lore-race-bonuses";
 
 function run() {
   assert.deepEqual(asiLevelsForClass("wizard"), [4, 8, 12, 16, 19]);
@@ -67,6 +78,7 @@ function run() {
   assert.equal(plan4.toLevel, 4);
   assert.equal(plan4.classId, "wizard");
   assert.equal(plan4.needsAsi, true);
+  assert.equal(plan4.isEpicBoonLevel, false);
   assert.ok(plan4.spellcasting);
   assert.equal(plan4.hpAverage, Math.floor(6 / 2) + 1 + 2); // d6 avg + CON(+2)
 
@@ -79,6 +91,17 @@ function run() {
   });
   assert.equal(plan5.needsAsi, false);
   assert.ok((plan5.spellcasting?.slotsMax["3"] ?? 0) >= 2);
+
+  const plan19 = planLevelUp({
+    className: "Wizard",
+    subclass: "Evocation",
+    raceName: "Human",
+    fromLevel: 18,
+    sheet: createEmptyDnd5eSheet(18),
+  });
+  assert.equal(plan19.toLevel, 19);
+  assert.equal(plan19.needsAsi, true);
+  assert.equal(plan19.isEpicBoonLevel, true);
 
   // --- subclassLevel catch-up (2024: alle Klassen Stufe 3) ---
   const clericPlan = planLevelUp({
@@ -244,7 +267,6 @@ function run() {
     raceName: "Mensch",
     raceId: "human",
     baseAbilities: base,
-    applyRacialBonuses: false,
     spellIds: [],
     skillKeys: [],
   });
@@ -258,7 +280,6 @@ function run() {
     raceName: "Mensch",
     raceId: "human",
     baseAbilities: base,
-    applyRacialBonuses: true,
     spellIds: [],
     skillKeys: [],
   });
@@ -583,6 +604,22 @@ function run() {
       (f) => f.source === BACKGROUND_SOURCE && f.id === "bg-acolyte-feature",
     ),
   );
+  assert.equal(acolyte.sheet.abilities.cha.score, 11);
+  assert.equal(acolyte.sheet.abilities.int.score, 11);
+  assert.equal(acolyte.sheet.abilities.wis.score, 11);
+  assert.ok(
+    acolyte.sheet.features.some((f) => f.id === "feat-magic-initiate-cleric"),
+    "origin feat applied",
+  );
+
+  // Meta-only background: sync applies grants without double-subtract
+  let metaOnly = createEmptyDnd5eSheet(1);
+  metaOnly.abilities.cha = { score: 10 };
+  metaOnly.abilities.int = { score: 10 };
+  metaOnly.abilities.wis = { score: 10 };
+  const synced = ensureBackgroundGrantsSynced(metaOnly, "Akolyth", "de");
+  assert.equal(synced.abilities.cha.score, 11);
+  assert.ok(synced.features.some((f) => f.id === "bg-acolyte-feature"));
 
   // Expertise override should survive remove
   acolyte.sheet.skills.ins.proficient = "expertise";
@@ -625,7 +662,6 @@ function run() {
       wis: 15,
       cha: 8,
     },
-    applyRacialBonuses: true,
     spellIds: [],
     skillKeys: [],
   });
@@ -686,7 +722,6 @@ function run() {
     raceId: "human",
     raceName: "Mensch",
     subclassId: null,
-    applyRacialBonuses: false,
     baseAbilities: {
       str: 8,
       dex: 14,
@@ -836,6 +871,44 @@ function run() {
   assert.equal(maxSlotLevelFromClass("wizard", 5, null), 3);
   assert.equal(maxSlotLevelFromClass("cleric", 9, null), 5);
   assert.equal(effectiveSlotMaxForLevel(emptyCasterSheet, "wizard", 5, 3, null), 2);
+
+  // --- D&D 2024: no race/species ASI; background only ---
+  const maschSpec = resolveLoreRaceBonuses({ raceName: "Maschinenzwerge" });
+  assert.ok(maschSpec);
+  const displayLines = formatLoreRaceBonusesForDisplay(maschSpec);
+  assert.ok(!displayLines.some((l) => /attribute|intelligenz \+1/i.test(l)));
+  assert.ok(displayLines.some((l) => /werkzeug|maschinist|roboter/i.test(l)));
+
+  let legacySheet = createEmptyDnd5eSheet(1);
+  legacySheet.abilities.int = { score: 12 };
+  legacySheet = setSheetCampaignLore(legacySheet, {
+    appliedAbilityBonuses: { int: 1 },
+  });
+  const stripped = stripLegacyRaceAbilityBonuses(legacySheet);
+  assert.equal(stripped.abilities.int.score, 11);
+  assert.equal(getSheetCampaignLore(stripped).appliedAbilityBonuses, undefined);
+
+  const withLoreRace = applyLoreRaceBonusesToSheet(stripped, {
+    raceName: "Maschinenzwerge",
+    level: 1,
+  });
+  assert.equal(withLoreRace.abilities.int.score, 11, "lore race must not grant ASI in 2024");
+  assert.ok(
+    withLoreRace.features.some((f) => f.source === "lore-race"),
+    "lore race features still apply",
+  );
+
+  assert.equal(formatRaceSelectionLabel("Tiefling (roter Tiefling)"), "Roter Tiefling");
+  assert.equal(formatRaceSelectionLabel("Jakal (blauer Tiefling)"), "Blauer Tiefling");
+  assert.equal(formatRaceSelectionLabel("Skotar (grüner Tiefling)"), "Grüner Tiefling");
+  assert.equal(formatRaceSelectionLabel("Hochelfen"), "Hochelfen");
+  const tieflingVariants = filterWizardRaceOptions([
+    { id: "1", name: "Tiefling" },
+    { id: "2", name: "Tiefling (roter Tiefling)" },
+    { id: "3", name: "Jakal (blauer Tiefling)" },
+  ]);
+  assert.equal(tieflingVariants.length, 2);
+  assert.ok(!tieflingVariants.some((r) => r.name === "Tiefling"));
 
   console.log("progression.selftest: OK");
 }

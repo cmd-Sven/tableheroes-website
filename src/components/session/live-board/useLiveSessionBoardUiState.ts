@@ -73,6 +73,7 @@ export function useLiveSessionBoardUiState({
   const [stageFactionSearch, setStageFactionSearch] = useState("");
   const [npcSearchModalOpen, setNpcSearchModalOpen] = useState(false);
   const [beastSearchModalOpen, setBeastSearchModalOpen] = useState(false);
+  const [quickRulebookModalOpen, setQuickRulebookModalOpen] = useState(false);
   const [creatureStates, setCreatureStates] =
     useState<Record<string, CampaignCreatureStateRow>>(initialCreatureStates);
   const [beastLootCreatureId, setBeastLootCreatureId] = useState<string | null>(null);
@@ -261,6 +262,8 @@ export function useLiveSessionBoardUiState({
     setNpcSearchModalOpen,
     beastSearchModalOpen,
     setBeastSearchModalOpen,
+    quickRulebookModalOpen,
+    setQuickRulebookModalOpen,
     creatureStates,
     setCreatureStates,
     beastLootCreatureId,

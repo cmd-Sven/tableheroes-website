@@ -26,7 +26,9 @@ import {
 } from "@/src/components/dashboard/CharacterCreateRulesPanel";
 import {
   filterRacesForCulture,
+  filterWizardRaceOptions,
   formatLoreRaceBonusesForDisplay,
+  formatRaceSelectionLabel,
   resolveLoreRaceBonuses,
   resolveLoreRaceDisplayText,
   setSheetCampaignLore,
@@ -151,7 +153,6 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const [srdRaceId, setSrdRaceId] = useState<RaceId>("human");
   const [baseAbilities, setBaseAbilities] =
     useState<Record<AbilityKeyShort, number>>(DEFAULT_ABILITIES);
-  const [applyRacialBonuses, setApplyRacialBonuses] = useState(false);
   const [spellIds, setSpellIds] = useState<string[]>([]);
 
   // Step: Identität
@@ -255,8 +256,11 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
   const selectedCulture = wizardCultures.find((c) => c.id === selectedCultureId);
 
   // Rassen der gewählten Kultur (race_ids ∪ culture_id; Exilanten-Fallback)
-  const racesForCulture = filterRacesForCulture(wizardRaces, selectedCulture);
+  const racesForCulture = filterWizardRaceOptions(
+    filterRacesForCulture(wizardRaces, selectedCulture),
+  );
   const hasRacesForCulture = racesForCulture.length > 0;
+  const allWizardRaceOptions = filterWizardRaceOptions(wizardRaces);
 
   const selectedRaceLore =
     race && race !== "__custom"
@@ -407,12 +411,10 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
           raceName: effectiveRace,
           raceId: srdRaceId,
           baseAbilities,
-          applyRacialBonuses,
           spellIds,
           skillKeys: [],
           loreRaceTraitsRaw: selectedRaceLore?.race_traits ?? null,
           loreRaceLoreId: selectedRaceLoreId,
-          preferLoreAbilityBonuses: true,
         });
 
         let sheetData = built.sheet;
@@ -616,8 +618,6 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               onSrdRaceId={setSrdRaceId}
               baseAbilities={baseAbilities}
               onBaseAbilities={setBaseAbilities}
-              applyRacialBonuses={applyRacialBonuses}
-              onApplyRacialBonuses={setApplyRacialBonuses}
               spellIds={spellIds}
               onSpellIds={setSpellIds}
             />
@@ -634,8 +634,6 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               onSrdRaceId={setSrdRaceId}
               baseAbilities={baseAbilities}
               onBaseAbilities={setBaseAbilities}
-              applyRacialBonuses={applyRacialBonuses}
-              onApplyRacialBonuses={setApplyRacialBonuses}
               spellIds={spellIds}
               onSpellIds={setSpellIds}
             />
@@ -652,8 +650,6 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
               onSrdRaceId={setSrdRaceId}
               baseAbilities={baseAbilities}
               onBaseAbilities={setBaseAbilities}
-              applyRacialBonuses={applyRacialBonuses}
-              onApplyRacialBonuses={setApplyRacialBonuses}
               spellIds={spellIds}
               onSpellIds={setSpellIds}
             />
@@ -720,9 +716,15 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                         >
                           <option value="">-- Rasse wählen --</option>
                           {racesForCulture
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .sort((a, b) =>
+                              formatRaceSelectionLabel(a.name).localeCompare(
+                                formatRaceSelectionLabel(b.name),
+                              ),
+                            )
                             .map((r) => (
-                              <option key={r.id} value={r.name}>{r.name}</option>
+                              <option key={r.id} value={r.name}>
+                                {formatRaceSelectionLabel(r.name)}
+                              </option>
                             ))}
                           <option value="__custom">Andere (Freitext)</option>
                         </select>
@@ -738,7 +740,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                           </a>
                         )}
                       </div>
-                    ) : wizardRaces.length > 0 && !selectedCultureId ? (
+                    ) : allWizardRaceOptions.length > 0 && !selectedCultureId ? (
                       <div className="flex items-center gap-2">
                         <select
                           value={race}
@@ -746,10 +748,16 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                           className="flex-1 rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
                         >
                           <option value="">-- Rasse wählen --</option>
-                          {wizardRaces
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                          {allWizardRaceOptions
+                            .sort((a, b) =>
+                              formatRaceSelectionLabel(a.name).localeCompare(
+                                formatRaceSelectionLabel(b.name),
+                              ),
+                            )
                             .map((r) => (
-                              <option key={r.id} value={r.name}>{r.name}</option>
+                              <option key={r.id} value={r.name}>
+                                {formatRaceSelectionLabel(r.name)}
+                              </option>
                             ))}
                           <option value="__custom">Andere (Freitext)</option>
                         </select>
@@ -794,7 +802,7 @@ export function CharacterCreator({ campaignId, isOpen, onClose, factions = [], l
                     {loreRaceBonusLines.length > 0 ? (
                       <div className="mt-3 rounded border border-accent-gold/40 bg-accent-gold/5 p-3 space-y-1.5">
                         <p className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                          Rassenboni / Besonderheiten
+                          Rassenmerkmale
                         </p>
                         <ul className="space-y-1 font-libre text-xs text-gray-200 leading-relaxed list-disc pl-4">
                           {loreRaceBonusLines.map((line) => (

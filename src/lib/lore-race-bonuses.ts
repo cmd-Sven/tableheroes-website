@@ -56,6 +56,9 @@ export type SheetCampaignLoreState = {
   appliedSkills?: Partial<Record<Dnd5eSkillKey, SkillProficiency>>;
   appliedSkillBonuses?: Partial<Record<Dnd5eSkillKey, number>>;
   appliedHpBonus?: number;
+  /** Katalog-Background, dessen Attributsboni im Blatt enthalten sind */
+  appliedBackgroundId?: string | null;
+  appliedBackgroundAbilityBonuses?: LoreRaceAbilityBonuses;
 };
 
 const ABILITY_KEYS: AbilityKeyShort[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -80,6 +83,34 @@ export function normalizeRaceKey(name: string | null | undefined): string {
 
 export function isExileCultureName(name: string | null | undefined): boolean {
   return /exilant/i.test(name ?? "");
+}
+
+/** UI-Label für Volksauswahl — bevorzugt Zusatzbezeichnung in Klammern (z. B. „Roter Tiefling“). */
+export function formatRaceSelectionLabel(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (!match) return trimmed;
+  const subtype = match[2].trim();
+  if (!subtype) return trimmed;
+  if (/tiefling/i.test(subtype)) {
+    return subtype.charAt(0).toUpperCase() + subtype.slice(1);
+  }
+  return trimmed;
+}
+
+export function isGenericTieflingRaceName(name: string | null | undefined): boolean {
+  return /^tiefling$/i.test((name ?? "").trim());
+}
+
+export function cultureHasTieflingVariants<T extends { name: string }>(races: T[]): boolean {
+  return races.some((r) => /tiefling/i.test(r.name) && /\([^)]+\)/.test(r.name));
+}
+
+/** Entfernt generisches „Tiefling“, wenn die Kultur konkrete Tiefling-Varianten hat. */
+export function filterWizardRaceOptions<T extends { name: string }>(races: T[]): T[] {
+  if (!cultureHasTieflingVariants(races)) return races;
+  return races.filter((r) => !isGenericTieflingRaceName(r.name));
 }
 
 /** Rassen einer Kultur: race_ids ∪ culture_id; Exilanten → explizite Liste oder alle. */
@@ -107,11 +138,11 @@ export function serializeRaceTraits(
   return text ? `${text}\n\n${block}` : block;
 }
 
+/** D&D 2024: Species/Race grant no ability score increases — backgrounds only. */
+export const RACE_GRANTS_ABILITY_BONUSES = false;
+
 export function hasLoreRaceBonusContent(spec: LoreRaceBonusSpec): boolean {
   if (spec.summary?.trim()) return true;
-  if (spec.abilityBonuses && Object.values(spec.abilityBonuses).some((v) => (v ?? 0) !== 0)) {
-    return true;
-  }
   if ((spec.features ?? []).length > 0) return true;
   if (spec.toolProficiencies?.length) return true;
   if (spec.weaponProficiencies?.length) return true;
@@ -176,8 +207,7 @@ export function parseRaceTraits(raw: string | null | undefined): ParsedRaceTrait
 export const KASSADRAS_RACE_BONUS_CATALOG: Record<string, LoreRaceBonusSpec> = {
   maschinenzwerge: {
     v: 1,
-    summary: "Intelligenz +1; Maschinist; Kleiner Roboter-Begleiter.",
-    abilityBonuses: { int: 1 },
+    summary: "Maschinist; Kleiner Roboter-Begleiter.",
     toolProficiencies: ["Handwerkswerkzeug"],
     features: [
       {
@@ -196,9 +226,7 @@ export const KASSADRAS_RACE_BONUS_CATALOG: Record<string, LoreRaceBonusSpec> = {
   },
   dahrinokzwerg: {
     v: 1,
-    summary:
-      "Wie Hügelzwerg (KON +2, WEI +1) plus Bund fürs Leben (permanenter Vertrauter).",
-    abilityBonuses: { con: 2, wis: 1 },
+    summary: "Zwergische Merkmale plus Bund fürs Leben (permanenter Vertrauter).",
     hpBonusPerLevel: 1,
     weaponProficiencies: ["Streitaxt", "Beil", "Leichter Hammer", "Kriegshammer"],
     toolProficiencies: ["Handwerkszeug (Schmied, Brauer oder Maurer — Wahl)"],
@@ -250,90 +278,81 @@ export const KASSADRAS_RACE_BONUS_CATALOG: Record<string, LoreRaceBonusSpec> = {
   // Narrative Platzhalter / ableitbare Hinweise für weitere Rassen
   arckoloth: {
     v: 1,
-    summary: "Handelsgeschick und zwergenhafte Zähigkeit (Platzhalter — mechanisch wie Zwerg-Basis).",
-    abilityBonuses: { con: 2, cha: 1 },
+    summary: "Handelsgeschick und zwergenhafte Zähigkeit (Platzhalter).",
     features: [
       {
         id: "arc-koloth-haendler",
         name: "Händlerclan",
-        description:
-          "Die Arc-Koloth sind geschickte Händler. (Mechanik: KON +2, CHA +1 — vom GM bei Bedarf anpassen.)",
+        description: "Die Arc-Koloth sind geschickte Händler.",
       },
     ],
   },
   aurumzwerge: {
     v: 1,
     summary: "Goldschmiedekunst und zwergenhafte Robustheit (Platzhalter).",
-    abilityBonuses: { con: 2, int: 1 },
     toolProficiencies: ["Juwelierwerkzeug"],
     features: [
       {
         id: "aurum-goldschmied",
         name: "Goldschmiedekunst",
-        description:
-          "Du bist geübt mit Juwelierwerkzeug. (KON +2, INT +1 — Platzhalter aus Lore ableitbar.)",
+        description: "Du bist geübt mit Juwelierwerkzeug.",
       },
     ],
   },
   tiefenzwerg: {
     v: 1,
     summary: "Feuerresistenz und teuflisches Erbe (aus Lore).",
-    abilityBonuses: { con: 2, cha: 1 },
     features: [
       {
         id: "tiefenzwerg-feuer",
         name: "Kind Pyrondras",
         description:
-          "Besonders widerstandsfähig gegenüber Feuer: Resistenz gegen Feuerschaden. (KON +2, CHA +1 — Platzhalter.)",
+          "Besonders widerstandsfähig gegenüber Feuer: Resistenz gegen Feuerschaden.",
       },
     ],
   },
   halbzwerg: {
     v: 1,
     summary: "Zähigkeit zwischen Mensch und Zwerg (Platzhalter).",
-    abilityBonuses: { con: 2 },
     features: [
       {
         id: "halbzwerg-zaehigkeit",
         name: "Zwergenblut",
-        description: "Hohe Ausdauer und Zähigkeit. (KON +2 — Platzhalter aus Lore.)",
+        description: "Hohe Ausdauer und Zähigkeit.",
       },
     ],
   },
   jakalblauertiefling: {
     v: 1,
     summary: "Kälteresistenz und Agilität (aus Lore).",
-    abilityBonuses: { dex: 2, int: 1 },
     features: [
       {
         id: "jakal-kaelte",
         name: "Eisnomade",
         description:
-          "Sehr widerstandsfähig gegenüber Kälte: Resistenz gegen Kälteschaden. Beweglich auf schwierigem Gelände. (DEX +2, INT +1 — Platzhalter.)",
+          "Sehr widerstandsfähig gegenüber Kälte: Resistenz gegen Kälteschaden. Beweglich auf schwierigem Gelände.",
       },
     ],
   },
   skotargrunertiefling: {
     v: 1,
     summary: "Tieflings-Erbe (Platzhalter).",
-    abilityBonuses: { int: 1, cha: 2 },
     features: [
       {
         id: "skotar-erbe",
         name: "Dämonisches Erbe",
-        description: "Klassische Tiefling-Attribute (INT +1, CHA +2 — Platzhalter).",
+        description: "Teuflisches Erbe mit klassischen Tiefling-Merkmalen.",
       },
     ],
   },
   tieflingrotertiefling: {
     v: 1,
     summary: "Klassisches Tiefling-Erbe (Platzhalter).",
-    abilityBonuses: { int: 1, cha: 2 },
     features: [
       {
         id: "roter-tiefling-erbe",
         name: "Dämonisches Erbe",
-        description: "INT +1, CHA +2 — Platzhalter analog PHB-Tiefling.",
+        description: "Teuflisches Erbe analog PHB-Tiefling.",
       },
     ],
   },
@@ -380,8 +399,6 @@ export function formatAbilityBonusesDe(bonuses: LoreRaceAbilityBonuses | undefin
 export function formatLoreRaceBonusesForDisplay(spec: LoreRaceBonusSpec | null): string[] {
   if (!spec) return [];
   const lines: string[] = [];
-  const abi = formatAbilityBonusesDe(spec.abilityBonuses);
-  if (abi) lines.push(`Attribute: ${abi}`);
   if (spec.hpBonusPerLevel) {
     lines.push(`TP-Maximum: +${spec.hpBonusPerLevel} pro Stufe`);
   }
@@ -573,8 +590,22 @@ function collectSkillProficienciesFromSpec(spec: LoreRaceBonusSpec): Dnd5eSkillK
 }
 
 /**
+ * Entfernt zuvor angewandte Rassen-Attributsboni aus dem Blatt (D&D-2024-Migration).
+ * Nutzt `campaignLore.appliedAbilityBonuses`, falls vorhanden.
+ */
+export function stripLegacyRaceAbilityBonuses(sheet: Dnd5eSheetData): Dnd5eSheetData {
+  const prevLore = getSheetCampaignLore(sheet);
+  if (!prevLore.appliedAbilityBonuses) return sheet;
+  let next = applyAbilityDelta(sheet, prevLore.appliedAbilityBonuses, -1);
+  return setSheetCampaignLore(next, {
+    ...prevLore,
+    appliedAbilityBonuses: undefined,
+  });
+}
+
+/**
  * Entfernt zuvor angewandte Lore-Rassenboni und wendet neue an.
- * SRD-Volksboni (character-create) bleiben unberührt, sofern source !== lore-race.
+ * D&D 2024: Attributssteigerungen kommen aus dem Background — keine Rassen-ASI.
  */
 export function applyLoreRaceBonusesToSheet(
   sheet: Dnd5eSheetData,
@@ -583,14 +614,15 @@ export function applyLoreRaceBonusesToSheet(
     raceTraitsRaw?: string | null;
     raceLoreId?: string | null;
     level?: number;
+    /** @deprecated D&D 2024 ignores race ASI; kept for migration revert only */
     applyAbilityBonuses?: boolean;
   },
 ): Dnd5eSheetData {
-  const applyAbi = opts.applyAbilityBonuses !== false;
+  const applyAbi = RACE_GRANTS_ABILITY_BONUSES && opts.applyAbilityBonuses === true;
   let next = { ...sheet };
   const prevLore = getSheetCampaignLore(next);
 
-  if (applyAbi && prevLore.appliedAbilityBonuses) {
+  if (prevLore.appliedAbilityBonuses) {
     next = applyAbilityDelta(next, prevLore.appliedAbilityBonuses, -1);
   }
 
@@ -654,11 +686,9 @@ export function applyLoreRaceBonusesToSheet(
 
   const raceKey = normalizeRaceKey(opts.raceName);
   let appliedAbility: LoreRaceAbilityBonuses | undefined;
-  if (spec.abilityBonuses) {
+  if (applyAbi && spec.abilityBonuses) {
     appliedAbility = { ...spec.abilityBonuses };
-    if (applyAbi) {
-      next = applyAbilityDelta(next, appliedAbility, 1);
-    }
+    next = applyAbilityDelta(next, appliedAbility, 1);
   }
 
   const featureEntries: Dnd5eFeatureEntry[] = (spec.features ?? [])
@@ -726,18 +756,12 @@ export function applyLoreRaceBonusesToSheet(
   });
 }
 
-/** Für Level-1-Create: Boni auf Basiswerte legen (ohne Sheet-Revert). */
+/** @deprecated D&D 2024: race/species no longer grant ASI — returns base unchanged. */
 export function applyLoreAbilityBonusesToScores(
   base: Record<AbilityKeyShort, number>,
-  spec: LoreRaceBonusSpec | null,
+  _spec: LoreRaceBonusSpec | null,
 ): Record<AbilityKeyShort, number> {
-  if (!spec?.abilityBonuses) return { ...base };
-  const out = { ...base };
-  for (const k of ABILITY_KEYS) {
-    const d = spec.abilityBonuses[k] ?? 0;
-    if (d) out[k] = Math.min(20, (out[k] ?? 10) + d);
-  }
-  return out;
+  return { ...base };
 }
 
 export function loreRaceFeaturesToSheetEntries(

@@ -38,7 +38,9 @@ import {
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 import {
   filterRacesForCulture,
+  filterWizardRaceOptions,
   formatLoreRaceBonusesForDisplay,
+  formatRaceSelectionLabel,
   resolveLoreRaceBonuses,
   resolveLoreRaceDisplayText,
 } from "@/src/lib/lore-race-bonuses";
@@ -206,13 +208,15 @@ export function CharacterSheetBiographyCultureTab({
   const selectedAlignment = findAlignmentOption(alignment);
 
   const selectedCulture = cultureOptions.find((c) => c.id === cultureLoreId);
-  const racesForCulture = filterRacesForCulture(raceOptions, selectedCulture
-    ? {
-        id: selectedCulture.id,
-        name: selectedCulture.name,
-        race_ids: selectedCulture.race_ids ?? [],
-      }
-    : null);
+  const racesForCulture = filterWizardRaceOptions(
+    filterRacesForCulture(raceOptions, selectedCulture
+      ? {
+          id: selectedCulture.id,
+          name: selectedCulture.name,
+          race_ids: selectedCulture.race_ids ?? [],
+        }
+      : null),
+  );
   const selectedRace = raceOptions.find((r) => r.name === raceName) ?? null;
   const raceBonusLines = formatLoreRaceBonusesForDisplay(
     resolveLoreRaceBonuses({
@@ -554,13 +558,17 @@ export function CharacterSheetBiographyCultureTab({
                 <option value="">{t("biography.raceNone")}</option>
                 {(cultureLoreId && racesForCulture.length > 0
                   ? racesForCulture
-                  : raceOptions
+                  : filterWizardRaceOptions(raceOptions)
                 )
                   .slice()
-                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .sort((a, b) =>
+                    formatRaceSelectionLabel(a.name).localeCompare(
+                      formatRaceSelectionLabel(b.name),
+                    ),
+                  )
                   .map((r) => (
                     <option key={r.id} value={r.name}>
-                      {r.name}
+                      {formatRaceSelectionLabel(r.name)}
                     </option>
                   ))}
                 {raceName &&

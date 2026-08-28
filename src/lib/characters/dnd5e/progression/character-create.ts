@@ -22,7 +22,6 @@ import type {
   SlotKey,
 } from "./types";
 import {
-  applyLoreAbilityBonusesToScores,
   applyLoreRaceBonusesToSheet,
   loreRaceFeaturesToSheetEntries,
   resolveLoreRaceBonuses,
@@ -81,16 +80,15 @@ export type Level1CreationDraft = {
   raceName: string;
   /** SRD race for mechanical bonuses; falls back to resolveRaceId(raceName) */
   raceId: RaceId;
-  /** Base scores before racial bonuses (e.g. standard array assignment) */
+  /** Base scores before background bonuses (e.g. standard array assignment) */
   baseAbilities: Record<AbilityKeyShort, number>;
-  applyRacialBonuses: boolean;
+  /** @deprecated Ignored in D&D 2024 — species grant no ASI */
+  applyRacialBonuses?: boolean;
   spellIds: string[];
   skillKeys: Dnd5eSkillKey[];
-  /** Kampagnen-Lore Rassenboni (überschreiben/ergänzen SRD wenn gesetzt) */
+  /** Kampagnen-Lore Rassenmerkmale (Features, Proficiencies — keine ASI) */
   loreRaceTraitsRaw?: string | null;
   loreRaceLoreId?: string | null;
-  /** Wenn Lore-Attributsboni existieren: SRD-ASI nicht zusätzlich anwenden */
-  preferLoreAbilityBonuses?: boolean;
 };
 
 export function planLevel1Creation(input: {
@@ -177,19 +175,6 @@ export function planLevel1Creation(input: {
   };
 }
 
-function applyRacialBonuses(
-  base: Record<AbilityKeyShort, number>,
-  raceId: RaceId,
-): Record<AbilityKeyShort, number> {
-  const bonus = RACE_ABILITY_BONUSES[raceId] ?? {};
-  const keys: AbilityKeyShort[] = ["str", "dex", "con", "int", "wis", "cha"];
-  const out = { ...base };
-  for (const k of keys) {
-    out[k] = Math.min(20, (out[k] ?? 10) + (bonus[k] ?? 0));
-  }
-  return out;
-}
-
 export function pointBuyCost(score: number): number {
   if (score < 8 || score > 15) return Number.POSITIVE_INFINITY;
   if (score <= 13) return score - 8;
@@ -230,19 +215,8 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
     raceName: draft.raceName,
     raceTraitsRaw: draft.loreRaceTraitsRaw,
   });
-  const useLoreAbi =
-    Boolean(loreSpec?.abilityBonuses) &&
-    (draft.preferLoreAbilityBonuses !== false);
 
-  let scores: Record<AbilityKeyShort, number>;
-  if (useLoreAbi) {
-    // Kampagnen-Lore-ASI unabhängig von optionalen 2014-SRD-Rassenboni
-    scores = applyLoreAbilityBonusesToScores(draft.baseAbilities, loreSpec);
-  } else if (draft.applyRacialBonuses) {
-    scores = applyRacialBonuses(draft.baseAbilities, plan.raceId);
-  } else {
-    scores = { ...draft.baseAbilities };
-  }
+  const scores: Record<AbilityKeyShort, number> = { ...draft.baseAbilities };
 
   let sheet = createEmptyDnd5eSheet(1);
   const keys: AbilityKeyShort[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -296,13 +270,11 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
   }
 
   if (loreSpec) {
-    // Proficiencies + Features + HP aus Lore; Attribute bereits gesetzt → nicht nochmal
     sheet = applyLoreRaceBonusesToSheet(sheet, {
       raceName: draft.raceName,
       raceTraitsRaw: draft.loreRaceTraitsRaw,
       raceLoreId: draft.loreRaceLoreId,
       level: 1,
-      applyAbilityBonuses: false,
     });
   }
 

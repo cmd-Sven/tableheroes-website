@@ -242,6 +242,7 @@ export function planLevelUp(input: PlanLevelUpInput): LevelUpPlan {
   const hpAverage = Math.floor(hitDie / 2) + 1 + conMod;
 
   const needsAsi = levelGrantsAsi(classId, toLevel);
+  const isEpicBoonLevel = needsAsi && toLevel === 19;
   const subclassLevel = prog?.subclassLevel ?? 3;
   const hasSubclassOptions = (prog?.subclasses?.length ?? 0) > 0;
   // Nachholen: Stufe erreicht/überschritten und keine gematchte Katalog-Subklasse
@@ -373,6 +374,7 @@ export function planLevelUp(input: PlanLevelUpInput): LevelUpPlan {
     features,
     raceFeatures,
     needsAsi,
+    isEpicBoonLevel,
     needsSubclass,
     subclassOptions: (prog?.subclasses ?? []).map((s) => ({
       id: s.id,

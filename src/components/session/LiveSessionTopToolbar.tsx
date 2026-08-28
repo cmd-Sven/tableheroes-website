@@ -48,6 +48,7 @@ type Props = {
   onToggleCombat: () => void;
   onOpenNpcs: () => void;
   onOpenBeasts: () => void;
+  onOpenQuickRulebook?: () => void;
   stageRosterOpen?: boolean;
   stageRosterCount?: number;
   onToggleStageRoster?: () => void;
@@ -176,6 +177,7 @@ export function LiveSessionTopToolbar({
   onToggleCombat,
   onOpenNpcs,
   onOpenBeasts,
+  onOpenQuickRulebook,
   stageRosterOpen = false,
   stageRosterCount = 0,
   onToggleStageRoster,
@@ -304,6 +306,15 @@ export function LiveSessionTopToolbar({
               <IconButton label="Biester auf die Bühne" onClick={onOpenBeasts}>
                 <PawPrint className="h-5 w-5 text-emerald-300" />
               </IconButton>
+              {onOpenQuickRulebook ? (
+                <IconButton
+                  label="Schnell-Regelwerk (D&D 2024)"
+                  onClick={onOpenQuickRulebook}
+                  tone="gold"
+                >
+                  <BookOpen className="h-5 w-5" />
+                </IconButton>
+              ) : null}
               <IconButton
                 label={combatActive ? "Combat beenden" : "Combat starten"}
                 onClick={onToggleCombat}

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { AnimatePresence } from "framer-motion";
 import { GmNpcSearchModal, type GmNpcSearchRow } from "@/src/components/session/GmNpcSearchModal";
 import { GmBeastSearchModal, type GmBeastSearchRow } from "@/src/components/session/GmBeastSearchModal";
+import { GmQuickRulebookModal } from "@/src/components/session/GmQuickRulebookModal";
 import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootModal";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { TrapWizardModal } from "@/src/components/session/battlemap/TrapWizardModal";
@@ -70,6 +71,8 @@ export type LiveSessionModalsProps = {
   onPlaceNpc: (id: string) => void;
   beastSearchModalOpen: boolean;
   setBeastSearchModalOpen: (open: boolean) => void;
+  quickRulebookModalOpen: boolean;
+  setQuickRulebookModalOpen: (open: boolean) => void;
   gmBeastSearchRows: GmBeastSearchRow[];
   stageDeckCreatureIds: string[] | null;
   activeCreatureIds: Set<string>;
@@ -119,6 +122,8 @@ export function LiveSessionModals({
   onPlaceNpc,
   beastSearchModalOpen,
   setBeastSearchModalOpen,
+  quickRulebookModalOpen,
+  setQuickRulebookModalOpen,
   gmBeastSearchRows,
   stageDeckCreatureIds,
   activeCreatureIds,
@@ -183,6 +188,13 @@ export function LiveSessionModals({
             onPlaceCreature(id);
             setBeastSearchModalOpen(false);
           }}
+        />
+      ) : null}
+
+      {isGM && showDnd5eSheet ? (
+        <GmQuickRulebookModal
+          open={quickRulebookModalOpen}
+          onClose={() => setQuickRulebookModalOpen(false)}
         />
       ) : null}
 

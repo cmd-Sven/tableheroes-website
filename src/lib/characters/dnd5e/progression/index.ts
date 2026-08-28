@@ -74,6 +74,7 @@ export {
   removeBackgroundGrants,
   resolveAppliedBackgroundId,
   listBackgroundOptions,
+  ensureBackgroundGrantsSynced,
   BACKGROUND_SOURCE,
 } from "./apply-background";
 export {

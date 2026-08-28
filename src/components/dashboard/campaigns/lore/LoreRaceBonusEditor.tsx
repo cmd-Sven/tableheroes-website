@@ -2,10 +2,8 @@
 
 import { Plus, X } from "lucide-react";
 import type { Dnd5eSkillKey } from "@/src/lib/characters/dnd5e/types";
-import { ABILITY_LABELS_DE } from "@/src/lib/characters/dnd5e/types";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import type {
-  LoreRaceAbilityBonuses,
   LoreRaceBonusSpec,
   LoreRaceFeatureEntry,
   LoreRaceFeatureType,
@@ -16,8 +14,6 @@ import {
   serializeRaceTraits,
 } from "@/src/lib/lore-race-bonuses";
 
-const ABILITY_KEYS = ["str", "dex", "con", "int", "wis", "cha"] as const;
-
 type Props = {
   displayText: string;
   bonusSpec: LoreRaceBonusSpec | null;
@@ -26,7 +22,7 @@ type Props = {
 };
 
 function emptyBonusSpec(): LoreRaceBonusSpec {
-  return { v: 1, abilityBonuses: {}, features: [] };
+  return { v: 1, features: [] };
 }
 
 function ensureBonusSpec(spec: LoreRaceBonusSpec | null): LoreRaceBonusSpec {
@@ -63,20 +59,6 @@ export function LoreRaceBonusEditor({
     onBonusSpecChange({ ...spec, ...patch });
   }
 
-  function updateAbilityBonus(key: keyof LoreRaceAbilityBonuses, raw: string) {
-    const parsed = raw.trim() === "" ? 0 : Number.parseInt(raw, 10);
-    const value = Number.isFinite(parsed) ? parsed : 0;
-    const next = { ...(spec.abilityBonuses ?? {}) };
-    if (value === 0) {
-      delete next[key];
-    } else {
-      next[key] = value;
-    }
-    updateSpec({
-      abilityBonuses: Object.keys(next).length > 0 ? next : undefined,
-    });
-  }
-
   function updateFeature(index: number, patch: Partial<LoreRaceFeatureEntry>) {
     const next = features.map((f, i) => (i === index ? { ...f, ...patch } : f));
     updateSpec({ features: next });
@@ -106,37 +88,9 @@ export function LoreRaceBonusEditor({
       </div>
 
       <div>
-        <label className="mb-2 block font-barlow font-bold text-xs uppercase text-gray-300">
-          Rassenboni (Attribute)
-        </label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {ABILITY_KEYS.map((key) => (
-            <div key={key} className="flex items-center gap-2">
-              <span className="min-w-[7rem] font-libre text-[11px] text-gray-400">
-                {ABILITY_LABELS_DE[key]}
-              </span>
-              <input
-                type="number"
-                min={-5}
-                max={5}
-                step={1}
-                value={spec.abilityBonuses?.[key] ?? ""}
-                onChange={(e) => updateAbilityBonus(key, e.target.value)}
-                className="w-16 rounded border border-hero-dark bg-slate-900/80 px-2 py-1 font-libre text-xs text-white outline-none focus:border-accent-gold"
-                placeholder="0"
-              />
-            </div>
-          ))}
-        </div>
-        <p className="mt-1 text-[10px] font-libre text-gray-500">
-          Positive Werte wie +1 oder +2 — werden beim Rassenwechsel automatisch verrechnet.
-        </p>
-      </div>
-
-      <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <label className="font-barlow font-bold text-xs uppercase text-gray-300">
-            Weitere Besonderheiten
+            Mechanische Besonderheiten (D&amp;D 2024)
           </label>
           <div className="flex gap-1">
             <button

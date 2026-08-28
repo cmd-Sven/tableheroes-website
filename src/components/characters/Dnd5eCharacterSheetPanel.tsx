@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Loader2,
   Save,
@@ -23,6 +24,7 @@ import {
   Eye,
   Sparkles,
   HelpCircle,
+  Info,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -73,6 +75,7 @@ import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesP
 import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
 import { CharakterTuvPanel } from "@/src/components/characters/CharakterTuvPanel";
 import { FeatureHelpModal } from "@/src/components/characters/FeatureHelpModal";
+import { BackgroundHelpModal } from "@/src/components/characters/BackgroundHelpModal";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
 import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
@@ -110,13 +113,16 @@ import {
 } from "@/src/lib/characters/dnd5e/progression/class-ids";
 import {
   findBackgroundByName,
+  getBackgroundById,
   getClassProgression,
 } from "@/src/lib/characters/dnd5e/progression/catalog";
 import {
   listBackgroundOptions,
   resolveAppliedBackgroundId,
   setCharacterBackground,
+  ensureBackgroundGrantsSynced,
 } from "@/src/lib/characters/dnd5e/progression/apply-background";
+import { formatBackgroundBonusLines } from "@/src/lib/characters/dnd5e/progression/background-display";
 import {
   applySubclassChange,
   catalogSubclassLevel,
@@ -131,10 +137,13 @@ import {
 import {
   applyLoreRaceBonusesToSheet,
   filterRacesForCulture,
+  filterWizardRaceOptions,
   formatLoreRaceBonusesForDisplay,
+  formatRaceSelectionLabel,
   getSheetCampaignLore,
   resolveLoreRaceBonuses,
   setSheetCampaignLore,
+  stripLegacyRaceAbilityBonuses,
 } from "@/src/lib/lore-race-bonuses";
 import {
   DND5E_ALIGNMENTS,
@@ -612,6 +621,7 @@ export function Dnd5eCharacterSheetPanel({
   }>({ armor: "", weapons: "", tools: "" });
   /** Freitext-Hintergrund (nicht aus Katalog) */
   const [backgroundCustomMode, setBackgroundCustomMode] = useState(false);
+  const [backgroundHelpId, setBackgroundHelpId] = useState<string | null>(null);
   const [inventoryItems, setInventoryItems] = useState<CharacterItem[]>([]);
   const equipmentPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -645,7 +655,13 @@ export function Dnd5eCharacterSheetPanel({
         return;
       }
       setPayload(data);
-      const loadedSheet = ensureClassResources(structuredClone(data.sheet), data.class ?? "");
+      const loadedSheet = ensureBackgroundGrantsSynced(
+        stripLegacyRaceAbilityBonuses(
+          ensureClassResources(structuredClone(data.sheet), data.class ?? ""),
+        ),
+        data.background ?? "",
+        locale,
+      );
       setSheet(loadedSheet);
       setMeta({
         subclass: data.subclass ?? "",
@@ -667,7 +683,7 @@ export function Dnd5eCharacterSheetPanel({
     } finally {
       setLoading(false);
     }
-  }, [campaignId, characterId, hydrateLocale, t]);
+  }, [campaignId, characterId, hydrateLocale, locale, t]);
 
   useEffect(() => {
     void reload();
@@ -1215,23 +1231,34 @@ export function Dnd5eCharacterSheetPanel({
   const backgroundSelectValue = backgroundCustomMode
     ? "__custom__"
     : matchedBackgroundId;
+  const matchedBackground = matchedBackgroundId
+    ? getBackgroundById(matchedBackgroundId)
+    : null;
+  const backgroundBonusLines = formatBackgroundBonusLines(matchedBackground, {
+    locale,
+    t,
+    skillLabel,
+    abilityLabel,
+  });
 
   const sheetCulture = biographyCulture
     ? biographyCulture.cultureOptions.find((c) => c.id === biographyCulture.cultureLoreId)
     : null;
   const sheetRacesForCulture = biographyCulture
-    ? filterRacesForCulture(biographyCulture.raceOptions, sheetCulture
-        ? {
-            id: sheetCulture.id,
-            name: sheetCulture.name,
-            race_ids: sheetCulture.race_ids ?? [],
-          }
-        : null)
+    ? filterWizardRaceOptions(
+        filterRacesForCulture(biographyCulture.raceOptions, sheetCulture
+          ? {
+              id: sheetCulture.id,
+              name: sheetCulture.name,
+              race_ids: sheetCulture.race_ids ?? [],
+            }
+          : null),
+      )
     : [];
   const headerRaceOptions =
     biographyCulture && sheetCulture && sheetRacesForCulture.length > 0
       ? sheetRacesForCulture
-      : biographyCulture?.raceOptions ?? [];
+      : filterWizardRaceOptions(biographyCulture?.raceOptions ?? []);
   const headerSelectedRace =
     biographyCulture?.raceOptions.find((r) => r.name === meta.race) ?? null;
   const headerRaceBonusLines = formatLoreRaceBonusesForDisplay(
@@ -1265,7 +1292,6 @@ export function Dnd5eCharacterSheetPanel({
       raceTraitsRaw: raceOpt?.race_traits,
       raceLoreId: raceOpt?.id ?? null,
       level: meta.level,
-      applyAbilityBonuses: true,
     });
     return setSheetCampaignLore(next, {
       ...getSheetCampaignLore(next),
@@ -1300,11 +1326,13 @@ export function Dnd5eCharacterSheetPanel({
     biographyCulture.onReligionIdsChange(relIds);
     nextSheet = syncLanguageNamesToSheet(nextSheet, langIds);
 
-    const nextRaces = filterRacesForCulture(biographyCulture.raceOptions, {
-      id: cult.id,
-      name: cult.name,
-      race_ids: cult.race_ids ?? [],
-    });
+    const nextRaces = filterWizardRaceOptions(
+      filterRacesForCulture(biographyCulture.raceOptions, {
+        id: cult.id,
+        name: cult.name,
+        race_ids: cult.race_ids ?? [],
+      }),
+    );
     if (meta.race && !nextRaces.some((r) => r.name === meta.race)) {
       setMeta({ ...meta, race: "" });
       biographyCulture.onRaceNameChange("");
@@ -1633,9 +1661,26 @@ export function Dnd5eCharacterSheetPanel({
               }`}
             >
               <label className="space-y-1">
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  {t("field.background")}
-                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    {t("field.background")}
+                  </span>
+                  {matchedBackground ? (
+                    <button
+                      type="button"
+                      onClick={() => setBackgroundHelpId(matchedBackground.id)}
+                      className="shrink-0 rounded p-0.5 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                      aria-label={t("backgroundCatalog.help.aria", {
+                        name:
+                          locale === "de"
+                            ? matchedBackground.nameDe || matchedBackground.nameEn
+                            : matchedBackground.nameEn,
+                      })}
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
                 {readOnly ? (
                   <TextInput value={meta.background} disabled onChange={() => {}} />
                 ) : (
@@ -1667,25 +1712,48 @@ export function Dnd5eCharacterSheetPanel({
                     ) : null}
                   </div>
                 )}
+                {backgroundBonusLines.length > 0 ? (
+                  <p className="font-libre text-[10px] text-accent-gold/90 leading-snug line-clamp-3">
+                    {backgroundBonusLines[0]}
+                    {backgroundBonusLines.length > 1
+                      ? t("backgroundCatalog.bonusMore", {
+                          count: backgroundBonusLines.length - 1,
+                        })
+                      : ""}
+                  </p>
+                ) : null}
               </label>
               {biographyCulture && biographyCulture.cultureOptions.length > 0 ? (
                 <label className="space-y-1">
                   <span className="font-barlow text-[10px] font-bold uppercase tracking-wider text-gray-500">
                     {t("biography.culture")}
                   </span>
-                  <select
-                    value={biographyCulture.cultureLoreId}
-                    disabled={readOnly}
-                    onChange={(e) => applyCultureFromHeader(e.target.value)}
-                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
-                  >
-                    <option value="">{t("biography.cultureNone")}</option>
-                    {biographyCulture.cultureOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={biographyCulture.cultureLoreId}
+                      disabled={readOnly}
+                      onChange={(e) => applyCultureFromHeader(e.target.value)}
+                      className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
+                    >
+                      <option value="">{t("biography.cultureNone")}</option>
+                      {biographyCulture.cultureOptions.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {biographyCulture.cultureLoreId ? (
+                      <Link
+                        href={`/dashboard/campaigns/${campaignId}/lore/${biographyCulture.cultureLoreId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 rounded border border-hero-border bg-hero-dark/60 p-1.5 text-gray-500 hover:text-accent-gold"
+                        title={t("biography.cultureLoreLink")}
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : null}
+                  </div>
                 </label>
               ) : null}
               <label className="space-y-1">
@@ -1693,31 +1761,50 @@ export function Dnd5eCharacterSheetPanel({
                   {t("field.race")}
                 </span>
                 {biographyCulture && headerRaceOptions.length > 0 ? (
-                  <select
-                    value={
-                      headerRaceOptions.some((r) => r.name === meta.race)
-                        ? meta.race
-                        : meta.race
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={
+                        headerRaceOptions.some((r) => r.name === meta.race)
                           ? meta.race
-                          : ""
-                    }
-                    disabled={readOnly}
-                    onChange={(e) => applyRaceFromHeader(e.target.value)}
-                    className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
-                  >
-                    <option value="">{t("biography.raceNone")}</option>
-                    {headerRaceOptions
-                      .slice()
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((r) => (
-                        <option key={r.id} value={r.name}>
-                          {r.name}
+                          : meta.race
+                            ? meta.race
+                            : ""
+                      }
+                      disabled={readOnly}
+                      onChange={(e) => applyRaceFromHeader(e.target.value)}
+                      className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-70"
+                    >
+                      <option value="">{t("biography.raceNone")}</option>
+                      {headerRaceOptions
+                        .slice()
+                        .sort((a, b) =>
+                          formatRaceSelectionLabel(a.name).localeCompare(
+                            formatRaceSelectionLabel(b.name),
+                          ),
+                        )
+                        .map((r) => (
+                          <option key={r.id} value={r.name}>
+                            {formatRaceSelectionLabel(r.name)}
+                          </option>
+                        ))}
+                      {meta.race && !headerRaceOptions.some((r) => r.name === meta.race) ? (
+                        <option value={meta.race}>
+                          {formatRaceSelectionLabel(meta.race)}
                         </option>
-                      ))}
-                    {meta.race && !headerRaceOptions.some((r) => r.name === meta.race) ? (
-                      <option value={meta.race}>{meta.race}</option>
+                      ) : null}
+                    </select>
+                    {headerSelectedRace?.id ? (
+                      <Link
+                        href={`/dashboard/campaigns/${campaignId}/lore/${headerSelectedRace.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 rounded border border-hero-border bg-hero-dark/60 p-1.5 text-gray-500 hover:text-accent-gold"
+                        title={t("biography.raceLoreLink")}
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </Link>
                     ) : null}
-                  </select>
+                  </div>
                 ) : (
                   <TextInput
                     value={meta.race}
@@ -2742,6 +2829,13 @@ export function Dnd5eCharacterSheetPanel({
           title={featureHelp.title}
           description={featureHelp.description}
           onClose={() => setFeatureHelp(null)}
+        />
+      ) : null}
+
+      {backgroundHelpId && getBackgroundById(backgroundHelpId) ? (
+        <BackgroundHelpModal
+          background={getBackgroundById(backgroundHelpId)!}
+          onClose={() => setBackgroundHelpId(null)}
         />
       ) : null}
       </div>

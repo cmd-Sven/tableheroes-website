@@ -57,6 +57,8 @@ export function LiveSessionBoardStageHost() {
       setNpcSearchModalOpen,
       beastSearchModalOpen,
       setBeastSearchModalOpen,
+      quickRulebookModalOpen,
+      setQuickRulebookModalOpen,
       creatureStates,
       setCreatureStates,
       beastLootCreatureId,
@@ -231,6 +233,7 @@ export function LiveSessionBoardStageHost() {
           writeSystemLog={writeSystemLog}
           setNpcSearchModalOpen={setNpcSearchModalOpen}
           setBeastSearchModalOpen={setBeastSearchModalOpen}
+          setQuickRulebookModalOpen={setQuickRulebookModalOpen}
           stageDeckHandOpen={stageDeckHandOpen}
           setStageDeckHandOpen={setStageDeckHandOpen}
           inHandNpcsCount={inHandNpcs.length}
@@ -253,6 +256,7 @@ export function LiveSessionBoardStageHost() {
           sessionStatus={sessionStatus}
           chronistTableMode={chronistTableMode}
           topBarTranscriptionStatus={topBarTranscriptionStatus}
+          showDnd5eSheet={showDnd5eSheet}
         />
 
         <div className="relative min-h-0 h-full overflow-visible">

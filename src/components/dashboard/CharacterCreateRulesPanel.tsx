@@ -73,8 +73,6 @@ type Props = {
   onSrdRaceId: (id: RaceId) => void;
   baseAbilities: Record<AbilityKeyShort, number>;
   onBaseAbilities: (next: Record<AbilityKeyShort, number>) => void;
-  applyRacialBonuses: boolean;
-  onApplyRacialBonuses: (v: boolean) => void;
   spellIds: string[];
   onSpellIds: (ids: string[]) => void;
   mode: "class" | "abilities" | "spells";
@@ -89,8 +87,6 @@ export function CharacterCreateRulesPanel({
   onSrdRaceId,
   baseAbilities,
   onBaseAbilities,
-  applyRacialBonuses,
-  onApplyRacialBonuses,
   spellIds,
   onSpellIds,
   mode,
@@ -309,7 +305,7 @@ export function CharacterCreateRulesPanel({
         </h3>
         <p className="font-libre text-sm text-gray-400">
           Standard-Array ({STANDARD_ARRAY.join(", ")}) oder manuell anpassen.
-          Rassenboni werden optional zusätzlich angewendet.
+          Attributssteigerungen kommen in D&amp;D 2024 aus dem Background — nicht aus der Species.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -319,15 +315,6 @@ export function CharacterCreateRulesPanel({
           >
             Standard-Array setzen
           </button>
-          <label className="flex items-center gap-2 font-libre text-sm text-gray-300">
-            <input
-              type="checkbox"
-              checked={applyRacialBonuses}
-              onChange={(e) => onApplyRacialBonuses(e.target.checked)}
-              className="accent-accent-gold"
-            />
-            Optionale 2014-SRD-Rassen-ASI (2024-Species haben keine festen ASI)
-          </label>
         </div>
         <div>
           <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
@@ -345,7 +332,7 @@ export function CharacterCreateRulesPanel({
             ))}
           </select>
           <p className="mt-1 text-xs text-gray-500 font-libre italic">
-            Lore-Rasse kommt aus dem Herkunfts-Schritt; hier die mechanische SRD-Rasse für Boni.
+            Lore-Species kommt aus dem Herkunfts-Schritt; hier die SRD-Species für Katalog-Merkmale.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -371,7 +358,7 @@ export function CharacterCreateRulesPanel({
           ))}
         </div>
         <p className="font-libre text-sm text-accent-gold">
-          Start-TP (ohne Rassenbonus auf CON): ca. {hitDie + conMod} (W{hitDie} + CON)
+          Start-TP: ca. {hitDie + conMod} (W{hitDie} + CON)
         </p>
       </div>
     );
