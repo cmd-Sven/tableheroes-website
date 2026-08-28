@@ -68,6 +68,7 @@ import {
 import type { CharacterItem } from "@/src/types/inventory";
 import { CharacterSheetLanguageToggle } from "@/src/components/characters/CharacterSheetLanguageToggle";
 import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPanel";
+import { HitDiceTracker } from "@/src/components/characters/HitDiceTracker";
 import { ClassResourcesPanel } from "@/src/components/characters/ClassResourcesPanel";
 import { CharacterAchievementsPanel } from "@/src/components/characters/CharacterAchievementsPanel";
 import { CharakterTuvPanel } from "@/src/components/characters/CharakterTuvPanel";
@@ -75,7 +76,7 @@ import { FeatureHelpModal } from "@/src/components/characters/FeatureHelpModal";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
 import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
-import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
+import { ensureClassResources, parseHitDiceString } from "@/src/lib/characters/dnd5e/rest";
 import {
   localizedFeatureDescription,
   localizedFeatureName,
@@ -771,6 +772,30 @@ export function Dnd5eCharacterSheetPanel({
   ) {
     if (!sheet) return;
     setSheet({ ...sheet, combat: { ...sheet.combat, [key]: value } });
+  }
+
+  function updateHitDicePool(value: string) {
+    if (!sheet) return;
+    const parsed = parseHitDiceString(value);
+    const total = parsed?.total ?? 0;
+    const stored = sheet.combat.hitDiceRemaining;
+    const remaining =
+      stored == null || !Number.isFinite(stored)
+        ? total
+        : Math.max(0, Math.min(total, Math.round(stored)));
+    setSheet({
+      ...sheet,
+      combat: {
+        ...sheet.combat,
+        hitDice: value,
+        hitDiceRemaining: remaining,
+      },
+    });
+  }
+
+  function updateHitDiceRemaining(remaining: number) {
+    if (!sheet) return;
+    updateCombat("hitDiceRemaining", remaining);
   }
 
   function updateFeature(index: number, patch: Partial<Dnd5eFeatureEntry>) {
@@ -2154,14 +2179,13 @@ export function Dnd5eCharacterSheetPanel({
               ) : null}
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 grid grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.hitDice")}</span>
-                  <TextInput
-                    value={sheet.combat.hitDice}
-                    disabled={readOnly}
-                    onChange={(v) => updateCombat("hitDice", v)}
-                  />
-                </label>
+                <HitDiceTracker
+                  hitDice={sheet.combat.hitDice}
+                  hitDiceRemaining={sheet.combat.hitDiceRemaining}
+                  readOnly={readOnly}
+                  onHitDiceChange={updateHitDicePool}
+                  onHitDiceRemainingChange={updateHitDiceRemaining}
+                />
                 <div className="space-y-2">
                   <span className="font-barlow text-[10px] uppercase text-gray-500">{t("combat.deathSaves")}</span>
                   <div className="flex gap-4 text-xs">
@@ -2214,6 +2238,40 @@ export function Dnd5eCharacterSheetPanel({
                   </label>
                 </div>
               </section>
+
+              {biographyCulture ? (
+                <>
+                  <CharacterFlawPicker
+                    characterFlaws={characterFlaws}
+                    onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
+                    readOnly={readOnly}
+                    compact
+                  />
+
+                  {hasFlawAdjustments || flawNotes.length > 0 ? (
+                    <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
+                      <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
+                        {t("flaws.effectsTitle")}
+                      </h3>
+                      {hasFlawAdjustments ? (
+                        <p className="font-libre text-xs text-gray-400">
+                          {t("flaws.effectsHint")}
+                        </p>
+                      ) : null}
+                      {flawNotes.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {flawNotes.map((note) => (
+                            <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
+                              <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
+                              {note.text}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </>
+              ) : null}
             </div>
 
             {/* Rechte Spalte: Feats & Proficiencies */}
@@ -2593,40 +2651,6 @@ export function Dnd5eCharacterSheetPanel({
                 )}
               </section>
             </div>
-
-            {biographyCulture ? (
-              <div className="xl:col-span-8 xl:col-start-3 space-y-4">
-                <CharacterFlawPicker
-                  characterFlaws={characterFlaws}
-                  onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
-                  readOnly={readOnly}
-                  compact
-                />
-
-                {hasFlawAdjustments || flawNotes.length > 0 ? (
-                  <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
-                    <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
-                      {t("flaws.effectsTitle")}
-                    </h3>
-                    {hasFlawAdjustments ? (
-                      <p className="font-libre text-xs text-gray-400">
-                        {t("flaws.effectsHint")}
-                      </p>
-                    ) : null}
-                    {flawNotes.length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {flawNotes.map((note) => (
-                          <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
-                            <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
-                            {note.text}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </section>
-                ) : null}
-              </div>
-            ) : null}
           </div>
 
         </>
