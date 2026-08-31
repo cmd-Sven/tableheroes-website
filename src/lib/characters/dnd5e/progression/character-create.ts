@@ -3,6 +3,7 @@
  */
 import { abilityModifier } from "../formulas";
 import { createEmptyDnd5eSheet } from "../defaults";
+import { progressionFeatureToEntry } from "../feature-entry";
 import { defaultSpellAbilityForClass } from "../spellcasting";
 import type { AbilityKey, Dnd5eSheetData, Dnd5eSkillKey } from "../types";
 import { applyClassBasicsFromCatalog, spellDefinitionToSheetEntry, appendGrantedSpellsFromFeatures } from "./catalog-bridge";
@@ -257,16 +258,7 @@ export function buildLevel1Sheet(draft: Level1CreationDraft): {
   const allFeatures = [...plan.classFeatures, ...raceFeatures];
   for (const f of allFeatures) {
     if (sheet.features.some((x) => x.id === f.id)) continue;
-    sheet.features.push({
-      id: f.id,
-      name: f.nameDe || f.nameEn,
-      nameDe: f.nameDe,
-      nameEn: f.nameEn,
-      description: f.descriptionDe || f.descriptionEn || null,
-      descriptionDe: f.descriptionDe ?? null,
-      descriptionEn: f.descriptionEn ?? null,
-      source: "character-create",
-    });
+    sheet.features.push(progressionFeatureToEntry(f, "character-create"));
   }
 
   if (loreSpec) {

@@ -3,6 +3,7 @@
  * apply new class basics (hit die, slots, spell ability, proficiencies, saves).
  */
 import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSheetData } from "../types";
+import { progressionFeatureToEntry } from "../feature-entry";
 import {
   appendGrantedSpellsFromFeatures,
   applyClassBasicsFromCatalog,
@@ -38,16 +39,7 @@ function featureMatchesProgression(
 }
 
 function progressionToFeature(f: ProgressionFeature): Dnd5eFeatureEntry {
-  return {
-    id: f.id,
-    name: f.nameDe || f.nameEn,
-    nameDe: f.nameDe,
-    nameEn: f.nameEn,
-    description: f.descriptionDe || f.descriptionEn || null,
-    descriptionDe: f.descriptionDe ?? null,
-    descriptionEn: f.descriptionEn ?? null,
-    source: "srd-class",
-  };
+  return progressionFeatureToEntry(f, "srd-class");
 }
 
 /** All non-ASI class (+ optional subclass) features with level ≤ maxLevel. */

@@ -436,6 +436,17 @@ export const CHARACTER_FLAWS: CharacterFlawDefinition[] = [
       "Auf Schiffen, Booten oder stark schwankendem Untergrund: Nachteil auf Angriffe und Geschicklichkeitsproben. +2 Überleben in Küsten-/Hafenregionen.",
     roleplay: "Grünes Gesicht an Deck, meidest Fähren, klammerst dich an Reling.",
   },
+  {
+    id: "salon_bursche",
+    nr: 41,
+    name: "Salonbursche",
+    mainDisadvantage: "−2 Überleben, −2 Naturkunde",
+    smallAdvantage: "+2 Geschichte, +2 Auftreten",
+    description: "Quasi ein Großstadtsnob, der mit dem Leben in der Natur so gar nicht klar kommt.",
+    effects:
+      "−2 Überleben, −2 Naturkunde. +2 Geschichte, +2 Auftreten. Nachteil auf Proben in Wildnis oder unter freiem Himmel (situativ).",
+    roleplay: "Du jammert über Schmutz und Ungeziefer, meidest Lagerfeuer und bestehst auf Sauberkeit.",
+  },
 ];
 
 const FLAW_BY_ID = Object.fromEntries(CHARACTER_FLAWS.map((f) => [f.id, f])) as Record<
@@ -452,8 +463,8 @@ export function getFlawByNr(nr: number): CharacterFlawDefinition | null {
 }
 
 /**
- * Optionaler Zufallswurf: 2W20 → Makel-Nr. 1–40.
- * Abbildung: ((W1 + W2 − 2) mod 40) + 1 — gleichmäßig über den Katalog.
+ * Optionaler Zufallswurf: 2W20 → Makel-Nr. 1–41.
+ * Abbildung: ((W1 + W2 − 2) mod 41) + 1 — gleichmäßig über den Katalog.
  */
 export function rollRandomFlawFrom2d20(excludeIds: Iterable<string> = []): {
   die1: number;
@@ -471,7 +482,7 @@ export function rollRandomFlawFrom2d20(excludeIds: Iterable<string> = []): {
     const die1 = rollDie();
     const die2 = rollDie();
     const sum = die1 + die2;
-    const flawNr = ((sum - 2) % 40) + 1;
+    const flawNr = ((sum - 2) % 41) + 1;
     const flaw = getFlawByNr(flawNr);
     if (!flaw) continue;
     if (excluded.has(flaw.id)) continue;

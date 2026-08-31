@@ -93,6 +93,7 @@ type Props = {
   partyCharacters: PartyCharacter[];
   downtimeCurrentDay: number;
   downtimeTotalDays: number;
+  downtimeConfig: import("@/src/lib/travel-fap-config").DowntimeConfig | null;
   fapAllocations: FapAllocationsMap;
   onTravelReload: () => void | Promise<void>;
   activeLootId: string | null;
@@ -150,6 +151,7 @@ export function LiveSessionSidePanels({
   partyCharacters,
   downtimeCurrentDay,
   downtimeTotalDays,
+  downtimeConfig,
   fapAllocations,
   onTravelReload,
   activeLootId,
@@ -302,6 +304,7 @@ export function LiveSessionSidePanels({
                           downtimeActive={downtimeActive}
                           downtimeCurrentDay={downtimeCurrentDay}
                           downtimeTotalDays={downtimeTotalDays}
+                          downtimeConfig={downtimeConfig}
                           fapAllocations={fapAllocations}
                           onReload={onTravelReload}
                           layout="sidebar"

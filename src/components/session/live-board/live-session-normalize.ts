@@ -3,6 +3,7 @@
  */
 import { normalizeHandRaises } from "@/src/lib/session/hand-raises";
 import { parseFapAllocations } from "@/src/lib/downtime-fap-types";
+import { parseDowntimeConfig } from "@/src/lib/travel-fap-config";
 import type { FateCoin } from "@/src/components/session/FateCoinsPool";
 import type { LiveState, StageVisibilityPatch } from "./live-session-types";
 
@@ -71,6 +72,7 @@ export function normalizeLiveRow(row: unknown): LiveState {
     downtime_current_day: Math.max(1, Number(r.downtime_current_day ?? 1)),
     downtime_total_days: Math.max(1, Number(r.downtime_total_days ?? 1)),
     fap_allocations: parseFapAllocations(r.fap_allocations as import("@/src/lib/database.types").Json),
+    downtime_config: parseDowntimeConfig(r.downtime_config as import("@/src/lib/database.types").Json),
     current_loot_id:
       r.current_loot_id != null && String(r.current_loot_id).trim() !== ""
         ? String(r.current_loot_id)

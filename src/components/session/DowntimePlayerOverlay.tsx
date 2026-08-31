@@ -13,6 +13,14 @@ import {
   sleepFapSum,
   type FapAllocationLine,
 } from "@/src/lib/downtime-fap-types";
+import {
+  defaultDowntimeConfig,
+  getDayLog,
+  mandatorySleepFap,
+  playerFapBudgetForDay,
+  travelFapCostPerDay,
+  type DowntimeConfig,
+} from "@/src/lib/travel-fap-config";
 import type { CharacterItem } from "@/src/types/inventory";
 
 const GENERAL_ACTIVITIES = [
@@ -32,6 +40,8 @@ type Props = {
   characterId: string;
   characterName: string;
   downtimeActive: boolean;
+  downtimeConfig?: DowntimeConfig | null;
+  downtimeCurrentDay?: number;
   /** Bereits „ready“ für heute — Overlay nur Planung */
   planningStatus: "planning" | "ready" | null;
   onClose: () => void;
@@ -47,10 +57,17 @@ export function DowntimePlayerOverlay({
   characterId,
   characterName,
   downtimeActive,
+  downtimeConfig = null,
+  downtimeCurrentDay = 1,
   planningStatus,
   onClose,
   onSubmitted,
 }: Props) {
+  const config = downtimeConfig ?? defaultDowntimeConfig();
+  const dayLog = getDayLog(config, downtimeCurrentDay);
+  const paceConfig = { ...config, pace: dayLog?.pace ?? config.pace };
+  const playerBudget = playerFapBudgetForDay(config, dayLog);
+  const travelCost = travelFapCostPerDay(paceConfig);
   const [isPending, startTransition] = useTransition();
   const [sleepDebt, setSleepDebt] = useState(0);
   const [rationsCount, setRationsCount] = useState(0);
@@ -58,10 +75,10 @@ export function DowntimePlayerOverlay({
   const [studyItems, setStudyItems] = useState<CharacterItem[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
 
-  const needSleep = useMemo(() => requiredSleepFap(sleepDebt), [sleepDebt]);
+  const needSleep = useMemo(() => mandatorySleepFap(config, sleepDebt), [config, sleepDebt]);
   const maxNonSleep = useMemo(
-    () => maxNonSleepFapBudget(needSleep, starvationDays),
-    [needSleep, starvationDays],
+    () => Math.max(0, playerBudget - needSleep - starvationDays),
+    [playerBudget, needSleep, starvationDays],
   );
 
   const load = useCallback(async () => {
@@ -70,10 +87,10 @@ export function DowntimePlayerOverlay({
       setSleepDebt(inv.sleep_debt_fap ?? 0);
       setRationsCount(inv.rations_count ?? 0);
       setStarvationDays(inv.starvation_days ?? 0);
-      const need = requiredSleepFap(inv.sleep_debt_fap ?? 0);
+      const need = mandatorySleepFap(config, inv.sleep_debt_fap ?? 0);
       const starv = Math.max(0, Math.round(inv.starvation_days ?? 0));
-      const sleepFap = minSleepFapForStarvation(need, starv);
-      const wakeFap = Math.max(0, FAP_DAILY_TOTAL - sleepFap);
+      const sleepFap = Math.min(playerBudget, Math.max(need, 2));
+      const wakeFap = Math.max(0, playerBudget - sleepFap);
       const projects = inv.items.filter(
         (it) => it.target_fap > 0 && it.current_fap < it.target_fap,
       );
@@ -87,7 +104,7 @@ export function DowntimePlayerOverlay({
       setRationsCount(0);
       setStarvationDays(0);
     }
-  }, [characterId]);
+  }, [characterId, config, playerBudget]);
 
   useEffect(() => {
     if (!downtimeActive || !characterId) return;
@@ -101,7 +118,7 @@ export function DowntimePlayerOverlay({
   const canSubmit =
     downtimeActive &&
     planningStatus === "planning" &&
-    totalFap === FAP_DAILY_TOTAL &&
+    totalFap === playerBudget &&
     sleepSum >= needSleep &&
     nonSleepSum <= maxNonSleep &&
     lines.every((l) => {
@@ -137,11 +154,22 @@ export function DowntimePlayerOverlay({
         <div className="mb-4 flex items-start justify-between gap-2">
           <div>
             <h2 className="font-barlow text-lg font-extrabold uppercase tracking-wide text-hero-vibrant">
-              Reisetag planen
+              {config.mode === "leisure" ? "Freizeittag planen" : "Reisetag planen"}
             </h2>
             <p className="font-libre text-sm text-gray-300">{characterName}</p>
             <p className="mt-1 font-libre text-xs text-gray-500">
-              {FAP_DAILY_TOTAL} FAP pro Tag — mindestens {needSleep} FAP für{" "}
+              {config.mode === "travel" ? (
+                <>
+                  {travelCost} FAP Reise (automatisch) ·{" "}
+                  <strong className="text-accent-gold">{playerBudget} FAP</strong> zum Verteilen
+                </>
+              ) : (
+                <>
+                  <strong className="text-accent-gold">{playerBudget} FAP</strong> pro Tag (6
+                  Abschnitte)
+                </>
+              )}{" "}
+              — mindestens {needSleep} FAP für{" "}
               <span className="text-accent-gold">Schlaf</span>
               {sleepDebt > 0 ? " (Schlafdefizit)" : ""}.
               {starvationDays > 0 ? (
@@ -186,8 +214,8 @@ export function DowntimePlayerOverlay({
           <>
             <div className="mb-2 flex items-center justify-between font-barlow text-[10px] font-bold uppercase text-gray-500">
               <span>Aktionen</span>
-              <span className={totalFap === FAP_DAILY_TOTAL ? "text-hero-vibrant" : "text-amber-300"}>
-                Summe: {totalFap} / {FAP_DAILY_TOTAL} FAP
+              <span className={totalFap === playerBudget ? "text-hero-vibrant" : "text-amber-300"}>
+                Summe: {totalFap} / {playerBudget} FAP
               </span>
             </div>
 

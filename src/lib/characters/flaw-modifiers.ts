@@ -251,6 +251,18 @@ export function applyFlawModifiers(flaws: CharacterFlawEntry[]): FlawModifiers {
         addSkillBonus(result.skillBonus, "nat", 2);
         addNote(result.notes, def.id, def.name, "Nachteil auf Etikette-/Hofproben (situativ)");
         break;
+      case "salon_bursche":
+        addSkillBonus(result.skillBonus, "surv", -2);
+        addSkillBonus(result.skillBonus, "nat", -2);
+        addSkillBonus(result.skillBonus, "his", 2);
+        addSkillBonus(result.skillBonus, "prf", 2);
+        addNote(
+          result.notes,
+          def.id,
+          def.name,
+          "Nachteil auf Proben in Wildnis/unter freiem Himmel (situativ)",
+        );
+        break;
       case "substance_addiction":
         addSkillBonus(result.skillBonus, "prc", 1);
         result.initiative += 1;

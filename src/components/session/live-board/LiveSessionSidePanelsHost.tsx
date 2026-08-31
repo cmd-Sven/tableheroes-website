@@ -318,6 +318,7 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
           }))}
           downtimeCurrentDay={liveState?.downtime_current_day ?? 1}
           downtimeTotalDays={liveState?.downtime_total_days ?? 1}
+          downtimeConfig={liveState?.downtime_config ?? null}
           fapAllocations={liveState?.fap_allocations ?? {}}
           onTravelReload={async () => {
             await refreshLiveState();

@@ -72,6 +72,15 @@ export type Dnd5eAttackEntry = {
   notes?: string | null;
 };
 
+export type Dnd5eFeatureKind = "class" | "subclass" | "feat" | "race" | "custom" | "other";
+
+/** Spielerentscheidung zu einem Klassenmerkmal (z. B. Waffenmeisterschaft, Expertise). */
+export type Dnd5eFeatureChoice = {
+  id: string;
+  label: string;
+  value?: string | null;
+};
+
 export type Dnd5eFeatureEntry = {
   id: string;
   name: string;
@@ -82,6 +91,14 @@ export type Dnd5eFeatureEntry = {
   descriptionDe?: string | null;
   descriptionEn?: string | null;
   source?: string | null;
+  /** Stufe, ab der das Merkmal erworben wurde */
+  level?: number | null;
+  /** Unterklassen-ID (nur bei Unterklassenmerkmalen) */
+  subclassId?: string | null;
+  /** Art des Merkmals für Darstellung und Sortierung */
+  featureKind?: Dnd5eFeatureKind | null;
+  /** Getroffene Entscheidungen (Waffen, Fertigkeiten …) */
+  choices?: Dnd5eFeatureChoice[] | null;
 };
 
 /** Foundry-Vorbereitungsmodus (dnd5e). */

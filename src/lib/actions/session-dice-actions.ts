@@ -45,6 +45,8 @@ export type RequestLiveDiceRollInput = {
   skillKey?: string;
   /** Attribut-Key für Rettungswurf — Server liest Bonus aus dem Bogen. */
   saveAbility?: string;
+  /** Temporäre Mali/Boni aus dem Würfelfenster (W20-Würfe). */
+  bonusMalus?: number;
   /** Initiator-Drop-Punkt (Viewport 0…1) für Sync der 3D-Animation. */
   dropNx?: number;
   dropNy?: number;
@@ -168,10 +170,22 @@ export async function requestLiveDiceRoll(
     ? groups.some((g) => g.sides === 20 && g.count > 0)
     : sides === 20;
 
+  const bonusMalus = Number.isFinite(input.bonusMalus)
+    ? Math.round(input.bonusMalus!)
+    : 0;
+
   const sheetMod = await resolveLiveDiceSheetModifier({
     characterId,
     kind: input.kind,
     clientModifier: input.modifier,
+    bonusMalus:
+      input.kind === "damage"
+        ? 0
+        : input.kind === "dice"
+          ? hasD20
+            ? bonusMalus
+            : 0
+          : bonusMalus,
     skillKey: input.skillKey,
     saveAbility: input.saveAbility,
     label: input.label,
@@ -263,6 +277,7 @@ export async function requestLiveDiceRoll(
 
   if (input.skillKey) meta.skillKey = input.skillKey;
   if (input.saveAbility) meta.saveAbility = input.saveAbility;
+  if (bonusMalus !== 0) meta.bonusMalus = bonusMalus;
 
   const entry = await appendSessionActivity({
     sessionId: input.sessionId,

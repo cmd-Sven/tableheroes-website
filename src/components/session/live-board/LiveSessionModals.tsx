@@ -21,7 +21,7 @@ import type {
   SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
 import type { UseSessionChronicleRecorderReturn } from "@/src/hooks/useSessionChronicleRecorder";
-import type { CampaignCreature, PartyCharacter } from "./live-session-types";
+import type { CampaignCreature, LiveState, PartyCharacter } from "./live-session-types";
 
 const CombatStartVideoModal = dynamic(
   () =>
@@ -89,6 +89,7 @@ export type LiveSessionModalsProps = {
   sheetCharacter: PartyCharacter | null;
   setSheetCharacter: (pc: PartyCharacter | null) => void;
   showDnd5eSheet: boolean;
+  liveState: LiveState | null;
   trapWizardCell: { gridX: number; gridY: number } | null;
   setTrapWizardCell: (cell: { gridX: number; gridY: number } | null) => void;
   setTrapTool: (tool: BattlemapTrapTool) => void;
@@ -140,6 +141,7 @@ export function LiveSessionModals({
   sheetCharacter,
   setSheetCharacter,
   showDnd5eSheet,
+  liveState,
   trapWizardCell,
   setTrapWizardCell,
   setTrapTool,
@@ -256,6 +258,17 @@ export function LiveSessionModals({
             level: sheetCharacter.level,
           }}
           liveSessionMode
+          downtimeContext={
+            liveState?.downtime_active
+              ? {
+                  config: liveState.downtime_config ?? null,
+                  currentDay: liveState.downtime_current_day ?? 1,
+                  totalDays: liveState.downtime_total_days ?? 1,
+                  allocations:
+                    liveState.fap_allocations?.[sheetCharacter.id]?.allocations ?? [],
+                }
+              : null
+          }
           onSaved={() => {
             void refreshLiveState();
             router.refresh();

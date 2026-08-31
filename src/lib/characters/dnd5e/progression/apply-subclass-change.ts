@@ -3,6 +3,7 @@
  * apply new ones, sync spell slots (incl. third-caster AT/EK).
  */
 import type { Dnd5eFeatureEntry, Dnd5eSheetData } from "../types";
+import { progressionFeatureToEntry } from "../feature-entry";
 import { appendGrantedSpellsFromFeatures, applyClassBasicsFromCatalog } from "./catalog-bridge";
 import { getClassProgression } from "./catalog";
 import { matchSubclassOption, resolveClassId } from "./class-ids";
@@ -32,16 +33,7 @@ function featureMatchesProgression(
 }
 
 function progressionToFeature(f: ProgressionFeature): Dnd5eFeatureEntry {
-  return {
-    id: f.id,
-    name: f.nameDe || f.nameEn,
-    nameDe: f.nameDe,
-    nameEn: f.nameEn,
-    description: f.descriptionDe || f.descriptionEn || null,
-    descriptionDe: f.descriptionDe ?? null,
-    descriptionEn: f.descriptionEn ?? null,
-    source: "srd-subclass",
-  };
+  return progressionFeatureToEntry(f, "srd-subclass");
 }
 
 function grantedSpellIdSet(features: ProgressionFeature[]): Set<string> {

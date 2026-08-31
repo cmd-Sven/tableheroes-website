@@ -11,7 +11,7 @@ import {
   computeEquippedWeaponAttacks,
   type WeaponAttackPreview,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { parseRollCommand, formatDicePoolFormula, type DicePoolGroup, type DiceRollMode } from "@/src/lib/session/dice-roll";
+import { parseRollCommand, formatDicePoolFormula, parseBonusMalus, type DicePoolGroup, type DiceRollMode } from "@/src/lib/session/dice-roll";
 import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
 import { requestDiceDropPlacement } from "@/src/lib/session/dice-placement-store";
 import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
@@ -64,9 +64,11 @@ export function useLiveSessionDiceRoll({
   const [selectedSave, setSelectedSave] = useState<AbilityKey | "">("");
   const [saveBonus, setSaveBonus] = useState(0);
   const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
+  const [bonusMalusInput, setBonusMalusInput] = useState("");
   const [pending, startTransition] = useTransition();
   const { skinId: storedSkinId, setSkinId } = useDiceSkin(userId, isGM);
   const skinId = diceSkinIdProp ?? storedSkinId;
+  const bonusMalus = parseBonusMalus(bonusMalusInput);
 
   useEffect(() => {
     if (!rollingAsGm) return;
@@ -151,6 +153,7 @@ export function useLiveSessionDiceRoll({
           characterId,
           characterName,
           ...input,
+          bonusMalus: input.bonusMalus ?? bonusMalus,
           dropNx,
           dropNy,
           throwDirX,
@@ -173,19 +176,22 @@ export function useLiveSessionDiceRoll({
       sides,
       modifier,
       mode,
+      bonusMalus: sides === 20 ? bonusMalus : 0,
     });
   }
 
   function rollPool(groups: DicePoolGroup[], mode: DiceRollMode = rollMode) {
     const total = groups.reduce((s, g) => s + g.count, 0);
     if (total <= 0) return;
+    const hasD20 = groups.some((g) => g.sides === 20 && g.count > 0);
     postLiveDiceRoll({
       kind: "dice",
       dice: total,
       sides: groups[0]?.sides ?? 20,
       diceGroups: groups,
       mode,
-      label: formatDicePoolFormula(groups),
+      label: formatDicePoolFormula(groups, hasD20 ? bonusMalus : 0),
+      bonusMalus: hasD20 ? bonusMalus : 0,
     });
   }
 
@@ -199,6 +205,7 @@ export function useLiveSessionDiceRoll({
       modifier: parsed.modifier,
       mode: rollMode,
       label: parsed.dice > 1 ? `${parsed.dice}d${parsed.sides}` : undefined,
+      bonusMalus: parsed.sides === 20 ? bonusMalus : 0,
     });
     return true;
   }
@@ -219,6 +226,7 @@ export function useLiveSessionDiceRoll({
       mode: rollMode,
       label,
       skillKey: selectedSkill,
+      bonusMalus,
     });
   }
 
@@ -236,6 +244,7 @@ export function useLiveSessionDiceRoll({
       mode: rollMode,
       label: `${ABILITY_LABELS_DE[selectedSave]}-Rettungswurf`,
       saveAbility: selectedSave,
+      bonusMalus,
     });
   }
 
@@ -256,6 +265,7 @@ export function useLiveSessionDiceRoll({
       weaponName,
       damage: primaryAttack?.damage ?? null,
       attackBonus: bonus,
+      bonusMalus,
     });
   }
 
@@ -322,6 +332,9 @@ export function useLiveSessionDiceRoll({
     selectedSave,
     saveBonus,
     primaryAttack: rollingAsGm ? null : primaryAttack,
+    bonusMalus,
+    bonusMalusInput,
+    setBonusMalusInput,
     pending,
     rollingAsGm,
     canRoll: Boolean(roller),

@@ -57,6 +57,8 @@ export async function resolveLiveDiceSheetModifier(input: {
   characterId: string;
   kind: LiveDiceRollKind;
   clientModifier?: number;
+  /** Temporäre Mali/Boni aus dem Würfelfenster (nur W20-Würfe). */
+  bonusMalus?: number;
   skillKey?: string;
   saveAbility?: string;
   label?: string;
@@ -66,6 +68,9 @@ export async function resolveLiveDiceSheetModifier(input: {
 }): Promise<ResolvedSheetModifier> {
   const clientMod = Number.isFinite(input.clientModifier)
     ? Math.round(input.clientModifier!)
+    : 0;
+  const bonusMalus = Number.isFinite(input.bonusMalus)
+    ? Math.round(input.bonusMalus!)
     : 0;
 
   if (isGmDiceRollerId(input.characterId)) {
@@ -97,10 +102,11 @@ export async function resolveLiveDiceSheetModifier(input: {
 
   if (input.kind === "dice") {
     // Freie Würfe: Erschöpfung nur auf W20-Proben (nicht auf reinen Schaden-Pools).
+    const applyD20Extras = input.applyExhaustionToD20 !== false;
     const mod =
-      input.applyExhaustionToD20 !== false && exhaustionPenalty !== 0
+      (applyD20Extras && exhaustionPenalty !== 0
         ? clientMod + exhaustionPenalty
-        : clientMod;
+        : clientMod) + (applyD20Extras ? bonusMalus : 0);
     return {
       modifier: mod,
       source: "client",
@@ -113,7 +119,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     const key = input.skillKey?.trim() ?? "";
     if (!isSkillKey(key)) {
       return {
-        modifier: clientMod + exhaustionPenalty,
+        modifier: clientMod + exhaustionPenalty + bonusMalus,
         source: "client",
         label: input.label,
         exhaustionLevel,
@@ -122,7 +128,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     const total = derived.skills[key]?.total ?? 0;
     const def = DND5E_SKILL_BY_KEY[key];
     return {
-      modifier: Math.round(total),
+      modifier: Math.round(total) + bonusMalus,
       label: input.label ?? def.labelDe,
       source: "sheet",
       exhaustionLevel,
@@ -133,7 +139,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     const key = input.saveAbility?.trim() ?? "";
     if (!isAbilityKey(key)) {
       return {
-        modifier: clientMod + exhaustionPenalty,
+        modifier: clientMod + exhaustionPenalty + bonusMalus,
         source: "client",
         label: input.label,
         exhaustionLevel,
@@ -141,7 +147,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     }
     const total = derived.savingThrows[key]?.total ?? 0;
     return {
-      modifier: Math.round(total),
+      modifier: Math.round(total) + bonusMalus,
       label: input.label,
       source: "sheet",
       exhaustionLevel,
@@ -181,7 +187,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     );
     const primary = attacks[0] ?? null;
     // Angriffswurf ist ein W20-Test → Erschöpfung abziehen (equipment-Bonus enthält sie nicht).
-    const bonus = (primary?.attackBonus ?? 0) + exhaustionPenalty;
+    const bonus = (primary?.attackBonus ?? 0) + exhaustionPenalty + bonusMalus;
     return {
       modifier: Math.round(bonus),
       attackBonus: Math.round(bonus),

@@ -292,6 +292,26 @@ export function LiveSessionDicePanel({
           </p>
         )}
 
+        <div className="flex items-center gap-2">
+          <label className="shrink-0 font-barlow text-[9px] font-bold uppercase text-gray-500">
+            Mali/Boni
+          </label>
+          <input
+            type="text"
+            inputMode="text"
+            value={dice.bonusMalusInput}
+            onChange={(e) => dice.setBonusMalusInput(e.target.value)}
+            placeholder="+2 / -1"
+            title="Temporäre Mali oder Boni für W20-Würfe"
+            className="min-w-0 flex-1 rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-barlow text-[11px] tabular-nums text-white placeholder:text-gray-600 focus:border-hero-vibrant outline-none"
+          />
+          {dice.bonusMalus !== 0 ? (
+            <span className="shrink-0 font-barlow text-[10px] font-bold tabular-nums text-accent-gold">
+              {formatSigned(dice.bonusMalus)}
+            </span>
+          ) : null}
+        </div>
+
         <div className="flex gap-1">
           {(["normal", "advantage", "disadvantage"] as DiceRollMode[]).map((mode) => (
             <button
@@ -376,18 +396,6 @@ export function LiveSessionDicePanel({
           </button>
         </div>
 
-        {dice.primaryAttack ? (
-          <button
-            type="button"
-            disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
-            onClick={dice.handleAttackRoll}
-            className="flex w-full items-center justify-center gap-1 rounded border border-accent-blood/50 bg-accent-blood/10 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
-          >
-            <Swords className="h-3.5 w-3.5" />
-            Angriff {formatSigned(dice.primaryAttack.attackBonus)}
-          </button>
-        ) : null}
-
         {!dice.canRoll ? (
           <p className="font-libre text-[10px] italic text-gray-500">
             Charakter wählen, um zu würfeln.
@@ -396,6 +404,44 @@ export function LiveSessionDicePanel({
           <p className="font-libre text-[10px] italic text-gray-500">
             Als Spielleiter — Pool-Würfe ohne Charakterbogen.
           </p>
+        ) : null}
+
+        {dice.primaryAttack ? (
+          <div className="mt-1 rounded border border-accent-blood/40 bg-accent-blood/5 p-2.5">
+            <p className="font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-blood">
+              Ausgerüstete Waffe
+            </p>
+            <p className="mt-0.5 truncate font-barlow text-xs font-bold text-white">
+              {dice.primaryAttack.name}
+            </p>
+            <p className="mt-1 font-libre text-[10px] text-accent-gold">
+              Angriff{" "}
+              {formatSigned(dice.primaryAttack.attackBonus + dice.bonusMalus)}
+              {dice.bonusMalus !== 0 ? (
+                <span className="text-gray-500">
+                  {" "}
+                  ({formatSigned(dice.primaryAttack.attackBonus)}
+                  {formatSigned(dice.bonusMalus)})
+                </span>
+              ) : null}
+              {" · "}
+              Schaden {dice.primaryAttack.damage}
+            </p>
+            {dice.primaryAttack.notes ? (
+              <p className="mt-0.5 font-libre text-[9px] text-gray-500">
+                {dice.primaryAttack.notes}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
+              onClick={dice.handleAttackRoll}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border border-accent-blood/60 bg-accent-blood/15 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
+            >
+              <Swords className="h-3.5 w-3.5" />
+              Angriff
+            </button>
+          </div>
         ) : null}
       </div>
     </div>

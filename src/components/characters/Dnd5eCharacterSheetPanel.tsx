@@ -67,6 +67,8 @@ import {
   getCharacterEquipmentPayload,
   saveCharacterEquipment,
 } from "@/src/lib/actions/character-inventory-actions";
+import type { FapAllocationLine } from "@/src/lib/downtime-fap-types";
+import type { DowntimeConfig } from "@/src/lib/travel-fap-config";
 import type { CharacterItem } from "@/src/types/inventory";
 import { CharacterSheetLanguageToggle } from "@/src/components/characters/CharacterSheetLanguageToggle";
 import { CharacterRestPanel } from "@/src/components/characters/CharacterRestPanel";
@@ -76,9 +78,12 @@ import { CharacterAchievementsPanel } from "@/src/components/characters/Characte
 import { CharakterTuvPanel } from "@/src/components/characters/CharakterTuvPanel";
 import { FeatureHelpModal } from "@/src/components/characters/FeatureHelpModal";
 import { BackgroundHelpModal } from "@/src/components/characters/BackgroundHelpModal";
+import { CharacterFapPanel } from "@/src/components/characters/CharacterFapPanel";
 import { XpProgressBar } from "@/src/components/characters/XpProgressBar";
 import { LevelUpWizardModal } from "@/src/components/characters/LevelUpWizardModal";
 import { FeatCatalogPickerModal } from "@/src/components/characters/FeatCatalogPickerModal";
+import { ClassFeaturesSection } from "@/src/components/characters/ClassFeaturesSection";
+import { getFeatAndOtherFeatureItems } from "@/src/lib/characters/dnd5e/feature-entry";
 import { ensureClassResources, parseHitDiceString } from "@/src/lib/characters/dnd5e/rest";
 import {
   localizedFeatureDescription,
@@ -556,6 +561,13 @@ type Props = {
   biographyCulture?: CharacterSheetBiographyCultureTabProps;
   /** Live-Session: schlankes Blatt ohne Dashboard-Chrome */
   liveSessionMode?: boolean;
+  /** Aktive Reise/Freizeit — FAP-Anzeige */
+  downtimeContext?: {
+    config: DowntimeConfig | null;
+    currentDay: number;
+    totalDays: number;
+    allocations?: FapAllocationLine[];
+  } | null;
   onSaved?: () => void;
 };
 
@@ -579,6 +591,7 @@ export function Dnd5eCharacterSheetPanel({
   compact = false,
   biographyCulture,
   liveSessionMode = false,
+  downtimeContext = null,
   onSaved,
 }: Props) {
   const {
@@ -1216,6 +1229,12 @@ export function Dnd5eCharacterSheetPanel({
         savedLevel: payload.level,
       })
     : [];
+  const featFeatureItems = getFeatAndOtherFeatureItems(
+    sheet.features,
+    meta.className ?? "",
+    meta.subclass,
+    meta.level,
+  );
   const matchedSubclassId =
     resolvedClassId && meta.subclass
       ? matchSubclassOption(
@@ -1478,6 +1497,53 @@ export function Dnd5eCharacterSheetPanel({
           {payload.progressionLockMessage ? (
             <FoundryProgressionLockNotice message={payload.progressionLockMessage} />
           ) : null}
+
+          {/* Attribute — eine Zeile, ganz oben */}
+          <section className="rounded-lg border border-hero-dark bg-background-card p-3">
+            <div className="grid grid-cols-6 gap-1 sm:gap-2">
+              {ABILITY_KEYS.map((key) => {
+                const AbilityIcon = ABILITY_ICONS[key];
+                return (
+                  <div
+                    key={key}
+                    className="relative flex flex-col items-center rounded-lg border border-hero-border/50 bg-hero-dark/30 px-2 py-2.5 text-center"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setAbilityHelpKey(key)}
+                      className="absolute right-1 top-1 rounded p-0.5 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                      aria-label={t("ability.help.aria", { name: abilityLabel(key) })}
+                    >
+                      <HelpCircle className="h-3 w-3" />
+                    </button>
+                    <span
+                      className="mb-1 flex h-7 w-7 items-center justify-center rounded border border-hero-border/50 bg-hero-dark/60 text-accent-gold"
+                      aria-hidden
+                    >
+                      <AbilityIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="w-full truncate font-barlow text-[9px] font-bold uppercase leading-tight text-gray-400">
+                      {abilityLabel(key)}
+                    </p>
+                    <p className="my-1 font-barlow text-2xl font-extrabold leading-none text-accent-gold">
+                      {formatSigned(displayDerived.abilities[key].modifier)}
+                    </p>
+                    {readOnly ? (
+                      <p className="font-barlow text-xs text-gray-500">{sheet.abilities[key].score}</p>
+                    ) : (
+                      <NumberInput
+                        value={sheet.abilities[key].score}
+                        min={1}
+                        max={30}
+                        className="!w-12 !py-0.5 !text-xs"
+                        onChange={(v) => updateAbility(key, v)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           {/* Kopfzeile — klar gruppiert */}
           <section className="rounded-lg border border-hero-dark bg-background-card p-4 md:p-5 space-y-5">
@@ -1859,7 +1925,7 @@ export function Dnd5eCharacterSheetPanel({
           </section>
 
           <div className="grid gap-4 xl:grid-cols-12">
-            {/* Linke Spalte: Portrait, Attribute, Rettungswürfe, Fertigkeiten */}
+            {/* Linke Spalte: Portrait, Rettungswürfe, Fertigkeiten */}
             <div className="xl:col-span-4 space-y-4">
               {portraitSrc ? (
                 <section className="rounded-lg border border-hero-dark bg-background-card p-4 flex flex-col items-center">
@@ -1874,57 +1940,6 @@ export function Dnd5eCharacterSheetPanel({
                   </p>
                 </section>
               ) : null}
-              <section className="rounded-lg border border-hero-dark bg-background-card p-3">
-                <div className="space-y-2">
-                  {ABILITY_KEYS.map((key) => {
-                    const AbilityIcon = ABILITY_ICONS[key];
-                    return (
-                      <div
-                        key={key}
-                        className="flex items-center gap-2 rounded border border-hero-border/40 bg-hero-dark/30 px-2 py-1.5"
-                      >
-                        <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-hero-border/50 bg-hero-dark/60 text-accent-gold"
-                          aria-hidden
-                        >
-                          <AbilityIcon className="h-4 w-4" />
-                        </span>
-                        <div className="w-10 text-center shrink-0">
-                          <p className="font-barlow text-xl font-bold text-accent-gold leading-none">
-                            {formatSigned(displayDerived.abilities[key].modifier)}
-                          </p>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-barlow text-[10px] font-bold uppercase text-gray-400 truncate">
-                            {abilityLabel(key)}
-                          </p>
-                          {readOnly ? (
-                            <p className="font-barlow text-xs text-gray-500">
-                              {sheet.abilities[key].score}
-                            </p>
-                          ) : (
-                            <NumberInput
-                              value={sheet.abilities[key].score}
-                              min={1}
-                              max={30}
-                              className="!py-0.5 !text-xs"
-                              onChange={(v) => updateAbility(key, v)}
-                            />
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setAbilityHelpKey(key)}
-                          className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
-                          aria-label={t("ability.help.aria", { name: abilityLabel(key) })}
-                        >
-                          <HelpCircle className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-3">
                 <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold border-b border-hero-dark pb-1.5 mb-2 flex items-center gap-1.5">
@@ -2323,6 +2338,25 @@ export function Dnd5eCharacterSheetPanel({
                       {t("combat.exhaustionHint")}
                     </p>
                   </label>
+                  {downtimeContext ? (
+                    <div className="mt-4">
+                      <CharacterFapPanel
+                        config={downtimeContext.config}
+                        currentDay={downtimeContext.currentDay}
+                        totalDays={downtimeContext.totalDays}
+                        allocations={downtimeContext.allocations}
+                        compact
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <CharacterFapPanel
+                        config={{ mode: "leisure" }}
+                        totalDays={1}
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -2361,9 +2395,19 @@ export function Dnd5eCharacterSheetPanel({
               ) : null}
             </div>
 
-            {/* Rechte Spalte: Feats & Proficiencies */}
+            {/* Rechte Spalte: Klassenmerkmale, Talente & Proficiencies */}
             <div className="xl:col-span-4 space-y-4">
-              <section className="rounded-lg border border-hero-dark bg-background-card p-4 min-h-[20rem] flex flex-col">
+              <ClassFeaturesSection
+                features={sheet.features}
+                characterClass={meta.className}
+                characterSubclass={meta.subclass}
+                level={meta.level}
+                readOnly={readOnly}
+                onUpdateFeature={updateFeature}
+                onFeatureHelp={(title, description) => setFeatureHelp({ title, description })}
+              />
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <div className="flex items-center justify-between border-b border-hero-dark pb-2 mb-3">
                   <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
                     {t("features.title")}
@@ -2387,11 +2431,11 @@ export function Dnd5eCharacterSheetPanel({
                     </div>
                   ) : null}
                 </div>
-                {sheet.features.length === 0 ? (
-                  <p className="font-libre text-sm text-gray-500 flex-1">{t("features.empty")}</p>
+                {featFeatureItems.length === 0 ? (
+                  <p className="font-libre text-sm text-gray-500">{t("features.empty")}</p>
                 ) : (
-                  <div className="space-y-2 flex-1 overflow-y-auto max-h-[24rem] pr-1">
-                    {sheet.features.map((feat, index) => {
+                  <div className="space-y-2">
+                    {featFeatureItems.map(({ feature: feat, index }) => {
                       const catalogMatch = matchSheetFeatureToFeat(feat);
                       const isCatalog =
                         feat.source === "srd-feat" || Boolean(catalogMatch);

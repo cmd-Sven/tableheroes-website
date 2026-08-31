@@ -325,6 +325,7 @@ export function LiveSessionBoardModalsLayer() {
         sheetCharacter={sheetCharacter}
         setSheetCharacter={setSheetCharacter}
         showDnd5eSheet={showDnd5eSheet}
+        liveState={liveState}
         trapWizardCell={trapWizardCell}
         setTrapWizardCell={setTrapWizardCell}
         setTrapTool={setTrapTool}

@@ -2,6 +2,8 @@
 
 import { X } from "lucide-react";
 import { Dnd5eCharacterSheetPanel } from "@/src/components/characters/Dnd5eCharacterSheetPanel";
+import type { FapAllocationLine } from "@/src/lib/downtime-fap-types";
+import type { DowntimeConfig } from "@/src/lib/travel-fap-config";
 import {
   CharacterSheetLocaleProvider,
   useCharacterSheetLocale,
@@ -19,8 +21,13 @@ type Props = {
   campaignId: string;
   character: SheetCharacter;
   onClose: () => void;
-  /** Live-Bühne: nur Blatt-Inhalt, kein Sprach-Umschalter */
   liveSessionMode?: boolean;
+  downtimeContext?: {
+    config: DowntimeConfig | null;
+    currentDay: number;
+    totalDays: number;
+    allocations?: FapAllocationLine[];
+  } | null;
   onSaved?: () => void;
 };
 
@@ -66,6 +73,7 @@ export function Dnd5eCharacterSheetModal({
   character,
   onClose,
   liveSessionMode = false,
+  downtimeContext = null,
   onSaved,
 }: Props) {
   const { t } = useCharacterSheetLocale();
@@ -89,6 +97,7 @@ export function Dnd5eCharacterSheetModal({
             characterId={character.id}
             compact
             liveSessionMode={liveSessionMode}
+            downtimeContext={downtimeContext}
             onSaved={onSaved}
           />
         </div>

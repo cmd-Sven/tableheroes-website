@@ -13,6 +13,26 @@ import {
   type FapAllocationLine,
   type FapAllocationsMap,
 } from "@/src/lib/downtime-fap-types";
+import {
+  defaultDowntimeConfig,
+  downtimeConfigToJson,
+  exhaustionGainForDay,
+  getDayLog,
+  kmPerDayForTransport,
+  mandatorySleepFap,
+  maxTravelDaysForPace,
+  parseDowntimeConfig,
+  playerFapBudgetForDay,
+  playerFapBudgetPerDay,
+  type DowntimeConfig,
+  type TravelDayLog,
+} from "@/src/lib/travel-fap-config";
+import {
+  calculateDayKm,
+  getWeatherRule,
+  isDayWorkflowComplete,
+  weatherFapPlayerExtra,
+} from "@/src/lib/travel-weather-rules";
 
 type SessionCtx = {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -101,6 +121,7 @@ function normalizeAllocationsInput(raw: FapAllocationLine[]): FapAllocationLine[
 export async function startDowntime(
   sessionId: string,
   totalDays: number,
+  configInput?: Partial<DowntimeConfig>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const ctx = await loadSessionContext(sessionId);
@@ -108,7 +129,13 @@ export async function startDowntime(
       return { ok: false, error: "Nur der Spielleiter kann eine Reise starten." };
     }
 
-    const days = Math.max(1, Math.min(60, Math.round(Number(totalDays) || 1)));
+    const config = { ...defaultDowntimeConfig(), ...configInput };
+    const pace = config.pace ?? "normal";
+    let days = Math.max(1, Math.min(60, Math.round(Number(totalDays) || 1)));
+    if (config.mode === "travel" && pace === "extreme") {
+      days = Math.min(days, maxTravelDaysForPace("extreme"));
+    }
+
     const characterIds = await fetchPlayerCharacterIds(ctx.supabase, ctx.campaignId);
     const initial: FapAllocationsMap = {};
     for (const id of characterIds) {
@@ -117,9 +144,10 @@ export async function startDowntime(
 
     const { error } = await (ctx.supabase as any).from("session_live_states").update({
       downtime_active: true,
-      downtime_type: "travel",
+      downtime_type: config.mode === "leisure" ? "leisure" : "travel",
       downtime_current_day: 1,
       downtime_total_days: days,
+      downtime_config: downtimeConfigToJson(config),
       fap_allocations: fapAllocationsToJson(initial),
     }).eq("session_id", sessionId);
 
@@ -145,6 +173,7 @@ export async function endDowntime(
     const { error } = await (ctx.supabase as any).from("session_live_states").update({
       downtime_active: false,
       fap_allocations: fapAllocationsToJson({}),
+      downtime_config: downtimeConfigToJson(defaultDowntimeConfig()),
     }).eq("session_id", sessionId);
 
     if (error) {
@@ -171,13 +200,18 @@ export async function submitFapAllocation(
 
     const { data: liveRaw, error: liveError } = await (ctx.supabase as any)
       .from("session_live_states")
-      .select("downtime_active, fap_allocations")
+      .select("downtime_active, fap_allocations, downtime_config, downtime_current_day")
       .eq("session_id", sessionId)
       .single();
 
     if (liveError || !liveRaw || !(liveRaw as { downtime_active?: boolean }).downtime_active) {
       return { ok: false, error: "Aktuell keine aktive Reise / Downtime." };
     }
+
+    const config = parseDowntimeConfig((liveRaw as { downtime_config?: unknown }).downtime_config);
+    const currentDay = Math.max(1, Number((liveRaw as { downtime_current_day?: number }).downtime_current_day ?? 1));
+    const dayLog = getDayLog(config, currentDay);
+    const playerBudget = playerFapBudgetForDay(config, dayLog);
 
     const { data: chRaw, error: chError } = await ctx.supabase
       .from("characters")
@@ -207,19 +241,23 @@ export async function submitFapAllocation(
 
     const normalized = normalizeAllocationsInput(allocations);
     const total = normalized.reduce((s, a) => s + a.fap, 0);
-    if (total !== FAP_DAILY_TOTAL) {
-      return { ok: false, error: `Genau ${FAP_DAILY_TOTAL} FAP pro Tag erforderlich (aktuell: ${total}).` };
+    if (total !== playerBudget) {
+      return {
+        ok: false,
+        error: `Genau ${playerBudget} FAP pro Tag erforderlich (aktuell: ${total}).`,
+      };
     }
 
     const debt = Number(ch.sleep_debt_fap ?? 0);
-    const needSleep = requiredSleepFap(debt);
+    const paceConfig = { ...config, pace: dayLog?.pace ?? config.pace };
+    const needSleep = mandatorySleepFap(paceConfig, debt);
     const sleepSum = sleepFapSum(normalized);
     if (sleepSum < needSleep) {
       return { ok: false, error: `Mindestens ${needSleep} FAP müssen auf „Schlaf“ entfallen.` };
     }
 
     const starvationDays = Math.max(0, Math.round(Number(ch.starvation_days ?? 0)));
-    const maxNonSleep = maxNonSleepFapBudget(needSleep, starvationDays);
+    const maxNonSleep = Math.max(0, playerBudget - needSleep - starvationDays);
     const nonSleepSum = nonSleepFapSum(normalized);
     if (nonSleepSum > maxNonSleep) {
       return {
@@ -284,7 +322,7 @@ export async function nextDowntimeDay(
     const { data: liveRaw, error: liveError } = await (ctx.supabase as any)
       .from("session_live_states")
       .select(
-        "downtime_active, downtime_current_day, downtime_total_days, fap_allocations",
+        "downtime_active, downtime_current_day, downtime_total_days, fap_allocations, downtime_config",
       )
       .eq("session_id", sessionId)
       .single();
@@ -298,11 +336,19 @@ export async function nextDowntimeDay(
       downtime_current_day: number;
       downtime_total_days: number;
       fap_allocations: unknown;
+      downtime_config?: unknown;
     };
 
     if (!live.downtime_active) {
       return { ok: false, error: "Keine aktive Reise." };
     }
+
+    const config = parseDowntimeConfig(live.downtime_config);
+    const currentDay = Math.max(1, Number(live.downtime_current_day ?? 1));
+    const totalDays = Math.max(1, Number(live.downtime_total_days ?? 1));
+    const dayLog = getDayLog(config, currentDay);
+    const paceConfig = { ...config, pace: dayLog?.pace ?? config.pace };
+    const exhaustionGain = exhaustionGainForDay(paceConfig, currentDay, totalDays);
 
     const map = parseFapAllocations(live.fap_allocations as any);
 
@@ -317,13 +363,39 @@ export async function nextDowntimeDay(
 
       const debt = Number((chRaw as { sleep_debt_fap?: number } | null)?.sleep_debt_fap ?? 0);
       const sleepSum = sleepFapSum(state.allocations);
-      const need = requiredSleepFap(debt);
+      const need = mandatorySleepFap(paceConfig, debt);
       const nextDebt = sleepSum < need ? debt + 3 : 0;
 
       await (ctx.supabase as any)
         .from("characters")
         .update({ sleep_debt_fap: nextDebt })
         .eq("id", charId);
+
+      if (exhaustionGain > 0) {
+        const { data: sheetRow } = await ctx.supabase
+          .from("characters")
+          .select("sheet_data")
+          .eq("id", charId)
+          .single();
+        const sheet = (sheetRow as { sheet_data?: Record<string, unknown> } | null)?.sheet_data;
+        const combat =
+          sheet?.combat && typeof sheet.combat === "object"
+            ? (sheet.combat as Record<string, unknown>)
+            : {};
+        const curEx = Math.max(0, Math.round(Number(combat.exhaustionLevel ?? 0)));
+        const nextEx = Math.min(10, curEx + exhaustionGain);
+        if (nextEx !== curEx && sheet) {
+          await (ctx.supabase as any)
+            .from("characters")
+            .update({
+              sheet_data: {
+                ...sheet,
+                combat: { ...combat, exhaustionLevel: nextEx },
+              },
+            })
+            .eq("id", charId);
+        }
+      }
 
       const itemDeltas = new Map<string, number>();
       for (const line of state.allocations) {
@@ -387,8 +459,18 @@ export async function nextDowntimeDay(
     }
 
     const nextDay = Math.max(1, Number(live.downtime_current_day ?? 1) + 1);
-    const total = Math.max(1, Number(live.downtime_total_days ?? 1));
-    const stillActive = nextDay <= total;
+    let total = Math.max(1, Number(live.downtime_total_days ?? 1));
+    const travelConfig = parseDowntimeConfig(live.downtime_config);
+    const reachedDestination =
+      travelConfig.distanceKm != null &&
+      travelConfig.distanceKm > 0 &&
+      (travelConfig.kmTraveled ?? 0) >= travelConfig.distanceKm;
+    if (travelConfig.openEnded && nextDay > total) {
+      total = nextDay;
+    }
+    const stillActive = travelConfig.openEnded
+      ? !reachedDestination
+      : nextDay <= total;
     const downtimeDayToStore = stillActive ? nextDay : Math.min(nextDay, total);
 
     const fresh: FapAllocationsMap = {};
@@ -398,6 +480,7 @@ export async function nextDowntimeDay(
 
     const { error: upErr } = await (ctx.supabase as any).from("session_live_states").update({
       downtime_current_day: downtimeDayToStore,
+      downtime_total_days: travelConfig.openEnded ? total : Math.max(total, Number(live.downtime_total_days ?? 1)),
       downtime_active: stillActive,
       fap_allocations: fapAllocationsToJson(fresh),
     }).eq("session_id", sessionId);
@@ -407,6 +490,139 @@ export async function nextDowntimeDay(
     }
 
     return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function updateTravelDayState(
+  sessionId: string,
+  day: number,
+  patch: Partial<TravelDayLog>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await loadSessionContext(sessionId);
+    if (!ctx.isGM) {
+      return { ok: false, error: "Nur der Spielleiter kann Tages-Logs speichern." };
+    }
+
+    const { data: liveRaw, error: liveError } = await (ctx.supabase as any)
+      .from("session_live_states")
+      .select("downtime_active, downtime_config, downtime_current_day")
+      .eq("session_id", sessionId)
+      .single();
+
+    if (liveError || !liveRaw || !(liveRaw as { downtime_active?: boolean }).downtime_active) {
+      return { ok: false, error: "Keine aktive Reise." };
+    }
+
+    const config = parseDowntimeConfig((liveRaw as { downtime_config?: unknown }).downtime_config);
+    const dayNum = Math.max(1, Math.round(Number(day) || 1));
+    const logs = [...(config.dayLogs ?? [])];
+    const idx = logs.findIndex((l) => l.day === dayNum);
+    const prev = idx >= 0 ? logs[idx] : { day: dayNum };
+    const merged: TravelDayLog = { ...prev, ...patch, day: dayNum };
+
+    if (merged.travelHalted) {
+      merged.kmThisDay = 0;
+      merged.fapWeatherExtra = 0;
+    } else {
+      const pace = merged.pace ?? config.pace ?? "normal";
+      if (merged.weatherId && pace) {
+        const weather = getWeatherRule(merged.weatherId);
+        const transport = config.transport ?? "foot";
+        merged.kmThisDay = calculateDayKm({
+          transport,
+          weather,
+          baseKmPerDay: kmPerDayForTransport(transport),
+          travelHalted: false,
+        });
+        merged.fapWeatherExtra = weather
+          ? weatherFapPlayerExtra(weather, transport) + weather.fapTravelExtra
+          : 0;
+      }
+    }
+
+    if (idx >= 0) logs[idx] = merged;
+    else logs.push(merged);
+    logs.sort((a, b) => a.day - b.day);
+
+    const nextConfig: DowntimeConfig = { ...config, dayLogs: logs };
+    const { error: upErr } = await (ctx.supabase as any)
+      .from("session_live_states")
+      .update({ downtime_config: downtimeConfigToJson(nextConfig) })
+      .eq("session_id", sessionId);
+
+    if (upErr) {
+      return { ok: false, error: upErr.message ?? "Speichern fehlgeschlagen." };
+    }
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+/** @deprecated — use updateTravelDayState */
+export async function saveTravelDayLog(
+  sessionId: string,
+  day: number,
+  patch: { weather?: string; encounter?: string; event?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return updateTravelDayState(sessionId, day, patch);
+}
+
+export async function completeTravelDayAndAdvance(
+  sessionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await loadSessionContext(sessionId);
+    if (!ctx.isGM) {
+      return { ok: false, error: "Nur der Spielleiter kann den Tag abschließen." };
+    }
+
+    const { data: liveRaw, error: liveError } = await (ctx.supabase as any)
+      .from("session_live_states")
+      .select("downtime_active, downtime_config, downtime_current_day, downtime_total_days")
+      .eq("session_id", sessionId)
+      .single();
+
+    if (liveError || !liveRaw || !(liveRaw as { downtime_active?: boolean }).downtime_active) {
+      return { ok: false, error: "Keine aktive Reise." };
+    }
+
+    const config = parseDowntimeConfig((liveRaw as { downtime_config?: unknown }).downtime_config);
+    const currentDay = Math.max(1, Number((liveRaw as { downtime_current_day?: number }).downtime_current_day ?? 1));
+    const dayLog = getDayLog(config, currentDay);
+
+    if (!dayLog || !isDayWorkflowComplete(dayLog)) {
+      return {
+        ok: false,
+        error: "Tag unvollständig: Wetter, Tempo/Stopp und Überleben-Wurf erforderlich.",
+      };
+    }
+
+    const kmAdd = dayLog.travelHalted ? 0 : Math.max(0, dayLog.kmThisDay ?? 0);
+    const logs = (config.dayLogs ?? []).map((l) =>
+      l.day === currentDay ? { ...l, status: "completed" as const, kmThisDay: kmAdd } : l,
+    );
+    const nextDay = currentDay + 1;
+    const nextConfig: DowntimeConfig = {
+      ...config,
+      dayLogs: logs,
+      kmTraveled: (config.kmTraveled ?? 0) + kmAdd,
+      calendarSlots: config.openEnded
+        ? Math.max(config.calendarSlots ?? 0, nextDay + 3)
+        : config.calendarSlots,
+    };
+
+    await (ctx.supabase as any)
+      .from("session_live_states")
+      .update({ downtime_config: downtimeConfigToJson(nextConfig) })
+      .eq("session_id", sessionId);
+
+    return nextDowntimeDay(sessionId);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
     return { ok: false, error: msg };

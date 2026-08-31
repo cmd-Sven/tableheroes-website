@@ -1,4 +1,5 @@
 import type { Json } from "@/src/lib/database.types";
+import { FAP_PARTS_PER_DAY } from "@/src/lib/travel-fap-config";
 
 /** Einzelne FAP-Zeile in der Tagesplanung */
 export type FapAllocationLine = {
@@ -47,8 +48,8 @@ export function requiredSleepFap(sleepDebtFap: number): number {
   return sleepDebtFap > 0 ? 3 : 2;
 }
 
-/** Gesamtbudget pro Reisetag */
-export const FAP_DAILY_TOTAL = 6;
+/** Gesamtbudget pro Reisetag (= 3 Tages- + 3 Nachtabschnitte) */
+export const FAP_DAILY_TOTAL = FAP_PARTS_PER_DAY;
 
 /** Obergrenze für FAP auf allen Aktivitäten außer „Schlaf“ (Hunger-Malus: −1 FAP pro hungerndem Tag). */
 export function maxNonSleepFapBudget(needSleep: number, starvationDays: number): number {

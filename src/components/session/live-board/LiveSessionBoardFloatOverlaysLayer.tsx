@@ -361,6 +361,8 @@ export function LiveSessionBoardFloatOverlaysLayer() {
             characterId={currentPlayerCharacter.id}
             characterName={currentPlayerCharacter.name}
             downtimeActive={!!liveState.downtime_active}
+            downtimeConfig={liveState.downtime_config ?? null}
+            downtimeCurrentDay={liveState.downtime_current_day ?? 1}
             planningStatus={liveState.fap_allocations[currentPlayerCharacter.id]?.status ?? null}
             onClose={() => setDowntimePlayerDismissed(true)}
             onSubmitted={async () => {

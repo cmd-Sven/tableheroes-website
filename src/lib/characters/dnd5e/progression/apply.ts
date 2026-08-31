@@ -1,4 +1,5 @@
 import type { AbilityKey, Dnd5eFeatureEntry, Dnd5eSheetData, Dnd5eSpellEntry } from "../types";
+import { progressionFeatureToEntry } from "../feature-entry";
 import { getFeatById, getSpells } from "./catalog";
 import { featuresForLevel, subclassFeaturesUpToLevel } from "./engine";
 import { matchSubclassOption } from "./class-ids";
@@ -34,21 +35,29 @@ function applyAbilityIncrease(
 }
 
 function featureFromProgression(
+  f: import("./types").ProgressionFeature,
+  source = "level-up",
+): Dnd5eFeatureEntry {
+  return progressionFeatureToEntry(f, source);
+}
+
+function customFeatureEntry(
   id: string,
-  nameEn: string,
-  nameDe: string,
-  descriptionEn?: string,
-  descriptionDe?: string,
+  name: string,
+  description?: string | null,
+  kind: import("../types").Dnd5eFeatureKind = "custom",
+  source = "level-up",
 ): Dnd5eFeatureEntry {
   return {
     id,
-    name: nameDe || nameEn,
-    nameDe,
-    nameEn,
-    description: descriptionDe || descriptionEn || null,
-    descriptionDe: descriptionDe ?? null,
-    descriptionEn: descriptionEn ?? null,
-    source: "level-up",
+    name,
+    nameDe: name,
+    nameEn: name,
+    description: description ?? null,
+    descriptionDe: description ?? null,
+    descriptionEn: description ?? null,
+    source,
+    featureKind: kind,
   };
 }
 
@@ -125,15 +134,7 @@ export function applyLevelUpDraft(
     ) {
       continue;
     }
-    next.features.push(
-      featureFromProgression(
-        f.id,
-        f.nameEn,
-        f.nameDe,
-        f.descriptionEn,
-        f.descriptionDe,
-      ),
-    );
+    next.features.push(featureFromProgression(f));
   }
 
   // Domain / subclass granted spells (always prepared) from newly applied features
@@ -143,24 +144,14 @@ export function applyLevelUpDraft(
   for (const f of plan.raceFeatures) {
     if (!draft.selectedRaceFeatureIds.includes(f.id)) continue;
     if (next.features.some((x) => x.id === f.id || x.nameEn === f.nameEn)) continue;
-    next.features.push(
-      featureFromProgression(
-        f.id,
-        f.nameEn,
-        f.nameDe,
-        f.descriptionEn,
-        f.descriptionDe,
-      ),
-    );
+    next.features.push(featureFromProgression(f));
   }
 
   if (draft.customFeature?.name?.trim()) {
     next.features.push(
-      featureFromProgression(
+      customFeatureEntry(
         `custom-${newId()}`,
         draft.customFeature.name.trim(),
-        draft.customFeature.name.trim(),
-        draft.customFeature.description,
         draft.customFeature.description,
       ),
     );
@@ -176,12 +167,12 @@ export function applyLevelUpDraft(
       const feat = getFeatById(draft.asi.featId);
       if (feat) {
         next.features.push(
-          featureFromProgression(
+          customFeatureEntry(
             `feat-${feat.id}`,
-            feat.nameEn,
-            feat.nameDe,
-            feat.descriptionEn,
-            feat.descriptionDe,
+            feat.nameDe || feat.nameEn,
+            feat.descriptionDe || feat.descriptionEn,
+            "feat",
+            "level-up",
           ),
         );
         if (feat.abilityBonus) {
@@ -200,12 +191,11 @@ export function applyLevelUpDraft(
         }
       } else if (draft.asi.customName?.trim()) {
         next.features.push(
-          featureFromProgression(
+          customFeatureEntry(
             `feat-custom-${newId()}`,
             draft.asi.customName.trim(),
-            draft.asi.customName.trim(),
             draft.asi.customDescription,
-            draft.asi.customDescription,
+            "feat",
           ),
         );
       }

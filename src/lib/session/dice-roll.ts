@@ -42,6 +42,18 @@ export type DiceRollOutcome = {
 const ROLL_RE =
   /^(?:\/roll\s+)?(?:(\d+)d(\d+)|w(\d+)|d(\d+))(?:\s*([+-]\s*\d+))?$/i;
 
+/** Kompakte Mali/Boni-Eingabe: „+2“, „-1“, „+2-1“ → Summe. */
+export function parseBonusMalus(input: string): number {
+  const trimmed = input.trim();
+  if (!trimmed) return 0;
+  const parts = trimmed.match(/[+-]?\d+/g);
+  if (!parts?.length) return 0;
+  return parts.reduce((sum, part) => {
+    const n = parseInt(part, 10);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
 export function parseRollCommand(input: string): ParsedRollCommand | null {
   const trimmed = input.trim();
   const m = trimmed.match(ROLL_RE);

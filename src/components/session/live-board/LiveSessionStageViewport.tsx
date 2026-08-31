@@ -18,6 +18,9 @@ import type { CampaignCreatureStateRow } from "@/src/app/dashboard/campaigns/[id
 import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 import { LiveSessionWeatherEffects } from "./LiveSessionWeatherEffects";
+import { TravelModeStageBanner } from "@/src/components/session/TravelModeStageBanner";
+import { TravelStageCalendar } from "@/src/components/session/TravelStageCalendar";
+import { defaultDowntimeConfig } from "@/src/lib/travel-fap-config";
 import { LiveSessionStageRoster } from "./LiveSessionStageRoster";
 import { LiveSessionPartyTray, type PartyTrayMode } from "./LiveSessionPartyTray";
 import type {
@@ -150,6 +153,28 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
               weatherCondition={weatherCondition}
               lightningPulseKey={lightningPulseKey}
             />
+            {liveState?.downtime_active && liveState.downtime_config ? (
+              <>
+                <TravelModeStageBanner
+                  config={liveState.downtime_config}
+                  currentDay={liveState.downtime_current_day ?? 1}
+                  totalDays={liveState.downtime_total_days ?? 1}
+                />
+                {liveState.downtime_config.mode === "travel" ? (
+                  <TravelStageCalendar
+                    config={liveState.downtime_config}
+                    currentDay={liveState.downtime_current_day ?? 1}
+                    totalDays={liveState.downtime_total_days ?? 1}
+                  />
+                ) : null}
+              </>
+            ) : liveState?.downtime_active ? (
+              <TravelModeStageBanner
+                config={defaultDowntimeConfig()}
+                currentDay={liveState.downtime_current_day ?? 1}
+                totalDays={liveState.downtime_total_days ?? 1}
+              />
+            ) : null}
             {liveState?.is_combat_mode ? (
               <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-3">
                 <CombatInitiativeHud
@@ -216,7 +241,14 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                       ? "pb-40 md:pb-44"
                       : "pb-72 md:pb-80"
                 } ${
-                  liveState?.is_combat_mode ? "pt-44" : "pt-[60px]"
+                  liveState?.is_combat_mode
+                    ? "pt-44"
+                    : liveState?.downtime_active &&
+                        liveState.downtime_config?.mode === "travel"
+                      ? "pt-56"
+                      : liveState?.downtime_active
+                        ? "pt-36"
+                        : "pt-[60px]"
                 }`}
               >
                 {!isGuest && liveState?.active_shop_id ? (

@@ -10,6 +10,8 @@ import {
   parseSheetData,
 } from "@/src/lib/characters/dnd5e/defaults";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
+import { parseCharacterFlaws } from "@/src/lib/characters/character-flaws";
+import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
 import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
 import { compareCombatInitiative, parseInitiativeLabel } from "@/src/lib/combat-initiative";
 
@@ -62,20 +64,34 @@ function writeClient() {
   return tryCreateAdminClient() ?? null;
 }
 
-async function resolveDexModifier(
+/**
+ * Initiative-Modifikator aus dem Charakterbogen: DEX-Mod + initiativeBonus
+ * (bzw. initiativeOverride), Erschöpfung und Makel — wie auf dem Bogen angezeigt.
+ */
+async function resolveCharacterInitiativeModifier(
   supabase: Awaited<ReturnType<typeof createClient>>,
   characterId: string | null,
 ): Promise<number> {
   if (!characterId) return 0;
   const { data } = await (supabase.from("characters") as any)
-    .select("sheet_data, level")
+    .select("sheet_data, level, character_flaws")
     .eq("id", characterId)
     .maybeSingle();
   if (!data) return 0;
   const level = Math.max(1, Math.floor(Number(data.level) || 1));
   const sheet = parseSheetData(data.sheet_data) ?? createEmptyDnd5eSheet(level);
-  const derived = computeDerivedDnd5eSheet(sheet, level);
-  return Number(derived.initiative ?? derived.abilities.dex?.modifier ?? 0) || 0;
+  const flaws = parseCharacterFlaws(data.character_flaws);
+  const baseDerived = computeDerivedDnd5eSheet(sheet, level);
+  const adjusted = applyFlawModifiersToDerived(
+    baseDerived,
+    sheet.combat.speed ?? 0,
+    flaws,
+  );
+  return Math.round(adjusted.derived.initiative);
+}
+
+function normalizeParticipantName(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 async function findCharacterForParticipant(
@@ -87,30 +103,48 @@ async function findCharacterForParticipant(
 ): Promise<{ id: string; name: string; playerUserId: string | null } | null> {
   if (participant.type !== "player") return null;
 
-  const { data } = await (supabase.from("characters") as any)
-    .select("id, name, player_user_id")
-    .eq("campaign_id", campaignId)
-    .eq("name", participant.name)
-    .maybeSingle();
+  // Spieler: zuverlässig über Account — auch wenn Battlemap-Label vom Charakternamen abweicht.
+  if (!isGm) {
+    const { data: ownChar } = await (supabase.from("characters") as any)
+      .select("id, name, player_user_id")
+      .eq("campaign_id", campaignId)
+      .eq("player_user_id", userId)
+      .maybeSingle();
 
-  if (!data) return null;
-  const playerUserId =
-    data.player_user_id != null ? String(data.player_user_id) : null;
+    if (!ownChar) {
+      throw new Error("Kein Charakter für deinen Account in dieser Kampagne gefunden.");
+    }
 
-  if (!isGm && playerUserId !== userId) {
-    throw new Error("Du darfst nur für deinen eigenen Charakter Initiative würfeln.");
+    return {
+      id: String(ownChar.id),
+      name: String(ownChar.name),
+      playerUserId: userId,
+    };
   }
 
+  const targetName = normalizeParticipantName(participant.name);
+  const { data: chars } = await (supabase.from("characters") as any)
+    .select("id, name, player_user_id")
+    .eq("campaign_id", campaignId);
+
+  const match = (Array.isArray(chars) ? chars : []).find(
+    (row: { name?: string | null }) =>
+      normalizeParticipantName(String(row.name ?? "")) === targetName,
+  );
+
+  if (!match) return null;
+
   return {
-    id: String(data.id),
-    name: String(data.name),
-    playerUserId,
+    id: String(match.id),
+    name: String(match.name),
+    playerUserId:
+      match.player_user_id != null ? String(match.player_user_id) : null,
   };
 }
 
 /**
- * Würfelt Initiative (w20 + DEX bei Spielercharakteren) und speichert den Wert.
- * Spieler nur für eigenen Charakter; SL für alle.
+ * Würfelt Initiative (w20 + Bogen-Modifikator bei Spielercharakteren) und speichert den Wert.
+ * NPCs/Monster erhalten keinen Bogen-Bonus. Spieler nur für eigenen Charakter; SL für alle.
  */
 export async function rollCombatInitiative(input: {
   sessionId: string;
@@ -168,7 +202,7 @@ export async function rollCombatInitiative(input: {
   );
 
   const modifier = character
-    ? await resolveDexModifier(supabase, character.id)
+    ? await resolveCharacterInitiativeModifier(supabase, character.id)
     : 0;
 
   const seed = randomBytes(16).toString("hex");

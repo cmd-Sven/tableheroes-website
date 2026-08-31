@@ -70,6 +70,7 @@ export type LiveState = {
   downtime_current_day?: number | null;
   downtime_total_days?: number | null;
   fap_allocations?: FapAllocationsMap;
+  downtime_config?: import("@/src/lib/travel-fap-config").DowntimeConfig | null;
 };
 
 export type StageVisibilityPatch = Pick<
