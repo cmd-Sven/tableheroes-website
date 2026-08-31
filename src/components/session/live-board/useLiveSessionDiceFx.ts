@@ -9,6 +9,7 @@ import {
   dispatchAvatarRollFx,
   rollFxKindFromMeta,
 } from "@/src/lib/session/avatar-roll-fx";
+import { dispatchBattlemapTokenAttackFx } from "@/src/lib/session/battlemap-token-attack-fx";
 import { playDiceNatSound, primeDiceNatSounds } from "@/src/lib/session/dice-nat-sounds";
 import {
   dispatchAvatarSpeechBubble,
@@ -84,6 +85,17 @@ export function useLiveSessionDiceFx({
 
   function applyDiceResolveFx(entry: SystemLogEntry) {
     const characterId = entry.character_id?.trim();
+    if (characterId && entry.type === "attack_hit") {
+      const meta =
+        entry.meta && typeof entry.meta === "object"
+          ? (entry.meta as Record<string, unknown>)
+          : null;
+      dispatchBattlemapTokenAttackFx({
+        characterId,
+        critical: meta?.critical === true,
+        sourceId: entry.id,
+      });
+    }
     if (characterId) {
       if (
         entry.type === "dice" ||

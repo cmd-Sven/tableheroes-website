@@ -8,11 +8,16 @@
 import { memo, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Sword } from "lucide-react";
 import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import { CHARACTER_CONDITION_DEFINITIONS } from "@/src/lib/characters/condition-tokens";
 import type { ActiveCombatTurnHighlight } from "@/src/lib/combat-initiative";
 import type { BattlemapGridConfig, SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import {
+  BATTLEMAP_TOKEN_ATTACK_FX_DURATION_MS,
+  BATTLEMAP_TOKEN_ATTACK_FX_EVENT,
+  type BattlemapTokenAttackFxDetail,
+} from "@/src/lib/session/battlemap-token-attack-fx";
 import { gridToPixel } from "@/src/lib/session/battlemap-grid";
 
 const TOKEN_DRAG_THRESHOLD_PX = 7;
@@ -25,6 +30,114 @@ function moveDurationForCells(cellDist: number): number {
   return Math.min(
     TOKEN_MOVE_MAX_MS,
     Math.max(TOKEN_MOVE_MIN_MS, cellDist * TOKEN_MOVE_MS_PER_CELL),
+  );
+}
+
+type TokenAttackSwingState = {
+  key: number;
+  critical: boolean;
+};
+
+function useTokenAttackSwings(characterIds: string[]) {
+  const [swingsByCharacterId, setSwingsByCharacterId] = useState<
+    Record<string, TokenAttackSwingState>
+  >({});
+  const idsRef = useRef(characterIds);
+  idsRef.current = characterIds;
+  const seenSourceIdsRef = useRef(new Set<string>());
+  const timersRef = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    function onAttackFx(e: Event) {
+      const detail = (e as CustomEvent<BattlemapTokenAttackFxDetail>).detail;
+      const characterId = detail?.characterId?.trim();
+      if (!characterId || !idsRef.current.includes(characterId)) return;
+      if (detail.sourceId) {
+        if (seenSourceIdsRef.current.has(detail.sourceId)) return;
+        seenSourceIdsRef.current.add(detail.sourceId);
+        if (seenSourceIdsRef.current.size > 40) {
+          const oldest = seenSourceIdsRef.current.values().next().value;
+          if (oldest) seenSourceIdsRef.current.delete(oldest);
+        }
+      }
+      const duration = detail.durationMs ?? BATTLEMAP_TOKEN_ATTACK_FX_DURATION_MS;
+      setSwingsByCharacterId((prev) => ({
+        ...prev,
+        [characterId]: {
+          key: (prev[characterId]?.key ?? 0) + 1,
+          critical: Boolean(detail.critical),
+        },
+      }));
+      const prevTimer = timersRef.current.get(characterId);
+      if (prevTimer != null) window.clearTimeout(prevTimer);
+      timersRef.current.set(
+        characterId,
+        window.setTimeout(() => {
+          setSwingsByCharacterId((prev) => {
+            if (!prev[characterId]) return prev;
+            const next = { ...prev };
+            delete next[characterId];
+            return next;
+          });
+          timersRef.current.delete(characterId);
+        }, duration),
+      );
+    }
+
+    window.addEventListener(BATTLEMAP_TOKEN_ATTACK_FX_EVENT, onAttackFx);
+    return () => {
+      window.removeEventListener(BATTLEMAP_TOKEN_ATTACK_FX_EVENT, onAttackFx);
+      for (const timer of timersRef.current.values()) window.clearTimeout(timer);
+      timersRef.current.clear();
+    };
+  }, []);
+
+  return swingsByCharacterId;
+}
+
+function TokenAttackSwordFx({
+  swingKey,
+  critical,
+  tokenSizePx,
+}: {
+  swingKey: number;
+  critical: boolean;
+  tokenSizePx: number;
+}) {
+  const iconSize = Math.max(14, Math.min(22, Math.round(tokenSizePx * 0.28)));
+
+  return (
+    <motion.span
+      key={swingKey}
+      className="pointer-events-none absolute z-[35] flex items-center justify-center"
+      style={{
+        right: -iconSize * 0.35,
+        top: "50%",
+        width: iconSize,
+        height: iconSize,
+        marginTop: -iconSize / 2,
+        transformOrigin: "20% 80%",
+      }}
+      aria-hidden
+      initial={{ opacity: 0, rotate: -55, scale: 0.85 }}
+      animate={{
+        opacity: [0, 1, 1, 0],
+        rotate: critical ? [-55, 35, -25, 40, -10] : [-55, 28, -18, 32],
+        scale: critical ? [0.85, 1.15, 1.05, 1.1, 0.9] : [0.85, 1.05, 1, 0.9],
+      }}
+      transition={{
+        duration: critical ? 1.05 : 0.85,
+        ease: "easeInOut",
+      }}
+    >
+      <Sword
+        className={`drop-shadow-[0_0_6px_rgba(0,0,0,0.85)] ${
+          critical ? "text-accent-gold" : "text-gray-100"
+        }`}
+        style={{ width: iconSize, height: iconSize }}
+        strokeWidth={2.25}
+      />
+    </motion.span>
   );
 }
 
@@ -108,6 +221,11 @@ export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
     dragged: boolean;
   } | null>(null);
 
+  const characterIds = tokens
+    .map((t) => t.character_id)
+    .filter((id): id is string => Boolean(id));
+  const attackSwingsByCharacterId = useTokenAttackSwings(characterIds);
+
   return (
     <>
       {tokens.map((token) => (
@@ -123,6 +241,9 @@ export const BattlemapTokenLayer = memo(function BattlemapTokenLayer({
           ownCharacterId={ownCharacterId}
           characterDisplayUrlById={characterDisplayUrlById}
           characterConditionsById={characterConditionsById}
+          attackSwing={
+            token.character_id ? attackSwingsByCharacterId[token.character_id] : undefined
+          }
           onSelectToken={onSelectToken}
           onTokenContextMenu={onTokenContextMenu}
           canDrag={Boolean(canDragToken?.(token))}
@@ -148,6 +269,7 @@ type AnimatedTokenProps = {
   ownCharacterId?: string | null;
   characterDisplayUrlById?: Record<string, string | null | undefined>;
   characterConditionsById?: Record<string, CharacterConditionKey[] | undefined>;
+  attackSwing?: TokenAttackSwingState;
   onSelectToken?: (tokenId: string | null) => void;
   onTokenContextMenu?: (token: SessionBattlemapToken, clientX: number, clientY: number) => void;
   canDrag: boolean;
@@ -179,6 +301,7 @@ const AnimatedToken = memo(function AnimatedToken({
   ownCharacterId,
   characterDisplayUrlById,
   characterConditionsById,
+  attackSwing,
   onSelectToken,
   onTokenContextMenu,
   canDrag,
@@ -512,6 +635,14 @@ const AnimatedToken = memo(function AnimatedToken({
             {conditions.length}
           </span>
         </span>
+      ) : null}
+
+      {attackSwing ? (
+        <TokenAttackSwordFx
+          swingKey={attackSwing.key}
+          critical={attackSwing.critical}
+          tokenSizePx={pxSize}
+        />
       ) : null}
     </div>
   );

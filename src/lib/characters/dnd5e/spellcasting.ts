@@ -25,6 +25,16 @@ export function isCasterClass(
   return s.length > 0 && THIRD_CASTER_SUBCLASS_RE.test(s);
 }
 
+/** Live-Session / Radial-Menü: Zauberbuch wenn Zauber vorhanden oder Zauberwirker (inkl. Drittelzauberer). */
+export function hasSpellbookAccess(
+  className: string | null | undefined,
+  subclass?: string | null,
+  spells?: readonly unknown[] | null,
+): boolean {
+  if ((spells?.length ?? 0) > 0) return true;
+  return isCasterClass(className, subclass);
+}
+
 export function getSpellPreparationStyle(
   className: string | null | undefined,
   subclass?: string | null,

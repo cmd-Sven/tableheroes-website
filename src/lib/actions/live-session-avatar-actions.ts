@@ -31,7 +31,7 @@ import { getCharacterInventory } from "@/src/lib/actions/character-inventory-act
 import { consumeFromStack } from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import type { Dnd5eClassResource } from "@/src/lib/characters/dnd5e/types";
 import {
-  isCasterClass,
+  hasSpellbookAccess,
   localizedSpellName,
 } from "@/src/lib/characters/dnd5e/spellcasting";
 import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
@@ -123,7 +123,7 @@ export async function getLiveSessionAvatarStatus(
   const { data: chRaw, error } = await supabase
     .from("characters")
     .select(
-      "id, name, class, level, avatar_url, token_url, sheet_data, sheet_locale, condition_tokens, mood_state, mood_tokens, active_conditions, user_id, campaign_id",
+      "id, name, class, subclass, level, avatar_url, token_url, sheet_data, sheet_locale, condition_tokens, mood_state, mood_tokens, active_conditions, user_id, campaign_id",
     )
     .eq("id", characterId)
     .single();
@@ -132,6 +132,7 @@ export async function getLiveSessionAvatarStatus(
 
   const ch = chRaw as {
     class?: string | null;
+    subclass?: string | null;
     level?: number | null;
     avatar_url?: string | null;
     token_url?: string | null;
@@ -172,6 +173,7 @@ export async function getLiveSessionAvatarStatus(
 
   const sheetRaw = parseSheetData(ch.sheet_data);
   const className = String(ch.class ?? "");
+  const subclassName = String(ch.subclass ?? "").trim() || null;
   const sheet = ensureClassResources(sheetRaw ?? mergeSheetWithDefaults({}), className);
   const equipment = normalizeEquipmentState(sheet.equipment);
 
@@ -259,7 +261,7 @@ export async function getLiveSessionAvatarStatus(
     displaySource: display.source,
     weaponLabels,
     className,
-    isCaster: isCasterClass(className),
+    isCaster: hasSpellbookAccess(className, subclassName, sheet.spells),
     classResources: sheet.classResources ?? [],
     weaponPresets: (equipment.weaponPresets ?? []).map((p) => ({ id: p.id, name: p.name })),
     loadouts: (equipment.loadouts ?? []).map((l) => ({ id: l.id, name: l.name })),

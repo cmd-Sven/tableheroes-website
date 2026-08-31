@@ -87,7 +87,11 @@ export function buildVisibleRadialItems(args: {
     if (item.joinCombatOnly) return isGm && combatMode && canJoinCombat && Boolean(onJoinCombat);
     if (item.tokenSettingsOnly) return hasBattlemapToken;
     if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
-    if (item.casterOnly) return Boolean(status?.isCaster ?? isCasterHeuristic(className));
+    if (item.casterOnly) {
+      if (status?.isCaster) return true;
+      if ((status?.spells?.length ?? 0) > 0) return true;
+      return isCasterHeuristic(className);
+    }
     if (item.abilitiesOnly) {
       if ((status?.classResources?.length ?? 0) > 0) return true;
       return hasClassAbilitiesHeuristic(className);
