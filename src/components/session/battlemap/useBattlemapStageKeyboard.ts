@@ -50,6 +50,8 @@ type Args = {
   onFogShapeDelete?: (shapeId: string) => void;
   onEffectTemplateDelete?: (templateId: string) => void;
   onMarkerDelete?: (markerId: string) => void;
+  selectedTrapId?: string | null;
+  onTrapDelete?: (trapId: string) => void;
 };
 
 export function useBattlemapStageKeyboard({
@@ -76,9 +78,11 @@ export function useBattlemapStageKeyboard({
   selectedFogShapeId,
   selectedEffectTemplateId,
   selectedMarkerId,
+  selectedTrapId = null,
   onFogShapeDelete,
   onEffectTemplateDelete,
   onMarkerDelete,
+  onTrapDelete,
 }: Args) {
   useEffect(() => {
     if (!placementActive && !shapeDrawActive && !markerPlaceActive && !trapPlaceActive)
@@ -217,4 +221,25 @@ export function useBattlemapStageKeyboard({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isGm, onMarkerDelete, selectedMarkerId]);
+
+  useEffect(() => {
+    if (!isGm || !selectedTrapId || !onTrapDelete) return;
+    const trapId = selectedTrapId;
+    const deleteFn = onTrapDelete;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (e.target as HTMLElement | null)?.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      deleteFn(trapId);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isGm, onTrapDelete, selectedTrapId]);
 }

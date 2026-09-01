@@ -142,6 +142,7 @@ export type SessionBattlemapTrap = {
   is_armed: boolean;
   is_detected: boolean;
   is_triggered: boolean;
+  is_disarmed: boolean;
   is_visible_to_players: boolean;
   triggered_by_character_id: string | null;
   triggered_at?: string | null;

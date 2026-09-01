@@ -312,6 +312,7 @@ export function mapBattlemapTrapRow(
     is_armed: row.is_armed !== false,
     is_detected: row.is_detected === true,
     is_triggered: row.is_triggered === true,
+    is_disarmed: row.is_disarmed === true,
     is_visible_to_players: row.is_visible_to_players === true,
     triggered_by_character_id:
       row.triggered_by_character_id != null

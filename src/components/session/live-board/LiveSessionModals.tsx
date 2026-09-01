@@ -5,7 +5,7 @@
 
 import dynamic from "next/dynamic";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { TransitionStartFunction } from "react";
+import type { TransitionStartFunction, Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { AnimatePresence } from "framer-motion";
 import { GmNpcSearchModal, type GmNpcSearchRow } from "@/src/components/session/GmNpcSearchModal";
@@ -15,6 +15,7 @@ import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootMo
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { TrapWizardModal } from "@/src/components/session/battlemap/TrapWizardModal";
 import { TrapTriggerModal } from "@/src/components/session/battlemap/TrapTriggerModal";
+import { TrapDisarmModal } from "@/src/components/session/battlemap/TrapDisarmModal";
 import { listBattlemapTraps } from "@/src/lib/actions/battlemap-trap-actions";
 import type {
   BattlemapTrapTool,
@@ -96,9 +97,12 @@ export type LiveSessionModalsProps = {
   activeBattlemapId: string | null;
   currentLocationName: string | null | undefined;
   setSelectedTrapId: (id: string | null) => void;
-  setBattlemapTraps: (traps: SessionBattlemapTrap[]) => void;
+  setBattlemapTraps: Dispatch<SetStateAction<SessionBattlemapTrap[]>>;
   trapTriggerEvent: TrapTriggerEvent;
   setTrapTriggerEvent: (event: TrapTriggerEvent) => void;
+  trapDisarmTarget: SessionBattlemapTrap | null;
+  setTrapDisarmTarget: (trap: SessionBattlemapTrap | null) => void;
+  ownCharacterId?: string | null;
   wrapUpOpen: boolean;
   setWrapUpOpen: (open: boolean) => void;
   chronicleRecorder: UseSessionChronicleRecorderReturn;
@@ -151,6 +155,9 @@ export function LiveSessionModals({
   setBattlemapTraps,
   trapTriggerEvent,
   setTrapTriggerEvent,
+  trapDisarmTarget,
+  setTrapDisarmTarget,
+  ownCharacterId,
   wrapUpOpen,
   setWrapUpOpen,
   chronicleRecorder,
@@ -320,6 +327,25 @@ export function LiveSessionModals({
         }}
         onRequestDamageRoll={(formula, damageType) => {
           toast.message(`Schaden: ${formula} ${damageType} — bitte über das Würfelpanel würfeln.`);
+        }}
+      />
+
+      <TrapDisarmModal
+        open={Boolean(trapDisarmTarget)}
+        trap={trapDisarmTarget}
+        sessionId={sessionId}
+        characterId={ownCharacterId ?? null}
+        isGm={isGM}
+        onClose={() => setTrapDisarmTarget(null)}
+        onTrapUpdated={(updated) => {
+          setBattlemapTraps((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t)),
+          );
+        }}
+        onRequestSkillRoll={({ skillKey, label, modifier }) => {
+          toast.message(
+            `${label}: W20 ${modifier >= 0 ? "+" : ""}${modifier} — bitte über das Würfelpanel würfeln (${skillKey}).`,
+          );
         }}
       />
 

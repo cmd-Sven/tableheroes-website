@@ -11,8 +11,23 @@ import type {
   BattlemapTrapEffectShape,
   SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
-import { cellInTrap } from "@/src/lib/session/battlemap-trap-geometry";
+import { cellInTrap, canPassivelyDetectTrapAtDistance, chebyshevDistance } from "@/src/lib/session/battlemap-trap-geometry";
+import {
+  buildRecipeScrollDescription,
+  parseTrapAiPayload,
+  recipeScrollGoldValue,
+  trapComponents,
+  trapDisarmPending,
+  type TrapComponent,
+  type TrapDisarmPending,
+} from "@/src/lib/session/battlemap-trap-model";
+import {
+  listHasProficiency,
+  PROFICIENCY_CATALOG,
+} from "@/src/lib/characters/dnd5e/progression/proficiencies-catalog";
+import { createCharacterItem } from "@/src/lib/actions/character-inventory-actions";
 import { parseTrapStatusEffect } from "@/src/lib/characters/condition-tokens";
+import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
 
 async function assertSessionGm(sessionId: string, userId: string) {
   const supabase = await createClient();
@@ -74,6 +89,7 @@ function normalizeTrap(row: Record<string, unknown>): SessionBattlemapTrap {
     is_armed: row.is_armed !== false,
     is_detected: row.is_detected === true,
     is_triggered: row.is_triggered === true,
+    is_disarmed: row.is_disarmed === true,
     is_visible_to_players: row.is_visible_to_players === true,
     triggered_by_character_id:
       row.triggered_by_character_id != null
@@ -131,6 +147,7 @@ export async function createBattlemapTrap(input: {
   statusEffect?: string | null;
   loreContext?: string | null;
   aiPayload?: Record<string, unknown>;
+  components?: TrapComponent[];
 }): Promise<SessionBattlemapTrap> {
   const supabase = await createClient();
   const {
@@ -148,6 +165,12 @@ export async function createBattlemapTrap(input: {
   if (!mapRaw) throw new Error("Battlemap nicht gefunden.");
 
   const statusEffect = parseTrapStatusEffect(input.statusEffect);
+  const aiPayload: Record<string, unknown> = {
+    ...(input.aiPayload ?? {}),
+  };
+  if (input.components?.length) {
+    aiPayload.components = input.components;
+  }
 
   const { data, error } = await (supabase as any)
     .from("session_battlemap_traps")
@@ -175,7 +198,7 @@ export async function createBattlemapTrap(input: {
       is_triggered: false,
       is_visible_to_players: false,
       lore_context: input.loreContext ?? null,
-      ai_payload: input.aiPayload ?? {},
+      ai_payload: aiPayload,
     })
     .select("*")
     .single();
@@ -228,6 +251,8 @@ export type TrapEnterCheckResult =
       trap: SessionBattlemapTrap;
       passivePerception: number;
       characterName: string;
+      /** passive = PP-Nähe; enter = Betreten der Trigger-Zelle */
+      source?: "passive" | "enter" | "gm";
     }
   | {
       kind: "triggered";
@@ -235,6 +260,16 @@ export type TrapEnterCheckResult =
       passivePerception: number;
       characterName: string;
       characterId: string;
+    };
+
+export type TrapProximityCheckResult =
+  | { kind: "none" }
+  | {
+      kind: "detected";
+      trap: SessionBattlemapTrap;
+      passivePerception: number;
+      characterName: string;
+      source: "passive";
     };
 
 async function loadPassivePerception(
@@ -264,12 +299,118 @@ async function loadPassivePerception(
   };
 }
 
+async function markTrapDetected(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  trap: SessionBattlemapTrap,
+  sessionId: string,
+  characterName: string,
+  source: "passive" | "enter" | "gm",
+): Promise<SessionBattlemapTrap> {
+  const { data, error: updErr } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .update({
+      is_detected: true,
+      is_visible_to_players: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", trap.id)
+    .eq("session_id", sessionId)
+    .select("*")
+    .single();
+  if (updErr) throw new Error(updErr.message);
+
+  const updated = normalizeTrap(data as Record<string, unknown>);
+  const sourceLabel =
+    source === "gm"
+      ? "Spielleiter"
+      : source === "passive"
+        ? "Passive Wahrnehmung"
+        : "Trigger-Zelle";
+  try {
+    await appendSessionActivity({
+      sessionId,
+      text: `${characterName} hat „${trap.name}“ entdeckt (${sourceLabel}).`,
+      type: "trap_detected",
+      meta: { trap_id: trap.id, source },
+    });
+  } catch {
+    /* Chat-Hinweis optional */
+  }
+  return updated;
+}
+
+/**
+ * Passive Erkennung in der Nähe (nicht auf der Trigger-Zelle).
+ * Läuft nach jeder Token-Bewegung; löst die Falle nicht aus.
+ */
+export async function checkBattlemapTrapsOnProximity(input: {
+  sessionId: string;
+  battlemapId: string;
+  characterId: string;
+  gridX: number;
+  gridY: number;
+}): Promise<TrapProximityCheckResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: trapsRaw, error } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .select("*")
+    .eq("battlemap_id", input.battlemapId)
+    .eq("session_id", input.sessionId)
+    .eq("is_armed", true)
+    .eq("is_triggered", false)
+    .eq("is_detected", false);
+  if (error) throw new Error(error.message);
+
+  const traps = ((trapsRaw ?? []) as Record<string, unknown>[]).map(normalizeTrap);
+  const { passivePerception, characterName } = await loadPassivePerception(
+    supabase,
+    input.characterId,
+  );
+
+  let best: SessionBattlemapTrap | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+
+  for (const trap of traps) {
+    const dist = chebyshevDistance(input.gridX, input.gridY, trap.grid_x, trap.grid_y);
+    if (dist === 0) continue;
+    if (
+      canPassivelyDetectTrapAtDistance(trap, input.gridX, input.gridY, passivePerception) &&
+      dist < bestDist
+    ) {
+      best = trap;
+      bestDist = dist;
+    }
+  }
+
+  if (!best) return { kind: "none" };
+
+  const updated = await markTrapDetected(
+    supabase,
+    best,
+    input.sessionId,
+    characterName,
+    "passive",
+  );
+  return {
+    kind: "detected",
+    trap: updated,
+    passivePerception,
+    characterName,
+    source: "passive",
+  };
+}
+
 /**
  * Nach Token-Betritt der Trigger-Zelle (immer genau grid_x/grid_y):
  * Passive Perception vs detectionDC.
  * Detection → Falle sichtbar, nicht ausgelöst.
  * Miss → Trigger, Bewegung pausieren.
- * AoE gilt erst nach Auslösen (Overlay), nicht für den Enter-Check.
+ * Bereits entdeckte Fallen lösen nicht erneut aus.
  */
 export async function checkBattlemapTrapsOnEnter(input: {
   sessionId: string;
@@ -297,32 +438,29 @@ export async function checkBattlemapTrapsOnEnter(input: {
   const hit = traps.find((t) => cellInTrap(t, input.gridX, input.gridY));
   if (!hit) return { kind: "none" };
 
+  if (hit.is_detected) {
+    return { kind: "none" };
+  }
+
   const { passivePerception, characterName } = await loadPassivePerception(
     supabase,
     input.characterId,
   );
 
   if (passivePerception >= hit.detection_dc) {
-    if (hit.is_detected) {
-      return { kind: "none" };
-    }
-    const { data, error: updErr } = await (supabase as any)
-      .from("session_battlemap_traps")
-      .update({
-        is_detected: true,
-        is_visible_to_players: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", hit.id)
-      .eq("session_id", input.sessionId)
-      .select("*")
-      .single();
-    if (updErr) throw new Error(updErr.message);
+    const updated = await markTrapDetected(
+      supabase,
+      hit,
+      input.sessionId,
+      characterName,
+      "enter",
+    );
     return {
       kind: "detected",
-      trap: normalizeTrap(data as Record<string, unknown>),
+      trap: updated,
       passivePerception,
       characterName,
+      source: "enter",
     };
   }
 
@@ -342,10 +480,21 @@ export async function checkBattlemapTrapsOnEnter(input: {
     .single();
   if (trigErr) throw new Error(trigErr.message);
 
-  // movementLocked
   await (supabase.from("session_live_states") as any)
     .update({ battlemap_movement_paused: true })
     .eq("session_id", input.sessionId);
+
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${characterName} löst „${hit.name}“ aus!`,
+      type: "trap_triggered",
+      characterId: input.characterId,
+      meta: { trap_id: hit.id },
+    });
+  } catch {
+    /* optional */
+  }
 
   return {
     kind: "triggered",
@@ -354,6 +503,40 @@ export async function checkBattlemapTrapsOnEnter(input: {
     characterName,
     characterId: input.characterId,
   };
+}
+
+/** SL markiert Falle nach aktiver Suche als entdeckt. */
+export async function markBattlemapTrapDiscovered(input: {
+  sessionId: string;
+  trapId: string;
+  characterName?: string;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const { data: row, error: fetchErr } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .select("*")
+    .eq("id", input.trapId)
+    .eq("session_id", input.sessionId)
+    .maybeSingle();
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!row) throw new Error("Falle nicht gefunden.");
+
+  const trap = normalizeTrap(row as Record<string, unknown>);
+  if (trap.is_detected) return trap;
+
+  return markTrapDetected(
+    supabase,
+    trap,
+    input.sessionId,
+    input.characterName?.trim() || "Die Gruppe",
+    "gm",
+  );
 }
 
 export async function resolveBattlemapTrapTrigger(input: {
@@ -373,4 +556,434 @@ export async function resolveBattlemapTrapTrigger(input: {
       .update({ battlemap_movement_paused: false })
       .eq("session_id", input.sessionId);
   }
+}
+
+const THIEVES_TOOLS_DEF =
+  PROFICIENCY_CATALOG.find((d) => d.id === "tool-thieves")!;
+
+function characterHasTrapMasteryFeat(sheet: ReturnType<typeof parseSheetData>): boolean {
+  if (!sheet) return false;
+  return sheet.features.some((f) => {
+    const name = `${f.name ?? ""} ${f.nameDe ?? ""} ${f.nameEn ?? ""}`.toLowerCase();
+    return (
+      name.includes("fallenmeister") ||
+      name.includes("trap mastery") ||
+      name.includes("trap-mastery")
+    );
+  });
+}
+
+export type TrapDisarmCharacterStats = {
+  characterId: string;
+  characterName: string;
+  proficiencyBonus: number;
+  investigationMod: number;
+  arcanaMod: number;
+  dexMod: number;
+  sleightMod: number;
+  sleightExpertise: boolean;
+  thievesToolsProficient: boolean;
+  hasTrapMasteryFeat: boolean;
+};
+
+/** Charakterwerte für Entschärfungs-Modal (Fertigkeiten, Werkzeuge, Feat). */
+export async function getTrapDisarmCharacterStats(
+  characterId: string,
+): Promise<TrapDisarmCharacterStats> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data: chRaw } = await (supabase as any)
+    .from("characters")
+    .select("sheet_data, level, character_flaws, name")
+    .eq("id", characterId)
+    .maybeSingle();
+  if (!chRaw) throw new Error("Charakter nicht gefunden.");
+
+  const level = Math.max(1, Number(chRaw.level ?? 1));
+  const sheet = parseSheetData(chRaw.sheet_data) ?? createEmptyDnd5eSheet(level);
+  const flaws = parseCharacterFlaws(chRaw.character_flaws);
+  const derived = computeDerivedDnd5eSheet(sheet, level);
+  const flawAdjusted = applyFlawModifiersToDerived(
+    derived,
+    sheet.combat.speed,
+    flaws,
+  );
+
+  const thievesToolsProficient = listHasProficiency(
+    sheet.proficiencies.tools,
+    THIEVES_TOOLS_DEF,
+  );
+  const sleightEntry = sheet.skills.slt ?? { proficient: "none" as const };
+
+  return {
+    characterId,
+    characterName: String(chRaw.name ?? "Charakter"),
+    proficiencyBonus: flawAdjusted.derived.proficiencyBonus,
+    investigationMod: flawAdjusted.derived.skills.inv.total,
+    arcanaMod: flawAdjusted.derived.skills.arc.total,
+    dexMod: flawAdjusted.derived.abilities.dex.modifier,
+    sleightMod: flawAdjusted.derived.skills.slt.total,
+    sleightExpertise: sleightEntry.proficient === "expertise",
+    thievesToolsProficient,
+    hasTrapMasteryFeat: characterHasTrapMasteryFeat(sheet),
+  };
+}
+
+async function loadTrapRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  trapId: string,
+  sessionId: string,
+): Promise<SessionBattlemapTrap> {
+  const { data: row, error } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .select("*")
+    .eq("id", trapId)
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Falle nicht gefunden.");
+  return normalizeTrap(row as Record<string, unknown>);
+}
+
+async function updateTrapAiPayload(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  trap: SessionBattlemapTrap,
+  sessionId: string,
+  patch: Record<string, unknown>,
+): Promise<SessionBattlemapTrap> {
+  const aiPayload = { ...(trap.ai_payload ?? {}), ...patch };
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .update({
+      ai_payload: aiPayload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", trap.id)
+    .eq("session_id", sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return normalizeTrap(data as Record<string, unknown>);
+}
+
+/** SL löst eine entdeckte, noch aktive Falle manuell aus. */
+export async function triggerBattlemapTrapManually(input: {
+  sessionId: string;
+  trapId: string;
+  characterId?: string | null;
+  characterName?: string;
+}): Promise<{
+  trap: SessionBattlemapTrap;
+  characterName: string;
+  characterId: string;
+  passivePerception: number;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  if (!trap.is_armed || trap.is_triggered || trap.is_disarmed) {
+    throw new Error("Diese Falle kann nicht ausgelöst werden.");
+  }
+
+  const characterId = input.characterId?.trim() || "";
+  let characterName = input.characterName?.trim() || "Die Gruppe";
+  let passivePerception = 10;
+  if (characterId) {
+    const pp = await loadPassivePerception(supabase, characterId);
+    characterName = pp.characterName;
+    passivePerception = pp.passivePerception;
+  }
+
+  const { data: triggered, error: trigErr } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .update({
+      is_armed: false,
+      is_triggered: true,
+      is_visible_to_players: true,
+      triggered_by_character_id: characterId || null,
+      triggered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", trap.id)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (trigErr) throw new Error(trigErr.message);
+
+  await (supabase.from("session_live_states") as any)
+    .update({ battlemap_movement_paused: true })
+    .eq("session_id", input.sessionId);
+
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${characterName} löst „${trap.name}“ aus (SL).`,
+      type: "trap_triggered",
+      characterId: characterId || undefined,
+      meta: { trap_id: trap.id, source: "gm_manual" },
+    });
+  } catch {
+    /* optional */
+  }
+
+  return {
+    trap: normalizeTrap(triggered as Record<string, unknown>),
+    characterName,
+    characterId: characterId || "",
+    passivePerception,
+  };
+}
+
+/** Spieler reicht Entschärf-Versuch ein — SL bestätigt danach. */
+export async function submitTrapDisarmAttempt(input: {
+  sessionId: string;
+  trapId: string;
+  characterId: string;
+  investigate: boolean;
+  trapMasteryDex: boolean;
+  hasThievesTools: boolean;
+  thievesToolsProficient: boolean;
+  sleightProficient: boolean;
+  sleightExpertise: boolean;
+  playerClaimsSuccess: boolean;
+  investigationSuccess?: boolean;
+  disarmSuccess?: boolean;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  if (!trap.is_detected || trap.is_triggered || trap.is_disarmed) {
+    throw new Error("Diese Falle kann nicht entschärft werden.");
+  }
+  if (trapDisarmPending(trap)?.status === "player_submitted") {
+    throw new Error("Ein Entschärfungsversuch wartet bereits auf SL-Bestätigung.");
+  }
+
+  const stats = await getTrapDisarmCharacterStats(input.characterId);
+  const disarm: TrapDisarmPending = {
+    status: "player_submitted",
+    characterId: input.characterId,
+    characterName: stats.characterName,
+    investigate: input.investigate,
+    trapMasteryDex: input.trapMasteryDex,
+    hasThievesTools: input.hasThievesTools,
+    thievesToolsProficient: input.thievesToolsProficient,
+    sleightProficient: input.sleightProficient,
+    sleightExpertise: input.sleightExpertise,
+    playerClaimsSuccess: input.playerClaimsSuccess,
+    investigationSuccess: input.investigationSuccess,
+    disarmSuccess: input.disarmSuccess,
+    submittedAt: new Date().toISOString(),
+  };
+
+  const updated = await updateTrapAiPayload(supabase, trap, input.sessionId, { disarm });
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${stats.characterName} versucht „${trap.name}“ zu entschärfen — SL-Bestätigung ausstehend.`,
+      type: "trap_disarm_pending",
+      characterId: input.characterId,
+      meta: { trap_id: trap.id },
+    });
+  } catch {
+    /* optional */
+  }
+  return updated;
+}
+
+/** SL bestätigt oder lehnt Entschärfung ab. Bei Erfolg: Falle entschärft. */
+export async function confirmTrapDisarm(input: {
+  sessionId: string;
+  trapId: string;
+  approved: boolean;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  const pending = trapDisarmPending(trap);
+  if (!pending || pending.status !== "player_submitted") {
+    throw new Error("Kein ausstehender Entschärfungsversuch.");
+  }
+
+  if (!input.approved) {
+    const cleared = await updateTrapAiPayload(supabase, trap, input.sessionId, {
+      disarm: null,
+    });
+    try {
+      await appendSessionActivity({
+        sessionId: input.sessionId,
+        text: `Entschärfung von „${trap.name}“ abgelehnt.`,
+        type: "trap_disarm_rejected",
+        meta: { trap_id: trap.id },
+      });
+    } catch {
+      /* optional */
+    }
+    return cleared;
+  }
+
+  if (!pending.playerClaimsSuccess) {
+    throw new Error("Spieler hat keinen erfolgreichen Versuch gemeldet.");
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_traps")
+    .update({
+      is_disarmed: true,
+      is_armed: false,
+      ai_payload: {
+        ...(trap.ai_payload ?? {}),
+        disarm: {
+          ...pending,
+          status: "gm_confirmed",
+          gmConfirmedAt: new Date().toISOString(),
+        },
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", trap.id)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  const updated = normalizeTrap(data as Record<string, unknown>);
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${pending.characterName} hat „${trap.name}“ entschärft.`,
+      type: "trap_disarmed",
+      characterId: pending.characterId,
+      meta: { trap_id: trap.id },
+    });
+  } catch {
+    /* optional */
+  }
+  return updated;
+}
+
+export type TrapDisarmLootItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  iconType: string | null;
+  quantity: number;
+};
+
+export type TrapDisarmLootResult = {
+  items: TrapDisarmLootItem[];
+  recipeScroll: TrapDisarmLootItem | null;
+};
+
+/** Nach erfolgreicher Entschärfung: Komponenten (+ optional Rezept) ins Inventar. */
+export async function claimTrapDisarmLoot(input: {
+  sessionId: string;
+  trapId: string;
+  characterId: string;
+}): Promise<TrapDisarmLootResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  if (!trap.is_disarmed) {
+    throw new Error("Falle wurde noch nicht entschärft.");
+  }
+
+  const pending = trapDisarmPending(trap);
+  if (!pending || pending.status !== "gm_confirmed") {
+    throw new Error("Entschärfung wurde noch nicht vom SL bestätigt.");
+  }
+  if (pending.characterId !== input.characterId) {
+    throw new Error("Nur der entschärfende Charakter kann die Beute nehmen.");
+  }
+
+  const components = trapComponents(trap);
+  const identified = pending.investigate && pending.investigationSuccess !== false;
+  if (!identified || components.length === 0) {
+    return { items: [], recipeScroll: null };
+  }
+
+  const items: TrapDisarmLootItem[] = [];
+  for (const comp of components) {
+    for (let i = 0; i < comp.quantity; i += 1) {
+      const created = await createCharacterItem({
+        characterId: input.characterId,
+        name: comp.quantity > 1 ? `${comp.name} (${i + 1}/${comp.quantity})` : comp.name,
+        description: comp.description ?? null,
+        category:
+          comp.category === "poison" || comp.category === "consumable"
+            ? "Consumable"
+            : comp.category === "scroll"
+              ? "Story"
+              : comp.category === "gem"
+                ? "CoinGem"
+                : "Equipment",
+        iconType: comp.iconType ?? comp.category,
+      });
+      items.push({
+        id: created.id,
+        name: created.name,
+        description: created.description,
+        category: created.category,
+        iconType: created.icon_type,
+        quantity: 1,
+      });
+    }
+  }
+
+  let recipeScroll: TrapDisarmLootItem | null = null;
+  if (Math.random() < 0.1) {
+    const gold = recipeScrollGoldValue(trap.difficulty);
+    const scroll = await createCharacterItem({
+      characterId: input.characterId,
+      name: `Rezept: ${trap.name}`,
+      description: `${buildRecipeScrollDescription(trap, components)}\n\nGeschätzter Wert: ${gold} GP`,
+      category: "Story",
+      iconType: "scroll",
+    });
+    recipeScroll = {
+      id: scroll.id,
+      name: scroll.name,
+      description: scroll.description,
+      category: scroll.category,
+      iconType: scroll.icon_type,
+      quantity: 1,
+    };
+  }
+
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${pending.characterName} sichert Komponenten aus „${trap.name}“.`,
+      type: "trap_loot_claimed",
+      characterId: input.characterId,
+      meta: { trap_id: trap.id, item_count: items.length },
+    });
+  } catch {
+    /* optional */
+  }
+
+  return { items, recipeScroll };
 }

@@ -18,6 +18,8 @@ export interface TrapWizardAiInput {
 export interface TrapWizardAiOutput {
   name: string;
   description: string;
+  /** mechanical | magical */
+  trapType?: "mechanical" | "magical";
   /** Perception Check DC */
   dc: number;
   /** z. B. "2d6 fire" */
@@ -32,6 +34,16 @@ export interface TrapWizardAiOutput {
    * oder null wenn kein Zustand.
    */
   statusEffect?: string | null;
+  /** 1–3 recoverable Komponenten bei erfolgreicher Entschärfung */
+  components?: Array<{
+    name: string;
+    description?: string;
+    category: string;
+    quantity: number;
+    isMagical?: boolean;
+  }>;
+  buildTimeSimple?: string;
+  buildTimeExpert?: string;
 }
 
 const SYSTEM_PROMPT =
@@ -80,6 +92,7 @@ export async function generateTrapWithAI(
             outputSchema: {
               name: "string",
               description: "string",
+              trapType: '"mechanical" | "magical"',
               dc: "number (Perception Check)",
               damage: 'string (z.B. "2d6 fire")',
               effectRadius:
@@ -89,6 +102,10 @@ export async function generateTrapWithAI(
               saveType: 'string (z.B. "Dexterity")',
               statusEffect:
                 'string|null — einer von: charmed, unconscious, blinded, exhaustion, restrained, paralyzed, grappled, incapacitated, prone, deafened, invisible, poisoned, frightened, silenced, sick, cursed — oder null',
+              components:
+                "array (1-3) — recoverable Bestandteile bei Entschärfung: { name, description?, category: poison|ammo|mechanical|gem|scroll|consumable|other, quantity, isMagical? }",
+              buildTimeSimple: 'string z.B. "1 Stunde"',
+              buildTimeExpert: 'string z.B. "1 FAP + Fertigkeitswurf"',
             },
           }),
         },
@@ -115,15 +132,47 @@ export async function generateTrapWithAI(
     const statusEffect =
       statusRaw && statusRaw.toLowerCase() !== "null" ? statusRaw : null;
 
+    const trapTypeRaw = String(raw.trapType ?? "mechanical").toLowerCase();
+    const trapType: "mechanical" | "magical" =
+      trapTypeRaw === "magical" ? "magical" : "mechanical";
+
+    const componentsRaw = Array.isArray(raw.components) ? raw.components : [];
+    const components = componentsRaw
+      .slice(0, 3)
+      .map((row) => {
+        const c = row as Record<string, unknown>;
+        const name = String(c.name ?? "").trim();
+        if (!name) return null;
+        return {
+          name: name.slice(0, 80),
+          description:
+            c.description != null ? String(c.description).slice(0, 200) : undefined,
+          category: String(c.category ?? "other").slice(0, 24),
+          quantity: Math.max(1, Math.min(20, Math.round(Number(c.quantity ?? 1)))),
+          isMagical: c.isMagical === true,
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => c != null);
+
     return {
       name: String(raw.name ?? "Unbekannte Falle").slice(0, 80),
       description: String(raw.description ?? "").slice(0, 800),
+      trapType,
       dc: clampDc(raw.dc, fallbackDc),
       damage: String(raw.damage ?? "2d6 piercing").slice(0, 40),
       ...(effectRadius != null ? { effectRadius } : {}),
       isAreaEffect,
       saveType: String(raw.saveType ?? "Dexterity").slice(0, 32),
       statusEffect,
+      ...(components.length ? { components } : {}),
+      buildTimeSimple:
+        raw.buildTimeSimple != null
+          ? String(raw.buildTimeSimple).slice(0, 80)
+          : "1 Stunde",
+      buildTimeExpert:
+        raw.buildTimeExpert != null
+          ? String(raw.buildTimeExpert).slice(0, 80)
+          : "1 FAP + Fertigkeitswurf",
     };
   } catch (error) {
     console.error("[Trap-Wizard AI]", error);

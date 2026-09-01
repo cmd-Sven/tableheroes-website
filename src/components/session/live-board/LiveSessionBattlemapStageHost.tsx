@@ -78,6 +78,10 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     handleFogShapeDelete,
     handleEffectTemplateDelete,
     handleMarkerDelete,
+    handleTrapDelete,
+    handleTrapMarkDiscovered,
+    handleTrapTrigger,
+    setTrapDisarmTarget,
     handleBattlemapCellClick,
     handleBattlemapTokenMove,
     handleBattlemapPropDrop,
@@ -332,6 +336,13 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       }}
       onMarkerDelete={handleMarkerDelete}
       onMarkerToolCancel={() => setMarkerTool(null)}
+      onTrapDelete={handleTrapDelete}
+      onTrapMarkDiscovered={handleTrapMarkDiscovered}
+      onTrapTrigger={handleTrapTrigger}
+      onTrapDisarm={(trapId) => {
+        const trap = battlemapTraps.find((t) => t.id === trapId) ?? null;
+        setTrapDisarmTarget(trap);
+      }}
       onSelectTrap={(id) => {
         setSelectedTrapId(id);
         setSelectedBattlemapTokenId(null);

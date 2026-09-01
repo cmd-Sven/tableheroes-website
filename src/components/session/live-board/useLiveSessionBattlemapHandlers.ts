@@ -12,6 +12,7 @@ import {
 } from "@/src/lib/actions/battlemap-actions";
 import {
   checkBattlemapTrapsOnEnter,
+  checkBattlemapTrapsOnProximity,
 } from "@/src/lib/actions/battlemap-trap-actions";
 import {
   isWithinMovementRange,
@@ -108,6 +109,100 @@ export function useLiveSessionBattlemapHandlers({
     battlemapMarkers,
     battlemapTraps,
   } = bm;
+
+  const applyTrapDetectionResult = useCallback(
+    (
+      result: {
+        kind: "detected";
+        trap: import("@/src/lib/session/battlemap-types").SessionBattlemapTrap;
+        passivePerception: number;
+        characterName: string;
+        source?: "passive" | "enter" | "gm";
+      },
+    ) => {
+      setBattlemapTraps((prev) => upsertBattlemapTrap(prev, result.trap));
+      const sourceHint =
+        result.source === "passive"
+          ? " (passiv, in der Nähe)"
+          : result.source === "enter"
+            ? " (auf Trigger-Zelle)"
+            : "";
+      toast.message(
+        `${result.characterName} bemerkt „${result.trap.name}“ (PP ${result.passivePerception} ≥ eff. DC)${sourceHint}.`,
+      );
+    },
+    [setBattlemapTraps],
+  );
+
+  const runTrapProximityCheck = useCallback(
+    async (characterId: string, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      try {
+        const result = await checkBattlemapTrapsOnProximity({
+          sessionId,
+          battlemapId: activeBattlemapId,
+          characterId,
+          gridX,
+          gridY,
+        });
+        if (result.kind === "detected") {
+          applyTrapDetectionResult(result);
+        }
+      } catch {
+        /* optional */
+      }
+    },
+    [activeBattlemapId, applyTrapDetectionResult, sessionId],
+  );
+
+  const runTrapEnterCheck = useCallback(
+    async (characterId: string, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      try {
+        await runTrapProximityCheck(characterId, gridX, gridY);
+        const result = await checkBattlemapTrapsOnEnter({
+          sessionId,
+          battlemapId: activeBattlemapId,
+          characterId,
+          gridX,
+          gridY,
+        });
+        if (result.kind === "detected") {
+          applyTrapDetectionResult(result);
+        } else if (result.kind === "triggered") {
+          setBattlemapTraps((prev) => upsertBattlemapTrap(prev, result.trap));
+          setLiveState((prev) => {
+            if (!prev) return prev;
+            const updated = normalizeLiveRow({
+              ...prev,
+              battlemap_movement_paused: true,
+            });
+            liveStateRef.current = updated;
+            return updated;
+          });
+          setTrapTriggerEvent({
+            trap: result.trap,
+            characterName: result.characterName,
+            characterId: result.characterId,
+            passivePerception: result.passivePerception,
+          });
+          toast.error(`Falle „${result.trap.name}“ ausgelöst!`);
+        }
+      } catch {
+        /* Trap-Check optional — Bewegung bleibt gültig */
+      }
+    },
+    [
+      activeBattlemapId,
+      applyTrapDetectionResult,
+      runTrapProximityCheck,
+      sessionId,
+      setBattlemapTraps,
+      setLiveState,
+      liveStateRef,
+      setTrapTriggerEvent,
+    ],
+  );
 
   const startCharacterTokenPlacement = useCallback(
     (characterId: string, characterName: string) => {
@@ -248,6 +343,7 @@ export function useLiveSessionBattlemapHandlers({
               : `Token für ${tokenPlacement.characterName} bewegt.`,
           );
           setTokenPlacement(null);
+          void runTrapEnterCheck(tokenPlacement.characterId, gridX, gridY);
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
         }
@@ -265,49 +361,8 @@ export function useLiveSessionBattlemapHandlers({
       supabase,
       startTransition,
       tokenPlacement,
+      runTrapEnterCheck,
     ],
-  );
-
-  const runTrapEnterCheck = useCallback(
-    async (characterId: string, gridX: number, gridY: number) => {
-      if (!activeBattlemapId) return;
-      try {
-        const result = await checkBattlemapTrapsOnEnter({
-          sessionId,
-          battlemapId: activeBattlemapId,
-          characterId,
-          gridX,
-          gridY,
-        });
-        if (result.kind === "detected") {
-          setBattlemapTraps((prev) => upsertBattlemapTrap(prev, result.trap));
-          toast.message(
-            `${result.characterName} bemerkt „${result.trap.name}“ (PP ${result.passivePerception} ≥ DC ${result.trap.detection_dc}).`,
-          );
-        } else if (result.kind === "triggered") {
-          setBattlemapTraps((prev) => upsertBattlemapTrap(prev, result.trap));
-          setLiveState((prev) => {
-            if (!prev) return prev;
-            const updated = normalizeLiveRow({
-              ...prev,
-              battlemap_movement_paused: true,
-            });
-            liveStateRef.current = updated;
-            return updated;
-          });
-          setTrapTriggerEvent({
-            trap: result.trap,
-            characterName: result.characterName,
-            characterId: result.characterId,
-            passivePerception: result.passivePerception,
-          });
-          toast.error(`Falle „${result.trap.name}“ ausgelöst!`);
-        }
-      } catch {
-        /* Trap-Check optional — Bewegung bleibt gültig */
-      }
-    },
-    [activeBattlemapId, sessionId],
   );
 
   const handleBattlemapTokenMove = useCallback(

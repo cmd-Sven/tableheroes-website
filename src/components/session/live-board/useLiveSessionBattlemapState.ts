@@ -64,6 +64,9 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     characterId: string;
     passivePerception: number;
   } | null>(null);
+  const [trapDisarmTarget, setTrapDisarmTarget] = useState<SessionBattlemapTrap | null>(
+    null,
+  );
   const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);
   const [gmTokenPlacement, setGmTokenPlacement] = useState<GmTokenPlacementDraft | null>(null);
   const [gmMoveTokenId, setGmMoveTokenId] = useState<string | null>(null);
@@ -148,6 +151,8 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setTrapWizardCell,
     trapTriggerEvent,
     setTrapTriggerEvent,
+    trapDisarmTarget,
+    setTrapDisarmTarget,
     tokenPlacement,
     setTokenPlacement,
     gmTokenPlacement,

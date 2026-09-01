@@ -17,7 +17,10 @@ import {
 } from "@/src/lib/actions/battlemap-actions";
 import {
   clearBattlemapTraps,
+  listBattlemapTraps,
+  markBattlemapTrapDiscovered,
   removeBattlemapTrap,
+  triggerBattlemapTrapManually,
 } from "@/src/lib/actions/battlemap-trap-actions";
 import type { GmPropPlacementDraft } from "@/src/lib/session/battlemap-types";
 import type { LiveSessionBattlemapState } from "./useLiveSessionBattlemapState";
@@ -62,6 +65,7 @@ export function useLiveSessionBattlemapToolHandlers({
     setSelectedMarkerId,
     setBattlemapTraps,
     setSelectedTrapId,
+    setTrapTriggerEvent,
     battlemapFogShapes,
     battlemapEffectTemplates,
     battlemapMarkers,
@@ -244,12 +248,18 @@ export function useLiveSessionBattlemapToolHandlers({
       toast.message("Keine Fallen zum Löschen.");
       return;
     }
+    const mapId = activeBattlemapId;
     startTransition(async () => {
       try {
-        await clearBattlemapTraps(activeBattlemapId, sessionId);
-        setBattlemapTraps([]);
+        await clearBattlemapTraps(mapId, sessionId);
+        const remaining = await listBattlemapTraps(mapId, sessionId);
+        setBattlemapTraps(remaining);
         setSelectedTrapId(null);
-        toast.success("Alle Fallen entfernt.");
+        if (remaining.length === 0) {
+          toast.success("Alle Fallen entfernt.");
+        } else {
+          toast.error(`${remaining.length} Falle(n) konnten nicht gelöscht werden.`);
+        }
       } catch (e) {
         toast.error(
           e instanceof Error ? e.message : "Fallen konnten nicht gelöscht werden.",
@@ -265,6 +275,57 @@ export function useLiveSessionBattlemapToolHandlers({
     setBattlemapTraps,
     setSelectedTrapId,
   ]);
+
+  const handleTrapMarkDiscovered = useCallback(
+    (trapId: string) => {
+      startTransition(async () => {
+        try {
+          const updated = await markBattlemapTrapDiscovered({
+            sessionId,
+            trapId,
+          });
+          setBattlemapTraps((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t)),
+          );
+          toast.success(`„${updated.name}“ als entdeckt markiert.`);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Falle konnte nicht markiert werden.",
+          );
+        }
+      });
+    },
+    [sessionId, startTransition, setBattlemapTraps],
+  );
+
+  const handleTrapTrigger = useCallback(
+    (trapId: string) => {
+      if (!isGM) return;
+      startTransition(async () => {
+        try {
+          const result = await triggerBattlemapTrapManually({
+            sessionId,
+            trapId,
+          });
+          setBattlemapTraps((prev) =>
+            prev.map((t) => (t.id === result.trap.id ? result.trap : t)),
+          );
+          setTrapTriggerEvent({
+            trap: result.trap,
+            characterName: result.characterName,
+            characterId: result.characterId,
+            passivePerception: result.passivePerception,
+          });
+          toast.error(`Falle „${result.trap.name}“ ausgelöst!`);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Falle konnte nicht ausgelöst werden.",
+          );
+        }
+      });
+    },
+    [isGM, sessionId, setBattlemapTraps, setTrapTriggerEvent, startTransition],
+  );
 
   const handleBattlemapPropDrop = useCallback(
     (draft: GmPropPlacementDraft, posX: number, posY: number) => {
@@ -322,6 +383,8 @@ export function useLiveSessionBattlemapToolHandlers({
     handleMarkerClearAll,
     handleTrapDelete,
     handleTrapClearAll,
+    handleTrapMarkDiscovered,
+    handleTrapTrigger,
     handleBattlemapPropDrop,
     handleBattlemapPropResize,
   };

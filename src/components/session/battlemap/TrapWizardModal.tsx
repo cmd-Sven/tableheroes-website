@@ -31,6 +31,9 @@ export type TrapWizardDraft = {
   saveDC: number;
   /** CharacterConditionKey oder leer */
   statusEffect: CharacterConditionKey | "";
+  components: import("@/src/lib/session/battlemap-trap-model").TrapComponent[];
+  buildTimeSimple: string;
+  buildTimeExpert: string;
 };
 
 type Props = {
@@ -86,6 +89,9 @@ const emptyDraft = (): TrapWizardDraft => ({
   saveAbility: "dex",
   saveDC: 13,
   statusEffect: "",
+  components: [],
+  buildTimeSimple: "1 Stunde",
+  buildTimeExpert: "1 FAP + Fertigkeitswurf",
 });
 
 export function TrapWizardModal({
@@ -120,10 +126,23 @@ export function TrapWizardModal({
         });
         const parsed = parseDamageField(out.damage);
         const statusEffect = parseTrapStatusEffect(out.statusEffect) ?? "";
+        const components =
+          out.components?.map((c, i) => ({
+            id: `comp-${i}`,
+            name: c.name,
+            description: c.description,
+            category: (["poison", "ammo", "mechanical", "gem", "scroll", "consumable", "other"].includes(
+              c.category,
+            )
+              ? c.category
+              : "other") as import("@/src/lib/session/battlemap-trap-model").TrapComponent["category"],
+            quantity: c.quantity,
+            isMagical: c.isMagical,
+          })) ?? [];
         setDraft({
           name: out.name,
           description: out.description,
-          trapType: "mechanical",
+          trapType: out.trapType ?? "mechanical",
           difficulty: aiDifficulty === "hard" ? "hard" : aiDifficulty === "easy" ? "easy" : "medium",
           detectionDC: out.dc,
           isAreaEffect: out.isAreaEffect,
@@ -134,6 +153,9 @@ export function TrapWizardModal({
           saveAbility: saveTypeToAbility(out.saveType),
           saveDC: out.dc,
           statusEffect,
+          components,
+          buildTimeSimple: out.buildTimeSimple ?? "1 Stunde",
+          buildTimeExpert: out.buildTimeExpert ?? "1 FAP + Fertigkeitswurf",
         });
         toast.success("Falle per KI erzeugt — bitte prüfen.");
       } catch (e) {
@@ -168,12 +190,16 @@ export function TrapWizardModal({
           saveDC: draft.saveDC,
           statusEffect: draft.statusEffect || null,
           loreContext: locationLoreContext || null,
+          components: draft.components,
           aiPayload: {
             detectionDC: draft.detectionDC,
             damage: `${draft.damage} ${draft.damageType}`.trim(),
             effectRadius: draft.effectRadius,
             isAreaEffect: draft.isAreaEffect,
             statusEffect: draft.statusEffect || null,
+            components: draft.components,
+            buildTimeSimple: draft.buildTimeSimple,
+            buildTimeExpert: draft.buildTimeExpert,
           },
         });
         toast.success(`Falle „${created.name}“ scharf gestellt.`);

@@ -56,6 +56,10 @@ export function BattlemapStage({
   onSelectTrap,
   onTrapPlaceCell,
   onTrapToolCancel,
+  onTrapDelete,
+  onTrapMarkDiscovered,
+  onTrapTrigger,
+  onTrapDisarm,
   onCancelPlacement,
   onToggleDash,
   onCellClick,
@@ -181,6 +185,19 @@ export function BattlemapStage({
       !markerPlaceActive &&
       !trapPlaceActive,
   );
+  const playerDisarmActive = Boolean(
+    !isGm &&
+      ownCharacterId &&
+      !placementActive &&
+      !trapPlaceActive &&
+      !shapeDrawActive,
+  );
+  const ownCharacterGrid = (() => {
+    if (!ownCharacterId) return null;
+    const token = tokens.find((t) => t.character_id === ownCharacterId);
+    if (!token) return null;
+    return { x: token.grid_x, y: token.grid_y };
+  })();
   const shapeSelectActive =
     fogInteractive || effectInteractive || markerInteractive || trapInteractive;
   const mapInteractionLocked =
@@ -318,9 +335,11 @@ export function BattlemapStage({
     selectedFogShapeId,
     selectedEffectTemplateId,
     selectedMarkerId,
+    selectedTrapId,
     onFogShapeDelete,
     onEffectTemplateDelete,
     onMarkerDelete,
+    onTrapDelete,
   });
 
   const displayFogShapes = fogMovePreview
@@ -461,6 +480,12 @@ export function BattlemapStage({
         onEffectTemplateDelete={onEffectTemplateDelete}
         onMarkerMove={onMarkerMove}
         onMarkerDelete={onMarkerDelete}
+        onTrapDelete={onTrapDelete}
+        onTrapMarkDiscovered={onTrapMarkDiscovered}
+        onTrapTrigger={onTrapTrigger}
+        onTrapDisarm={onTrapDisarm}
+        playerDisarmActive={playerDisarmActive}
+        ownCharacterGrid={ownCharacterGrid}
         onTokenMove={onTokenMove}
         onTokenContextMenu={onTokenContextMenu}
         handleContentClick={handleContentClick}

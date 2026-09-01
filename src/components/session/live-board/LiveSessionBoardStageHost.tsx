@@ -142,6 +142,10 @@ export function LiveSessionBoardStageHost() {
       handleFogShapeDelete,
       handleEffectTemplateDelete,
       handleMarkerDelete,
+      handleTrapDelete,
+      handleTrapMarkDiscovered,
+      handleTrapTrigger,
+      setTrapDisarmTarget,
       handleBattlemapPropDrop,
       handleBattlemapPropResize,
       visibleBattlemapTokens,
@@ -364,6 +368,10 @@ export function LiveSessionBoardStageHost() {
               handleFogShapeDelete={handleFogShapeDelete}
               handleEffectTemplateDelete={handleEffectTemplateDelete}
               handleMarkerDelete={handleMarkerDelete}
+              handleTrapDelete={handleTrapDelete}
+              handleTrapMarkDiscovered={handleTrapMarkDiscovered}
+              handleTrapTrigger={handleTrapTrigger}
+              setTrapDisarmTarget={setTrapDisarmTarget}
               handleBattlemapCellClick={handleBattlemapCellClick}
               handleBattlemapTokenMove={handleBattlemapTokenMove}
               handleBattlemapPropDrop={handleBattlemapPropDrop}

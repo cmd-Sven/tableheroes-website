@@ -175,6 +175,8 @@ export function LiveSessionBoardModalsLayer() {
       setTrapWizardCell,
       trapTriggerEvent,
       setTrapTriggerEvent,
+      trapDisarmTarget,
+      setTrapDisarmTarget,
       tokenPlacement,
       setTokenPlacement,
       gmTokenPlacement,
@@ -335,6 +337,9 @@ export function LiveSessionBoardModalsLayer() {
         setBattlemapTraps={setBattlemapTraps}
         trapTriggerEvent={trapTriggerEvent}
         setTrapTriggerEvent={setTrapTriggerEvent}
+        trapDisarmTarget={trapDisarmTarget}
+        setTrapDisarmTarget={setTrapDisarmTarget}
+        ownCharacterId={currentPlayerCharacter?.id ?? null}
         wrapUpOpen={wrapUpOpen}
         setWrapUpOpen={setWrapUpOpen}
         chronicleRecorder={chronicleRecorder}

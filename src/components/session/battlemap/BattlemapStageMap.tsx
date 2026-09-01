@@ -138,6 +138,12 @@ export type BattlemapStageMapProps = {
   onEffectTemplateDelete?: (templateId: string) => void;
   onMarkerMove?: (markerId: string, gridX: number, gridY: number) => void;
   onMarkerDelete?: (markerId: string) => void;
+  onTrapDelete?: (trapId: string) => void;
+  onTrapMarkDiscovered?: (trapId: string) => void;
+  onTrapTrigger?: (trapId: string) => void;
+  onTrapDisarm?: (trapId: string) => void;
+  playerDisarmActive?: boolean;
+  ownCharacterGrid?: { x: number; y: number } | null;
   onTokenMove?: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
   onTokenContextMenu?: (
     token: SessionBattlemapToken,
@@ -231,6 +237,12 @@ export function BattlemapStageMap({
   onEffectTemplateDelete,
   onMarkerMove,
   onMarkerDelete,
+  onTrapDelete,
+  onTrapMarkDiscovered,
+  onTrapTrigger,
+  onTrapDisarm,
+  playerDisarmActive = false,
+  ownCharacterGrid = null,
   onTokenMove,
   onTokenContextMenu,
   handleContentClick,
@@ -546,8 +558,14 @@ export function BattlemapStageMap({
             config={config}
             isGm={isGm}
             interactive={trapInteractive}
+            playerDisarmActive={playerDisarmActive}
+            ownCharacterGrid={ownCharacterGrid}
             selectedTrapId={selectedTrapId}
             onSelectTrap={layerSelect.onSelectTrap}
+            onDeleteTrap={onTrapDelete}
+            onMarkDiscovered={onTrapMarkDiscovered}
+            onTriggerTrap={onTrapTrigger}
+            onDisarmTrap={onTrapDisarm}
           />
           <BattlemapTokenLayer
             tokens={tokens}

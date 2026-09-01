@@ -112,6 +112,10 @@ export type LiveSessionBattlemapPaneProps = {
   handleFogShapeDelete: (shapeId: string) => void;
   handleEffectTemplateDelete: (templateId: string) => void;
   handleMarkerDelete: (markerId: string) => void;
+  handleTrapDelete: (trapId: string) => void;
+  handleTrapMarkDiscovered: (trapId: string) => void;
+  handleTrapTrigger: (trapId: string) => void;
+  setTrapDisarmTarget: Dispatch<SetStateAction<SessionBattlemapTrap | null>>;
   handleBattlemapCellClick: (gridX: number, gridY: number) => void;
   handleBattlemapTokenMove: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
   handleBattlemapPropDrop: (draft: GmPropPlacementDraft, posX: number, posY: number) => void;
