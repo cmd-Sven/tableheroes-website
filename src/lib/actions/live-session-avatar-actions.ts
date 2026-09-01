@@ -538,7 +538,7 @@ export async function applyLiveSessionWeaponPreset(input: {
   await appendSessionActivity({
     sessionId: input.sessionId,
     type: "player_action",
-    text: `${input.characterName} wechselt Waffenkombination: „${preset.name}"`,
+    text: `${input.characterName} wechselt Waffe auf: ${preset.name}`,
     characterId: input.characterId,
     characterName: input.characterName,
   });

@@ -62,7 +62,8 @@ export function useLiveSessionDiceFx({
         entry.type === "player_action" &&
         (text.includes("Ausrüstung") ||
           text.includes("Loadout") ||
-          text.includes("Waffenkombination"))
+          text.includes("Waffenkombination") ||
+          text.includes("wechselt Waffe auf"))
       ) {
         toast.info(text, { duration: 9000 });
       }

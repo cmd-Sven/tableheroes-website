@@ -78,7 +78,11 @@ export async function resolveLiveDiceSheetModifier(input: {
   }
 
   if (input.kind === "damage") {
-    return { modifier: clientMod, source: "client", label: input.label };
+    return {
+      modifier: clientMod + bonusMalus,
+      source: "client",
+      label: input.label,
+    };
   }
 
   const supabase = await createClient();
@@ -185,15 +189,19 @@ export async function resolveLiveDiceSheetModifier(input: {
       equipment,
       level,
     );
-    const primary = attacks[0] ?? null;
+    const weaponFilter = input.weaponName?.trim();
+    const matched =
+      weaponFilter != null && weaponFilter.length > 0
+        ? attacks.find((a) => a.name === weaponFilter) ?? attacks[0] ?? null
+        : attacks[0] ?? null;
     // Angriffswurf ist ein W20-Test → Erschöpfung abziehen (equipment-Bonus enthält sie nicht).
-    const bonus = (primary?.attackBonus ?? 0) + exhaustionPenalty + bonusMalus;
+    const bonus = (matched?.attackBonus ?? 0) + exhaustionPenalty + bonusMalus;
     return {
       modifier: Math.round(bonus),
       attackBonus: Math.round(bonus),
-      weaponName: primary?.name ?? input.weaponName ?? "Waffe",
-      damage: primary?.damage ?? null,
-      source: primary ? "sheet" : "client",
+      weaponName: matched?.name ?? input.weaponName ?? "Waffe",
+      damage: matched?.damage ?? null,
+      source: matched ? "sheet" : "client",
       exhaustionLevel,
     };
   }

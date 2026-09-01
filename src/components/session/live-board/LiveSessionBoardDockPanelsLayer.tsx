@@ -338,6 +338,7 @@ export function LiveSessionBoardDockPanelsLayer() {
         setPrepTestCharacterId={setPrepTestCharacterId}
         setLiveState={setLiveState}
         liveStateRef={liveStateRef}
+        activityLogs={liveState?.system_logs ?? []}
         weatherVisual={weatherVisual}
         dayPhase={dayPhase}
         temperatureValue={temperatureValue}

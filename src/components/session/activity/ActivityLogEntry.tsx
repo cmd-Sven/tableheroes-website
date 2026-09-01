@@ -204,9 +204,13 @@ export function ActivityLogEntry({
           onClick={() =>
             onDamageRoll(meta?.damage, Boolean(meta?.critical), requestId, meta?.weaponName)
           }
-          className="mt-1.5 w-full rounded border border-accent-blood/50 bg-accent-blood/15 px-2 py-1 font-barlow text-[9px] font-bold uppercase text-accent-blood"
+          className={`mt-1.5 w-full rounded border px-2 py-1 font-barlow text-[9px] font-bold uppercase ${
+            meta?.critical
+              ? "border-accent-gold/70 bg-accent-gold/15 text-accent-gold"
+              : "border-accent-blood/50 bg-accent-blood/15 text-accent-blood"
+          }`}
         >
-          Schaden würfeln ({meta?.damage ?? "?"})
+          {meta?.critical ? "Crit Schaden" : "Schaden"} würfeln ({meta?.damage ?? "?"})
           {meta?.critical ? " · doppelte Würfel" : ""}
         </button>
       ) : null}

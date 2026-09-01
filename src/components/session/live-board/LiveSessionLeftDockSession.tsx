@@ -32,7 +32,7 @@ import type { SessionDayPhase } from "@/src/lib/session-day-phase";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import type { UseSessionChronicleRecorderReturn } from "@/src/hooks/useSessionChronicleRecorder";
 import type { MicMonitorApi } from "@/src/hooks/useMicMonitor";
-import type { LiveState, PartyCharacter } from "./live-session-types";
+import type { LiveState, PartyCharacter, SystemLogEntry } from "./live-session-types";
 import type { getWeatherVisual } from "./live-session-weather";
 
 export type LiveSessionLeftDockSessionProps = {
@@ -59,6 +59,7 @@ export type LiveSessionLeftDockSessionProps = {
   setPrepTestCharacterId: Dispatch<SetStateAction<string | null>>;
   setLiveState: Dispatch<SetStateAction<LiveState | null>>;
   liveStateRef: MutableRefObject<LiveState | null>;
+  activityLogs?: SystemLogEntry[];
   weatherVisual: ReturnType<typeof getWeatherVisual>;
   dayPhase: SessionDayPhase;
   temperatureValue: number;
@@ -164,6 +165,7 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     setPrepTestCharacterId,
     setLiveState,
     liveStateRef,
+    activityLogs = [],
     weatherVisual,
     dayPhase,
     temperatureValue,
@@ -271,6 +273,7 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
               open={isDiceOpen}
               onClose={() => setIsDiceOpen(false)}
               currentCharacter={activityCharacter ?? null}
+              activityLogs={activityLogs}
               userId={userId}
               isGM={isGM && !forcePlayerView}
               isPrepMode={isPrepMode}

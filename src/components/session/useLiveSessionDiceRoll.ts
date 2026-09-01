@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { getCharacterEquipmentPayload } from "@/src/lib/actions/character-inventory-actions";
 import { loadDnd5eCharacterSheet } from "@/src/app/dashboard/campaigns/[id]/character-sheet-actions";
+import { applyLiveSessionWeaponPreset } from "@/src/lib/actions/live-session-avatar-actions";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import { ABILITY_LABELS_DE, ABILITY_KEYS, type AbilityKey } from "@/src/lib/characters/dnd5e/types";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
@@ -11,7 +12,13 @@ import {
   computeEquippedWeaponAttacks,
   type WeaponAttackPreview,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { parseRollCommand, formatDicePoolFormula, parseBonusMalus, type DicePoolGroup, type DiceRollMode } from "@/src/lib/session/dice-roll";
+import {
+  parseRollCommand,
+  formatDicePoolFormula,
+  parseBonusMalus,
+  type DicePoolGroup,
+  type DiceRollMode,
+} from "@/src/lib/session/dice-roll";
 import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
 import { requestDiceDropPlacement } from "@/src/lib/session/dice-placement-store";
 import { applyFlawModifiersToDerived } from "@/src/lib/characters/flaw-modifiers";
@@ -29,6 +36,20 @@ function sheetDerivedForRolls(payload: CharacterSheetPayload) {
 
 type DiceRoller = { id: string; name: string };
 
+export type PendingDamageRoll = {
+  requestId: string;
+  damage: string;
+  weaponName: string;
+  critical: boolean;
+};
+
+type ActivityLogLike = {
+  id: string;
+  type?: string;
+  character_id?: string;
+  meta?: Record<string, unknown>;
+};
+
 type UseLiveSessionDiceRollOptions = {
   sessionId: string;
   campaignId: string;
@@ -37,6 +58,7 @@ type UseLiveSessionDiceRollOptions = {
   roller: DiceRoller | null;
   /** Panel sichtbar — Charakterbogen für Angriff/Fertigkeit laden. */
   active: boolean;
+  activityLogs?: ActivityLogLike[];
   onActivityPosted?: (entry: SessionActivityEntry) => void;
   userId?: string | null;
   isGM?: boolean;
@@ -44,12 +66,51 @@ type UseLiveSessionDiceRollOptions = {
   diceSkinId?: DiceSkinId;
 };
 
+function computePendingDamageRolls(
+  logs: ActivityLogLike[],
+  rollerId: string | undefined,
+): PendingDamageRoll[] {
+  if (!rollerId || isGmDiceRollerId(rollerId)) return [];
+
+  const rolled = new Set<string>();
+  for (const log of logs) {
+    if (log.type === "damage_roll" && log.meta?.requestId) {
+      rolled.add(String(log.meta.requestId));
+    }
+  }
+
+  const pending: PendingDamageRoll[] = [];
+  for (const log of logs) {
+    if (log.type !== "attack_hit" || log.character_id !== rollerId) continue;
+    const meta = log.meta as
+      | {
+          awaitsDamageRoll?: boolean;
+          damage?: string;
+          weaponName?: string;
+          critical?: boolean;
+          requestId?: string;
+        }
+      | undefined;
+    if (!meta?.awaitsDamageRoll || !meta.damage) continue;
+    const requestId = String(meta.requestId ?? log.id);
+    if (rolled.has(requestId)) continue;
+    pending.push({
+      requestId,
+      damage: meta.damage,
+      weaponName: meta.weaponName ?? "Waffe",
+      critical: Boolean(meta.critical),
+    });
+  }
+  return pending;
+}
+
 export function useLiveSessionDiceRoll({
   sessionId,
   campaignId,
   currentCharacter,
   roller,
   active,
+  activityLogs = [],
   onActivityPosted,
   userId = null,
   isGM = false,
@@ -63,12 +124,52 @@ export function useLiveSessionDiceRoll({
   const [skillBonus, setSkillBonus] = useState(0);
   const [selectedSave, setSelectedSave] = useState<AbilityKey | "">("");
   const [saveBonus, setSaveBonus] = useState(0);
-  const [primaryAttack, setPrimaryAttack] = useState<WeaponAttackPreview | null>(null);
+  const [weaponAttacks, setWeaponAttacks] = useState<WeaponAttackPreview[]>([]);
+  const [selectedAttackIndex, setSelectedAttackIndex] = useState(0);
+  const [weaponPresets, setWeaponPresets] = useState<{ id: string; name: string }[]>([]);
   const [bonusMalusInput, setBonusMalusInput] = useState("");
   const [pending, startTransition] = useTransition();
   const { skinId: storedSkinId, setSkinId } = useDiceSkin(userId, isGM);
   const skinId = diceSkinIdProp ?? storedSkinId;
   const bonusMalus = parseBonusMalus(bonusMalusInput);
+
+  const selectedAttack =
+    weaponAttacks[selectedAttackIndex] ?? weaponAttacks[0] ?? null;
+
+  const pendingDamageRolls = useMemo(
+    () => computePendingDamageRolls(activityLogs, roller?.id),
+    [activityLogs, roller?.id],
+  );
+
+  const reloadWeaponData = useCallback(async (characterId: string) => {
+    const [payload, equip] = await Promise.all([
+      loadDnd5eCharacterSheet(campaignId, characterId),
+      getCharacterEquipmentPayload(characterId),
+    ]);
+    if (!payload) return;
+    const derived = sheetDerivedForRolls(payload);
+    const attacks = computeEquippedWeaponAttacks(
+      payload.sheet,
+      derived,
+      equip.items.filter((i) => !i.is_deleted),
+      equip.equipment,
+      payload.level,
+    );
+    setWeaponAttacks(attacks);
+    setSelectedAttackIndex(0);
+    setWeaponPresets(
+      (equip.equipment.weaponPresets ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+      })),
+    );
+    if (selectedSkill) {
+      setSkillBonus(derived.skills[selectedSkill as Dnd5eSkillKey]?.total ?? 0);
+    }
+    if (selectedSave) {
+      setSaveBonus(derived.savingThrows[selectedSave]?.total ?? 0);
+    }
+  }, [campaignId, selectedSave, selectedSkill]);
 
   useEffect(() => {
     if (!rollingAsGm) return;
@@ -76,33 +177,15 @@ export function useLiveSessionDiceRoll({
     setSkillBonus(0);
     setSelectedSave("");
     setSaveBonus(0);
-    setPrimaryAttack(null);
+    setWeaponAttacks([]);
+    setSelectedAttackIndex(0);
+    setWeaponPresets([]);
   }, [rollingAsGm]);
 
   useEffect(() => {
     if (!active || !sheetCharacter) return;
-    void Promise.all([
-      loadDnd5eCharacterSheet(campaignId, sheetCharacter.id),
-      getCharacterEquipmentPayload(sheetCharacter.id),
-    ]).then(([payload, equip]) => {
-      if (!payload) return;
-      const derived = sheetDerivedForRolls(payload);
-      const attacks = computeEquippedWeaponAttacks(
-        payload.sheet,
-        derived,
-        equip.items.filter((i) => !i.is_deleted),
-        equip.equipment,
-        payload.level,
-      );
-      setPrimaryAttack(attacks[0] ?? null);
-      if (selectedSkill) {
-        setSkillBonus(derived.skills[selectedSkill as Dnd5eSkillKey]?.total ?? 0);
-      }
-      if (selectedSave) {
-        setSaveBonus(derived.savingThrows[selectedSave]?.total ?? 0);
-      }
-    });
-  }, [campaignId, sheetCharacter, active, selectedSkill, selectedSave]);
+    void reloadWeaponData(sheetCharacter.id);
+  }, [active, sheetCharacter, reloadWeaponData]);
 
   function postLiveDiceRoll(
     input: Omit<
@@ -133,7 +216,7 @@ export function useLiveSessionDiceRoll({
         let throwStrength: number | undefined;
         let isTap: boolean | undefined;
         try {
-        const drop = await requestDiceDropPlacement({
+          const drop = await requestDiceDropPlacement({
             sides: input.sides,
             count: input.diceGroups
               ? input.diceGroups.reduce((s, g) => s + g.count, 0)
@@ -253,17 +336,16 @@ export function useLiveSessionDiceRoll({
       toast.error("Angriffswürfe brauchen einen Charakter — nicht als Spielleiter.");
       return;
     }
-    if (!sheetCharacter) return;
-    const bonus = primaryAttack?.attackBonus ?? 0;
-    const weaponName = primaryAttack?.name ?? "Waffe";
+    if (!sheetCharacter || !selectedAttack) return;
+    const bonus = selectedAttack.attackBonus;
     postLiveDiceRoll({
       kind: "attack",
       dice: 1,
       sides: 20,
       modifier: bonus,
       mode: rollMode,
-      weaponName,
-      damage: primaryAttack?.damage ?? null,
+      weaponName: selectedAttack.name,
+      damage: selectedAttack.damage,
       attackBonus: bonus,
       bonusMalus,
     });
@@ -275,7 +357,7 @@ export function useLiveSessionDiceRoll({
     requestId?: string,
     weaponName?: string,
   ) {
-    if (!currentCharacter || !damageFormula) {
+    if (!sheetCharacter || !damageFormula) {
       toast.error("Kein Schadenswert für diese Waffe hinterlegt.");
       return;
     }
@@ -295,6 +377,24 @@ export function useLiveSessionDiceRoll({
       requestId,
       damageFormula,
       weaponName,
+      bonusMalus,
+    });
+  }
+
+  function switchWeaponPreset(presetId: string) {
+    if (!sheetCharacter || !presetId) return;
+    startTransition(async () => {
+      try {
+        await applyLiveSessionWeaponPreset({
+          sessionId,
+          characterId: sheetCharacter.id,
+          characterName: sheetCharacter.name,
+          presetId,
+        });
+        await reloadWeaponData(sheetCharacter.id);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Waffenwechsel fehlgeschlagen.");
+      }
     });
   }
 
@@ -331,7 +431,13 @@ export function useLiveSessionDiceRoll({
     skillBonus,
     selectedSave,
     saveBonus,
-    primaryAttack: rollingAsGm ? null : primaryAttack,
+    selectedAttack: rollingAsGm ? null : selectedAttack,
+    weaponAttacks: rollingAsGm ? [] : weaponAttacks,
+    selectedAttackIndex,
+    setSelectedAttackIndex,
+    weaponPresets: rollingAsGm ? [] : weaponPresets,
+    switchWeaponPreset,
+    pendingDamageRolls,
     bonusMalus,
     bonusMalusInput,
     setBonusMalusInput,
@@ -351,5 +457,7 @@ export function useLiveSessionDiceRoll({
     onSaveChange,
     skillOptions: DND5E_SKILLS,
     saveOptions: ABILITY_KEYS,
+    /** @deprecated Alias für selectedAttack */
+    primaryAttack: rollingAsGm ? null : selectedAttack,
   };
 }

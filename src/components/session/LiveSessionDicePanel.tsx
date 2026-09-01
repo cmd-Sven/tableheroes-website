@@ -23,6 +23,7 @@ import { useLiveSessionDiceRoll } from "@/src/components/session/useLiveSessionD
 import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
 import { DiceSkinPalette } from "@/src/components/session/dice/DiceSkinPalette";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
+import type { SystemLogEntry } from "@/src/components/session/live-board/live-session-types";
 
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
 const MAX_POOL = 12;
@@ -37,6 +38,7 @@ type Props = {
   currentCharacter: { id: string; name: string } | null;
   /** Alle wählbaren Gruppencharaktere für den SL (Live + Vorbereitung). */
   gmRollCharacters?: { id: string; name: string }[];
+  activityLogs?: SystemLogEntry[];
   isPrepMode?: boolean;
   prepTestCharacters?: { id: string; name: string }[];
   prepTestCharacterId?: string | null;
@@ -55,6 +57,7 @@ export function LiveSessionDicePanel({
   onClose,
   currentCharacter,
   gmRollCharacters,
+  activityLogs = [],
   isPrepMode = false,
   prepTestCharacters,
   prepTestCharacterId,
@@ -95,6 +98,7 @@ export function LiveSessionDicePanel({
     currentCharacter,
     roller,
     active: open,
+    activityLogs,
     onActivityPosted,
     userId,
     isGM,
@@ -408,41 +412,130 @@ export function LiveSessionDicePanel({
           </p>
         ) : null}
 
-        {dice.primaryAttack ? (
+        {!dice.rollingAsGm && dice.canRoll ? (
           <div className="mt-1 rounded border border-accent-blood/40 bg-accent-blood/5 p-2.5">
             <p className="font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-blood">
-              Ausgerüstete Waffe
+              Angriff
             </p>
-            <p className="mt-0.5 truncate font-barlow text-xs font-bold text-white">
-              {dice.primaryAttack.name}
-            </p>
-            <p className="mt-1 font-libre text-[10px] text-accent-gold">
-              Angriff{" "}
-              {formatSigned(dice.primaryAttack.attackBonus + dice.bonusMalus)}
-              {dice.bonusMalus !== 0 ? (
-                <span className="text-gray-500">
-                  {" "}
-                  ({formatSigned(dice.primaryAttack.attackBonus)}
-                  {formatSigned(dice.bonusMalus)})
-                </span>
-              ) : null}
-              {" · "}
-              Schaden {dice.primaryAttack.damage}
-            </p>
-            {dice.primaryAttack.notes ? (
-              <p className="mt-0.5 font-libre text-[9px] text-gray-500">
-                {dice.primaryAttack.notes}
+
+            {dice.weaponPresets.length > 1 ? (
+              <select
+                value=""
+                onChange={(e) => {
+                  const presetId = e.target.value;
+                  if (presetId) dice.switchWeaponPreset(presetId);
+                }}
+                disabled={dice.pending}
+                className="mt-1.5 w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
+              >
+                <option value="">Waffenset wechseln…</option>
+                {dice.weaponPresets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            {dice.weaponAttacks.length > 1 ? (
+              <select
+                value={dice.selectedAttackIndex}
+                onChange={(e) => dice.setSelectedAttackIndex(Number(e.target.value))}
+                disabled={dice.pending}
+                className="mt-1.5 w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
+              >
+                {dice.weaponAttacks.map((attack, index) => (
+                  <option key={attack.itemId} value={index}>
+                    {attack.name}
+                  </option>
+                ))}
+              </select>
+            ) : dice.selectedAttack ? (
+              <p className="mt-0.5 truncate font-barlow text-xs font-bold text-white">
+                {dice.selectedAttack.name}
               </p>
             ) : null}
-            <button
-              type="button"
-              disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
-              onClick={dice.handleAttackRoll}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border border-accent-blood/60 bg-accent-blood/15 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
-            >
-              <Swords className="h-3.5 w-3.5" />
-              Angriff
-            </button>
+
+            {dice.selectedAttack ? (
+              <>
+                <p className="mt-1 font-libre text-[10px] text-accent-gold">
+                  Angriff{" "}
+                  {formatSigned(dice.selectedAttack.attackBonus + dice.bonusMalus)}
+                  {dice.bonusMalus !== 0 ? (
+                    <span className="text-gray-500">
+                      {" "}
+                      ({formatSigned(dice.selectedAttack.attackBonus)}
+                      {formatSigned(dice.bonusMalus)})
+                    </span>
+                  ) : null}
+                  {" · "}
+                  Schaden {dice.selectedAttack.damage}
+                  {dice.bonusMalus !== 0 ? (
+                    <span className="text-gray-500"> {formatSigned(dice.bonusMalus)} Mali/Boni</span>
+                  ) : null}
+                </p>
+                {dice.selectedAttack.notes ? (
+                  <p className="mt-0.5 font-libre text-[9px] text-gray-500">
+                    {dice.selectedAttack.notes}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
+                  onClick={dice.handleAttackRoll}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border border-accent-blood/60 bg-accent-blood/15 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
+                >
+                  <Swords className="h-3.5 w-3.5" />
+                  Angriff
+                </button>
+              </>
+            ) : (
+              <p className="mt-1 font-libre text-[10px] italic text-gray-500">
+                Keine Waffe ausgerüstet.
+              </p>
+            )}
+
+            {dice.pendingDamageRolls.length > 0 ? (
+              <div className="mt-2 space-y-1 border-t border-accent-blood/20 pt-2">
+                {dice.pendingDamageRolls.map((pendingRoll) => (
+                  <div key={pendingRoll.requestId} className="flex gap-1">
+                    {pendingRoll.critical ? (
+                      <button
+                        type="button"
+                        disabled={dice.pending}
+                        onClick={() =>
+                          dice.handleDamageRoll(
+                            pendingRoll.damage,
+                            true,
+                            pendingRoll.requestId,
+                            pendingRoll.weaponName,
+                          )
+                        }
+                        className="flex flex-1 items-center justify-center gap-1 rounded border border-accent-gold/70 bg-accent-gold/15 px-2 py-1.5 font-barlow text-[9px] font-bold uppercase text-accent-gold disabled:opacity-40"
+                      >
+                        Crit Schaden
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={dice.pending}
+                        onClick={() =>
+                          dice.handleDamageRoll(
+                            pendingRoll.damage,
+                            false,
+                            pendingRoll.requestId,
+                            pendingRoll.weaponName,
+                          )
+                        }
+                        className="flex flex-1 items-center justify-center gap-1 rounded border border-accent-blood/60 bg-accent-blood/20 px-2 py-1.5 font-barlow text-[9px] font-bold uppercase text-accent-blood disabled:opacity-40"
+                      >
+                        Schaden
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -179,13 +179,11 @@ export async function requestLiveDiceRoll(
     kind: input.kind,
     clientModifier: input.modifier,
     bonusMalus:
-      input.kind === "damage"
-        ? 0
-        : input.kind === "dice"
-          ? hasD20
-            ? bonusMalus
-            : 0
-          : bonusMalus,
+      input.kind === "dice"
+        ? hasD20
+          ? bonusMalus
+          : 0
+        : bonusMalus,
     skillKey: input.skillKey,
     saveAbility: input.saveAbility,
     label: input.label,
