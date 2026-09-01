@@ -64,7 +64,7 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     characterId: string;
     passivePerception: number;
   } | null>(null);
-  const [trapDisarmTarget, setTrapDisarmTarget] = useState<SessionBattlemapTrap | null>(
+  const [trapDisarmTarget, setTrapDisarmTarget] = useState<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>(
     null,
   );
   const [tokenPlacement, setTokenPlacement] = useState<CharacterTokenPlacement | null>(null);

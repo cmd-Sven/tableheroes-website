@@ -370,7 +370,7 @@ export type LiveSessionStagePartyTraySectionProps = {
     tokenId?: string | null;
   }) => void;
   setTrapDisarmTarget: Dispatch<
-    SetStateAction<import("@/src/lib/session/battlemap-types").SessionBattlemapTrap | null>
+    SetStateAction<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>
   >;
   addCombatToken: (payload: CombatTokenPayload) => Promise<void> | void;
 };
@@ -440,7 +440,9 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
               );
               notifyBattlemapTokensChanged({ op: "upsert", token: updated });
             }}
-            onDisarmTrap={(trap) => setTrapDisarmTarget(trap)}
+            onDisarmTrap={(trap, characterId) =>
+              setTrapDisarmTarget({ trap, characterId })
+            }
             onJoinCombat={(pc) => {
               void addCombatToken({
                 type: "player",

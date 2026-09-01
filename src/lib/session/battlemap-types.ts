@@ -155,6 +155,12 @@ export type SessionBattlemapTrap = {
 /** null = aus; place = Falle setzen; select = auswählen */
 export type BattlemapTrapTool = "select" | "place" | null;
 
+/** Falle + Charakter, der entschärfen soll (Token am Battlemap). */
+export type TrapDisarmTarget = {
+  trap: SessionBattlemapTrap;
+  characterId: string;
+};
+
 export type CharacterTokenPlacement = {
   characterId: string;
   characterName: string;

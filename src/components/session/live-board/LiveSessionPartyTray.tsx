@@ -43,7 +43,7 @@ type Props = {
   onOpenInventory: (pc: PartyCharacter) => void;
   onStartTokenPlacement: (characterId: string, characterName: string) => void;
   onBattlemapTokensChanged: (updated: SessionBattlemapToken) => void;
-  onDisarmTrap: (trap: SessionBattlemapTrap) => void;
+  onDisarmTrap: (trap: SessionBattlemapTrap, characterId: string) => void;
   onJoinCombat: (pc: PartyCharacter) => void;
 };
 

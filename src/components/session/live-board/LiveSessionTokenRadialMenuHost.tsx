@@ -11,7 +11,7 @@ import {
   toggleBattlemapTokenVisibility,
   updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import type { SessionBattlemapToken, SessionBattlemapTrap, TrapDisarmTarget } from "@/src/lib/session/battlemap-types";
 import { isCombatTokenUsed } from "./live-session-combat-utils";
 import type { CombatTokenPayload, LiveState, PartyCharacter } from "./live-session-types";
 
@@ -41,6 +41,8 @@ export type LiveSessionTokenRadialMenuHostProps = {
   combatParticipantNames: Set<string>;
   combatParticipantNpcIds: Set<string>;
   addCombatToken: (payload: CombatTokenPayload) => Promise<void> | void;
+  battlemapTraps: SessionBattlemapTrap[];
+  setTrapDisarmTarget: Dispatch<SetStateAction<TrapDisarmTarget | null>>;
 };
 
 export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenuHostProps) {
@@ -64,11 +66,13 @@ export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenu
     combatParticipantNames,
     combatParticipantNpcIds,
     addCombatToken,
+    battlemapTraps,
+    setTrapDisarmTarget,
   } = props;
 
   return (
     <>
-{tokenRadial && !tokenRadial.token.character_id ? (
+{tokenRadial ? (
         <BattlemapTokenRadialMenu
           token={tokenRadial.token}
           anchor={{ x: tokenRadial.x, y: tokenRadial.y }}
@@ -186,6 +190,11 @@ export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenu
                 );
               }
             });
+          }}
+          battlemapTraps={battlemapTraps}
+          onDisarmTrap={(trap, characterId) => {
+            setTrapDisarmTarget({ trap, characterId });
+            setTokenRadial(null);
           }}
         />
       ) : null}

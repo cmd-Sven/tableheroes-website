@@ -93,7 +93,6 @@ export function buildVisibleRadialItems(args: {
     if (item.tokenSettingsOnly) return hasBattlemapToken;
     if (item.disarmTrapOnly) {
       return (
-        !isGm &&
         battlemapActive &&
         hasBattlemapToken &&
         adjacentDisarmableTraps.length > 0
@@ -153,7 +152,7 @@ export type LiveSessionCharacterAvatarProps = {
   onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
   /** Entdeckte Fallen auf der Battlemap (für Entschärfen am Token). */
   battlemapTraps?: SessionBattlemapTrap[];
-  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
+  onDisarmTrap?: (trap: SessionBattlemapTrap, characterId: string) => void;
   /** Kampfmodus: SL kann Charakter in Initiative aufnehmen */
   combatMode?: boolean;
   canJoinCombat?: boolean;

@@ -115,7 +115,7 @@ export type LiveSessionBattlemapPaneProps = {
   handleTrapDelete: (trapId: string) => void;
   handleTrapMarkDiscovered: (trapId: string) => void;
   handleTrapTrigger: (trapId: string) => void;
-  setTrapDisarmTarget: Dispatch<SetStateAction<SessionBattlemapTrap | null>>;
+  setTrapDisarmTarget: Dispatch<SetStateAction<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>>;
   handleBattlemapCellClick: (gridX: number, gridY: number) => void;
   handleBattlemapTokenMove: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
   handleBattlemapPropDrop: (draft: GmPropPlacementDraft, posX: number, posY: number) => void;

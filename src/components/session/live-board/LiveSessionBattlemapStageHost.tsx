@@ -341,7 +341,8 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       onTrapTrigger={handleTrapTrigger}
       onTrapDisarm={(trapId) => {
         const trap = battlemapTraps.find((t) => t.id === trapId) ?? null;
-        setTrapDisarmTarget(trap);
+        if (!trap || !currentPlayerCharacterId) return;
+        setTrapDisarmTarget({ trap, characterId: currentPlayerCharacterId });
       }}
       onSelectTrap={(id) => {
         setSelectedTrapId(id);
@@ -411,14 +412,20 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       characterDisplayUrlById={characterDisplayUrlById}
       characterConditionsById={characterConditionsById}
       onTokenContextMenu={(token, x, y) => {
-        setTokenRadial({ token, x, y });
-        if (token.character_id) {
+        if (token.character_id && !isGM) {
           dispatchOpenCharacterRadial({
             characterId: token.character_id,
             clientX: x,
             clientY: y,
+            battlemapToken: {
+              tokenId: token.id,
+              showHpBar: token.show_hp_bar === true,
+              sizeCells: token.size_cells,
+            },
           });
+          return;
         }
+        setTokenRadial({ token, x, y });
       }}
     />
   );

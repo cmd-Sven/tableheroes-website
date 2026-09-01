@@ -10,9 +10,11 @@ import {
   Settings2,
   Swords,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import type { SessionBattlemapToken, SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
+import { findAdjacentDisarmableTraps } from "@/src/lib/session/battlemap-trap-geometry";
 import {
   NPC_SIZE_CELLS,
   NPC_SIZE_LABELS_DE,
@@ -38,6 +40,8 @@ type Props = {
     showHpBar: boolean;
     sizeCells: number;
   }) => void;
+  battlemapTraps?: SessionBattlemapTrap[];
+  onDisarmTrap?: (trap: SessionBattlemapTrap, characterId: string) => void;
 };
 
 export function BattlemapTokenRadialMenu({
@@ -53,8 +57,11 @@ export function BattlemapTokenRadialMenu({
   onJoinCombat,
   canJoinCombat = false,
   onSaveSettings,
+  battlemapTraps = [],
+  onDisarmTrap,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [disarmPickerOpen, setDisarmPickerOpen] = useState(false);
   const [showHpBar, setShowHpBar] = useState(token.show_hp_bar === true);
   const [sizeCategory, setSizeCategory] = useState<NpcTokenSizeCategory>(() => {
     const fromCells = (Object.entries(NPC_SIZE_CELLS) as [NpcTokenSizeCategory, number][])
@@ -63,6 +70,13 @@ export function BattlemapTokenRadialMenu({
   });
 
   const isCharacter = Boolean(token.character_id);
+  const adjacentDisarmableTraps = useMemo(
+    () =>
+      token.character_id
+        ? findAdjacentDisarmableTraps(battlemapTraps, token.grid_x, token.grid_y)
+        : [],
+    [battlemapTraps, token.character_id, token.grid_x, token.grid_y],
+  );
   const items = useMemo(() => {
     const list: Array<{
       id: string;
@@ -92,6 +106,22 @@ export function BattlemapTokenRadialMenu({
         onClick: () => {
           onJoinCombat();
           onClose();
+        },
+      });
+    }
+
+    if (token.character_id && adjacentDisarmableTraps.length > 0 && onDisarmTrap) {
+      list.push({
+        id: "disarm_trap",
+        label: "Falle entschärfen",
+        Icon: Wrench,
+        onClick: () => {
+          if (adjacentDisarmableTraps.length === 1) {
+            onDisarmTrap(adjacentDisarmableTraps[0]!, token.character_id!);
+            onClose();
+            return;
+          }
+          setDisarmPickerOpen(true);
         },
       });
     }
@@ -130,13 +160,16 @@ export function BattlemapTokenRadialMenu({
 
     return list;
   }, [
+    adjacentDisarmableTraps,
     canJoinCombat,
     isGm,
     onClose,
+    onDisarmTrap,
     onJoinCombat,
     onMove,
     onRemove,
     onToggleVisibility,
+    token.character_id,
     token.is_visible_to_players,
   ]);
 
@@ -154,7 +187,7 @@ export function BattlemapTokenRadialMenu({
         className="pointer-events-none absolute"
         style={{ left: anchor.x, top: anchor.y }}
       >
-        {!settingsOpen ? (
+        {!settingsOpen && !disarmPickerOpen ? (
           <div className="pointer-events-auto relative h-0 w-0">
             {items.map((item, index) => {
               const angle =
@@ -188,6 +221,37 @@ export function BattlemapTokenRadialMenu({
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+        ) : disarmPickerOpen ? (
+          <div className="pointer-events-auto absolute left-1/2 top-1/2 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hero-border bg-background-card p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-barlow text-xs font-bold uppercase text-accent-gold">
+                Falle entschärfen
+              </h3>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <ul className="max-h-48 space-y-1 overflow-y-auto">
+              {adjacentDisarmableTraps.map((trap) => (
+                <li key={trap.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDisarmTrap?.(trap, token.character_id!);
+                      onClose();
+                    }}
+                    className="w-full rounded border border-hero-dark px-3 py-2 text-left font-libre text-sm text-gray-200 hover:border-hero-vibrant hover:text-accent-gold"
+                  >
+                    {trap.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
           <div className="pointer-events-auto absolute left-1/2 top-1/2 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hero-border bg-background-card p-4 shadow-2xl">

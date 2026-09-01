@@ -68,7 +68,7 @@ export type LiveSessionCharacterAvatarRadialOverlayProps = {
   saveTokenSettings: () => void;
   runAction: (fn: () => Promise<LiveAvatarStatus | void>) => void;
   adjacentDisarmableTraps: SessionBattlemapTrap[];
-  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
+  onDisarmTrap?: (trap: SessionBattlemapTrap, characterId: string) => void;
   sessionId: string;
   characterId: string;
   characterName: string;
@@ -497,7 +497,7 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                         id: trap.id,
                         label: trap.name,
                         onClick: () => {
-                          onDisarmTrap?.(trap);
+                          onDisarmTrap?.(trap, characterId);
                           setMenuOpen(false);
                           setPanel(null);
                         },

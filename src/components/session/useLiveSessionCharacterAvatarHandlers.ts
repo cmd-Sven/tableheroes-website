@@ -41,7 +41,7 @@ type Args = {
   battlemapToken: { id: string; showHpBar: boolean; sizeCells: number; gridX: number; gridY: number } | null;
   onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
   battlemapTraps?: SessionBattlemapTrap[];
-  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
+  onDisarmTrap?: (trap: SessionBattlemapTrap, characterId: string) => void;
   combatMode: boolean;
   canJoinCombat: boolean;
   onJoinCombat?: () => void;
@@ -211,7 +211,7 @@ export function useLiveSessionCharacterAvatarHandlers({
     }
     if (id === "disarm_trap") {
       if (adjacentDisarmableTraps.length === 1) {
-        onDisarmTrap?.(adjacentDisarmableTraps[0]!);
+        onDisarmTrap?.(adjacentDisarmableTraps[0]!, characterId);
         setMenuOpen(false);
         setPanel(null);
         return;

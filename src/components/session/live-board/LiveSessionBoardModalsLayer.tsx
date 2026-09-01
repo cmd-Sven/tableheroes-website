@@ -371,6 +371,8 @@ export function LiveSessionBoardModalsLayer() {
         combatParticipantNames={combatParticipantNames}
         combatParticipantNpcIds={combatParticipantNpcIds}
         addCombatToken={addCombatToken}
+        battlemapTraps={battlemapTraps}
+        setTrapDisarmTarget={setTrapDisarmTarget}
       />
     </>
   );

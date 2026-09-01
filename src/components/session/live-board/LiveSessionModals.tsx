@@ -100,8 +100,10 @@ export type LiveSessionModalsProps = {
   setBattlemapTraps: Dispatch<SetStateAction<SessionBattlemapTrap[]>>;
   trapTriggerEvent: TrapTriggerEvent;
   setTrapTriggerEvent: (event: TrapTriggerEvent) => void;
-  trapDisarmTarget: SessionBattlemapTrap | null;
-  setTrapDisarmTarget: (trap: SessionBattlemapTrap | null) => void;
+  trapDisarmTarget: import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null;
+  setTrapDisarmTarget: (
+    target: import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null,
+  ) => void;
   ownCharacterId?: string | null;
   wrapUpOpen: boolean;
   setWrapUpOpen: (open: boolean) => void;
@@ -332,9 +334,9 @@ export function LiveSessionModals({
 
       <TrapDisarmModal
         open={Boolean(trapDisarmTarget)}
-        trap={trapDisarmTarget}
+        trap={trapDisarmTarget?.trap ?? null}
         sessionId={sessionId}
-        characterId={ownCharacterId ?? null}
+        characterId={trapDisarmTarget?.characterId ?? ownCharacterId ?? null}
         isGm={isGM}
         onClose={() => setTrapDisarmTarget(null)}
         onTrapUpdated={(updated) => {
