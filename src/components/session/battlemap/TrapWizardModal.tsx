@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, X } from "lucide-react";
+import { Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
   BattlemapTrapDifficulty,
   BattlemapTrapEffectShape,
 } from "@/src/lib/session/battlemap-types";
+import type { TrapComponent } from "@/src/lib/session/battlemap-trap-model";
 import { generateTrapWithAI } from "@/src/lib/actions/battlemap-trap-ai";
 import { createBattlemapTrap } from "@/src/lib/actions/battlemap-trap-actions";
 import {
@@ -31,9 +32,19 @@ export type TrapWizardDraft = {
   saveDC: number;
   /** CharacterConditionKey oder leer */
   statusEffect: CharacterConditionKey | "";
-  components: import("@/src/lib/session/battlemap-trap-model").TrapComponent[];
+  components: TrapComponent[];
   buildTimeSimple: string;
   buildTimeExpert: string;
+};
+
+const COMPONENT_CATEGORY_LABELS: Record<TrapComponent["category"], string> = {
+  poison: "Gift",
+  ammo: "Munition",
+  mechanical: "Mechanik",
+  gem: "Edelstein",
+  scroll: "Schriftrolle",
+  consumable: "Verbrauch",
+  other: "Sonstiges",
 };
 
 type Props = {
@@ -113,7 +124,49 @@ export function TrapWizardModal({
   );
   const [pending, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (!open) return;
+    setDraft(emptyDraft());
+    setAiHint("");
+    setAiDifficulty("medium");
+  }, [open, gridX, gridY]);
+
   if (!open) return null;
+
+  function addComponent() {
+    setDraft((prev) => {
+      if (prev.components.length >= 3) {
+        toast.message("Maximal 3 Komponenten.");
+        return prev;
+      }
+      return {
+        ...prev,
+        components: [
+          ...prev.components,
+          {
+            id: `comp-${Date.now()}`,
+            name: "",
+            category: "other" as const,
+            quantity: 1,
+          },
+        ],
+      };
+    });
+  }
+
+  function updateComponent(index: number, patch: Partial<TrapComponent>) {
+    setDraft((prev) => ({
+      ...prev,
+      components: prev.components.map((c, i) => (i === index ? { ...c, ...patch } : c)),
+    }));
+  }
+
+  function removeComponent(index: number) {
+    setDraft((prev) => ({
+      ...prev,
+      components: prev.components.filter((_, i) => i !== index),
+    }));
+  }
 
   function runAi() {
     startTransition(async () => {
@@ -135,7 +188,7 @@ export function TrapWizardModal({
               c.category,
             )
               ? c.category
-              : "other") as import("@/src/lib/session/battlemap-trap-model").TrapComponent["category"],
+              : "other") as TrapComponent["category"],
             quantity: c.quantity,
             isMagical: c.isMagical,
           })) ?? [];
@@ -171,6 +224,9 @@ export function TrapWizardModal({
     }
     startTransition(async () => {
       try {
+        const components = draft.components
+          .filter((c) => c.name.trim())
+          .slice(0, 3);
         const created = await createBattlemapTrap({
           sessionId,
           battlemapId,
@@ -190,14 +246,14 @@ export function TrapWizardModal({
           saveDC: draft.saveDC,
           statusEffect: draft.statusEffect || null,
           loreContext: locationLoreContext || null,
-          components: draft.components,
+          components,
           aiPayload: {
             detectionDC: draft.detectionDC,
             damage: `${draft.damage} ${draft.damageType}`.trim(),
             effectRadius: draft.effectRadius,
             isAreaEffect: draft.isAreaEffect,
             statusEffect: draft.statusEffect || null,
-            components: draft.components,
+            components,
             buildTimeSimple: draft.buildTimeSimple,
             buildTimeExpert: draft.buildTimeExpert,
           },
@@ -293,6 +349,49 @@ export function TrapWizardModal({
               className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
             />
           </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                Fallen-Typ
+              </span>
+              <select
+                value={draft.trapType}
+                onChange={(e) =>
+                  setDraft((p) => ({
+                    ...p,
+                    trapType: e.target.value === "magical" ? "magical" : "mechanical",
+                  }))
+                }
+                className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+              >
+                <option value="mechanical">Mechanisch</option>
+                <option value="magical">Magisch</option>
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                Schwierigkeit
+              </span>
+              <select
+                value={draft.difficulty}
+                onChange={(e) =>
+                  setDraft((p) => ({
+                    ...p,
+                    difficulty: (["easy", "medium", "hard", "deadly"].includes(e.target.value)
+                      ? e.target.value
+                      : "medium") as BattlemapTrapDifficulty,
+                  }))
+                }
+                className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+              >
+                <option value="easy">Leicht</option>
+                <option value="medium">Mittel</option>
+                <option value="hard">Schwer</option>
+                <option value="deadly">Tödlich</option>
+              </select>
+            </label>
+          </div>
 
           <label className="block space-y-1">
             <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
@@ -485,6 +584,128 @@ export function TrapWizardModal({
               Wird über das bestehende Zustands-/Avatar-System gesetzt (SL kann später entfernen).
             </p>
           </label>
+
+          <section className="rounded-md border border-hero-border/40 bg-background-dark/40 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="font-cinzel text-sm font-bold text-accent-gold">
+                Komponenten (1–3)
+              </h3>
+              <button
+                type="button"
+                disabled={draft.components.length >= 3}
+                onClick={addComponent}
+                className="inline-flex items-center gap-1 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant disabled:opacity-40"
+              >
+                <Plus className="h-3 w-3" />
+                Hinzufügen
+              </button>
+            </div>
+            <p className="mb-3 font-libre text-[11px] text-gray-500">
+              Recoverable Bestandteile nach erfolgreicher Entschärfung — per KI befüllt oder
+              manuell ergänzt.
+            </p>
+            {draft.components.length === 0 ? (
+              <p className="font-libre text-xs italic text-gray-500">
+                Noch keine Komponenten — „Mit KI erzeugen“ oder manuell hinzufügen.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {draft.components.map((comp, index) => (
+                  <li
+                    key={comp.id}
+                    className="rounded border border-hero-border/30 bg-slate-900/60 p-2"
+                  >
+                    <div className="mb-2 flex items-start gap-2">
+                      <input
+                        value={comp.name}
+                        onChange={(e) => updateComponent(index, { name: e.target.value })}
+                        placeholder="Name"
+                        className="min-w-0 flex-1 rounded border border-hero-dark bg-slate-900 p-1.5 text-sm text-white outline-none focus:border-hero-vibrant"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeComponent(index)}
+                        className="rounded p-1 text-gray-500 hover:text-red-300"
+                        aria-label="Komponente entfernen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <select
+                        value={comp.category}
+                        onChange={(e) =>
+                          updateComponent(index, {
+                            category: e.target.value as TrapComponent["category"],
+                          })
+                        }
+                        className="rounded border border-hero-dark bg-slate-900 p-1.5 text-xs text-white outline-none focus:border-hero-vibrant"
+                      >
+                        {Object.entries(COMPONENT_CATEGORY_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={comp.quantity}
+                        onChange={(e) =>
+                          updateComponent(index, {
+                            quantity: Math.max(1, Number(e.target.value) || 1),
+                          })
+                        }
+                        className="rounded border border-hero-dark bg-slate-900 p-1.5 text-xs text-white outline-none focus:border-hero-vibrant"
+                        title="Menge"
+                      />
+                      <label className="flex items-center gap-1 font-libre text-[11px] text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={comp.isMagical === true}
+                          onChange={(e) =>
+                            updateComponent(index, { isMagical: e.target.checked })
+                          }
+                          className="rounded border-hero-border"
+                        />
+                        Magisch
+                      </label>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                Bauzeit (einfach)
+              </span>
+              <input
+                value={draft.buildTimeSimple}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...p, buildTimeSimple: e.target.value }))
+                }
+                placeholder="1 Stunde"
+                className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                Bauzeit (Experte)
+              </span>
+              <input
+                value={draft.buildTimeExpert}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...p, buildTimeExpert: e.target.value }))
+                }
+                placeholder="1 FAP + Fertigkeitswurf"
+                className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-hero-border/40 px-4 py-3">
