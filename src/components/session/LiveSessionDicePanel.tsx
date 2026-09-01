@@ -35,6 +35,8 @@ type Props = {
   embedded?: boolean;
   onClose?: () => void;
   currentCharacter: { id: string; name: string } | null;
+  /** Alle wählbaren Gruppencharaktere für den SL (Live + Vorbereitung). */
+  gmRollCharacters?: { id: string; name: string }[];
   isPrepMode?: boolean;
   prepTestCharacters?: { id: string; name: string }[];
   prepTestCharacterId?: string | null;
@@ -52,6 +54,7 @@ export function LiveSessionDicePanel({
   embedded = false,
   onClose,
   currentCharacter,
+  gmRollCharacters,
   isPrepMode = false,
   prepTestCharacters,
   prepTestCharacterId,
@@ -76,13 +79,15 @@ export function LiveSessionDicePanel({
     if (isGmDiceRollerId(rollerId)) {
       return { id: GM_DICE_ROLLER_ID, name: GM_DICE_ROLLER_NAME };
     }
+    const gmPc = gmRollCharacters?.find((pc) => pc.id === rollerId);
+    if (gmPc) return gmPc;
     if (currentCharacter && rollerId === currentCharacter.id) {
       return currentCharacter;
     }
     const prepPc = prepTestCharacters?.find((pc) => pc.id === rollerId);
     if (prepPc) return prepPc;
     return null;
-  }, [rollerId, currentCharacter, prepTestCharacters]);
+  }, [rollerId, currentCharacter, gmRollCharacters, prepTestCharacters]);
 
   const dice = useLiveSessionDiceRoll({
     sessionId,
@@ -169,12 +174,9 @@ export function LiveSessionDicePanel({
               className="mt-1 w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1 font-libre text-[10px] text-white"
             >
               <option value={GM_DICE_ROLLER_ID}>Als Spielleiter</option>
-              {currentCharacter ? (
-                <option value={currentCharacter.id}>{currentCharacter.name}</option>
-              ) : null}
-              {prepTestCharacters?.map((pc) => (
+              {gmRollCharacters?.map((pc) => (
                 <option key={pc.id} value={pc.id}>
-                  Test als: {pc.name}
+                  {pc.name}
                 </option>
               ))}
             </select>

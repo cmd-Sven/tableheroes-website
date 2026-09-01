@@ -250,7 +250,7 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                                 sessionId,
                                 characterId,
                                 characterName,
-                                spellName: s.name,
+                                spellId: s.id,
                               });
                               toast.success(`„${s.name}" angekündigt.`);
                             }),

@@ -32,9 +32,16 @@ import { consumeFromStack } from "@/src/lib/characters/dnd5e/inventory-item-ops"
 import type { Dnd5eClassResource } from "@/src/lib/characters/dnd5e/types";
 import {
   hasSpellbookAccess,
+  localizedSpellDescription,
   localizedSpellName,
 } from "@/src/lib/characters/dnd5e/spellcasting";
-import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
+import { getSpells } from "@/src/lib/characters/dnd5e/progression/catalog";
+import { spellDefinitionToSheetEntry } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
+import type { Dnd5eSheetData, Dnd5eSpellEntry } from "@/src/lib/characters/dnd5e/types";
+import {
+  normalizeCharacterSheetLocale,
+  type CharacterSheetLocale,
+} from "@/src/lib/i18n/character-sheet/types";
 
 export type LiveAvatarBeltItem = {
   id: string;
@@ -109,6 +116,74 @@ async function assertLiveAvatarAccess(
   }
 
   return { isOwner, isGm, campaignId };
+}
+
+function catalogSpellById(spellId: string) {
+  const bare = spellId.replace(/^srd-/i, "").toLowerCase();
+  return getSpells().find((s) => s.id.toLowerCase() === bare) ?? null;
+}
+
+function mergeSpellWithCatalog(spell: Dnd5eSpellEntry): Dnd5eSpellEntry {
+  const def = catalogSpellById(spell.id);
+  if (!def) return spell;
+  const fromCatalog = spellDefinitionToSheetEntry(def);
+  return {
+    ...fromCatalog,
+    ...spell,
+    descriptionDe: spell.descriptionDe?.trim() || fromCatalog.descriptionDe,
+    descriptionEn: spell.descriptionEn?.trim() || fromCatalog.descriptionEn,
+    description: spell.description?.trim() || fromCatalog.description,
+    castingTime: spell.castingTime?.trim() || null,
+    range: spell.range?.trim() || null,
+  };
+}
+
+function resolveSpellForSessionAnnounce(
+  spellId: string,
+  sheet: Dnd5eSheetData,
+  locale: CharacterSheetLocale,
+): {
+  name: string;
+  description: string | null;
+  levelLabel: string | null;
+  castingTime: string | null;
+  range: string | null;
+} {
+  const sheetSpell = (sheet.spells ?? []).find((s) => s.id === spellId);
+  const spell = sheetSpell
+    ? mergeSpellWithCatalog(sheetSpell)
+    : catalogSpellById(spellId)
+      ? mergeSpellWithCatalog(spellDefinitionToSheetEntry(catalogSpellById(spellId)!))
+      : null;
+
+  if (!spell) {
+    return {
+      name: spellId,
+      description: null,
+      levelLabel: null,
+      castingTime: null,
+      range: null,
+    };
+  }
+
+  const name = localizedSpellName(spell, locale) || spell.name || spellId;
+  const description = localizedSpellDescription(spell, locale);
+  const levelLabel =
+    spell.level <= 0
+      ? locale === "de"
+        ? "Zaubertrick"
+        : "Cantrip"
+      : locale === "de"
+        ? `Grad ${spell.level}`
+        : `Level ${spell.level}`;
+
+  return {
+    name,
+    description,
+    levelLabel,
+    castingTime: spell.castingTime?.trim() || null,
+    range: spell.range?.trim() || null,
+  };
 }
 
 export async function getLiveSessionAvatarStatus(
@@ -377,7 +452,7 @@ export async function announceLiveSessionSpell(input: {
   sessionId: string;
   characterId: string;
   characterName: string;
-  spellName: string;
+  spellId: string;
 }): Promise<void> {
   const supabase = await createClient();
   const {
@@ -386,12 +461,38 @@ export async function announceLiveSessionSpell(input: {
   if (!user) throw new Error("Nicht authentifiziert.");
   await assertLiveAvatarAccess(input.characterId, input.sessionId, user.id);
 
+  const { data: chRaw } = await supabase
+    .from("characters")
+    .select("sheet_data, sheet_locale")
+    .eq("id", input.characterId)
+    .single();
+  const sheet = parseSheetData((chRaw as { sheet_data?: unknown } | null)?.sheet_data);
+  const locale = normalizeCharacterSheetLocale(
+    (chRaw as { sheet_locale?: string | null } | null)?.sheet_locale,
+  );
+  const spell = resolveSpellForSessionAnnounce(
+    input.spellId,
+    sheet ?? mergeSheetWithDefaults({}),
+    locale,
+  );
+
+  const meta: Record<string, unknown> = {
+    spellCast: true,
+    spellId: input.spellId,
+    spellName: spell.name,
+  };
+  if (spell.levelLabel) meta.spellLevelLabel = spell.levelLabel;
+  if (spell.castingTime) meta.castingTime = spell.castingTime;
+  if (spell.range) meta.range = spell.range;
+  if (spell.description) meta.spellDescription = spell.description;
+
   await appendSessionActivity({
     sessionId: input.sessionId,
     type: "player_action",
-    text: `${input.characterName} wirkt „${input.spellName}"`,
+    text: `${input.characterName} wirkt „${spell.name}"`,
     characterId: input.characterId,
     characterName: input.characterName,
+    meta,
   });
 }
 

@@ -274,6 +274,13 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
               userId={userId}
               isGM={isGM && !forcePlayerView}
               isPrepMode={isPrepMode}
+              gmRollCharacters={
+                isGM && !forcePlayerView
+                  ? partyCharacters
+                      .filter((pc) => !pc.isSessionDummy)
+                      .map((pc) => ({ id: pc.id, name: pc.name }))
+                  : undefined
+              }
               prepTestCharacters={
                 isPrepMode && isGM && !forcePlayerView && !currentPlayerCharacter
                   ? partyCharacters

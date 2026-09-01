@@ -25,6 +25,12 @@ type EntryMeta = {
   label?: string;
   formula?: string;
   sides?: number;
+  spellCast?: boolean;
+  spellName?: string;
+  spellLevelLabel?: string;
+  castingTime?: string;
+  range?: string;
+  spellDescription?: string;
 };
 
 type Props = {
@@ -71,6 +77,18 @@ export function ActivityLogEntry({
     animating && isDiceAnimMeta(meta)
       ? formatPendingDiceChatText(entry.author_name ?? "Spieler", meta)
       : entry.text;
+  const spellMeta =
+    meta?.spellCast === true
+      ? {
+          levelLabel: meta.spellLevelLabel?.trim() || null,
+          castingTime: meta.castingTime?.trim() || null,
+          range: meta.range?.trim() || null,
+          description: meta.spellDescription?.trim() || null,
+        }
+      : null;
+  const spellDetails = [spellMeta?.levelLabel, spellMeta?.castingTime, spellMeta?.range].filter(
+    Boolean,
+  );
 
   return (
     <div
@@ -143,6 +161,14 @@ export function ActivityLogEntry({
         {isFumble ? "💀 Patzer! " : ""}
         {displayText}
       </p>
+      {spellMeta && spellDetails.length > 0 ? (
+        <p className="mt-1 font-libre text-[10px] text-gray-500">{spellDetails.join(" · ")}</p>
+      ) : null}
+      {spellMeta?.description ? (
+        <p className="mt-1 font-libre text-[11px] leading-relaxed text-gray-300 whitespace-pre-wrap">
+          {spellMeta.description}
+        </p>
+      ) : null}
       {isGM && revealed && entry.type === "attack_pending" ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
           <button
