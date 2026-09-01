@@ -107,3 +107,26 @@ export function canDisarmTrapAtDistance(
 ): boolean {
   return chebyshevDistance(gridX, gridY, trap.grid_x, trap.grid_y) <= maxCells;
 }
+
+/** Spieler darf Falle entschärfen (entdeckt, sichtbar, benachbart). */
+export function isTrapDisarmableByPlayerAt(
+  trap: SessionBattlemapTrap,
+  gridX: number,
+  gridY: number,
+): boolean {
+  return (
+    trap.is_detected &&
+    trap.is_visible_to_players &&
+    !trap.is_triggered &&
+    !trap.is_disarmed &&
+    canDisarmTrapAtDistance(trap, gridX, gridY)
+  );
+}
+
+export function findAdjacentDisarmableTraps(
+  traps: SessionBattlemapTrap[],
+  gridX: number,
+  gridY: number,
+): SessionBattlemapTrap[] {
+  return traps.filter((trap) => isTrapDisarmableByPlayerAt(trap, gridX, gridY));
+}

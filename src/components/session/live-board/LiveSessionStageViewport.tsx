@@ -356,6 +356,7 @@ export type LiveSessionStagePartyTraySectionProps = {
   showDnd5eSheet: boolean;
   battlemapActive: boolean;
   battlemapTokens: SessionBattlemapToken[];
+  battlemapTraps: import("@/src/lib/session/battlemap-types").SessionBattlemapTrap[];
   combatParticipantNames: Set<string>;
   sessionId: string;
   campaignId: string;
@@ -368,6 +369,9 @@ export type LiveSessionStagePartyTraySectionProps = {
     token?: SessionBattlemapToken | null;
     tokenId?: string | null;
   }) => void;
+  setTrapDisarmTarget: Dispatch<
+    SetStateAction<import("@/src/lib/session/battlemap-types").SessionBattlemapTrap | null>
+  >;
   addCombatToken: (payload: CombatTokenPayload) => Promise<void> | void;
 };
 
@@ -390,6 +394,7 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
     showDnd5eSheet,
     battlemapActive,
     battlemapTokens,
+    battlemapTraps,
     combatParticipantNames,
     sessionId,
     campaignId,
@@ -398,6 +403,7 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
     startCharacterTokenPlacement,
     setBattlemapTokens,
     notifyBattlemapTokensChanged,
+    setTrapDisarmTarget,
     addCombatToken,
   } = p;
 
@@ -420,6 +426,7 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
             battlemapActive={battlemapActive}
             battlemapMovementPaused={liveState?.battlemap_movement_paused}
             battlemapTokens={battlemapTokens}
+            battlemapTraps={battlemapTraps}
             isCombatMode={!!liveState?.is_combat_mode}
             combatParticipantNames={combatParticipantNames}
             sessionId={sessionId}
@@ -433,6 +440,7 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
               );
               notifyBattlemapTokensChanged({ op: "upsert", token: updated });
             }}
+            onDisarmTrap={(trap) => setTrapDisarmTarget(trap)}
             onJoinCombat={(pc) => {
               void addCombatToken({
                 type: "player",

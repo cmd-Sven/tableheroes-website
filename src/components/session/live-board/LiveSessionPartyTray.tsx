@@ -11,7 +11,7 @@ import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSession
 import { PartyTrayExhaustionBadge } from "./PartyTrayExhaustionBadge";
 import { FALLBACK_PLAYER_COLOR } from "@/src/lib/session/class-player-color";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import type { SessionBattlemapToken, SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
 import type { CombatParticipant, PartyCharacter } from "./live-session-types";
 
 export type PartyTrayMode = "full" | "compact" | "hidden";
@@ -34,6 +34,7 @@ type Props = {
   battlemapActive: boolean;
   battlemapMovementPaused: boolean | null | undefined;
   battlemapTokens: SessionBattlemapToken[];
+  battlemapTraps: SessionBattlemapTrap[];
   isCombatMode: boolean;
   combatParticipantNames: Set<string>;
   sessionId: string;
@@ -42,6 +43,7 @@ type Props = {
   onOpenInventory: (pc: PartyCharacter) => void;
   onStartTokenPlacement: (characterId: string, characterName: string) => void;
   onBattlemapTokensChanged: (updated: SessionBattlemapToken) => void;
+  onDisarmTrap: (trap: SessionBattlemapTrap) => void;
   onJoinCombat: (pc: PartyCharacter) => void;
 };
 
@@ -63,6 +65,7 @@ export function LiveSessionPartyTray({
   battlemapActive,
   battlemapMovementPaused,
   battlemapTokens,
+  battlemapTraps,
   isCombatMode,
   combatParticipantNames,
   sessionId,
@@ -71,6 +74,7 @@ export function LiveSessionPartyTray({
   onOpenInventory,
   onStartTokenPlacement,
   onBattlemapTokensChanged,
+  onDisarmTrap,
   onJoinCombat,
 }: Props) {
   return (
@@ -229,8 +233,12 @@ export function LiveSessionPartyTray({
                               id: t.id,
                               showHpBar: t.show_hp_bar === true,
                               sizeCells: t.size_cells,
+                              gridX: t.grid_x,
+                              gridY: t.grid_y,
                             };
                           })()}
+                          battlemapTraps={battlemapTraps}
+                          onDisarmTrap={onDisarmTrap}
                           onBattlemapTokenSaved={onBattlemapTokensChanged}
                           combatMode={isCombatMode}
                           canJoinCombat={

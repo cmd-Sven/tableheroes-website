@@ -455,6 +455,7 @@ export function LiveSessionBoardStageHost() {
             showDnd5eSheet={showDnd5eSheet}
             battlemapActive={battlemapActive}
             battlemapTokens={battlemapTokens}
+            battlemapTraps={battlemapTraps}
             combatParticipantNames={combatParticipantNames}
             sessionId={sessionId}
             campaignId={campaignId}
@@ -463,6 +464,7 @@ export function LiveSessionBoardStageHost() {
             startCharacterTokenPlacement={startCharacterTokenPlacement}
             setBattlemapTokens={setBattlemapTokens}
             notifyBattlemapTokensChanged={notifyBattlemapTokensChanged}
+            setTrapDisarmTarget={setTrapDisarmTarget}
             addCombatToken={addCombatToken}
           />
         </div>

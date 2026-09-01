@@ -32,6 +32,7 @@ import {
   useLiveSessionClassAbility,
   type LiveAvatarStatus,
 } from "@/src/lib/actions/live-session-avatar-actions";
+import type { SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
 import {
   type AnchorRect,
   type RadialPanel,
@@ -66,6 +67,8 @@ export type LiveSessionCharacterAvatarRadialOverlayProps = {
   setGmExhaustionLevel: (level: number) => void;
   saveTokenSettings: () => void;
   runAction: (fn: () => Promise<LiveAvatarStatus | void>) => void;
+  adjacentDisarmableTraps: SessionBattlemapTrap[];
+  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
   sessionId: string;
   characterId: string;
   characterName: string;
@@ -98,6 +101,8 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
     setGmExhaustionLevel,
     saveTokenSettings,
     runAction,
+    adjacentDisarmableTraps,
+    onDisarmTrap,
     sessionId,
     characterId,
     characterName,
@@ -483,6 +488,22 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                         Speichern
                       </button>
                     </div>
+                  ) : null}
+
+                  {panel === "disarm_trap" ? (
+                    <LiveSessionCharacterAvatarActionList
+                      empty="Keine Falle in Reichweite."
+                      items={adjacentDisarmableTraps.map((trap) => ({
+                        id: trap.id,
+                        label: trap.name,
+                        onClick: () => {
+                          onDisarmTrap?.(trap);
+                          setMenuOpen(false);
+                          setPanel(null);
+                        },
+                      }))}
+                      pending={pending}
+                    />
                   ) : null}
                 </motion.div>
               ) : null}

@@ -32,6 +32,8 @@ export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvat
   onStartTokenPlacement,
   battlemapToken = null,
   onBattlemapTokenSaved,
+  battlemapTraps,
+  onDisarmTrap,
   combatMode = false,
   canJoinCombat = false,
   onJoinCombat,
@@ -72,6 +74,8 @@ export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvat
     onStartTokenPlacement,
     battlemapToken,
     onBattlemapTokenSaved,
+    battlemapTraps,
+    onDisarmTrap,
     combatMode,
     canJoinCombat,
     onJoinCombat,
@@ -154,6 +158,8 @@ export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvat
         setGmExhaustionLevel={handlers.setGmExhaustionLevel}
         saveTokenSettings={handlers.saveTokenSettings}
         runAction={handlers.runAction}
+        adjacentDisarmableTraps={handlers.adjacentDisarmableTraps}
+        onDisarmTrap={onDisarmTrap}
         sessionId={sessionId}
         characterId={characterId}
         characterName={characterName}

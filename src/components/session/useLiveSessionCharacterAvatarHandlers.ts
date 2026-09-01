@@ -18,12 +18,13 @@ import {
   type MoodStateKey,
 } from "@/src/lib/characters/mood-states";
 import { NPC_SIZE_CELLS, type NpcTokenSizeCategory } from "@/src/lib/npcs/npc-sheet-types";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import type { SessionBattlemapToken, SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
 import { dispatchCharacterDisplayChanged } from "@/src/lib/session/character-radial-bridge";
 import {
   type RadialPanel,
   RADIAL_ITEMS,
   buildVisibleRadialItems,
+  resolveAdjacentDisarmableTraps,
   sizeCategoryFromCells,
 } from "./live-session-character-avatar.constants";
 
@@ -37,8 +38,10 @@ type Args = {
   showDnd5eSheet: boolean;
   battlemapActive: boolean;
   onStartTokenPlacement?: () => void;
-  battlemapToken: { id: string; showHpBar: boolean; sizeCells: number } | null;
+  battlemapToken: { id: string; showHpBar: boolean; sizeCells: number; gridX: number; gridY: number } | null;
   onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
+  battlemapTraps?: SessionBattlemapTrap[];
+  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
   combatMode: boolean;
   canJoinCombat: boolean;
   onJoinCombat?: () => void;
@@ -69,6 +72,8 @@ export function useLiveSessionCharacterAvatarHandlers({
   onStartTokenPlacement,
   battlemapToken,
   onBattlemapTokenSaved,
+  battlemapTraps,
+  onDisarmTrap,
   combatMode,
   canJoinCombat,
   onJoinCombat,
@@ -123,6 +128,11 @@ export function useLiveSessionCharacterAvatarHandlers({
 
   const hasBattlemapToken = Boolean(activeBattlemapTokenId || battlemapToken?.id);
 
+  const adjacentDisarmableTraps = useMemo(
+    () => resolveAdjacentDisarmableTraps(battlemapTraps, battlemapToken),
+    [battlemapTraps, battlemapToken],
+  );
+
   const visibleRadial = useMemo(
     () =>
       buildVisibleRadialItems({
@@ -138,6 +148,7 @@ export function useLiveSessionCharacterAvatarHandlers({
       onJoinCombat,
       canControlWebcam,
       webcamActive,
+      adjacentDisarmableTraps,
     }),
     [
       status,
@@ -152,6 +163,7 @@ export function useLiveSessionCharacterAvatarHandlers({
       onJoinCombat,
       canControlWebcam,
       webcamActive,
+      adjacentDisarmableTraps,
     ],
   );
 
@@ -193,6 +205,16 @@ export function useLiveSessionCharacterAvatarHandlers({
       if (tokenId && battlemapToken && battlemapToken.id === tokenId) {
         setTokenShowHpBar(battlemapToken.showHpBar);
         setTokenSizeCategory(sizeCategoryFromCells(battlemapToken.sizeCells));
+      }
+      setPanel((prev) => (prev === id ? null : id));
+      return;
+    }
+    if (id === "disarm_trap") {
+      if (adjacentDisarmableTraps.length === 1) {
+        onDisarmTrap?.(adjacentDisarmableTraps[0]!);
+        setMenuOpen(false);
+        setPanel(null);
+        return;
       }
       setPanel((prev) => (prev === id ? null : id));
       return;
@@ -311,6 +333,7 @@ export function useLiveSessionCharacterAvatarHandlers({
     pending,
     reload,
     hasBattlemapToken,
+    adjacentDisarmableTraps,
     visibleRadial,
     handleRadialClick,
     saveTokenSettings,

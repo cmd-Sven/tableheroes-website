@@ -14,9 +14,11 @@ import {
   Smile,
   Sparkles,
   Swords,
+  Wrench,
 } from "lucide-react";
 import { NPC_SIZE_CELLS, parseNpcTokenSizeCategory, type NpcTokenSizeCategory } from "@/src/lib/npcs/npc-sheet-types";
-import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import type { SessionBattlemapToken, SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
+import { findAdjacentDisarmableTraps } from "@/src/lib/session/battlemap-trap-geometry";
 
 export type RadialPanel =
   | "weapons"
@@ -27,6 +29,7 @@ export type RadialPanel =
   | "mood"
   | "gm_state"
   | "token_settings"
+  | "disarm_trap"
   | null;
 
 export function isCasterHeuristic(className: string | null): boolean {
@@ -64,6 +67,7 @@ export function buildVisibleRadialItems(args: {
   /** Owner or GM may toggle avatar↔webcam mode. */
   canControlWebcam?: boolean;
   webcamActive?: boolean;
+  adjacentDisarmableTraps?: SessionBattlemapTrap[];
 }) {
   const {
     status,
@@ -78,6 +82,7 @@ export function buildVisibleRadialItems(args: {
     onJoinCombat,
     canControlWebcam = false,
     webcamActive = false,
+    adjacentDisarmableTraps = [],
   } = args;
   const filtered = RADIAL_ITEMS.filter((item) => {
     if (item.id === "sheet") return showDnd5eSheet;
@@ -86,6 +91,14 @@ export function buildVisibleRadialItems(args: {
     if (item.gmOnly) return isGm;
     if (item.joinCombatOnly) return isGm && combatMode && canJoinCombat && Boolean(onJoinCombat);
     if (item.tokenSettingsOnly) return hasBattlemapToken;
+    if (item.disarmTrapOnly) {
+      return (
+        !isGm &&
+        battlemapActive &&
+        hasBattlemapToken &&
+        adjacentDisarmableTraps.length > 0
+      );
+    }
     if (item.tokenOnly) return battlemapActive && Boolean(onStartTokenPlacement);
     if (item.casterOnly) {
       if (status?.isCaster) return true;
@@ -134,8 +147,13 @@ export type LiveSessionCharacterAvatarProps = {
     id: string;
     showHpBar: boolean;
     sizeCells: number;
+    gridX: number;
+    gridY: number;
   } | null;
   onBattlemapTokenSaved?: (token: SessionBattlemapToken) => void;
+  /** Entdeckte Fallen auf der Battlemap (für Entschärfen am Token). */
+  battlemapTraps?: SessionBattlemapTrap[];
+  onDisarmTrap?: (trap: SessionBattlemapTrap) => void;
   /** Kampfmodus: SL kann Charakter in Initiative aufnehmen */
   combatMode?: boolean;
   canJoinCombat?: boolean;
@@ -161,6 +179,7 @@ export const RADIAL_ITEMS: {
   tokenSettingsOnly?: boolean;
   joinCombatOnly?: boolean;
   webcamOnly?: boolean;
+  disarmTrapOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
   { id: "webcam", label: "Webcam", Icon: Camera, angle: -70, webcamOnly: true },
@@ -185,6 +204,13 @@ export const RADIAL_ITEMS: {
   { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
   { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 165, abilitiesOnly: true },
   { id: "belt", label: "Gürtel", Icon: Package, angle: 210 },
+  {
+    id: "disarm_trap",
+    label: "Falle entschärfen",
+    Icon: Wrench,
+    angle: 240,
+    disarmTrapOnly: true,
+  },
   { id: "token", label: "Token setzen", Icon: MapPin, angle: 255, tokenOnly: true },
 ];
 
@@ -197,6 +223,19 @@ export const PANEL_TITLES: Record<Exclude<RadialPanel, null>, string> = {
   mood: "Gemütszustand auswählen",
   gm_state: "Zustand zuweisen (SL)",
   token_settings: "Token-Einstellungen",
+  disarm_trap: "Falle entschärfen",
 };
+
+export function resolveAdjacentDisarmableTraps(
+  battlemapTraps: SessionBattlemapTrap[] | undefined,
+  battlemapToken: LiveSessionCharacterAvatarProps["battlemapToken"],
+): SessionBattlemapTrap[] {
+  if (!battlemapToken || !battlemapTraps?.length) return [];
+  return findAdjacentDisarmableTraps(
+    battlemapTraps,
+    battlemapToken.gridX,
+    battlemapToken.gridY,
+  );
+}
 
 export type AnchorRect = { cx: number; cy: number; top: number; width: number; height: number };
