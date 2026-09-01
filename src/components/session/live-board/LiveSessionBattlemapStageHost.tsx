@@ -22,6 +22,7 @@ import {
   updateBattlemapProp,
 } from "@/src/lib/actions/battlemap-actions";
 import { dispatchOpenCharacterRadial } from "@/src/lib/session/character-radial-bridge";
+import { trapDisarmPending } from "@/src/lib/session/battlemap-trap-model";
 import type { LiveSessionBattlemapPaneProps } from "./LiveSessionBattlemapPane.types";
 import { useBattlemapDrawSync } from "./useBattlemapDrawSync";
 
@@ -341,8 +342,11 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       onTrapTrigger={handleTrapTrigger}
       onTrapDisarm={(trapId) => {
         const trap = battlemapTraps.find((t) => t.id === trapId) ?? null;
-        if (!trap || !currentPlayerCharacterId) return;
-        setTrapDisarmTarget({ trap, characterId: currentPlayerCharacterId });
+        if (!trap) return;
+        const pending = trapDisarmPending(trap);
+        const characterId = pending?.characterId ?? currentPlayerCharacterId;
+        if (!characterId) return;
+        setTrapDisarmTarget({ trap, characterId });
       }}
       onSelectTrap={(id) => {
         setSelectedTrapId(id);

@@ -16,6 +16,7 @@ import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUp
 import { TrapWizardModal } from "@/src/components/session/battlemap/TrapWizardModal";
 import { TrapTriggerModal } from "@/src/components/session/battlemap/TrapTriggerModal";
 import { TrapDisarmModal } from "@/src/components/session/battlemap/TrapDisarmModal";
+import { canOpenTrapDisarmModal } from "./useTrapDisarmModalSync";
 import { listBattlemapTraps } from "@/src/lib/actions/battlemap-trap-actions";
 import type {
   BattlemapTrapTool,
@@ -101,9 +102,9 @@ export type LiveSessionModalsProps = {
   trapTriggerEvent: TrapTriggerEvent;
   setTrapTriggerEvent: (event: TrapTriggerEvent) => void;
   trapDisarmTarget: import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null;
-  setTrapDisarmTarget: (
-    target: import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null,
-  ) => void;
+  setTrapDisarmTarget: Dispatch<
+    SetStateAction<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>
+  >;
   ownCharacterId?: string | null;
   wrapUpOpen: boolean;
   setWrapUpOpen: (open: boolean) => void;
@@ -166,6 +167,10 @@ export function LiveSessionModals({
   liveTranscriptionStatus,
   startEndTransition,
 }: LiveSessionModalsProps) {
+  const trapDisarmVisible =
+    trapDisarmTarget &&
+    canOpenTrapDisarmModal(isGM, ownCharacterId, trapDisarmTarget.characterId);
+
   return (
     <>
       <AnimatePresence>
@@ -332,24 +337,32 @@ export function LiveSessionModals({
         }}
       />
 
-      <TrapDisarmModal
-        open={Boolean(trapDisarmTarget)}
-        trap={trapDisarmTarget?.trap ?? null}
-        sessionId={sessionId}
-        characterId={trapDisarmTarget?.characterId ?? ownCharacterId ?? null}
-        isGm={isGM}
-        onClose={() => setTrapDisarmTarget(null)}
-        onTrapUpdated={(updated) => {
-          setBattlemapTraps((prev) =>
-            prev.map((t) => (t.id === updated.id ? updated : t)),
-          );
-        }}
-        onRequestSkillRoll={({ skillKey, label, modifier }) => {
-          toast.message(
-            `${label}: W20 ${modifier >= 0 ? "+" : ""}${modifier} — bitte über das Würfelpanel würfeln (${skillKey}).`,
-          );
-        }}
-      />
+      {trapDisarmVisible ? (
+        <TrapDisarmModal
+          open
+          trap={trapDisarmTarget.trap}
+          sessionId={sessionId}
+          characterId={trapDisarmTarget.characterId}
+          ownCharacterId={ownCharacterId}
+          isGm={isGM}
+          onClose={() => setTrapDisarmTarget(null)}
+          onTrapUpdated={(updated) => {
+            setBattlemapTraps((prev) =>
+              prev.map((t) => (t.id === updated.id ? updated : t)),
+            );
+            setTrapDisarmTarget((prev) =>
+              prev && prev.trap.id === updated.id
+                ? { ...prev, trap: updated }
+                : prev,
+            );
+          }}
+          onRequestSkillRoll={({ skillKey, label, modifier }) => {
+            toast.message(
+              `${label}: W20 ${modifier >= 0 ? "+" : ""}${modifier} — bitte über das Würfelpanel würfeln (${skillKey}).`,
+            );
+          }}
+        />
+      ) : null}
 
       <SessionEndWrapUpModal
         open={wrapUpOpen}

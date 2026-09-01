@@ -7,6 +7,7 @@ import { DiceRollOverlay } from "@/src/components/session/dice/DiceRollOverlay";
 import { LiveSessionModals } from "./LiveSessionModals";
 import { LiveSessionTokenRadialMenuHost } from "./LiveSessionTokenRadialMenuHost";
 import { useLiveSessionBoardContext } from "./LiveSessionBoardContext";
+import { useTrapDisarmModalSync } from "./useTrapDisarmModalSync";
 
 export function LiveSessionBoardModalsLayer() {
   const {
@@ -290,6 +291,15 @@ export function LiveSessionBoardModalsLayer() {
     writeSystemLog,
     presentUserIds,
   } = useLiveSessionBoardContext();
+
+  useTrapDisarmModalSync({
+    battlemapTraps,
+    trapDisarmTarget,
+    setTrapDisarmTarget,
+    isGM,
+    ownCharacterId: currentPlayerCharacter?.id ?? null,
+  });
+
   return (
     <>
       <LiveSessionModals

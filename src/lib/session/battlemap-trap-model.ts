@@ -20,8 +20,10 @@ export type TrapDisarmRollKind =
   | "disarm_dex"
   | "disarm_sleight";
 
+export type TrapDisarmStatus = "in_progress" | "player_submitted" | "gm_confirmed";
+
 export type TrapDisarmPending = {
-  status: "player_submitted" | "gm_confirmed";
+  status: TrapDisarmStatus;
   characterId: string;
   characterName: string;
   investigate: boolean;
@@ -31,10 +33,13 @@ export type TrapDisarmPending = {
   sleightProficient: boolean;
   sleightExpertise: boolean;
   /** Spieler hat Würfe abgeschlossen und Ergebnis gemeldet */
-  playerClaimsSuccess: boolean;
-  investigationSuccess?: boolean;
-  disarmSuccess?: boolean;
-  submittedAt: string;
+  playerClaimsSuccess?: boolean;
+  investigationSuccess?: boolean | null;
+  disarmSuccess?: boolean | null;
+  /** SL übernimmt Eingaben für den Spieler */
+  gmTakeover?: boolean;
+  startedAt?: string;
+  submittedAt?: string;
   gmConfirmedAt?: string;
 };
 
@@ -102,6 +107,21 @@ export function trapComponents(trap: SessionBattlemapTrap): TrapComponent[] {
 
 export function trapDisarmPending(trap: SessionBattlemapTrap): TrapDisarmPending | null {
   return parseTrapAiPayload(trap.ai_payload).disarm ?? null;
+}
+
+/** Aktive Entschärfungs-Session (in Bearbeitung oder SL-Review). */
+export function trapDisarmActive(trap: SessionBattlemapTrap): TrapDisarmPending | null {
+  const pending = trapDisarmPending(trap);
+  if (!pending || pending.status === "gm_confirmed") return null;
+  return pending;
+}
+
+export function canViewTrapDisarmModal(
+  pending: TrapDisarmPending,
+  isGm: boolean,
+  ownCharacterId: string | null | undefined,
+): boolean {
+  return isGm || ownCharacterId === pending.characterId;
 }
 
 export function isMechanicalTrap(trap: SessionBattlemapTrap): boolean {

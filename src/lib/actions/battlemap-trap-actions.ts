@@ -52,6 +52,51 @@ async function assertSessionGm(sessionId: string, userId: string) {
   return { supabase, campaignId };
 }
 
+async function assertTrapDisarmAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  userId: string,
+  characterId: string,
+): Promise<{ isGm: boolean }> {
+  const { data: sessionRaw } = await (supabase.from("sessions") as any)
+    .select("campaign_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!sessionRaw) throw new Error("Session nicht gefunden.");
+  const campaignId = String((sessionRaw as { campaign_id: string }).campaign_id);
+  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
+    .select("gm_id, owner_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const isGm = isCampaignGm(
+    campaignRaw as { gm_id?: string | null; owner_id?: string | null },
+    userId,
+  );
+  if (isGm) return { isGm: true };
+
+  const { data: chRaw } = await (supabase as any)
+    .from("characters")
+    .select("user_id")
+    .eq("id", characterId)
+    .maybeSingle();
+  if (!chRaw || String(chRaw.user_id) !== userId) {
+    throw new Error("Keine Berechtigung für diese Entschärfung.");
+  }
+  return { isGm: false };
+}
+
+export type TrapDisarmDraftInput = {
+  investigate: boolean;
+  trapMasteryDex: boolean;
+  hasThievesTools: boolean;
+  thievesToolsProficient: boolean;
+  sleightProficient: boolean;
+  sleightExpertise: boolean;
+  investigationSuccess?: boolean | null;
+  disarmSuccess?: boolean | null;
+  gmTakeover?: boolean;
+};
+
 function normalizeTrap(row: Record<string, unknown>): SessionBattlemapTrap {
   const difficultyRaw = String(row.difficulty ?? "medium");
   const difficulty: BattlemapTrapDifficulty =
@@ -743,6 +788,129 @@ export async function triggerBattlemapTrapManually(input: {
   };
 }
 
+/** Öffnet eine synchronisierte Entschärfungs-Session (sichtbar für SL + betroffenen Spieler). */
+export async function openTrapDisarmSession(input: {
+  sessionId: string;
+  trapId: string;
+  characterId: string;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  await assertTrapDisarmAccess(supabase, input.sessionId, user.id, input.characterId);
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  if (!trap.is_detected || trap.is_triggered || trap.is_disarmed) {
+    throw new Error("Diese Falle kann nicht entschärft werden.");
+  }
+
+  const existing = trapDisarmPending(trap);
+  if (existing?.status === "player_submitted") {
+    return trap;
+  }
+  if (existing?.status === "in_progress" && existing.characterId === input.characterId) {
+    return trap;
+  }
+
+  const stats = await getTrapDisarmCharacterStats(input.characterId);
+  const disarm: TrapDisarmPending = {
+    status: "in_progress",
+    characterId: input.characterId,
+    characterName: stats.characterName,
+    investigate: false,
+    trapMasteryDex: stats.hasTrapMasteryFeat,
+    hasThievesTools: true,
+    thievesToolsProficient: stats.thievesToolsProficient,
+    sleightProficient: stats.sleightMod > stats.dexMod,
+    sleightExpertise: stats.sleightExpertise,
+    investigationSuccess: null,
+    disarmSuccess: null,
+    gmTakeover: false,
+    startedAt: new Date().toISOString(),
+  };
+
+  return updateTrapAiPayload(supabase, trap, input.sessionId, { disarm });
+}
+
+/** Synchronisiert Entwurfs-Eingaben zwischen SL und Spieler. */
+export async function updateTrapDisarmDraft(input: {
+  sessionId: string;
+  trapId: string;
+  characterId: string;
+  draft: TrapDisarmDraftInput;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { isGm } = await assertTrapDisarmAccess(
+    supabase,
+    input.sessionId,
+    user.id,
+    input.characterId,
+  );
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  const pending = trapDisarmPending(trap);
+  if (!pending || pending.status !== "in_progress") {
+    throw new Error("Keine aktive Entschärfungs-Session.");
+  }
+  if (pending.characterId !== input.characterId) {
+    throw new Error("Falscher Charakter für diese Entschärfung.");
+  }
+
+  const gmTakeover = input.draft.gmTakeover === true;
+  if (gmTakeover && !isGm) {
+    throw new Error("Nur der SL kann die Übernahme aktivieren.");
+  }
+  if (!isGm && gmTakeover) {
+    throw new Error("Der SL hat die Eingabe übernommen.");
+  }
+  if (!isGm && pending.gmTakeover) {
+    throw new Error("Der SL hat die Eingabe übernommen.");
+  }
+
+  const disarm: TrapDisarmPending = {
+    ...pending,
+    ...input.draft,
+    status: "in_progress",
+    gmTakeover,
+  };
+
+  return updateTrapAiPayload(supabase, trap, input.sessionId, { disarm });
+}
+
+/** Schließt eine laufende Entschärfungs-Session ohne Einreichung. */
+export async function closeTrapDisarmSession(input: {
+  sessionId: string;
+  trapId: string;
+  characterId: string;
+}): Promise<SessionBattlemapTrap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  await assertTrapDisarmAccess(supabase, input.sessionId, user.id, input.characterId);
+
+  const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
+  const pending = trapDisarmPending(trap);
+  if (!pending || pending.status !== "in_progress") {
+    return trap;
+  }
+  if (pending.characterId !== input.characterId) {
+    throw new Error("Falscher Charakter für diese Entschärfung.");
+  }
+
+  return updateTrapAiPayload(supabase, trap, input.sessionId, { disarm: null });
+}
+
 /** Spieler reicht Entschärf-Versuch ein — SL bestätigt danach. */
 export async function submitTrapDisarmAttempt(input: {
   sessionId: string;
@@ -764,12 +932,23 @@ export async function submitTrapDisarmAttempt(input: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht authentifiziert.");
 
+  const { isGm } = await assertTrapDisarmAccess(
+    supabase,
+    input.sessionId,
+    user.id,
+    input.characterId,
+  );
+
   const trap = await loadTrapRow(supabase, input.trapId, input.sessionId);
   if (!trap.is_detected || trap.is_triggered || trap.is_disarmed) {
     throw new Error("Diese Falle kann nicht entschärft werden.");
   }
-  if (trapDisarmPending(trap)?.status === "player_submitted") {
+  const pending = trapDisarmPending(trap);
+  if (pending?.status === "player_submitted") {
     throw new Error("Ein Entschärfungsversuch wartet bereits auf SL-Bestätigung.");
+  }
+  if (!isGm && pending?.gmTakeover) {
+    throw new Error("Der SL hat die Eingabe übernommen — bitte warten.");
   }
 
   const stats = await getTrapDisarmCharacterStats(input.characterId);
