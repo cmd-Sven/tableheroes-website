@@ -19,9 +19,17 @@ import {
 import {
   isMagicalTrap,
   isMechanicalTrap,
+  resolveTrapDisarmRollMode,
   trapComponents,
+  trapDisarmDc,
   trapDisarmPending,
+  type TrapDisarmRollKind,
+  type TrapDisarmRollResult,
 } from "@/src/lib/session/battlemap-trap-model";
+import {
+  executeDiceRoll,
+} from "@/src/lib/session/dice-roll";
+import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
 
 type Props = {
   open: boolean;
@@ -32,13 +40,6 @@ type Props = {
   isGm: boolean;
   onClose: () => void;
   onTrapUpdated: (trap: SessionBattlemapTrap) => void;
-  onRequestSkillRoll?: (input: {
-    skillKey: "inv" | "arc" | "slt";
-    label: string;
-    modifier: number;
-    advantage?: boolean;
-    disadvantage?: boolean;
-  }) => void;
 };
 
 type DraftState = {
@@ -50,11 +51,40 @@ type DraftState = {
   sleightExpertise: boolean;
   investigationSuccess: boolean | null;
   disarmSuccess: boolean | null;
+  investigationRoll: TrapDisarmRollResult | null;
+  disarmRoll: TrapDisarmRollResult | null;
   gmTakeover: boolean;
 };
 
 function formatSigned(n: number): string {
   return n >= 0 ? `+${n}` : String(n);
+}
+
+function RollResultBanner({ roll }: { roll: TrapDisarmRollResult }) {
+  const modeLabel =
+    roll.mode === "advantage" ? "Vorteil" : roll.mode === "disadvantage" ? "Nachteil" : null;
+  return (
+    <div
+      className={`mt-2 rounded-md border px-3 py-2 font-libre text-xs ${
+        roll.success
+          ? "border-emerald-600/50 bg-emerald-950/30 text-emerald-100"
+          : "border-red-600/50 bg-red-950/30 text-red-100"
+      }`}
+    >
+      <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-300">
+        {roll.label}
+        {modeLabel ? ` · ${modeLabel}` : ""}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-white">{roll.display}</p>
+      <p className="mt-0.5 text-[11px]">
+        SG {roll.dc} —{" "}
+        <span className={roll.success ? "text-emerald-200" : "text-red-200"}>
+          {roll.success ? "Erfolg" : "Misserfolg"}
+        </span>
+        {roll.isCritical ? " · Natürliche 20" : roll.isFumble ? " · Natürliche 1" : ""}
+      </p>
+    </div>
+  );
 }
 
 function LootCard({ item }: { item: TrapDisarmLootItem }) {
@@ -87,6 +117,8 @@ function draftFromPending(
     sleightExpertise: pending.sleightExpertise,
     investigationSuccess: pending.investigationSuccess ?? null,
     disarmSuccess: pending.disarmSuccess ?? null,
+    investigationRoll: pending.investigationRoll ?? null,
+    disarmRoll: pending.disarmRoll ?? null,
     gmTakeover: pending.gmTakeover === true,
   };
 }
@@ -100,7 +132,6 @@ export function TrapDisarmModal({
   isGm,
   onClose,
   onTrapUpdated,
-  onRequestSkillRoll,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [stats, setStats] = useState<TrapDisarmCharacterStats | null>(null);
@@ -113,6 +144,8 @@ export function TrapDisarmModal({
     sleightExpertise: false,
     investigationSuccess: null,
     disarmSuccess: null,
+    investigationRoll: null,
+    disarmRoll: null,
     gmTakeover: false,
   });
   const [loot, setLoot] = useState<{
@@ -263,6 +296,63 @@ export function TrapDisarmModal({
       draft.sleightProficient,
   );
   const disarmDisadvantage = !draft.hasThievesTools;
+  const trapDc = trap ? trapDisarmDc(trap) : 15;
+
+  const performInlineRoll = useCallback(
+    (input: {
+      kind: TrapDisarmRollKind;
+      label: string;
+      modifier: number;
+      skillKey: "inv" | "arc" | "slt";
+      advantage?: boolean;
+      disadvantage?: boolean;
+      onSuccessField: "investigationSuccess" | "disarmSuccess";
+      rollField: "investigationRoll" | "disarmRoll";
+    }) => {
+      if (!canEditForm || !characterId || !stats) return;
+
+      const mode = resolveTrapDisarmRollMode(input.advantage, input.disadvantage);
+      const outcome = executeDiceRoll({ dice: 1, sides: 20, modifier: input.modifier }, mode);
+      const success = outcome.total >= trapDc;
+
+      const rollResult: TrapDisarmRollResult = {
+        kind: input.kind,
+        label: input.label,
+        modifier: input.modifier,
+        mode,
+        rolls: outcome.rolls,
+        usedRoll: outcome.usedRoll,
+        total: outcome.total,
+        isCritical: outcome.isCritical,
+        isFumble: outcome.isFumble,
+        display: outcome.display,
+        dc: trapDc,
+        success,
+        rolledAt: new Date().toISOString(),
+      };
+
+      updateDraft({
+        [input.onSuccessField]: success,
+        [input.rollField]: rollResult,
+      } as Partial<DraftState>);
+
+      void requestLiveDiceRoll({
+        sessionId,
+        characterId,
+        characterName: stats.characterName,
+        kind: "skill",
+        dice: 1,
+        sides: 20,
+        modifier: input.modifier,
+        mode,
+        label: `${input.label} (SG ${trapDc})`,
+        skillKey: input.skillKey,
+      }).catch(() => {
+        /* Chat-Transparenz optional — Modal zeigt Ergebnis primär */
+      });
+    },
+    [canEditForm, characterId, stats, trapDc, sessionId, updateDraft],
+  );
 
   if (!open || !trap || !characterId) return null;
 
@@ -498,6 +588,12 @@ export function TrapDisarmModal({
                   <dd>{disarmPending.trapMasteryDex ? "Ja" : "Nein"}</dd>
                 </div>
               </dl>
+              {disarmPending.investigationRoll ? (
+                <RollResultBanner roll={disarmPending.investigationRoll} />
+              ) : null}
+              {disarmPending.disarmRoll ? (
+                <RollResultBanner roll={disarmPending.disarmRoll} />
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -533,49 +629,60 @@ export function TrapDisarmModal({
               </label>
 
               {draft.investigate ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() =>
-                      onRequestSkillRoll?.({
-                        skillKey: mechanical && draft.trapMasteryDex ? "slt" : "inv",
-                        label:
-                          mechanical && draft.trapMasteryDex
-                            ? "Nachforschung (DEX)"
-                            : "Nachforschung (INT)",
-                        modifier: investigationMod,
-                      })
-                    }
-                    className="inline-flex items-center gap-1 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-200 disabled:opacity-50"
-                  >
-                    <Dices className="h-3 w-3" />
-                    Wurf {formatSigned(investigationMod)}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() => updateDraft({ investigationSuccess: true })}
-                    className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
-                      draft.investigationSuccess === true
-                        ? "bg-emerald-900 text-emerald-200"
-                        : "border border-hero-border/40 text-gray-400"
-                    }`}
-                  >
-                    Erfolg
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() => updateDraft({ investigationSuccess: false })}
-                    className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
-                      draft.investigationSuccess === false
-                        ? "bg-red-900 text-red-200"
-                        : "border border-hero-border/40 text-gray-400"
-                    }`}
-                  >
-                    Misserfolg
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!canEditForm || !stats}
+                      onClick={() =>
+                        performInlineRoll({
+                          kind:
+                            mechanical && draft.trapMasteryDex
+                              ? "disarm_sleight"
+                              : "investigation",
+                          label:
+                            mechanical && draft.trapMasteryDex
+                              ? "Nachforschung (DEX)"
+                              : "Nachforschung (INT)",
+                          modifier: investigationMod,
+                          skillKey: mechanical && draft.trapMasteryDex ? "slt" : "inv",
+                          onSuccessField: "investigationSuccess",
+                          rollField: "investigationRoll",
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-200 disabled:opacity-50"
+                    >
+                      <Dices className="h-3 w-3" />
+                      Würfeln {formatSigned(investigationMod)}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canEditForm}
+                      onClick={() => updateDraft({ investigationSuccess: true })}
+                      className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+                        draft.investigationSuccess === true
+                          ? "bg-emerald-900 text-emerald-200"
+                          : "border border-hero-border/40 text-gray-400"
+                      }`}
+                    >
+                      Erfolg
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canEditForm}
+                      onClick={() => updateDraft({ investigationSuccess: false })}
+                      className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+                        draft.investigationSuccess === false
+                          ? "bg-red-900 text-red-200"
+                          : "border border-hero-border/40 text-gray-400"
+                      }`}
+                    >
+                      Misserfolg
+                    </button>
+                  </div>
+                  {draft.investigationRoll ? (
+                    <RollResultBanner roll={draft.investigationRoll} />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -631,51 +738,59 @@ export function TrapDisarmModal({
                       : ""}
                     {disarmAdvantage ? " · Vorteil (Fingerfertigkeit + Werkzeug)" : ""}
                     {disarmDisadvantage ? " · Nachteil (kein Werkzeug)" : ""}
+                    {" · SG "}
+                    {trapDc}
                   </p>
                 )}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() =>
-                      onRequestSkillRoll?.({
-                        skillKey: magical ? "arc" : "slt",
-                        label: magical ? "Arcana (Entschärfen)" : "Entschärfen (DEX)",
-                        modifier: magical ? (stats?.arcanaMod ?? 0) : disarmMod,
-                        advantage: disarmAdvantage,
-                        disadvantage: disarmDisadvantage,
-                      })
-                    }
-                    className="inline-flex items-center gap-1 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-200 disabled:opacity-50"
-                  >
-                    <Dices className="h-3 w-3" />
-                    Wurf{" "}
-                    {formatSigned(magical ? (stats?.arcanaMod ?? 0) : disarmMod)}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() => updateDraft({ disarmSuccess: true })}
-                    className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
-                      draft.disarmSuccess === true
-                        ? "bg-emerald-900 text-emerald-200"
-                        : "border border-hero-border/40 text-gray-400"
-                    }`}
-                  >
-                    Erfolg
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canEditForm}
-                    onClick={() => updateDraft({ disarmSuccess: false })}
-                    className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
-                      draft.disarmSuccess === false
-                        ? "bg-red-900 text-red-200"
-                        : "border border-hero-border/40 text-gray-400"
-                    }`}
-                  >
-                    Misserfolg
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!canEditForm || !stats}
+                      onClick={() =>
+                        performInlineRoll({
+                          kind: magical ? "arcana" : "disarm_dex",
+                          label: magical ? "Arcana (Entschärfen)" : "Entschärfen (DEX)",
+                          modifier: magical ? (stats?.arcanaMod ?? 0) : disarmMod,
+                          skillKey: magical ? "arc" : "slt",
+                          advantage: disarmAdvantage,
+                          disadvantage: disarmDisadvantage,
+                          onSuccessField: "disarmSuccess",
+                          rollField: "disarmRoll",
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded border border-hero-border/50 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-200 disabled:opacity-50"
+                    >
+                      <Dices className="h-3 w-3" />
+                      Würfeln{" "}
+                      {formatSigned(magical ? (stats?.arcanaMod ?? 0) : disarmMod)}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canEditForm}
+                      onClick={() => updateDraft({ disarmSuccess: true })}
+                      className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+                        draft.disarmSuccess === true
+                          ? "bg-emerald-900 text-emerald-200"
+                          : "border border-hero-border/40 text-gray-400"
+                      }`}
+                    >
+                      Erfolg
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canEditForm}
+                      onClick={() => updateDraft({ disarmSuccess: false })}
+                      className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+                        draft.disarmSuccess === false
+                          ? "bg-red-900 text-red-200"
+                          : "border border-hero-border/40 text-gray-400"
+                      }`}
+                    >
+                      Misserfolg
+                    </button>
+                  </div>
+                  {draft.disarmRoll ? <RollResultBanner roll={draft.disarmRoll} /> : null}
                 </div>
               </div>
 

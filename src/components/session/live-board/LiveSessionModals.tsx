@@ -356,11 +356,6 @@ export function LiveSessionModals({
                 : prev,
             );
           }}
-          onRequestSkillRoll={({ skillKey, label, modifier }) => {
-            toast.message(
-              `${label}: W20 ${modifier >= 0 ? "+" : ""}${modifier} — bitte über das Würfelpanel würfeln (${skillKey}).`,
-            );
-          }}
         />
       ) : null}
 

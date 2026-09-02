@@ -2,6 +2,7 @@ import type {
   BattlemapTrapDifficulty,
   SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
+import type { DiceRollMode } from "@/src/lib/session/dice-roll";
 
 /** Ein recoverable Bestandteil einer Falle (in ai_payload.components). */
 export type TrapComponent = {
@@ -20,6 +21,23 @@ export type TrapDisarmRollKind =
   | "disarm_dex"
   | "disarm_sleight";
 
+/** Gespeicherter W20-Wurf in der synchronisierten Entschärfungs-Session. */
+export type TrapDisarmRollResult = {
+  kind: TrapDisarmRollKind;
+  label: string;
+  modifier: number;
+  mode: DiceRollMode;
+  rolls: number[];
+  usedRoll: number;
+  total: number;
+  isCritical: boolean;
+  isFumble: boolean;
+  display: string;
+  dc: number;
+  success: boolean;
+  rolledAt: string;
+};
+
 export type TrapDisarmStatus = "in_progress" | "player_submitted" | "gm_confirmed";
 
 export type TrapDisarmPending = {
@@ -36,6 +54,8 @@ export type TrapDisarmPending = {
   playerClaimsSuccess?: boolean;
   investigationSuccess?: boolean | null;
   disarmSuccess?: boolean | null;
+  investigationRoll?: TrapDisarmRollResult | null;
+  disarmRoll?: TrapDisarmRollResult | null;
   /** SL übernimmt Eingaben für den Spieler */
   gmTakeover?: boolean;
   startedAt?: string;
@@ -131,6 +151,21 @@ export function isMechanicalTrap(trap: SessionBattlemapTrap): boolean {
 
 export function isMagicalTrap(trap: SessionBattlemapTrap): boolean {
   return !isMechanicalTrap(trap);
+}
+
+/** SG für Nachforschung und Entschärfen (Perception/Detection-DC der Falle). */
+export function trapDisarmDc(trap: SessionBattlemapTrap): number {
+  return Math.max(1, Math.round(trap.detection_dc));
+}
+
+export function resolveTrapDisarmRollMode(
+  advantage?: boolean,
+  disadvantage?: boolean,
+): DiceRollMode {
+  if (advantage && disadvantage) return "normal";
+  if (advantage) return "advantage";
+  if (disadvantage) return "disadvantage";
+  return "normal";
 }
 
 /** Goldwert Rezept-Pergament nach Schwierigkeit (50–500 GP). */

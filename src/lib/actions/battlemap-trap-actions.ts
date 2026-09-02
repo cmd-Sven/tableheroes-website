@@ -20,6 +20,7 @@ import {
   trapDisarmPending,
   type TrapComponent,
   type TrapDisarmPending,
+  type TrapDisarmRollResult,
 } from "@/src/lib/session/battlemap-trap-model";
 import {
   listHasProficiency,
@@ -94,6 +95,8 @@ export type TrapDisarmDraftInput = {
   sleightExpertise: boolean;
   investigationSuccess?: boolean | null;
   disarmSuccess?: boolean | null;
+  investigationRoll?: TrapDisarmRollResult | null;
+  disarmRoll?: TrapDisarmRollResult | null;
   gmTakeover?: boolean;
 };
 
