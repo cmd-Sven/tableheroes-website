@@ -1924,9 +1924,9 @@ export function Dnd5eCharacterSheetPanel({
             />
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-12">
-            {/* Linke Spalte: Portrait, Rettungswürfe, Fertigkeiten */}
-            <div className="xl:col-span-4 space-y-4">
+          <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
+            {/* Linke Spalte: Portrait, Rettungswürfe, Fertigkeiten, Talente */}
+            <div className="min-w-0 space-y-4 xl:col-span-4">
               {portraitSrc ? (
                 <section className="rounded-lg border border-hero-dark bg-background-card p-4 flex flex-col items-center">
                   <CharacterAvatarImage
@@ -2083,10 +2083,140 @@ export function Dnd5eCharacterSheetPanel({
                   <span className="font-barlow text-lg font-bold text-white">{passivePerception}</span>
                 </div>
               </section>
+
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4">
+                <div className="flex items-center justify-between border-b border-hero-dark pb-2 mb-3">
+                  <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
+                    {t("features.title")}
+                  </h3>
+                  {!readOnly ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={addFeature}
+                        className="font-barlow text-[10px] font-bold uppercase text-accent-gold hover:text-white"
+                      >
+                        {t("featCatalog.open")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addCustomFeature}
+                        className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
+                      >
+                        {t("features.addCustom")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {featFeatureItems.length === 0 ? (
+                  <p className="font-libre text-sm text-gray-500">{t("features.empty")}</p>
+                ) : (
+                  <div className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
+                    {featFeatureItems.map(({ feature: feat, index }) => {
+                      const catalogMatch = matchSheetFeatureToFeat(feat);
+                      const isCatalog =
+                        feat.source === "srd-feat" || Boolean(catalogMatch);
+                      const featName = localizedFeatureName(feat, locale);
+                      const featDescription = localizedFeatureDescription(feat, locale);
+                      return (
+                      <div
+                        key={feat.id}
+                        className="rounded border border-hero-border/40 bg-hero-dark/20 p-2.5"
+                      >
+                        {readOnly ? (
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-barlow text-sm font-bold text-white">
+                                {featName}
+                              </p>
+                              {isCatalog ? (
+                                <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
+                                  {t("featCatalog.matchedBadge")}
+                                </p>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFeatureHelp({
+                                  title: featName,
+                                  description: featDescription,
+                                })
+                              }
+                              className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                              aria-label={t("features.help.aria", { name: featName })}
+                            >
+                              <HelpCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <TextInput
+                                value={feat.name}
+                                onChange={(v) => updateFeature(index, { name: v })}
+                                className="flex-1 !text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFeatureHelp({
+                                    title: featName || feat.name,
+                                    description: featDescription,
+                                  })
+                                }
+                                className="rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
+                                aria-label={t("features.help.aria", {
+                                  name: featName || feat.name,
+                                })}
+                              >
+                                <HelpCircle className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeFeature(index)}
+                                className="text-[10px] text-red-400 hover:text-red-300 px-1"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {catalogMatch && feat.source !== "srd-feat" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => matchFeatureToCatalog(index)}
+                                  className="font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
+                                >
+                                  {t("featCatalog.match")}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => replaceFeatureFromCatalog(index)}
+                                className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:text-white"
+                              >
+                                {t("featCatalog.replace")}
+                              </button>
+                            </div>
+                            <textarea
+                              value={feat.description ?? ""}
+                              onChange={(e) => updateFeature(index, { description: e.target.value })}
+                              rows={2}
+                              className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white"
+                              placeholder={t("field.descriptionPlaceholder")}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                    })}
+                  </div>
+                )}
+              </section>
             </div>
 
-            {/* Mittlere Spalte: Kampf */}
-            <div className="xl:col-span-4 space-y-4">
+            {/* Mittlere Spalte: Kampf, Ressourcen, Proficiencies */}
+            <div className="min-w-0 space-y-4 xl:col-span-4">
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-lg border-2 border-hero-border/70 bg-hero-dark/40 p-3">
@@ -2360,183 +2490,6 @@ export function Dnd5eCharacterSheetPanel({
                 </div>
               </section>
 
-              {biographyCulture ? (
-                <>
-                  <CharacterFlawPicker
-                    characterFlaws={characterFlaws}
-                    onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
-                    readOnly={readOnly}
-                    compact
-                  />
-
-                  {hasFlawAdjustments || flawNotes.length > 0 ? (
-                    <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
-                      <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
-                        {t("flaws.effectsTitle")}
-                      </h3>
-                      {hasFlawAdjustments ? (
-                        <p className="font-libre text-xs text-gray-400">
-                          {t("flaws.effectsHint")}
-                        </p>
-                      ) : null}
-                      {flawNotes.length > 0 ? (
-                        <ul className="space-y-1.5">
-                          {flawNotes.map((note) => (
-                            <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
-                              <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
-                              {note.text}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </section>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-
-            {/* Rechte Spalte: Klassenmerkmale, Talente & Proficiencies */}
-            <div className="xl:col-span-4 space-y-4">
-              <ClassFeaturesSection
-                features={sheet.features}
-                characterClass={meta.className}
-                characterSubclass={meta.subclass}
-                level={meta.level}
-                readOnly={readOnly}
-                onUpdateFeature={updateFeature}
-                onFeatureHelp={(title, description) => setFeatureHelp({ title, description })}
-              />
-
-              <section className="rounded-lg border border-hero-dark bg-background-card p-4">
-                <div className="flex items-center justify-between border-b border-hero-dark pb-2 mb-3">
-                  <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
-                    {t("features.title")}
-                  </h3>
-                  {!readOnly ? (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={addFeature}
-                        className="font-barlow text-[10px] font-bold uppercase text-accent-gold hover:text-white"
-                      >
-                        {t("featCatalog.open")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={addCustomFeature}
-                        className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
-                      >
-                        {t("features.addCustom")}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                {featFeatureItems.length === 0 ? (
-                  <p className="font-libre text-sm text-gray-500">{t("features.empty")}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {featFeatureItems.map(({ feature: feat, index }) => {
-                      const catalogMatch = matchSheetFeatureToFeat(feat);
-                      const isCatalog =
-                        feat.source === "srd-feat" || Boolean(catalogMatch);
-                      const featName = localizedFeatureName(feat, locale);
-                      const featDescription = localizedFeatureDescription(feat, locale);
-                      return (
-                      <div
-                        key={feat.id}
-                        className="rounded border border-hero-border/40 bg-hero-dark/20 p-2.5"
-                      >
-                        {readOnly ? (
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-barlow text-sm font-bold text-white">
-                                {featName}
-                              </p>
-                              {isCatalog ? (
-                                <p className="font-barlow text-[9px] font-bold uppercase text-accent-gold">
-                                  {t("featCatalog.matchedBadge")}
-                                </p>
-                              ) : null}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFeatureHelp({
-                                  title: featName,
-                                  description: featDescription,
-                                })
-                              }
-                              className="shrink-0 rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
-                              aria-label={t("features.help.aria", { name: featName })}
-                            >
-                              <HelpCircle className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <TextInput
-                                value={feat.name}
-                                onChange={(v) => updateFeature(index, { name: v })}
-                                className="flex-1 !text-sm"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setFeatureHelp({
-                                    title: featName || feat.name,
-                                    description: featDescription,
-                                  })
-                                }
-                                className="rounded p-1 text-gray-500 hover:bg-hero-dark/50 hover:text-accent-gold focus:outline-none focus:ring-2 focus:ring-hero-vibrant"
-                                aria-label={t("features.help.aria", {
-                                  name: featName || feat.name,
-                                })}
-                              >
-                                <HelpCircle className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeFeature(index)}
-                                className="text-[10px] text-red-400 hover:text-red-300 px-1"
-                              >
-                                ×
-                              </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {catalogMatch && feat.source !== "srd-feat" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => matchFeatureToCatalog(index)}
-                                  className="font-barlow text-[9px] font-bold uppercase text-accent-gold hover:text-white"
-                                >
-                                  {t("featCatalog.match")}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => replaceFeatureFromCatalog(index)}
-                                className="font-barlow text-[9px] font-bold uppercase text-hero-vibrant hover:text-white"
-                              >
-                                {t("featCatalog.replace")}
-                              </button>
-                            </div>
-                            <textarea
-                              value={feat.description ?? ""}
-                              onChange={(e) => updateFeature(index, { description: e.target.value })}
-                              rows={2}
-                              className="w-full rounded border border-hero-border bg-hero-dark/60 px-2 py-1.5 font-libre text-xs text-white"
-                              placeholder={t("field.descriptionPlaceholder")}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                    })}
-                  </div>
-                )}
-              </section>
-
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hero-dark pb-2">
                   <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
@@ -2562,6 +2515,7 @@ export function Dnd5eCharacterSheetPanel({
                   ) : null}
                 </div>
 
+                <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
                 {(
                   [
                     ["armor", "proficiencies.armor"] as const,
@@ -2579,7 +2533,6 @@ export function Dnd5eCharacterSheetPanel({
                       .map((label) => matchProficiencyEntry(label, category)?.id)
                       .filter(Boolean),
                   );
-                  // Armor/tools: full catalog. Weapons: groups always; specifics if selected or class-granted.
                   const catalogItems =
                     category === "weapons"
                       ? allCatalog.filter((def) => {
@@ -2759,8 +2712,55 @@ export function Dnd5eCharacterSheetPanel({
                 sheet.proficiencies.languages.length === 0 ? (
                   <p className="font-libre text-sm text-gray-500">{t("proficiencies.empty")}</p>
                 ) : null}
+                </div>
               </section>
 
+              {biographyCulture ? (
+                <>
+                  <CharacterFlawPicker
+                    characterFlaws={characterFlaws}
+                    onCharacterFlawsChange={biographyCulture.onCharacterFlawsChange}
+                    readOnly={readOnly}
+                    compact
+                  />
+
+                  {hasFlawAdjustments || flawNotes.length > 0 ? (
+                    <section className="rounded-lg border border-accent-blood/30 bg-accent-blood/5 p-4 space-y-2">
+                      <h3 className="font-barlow text-[10px] font-bold uppercase text-accent-blood">
+                        {t("flaws.effectsTitle")}
+                      </h3>
+                      {hasFlawAdjustments ? (
+                        <p className="font-libre text-xs text-gray-400">
+                          {t("flaws.effectsHint")}
+                        </p>
+                      ) : null}
+                      {flawNotes.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {flawNotes.map((note) => (
+                            <li key={`${note.flawId}-${note.text}`} className="font-libre text-xs text-gray-300">
+                              <span className="font-barlow font-bold text-gray-400">{note.flawName}:</span>{" "}
+                              {note.text}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            {/* Rechte Spalte: Klassenmerkmale, Errungenschaften, Notizen */}
+            <div className="min-w-0 space-y-4 xl:col-span-4">
+              <ClassFeaturesSection
+                features={sheet.features}
+                characterClass={meta.className}
+                characterSubclass={meta.subclass}
+                level={meta.level}
+                readOnly={readOnly}
+                onUpdateFeature={updateFeature}
+                onFeatureHelp={(title, description) => setFeatureHelp({ title, description })}
+              />
               <CharacterAchievementsPanel achievements={payload.achievements ?? []} />
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4">

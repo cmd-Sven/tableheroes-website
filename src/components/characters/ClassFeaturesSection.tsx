@@ -257,26 +257,28 @@ export function ClassFeaturesSection({
   }
 
   return (
-    <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
-      <h3 className="border-b border-hero-dark pb-2 font-barlow text-[10px] font-bold uppercase text-accent-gold">
+    <section className="flex min-h-0 flex-col rounded-lg border border-hero-dark bg-background-card p-4">
+      <h3 className="shrink-0 border-b border-hero-dark pb-2 font-barlow text-[10px] font-bold uppercase text-accent-gold">
         {t("classFeatures.title")}
       </h3>
-      <FeatureGroup
-        title={t("classFeatures.classGroup")}
-        variant="class"
-        items={classItems}
-        readOnly={readOnly}
-        onUpdateFeature={onUpdateFeature}
-        onFeatureHelp={onFeatureHelp}
-      />
-      <FeatureGroup
-        title={t("classFeatures.subclassGroup")}
-        variant="subclass"
-        items={subclassItems}
-        readOnly={readOnly}
-        onUpdateFeature={onUpdateFeature}
-        onFeatureHelp={onFeatureHelp}
-      />
+      <div className="mt-4 max-h-[min(60vh,32rem)] space-y-4 overflow-y-auto pr-1">
+        <FeatureGroup
+          title={t("classFeatures.classGroup")}
+          variant="class"
+          items={classItems}
+          readOnly={readOnly}
+          onUpdateFeature={onUpdateFeature}
+          onFeatureHelp={onFeatureHelp}
+        />
+        <FeatureGroup
+          title={t("classFeatures.subclassGroup")}
+          variant="subclass"
+          items={subclassItems}
+          readOnly={readOnly}
+          onUpdateFeature={onUpdateFeature}
+          onFeatureHelp={onFeatureHelp}
+        />
+      </div>
     </section>
   );
 }
