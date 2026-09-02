@@ -278,7 +278,7 @@ export async function resolveCombatRequest(input: {
   requestId: string;
   hit: boolean;
   critical?: boolean;
-}): Promise<void> {
+}): Promise<SessionActivityEntry> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -311,7 +311,7 @@ export async function resolveCombatRequest(input: {
       : `${name} trifft mit ${reqMeta.weaponName ?? "Waffe"}! — Schaden würfeln.`
     : `${name} verfehlt das Ziel.`;
 
-  await appendSessionActivity({
+  const entry = await appendSessionActivity({
     sessionId: input.sessionId,
     type: input.hit ? "attack_hit" : "attack_miss",
     text: resultText,
@@ -326,4 +326,6 @@ export async function resolveCombatRequest(input: {
       awaitsDamageRoll: input.hit,
     },
   });
+  if (!entry) throw new Error("Treffer konnte nicht gespeichert werden.");
+  return entry;
 }

@@ -111,6 +111,7 @@ export function LiveSessionActivityPanel({
     currentCharacter,
     roller,
     active: open,
+    activityLogs: logs,
     onActivityPosted,
     userId: currentUserId,
     isGM,
@@ -278,7 +279,8 @@ export function LiveSessionActivityPanel({
   function resolveAttack(requestId: string, hit: boolean, critical = false) {
     startTransition(async () => {
       try {
-        await resolveCombatRequest({ sessionId, requestId, hit, critical });
+        const entry = await resolveCombatRequest({ sessionId, requestId, hit, critical });
+        onActivityPosted?.(entry);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Antwort fehlgeschlagen.");
       }

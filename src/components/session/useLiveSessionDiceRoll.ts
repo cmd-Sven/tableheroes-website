@@ -66,39 +66,80 @@ type UseLiveSessionDiceRollOptions = {
   diceSkinId?: DiceSkinId;
 };
 
+function normalizeCharacterId(id: string | undefined): string {
+  return id?.trim().toLowerCase() ?? "";
+}
+
+function resolveDamageFormula(
+  meta: Record<string, unknown> | undefined,
+  attackPendingById: Map<string, Record<string, unknown>>,
+  requestId: string,
+): string | null {
+  const direct = meta?.damage;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (typeof direct === "number" && Number.isFinite(direct)) {
+    return String(direct);
+  }
+  const pendingMeta = attackPendingById.get(requestId);
+  const fallback = pendingMeta?.damage;
+  if (typeof fallback === "string" && fallback.trim()) return fallback.trim();
+  if (typeof fallback === "number" && Number.isFinite(fallback)) {
+    return String(fallback);
+  }
+  return null;
+}
+
 function computePendingDamageRolls(
   logs: ActivityLogLike[],
   rollerId: string | undefined,
 ): PendingDamageRoll[] {
-  if (!rollerId || isGmDiceRollerId(rollerId)) return [];
+  const normalizedRollerId = normalizeCharacterId(rollerId);
+  if (!normalizedRollerId || isGmDiceRollerId(rollerId)) return [];
 
   const rolled = new Set<string>();
+  const attackPendingById = new Map<string, Record<string, unknown>>();
   for (const log of logs) {
     if (log.type === "damage_roll" && log.meta?.requestId) {
       rolled.add(String(log.meta.requestId));
+    }
+    if (log.type === "attack_pending" && log.meta && typeof log.meta === "object") {
+      attackPendingById.set(log.id, log.meta);
     }
   }
 
   const pending: PendingDamageRoll[] = [];
   for (const log of logs) {
-    if (log.type !== "attack_hit" || log.character_id !== rollerId) continue;
+    if (log.type !== "attack_hit") continue;
+    if (normalizeCharacterId(log.character_id) !== normalizedRollerId) continue;
     const meta = log.meta as
       | {
           awaitsDamageRoll?: boolean;
-          damage?: string;
+          hit?: boolean;
+          damage?: string | number;
           weaponName?: string;
           critical?: boolean;
           requestId?: string;
         }
       | undefined;
-    if (!meta?.awaitsDamageRoll || !meta.damage) continue;
-    const requestId = String(meta.requestId ?? log.id);
+    const awaitsDamage = meta?.awaitsDamageRoll ?? meta?.hit ?? true;
+    if (!awaitsDamage) continue;
+    const requestId = String(meta?.requestId ?? log.id);
     if (rolled.has(requestId)) continue;
+    const damage = resolveDamageFormula(
+      meta as Record<string, unknown> | undefined,
+      attackPendingById,
+      requestId,
+    );
+    if (!damage) continue;
+    const pendingMeta = attackPendingById.get(requestId);
     pending.push({
       requestId,
-      damage: meta.damage,
-      weaponName: meta.weaponName ?? "Waffe",
-      critical: Boolean(meta.critical),
+      damage,
+      weaponName:
+        (typeof meta?.weaponName === "string" && meta.weaponName) ||
+        (typeof pendingMeta?.weaponName === "string" && pendingMeta.weaponName) ||
+        "Waffe",
+      critical: Boolean(meta?.critical),
     });
   }
   return pending;
