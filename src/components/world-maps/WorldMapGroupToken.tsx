@@ -1,5 +1,5 @@
 /**
- * WorldMapGroupToken — Draggable group token with radial camping toggle.
+ * WorldMapGroupToken — Draggable group token with radial camping toggle (GM).
  */
 "use client";
 
@@ -12,6 +12,8 @@ type Props = {
   cellSize: number;
   isCamping: boolean;
   isGm: boolean;
+  /** Spieler und GM dürfen das Gruppenicon ziehen (default: isGm). */
+  canMove?: boolean;
   onToggleCamping: (next: boolean) => void;
   onMoveToPixel?: (clientX: number, clientY: number) => void;
 };
@@ -22,9 +24,11 @@ export function WorldMapGroupToken({
   cellSize,
   isCamping,
   isGm,
+  canMove,
   onToggleCamping,
   onMoveToPixel,
 }: Props) {
+  const allowMove = canMove ?? isGm;
   const [menuOpen, setMenuOpen] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(
     null,
@@ -62,10 +66,10 @@ export function WorldMapGroupToken({
           isCamping
             ? "border-orange-400 bg-hero-dark text-orange-300"
             : "border-accent-gold bg-hero-dark text-accent-gold"
-        } ${isGm ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
+        } ${allowMove ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
         title={isCamping ? "Gruppe kampiert" : "Gruppe"}
         onPointerDown={(e) => {
-          if (!isGm || e.button !== 0) return;
+          if (!allowMove || e.button !== 0) return;
           e.stopPropagation();
           dragRef.current = { startX: e.clientX, startY: e.clientY, moved: false };
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);

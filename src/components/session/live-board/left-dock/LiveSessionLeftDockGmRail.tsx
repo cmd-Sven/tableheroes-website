@@ -1,5 +1,5 @@
 /**
- * LiveSessionLeftDockGmRail — GM left rail: atmosphere/chronist/table panels and battlemap tool anchors.
+ * LiveSessionLeftDockGmRail — GM left rail: atmosphere/chronist/table panels and map tool anchors.
  */
 "use client";
 
@@ -11,6 +11,7 @@ import {
   Box,
   Cloud,
   Dices,
+  MapPin,
   Mic,
   Pencil,
   Sparkles,
@@ -27,6 +28,7 @@ import type {
   BattlemapContainerTool,
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool } from "@/src/lib/session/map-draw-types";
+import type { WorldMapPoiTool } from "@/src/lib/world-maps/types";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
 import { LIVE_SESSION_SIDE_RAIL_WIDTH_CLASS } from "@/src/components/session/live-session-side-types";
 import type { ToolFlyoutId } from "./left-dock-constants";
@@ -42,10 +44,12 @@ type Props = {
   temperatureValue: number;
   chronistRecording: boolean;
   tableMarked: boolean;
-  /** Battlemap oder Weltkarte aktiv — Fog/Effekte/Marker/Zeichnen */
+  /** Battlemap aktiv und keine Weltkarte darüber — Fog/Effekte/Marker/Fallen/Behälter */
+  battlemapToolsActive: boolean;
+  /** Weltkarte aktiv — Zeichnen + POI */
+  worldMapActive: boolean;
+  /** Battlemap oder Weltkarte — Zeichnen */
   mapToolsActive: boolean;
-  /** Fallen nur auf Battlemap */
-  battlemapActive: boolean;
   toolFlyout: ToolFlyoutId | null;
   onToggleToolFlyout: (id: ToolFlyoutId) => void;
   fogTool: BattlemapFogTool;
@@ -54,12 +58,14 @@ type Props = {
   trapTool: BattlemapTrapTool;
   containerTool: BattlemapContainerTool;
   drawTool: MapDrawTool;
+  poiTool: WorldMapPoiTool;
   onFogToolChange?: (tool: BattlemapFogTool) => void;
   onEffectToolChange?: (tool: BattlemapEffectTool) => void;
   onMarkerToolChange?: (tool: BattlemapMarkerTool) => void;
   onTrapToolChange?: (tool: BattlemapTrapTool) => void;
   onContainerToolChange?: (tool: BattlemapContainerTool) => void;
   onDrawToolChange?: (tool: MapDrawTool) => void;
+  onPoiToolChange?: (tool: WorldMapPoiTool) => void;
   showDice: boolean;
   diceOpen: boolean;
   onToggleDice?: () => void;
@@ -76,8 +82,9 @@ export function LiveSessionLeftDockGmRail({
   temperatureValue,
   chronistRecording,
   tableMarked,
+  battlemapToolsActive,
+  worldMapActive,
   mapToolsActive,
-  battlemapActive,
   toolFlyout,
   onToggleToolFlyout,
   fogTool,
@@ -86,12 +93,14 @@ export function LiveSessionLeftDockGmRail({
   trapTool,
   containerTool,
   drawTool,
+  poiTool,
   onFogToolChange,
   onEffectToolChange,
   onMarkerToolChange,
   onTrapToolChange,
   onContainerToolChange,
   onDrawToolChange,
+  onPoiToolChange,
   showDice,
   diceOpen,
   onToggleDice,
@@ -140,9 +149,9 @@ export function LiveSessionLeftDockGmRail({
         <Armchair className="h-5 w-5" />
       </RailButton>
 
-      {/* Battlemap-Tools scrollbar — Helden/Würfel bleiben unten in der Leiste. */}
+      {/* Map-Tools scrollbar — Helden/Würfel bleiben unten in der Leiste. */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {mapToolsActive && onFogToolChange ? (
+        {battlemapToolsActive && onFogToolChange ? (
           <div ref={anchorRefs.fog as RefObject<HTMLDivElement>} className="relative shrink-0">
             <div className="mx-2 my-1 h-px bg-hero-border/40" />
             <RailButton
@@ -157,7 +166,7 @@ export function LiveSessionLeftDockGmRail({
           </div>
         ) : null}
 
-        {mapToolsActive && onEffectToolChange ? (
+        {battlemapToolsActive && onEffectToolChange ? (
           <div ref={anchorRefs.effect as RefObject<HTMLDivElement>} className="relative shrink-0">
             <div className="mx-2 my-1 h-px bg-hero-border/40" />
             <RailButton
@@ -172,7 +181,7 @@ export function LiveSessionLeftDockGmRail({
           </div>
         ) : null}
 
-        {mapToolsActive && onMarkerToolChange ? (
+        {battlemapToolsActive && onMarkerToolChange ? (
           <div ref={anchorRefs.marker as RefObject<HTMLDivElement>} className="relative shrink-0">
             <div className="mx-2 my-1 h-px bg-hero-border/40" />
             <RailButton
@@ -202,7 +211,22 @@ export function LiveSessionLeftDockGmRail({
           </div>
         ) : null}
 
-        {battlemapActive && onTrapToolChange ? (
+        {worldMapActive && onPoiToolChange ? (
+          <div ref={anchorRefs.poi as RefObject<HTMLDivElement>} className="relative shrink-0">
+            <div className="mx-2 my-1 h-px bg-hero-border/40" />
+            <RailButton
+              label="Points of Interest"
+              active={toolFlyout === "poi" || poiTool != null}
+              hideLabel={toolFlyout === "poi"}
+              onClick={() => onToggleToolFlyout("poi")}
+              className="h-11"
+            >
+              <MapPin className="h-5 w-5 text-accent-gold" />
+            </RailButton>
+          </div>
+        ) : null}
+
+        {battlemapToolsActive && onTrapToolChange ? (
           <div ref={anchorRefs.trap as RefObject<HTMLDivElement>} className="relative shrink-0">
             <div className="mx-2 my-1 h-px bg-hero-border/40" />
             <RailButton
@@ -217,7 +241,7 @@ export function LiveSessionLeftDockGmRail({
           </div>
         ) : null}
 
-        {battlemapActive && onContainerToolChange ? (
+        {battlemapToolsActive && onContainerToolChange ? (
           <div ref={anchorRefs.container as RefObject<HTMLDivElement>} className="relative shrink-0">
             <RailButton
               label="Behälter (Container-Wizard)"

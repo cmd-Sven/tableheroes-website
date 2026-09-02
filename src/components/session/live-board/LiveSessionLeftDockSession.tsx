@@ -100,6 +100,15 @@ export type LiveSessionLeftDockSessionProps = {
   drawStrokeCount: number;
   onDrawUndo: () => void;
   onDrawClearAll: () => void;
+  poiTool: import("@/src/lib/world-maps/types").WorldMapPoiTool;
+  setPoiTool: Dispatch<
+    SetStateAction<import("@/src/lib/world-maps/types").WorldMapPoiTool>
+  >;
+  selectedPoiId: string | null;
+  setSelectedPoiId: Dispatch<SetStateAction<string | null>>;
+  worldMapPoiCount: number;
+  onWorldMapPoiClearAll: () => void;
+  onWorldMapPoiDelete: () => void;
   worldMapFogCount: number;
   worldMapEffectCount: number;
   worldMapMarkerCount: number;
@@ -213,6 +222,13 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     drawStrokeCount,
     onDrawUndo,
     onDrawClearAll,
+    poiTool,
+    setPoiTool,
+    selectedPoiId,
+    setSelectedPoiId,
+    worldMapPoiCount,
+    onWorldMapPoiClearAll,
+    onWorldMapPoiDelete,
     worldMapFogCount,
     worldMapEffectCount,
     worldMapMarkerCount,
@@ -334,6 +350,7 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
         chronistRecording={chronicleRecorder.phase === "recording"}
         tableMarked={physicallyPresentIdSet.size > 0 || dummyPlayerCountLive > 0}
         battlemapActive={battlemapActive}
+        worldMapActive={worldMapActive}
         mapToolsActive={mapToolsActive}
         fogTool={fogTool}
         selectedFogShapeId={selectedFogShapeId}
@@ -347,6 +364,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setTrapTool(null);
             setSelectedTrapId(null);
             setDrawTool(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -368,6 +389,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setTrapTool(null);
             setSelectedTrapId(null);
             setDrawTool(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -389,6 +414,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setTrapTool(null);
             setSelectedTrapId(null);
             setDrawTool(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -432,6 +461,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setMarkerTool(null);
             setSelectedMarkerId(null);
             setDrawTool(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -469,6 +502,8 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setTrapTool(null);
             setSelectedTrapId(null);
             setDrawTool(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -506,6 +541,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             setSelectedMarkerId(null);
             setTrapTool(null);
             setSelectedTrapId(null);
+            setPoiTool(null);
+            setSelectedPoiId(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
             setLeftPanel(null);
             setTokenPlacement(null);
             setGmTokenPlacement(null);
@@ -519,6 +558,40 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
         onDrawUndo={onDrawUndo}
         onDrawClearAll={onDrawClearAll}
         drawCount={drawStrokeCount}
+        poiTool={poiTool}
+        selectedPoiId={selectedPoiId}
+        onPoiToolChange={(tool) => {
+          setPoiTool(tool);
+          if (tool) {
+            setFogTool(null);
+            setSelectedFogShapeId(null);
+            setEffectTool(null);
+            setSelectedEffectTemplateId(null);
+            setMarkerTool(null);
+            setSelectedMarkerId(null);
+            setTrapTool(null);
+            setSelectedTrapId(null);
+            setDrawTool(null);
+            setContainerTool(null);
+            setSelectedContainerId(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedPoiId(null);
+        }}
+        onPoiDelete={() => {
+          if (!selectedPoiId) {
+            toast.message("POI auf der Karte auswählen, dann löschen.");
+            return;
+          }
+          onWorldMapPoiDelete();
+        }}
+        onPoiClearAll={onWorldMapPoiClearAll}
+        poiCount={worldMapPoiCount}
         onEffectDelete={() => {
           if (worldMapActive) {
             toast.message("Effekt-Schablone auf der Weltkarte anklicken, um zu löschen.");

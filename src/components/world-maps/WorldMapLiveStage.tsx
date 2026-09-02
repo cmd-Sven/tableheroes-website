@@ -1,5 +1,5 @@
 /**
- * WorldMapLiveStage — Interactive world map for live sessions (markers, FoW, effects, draw).
+ * WorldMapLiveStage — Interactive world map for live sessions (POIs, draw, group token).
  */
 "use client";
 
@@ -22,11 +22,18 @@ import { WorldMapGroupToken } from "@/src/components/world-maps/WorldMapGroupTok
 import { WorldMapIcon } from "@/src/lib/world-maps/icons";
 import { gridToPixel, pixelToGrid } from "@/src/lib/session/battlemap-grid";
 import {
+  moveWorldMapGroupToken,
   setWorldMapGroupToken,
   toggleWorldMapMarkerVisibility,
   upsertWorldMapMarker,
 } from "@/src/lib/actions/world-map-actions";
-import type { WorldMap, WorldMapMarker } from "@/src/lib/world-maps/types";
+import {
+  isWorldMapPoiPlaceIcon,
+  type WorldMap,
+  type WorldMapMarker,
+  type WorldMapPoiTool,
+} from "@/src/lib/world-maps/types";
+import { WORLD_MAP_ICON_LABELS } from "@/src/lib/world-maps/types";
 import type {
   BattlemapEffectTool,
   BattlemapFogTool,
@@ -55,6 +62,9 @@ type Props = {
   drawTool: MapDrawTool;
   drawColor: string;
   drawWidth: number;
+  poiTool: WorldMapPoiTool;
+  selectedPoiId?: string | null;
+  onSelectedPoiIdChange?: (id: string | null) => void;
   onMapChange: (m: WorldMap) => void;
   onMarkersChange: (m: WorldMapMarker[]) => void;
   onFogCreate: (input: {
@@ -100,6 +110,9 @@ export function WorldMapLiveStage({
   drawTool,
   drawColor,
   drawWidth,
+  poiTool,
+  selectedPoiId = null,
+  onSelectedPoiIdChange,
   onMapChange,
   onMarkersChange,
   onFogCreate,
@@ -115,7 +128,6 @@ export function WorldMapLiveStage({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapSize, setMapSize] = useState({ width: 1200, height: 800 });
   const [pending, startTransition] = useTransition();
-  const [placePoi, setPlacePoi] = useState(false);
   const [selectedFogId, setSelectedFogId] = useState<string | null>(null);
   const [fogDraft, setFogDraft] = useState<{
     shape: "rect" | "circle";
@@ -148,6 +160,8 @@ export function WorldMapLiveStage({
   const fogDrawActive = Boolean(isGm && fogTool && fogTool !== "select");
   const effectDrawActive = Boolean(isGm && effectTool && effectTool !== "select");
   const drawActive = Boolean(isGm && drawTool === "draw");
+  const poiPlaceActive = Boolean(isGm && isWorldMapPoiPlaceIcon(poiTool));
+  const poiSelectActive = Boolean(isGm && poiTool === "select");
 
   const { draftPoints, drawHandlers } = useMapDrawStroke({
     enabled: drawActive,
@@ -175,24 +189,16 @@ export function WorldMapLiveStage({
     });
   }, []);
 
+  const panDisabled =
+    fogDrawActive || effectDrawActive || drawActive || poiPlaceActive;
+
   return (
     <div className="relative h-full overflow-hidden rounded border border-hero-border bg-black">
-      {isGm && (
-        <div className="absolute left-2 top-2 z-30 flex flex-wrap gap-1">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => setPlacePoi((v) => !v)}
-            className={`rounded px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
-              placePoi
-                ? "bg-hero-vibrant text-black"
-                : "border border-hero-border bg-black/70 text-gray-300"
-            }`}
-          >
-            POI setzen
-          </button>
+      {isGm && poiPlaceActive && poiTool && isWorldMapPoiPlaceIcon(poiTool) ? (
+        <div className="pointer-events-none absolute left-2 top-2 z-30 rounded border border-hero-border bg-black/80 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold">
+          POI: {WORLD_MAP_ICON_LABELS[poiTool]} — Karte klicken
         </div>
-      )}
+      ) : null}
       <div className="absolute right-2 top-2 z-30 flex gap-1">
         <button
           type="button"
@@ -217,7 +223,7 @@ export function WorldMapLiveStage({
         maxScale={4}
         limitToBounds={false}
         doubleClick={{ disabled: true }}
-        panning={{ disabled: fogDrawActive || effectDrawActive || drawActive || placePoi }}
+        panning={{ disabled: panDisabled }}
       >
         <TransformComponent
           wrapperStyle={{ width: "100%", height: "100%" }}
@@ -229,28 +235,27 @@ export function WorldMapLiveStage({
             style={{
               width: mapSize.width,
               height: mapSize.height,
-              cursor: drawActive ? "crosshair" : undefined,
+              cursor: drawActive || poiPlaceActive ? "crosshair" : undefined,
             }}
             onClick={(e) => {
               if (!isGm) return;
               const cell = cellFromClient(e.clientX, e.clientY);
               if (!cell) return;
 
-              if (placePoi) {
+              if (poiPlaceActive && isWorldMapPoiPlaceIcon(poiTool)) {
                 startTransition(async () => {
                   try {
                     const saved = await upsertWorldMapMarker({
                       worldId,
                       mapId: map.id,
-                      icon: "marker",
-                      name: "Neuer Ort",
+                      icon: poiTool,
+                      name: WORLD_MAP_ICON_LABELS[poiTool],
                       gridX: cell.gridX,
                       gridY: cell.gridY,
-                      isVisibleToPlayers: false,
+                      isVisibleToPlayers: true,
                     });
                     onMarkersChange([...markers, saved]);
-                    setPlacePoi(false);
-                    toast.success("Markierung gesetzt (noch verborgen).");
+                    toast.success("POI gesetzt.");
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : "Fehler.");
                   }
@@ -430,27 +435,39 @@ export function WorldMapLiveStage({
             {visibleMarkers.map((m) => {
               const pos = gridToPixel(m.grid_x, m.grid_y, config);
               const hidden = !m.is_visible_to_players;
+              const selected = selectedPoiId === m.id;
               return (
                 <button
                   key={m.id}
                   type="button"
+                  disabled={pending}
                   className={`absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow ${
-                    hidden
-                      ? "border-dashed border-amber-400/80 bg-black/70 text-amber-300"
-                      : "border-hero-vibrant bg-hero-dark text-hero-vibrant"
-                  }`}
+                    selected
+                      ? "border-accent-gold bg-hero-vibrant text-black ring-2 ring-accent-gold/60"
+                      : hidden
+                        ? "border-dashed border-amber-400/80 bg-black/70 text-amber-300"
+                        : "border-hero-vibrant bg-hero-dark text-hero-vibrant"
+                  } ${isGm ? "cursor-pointer" : "pointer-events-none"}`}
                   style={{
                     left: pos.x + config.cellSizePx / 2,
                     top: pos.y + config.cellSizePx / 2,
                   }}
                   title={
                     isGm
-                      ? `${m.name}${hidden ? " (verborgen)" : ""} — Klick: Sichtbarkeit`
+                      ? `${m.name}${hidden ? " (verborgen)" : ""}${
+                          poiSelectActive
+                            ? " — Klick: auswählen / Doppelklick: Sichtbarkeit"
+                            : ""
+                        }`
                       : m.name
                   }
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!isGm) return;
+                    if (poiSelectActive) {
+                      onSelectedPoiIdChange?.(selected ? null : m.id);
+                      return;
+                    }
                     startTransition(async () => {
                       try {
                         const saved = await toggleWorldMapMarkerVisibility(
@@ -464,8 +481,32 @@ export function WorldMapLiveStage({
                         );
                         toast.success(
                           saved.is_visible_to_players
-                            ? "Markierung für Spieler sichtbar."
-                            : "Markierung verborgen.",
+                            ? "POI für Spieler sichtbar."
+                            : "POI verborgen.",
+                        );
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Fehler.");
+                      }
+                    });
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (!isGm || !poiSelectActive) return;
+                    startTransition(async () => {
+                      try {
+                        const saved = await toggleWorldMapMarkerVisibility(
+                          m.id,
+                          map.id,
+                          worldId,
+                          !m.is_visible_to_players,
+                        );
+                        onMarkersChange(
+                          markers.map((x) => (x.id === saved.id ? saved : x)),
+                        );
+                        toast.success(
+                          saved.is_visible_to_players
+                            ? "POI für Spieler sichtbar."
+                            : "POI verborgen.",
                         );
                       } catch (err) {
                         toast.error(err instanceof Error ? err.message : "Fehler.");
@@ -485,7 +526,9 @@ export function WorldMapLiveStage({
                 cellSize={config.cellSizePx}
                 isCamping={map.group_token_is_camping}
                 isGm={isGm}
+                canMove
                 onToggleCamping={(next) => {
+                  if (!isGm) return;
                   startTransition(async () => {
                     try {
                       const updated = await setWorldMapGroupToken({
@@ -507,17 +550,15 @@ export function WorldMapLiveStage({
                   if (!cell) return;
                   startTransition(async () => {
                     try {
-                      const updated = await setWorldMapGroupToken({
+                      const updated = await moveWorldMapGroupToken({
                         mapId: map.id,
-                        worldId,
                         gridX: cell.gridX,
                         gridY: cell.gridY,
                         visible: true,
-                        isCamping: map.group_token_is_camping,
                       });
                       onMapChange(updated);
                     } catch {
-                      /* ignore */
+                      /* ignore transient drag errors */
                     }
                   });
                 }}

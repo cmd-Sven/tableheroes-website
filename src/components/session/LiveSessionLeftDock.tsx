@@ -1,5 +1,5 @@
 /**
- * LiveSessionLeftDock — Left rail orchestrator for atmosphere, chronist, table, dice, and battlemap tools.
+ * LiveSessionLeftDock — Left rail orchestrator for atmosphere, chronist, table, dice, and map tools.
  */
 "use client";
 
@@ -14,6 +14,7 @@ import type {
   BattlemapContainerTool,
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool } from "@/src/lib/session/map-draw-types";
+import type { WorldMapPoiTool } from "@/src/lib/world-maps/types";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
 import { LiveSessionLeftDockDiceSlot } from "./live-board/left-dock/LiveSessionLeftDockDiceSlot";
 import { LiveSessionLeftDockGmRail } from "./live-board/left-dock/LiveSessionLeftDockGmRail";
@@ -34,6 +35,7 @@ type Props = {
   chronistRecording?: boolean;
   tableMarked?: boolean;
   battlemapActive?: boolean;
+  worldMapActive?: boolean;
   mapToolsActive?: boolean;
   fogTool?: BattlemapFogTool;
   selectedFogShapeId?: string | null;
@@ -74,6 +76,12 @@ type Props = {
   onDrawUndo?: () => void;
   onDrawClearAll?: () => void;
   drawCount?: number;
+  poiTool?: WorldMapPoiTool;
+  selectedPoiId?: string | null;
+  onPoiToolChange?: (tool: WorldMapPoiTool) => void;
+  onPoiDelete?: () => void;
+  onPoiClearAll?: () => void;
+  poiCount?: number;
   atmosphereContent: ReactNode;
   chronistContent?: ReactNode;
   tableContent?: ReactNode;
@@ -97,6 +105,7 @@ export function LiveSessionLeftDock({
   chronistRecording = false,
   tableMarked = false,
   battlemapActive = false,
+  worldMapActive = false,
   mapToolsActive = false,
   fogTool = null,
   selectedFogShapeId = null,
@@ -137,6 +146,12 @@ export function LiveSessionLeftDock({
   onDrawUndo,
   onDrawClearAll,
   drawCount = 0,
+  poiTool = null,
+  selectedPoiId = null,
+  onPoiToolChange,
+  onPoiDelete,
+  onPoiClearAll,
+  poiCount = 0,
   atmosphereContent,
   chronistContent,
   tableContent,
@@ -148,15 +163,16 @@ export function LiveSessionLeftDock({
   onOpenQuickRulebook,
 }: Props) {
   const timeLabel = SESSION_DAY_PHASE_META[dayPhase].label;
-  const showPanel =
-    panel != null && (isGM || panel === "party");
+  const showPanel = panel != null && (isGM || panel === "party");
+  const toolsActive = mapToolsActive || battlemapActive || worldMapActive;
+  const battlemapToolsActive = battlemapActive && !worldMapActive;
   const {
     toolFlyout,
     flyoutPos,
     portalReady,
     anchorRefs,
     toggleToolFlyout,
-  } = useLiveSessionLeftDockToolFlyout(mapToolsActive || battlemapActive);
+  } = useLiveSessionLeftDockToolFlyout(toolsActive);
 
   const panelBody =
     panel === "atmosphere"
@@ -183,8 +199,9 @@ export function LiveSessionLeftDock({
           temperatureValue={temperatureValue}
           chronistRecording={chronistRecording}
           tableMarked={tableMarked}
-          mapToolsActive={mapToolsActive || battlemapActive}
-          battlemapActive={battlemapActive}
+          battlemapToolsActive={battlemapToolsActive}
+          worldMapActive={worldMapActive}
+          mapToolsActive={toolsActive}
           toolFlyout={toolFlyout}
           onToggleToolFlyout={toggleToolFlyout}
           fogTool={fogTool}
@@ -193,12 +210,16 @@ export function LiveSessionLeftDock({
           trapTool={trapTool}
           containerTool={containerTool}
           drawTool={drawTool}
-          onFogToolChange={onFogToolChange}
-          onEffectToolChange={onEffectToolChange}
-          onMarkerToolChange={onMarkerToolChange}
-          onTrapToolChange={onTrapToolChange}
-          onContainerToolChange={onContainerToolChange}
+          poiTool={poiTool}
+          onFogToolChange={battlemapToolsActive ? onFogToolChange : undefined}
+          onEffectToolChange={battlemapToolsActive ? onEffectToolChange : undefined}
+          onMarkerToolChange={battlemapToolsActive ? onMarkerToolChange : undefined}
+          onTrapToolChange={battlemapToolsActive ? onTrapToolChange : undefined}
+          onContainerToolChange={
+            battlemapToolsActive ? onContainerToolChange : undefined
+          }
           onDrawToolChange={onDrawToolChange}
+          onPoiToolChange={worldMapActive ? onPoiToolChange : undefined}
           showDice={showDice}
           diceOpen={diceOpen}
           onToggleDice={onToggleDice}
@@ -275,6 +296,12 @@ export function LiveSessionLeftDock({
         onDrawUndo={onDrawUndo}
         onDrawClearAll={onDrawClearAll}
         drawCount={drawCount}
+        poiTool={poiTool}
+        selectedPoiId={selectedPoiId}
+        onPoiToolChange={onPoiToolChange}
+        onPoiDelete={onPoiDelete}
+        onPoiClearAll={onPoiClearAll}
+        poiCount={poiCount}
       />
     </div>
   );

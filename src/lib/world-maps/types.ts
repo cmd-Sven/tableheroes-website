@@ -139,3 +139,10 @@ export type WorldMapEntityLink = {
 export function isWorldMapIconKey(value: unknown): value is WorldMapIconKey {
   return typeof value === "string" && (WORLD_MAP_ICON_KEYS as readonly string[]).includes(value);
 }
+
+/** Live-Session Weltkarten-POI-Werkzeug: Auswählen oder Icon zum Platzieren. */
+export type WorldMapPoiTool = "select" | WorldMapIconKey | null;
+
+export function isWorldMapPoiPlaceIcon(tool: WorldMapPoiTool): tool is WorldMapIconKey {
+  return tool != null && tool !== "select" && isWorldMapIconKey(tool);
+}

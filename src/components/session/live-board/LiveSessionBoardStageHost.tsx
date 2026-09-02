@@ -103,13 +103,19 @@ export function LiveSessionBoardStageHost() {
       drawTool,
       drawColor,
       drawWidth,
+      poiTool,
+      selectedPoiId,
+      setSelectedPoiId,
       setWorldMapFogCount,
       setWorldMapEffectCount,
       setWorldMapMarkerCount,
+      setWorldMapPoiCount,
       setDrawStrokeCount,
       worldMapFogClearReq,
       worldMapEffectClearReq,
       worldMapMarkerClearReq,
+      worldMapPoiClearReq,
+      worldMapPoiDeleteReq,
       drawUndoReq,
       drawClearReq,
       selectedFogShapeId,
@@ -351,13 +357,19 @@ export function LiveSessionBoardStageHost() {
               drawTool={drawTool}
               drawColor={drawColor}
               drawWidth={drawWidth}
+              poiTool={poiTool}
+              selectedPoiId={selectedPoiId}
+              setSelectedPoiId={setSelectedPoiId}
               setWorldMapFogCount={setWorldMapFogCount}
               setWorldMapEffectCount={setWorldMapEffectCount}
               setWorldMapMarkerCount={setWorldMapMarkerCount}
+              setWorldMapPoiCount={setWorldMapPoiCount}
               setDrawStrokeCount={setDrawStrokeCount}
               worldMapFogClearReq={worldMapFogClearReq}
               worldMapEffectClearReq={worldMapEffectClearReq}
               worldMapMarkerClearReq={worldMapMarkerClearReq}
+              worldMapPoiClearReq={worldMapPoiClearReq}
+              worldMapPoiDeleteReq={worldMapPoiDeleteReq}
               drawUndoReq={drawUndoReq}
               drawClearReq={drawClearReq}
               trapWizardCell={trapWizardCell}

@@ -174,6 +174,16 @@ export function LiveSessionBoardDockPanelsLayer() {
       setDrawWidth,
       drawStrokeCount,
       setDrawStrokeCount,
+      poiTool,
+      setPoiTool,
+      selectedPoiId,
+      setSelectedPoiId,
+      worldMapPoiCount,
+      setWorldMapPoiCount,
+      worldMapPoiClearReq,
+      setWorldMapPoiClearReq,
+      worldMapPoiDeleteReq,
+      setWorldMapPoiDeleteReq,
       worldMapFogCount,
       setWorldMapFogCount,
       worldMapEffectCount,
@@ -384,6 +394,13 @@ export function LiveSessionBoardDockPanelsLayer() {
         drawStrokeCount={drawStrokeCount}
         onDrawUndo={() => setDrawUndoReq((n) => n + 1)}
         onDrawClearAll={() => setDrawClearReq((n) => n + 1)}
+        poiTool={poiTool}
+        setPoiTool={setPoiTool}
+        selectedPoiId={selectedPoiId}
+        setSelectedPoiId={setSelectedPoiId}
+        worldMapPoiCount={worldMapPoiCount}
+        onWorldMapPoiClearAll={() => setWorldMapPoiClearReq((n) => n + 1)}
+        onWorldMapPoiDelete={() => setWorldMapPoiDeleteReq((n) => n + 1)}
         worldMapFogCount={worldMapFogCount}
         worldMapEffectCount={worldMapEffectCount}
         worldMapMarkerCount={worldMapMarkerCount}

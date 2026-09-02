@@ -30,6 +30,12 @@ import {
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool } from "@/src/lib/session/map-draw-types";
 import { MAP_DRAW_PRESET_COLORS } from "@/src/lib/session/map-draw-types";
+import {
+  WORLD_MAP_ICON_KEYS,
+  WORLD_MAP_ICON_LABELS,
+  type WorldMapPoiTool,
+} from "@/src/lib/world-maps/types";
+import { WorldMapIcon } from "@/src/lib/world-maps/icons";
 import type { ToolFlyoutId } from "./left-dock-constants";
 import { FLYOUT_SLIDE } from "./left-dock-constants";
 import { MarkerKindIcon, ToolFlyoutButton } from "./left-dock-ui";
@@ -77,6 +83,12 @@ type Props = {
   onDrawUndo?: () => void;
   onDrawClearAll?: () => void;
   drawCount?: number;
+  poiTool?: WorldMapPoiTool;
+  selectedPoiId?: string | null;
+  onPoiToolChange?: (tool: WorldMapPoiTool) => void;
+  onPoiDelete?: () => void;
+  onPoiClearAll?: () => void;
+  poiCount?: number;
 };
 
 export function LiveSessionLeftDockToolFlyoutPortal({
@@ -122,6 +134,12 @@ export function LiveSessionLeftDockToolFlyoutPortal({
   onDrawUndo,
   onDrawClearAll,
   drawCount = 0,
+  poiTool = null,
+  selectedPoiId = null,
+  onPoiToolChange,
+  onPoiDelete,
+  onPoiClearAll,
+  poiCount = 0,
 }: Props) {
   if (!portalReady || !toolFlyout || !flyoutPos) return null;
 
@@ -489,6 +507,59 @@ export function LiveSessionLeftDockToolFlyoutPortal({
             onClick={() => onDrawClearAll?.()}
           >
             <Eraser className={`h-4 w-4 ${drawCount > 0 ? "text-red-300" : "opacity-40"}`} />
+          </ToolFlyoutButton>
+        </motion.div>
+      ) : null}
+      {toolFlyout === "poi" && onPoiToolChange ? (
+        <motion.div
+          id="th-tool-flyout"
+          key="poi-flyout"
+          initial={FLYOUT_SLIDE.initial}
+          animate={FLYOUT_SLIDE.animate}
+          exit={FLYOUT_SLIDE.exit}
+          transition={FLYOUT_SLIDE.transition}
+          style={{ top: flyoutPos.top, left: flyoutPos.left }}
+          className="pointer-events-auto fixed z-[200] flex max-w-[min(92vw,28rem)] flex-wrap items-center gap-1.5 rounded-xl border border-accent-gold/40 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+          role="toolbar"
+          aria-label="Points of Interest"
+        >
+          <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-accent-gold/90">
+            POI
+          </span>
+          <ToolFlyoutButton
+            label="POI: Auswählen / Sichtbarkeit"
+            active={poiTool === "select"}
+            onClick={() => onPoiToolChange(poiTool === "select" ? null : "select")}
+          >
+            <MousePointer2 className="h-4 w-4" />
+          </ToolFlyoutButton>
+          {WORLD_MAP_ICON_KEYS.map((key) => (
+            <ToolFlyoutButton
+              key={key}
+              label={`${WORLD_MAP_ICON_LABELS[key]} platzieren`}
+              active={poiTool === key}
+              onClick={() => onPoiToolChange(poiTool === key ? null : key)}
+            >
+              <WorldMapIcon icon={key} className="h-4 w-4" />
+            </ToolFlyoutButton>
+          ))}
+          <ToolFlyoutButton
+            label="POI löschen"
+            active={false}
+            tone="danger"
+            onClick={() => onPoiDelete?.()}
+          >
+            <Trash2
+              className={`h-4 w-4 ${selectedPoiId ? "text-red-300" : "opacity-40"}`}
+            />
+          </ToolFlyoutButton>
+          <ToolFlyoutButton
+            label="Alle POIs löschen"
+            active={false}
+            tone="danger"
+            onClick={() => onPoiClearAll?.()}
+          >
+            <Eraser className={`h-4 w-4 ${poiCount > 0 ? "text-red-300" : "opacity-40"}`} />
           </ToolFlyoutButton>
         </motion.div>
       ) : null}

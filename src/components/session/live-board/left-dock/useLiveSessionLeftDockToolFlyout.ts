@@ -19,6 +19,7 @@ export type LeftDockToolAnchorRefs = {
   trap: RefObject<HTMLDivElement | null>;
   container: RefObject<HTMLDivElement | null>;
   draw: RefObject<HTMLDivElement | null>;
+  poi: RefObject<HTMLDivElement | null>;
 };
 
 export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
@@ -32,6 +33,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
   const trapAnchorRef = useRef<HTMLDivElement>(null);
   const containerAnchorRef = useRef<HTMLDivElement>(null);
   const drawAnchorRef = useRef<HTMLDivElement>(null);
+  const poiAnchorRef = useRef<HTMLDivElement>(null);
   const [portalReady, setPortalReady] = useState(false);
 
   const anchorRefs: LeftDockToolAnchorRefs = {
@@ -41,6 +43,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
     trap: trapAnchorRef,
     container: containerAnchorRef,
     draw: drawAnchorRef,
+    poi: poiAnchorRef,
   };
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
     if (id === "marker") return markerAnchorRef.current;
     if (id === "draw") return drawAnchorRef.current;
     if (id === "container") return containerAnchorRef.current;
+    if (id === "poi") return poiAnchorRef.current;
     return trapAnchorRef.current;
   }
 
@@ -100,7 +104,9 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
       if (effectAnchorRef.current?.contains(target)) return;
       if (markerAnchorRef.current?.contains(target)) return;
       if (trapAnchorRef.current?.contains(target)) return;
+      if (containerAnchorRef.current?.contains(target)) return;
       if (drawAnchorRef.current?.contains(target)) return;
+      if (poiAnchorRef.current?.contains(target)) return;
       const flyout = document.getElementById("th-tool-flyout");
       if (flyout?.contains(target)) return;
       setToolFlyout(null);

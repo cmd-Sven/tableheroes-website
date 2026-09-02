@@ -33,13 +33,19 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
     drawTool,
     drawColor,
     drawWidth,
+    poiTool,
+    selectedPoiId,
+    setSelectedPoiId,
     setWorldMapFogCount,
     setWorldMapEffectCount,
     setWorldMapMarkerCount,
+    setWorldMapPoiCount,
     setDrawStrokeCount,
     worldMapFogClearReq,
     worldMapEffectClearReq,
     worldMapMarkerClearReq,
+    worldMapPoiClearReq,
+    worldMapPoiDeleteReq,
     drawUndoReq,
     drawClearReq,
   } = props;
@@ -54,19 +60,25 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
           campaignId={campaignId}
           sessionId={sessionId}
           isGm={isGM}
-          fogTool={fogTool}
-          effectTool={effectTool}
-          markerTool={markerTool}
+          fogTool={null}
+          effectTool={null}
+          markerTool={null}
           drawTool={drawTool}
           drawColor={drawColor}
           drawWidth={drawWidth}
+          poiTool={isGM ? poiTool : null}
+          selectedPoiId={selectedPoiId}
+          onSelectedPoiIdChange={setSelectedPoiId}
           onFogCountChange={setWorldMapFogCount}
           onEffectCountChange={setWorldMapEffectCount}
           onMarkerCountChange={setWorldMapMarkerCount}
+          onPoiCountChange={setWorldMapPoiCount}
           onDrawCountChange={setDrawStrokeCount}
           fogClearRequest={worldMapFogClearReq}
           effectClearRequest={worldMapEffectClearReq}
           markerClearRequest={worldMapMarkerClearReq}
+          poiClearRequest={worldMapPoiClearReq}
+          poiDeleteRequest={worldMapPoiDeleteReq}
           drawUndoRequest={drawUndoReq}
           drawClearRequest={drawClearReq}
           onClose={

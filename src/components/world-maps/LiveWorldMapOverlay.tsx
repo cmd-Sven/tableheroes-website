@@ -1,5 +1,5 @@
 /**
- * LiveWorldMapOverlay — Fullscreen world map in live session with FoW/effects/draw/markers.
+ * LiveWorldMapOverlay — Fullscreen world map in live session with draw/POI/group token.
  */
 "use client";
 
@@ -8,6 +8,8 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/src/lib/supabase/client";
 import {
+  clearWorldMapMarkers,
+  deleteWorldMapMarker,
   getWorldMap,
   getWorldMapMarkers,
 } from "@/src/lib/actions/world-map-actions";
@@ -31,7 +33,7 @@ import {
   listMapDrawStrokes,
   undoLastMapDrawStroke,
 } from "@/src/lib/actions/map-draw-actions";
-import type { WorldMap, WorldMapMarker } from "@/src/lib/world-maps/types";
+import type { WorldMap, WorldMapMarker, WorldMapPoiTool } from "@/src/lib/world-maps/types";
 import type {
   BattlemapEffectTool,
   BattlemapFogTool,
@@ -55,14 +57,20 @@ type Props = {
   drawTool?: MapDrawTool;
   drawColor?: string;
   drawWidth?: number;
+  poiTool?: WorldMapPoiTool;
+  selectedPoiId?: string | null;
+  onSelectedPoiIdChange?: (id: string | null) => void;
   onClose?: () => void;
   onFogCountChange?: (n: number) => void;
   onEffectCountChange?: (n: number) => void;
   onMarkerCountChange?: (n: number) => void;
+  onPoiCountChange?: (n: number) => void;
   onDrawCountChange?: (n: number) => void;
   fogClearRequest?: number;
   effectClearRequest?: number;
   markerClearRequest?: number;
+  poiClearRequest?: number;
+  poiDeleteRequest?: number;
   drawUndoRequest?: number;
   drawClearRequest?: number;
 };
@@ -79,14 +87,20 @@ export function LiveWorldMapOverlay({
   drawTool = null,
   drawColor = "#cab926",
   drawWidth = 4,
+  poiTool = null,
+  selectedPoiId = null,
+  onSelectedPoiIdChange,
   onClose,
   onFogCountChange,
   onEffectCountChange,
   onMarkerCountChange,
+  onPoiCountChange,
   onDrawCountChange,
   fogClearRequest = 0,
   effectClearRequest = 0,
   markerClearRequest = 0,
+  poiClearRequest = 0,
+  poiDeleteRequest = 0,
   drawUndoRequest = 0,
   drawClearRequest = 0,
 }: Props) {
@@ -99,6 +113,15 @@ export function LiveWorldMapOverlay({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const supabase = useRef(createClient()).current;
+  const selectedPoiIdRef = useRef(selectedPoiId);
+  selectedPoiIdRef.current = selectedPoiId;
+
+  const syncPoiCount = useCallback(
+    (list: WorldMapMarker[]) => {
+      onPoiCountChange?.(list.length);
+    },
+    [onPoiCountChange],
+  );
 
   const reloadOverlays = useCallback(async () => {
     const [fog, effects, marks, strokes] = await Promise.all([
@@ -139,6 +162,7 @@ export function LiveWorldMapOverlay({
         }
         setMap(m);
         setMarkers(mk);
+        syncPoiCount(mk);
         await reloadOverlays();
       } catch (e) {
         if (!cancelled) {
@@ -149,7 +173,7 @@ export function LiveWorldMapOverlay({
     return () => {
       cancelled = true;
     };
-  }, [worldMapId, reloadOverlays]);
+  }, [worldMapId, reloadOverlays, syncPoiCount]);
 
   // Realtime: map + markers + overlays
   useEffect(() => {
@@ -173,7 +197,10 @@ export function LiveWorldMapOverlay({
           filter: `world_map_id=eq.${worldMapId}`,
         },
         () => {
-          void getWorldMapMarkers(worldMapId).then(setMarkers);
+          void getWorldMapMarkers(worldMapId).then((mk) => {
+            setMarkers(mk);
+            syncPoiCount(mk);
+          });
         },
       )
       .on(
@@ -249,6 +276,7 @@ export function LiveWorldMapOverlay({
     onEffectCountChange,
     onMarkerCountChange,
     onDrawCountChange,
+    syncPoiCount,
   ]);
 
   useEffect(() => {
@@ -294,6 +322,55 @@ export function LiveWorldMapOverlay({
   }, [markerClearRequest, isGm, worldMapId, sessionId, onMarkerCountChange]);
 
   useEffect(() => {
+    if (!isGm || poiClearRequest <= 0) return;
+    startTransition(async () => {
+      try {
+        await clearWorldMapMarkers(worldMapId, worldId);
+        setMarkers([]);
+        syncPoiCount([]);
+        onSelectedPoiIdChange?.(null);
+        toast.success("Alle POIs gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [
+    poiClearRequest,
+    isGm,
+    worldMapId,
+    worldId,
+    syncPoiCount,
+    onSelectedPoiIdChange,
+  ]);
+
+  useEffect(() => {
+    if (!isGm || poiDeleteRequest <= 0) return;
+    const id = selectedPoiIdRef.current;
+    if (!id) return;
+    startTransition(async () => {
+      try {
+        await deleteWorldMapMarker(id, worldMapId, worldId);
+        setMarkers((prev) => {
+          const next = prev.filter((m) => m.id !== id);
+          queueMicrotask(() => syncPoiCount(next));
+          return next;
+        });
+        onSelectedPoiIdChange?.(null);
+        toast.success("POI gelöscht.");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+      }
+    });
+  }, [
+    poiDeleteRequest,
+    isGm,
+    worldMapId,
+    worldId,
+    syncPoiCount,
+    onSelectedPoiIdChange,
+  ]);
+
+  useEffect(() => {
     if (!isGm || drawUndoRequest <= 0) return;
     startTransition(async () => {
       try {
@@ -334,7 +411,7 @@ export function LiveWorldMapOverlay({
           {map?.title ?? "Weltkarte"}
           {!isGm && (
             <span className="ml-2 text-xs font-normal normal-case text-gray-400">
-              (Ansicht — SL steuert die Karte)
+              (Gruppenicon verschieben · POIs sichtbar)
             </span>
           )}
         </div>
@@ -372,8 +449,14 @@ export function LiveWorldMapOverlay({
             drawTool={isGm ? drawTool : null}
             drawColor={drawColor}
             drawWidth={drawWidth}
+            poiTool={isGm ? poiTool : null}
+            selectedPoiId={selectedPoiId}
+            onSelectedPoiIdChange={onSelectedPoiIdChange}
             onMapChange={setMap}
-            onMarkersChange={setMarkers}
+            onMarkersChange={(next) => {
+              setMarkers(next);
+              syncPoiCount(next);
+            }}
             onFogCreate={(input) => {
               startTransition(async () => {
                 try {

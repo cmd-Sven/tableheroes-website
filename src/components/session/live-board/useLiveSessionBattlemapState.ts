@@ -46,6 +46,13 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
   const [drawColor, setDrawColor] = useState("#cab926");
   const [drawWidth, setDrawWidth] = useState(4);
   const [drawStrokeCount, setDrawStrokeCount] = useState(0);
+  const [poiTool, setPoiTool] = useState<
+    import("@/src/lib/world-maps/types").WorldMapPoiTool
+  >(null);
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  const [worldMapPoiCount, setWorldMapPoiCount] = useState(0);
+  const [worldMapPoiClearReq, setWorldMapPoiClearReq] = useState(0);
+  const [worldMapPoiDeleteReq, setWorldMapPoiDeleteReq] = useState(0);
   const [worldMapFogCount, setWorldMapFogCount] = useState(0);
   const [worldMapEffectCount, setWorldMapEffectCount] = useState(0);
   const [worldMapMarkerCount, setWorldMapMarkerCount] = useState(0);
@@ -142,6 +149,16 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setDrawWidth,
     drawStrokeCount,
     setDrawStrokeCount,
+    poiTool,
+    setPoiTool,
+    selectedPoiId,
+    setSelectedPoiId,
+    worldMapPoiCount,
+    setWorldMapPoiCount,
+    worldMapPoiClearReq,
+    setWorldMapPoiClearReq,
+    worldMapPoiDeleteReq,
+    setWorldMapPoiDeleteReq,
     worldMapFogCount,
     setWorldMapFogCount,
     worldMapEffectCount,

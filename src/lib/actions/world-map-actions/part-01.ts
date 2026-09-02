@@ -1,5 +1,5 @@
 /**
- * world-map-actions — part 1: getWorldMaps, getWorldMap, createWorldMap, updateWorldMap, deleteWorldMap, setWorldMapGroupToken, getWorldMapMarkers, upsertWorldMapMarker, toggleWorldMapMarkerVisibility, deleteWorldMapMarker, getWorldMapMarkerNotes, addWorldMapMarkerNote, deleteWorldMapMarkerNote, getSessionWorldMaps, attachWorldMapToSession, detachWorldMapFromSession, setActiveWorldMap.
+ * world-map-actions — part 1: getWorldMaps, getWorldMap, createWorldMap, updateWorldMap, deleteWorldMap, setWorldMapGroupToken, moveWorldMapGroupToken, getWorldMapMarkers, upsertWorldMapMarker, toggleWorldMapMarkerVisibility, deleteWorldMapMarker, clearWorldMapMarkers, getWorldMapMarkerNotes, addWorldMapMarkerNote, deleteWorldMapMarkerNote, getSessionWorldMaps, attachWorldMapToSession, detachWorldMapFromSession, setActiveWorldMap.
  */
 "use server";
 
@@ -226,6 +226,33 @@ export async function setWorldMapGroupToken(input: {
   });
 }
 
+/**
+ * Spieler oder GM: Gruppentoken-Position verschieben (RPC, umgeht GM-only UPDATE-RLS).
+ * Camping-Status bleibt unverändert.
+ */
+export async function moveWorldMapGroupToken(input: {
+  mapId: string;
+  gridX: number;
+  gridY: number;
+  visible?: boolean;
+}): Promise<WorldMap> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { data, error } = await (supabase as any).rpc("move_world_map_group_token", {
+    p_map_id: input.mapId,
+    p_grid_x: Math.round(input.gridX),
+    p_grid_y: Math.round(input.gridY),
+    p_visible: input.visible !== false,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Gruppentoken konnte nicht verschoben werden.");
+  return normalizeWorldMap(data as Record<string, unknown>);
+}
+
 // ---------------------------------------------------------------------------
 // Markers
 // ---------------------------------------------------------------------------
@@ -337,6 +364,19 @@ export async function deleteWorldMapMarker(
     .from("world_map_markers")
     .delete()
     .eq("id", markerId)
+    .eq("world_map_id", mapId);
+  if (error) throw new Error(error.message);
+  revalidateWorldMaps(worldId);
+}
+
+export async function clearWorldMapMarkers(
+  mapId: string,
+  worldId: string,
+): Promise<void> {
+  const { supabase } = await assertWorldGm(worldId);
+  const { error } = await (supabase as any)
+    .from("world_map_markers")
+    .delete()
     .eq("world_map_id", mapId);
   if (error) throw new Error(error.message);
   revalidateWorldMaps(worldId);
