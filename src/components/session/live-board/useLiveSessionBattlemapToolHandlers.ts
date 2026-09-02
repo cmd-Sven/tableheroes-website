@@ -22,6 +22,13 @@ import {
   removeBattlemapTrap,
   triggerBattlemapTrapManually,
 } from "@/src/lib/actions/battlemap-trap-actions";
+import {
+  clearBattlemapContainers,
+  listBattlemapContainers,
+  markContainerTrapDiscovered,
+  removeBattlemapContainer,
+  triggerContainerTrapManually,
+} from "@/src/lib/actions/battlemap-container-actions";
 import type { GmPropPlacementDraft } from "@/src/lib/session/battlemap-types";
 import type { LiveSessionBattlemapState } from "./useLiveSessionBattlemapState";
 
@@ -65,11 +72,14 @@ export function useLiveSessionBattlemapToolHandlers({
     setSelectedMarkerId,
     setBattlemapTraps,
     setSelectedTrapId,
+    setBattlemapContainers,
+    setSelectedContainerId,
     setTrapTriggerEvent,
     battlemapFogShapes,
     battlemapEffectTemplates,
     battlemapMarkers,
     battlemapTraps,
+    battlemapContainers,
   } = bm;
 
   const handleFogShapeDelete = useCallback(
@@ -327,6 +337,108 @@ export function useLiveSessionBattlemapToolHandlers({
     [isGM, sessionId, setBattlemapTraps, setTrapTriggerEvent, startTransition],
   );
 
+  const handleContainerDelete = useCallback(
+    (containerId: string) => {
+      startTransition(async () => {
+        try {
+          await removeBattlemapContainer(containerId, sessionId);
+          setBattlemapContainers((prev) => prev.filter((c) => c.id !== containerId));
+          setSelectedContainerId((prev) => (prev === containerId ? null : prev));
+          toast.success("Behälter entfernt.");
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Behälter konnte nicht gelöscht werden.",
+          );
+        }
+      });
+    },
+    [sessionId, setBattlemapContainers, setSelectedContainerId, startTransition],
+  );
+
+  const handleContainerClearAll = useCallback(() => {
+    if (!activeBattlemapId || !isGM) return;
+    if (battlemapContainers.length === 0) {
+      toast.message("Keine Behälter zum Löschen.");
+      return;
+    }
+    const mapId = activeBattlemapId;
+    startTransition(async () => {
+      try {
+        await clearBattlemapContainers(mapId, sessionId);
+        const remaining = await listBattlemapContainers(mapId, sessionId);
+        setBattlemapContainers(remaining);
+        setSelectedContainerId(null);
+        if (remaining.length === 0) {
+          toast.success("Alle Behälter entfernt.");
+        }
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Behälter konnten nicht gelöscht werden.",
+        );
+      }
+    });
+  }, [
+    activeBattlemapId,
+    battlemapContainers.length,
+    isGM,
+    sessionId,
+    setBattlemapContainers,
+    setSelectedContainerId,
+    startTransition,
+  ]);
+
+  const handleContainerTrapMarkDiscovered = useCallback(
+    (containerId: string) => {
+      startTransition(async () => {
+        try {
+          const updated = await markContainerTrapDiscovered({
+            sessionId,
+            containerId,
+          });
+          setBattlemapContainers((prev) =>
+            prev.map((c) => (c.id === updated.id ? updated : c)),
+          );
+          toast.success(`Falle in „${updated.name}" als entdeckt markiert.`);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Falle konnte nicht markiert werden.",
+          );
+        }
+      });
+    },
+    [sessionId, setBattlemapContainers, startTransition],
+  );
+
+  const handleContainerTrapTrigger = useCallback(
+    (containerId: string) => {
+      if (!isGM) return;
+      startTransition(async () => {
+        try {
+          const result = await triggerContainerTrapManually({
+            sessionId,
+            containerId,
+          });
+          setBattlemapContainers((prev) =>
+            prev.map((c) => (c.id === result.container.id ? result.container : c)),
+          );
+          setTrapTriggerEvent({
+            trap: result.trap,
+            characterName: result.characterName,
+            characterId: result.characterId,
+            passivePerception: result.passivePerception,
+            sourceContainerId: result.container.id,
+          });
+          toast.error(`Falle in „${result.container.name}" ausgelöst!`);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Falle konnte nicht ausgelöst werden.",
+          );
+        }
+      });
+    },
+    [isGM, sessionId, setBattlemapContainers, setTrapTriggerEvent, startTransition],
+  );
+
   const handleBattlemapPropDrop = useCallback(
     (draft: GmPropPlacementDraft, posX: number, posY: number) => {
       if (!isGM || !activeBattlemapId) return;
@@ -385,6 +497,10 @@ export function useLiveSessionBattlemapToolHandlers({
     handleTrapClearAll,
     handleTrapMarkDiscovered,
     handleTrapTrigger,
+    handleContainerDelete,
+    handleContainerClearAll,
+    handleContainerTrapMarkDiscovered,
+    handleContainerTrapTrigger,
     handleBattlemapPropDrop,
     handleBattlemapPropResize,
   };

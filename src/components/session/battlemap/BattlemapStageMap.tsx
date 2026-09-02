@@ -25,6 +25,7 @@ import type {
   SessionBattlemapProp,
   SessionBattlemapToken,
   SessionBattlemapTrap,
+  SessionBattlemapContainer,
 } from "@/src/lib/session/battlemap-types";
 import { BattlemapGridOverlay } from "./BattlemapGridOverlay";
 import { BattlemapTokenLayer } from "./BattlemapTokenLayer";
@@ -35,6 +36,7 @@ import { useMapDrawStroke } from "@/src/components/session/map-draw/useMapDrawSt
 import { BattlemapFogLayer } from "./BattlemapFogLayer";
 import { BattlemapMarkerLayer } from "./BattlemapMarkerLayer";
 import { BattlemapTrapOverlayLayer } from "./BattlemapTrapOverlayLayer";
+import { BattlemapContainerOverlayLayer } from "./BattlemapContainerOverlayLayer";
 import { BattlemapTokenDragOverlay } from "./BattlemapTokenDragOverlay";
 import { canUserDragBattlemapToken, isMarkerPlaceKind } from "./battlemap-stage-utils";
 import { buildBattlemapLayerSelectHandlers } from "./battlemap-stage-map-selection";
@@ -75,10 +77,12 @@ export type BattlemapStageMapProps = {
   shapeSelectActive: boolean;
   markerPlaceActive: boolean;
   trapPlaceActive: boolean;
+  containerPlaceActive?: boolean;
   fogInteractive: boolean;
   effectInteractive: boolean;
   markerInteractive: boolean;
   trapInteractive: boolean;
+  containerInteractive?: boolean;
   isGm: boolean;
   props: SessionBattlemapProp[];
   tokens: SessionBattlemapToken[];
@@ -86,6 +90,7 @@ export type BattlemapStageMapProps = {
   displayEffectTemplates: SessionBattlemapEffectTemplate[];
   displayMarkers: SessionBattlemapMarker[];
   traps: SessionBattlemapTrap[];
+  containers?: SessionBattlemapContainer[];
   fogDraft: FogDraft;
   effectDraft: EffectDraft;
   selectedPropId?: string | null;
@@ -94,6 +99,7 @@ export type BattlemapStageMapProps = {
   selectedEffectTemplateId?: string | null;
   selectedMarkerId?: string | null;
   selectedTrapId?: string | null;
+  selectedContainerId?: string | null;
   markerTool: BattlemapMarkerTool;
   hoverCell: { x: number; y: number } | null;
   hoverReachable: boolean;
@@ -142,6 +148,11 @@ export type BattlemapStageMapProps = {
   onTrapMarkDiscovered?: (trapId: string) => void;
   onTrapTrigger?: (trapId: string) => void;
   onTrapDisarm?: (trapId: string) => void;
+  onSelectContainer?: (containerId: string | null) => void;
+  onContainerDelete?: (containerId: string) => void;
+  onContainerTrapMarkDiscovered?: (containerId: string) => void;
+  onContainerTrapTrigger?: (containerId: string) => void;
+  onContainerTrapDisarm?: (containerId: string) => void;
   playerDisarmActive?: boolean;
   ownCharacterGrid?: { x: number; y: number } | null;
   onTokenMove?: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
@@ -189,10 +200,12 @@ export function BattlemapStageMap({
   shapeSelectActive,
   markerPlaceActive,
   trapPlaceActive,
+  containerPlaceActive = false,
   fogInteractive,
   effectInteractive,
   markerInteractive,
   trapInteractive,
+  containerInteractive = false,
   isGm,
   props,
   tokens,
@@ -200,6 +213,7 @@ export function BattlemapStageMap({
   displayEffectTemplates,
   displayMarkers,
   traps,
+  containers = [],
   fogDraft,
   effectDraft,
   selectedPropId,
@@ -208,6 +222,7 @@ export function BattlemapStageMap({
   selectedEffectTemplateId,
   selectedMarkerId,
   selectedTrapId,
+  selectedContainerId = null,
   markerTool,
   hoverCell,
   hoverReachable,
@@ -241,6 +256,11 @@ export function BattlemapStageMap({
   onTrapMarkDiscovered,
   onTrapTrigger,
   onTrapDisarm,
+  onSelectContainer,
+  onContainerDelete,
+  onContainerTrapMarkDiscovered,
+  onContainerTrapTrigger,
+  onContainerTrapDisarm,
   playerDisarmActive = false,
   ownCharacterGrid = null,
   onTokenMove,
@@ -263,6 +283,7 @@ export function BattlemapStageMap({
     onSelectEffectTemplate,
     onSelectMarker,
     onSelectTrap,
+    onSelectContainer,
   });
 
   const { draftPoints, drawHandlers } = useMapDrawStroke({
@@ -566,6 +587,20 @@ export function BattlemapStageMap({
             onMarkDiscovered={onTrapMarkDiscovered}
             onTriggerTrap={onTrapTrigger}
             onDisarmTrap={onTrapDisarm}
+          />
+          <BattlemapContainerOverlayLayer
+            containers={containers ?? []}
+            config={config}
+            isGm={isGm}
+            interactive={containerInteractive ?? false}
+            playerDisarmActive={playerDisarmActive}
+            ownCharacterGrid={ownCharacterGrid}
+            selectedContainerId={selectedContainerId}
+            onSelectContainer={layerSelect.onSelectContainer}
+            onDeleteContainer={onContainerDelete}
+            onMarkTrapDiscovered={onContainerTrapMarkDiscovered}
+            onTriggerTrap={onContainerTrapTrigger}
+            onDisarmTrap={onContainerTrapDisarm}
           />
           <BattlemapTokenLayer
             tokens={tokens}

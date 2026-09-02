@@ -17,6 +17,7 @@ export type LeftDockToolAnchorRefs = {
   effect: RefObject<HTMLDivElement | null>;
   marker: RefObject<HTMLDivElement | null>;
   trap: RefObject<HTMLDivElement | null>;
+  container: RefObject<HTMLDivElement | null>;
   draw: RefObject<HTMLDivElement | null>;
 };
 
@@ -29,6 +30,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
   const effectAnchorRef = useRef<HTMLDivElement>(null);
   const markerAnchorRef = useRef<HTMLDivElement>(null);
   const trapAnchorRef = useRef<HTMLDivElement>(null);
+  const containerAnchorRef = useRef<HTMLDivElement>(null);
   const drawAnchorRef = useRef<HTMLDivElement>(null);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -37,6 +39,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
     effect: effectAnchorRef,
     marker: markerAnchorRef,
     trap: trapAnchorRef,
+    container: containerAnchorRef,
     draw: drawAnchorRef,
   };
 
@@ -53,6 +56,7 @@ export function useLiveSessionLeftDockToolFlyout(mapToolsActive: boolean) {
     if (id === "effect") return effectAnchorRef.current;
     if (id === "marker") return markerAnchorRef.current;
     if (id === "draw") return drawAnchorRef.current;
+    if (id === "container") return containerAnchorRef.current;
     return trapAnchorRef.current;
   }
 

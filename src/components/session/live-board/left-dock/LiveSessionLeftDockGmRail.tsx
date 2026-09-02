@@ -8,6 +8,7 @@ import {
   Armchair,
   BookOpen,
   Bomb,
+  Box,
   Cloud,
   Dices,
   Mic,
@@ -23,6 +24,7 @@ import type {
   BattlemapFogTool,
   BattlemapMarkerTool,
   BattlemapTrapTool,
+  BattlemapContainerTool,
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool } from "@/src/lib/session/map-draw-types";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
@@ -50,11 +52,13 @@ type Props = {
   effectTool: BattlemapEffectTool;
   markerTool: BattlemapMarkerTool;
   trapTool: BattlemapTrapTool;
+  containerTool: BattlemapContainerTool;
   drawTool: MapDrawTool;
   onFogToolChange?: (tool: BattlemapFogTool) => void;
   onEffectToolChange?: (tool: BattlemapEffectTool) => void;
   onMarkerToolChange?: (tool: BattlemapMarkerTool) => void;
   onTrapToolChange?: (tool: BattlemapTrapTool) => void;
+  onContainerToolChange?: (tool: BattlemapContainerTool) => void;
   onDrawToolChange?: (tool: MapDrawTool) => void;
   showDice: boolean;
   diceOpen: boolean;
@@ -80,11 +84,13 @@ export function LiveSessionLeftDockGmRail({
   effectTool,
   markerTool,
   trapTool,
+  containerTool,
   drawTool,
   onFogToolChange,
   onEffectToolChange,
   onMarkerToolChange,
   onTrapToolChange,
+  onContainerToolChange,
   onDrawToolChange,
   showDice,
   diceOpen,
@@ -207,6 +213,20 @@ export function LiveSessionLeftDockGmRail({
               className="h-11"
             >
               <Bomb className="h-5 w-5 text-red-300" />
+            </RailButton>
+          </div>
+        ) : null}
+
+        {battlemapActive && onContainerToolChange ? (
+          <div ref={anchorRefs.container as RefObject<HTMLDivElement>} className="relative shrink-0">
+            <RailButton
+              label="Behälter (Container-Wizard)"
+              active={toolFlyout === "container" || containerTool != null}
+              hideLabel={toolFlyout === "container"}
+              onClick={() => onToggleToolFlyout("container")}
+              className="h-11"
+            >
+              <Box className="h-5 w-5 text-amber-200" />
             </RailButton>
           </div>
         ) : null}

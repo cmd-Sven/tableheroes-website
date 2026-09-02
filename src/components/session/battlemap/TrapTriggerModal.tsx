@@ -6,6 +6,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 import type { SessionBattlemapTrap } from "@/src/lib/session/battlemap-types";
 import { resolveBattlemapTrapTrigger } from "@/src/lib/actions/battlemap-trap-actions";
+import { resolveContainerTrapTrigger } from "@/src/lib/actions/battlemap-container-actions";
 import { addCharacterActiveCondition } from "@/src/app/dashboard/campaigns/[id]/character-state-actions";
 import { getLiveSessionAvatarStatus } from "@/src/lib/actions/live-session-avatar-actions";
 import {
@@ -26,6 +27,7 @@ type Props = {
   onClose: () => void;
   onRequestSaveRoll?: (ability: string, dc: number) => void;
   onRequestDamageRoll?: (formula: string, damageType: string) => void;
+  sourceContainerId?: string | null;
 };
 
 export function TrapTriggerModal({
@@ -40,6 +42,7 @@ export function TrapTriggerModal({
   onClose,
   onRequestSaveRoll,
   onRequestDamageRoll,
+  sourceContainerId = null,
 }: Props) {
   const [pending, startTransition] = useTransition();
 
@@ -53,11 +56,19 @@ export function TrapTriggerModal({
   function resume() {
     startTransition(async () => {
       try {
-        await resolveBattlemapTrapTrigger({
-          sessionId,
-          trapId: trap!.id,
-          resumeMovement: true,
-        });
+        if (sourceContainerId) {
+          await resolveContainerTrapTrigger({
+            sessionId,
+            containerId: sourceContainerId,
+            resumeMovement: true,
+          });
+        } else {
+          await resolveBattlemapTrapTrigger({
+            sessionId,
+            trapId: trap!.id,
+            resumeMovement: true,
+          });
+        }
         toast.success("Bewegung fortgesetzt.");
         onClose();
       } catch (e) {

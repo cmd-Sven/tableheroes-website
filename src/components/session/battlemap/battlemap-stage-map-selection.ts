@@ -6,6 +6,7 @@ type SelectionCallbacks = {
   onSelectEffectTemplate?: (templateId: string | null) => void;
   onSelectMarker?: (markerId: string | null) => void;
   onSelectTrap?: (trapId: string | null) => void;
+  onSelectContainer?: (containerId: string | null) => void;
 };
 
 export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks) {
@@ -16,6 +17,7 @@ export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks)
     onSelectEffectTemplate,
     onSelectMarker,
     onSelectTrap,
+    onSelectContainer,
   } = callbacks;
 
   return {
@@ -26,6 +28,7 @@ export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks)
       onSelectEffectTemplate?.(null);
       onSelectMarker?.(null);
       onSelectTrap?.(null);
+      onSelectContainer?.(null);
     },
     onSelectEffectTemplate: (id: string | null) => {
       onSelectEffectTemplate?.(id);
@@ -34,6 +37,7 @@ export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks)
       onSelectFogShape?.(null);
       onSelectMarker?.(null);
       onSelectTrap?.(null);
+      onSelectContainer?.(null);
     },
     onSelectMarker: (id: string | null) => {
       onSelectMarker?.(id);
@@ -42,6 +46,7 @@ export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks)
       onSelectFogShape?.(null);
       onSelectEffectTemplate?.(null);
       onSelectTrap?.(null);
+      onSelectContainer?.(null);
     },
     onSelectTrap: (id: string | null) => {
       onSelectTrap?.(id);
@@ -50,6 +55,16 @@ export function buildBattlemapLayerSelectHandlers(callbacks: SelectionCallbacks)
       onSelectFogShape?.(null);
       onSelectEffectTemplate?.(null);
       onSelectMarker?.(null);
+      onSelectContainer?.(null);
+    },
+    onSelectContainer: (id: string | null) => {
+      onSelectContainer?.(id);
+      onSelectToken?.(null);
+      onSelectProp?.(null);
+      onSelectFogShape?.(null);
+      onSelectEffectTemplate?.(null);
+      onSelectMarker?.(null);
+      onSelectTrap?.(null);
     },
   };
 }

@@ -11,9 +11,12 @@ import {
   listBattlemapMarkers,
 } from "@/src/lib/actions/battlemap-actions";
 import { listBattlemapTraps } from "@/src/lib/actions/battlemap-trap-actions";
+import { listBattlemapContainers } from "@/src/lib/actions/battlemap-container-actions";
 import {
+  mapBattlemapContainerRow,
   mapBattlemapPropRow,
   mapBattlemapTrapRow,
+  upsertBattlemapContainer,
   upsertBattlemapProp,
   upsertBattlemapTrap,
 } from "@/src/lib/session/battlemap-realtime-map";
@@ -49,6 +52,8 @@ export function useLiveSessionBattlemapEntitySync({
     setSelectedMarkerId,
     setBattlemapTraps,
     setSelectedTrapId,
+    setBattlemapContainers,
+    setSelectedContainerId,
     setBattlemapProps,
   } = bm;
 
@@ -354,6 +359,74 @@ export function useLiveSessionBattlemapEntitySync({
       supabase.removeChannel(channel);
     };
   }, [activeBattlemapId, isGuest, sessionId, supabase, setBattlemapTraps, setSelectedTrapId]);
+
+  useEffect(() => {
+    if (isGuest || !activeBattlemapId) {
+      setBattlemapContainers([]);
+      setSelectedContainerId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadContainers() {
+      try {
+        const list = await listBattlemapContainers(activeBattlemapId!, sessionId);
+        if (!cancelled) setBattlemapContainers(list);
+      } catch {
+        if (!cancelled) setBattlemapContainers([]);
+      }
+    }
+
+    void loadContainers();
+
+    const channel = supabase
+      .channel(`session_battlemap_containers_${activeBattlemapId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "session_battlemap_containers",
+          filter: `battlemap_id=eq.${activeBattlemapId}`,
+        },
+        (payload) => {
+          if (cancelled) return;
+          if (payload.eventType === "DELETE") {
+            const oldId =
+              payload.old && typeof payload.old === "object" && "id" in payload.old
+                ? String((payload.old as { id: unknown }).id)
+                : "";
+            if (oldId) {
+              setBattlemapContainers((prev) => prev.filter((c) => c.id !== oldId));
+              setSelectedContainerId((prev) => (prev === oldId ? null : prev));
+            } else {
+              void loadContainers();
+            }
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row?.id) {
+            void loadContainers();
+            return;
+          }
+          const container = mapBattlemapContainerRow(row);
+          setBattlemapContainers((prev) => upsertBattlemapContainer(prev, container));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [
+    activeBattlemapId,
+    isGuest,
+    sessionId,
+    supabase,
+    setBattlemapContainers,
+    setSelectedContainerId,
+  ]);
 
   useEffect(() => {
     if (isGuest || !activeBattlemapId) {

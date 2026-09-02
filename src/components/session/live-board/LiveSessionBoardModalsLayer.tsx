@@ -156,6 +156,8 @@ export function LiveSessionBoardModalsLayer() {
       setBattlemapMarkers,
       battlemapTraps,
       setBattlemapTraps,
+      battlemapContainers,
+      setBattlemapContainers,
       fogTool,
       setFogTool,
       effectTool,
@@ -164,6 +166,8 @@ export function LiveSessionBoardModalsLayer() {
       setMarkerTool,
       trapTool,
       setTrapTool,
+      containerTool,
+      setContainerTool,
       selectedFogShapeId,
       setSelectedFogShapeId,
       selectedEffectTemplateId,
@@ -172,8 +176,12 @@ export function LiveSessionBoardModalsLayer() {
       setSelectedMarkerId,
       selectedTrapId,
       setSelectedTrapId,
+      selectedContainerId,
+      setSelectedContainerId,
       trapWizardCell,
       setTrapWizardCell,
+      containerWizardCell,
+      setContainerWizardCell,
       trapTriggerEvent,
       setTrapTriggerEvent,
       trapDisarmTarget,
@@ -208,6 +216,8 @@ export function LiveSessionBoardModalsLayer() {
       handleMarkerClearAll,
       handleTrapDelete,
       handleTrapClearAll,
+      handleContainerPickLock,
+      handleContainerForceOpen,
       handleBattlemapPropDrop,
       handleBattlemapPropResize,
       visibleBattlemapTokens,
@@ -340,11 +350,16 @@ export function LiveSessionBoardModalsLayer() {
         liveState={liveState}
         trapWizardCell={trapWizardCell}
         setTrapWizardCell={setTrapWizardCell}
+        containerWizardCell={containerWizardCell}
+        setContainerWizardCell={setContainerWizardCell}
         setTrapTool={setTrapTool}
+        setContainerTool={setContainerTool}
         activeBattlemapId={activeBattlemapId}
         currentLocationName={liveState?.current_location}
         setSelectedTrapId={setSelectedTrapId}
+        setSelectedContainerId={setSelectedContainerId}
         setBattlemapTraps={setBattlemapTraps}
+        setBattlemapContainers={setBattlemapContainers}
         trapTriggerEvent={trapTriggerEvent}
         setTrapTriggerEvent={setTrapTriggerEvent}
         trapDisarmTarget={trapDisarmTarget}
@@ -382,7 +397,10 @@ export function LiveSessionBoardModalsLayer() {
         combatParticipantNpcIds={combatParticipantNpcIds}
         addCombatToken={addCombatToken}
         battlemapTraps={battlemapTraps}
+        battlemapContainers={battlemapContainers}
         setTrapDisarmTarget={setTrapDisarmTarget}
+        handleContainerPickLock={handleContainerPickLock}
+        handleContainerForceOpen={handleContainerForceOpen}
       />
     </>
   );

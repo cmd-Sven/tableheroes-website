@@ -14,14 +14,18 @@ import { GmQuickRulebookModal } from "@/src/components/session/GmQuickRulebookMo
 import { BeastDefeatLootModal } from "@/src/components/session/BeastDefeatLootModal";
 import { SessionEndWrapUpModal } from "@/src/components/session/SessionEndWrapUpModal";
 import { TrapWizardModal } from "@/src/components/session/battlemap/TrapWizardModal";
+import { ContainerWizardModal } from "@/src/components/session/battlemap/ContainerWizardModal";
 import { TrapTriggerModal } from "@/src/components/session/battlemap/TrapTriggerModal";
 import { TrapDisarmModal } from "@/src/components/session/battlemap/TrapDisarmModal";
 import { canOpenTrapDisarmModal } from "./useTrapDisarmModalSync";
 import { listBattlemapTraps } from "@/src/lib/actions/battlemap-trap-actions";
-import type {
+import {
+  BattlemapContainerTool,
   BattlemapTrapTool,
+  SessionBattlemapContainer,
   SessionBattlemapTrap,
 } from "@/src/lib/session/battlemap-types";
+import { listBattlemapContainers } from "@/src/lib/actions/battlemap-container-actions";
 import type { UseSessionChronicleRecorderReturn } from "@/src/hooks/useSessionChronicleRecorder";
 import type { CampaignCreature, LiveState, PartyCharacter } from "./live-session-types";
 
@@ -54,6 +58,7 @@ type TrapTriggerEvent = {
   characterName: string;
   characterId: string;
   passivePerception: number;
+  sourceContainerId?: string;
 } | null;
 
 export type LiveSessionModalsProps = {
@@ -94,11 +99,16 @@ export type LiveSessionModalsProps = {
   liveState: LiveState | null;
   trapWizardCell: { gridX: number; gridY: number } | null;
   setTrapWizardCell: (cell: { gridX: number; gridY: number } | null) => void;
+  containerWizardCell: { gridX: number; gridY: number } | null;
+  setContainerWizardCell: (cell: { gridX: number; gridY: number } | null) => void;
   setTrapTool: (tool: BattlemapTrapTool) => void;
+  setContainerTool: (tool: BattlemapContainerTool) => void;
   activeBattlemapId: string | null;
   currentLocationName: string | null | undefined;
   setSelectedTrapId: (id: string | null) => void;
+  setSelectedContainerId: (id: string | null) => void;
   setBattlemapTraps: Dispatch<SetStateAction<SessionBattlemapTrap[]>>;
+  setBattlemapContainers: Dispatch<SetStateAction<SessionBattlemapContainer[]>>;
   trapTriggerEvent: TrapTriggerEvent;
   setTrapTriggerEvent: (event: TrapTriggerEvent) => void;
   trapDisarmTarget: import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null;
@@ -151,11 +161,16 @@ export function LiveSessionModals({
   liveState,
   trapWizardCell,
   setTrapWizardCell,
+  containerWizardCell,
+  setContainerWizardCell,
   setTrapTool,
+  setContainerTool,
   activeBattlemapId,
   currentLocationName,
   setSelectedTrapId,
+  setSelectedContainerId,
   setBattlemapTraps,
+  setBattlemapContainers,
   trapTriggerEvent,
   setTrapTriggerEvent,
   trapDisarmTarget,
@@ -317,6 +332,30 @@ export function LiveSessionModals({
         }}
       />
 
+      <ContainerWizardModal
+        open={Boolean(isGM && containerWizardCell && activeBattlemapId)}
+        onClose={() => {
+          setContainerWizardCell(null);
+          setContainerTool(null);
+        }}
+        sessionId={sessionId}
+        campaignId={campaignId}
+        battlemapId={activeBattlemapId ?? ""}
+        gridX={containerWizardCell?.gridX ?? 0}
+        gridY={containerWizardCell?.gridY ?? 0}
+        locationLoreContext={
+          currentLocationName ? `Aktueller Ort: ${currentLocationName}` : ""
+        }
+        targetLevel={3}
+        onCreated={(containerId) => {
+          setSelectedContainerId(containerId);
+          setContainerTool("select");
+          void listBattlemapContainers(activeBattlemapId!, sessionId)
+            .then((list) => setBattlemapContainers(list))
+            .catch(() => undefined);
+        }}
+      />
+
       <TrapTriggerModal
         open={Boolean(trapTriggerEvent)}
         trap={trapTriggerEvent?.trap ?? null}
@@ -326,6 +365,7 @@ export function LiveSessionModals({
         passivePerception={trapTriggerEvent?.passivePerception ?? 10}
         isGm={isGM}
         sessionId={sessionId}
+        sourceContainerId={trapTriggerEvent?.sourceContainerId ?? null}
         onClose={() => setTrapTriggerEvent(null)}
         onRequestSaveRoll={(ability, dc) => {
           toast.message(
@@ -347,13 +387,29 @@ export function LiveSessionModals({
           isGm={isGM}
           onClose={() => setTrapDisarmTarget(null)}
           onTrapUpdated={(updated) => {
-            setBattlemapTraps((prev) =>
-              prev.map((t) => (t.id === updated.id ? updated : t)),
-            );
+            if (trapDisarmTarget.sourceContainerId) {
+              setBattlemapContainers((prev) =>
+                prev.map((c) =>
+                  c.id === trapDisarmTarget.sourceContainerId
+                    ? { ...c, ai_payload: updated.ai_payload, is_trap_disarmed: updated.is_disarmed }
+                    : c,
+                ),
+              );
+            } else {
+              setBattlemapTraps((prev) =>
+                prev.map((t) => (t.id === updated.id ? updated : t)),
+              );
+            }
             setTrapDisarmTarget((prev) =>
               prev && prev.trap.id === updated.id
                 ? { ...prev, trap: updated }
                 : prev,
+            );
+          }}
+          sourceContainerId={trapDisarmTarget.sourceContainerId ?? null}
+          onContainerUpdated={(container) => {
+            setBattlemapContainers((prev) =>
+              prev.map((c) => (c.id === container.id ? container : c)),
             );
           }}
         />

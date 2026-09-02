@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseTrapStatusEffect } from "@/src/lib/characters/condition-tokens";
 import type {
+  BattlemapContainerType,
   BattlemapTrapDifficulty,
   BattlemapTrapEffectShape,
+  SessionBattlemapContainer,
   SessionBattlemapProp,
   SessionBattlemapToken,
   SessionBattlemapTrap,
@@ -352,5 +354,86 @@ export function upsertBattlemapTrap(
   }
   const next = [...prev];
   next[idx] = trap;
+  return next;
+}
+
+const CONTAINER_TYPES = new Set<BattlemapContainerType>([
+  "chest",
+  "barrel",
+  "crate",
+  "urn",
+  "sarcophagus",
+  "other",
+]);
+
+export function mapBattlemapContainerRow(
+  row: Record<string, unknown>,
+): SessionBattlemapContainer {
+  const typeRaw = String(row.container_type ?? "chest");
+  const container_type: BattlemapContainerType = CONTAINER_TYPES.has(
+    typeRaw as BattlemapContainerType,
+  )
+    ? (typeRaw as BattlemapContainerType)
+    : "chest";
+  return {
+    id: String(row.id),
+    battlemap_id: String(row.battlemap_id),
+    session_id: String(row.session_id),
+    campaign_id: String(row.campaign_id),
+    name: String(row.name ?? "Behälter"),
+    description: String(row.description ?? ""),
+    container_type,
+    grid_x: Math.round(Number(row.grid_x ?? 0)),
+    grid_y: Math.round(Number(row.grid_y ?? 0)),
+    is_locked: row.is_locked === true,
+    is_open: row.is_open === true,
+    force_open_dc: Math.max(1, Math.min(40, Math.round(Number(row.force_open_dc ?? 15)))),
+    has_trap: row.has_trap === true,
+    trap_config:
+      row.trap_config && typeof row.trap_config === "object"
+        ? (row.trap_config as Record<string, unknown>)
+        : {},
+    is_trap_detected: row.is_trap_detected === true,
+    is_trap_disarmed: row.is_trap_disarmed === true,
+    is_trap_triggered: row.is_trap_triggered === true,
+    trap_visible_to_players: row.trap_visible_to_players === true,
+    trap_triggered_by_character_id:
+      row.trap_triggered_by_character_id != null
+        ? String(row.trap_triggered_by_character_id)
+        : null,
+    trap_triggered_at:
+      row.trap_triggered_at != null ? String(row.trap_triggered_at) : null,
+    lore_context: row.lore_context != null ? String(row.lore_context) : null,
+    ai_payload:
+      row.ai_payload && typeof row.ai_payload === "object"
+        ? (row.ai_payload as Record<string, unknown>)
+        : {},
+    created_at: row.created_at != null ? String(row.created_at) : undefined,
+    updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
+  };
+}
+
+export function upsertBattlemapContainer(
+  prev: SessionBattlemapContainer[],
+  container: SessionBattlemapContainer,
+): SessionBattlemapContainer[] {
+  const idx = prev.findIndex((c) => c.id === container.id);
+  if (idx < 0) return [...prev, container];
+  const cur = prev[idx]!;
+  if (
+    cur.grid_x === container.grid_x &&
+    cur.grid_y === container.grid_y &&
+    cur.is_open === container.is_open &&
+    cur.is_locked === container.is_locked &&
+    cur.is_trap_detected === container.is_trap_detected &&
+    cur.is_trap_disarmed === container.is_trap_disarmed &&
+    cur.is_trap_triggered === container.is_trap_triggered &&
+    cur.trap_visible_to_players === container.trap_visible_to_players &&
+    cur.name === container.name
+  ) {
+    return prev;
+  }
+  const next = [...prev];
+  next[idx] = container;
   return next;
 }

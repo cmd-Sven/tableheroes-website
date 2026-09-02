@@ -85,6 +85,12 @@ export type LiveSessionLeftDockSessionProps = {
   setTrapTool: Dispatch<SetStateAction<BattlemapTrapTool>>;
   selectedTrapId: string | null;
   setSelectedTrapId: Dispatch<SetStateAction<string | null>>;
+  containerTool: import("@/src/lib/session/battlemap-types").BattlemapContainerTool;
+  setContainerTool: Dispatch<
+    SetStateAction<import("@/src/lib/session/battlemap-types").BattlemapContainerTool>
+  >;
+  selectedContainerId: string | null;
+  setSelectedContainerId: Dispatch<SetStateAction<string | null>>;
   drawTool: "draw" | null;
   setDrawTool: Dispatch<SetStateAction<"draw" | null>>;
   drawColor: string;
@@ -109,8 +115,11 @@ export type LiveSessionLeftDockSessionProps = {
   handleMarkerDelete: (markerId: string) => void;
   handleMarkerClearAll: () => void;
   battlemapTraps: SessionBattlemapTrap[];
+  battlemapContainers: import("@/src/lib/session/battlemap-types").SessionBattlemapContainer[];
   handleTrapDelete: (trapId: string) => void;
   handleTrapClearAll: () => void;
+  handleContainerDelete: (containerId: string) => void;
+  handleContainerClearAll: () => void;
   battlemapEffectTemplates: SessionBattlemapEffectTemplate[];
   handleEffectTemplateDelete: (templateId: string) => void;
   handleEffectClearAll: () => void;
@@ -191,6 +200,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     setTrapTool,
     selectedTrapId,
     setSelectedTrapId,
+    containerTool,
+    setContainerTool,
+    selectedContainerId,
+    setSelectedContainerId,
     drawTool,
     setDrawTool,
     drawColor,
@@ -215,8 +228,11 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     handleMarkerDelete,
     handleMarkerClearAll,
     battlemapTraps,
+    battlemapContainers,
     handleTrapDelete,
     handleTrapClearAll,
+    handleContainerDelete,
+    handleContainerClearAll,
     battlemapEffectTemplates,
     handleEffectTemplateDelete,
     handleEffectClearAll,
@@ -439,6 +455,43 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
         }}
         onTrapClearAll={handleTrapClearAll}
         trapCount={battlemapTraps.length}
+        containerTool={containerTool}
+        selectedContainerId={selectedContainerId}
+        onContainerToolChange={(tool) => {
+          setContainerTool(tool);
+          if (tool) {
+            setFogTool(null);
+            setSelectedFogShapeId(null);
+            setEffectTool(null);
+            setSelectedEffectTemplateId(null);
+            setMarkerTool(null);
+            setSelectedMarkerId(null);
+            setTrapTool(null);
+            setSelectedTrapId(null);
+            setDrawTool(null);
+            setLeftPanel(null);
+            setTokenPlacement(null);
+            setGmTokenPlacement(null);
+            setGmMoveTokenId(null);
+            setSelectedBattlemapTokenId(null);
+            setSelectedBattlemapPropId(null);
+          }
+          if (tool !== "select") setSelectedContainerId(null);
+        }}
+        onContainerDelete={() => {
+          const fallbackId =
+            selectedContainerId ??
+            (battlemapContainers.length > 0
+              ? battlemapContainers[battlemapContainers.length - 1]?.id
+              : null);
+          if (!fallbackId) {
+            toast.message("Behälter auf der Karte auswählen, dann löschen.");
+            return;
+          }
+          handleContainerDelete(fallbackId);
+        }}
+        onContainerClearAll={handleContainerClearAll}
+        containerCount={battlemapContainers.length}
         drawTool={drawTool}
         drawColor={drawColor}
         drawWidth={drawWidth}

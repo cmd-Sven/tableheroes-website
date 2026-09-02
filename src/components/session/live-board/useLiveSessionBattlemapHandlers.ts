@@ -15,6 +15,11 @@ import {
   checkBattlemapTrapsOnProximity,
 } from "@/src/lib/actions/battlemap-trap-actions";
 import {
+  attemptContainerForceOpen,
+  attemptContainerPickLock,
+  checkContainerTrapsOnProximity,
+} from "@/src/lib/actions/battlemap-container-actions";
+import {
   isWithinMovementRange,
   movementCellsForBurst,
 } from "@/src/lib/session/battlemap-movement";
@@ -24,6 +29,7 @@ import {
   clearPendingBattlemapTokenMove,
   placeBattlemapCharacterTokenClient,
   registerPendingBattlemapTokenMove,
+  upsertBattlemapContainer,
   upsertBattlemapToken,
   upsertBattlemapTrap,
 } from "@/src/lib/session/battlemap-realtime-map";
@@ -95,6 +101,7 @@ export function useLiveSessionBattlemapHandlers({
     setSelectedMarkerId,
     setBattlemapTraps,
     setSelectedTrapId,
+    setBattlemapContainers,
     setTrapTriggerEvent,
     setTokenPlacement,
     setGmTokenPlacement,
@@ -108,6 +115,7 @@ export function useLiveSessionBattlemapHandlers({
     battlemapEffectTemplates,
     battlemapMarkers,
     battlemapTraps,
+    battlemapContainers,
   } = bm;
 
   const applyTrapDetectionResult = useCallback(
@@ -155,11 +163,38 @@ export function useLiveSessionBattlemapHandlers({
     [activeBattlemapId, applyTrapDetectionResult, sessionId],
   );
 
+  const runContainerTrapProximityCheck = useCallback(
+    async (characterId: string, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      try {
+        const result = await checkContainerTrapsOnProximity({
+          sessionId,
+          battlemapId: activeBattlemapId,
+          characterId,
+          gridX,
+          gridY,
+        });
+        if (result.kind === "detected") {
+          setBattlemapContainers((prev) =>
+            upsertBattlemapContainer(prev, result.container),
+          );
+          toast.message(
+            `${result.characterName} bemerkt Falle in „${result.container.name}" (PP ${result.passivePerception} ≥ eff. DC, passiv).`,
+          );
+        }
+      } catch {
+        /* optional */
+      }
+    },
+    [activeBattlemapId, sessionId, setBattlemapContainers],
+  );
+
   const runTrapEnterCheck = useCallback(
     async (characterId: string, gridX: number, gridY: number) => {
       if (!activeBattlemapId) return;
       try {
         await runTrapProximityCheck(characterId, gridX, gridY);
+        await runContainerTrapProximityCheck(characterId, gridX, gridY);
         const result = await checkBattlemapTrapsOnEnter({
           sessionId,
           battlemapId: activeBattlemapId,
@@ -196,6 +231,7 @@ export function useLiveSessionBattlemapHandlers({
       activeBattlemapId,
       applyTrapDetectionResult,
       runTrapProximityCheck,
+      runContainerTrapProximityCheck,
       sessionId,
       setBattlemapTraps,
       setLiveState,
@@ -460,10 +496,112 @@ export function useLiveSessionBattlemapHandlers({
     ],
   );
 
+  const handleContainerPickLock = useCallback(
+    (containerId: string, characterId: string) => {
+      startTransition(async () => {
+        try {
+          const result = await attemptContainerPickLock({
+            sessionId,
+            containerId,
+            characterId,
+          });
+          setBattlemapContainers((prev) =>
+            prev.map((c) =>
+              c.id === result.container.id ? result.container : c,
+            ),
+          );
+          if (result.kind === "trap_triggered") {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const updated = normalizeLiveRow({
+                ...prev,
+                battlemap_movement_paused: true,
+              });
+              liveStateRef.current = updated;
+              return updated;
+            });
+            setTrapTriggerEvent({
+              trap: result.trap,
+              characterName: result.characterName,
+              characterId: result.characterId,
+              passivePerception: result.passivePerception,
+              sourceContainerId: result.container.id,
+            });
+            toast.error(`Falle in „${result.container.name}" ausgelöst!`);
+          } else {
+            toast.success(`„${result.container.name}" geöffnet.`);
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Schloss knacken fehlgeschlagen.");
+        }
+      });
+    },
+    [
+      sessionId,
+      setBattlemapContainers,
+      setTrapTriggerEvent,
+      setLiveState,
+      liveStateRef,
+      startTransition,
+    ],
+  );
+
+  const handleContainerForceOpen = useCallback(
+    (containerId: string, characterId: string) => {
+      startTransition(async () => {
+        try {
+          const result = await attemptContainerForceOpen({
+            sessionId,
+            containerId,
+            characterId,
+          });
+          setBattlemapContainers((prev) =>
+            prev.map((c) =>
+              c.id === result.container.id ? result.container : c,
+            ),
+          );
+          if (result.kind === "trap_triggered") {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const updated = normalizeLiveRow({
+                ...prev,
+                battlemap_movement_paused: true,
+              });
+              liveStateRef.current = updated;
+              return updated;
+            });
+            setTrapTriggerEvent({
+              trap: result.trap,
+              characterName: result.characterName,
+              characterId: result.characterId,
+              passivePerception: result.passivePerception,
+              sourceContainerId: result.container.id,
+            });
+            toast.error(`Falle in „${result.container.name}" ausgelöst!`);
+          } else {
+            toast.success(`„${result.container.name}" gewaltsam geöffnet.`);
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Öffnen fehlgeschlagen.");
+        }
+      });
+    },
+    [
+      sessionId,
+      setBattlemapContainers,
+      setTrapTriggerEvent,
+      setLiveState,
+      liveStateRef,
+      startTransition,
+    ],
+  );
+
   return {
     startCharacterTokenPlacement,
     handleBattlemapCellClick,
     runTrapEnterCheck,
     handleBattlemapTokenMove,
+    handleContainerPickLock,
+    handleContainerForceOpen,
   };
 }

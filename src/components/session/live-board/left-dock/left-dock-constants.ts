@@ -24,4 +24,4 @@ export const PANEL_META: Record<LeftPanelId, { title: string; subtitle: string }
   party: { title: "Helden", subtitle: "Avatar-Leiste & Webcam" },
 };
 
-export type ToolFlyoutId = "fog" | "effect" | "marker" | "trap" | "draw";
+export type ToolFlyoutId = "fog" | "effect" | "marker" | "trap" | "container" | "draw";

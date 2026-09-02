@@ -43,6 +43,7 @@ type Args = {
   trapInteractive: boolean;
   markerPlaceActive: boolean;
   trapPlaceActive: boolean;
+  containerPlaceActive?: boolean;
   markerTool: BattlemapMarkerTool;
   onCellClick?: (gridX: number, gridY: number) => void;
   onMarkerCreate?: (input: {
@@ -51,6 +52,7 @@ type Args = {
     gridY: number;
   }) => void;
   onTrapPlaceCell?: (gridX: number, gridY: number) => void;
+  onContainerPlaceCell?: (gridX: number, gridY: number) => void;
   onSelectFogShape?: (shapeId: string | null) => void;
   onSelectEffectTemplate?: (templateId: string | null) => void;
   onSelectMarker?: (markerId: string | null) => void;
@@ -76,10 +78,12 @@ export function useBattlemapMapInteraction({
   trapInteractive,
   markerPlaceActive,
   trapPlaceActive,
+  containerPlaceActive = false,
   markerTool,
   onCellClick,
   onMarkerCreate,
   onTrapPlaceCell,
+  onContainerPlaceCell,
   onSelectFogShape,
   onSelectEffectTemplate,
   onSelectMarker,
@@ -231,6 +235,29 @@ export function useBattlemapMapInteraction({
           return;
         }
         onTrapPlaceCell(cell.gridX, cell.gridY);
+        return;
+      }
+      if (containerPlaceActive && onContainerPlaceCell) {
+        if (e.button !== 0) return;
+        const coords = clientToMapPixels(
+          e.clientX,
+          e.clientY,
+          e.currentTarget,
+          mapSize.width,
+          mapSize.height,
+        );
+        if (!coords) return;
+        const cell = pixelToGrid(coords.px, coords.py, config);
+        if (!cell) return;
+        if (
+          cell.gridX < 0 ||
+          cell.gridY < 0 ||
+          cell.gridX >= config.columns ||
+          cell.gridY >= config.rows
+        ) {
+          return;
+        }
+        onContainerPlaceCell(cell.gridX, cell.gridY);
         return;
       }
       if (!placementActive || !onCellClick) return;

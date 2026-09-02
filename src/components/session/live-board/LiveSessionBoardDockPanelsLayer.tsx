@@ -153,6 +153,11 @@ export function LiveSessionBoardDockPanelsLayer() {
       setBattlemapMarkers,
       battlemapTraps,
       setBattlemapTraps,
+      battlemapContainers,
+      containerTool,
+      setContainerTool,
+      selectedContainerId,
+      setSelectedContainerId,
       fogTool,
       setFogTool,
       effectTool,
@@ -229,6 +234,8 @@ export function LiveSessionBoardDockPanelsLayer() {
       handleMarkerClearAll,
       handleTrapDelete,
       handleTrapClearAll,
+      handleContainerDelete,
+      handleContainerClearAll,
       handleBattlemapPropDrop,
       handleBattlemapPropResize,
       visibleBattlemapTokens,
@@ -364,6 +371,10 @@ export function LiveSessionBoardDockPanelsLayer() {
         setTrapTool={setTrapTool}
         selectedTrapId={selectedTrapId}
         setSelectedTrapId={setSelectedTrapId}
+        containerTool={containerTool}
+        setContainerTool={setContainerTool}
+        selectedContainerId={selectedContainerId}
+        setSelectedContainerId={setSelectedContainerId}
         drawTool={drawTool}
         setDrawTool={setDrawTool}
         drawColor={drawColor}
@@ -388,8 +399,11 @@ export function LiveSessionBoardDockPanelsLayer() {
         handleMarkerDelete={handleMarkerDelete}
         handleMarkerClearAll={handleMarkerClearAll}
         battlemapTraps={battlemapTraps}
+        battlemapContainers={battlemapContainers}
         handleTrapDelete={handleTrapDelete}
         handleTrapClearAll={handleTrapClearAll}
+        handleContainerDelete={handleContainerDelete}
+        handleContainerClearAll={handleContainerClearAll}
         battlemapEffectTemplates={battlemapEffectTemplates}
         handleEffectTemplateDelete={handleEffectTemplateDelete}
         handleEffectClearAll={handleEffectClearAll}

@@ -5,6 +5,7 @@
 
 import { useMemo, useState } from "react";
 import type {
+  BattlemapContainerTool,
   BattlemapEffectTool,
   BattlemapFogTool,
   BattlemapMarkerTool,
@@ -12,6 +13,7 @@ import type {
   CharacterTokenPlacement,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapContainer,
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
   SessionBattlemapMarker,
@@ -34,10 +36,12 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
   >([]);
   const [battlemapMarkers, setBattlemapMarkers] = useState<SessionBattlemapMarker[]>([]);
   const [battlemapTraps, setBattlemapTraps] = useState<SessionBattlemapTrap[]>([]);
+  const [battlemapContainers, setBattlemapContainers] = useState<SessionBattlemapContainer[]>([]);
   const [fogTool, setFogTool] = useState<BattlemapFogTool>(null);
   const [effectTool, setEffectTool] = useState<BattlemapEffectTool>(null);
   const [markerTool, setMarkerTool] = useState<BattlemapMarkerTool>(null);
   const [trapTool, setTrapTool] = useState<BattlemapTrapTool>(null);
+  const [containerTool, setContainerTool] = useState<BattlemapContainerTool>(null);
   const [drawTool, setDrawTool] = useState<"draw" | null>(null);
   const [drawColor, setDrawColor] = useState("#cab926");
   const [drawWidth, setDrawWidth] = useState(4);
@@ -54,7 +58,12 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
   const [selectedEffectTemplateId, setSelectedEffectTemplateId] = useState<string | null>(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [selectedTrapId, setSelectedTrapId] = useState<string | null>(null);
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [trapWizardCell, setTrapWizardCell] = useState<{
+    gridX: number;
+    gridY: number;
+  } | null>(null);
+  const [containerWizardCell, setContainerWizardCell] = useState<{
     gridX: number;
     gridY: number;
   } | null>(null);
@@ -63,6 +72,7 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     characterName: string;
     characterId: string;
     passivePerception: number;
+    sourceContainerId?: string;
   } | null>(null);
   const [trapDisarmTarget, setTrapDisarmTarget] = useState<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>(
     null,
@@ -107,6 +117,8 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setBattlemapMarkers,
     battlemapTraps,
     setBattlemapTraps,
+    battlemapContainers,
+    setBattlemapContainers,
     fogTool,
     setFogTool,
     effectTool,
@@ -115,6 +127,8 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setMarkerTool,
     trapTool,
     setTrapTool,
+    containerTool,
+    setContainerTool,
     drawTool,
     setDrawTool,
     drawColor,
@@ -147,8 +161,12 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setSelectedMarkerId,
     selectedTrapId,
     setSelectedTrapId,
+    selectedContainerId,
+    setSelectedContainerId,
     trapWizardCell,
     setTrapWizardCell,
+    containerWizardCell,
+    setContainerWizardCell,
     trapTriggerEvent,
     setTrapTriggerEvent,
     trapDisarmTarget,

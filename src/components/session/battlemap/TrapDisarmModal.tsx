@@ -30,6 +30,15 @@ import {
   executeDiceRoll,
 } from "@/src/lib/session/dice-roll";
 import { requestLiveDiceRoll } from "@/src/lib/actions/session-dice-actions";
+import {
+  closeContainerTrapDisarmSession,
+  confirmContainerTrapDisarm,
+  openContainerTrapDisarmSession,
+  submitContainerTrapDisarmAttempt,
+  updateContainerTrapDisarmDraft,
+} from "@/src/lib/actions/battlemap-container-actions";
+import type { SessionBattlemapContainer } from "@/src/lib/session/battlemap-types";
+import { containerToVirtualTrap } from "@/src/lib/session/battlemap-container-model";
 
 type Props = {
   open: boolean;
@@ -40,6 +49,9 @@ type Props = {
   isGm: boolean;
   onClose: () => void;
   onTrapUpdated: (trap: SessionBattlemapTrap) => void;
+  /** Falle in Container — Actions auf Container-Tabelle */
+  sourceContainerId?: string | null;
+  onContainerUpdated?: (container: SessionBattlemapContainer) => void;
 };
 
 type DraftState = {
@@ -132,7 +144,17 @@ export function TrapDisarmModal({
   isGm,
   onClose,
   onTrapUpdated,
+  sourceContainerId = null,
+  onContainerUpdated,
 }: Props) {
+  const notifyContainerUpdate = useCallback(
+    (container: SessionBattlemapContainer) => {
+      onContainerUpdated?.(container);
+      const virtual = containerToVirtualTrap(container);
+      if (virtual) onTrapUpdated(virtual);
+    },
+    [onContainerUpdated, onTrapUpdated],
+  );
   const [pending, startTransition] = useTransition();
   const [stats, setStats] = useState<TrapDisarmCharacterStats | null>(null);
   const [draft, setDraft] = useState<DraftState>({
@@ -180,21 +202,32 @@ export function TrapDisarmModal({
       syncTimerRef.current = setTimeout(() => {
         startTransition(async () => {
           try {
-            const updated = await updateTrapDisarmDraft({
-              sessionId,
-              trapId: trap.id,
-              characterId,
-              draft: nextDraft,
-            });
+            const updated = sourceContainerId
+              ? await updateContainerTrapDisarmDraft({
+                  sessionId,
+                  containerId: sourceContainerId,
+                  characterId,
+                  draft: nextDraft,
+                })
+              : await updateTrapDisarmDraft({
+                  sessionId,
+                  trapId: trap.id,
+                  characterId,
+                  draft: nextDraft,
+                });
             skipNextSyncRef.current = true;
-            onTrapUpdated(updated);
+            if (sourceContainerId) {
+              notifyContainerUpdate(updated as SessionBattlemapContainer);
+            } else {
+              onTrapUpdated(updated as SessionBattlemapTrap);
+            }
           } catch {
             /* optional — nächster Realtime-Sync korrigiert */
           }
         });
       }, 350);
     },
-    [trap, characterId, disarmPending, sessionId, onTrapUpdated],
+    [trap, characterId, disarmPending, sessionId, onTrapUpdated, sourceContainerId, notifyContainerUpdate],
   );
 
   const updateDraft = useCallback(
@@ -216,17 +249,27 @@ export function TrapDisarmModal({
 
     startTransition(async () => {
       try {
-        const updated = await openTrapDisarmSession({
-          sessionId,
-          trapId: trap.id,
-          characterId,
-        });
-        onTrapUpdated(updated);
+        const updated = sourceContainerId
+          ? await openContainerTrapDisarmSession({
+              sessionId,
+              containerId: sourceContainerId,
+              characterId,
+            })
+          : await openTrapDisarmSession({
+              sessionId,
+              trapId: trap.id,
+              characterId,
+            });
+        if (sourceContainerId) {
+          notifyContainerUpdate(updated as SessionBattlemapContainer);
+        } else {
+          onTrapUpdated(updated as SessionBattlemapTrap);
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Session konnte nicht geöffnet werden.");
       }
     });
-  }, [open, trap, characterId, sessionId, onTrapUpdated]);
+  }, [open, trap, characterId, sessionId, onTrapUpdated, sourceContainerId, notifyContainerUpdate]);
 
   useEffect(() => {
     if (!open) {
@@ -360,12 +403,22 @@ export function TrapDisarmModal({
     if (inProgress) {
       startTransition(async () => {
         try {
-          const updated = await closeTrapDisarmSession({
-            sessionId,
-            trapId: trap!.id,
-            characterId: characterId!,
-          });
-          onTrapUpdated(updated);
+          const updated = sourceContainerId
+            ? await closeContainerTrapDisarmSession({
+                sessionId,
+                containerId: sourceContainerId,
+                characterId: characterId!,
+              })
+            : await closeTrapDisarmSession({
+                sessionId,
+                trapId: trap!.id,
+                characterId: characterId!,
+              });
+          if (sourceContainerId) {
+            notifyContainerUpdate(updated as SessionBattlemapContainer);
+          } else {
+            onTrapUpdated(updated as SessionBattlemapTrap);
+          }
         } catch {
           /* ignore */
         }
@@ -384,23 +437,44 @@ export function TrapDisarmModal({
     }
     startTransition(async () => {
       try {
-        const updated = await submitTrapDisarmAttempt({
-          sessionId,
-          trapId: trap!.id,
-          characterId,
-          investigate: draft.investigate,
-          trapMasteryDex: draft.trapMasteryDex,
-          hasThievesTools: draft.hasThievesTools,
-          thievesToolsProficient: draft.thievesToolsProficient,
-          sleightProficient: draft.sleightProficient,
-          sleightExpertise: draft.sleightExpertise,
-          playerClaimsSuccess: true,
-          investigationSuccess: draft.investigate
-            ? (draft.investigationSuccess ?? undefined)
-            : undefined,
-          disarmSuccess: true,
-        });
-        onTrapUpdated(updated);
+        const updated = sourceContainerId
+          ? await submitContainerTrapDisarmAttempt({
+              sessionId,
+              containerId: sourceContainerId,
+              characterId,
+              investigate: draft.investigate,
+              trapMasteryDex: draft.trapMasteryDex,
+              hasThievesTools: draft.hasThievesTools,
+              thievesToolsProficient: draft.thievesToolsProficient,
+              sleightProficient: draft.sleightProficient,
+              sleightExpertise: draft.sleightExpertise,
+              playerClaimsSuccess: true,
+              investigationSuccess: draft.investigate
+                ? (draft.investigationSuccess ?? undefined)
+                : undefined,
+              disarmSuccess: true,
+            })
+          : await submitTrapDisarmAttempt({
+              sessionId,
+              trapId: trap!.id,
+              characterId,
+              investigate: draft.investigate,
+              trapMasteryDex: draft.trapMasteryDex,
+              hasThievesTools: draft.hasThievesTools,
+              thievesToolsProficient: draft.thievesToolsProficient,
+              sleightProficient: draft.sleightProficient,
+              sleightExpertise: draft.sleightExpertise,
+              playerClaimsSuccess: true,
+              investigationSuccess: draft.investigate
+                ? (draft.investigationSuccess ?? undefined)
+                : undefined,
+              disarmSuccess: true,
+            });
+        if (sourceContainerId) {
+          notifyContainerUpdate(updated as SessionBattlemapContainer);
+        } else {
+          onTrapUpdated(updated as SessionBattlemapTrap);
+        }
         toast.success(
           isGm && gmTakeoverActive
             ? "Entschärfung im Namen des Spielers eingereicht."
@@ -415,12 +489,22 @@ export function TrapDisarmModal({
   function gmConfirm(approved: boolean) {
     startTransition(async () => {
       try {
-        const updated = await confirmTrapDisarm({
-          sessionId,
-          trapId: trap!.id,
-          approved,
-        });
-        onTrapUpdated(updated);
+        const updated = sourceContainerId
+          ? await confirmContainerTrapDisarm({
+              sessionId,
+              containerId: sourceContainerId,
+              approved,
+            })
+          : await confirmTrapDisarm({
+              sessionId,
+              trapId: trap!.id,
+              approved,
+            });
+        if (sourceContainerId) {
+          notifyContainerUpdate(updated as SessionBattlemapContainer);
+        } else {
+          onTrapUpdated(updated as SessionBattlemapTrap);
+        }
         toast.success(approved ? "Entschärfung bestätigt." : "Entschärfung abgelehnt.");
         if (!approved) handleClose();
       } catch (e) {

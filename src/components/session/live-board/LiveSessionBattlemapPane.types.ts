@@ -10,6 +10,7 @@ import type {
 import type { ActiveCombatTurnHighlight } from "@/src/lib/combat-initiative";
 import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import type {
+  BattlemapContainerTool,
   BattlemapEffectTool,
   BattlemapFogTool,
   BattlemapMarkerTool,
@@ -18,6 +19,7 @@ import type {
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapContainer,
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
   SessionBattlemapMarker,
@@ -52,6 +54,7 @@ export type LiveSessionBattlemapPaneProps = {
   battlemapEffectTemplates: SessionBattlemapEffectTemplate[];
   battlemapMarkers: SessionBattlemapMarker[];
   battlemapTraps: SessionBattlemapTrap[];
+  battlemapContainers: SessionBattlemapContainer[];
   battlemapTokens: SessionBattlemapToken[];
   isGM: boolean;
   tokenPlacement: CharacterTokenPlacement | null;
@@ -74,6 +77,8 @@ export type LiveSessionBattlemapPaneProps = {
   setMarkerTool: Dispatch<SetStateAction<BattlemapMarkerTool>>;
   trapTool: BattlemapTrapTool;
   setTrapTool: Dispatch<SetStateAction<BattlemapTrapTool>>;
+  containerTool: BattlemapContainerTool;
+  setContainerTool: Dispatch<SetStateAction<BattlemapContainerTool>>;
   drawTool: "draw" | null;
   drawColor: string;
   drawWidth: number;
@@ -88,12 +93,17 @@ export type LiveSessionBattlemapPaneProps = {
   drawClearReq: number;
   trapWizardCell: { gridX: number; gridY: number } | null;
   setTrapWizardCell: Dispatch<SetStateAction<{ gridX: number; gridY: number } | null>>;
+  containerWizardCell: { gridX: number; gridY: number } | null;
+  setContainerWizardCell: Dispatch<SetStateAction<{ gridX: number; gridY: number } | null>>;
   selectedEffectTemplateId: string | null;
   setSelectedEffectTemplateId: Dispatch<SetStateAction<string | null>>;
   selectedMarkerId: string | null;
   setSelectedMarkerId: Dispatch<SetStateAction<string | null>>;
   selectedTrapId: string | null;
   setSelectedTrapId: Dispatch<SetStateAction<string | null>>;
+  selectedContainerId: string | null;
+  setSelectedContainerId: Dispatch<SetStateAction<string | null>>;
+  setBattlemapContainers: Dispatch<SetStateAction<SessionBattlemapContainer[]>>;
   activeBattlemapId: string | null;
   sessionId: string;
   campaignId: string;
@@ -115,6 +125,11 @@ export type LiveSessionBattlemapPaneProps = {
   handleTrapDelete: (trapId: string) => void;
   handleTrapMarkDiscovered: (trapId: string) => void;
   handleTrapTrigger: (trapId: string) => void;
+  handleContainerDelete: (containerId: string) => void;
+  handleContainerTrapMarkDiscovered: (containerId: string) => void;
+  handleContainerTrapTrigger: (containerId: string) => void;
+  handleContainerPickLock: (containerId: string, characterId: string) => void;
+  handleContainerForceOpen: (containerId: string, characterId: string) => void;
   setTrapDisarmTarget: Dispatch<SetStateAction<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>>;
   handleBattlemapCellClick: (gridX: number, gridY: number) => void;
   handleBattlemapTokenMove: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;

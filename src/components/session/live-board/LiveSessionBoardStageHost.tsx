@@ -88,6 +88,8 @@ export function LiveSessionBoardStageHost() {
       battlemapMarkers,
       setBattlemapMarkers,
       battlemapTraps,
+      battlemapContainers,
+      setBattlemapContainers,
       fogTool,
       setFogTool,
       effectTool,
@@ -96,6 +98,8 @@ export function LiveSessionBoardStageHost() {
       setMarkerTool,
       trapTool,
       setTrapTool,
+      containerTool,
+      setContainerTool,
       drawTool,
       drawColor,
       drawWidth,
@@ -116,8 +120,12 @@ export function LiveSessionBoardStageHost() {
       setSelectedMarkerId,
       selectedTrapId,
       setSelectedTrapId,
+      selectedContainerId,
+      setSelectedContainerId,
       trapWizardCell,
       setTrapWizardCell,
+      containerWizardCell,
+      setContainerWizardCell,
       tokenPlacement,
       setTokenPlacement,
       gmTokenPlacement,
@@ -145,6 +153,11 @@ export function LiveSessionBoardStageHost() {
       handleTrapDelete,
       handleTrapMarkDiscovered,
       handleTrapTrigger,
+      handleContainerDelete,
+      handleContainerTrapMarkDiscovered,
+      handleContainerTrapTrigger,
+      handleContainerPickLock,
+      handleContainerForceOpen,
       setTrapDisarmTarget,
       handleBattlemapPropDrop,
       handleBattlemapPropResize,
@@ -308,6 +321,7 @@ export function LiveSessionBoardStageHost() {
               battlemapEffectTemplates={battlemapEffectTemplates}
               battlemapMarkers={battlemapMarkers}
               battlemapTraps={battlemapTraps}
+              battlemapContainers={battlemapContainers}
               battlemapTokens={battlemapTokens}
               isGM={isGM}
               tokenPlacement={tokenPlacement}
@@ -330,6 +344,8 @@ export function LiveSessionBoardStageHost() {
               setMarkerTool={setMarkerTool}
               trapTool={trapTool}
               setTrapTool={setTrapTool}
+              containerTool={containerTool}
+              setContainerTool={setContainerTool}
               drawTool={drawTool}
               drawColor={drawColor}
               drawWidth={drawWidth}
@@ -344,12 +360,17 @@ export function LiveSessionBoardStageHost() {
               drawClearReq={drawClearReq}
               trapWizardCell={trapWizardCell}
               setTrapWizardCell={setTrapWizardCell}
+              containerWizardCell={containerWizardCell}
+              setContainerWizardCell={setContainerWizardCell}
               selectedEffectTemplateId={selectedEffectTemplateId}
               setSelectedEffectTemplateId={setSelectedEffectTemplateId}
               selectedMarkerId={selectedMarkerId}
               setSelectedMarkerId={setSelectedMarkerId}
               selectedTrapId={selectedTrapId}
               setSelectedTrapId={setSelectedTrapId}
+              selectedContainerId={selectedContainerId}
+              setSelectedContainerId={setSelectedContainerId}
+              setBattlemapContainers={setBattlemapContainers}
               activeBattlemapId={activeBattlemapId}
               sessionId={sessionId}
               campaignId={campaignId}
@@ -371,6 +392,11 @@ export function LiveSessionBoardStageHost() {
               handleTrapDelete={handleTrapDelete}
               handleTrapMarkDiscovered={handleTrapMarkDiscovered}
               handleTrapTrigger={handleTrapTrigger}
+              handleContainerDelete={handleContainerDelete}
+              handleContainerTrapMarkDiscovered={handleContainerTrapMarkDiscovered}
+              handleContainerTrapTrigger={handleContainerTrapTrigger}
+              handleContainerPickLock={handleContainerPickLock}
+              handleContainerForceOpen={handleContainerForceOpen}
               setTrapDisarmTarget={setTrapDisarmTarget}
               handleBattlemapCellClick={handleBattlemapCellClick}
               handleBattlemapTokenMove={handleBattlemapTokenMove}

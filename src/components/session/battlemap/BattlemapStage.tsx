@@ -28,6 +28,7 @@ export function BattlemapStage({
   effectTemplates = [],
   markers = [],
   traps = [],
+  containers = [],
   isGm = false,
   characterPlacement,
   gmTokenPlacement,
@@ -39,10 +40,12 @@ export function BattlemapStage({
   effectTool = null,
   markerTool = null,
   trapTool = null,
+  containerTool = null,
   disableSpacePan = false,
   selectedEffectTemplateId = null,
   selectedMarkerId = null,
   selectedTrapId = null,
+  selectedContainerId = null,
   onSelectEffectTemplate,
   onEffectTemplateCreate,
   onEffectTemplateMove,
@@ -60,6 +63,13 @@ export function BattlemapStage({
   onTrapMarkDiscovered,
   onTrapTrigger,
   onTrapDisarm,
+  onSelectContainer,
+  onContainerPlaceCell,
+  onContainerToolCancel,
+  onContainerDelete,
+  onContainerTrapMarkDiscovered,
+  onContainerTrapTrigger,
+  onContainerTrapDisarm,
   onCancelPlacement,
   onToggleDash,
   onCellClick,
@@ -147,6 +157,9 @@ export function BattlemapStage({
     isGm && isMarkerPlaceKind(markerTool) && onMarkerCreate,
   );
   const trapPlaceActive = Boolean(isGm && trapTool === "place" && onTrapPlaceCell);
+  const containerPlaceActive = Boolean(
+    isGm && containerTool === "place" && onContainerPlaceCell,
+  );
   const shapeDrawActive = fogDrawActive || effectDrawActive;
   const freehandDrawActive = Boolean(isGm && drawTool === "draw" && onDrawStroke);
   const fogInteractive = Boolean(
@@ -156,7 +169,8 @@ export function BattlemapStage({
       !fogDrawActive &&
       !effectDrawActive &&
       !markerPlaceActive &&
-      !trapPlaceActive,
+      !trapPlaceActive &&
+      !containerPlaceActive,
   );
   const effectInteractive = Boolean(
     isGm &&
@@ -165,7 +179,8 @@ export function BattlemapStage({
       !fogDrawActive &&
       !effectDrawActive &&
       !markerPlaceActive &&
-      !trapPlaceActive,
+      !trapPlaceActive &&
+      !containerPlaceActive,
   );
   const markerInteractive = Boolean(
     isGm &&
@@ -174,7 +189,8 @@ export function BattlemapStage({
       !fogDrawActive &&
       !effectDrawActive &&
       !markerPlaceActive &&
-      !trapPlaceActive,
+      !trapPlaceActive &&
+      !containerPlaceActive,
   );
   const trapInteractive = Boolean(
     isGm &&
@@ -183,7 +199,18 @@ export function BattlemapStage({
       !fogDrawActive &&
       !effectDrawActive &&
       !markerPlaceActive &&
-      !trapPlaceActive,
+      !trapPlaceActive &&
+      !containerPlaceActive,
+  );
+  const containerInteractive = Boolean(
+    isGm &&
+      containerTool === "select" &&
+      !placementActive &&
+      !fogDrawActive &&
+      !effectDrawActive &&
+      !markerPlaceActive &&
+      !trapPlaceActive &&
+      !containerPlaceActive,
   );
   const playerDisarmActive = Boolean(
     !isGm &&
@@ -199,12 +226,17 @@ export function BattlemapStage({
     return { x: token.grid_x, y: token.grid_y };
   })();
   const shapeSelectActive =
-    fogInteractive || effectInteractive || markerInteractive || trapInteractive;
+    fogInteractive ||
+    effectInteractive ||
+    markerInteractive ||
+    trapInteractive ||
+    containerInteractive;
   const mapInteractionLocked =
     placementActive ||
     shapeDrawActive ||
     markerPlaceActive ||
     trapPlaceActive ||
+    containerPlaceActive ||
     freehandDrawActive;
 
   const movingGmToken = gmMoveTokenId
@@ -276,10 +308,12 @@ export function BattlemapStage({
     trapInteractive,
     markerPlaceActive,
     trapPlaceActive,
+    containerPlaceActive,
     markerTool,
     onCellClick,
     onMarkerCreate,
     onTrapPlaceCell,
+    onContainerPlaceCell,
     onSelectFogShape,
     onSelectEffectTemplate,
     onSelectMarker,
@@ -432,10 +466,12 @@ export function BattlemapStage({
         shapeSelectActive={shapeSelectActive}
         markerPlaceActive={markerPlaceActive}
         trapPlaceActive={trapPlaceActive}
+        containerPlaceActive={containerPlaceActive}
         fogInteractive={fogInteractive}
         effectInteractive={effectInteractive}
         markerInteractive={markerInteractive}
         trapInteractive={trapInteractive}
+        containerInteractive={containerInteractive}
         isGm={isGm}
         props={props}
         tokens={tokens}
@@ -443,6 +479,7 @@ export function BattlemapStage({
         displayEffectTemplates={displayEffectTemplates}
         displayMarkers={displayMarkers}
         traps={traps}
+        containers={containers}
         fogDraft={fogDraft}
         effectDraft={effectDraft}
         selectedPropId={selectedPropId}
@@ -451,6 +488,7 @@ export function BattlemapStage({
         selectedEffectTemplateId={selectedEffectTemplateId}
         selectedMarkerId={selectedMarkerId}
         selectedTrapId={selectedTrapId}
+        selectedContainerId={selectedContainerId}
         markerTool={markerTool}
         hoverCell={hoverCell}
         hoverReachable={hoverReachable}
@@ -484,6 +522,11 @@ export function BattlemapStage({
         onTrapMarkDiscovered={onTrapMarkDiscovered}
         onTrapTrigger={onTrapTrigger}
         onTrapDisarm={onTrapDisarm}
+        onSelectContainer={onSelectContainer}
+        onContainerDelete={onContainerDelete}
+        onContainerTrapMarkDiscovered={onContainerTrapMarkDiscovered}
+        onContainerTrapTrigger={onContainerTrapTrigger}
+        onContainerTrapDisarm={onContainerTrapDisarm}
         playerDisarmActive={playerDisarmActive}
         ownCharacterGrid={ownCharacterGrid}
         onTokenMove={onTokenMove}

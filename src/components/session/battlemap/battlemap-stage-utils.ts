@@ -2,6 +2,7 @@
  * battlemap-stage-utils — Shared helpers and prop types for BattlemapStage (coords, fit scale, keyboard guards).
  */
 import type {
+  BattlemapContainerTool,
   BattlemapEffectTool,
   BattlemapFogTool,
   BattlemapMarkerKind,
@@ -11,6 +12,7 @@ import type {
   GmPropPlacementDraft,
   GmTokenPlacementDraft,
   SessionBattlemap,
+  SessionBattlemapContainer,
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
   SessionBattlemapMarker,
@@ -68,6 +70,7 @@ export type BattlemapStageProps = {
   effectTemplates?: SessionBattlemapEffectTemplate[];
   markers?: SessionBattlemapMarker[];
   traps?: SessionBattlemapTrap[];
+  containers?: SessionBattlemapContainer[];
   isGm?: boolean;
   characterPlacement?: CharacterTokenPlacement | null;
   gmTokenPlacement?: GmTokenPlacementDraft | null;
@@ -79,11 +82,13 @@ export type BattlemapStageProps = {
   effectTool?: BattlemapEffectTool;
   markerTool?: BattlemapMarkerTool;
   trapTool?: BattlemapTrapTool;
+  containerTool?: BattlemapContainerTool;
   /** Wenn true: Space-Pan nicht aktiv (z. B. Trap-Wizard-Modal offen). */
   disableSpacePan?: boolean;
   selectedEffectTemplateId?: string | null;
   selectedMarkerId?: string | null;
   selectedTrapId?: string | null;
+  selectedContainerId?: string | null;
   onSelectEffectTemplate?: (templateId: string | null) => void;
   onEffectTemplateCreate?: (input: {
     shape: "rect" | "circle" | "cone";
@@ -112,6 +117,13 @@ export type BattlemapStageProps = {
   onTrapMarkDiscovered?: (trapId: string) => void;
   onTrapTrigger?: (trapId: string) => void;
   onTrapDisarm?: (trapId: string) => void;
+  onSelectContainer?: (containerId: string | null) => void;
+  onContainerPlaceCell?: (gridX: number, gridY: number) => void;
+  onContainerToolCancel?: () => void;
+  onContainerDelete?: (containerId: string) => void;
+  onContainerTrapMarkDiscovered?: (containerId: string) => void;
+  onContainerTrapTrigger?: (containerId: string) => void;
+  onContainerTrapDisarm?: (containerId: string) => void;
   onCancelPlacement?: () => void;
   onToggleDash?: () => void;
   onCellClick?: (gridX: number, gridY: number) => void;

@@ -159,6 +159,48 @@ export type BattlemapTrapTool = "select" | "place" | null;
 export type TrapDisarmTarget = {
   trap: SessionBattlemapTrap;
   characterId: string;
+  /** Trap eingebettet in Container — Disarm-Actions auf Container-Tabelle */
+  sourceContainerId?: string;
+};
+
+/** Behältertyp für Battlemap-Container. */
+export type BattlemapContainerType =
+  | "chest"
+  | "barrel"
+  | "crate"
+  | "urn"
+  | "sarcophagus"
+  | "other";
+
+/** null = aus; place = setzen; select = auswählen */
+export type BattlemapContainerTool = "select" | "place" | null;
+
+/** Runtime-Behälter auf der Battlemap. */
+export type SessionBattlemapContainer = {
+  id: string;
+  battlemap_id: string;
+  session_id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  container_type: BattlemapContainerType;
+  grid_x: number;
+  grid_y: number;
+  is_locked: boolean;
+  is_open: boolean;
+  force_open_dc: number;
+  has_trap: boolean;
+  trap_config: Record<string, unknown>;
+  is_trap_detected: boolean;
+  is_trap_disarmed: boolean;
+  is_trap_triggered: boolean;
+  trap_visible_to_players: boolean;
+  trap_triggered_by_character_id: string | null;
+  trap_triggered_at?: string | null;
+  lore_context?: string | null;
+  ai_payload?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CharacterTokenPlacement = {

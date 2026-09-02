@@ -11,6 +11,7 @@ import type {
   BattlemapFogTool,
   BattlemapMarkerTool,
   BattlemapTrapTool,
+  BattlemapContainerTool,
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool } from "@/src/lib/session/map-draw-types";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
@@ -58,6 +59,12 @@ type Props = {
   onTrapDelete?: () => void;
   onTrapClearAll?: () => void;
   trapCount?: number;
+  containerTool?: BattlemapContainerTool;
+  selectedContainerId?: string | null;
+  onContainerToolChange?: (tool: BattlemapContainerTool) => void;
+  onContainerDelete?: () => void;
+  onContainerClearAll?: () => void;
+  containerCount?: number;
   drawTool?: MapDrawTool;
   drawColor?: string;
   drawWidth?: number;
@@ -115,6 +122,12 @@ export function LiveSessionLeftDock({
   onTrapDelete,
   onTrapClearAll,
   trapCount = 0,
+  containerTool = null,
+  selectedContainerId = null,
+  onContainerToolChange,
+  onContainerDelete,
+  onContainerClearAll,
+  containerCount = 0,
   drawTool = null,
   drawColor = "#cab926",
   drawWidth = 4,
@@ -178,11 +191,13 @@ export function LiveSessionLeftDock({
           effectTool={effectTool}
           markerTool={markerTool}
           trapTool={trapTool}
+          containerTool={containerTool}
           drawTool={drawTool}
           onFogToolChange={onFogToolChange}
           onEffectToolChange={onEffectToolChange}
           onMarkerToolChange={onMarkerToolChange}
           onTrapToolChange={onTrapToolChange}
+          onContainerToolChange={onContainerToolChange}
           onDrawToolChange={onDrawToolChange}
           showDice={showDice}
           diceOpen={diceOpen}
@@ -245,6 +260,12 @@ export function LiveSessionLeftDock({
         onTrapDelete={onTrapDelete}
         onTrapClearAll={onTrapClearAll}
         trapCount={trapCount}
+        containerTool={containerTool}
+        selectedContainerId={selectedContainerId}
+        onContainerToolChange={onContainerToolChange}
+        onContainerDelete={onContainerDelete}
+        onContainerClearAll={onContainerClearAll}
+        containerCount={containerCount}
         drawTool={drawTool}
         drawColor={drawColor}
         drawWidth={drawWidth}

@@ -6,6 +6,7 @@
 import { createPortal } from "react-dom";
 import {
   Bomb,
+  Box,
   Circle,
   Eraser,
   MousePointer2,
@@ -21,6 +22,7 @@ import type {
   BattlemapFogTool,
   BattlemapMarkerTool,
   BattlemapTrapTool,
+  BattlemapContainerTool,
 } from "@/src/lib/session/battlemap-types";
 import {
   BATTLEMAP_MARKER_KINDS,
@@ -60,6 +62,12 @@ type Props = {
   onTrapDelete?: () => void;
   onTrapClearAll?: () => void;
   trapCount: number;
+  containerTool: BattlemapContainerTool;
+  selectedContainerId: string | null;
+  onContainerToolChange?: (tool: BattlemapContainerTool) => void;
+  onContainerDelete?: () => void;
+  onContainerClearAll?: () => void;
+  containerCount: number;
   drawTool?: MapDrawTool;
   drawColor?: string;
   drawWidth?: number;
@@ -99,6 +107,12 @@ export function LiveSessionLeftDockToolFlyoutPortal({
   onTrapDelete,
   onTrapClearAll,
   trapCount,
+  containerTool,
+  selectedContainerId,
+  onContainerToolChange,
+  onContainerDelete,
+  onContainerClearAll,
+  containerCount,
   drawTool = null,
   drawColor = "#cab926",
   drawWidth = 4,
@@ -350,6 +364,64 @@ export function LiveSessionLeftDockToolFlyoutPortal({
             onClick={() => onTrapClearAll?.()}
           >
             <Eraser className={`h-4 w-4 ${trapCount > 0 ? "text-red-300" : "opacity-40"}`} />
+          </ToolFlyoutButton>
+        </motion.div>
+      ) : null}
+      {toolFlyout === "container" && onContainerToolChange ? (
+        <motion.div
+          id="th-tool-flyout"
+          key="container-flyout"
+          initial={FLYOUT_SLIDE.initial}
+          animate={FLYOUT_SLIDE.animate}
+          exit={FLYOUT_SLIDE.exit}
+          transition={FLYOUT_SLIDE.transition}
+          style={{ top: flyoutPos.top, left: flyoutPos.left }}
+          className="pointer-events-auto fixed z-[200] flex items-center gap-1.5 rounded-xl border border-amber-700/50 bg-background-card/98 p-1.5 shadow-2xl backdrop-blur-md"
+          role="toolbar"
+          aria-label="Behälter-Werkzeuge"
+        >
+          <span className="px-1.5 font-barlow text-[9px] font-bold uppercase tracking-wide text-amber-200/90">
+            Behälter
+          </span>
+          <ToolFlyoutButton
+            label="Behälter: Auswählen"
+            active={containerTool === "select"}
+            tone="effect"
+            onClick={() =>
+              onContainerToolChange(containerTool === "select" ? null : "select")
+            }
+          >
+            <MousePointer2 className="h-4 w-4" />
+          </ToolFlyoutButton>
+          <ToolFlyoutButton
+            label="Behälter platzieren"
+            active={containerTool === "place"}
+            tone="effect"
+            onClick={() =>
+              onContainerToolChange(containerTool === "place" ? null : "place")
+            }
+          >
+            <Box className="h-4 w-4" />
+          </ToolFlyoutButton>
+          <ToolFlyoutButton
+            label="Behälter löschen"
+            active={false}
+            tone="danger"
+            onClick={() => onContainerDelete?.()}
+          >
+            <Trash2
+              className={`h-4 w-4 ${selectedContainerId ? "text-red-300" : "opacity-40"}`}
+            />
+          </ToolFlyoutButton>
+          <ToolFlyoutButton
+            label="Alle Behälter löschen"
+            active={false}
+            tone="danger"
+            onClick={() => onContainerClearAll?.()}
+          >
+            <Eraser
+              className={`h-4 w-4 ${containerCount > 0 ? "text-red-300" : "opacity-40"}`}
+            />
           </ToolFlyoutButton>
         </motion.div>
       ) : null}
