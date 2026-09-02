@@ -137,6 +137,7 @@ export function LiveSessionBoardStageHost() {
       selectedBattlemapPropId,
       setSelectedBattlemapPropId,
       setTokenRadial,
+      setContainerRadial,
       activeBattlemapId,
       activeWorldMapId,
       activeBattlemap,
@@ -410,6 +411,7 @@ export function LiveSessionBoardStageHost() {
               characterDisplayUrlById={characterDisplayUrlById}
               characterConditionsById={characterConditionsById}
               setTokenRadial={setTokenRadial}
+              setContainerRadial={setContainerRadial}
               setLiveState={setLiveState}
               liveStateRef={liveStateRef}
             />

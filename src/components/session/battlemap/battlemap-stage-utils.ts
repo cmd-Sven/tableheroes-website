@@ -118,13 +118,13 @@ export type BattlemapStageProps = {
   onTrapTrigger?: (trapId: string) => void;
   onTrapDisarm?: (trapId: string) => void;
   onSelectContainer?: (containerId: string | null) => void;
+  onContainerOpenMenu?: (
+    container: SessionBattlemapContainer,
+    clientX: number,
+    clientY: number,
+  ) => void;
   onContainerPlaceCell?: (gridX: number, gridY: number) => void;
   onContainerToolCancel?: () => void;
-  onContainerDelete?: (containerId: string) => void;
-  onContainerTrapMarkDiscovered?: (containerId: string) => void;
-  onContainerMarkDiscovered?: (containerId: string) => void;
-  onContainerTrapTrigger?: (containerId: string) => void;
-  onContainerTrapDisarm?: (containerId: string) => void;
   onCancelPlacement?: () => void;
   onToggleDash?: () => void;
   onCellClick?: (gridX: number, gridY: number) => void;

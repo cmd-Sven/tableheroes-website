@@ -64,13 +64,9 @@ export function BattlemapStage({
   onTrapTrigger,
   onTrapDisarm,
   onSelectContainer,
+  onContainerOpenMenu,
   onContainerPlaceCell,
   onContainerToolCancel,
-  onContainerDelete,
-  onContainerTrapMarkDiscovered,
-  onContainerMarkDiscovered,
-  onContainerTrapTrigger,
-  onContainerTrapDisarm,
   onCancelPlacement,
   onToggleDash,
   onCellClick,
@@ -524,11 +520,7 @@ export function BattlemapStage({
         onTrapTrigger={onTrapTrigger}
         onTrapDisarm={onTrapDisarm}
         onSelectContainer={onSelectContainer}
-        onContainerDelete={onContainerDelete}
-        onContainerTrapMarkDiscovered={onContainerTrapMarkDiscovered}
-        onContainerMarkDiscovered={onContainerMarkDiscovered}
-        onContainerTrapTrigger={onContainerTrapTrigger}
-        onContainerTrapDisarm={onContainerTrapDisarm}
+        onContainerOpenMenu={onContainerOpenMenu}
         playerDisarmActive={playerDisarmActive}
         ownCharacterGrid={ownCharacterGrid}
         onTokenMove={onTokenMove}

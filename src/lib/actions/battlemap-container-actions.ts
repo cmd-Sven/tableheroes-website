@@ -26,6 +26,7 @@ import {
 import {
   containerToVirtualTrap,
   containerTrapActive,
+  defaultContainerHp,
   defaultForceOpenDc,
   parseContainerTrapConfig,
   type ContainerTrapConfig,
@@ -138,6 +139,8 @@ function normalizeContainer(row: Record<string, unknown>): SessionBattlemapConta
     is_locked: row.is_locked === true,
     is_open: row.is_open === true,
     force_open_dc: Math.max(1, Math.min(40, Math.round(Number(row.force_open_dc ?? 15)))),
+    hp_current: Math.max(0, Math.min(9999, Math.round(Number(row.hp_current ?? 20)))),
+    hp_max: Math.max(1, Math.min(9999, Math.round(Number(row.hp_max ?? 20)))),
     is_hidden: row.is_hidden === true,
     is_discovered: row.is_discovered === true,
     detection_dc: Math.max(1, Math.min(40, Math.round(Number(row.detection_dc ?? 15)))),
@@ -335,6 +338,9 @@ export async function createBattlemapContainer(input: {
   gridY: number;
   isLocked?: boolean;
   forceOpenDc?: number;
+  /** Aktuelle / Max TP (Default je Behältertyp). */
+  hpCurrent?: number;
+  hpMax?: number;
   /** Default false = sichtbar für alle. */
   isHidden?: boolean;
   detectionDc?: number;
@@ -358,6 +364,15 @@ export async function createBattlemapContainer(input: {
     : "chest";
   const forceOpenDc =
     input.forceOpenDc ?? defaultForceOpenDc(container_type);
+  const defaultHp = defaultContainerHp(container_type);
+  const hpMax = Math.max(
+    1,
+    Math.min(9999, Math.round(input.hpMax ?? defaultHp)),
+  );
+  const hpCurrent = Math.max(
+    0,
+    Math.min(hpMax, Math.round(input.hpCurrent ?? hpMax)),
+  );
 
   const trapConfig: Record<string, unknown> = input.hasTrap
     ? {
@@ -405,6 +420,8 @@ export async function createBattlemapContainer(input: {
       is_locked: input.isLocked === true,
       is_open: false,
       force_open_dc: Math.max(1, Math.min(40, Math.round(forceOpenDc))),
+      hp_current: hpCurrent,
+      hp_max: hpMax,
       is_hidden: input.isHidden === true,
       is_discovered: false,
       detection_dc: Math.max(
@@ -439,6 +456,38 @@ export async function removeBattlemapContainer(
     .eq("id", containerId)
     .eq("session_id", sessionId);
   if (error) throw new Error(error.message);
+}
+
+/** SL: Trefferpunkte des Behälters manuell setzen. */
+export async function updateBattlemapContainerHp(input: {
+  sessionId: string;
+  containerId: string;
+  hpCurrent: number;
+  hpMax: number;
+}): Promise<SessionBattlemapContainer> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const hpMax = Math.max(1, Math.min(9999, Math.round(input.hpMax)));
+  const hpCurrent = Math.max(0, Math.min(hpMax, Math.round(input.hpCurrent)));
+
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_containers")
+    .update({
+      hp_current: hpCurrent,
+      hp_max: hpMax,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.containerId)
+    .eq("session_id", input.sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message || "TP konnten nicht gespeichert werden.");
+  return normalizeContainer(data as Record<string, unknown>);
 }
 
 export async function clearBattlemapContainers(

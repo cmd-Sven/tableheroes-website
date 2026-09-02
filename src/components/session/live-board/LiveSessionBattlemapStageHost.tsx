@@ -23,7 +23,6 @@ import {
 } from "@/src/lib/actions/battlemap-actions";
 import { dispatchOpenCharacterRadial } from "@/src/lib/session/character-radial-bridge";
 import { trapDisarmPending } from "@/src/lib/session/battlemap-trap-model";
-import { containerToVirtualTrap } from "@/src/lib/session/battlemap-container-model";
 import type { LiveSessionBattlemapPaneProps } from "./LiveSessionBattlemapPane.types";
 import { useBattlemapDrawSync } from "./useBattlemapDrawSync";
 
@@ -91,12 +90,6 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     handleTrapDelete,
     handleTrapMarkDiscovered,
     handleTrapTrigger,
-    handleContainerDelete,
-    handleContainerTrapMarkDiscovered,
-    handleContainerMarkDiscovered,
-    handleContainerTrapTrigger,
-    handleContainerPickLock,
-    handleContainerForceOpen,
     setTrapDisarmTarget,
     handleBattlemapCellClick,
     handleBattlemapTokenMove,
@@ -108,6 +101,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     characterDisplayUrlById,
     characterConditionsById,
     setTokenRadial,
+    setContainerRadial,
     drawTool,
     drawColor,
     drawWidth,
@@ -390,24 +384,18 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
         setSelectedTrapId(null);
         setGmMoveTokenId(null);
       }}
+      onContainerOpenMenu={(container, x, y) => {
+        setTokenRadial(null);
+        setContainerRadial({ container, x, y });
+        setSelectedContainerId(container.id);
+        setSelectedBattlemapTokenId(null);
+        setSelectedTrapId(null);
+      }}
       onContainerPlaceCell={(gridX, gridY) => {
         setContainerWizardCell({ gridX, gridY });
         setContainerTool(null);
       }}
       onContainerToolCancel={() => setContainerTool(null)}
-      onContainerDelete={handleContainerDelete}
-      onContainerTrapMarkDiscovered={handleContainerTrapMarkDiscovered}
-      onContainerMarkDiscovered={handleContainerMarkDiscovered}
-      onContainerTrapTrigger={handleContainerTrapTrigger}
-      onContainerTrapDisarm={(containerId) => {
-        const container = battlemapContainers.find((c) => c.id === containerId) ?? null;
-        if (!container) return;
-        const trap = containerToVirtualTrap(container);
-        if (!trap) return;
-        const characterId = currentPlayerCharacterId;
-        if (!characterId) return;
-        setTrapDisarmTarget({ trap, characterId, sourceContainerId: container.id });
-      }}
       onTokenMove={handleBattlemapTokenMove}
       onPropDrop={handleBattlemapPropDrop}
       onPropResize={handleBattlemapPropResize}

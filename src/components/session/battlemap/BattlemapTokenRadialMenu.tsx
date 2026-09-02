@@ -6,25 +6,18 @@ import {
   Eye,
   EyeOff,
   Heart,
-  Key,
   Move,
   Settings2,
   Swords,
   Trash2,
   Wrench,
-  Hammer,
   X,
 } from "lucide-react";
 import type {
   SessionBattlemapToken,
   SessionBattlemapTrap,
-  SessionBattlemapContainer,
 } from "@/src/lib/session/battlemap-types";
 import { findAdjacentDisarmableTraps } from "@/src/lib/session/battlemap-trap-geometry";
-import {
-  findAdjacentDisarmableContainerTraps,
-  findAdjacentInteractableContainers,
-} from "@/src/lib/session/battlemap-container-model";
 import {
   NPC_SIZE_CELLS,
   NPC_SIZE_LABELS_DE,
@@ -51,11 +44,7 @@ type Props = {
     sizeCells: number;
   }) => void;
   battlemapTraps?: SessionBattlemapTrap[];
-  battlemapContainers?: SessionBattlemapContainer[];
   onDisarmTrap?: (trap: SessionBattlemapTrap, characterId: string) => void;
-  onDisarmContainerTrap?: (container: SessionBattlemapContainer, characterId: string) => void;
-  onPickLockContainer?: (container: SessionBattlemapContainer, characterId: string) => void;
-  onForceOpenContainer?: (container: SessionBattlemapContainer, characterId: string) => void;
 };
 
 export function BattlemapTokenRadialMenu({
@@ -72,18 +61,10 @@ export function BattlemapTokenRadialMenu({
   canJoinCombat = false,
   onSaveSettings,
   battlemapTraps = [],
-  battlemapContainers = [],
   onDisarmTrap,
-  onDisarmContainerTrap,
-  onPickLockContainer,
-  onForceOpenContainer,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [disarmPickerOpen, setDisarmPickerOpen] = useState(false);
-  const [containerPickerOpen, setContainerPickerOpen] = useState(false);
-  const [containerAction, setContainerAction] = useState<"pick" | "force" | "disarm" | null>(
-    null,
-  );
   const [showHpBar, setShowHpBar] = useState(token.show_hp_bar === true);
   const [sizeCategory, setSizeCategory] = useState<NpcTokenSizeCategory>(() => {
     const fromCells = (Object.entries(NPC_SIZE_CELLS) as [NpcTokenSizeCategory, number][])
@@ -98,20 +79,6 @@ export function BattlemapTokenRadialMenu({
         ? findAdjacentDisarmableTraps(battlemapTraps, token.grid_x, token.grid_y)
         : [],
     [battlemapTraps, token.character_id, token.grid_x, token.grid_y],
-  );
-  const adjacentContainers = useMemo(
-    () =>
-      token.character_id
-        ? findAdjacentInteractableContainers(battlemapContainers, token.grid_x, token.grid_y)
-        : [],
-    [battlemapContainers, token.character_id, token.grid_x, token.grid_y],
-  );
-  const adjacentDisarmableContainerTraps = useMemo(
-    () =>
-      token.character_id
-        ? findAdjacentDisarmableContainerTraps(battlemapContainers, token.grid_x, token.grid_y)
-        : [],
-    [battlemapContainers, token.character_id, token.grid_x, token.grid_y],
   );
   const items = useMemo(() => {
     const list: Array<{
@@ -144,59 +111,6 @@ export function BattlemapTokenRadialMenu({
           onClose();
         },
       });
-    }
-
-    if (token.character_id && adjacentDisarmableContainerTraps.length > 0 && onDisarmContainerTrap) {
-      list.push({
-        id: "disarm_container_trap",
-        label: "Falle entschärfen",
-        Icon: Wrench,
-        onClick: () => {
-          if (adjacentDisarmableContainerTraps.length === 1) {
-            onDisarmContainerTrap(adjacentDisarmableContainerTraps[0]!, token.character_id!);
-            onClose();
-            return;
-          }
-          setContainerAction("disarm");
-          setContainerPickerOpen(true);
-        },
-      });
-    }
-
-    if (token.character_id && adjacentContainers.length > 0) {
-      const locked = adjacentContainers.filter((c) => c.is_locked);
-      if (locked.length > 0 && onPickLockContainer) {
-        list.push({
-          id: "pick_lock",
-          label: "Schloss knacken",
-          Icon: Key,
-          onClick: () => {
-            if (locked.length === 1) {
-              onPickLockContainer(locked[0]!, token.character_id!);
-              onClose();
-              return;
-            }
-            setContainerAction("pick");
-            setContainerPickerOpen(true);
-          },
-        });
-      }
-      if (onForceOpenContainer) {
-        list.push({
-          id: "force_open",
-          label: "Gewaltsam öffnen",
-          Icon: Hammer,
-          onClick: () => {
-            if (adjacentContainers.length === 1) {
-              onForceOpenContainer(adjacentContainers[0]!, token.character_id!);
-              onClose();
-              return;
-            }
-            setContainerAction("force");
-            setContainerPickerOpen(true);
-          },
-        });
-      }
     }
 
     if (token.character_id && adjacentDisarmableTraps.length > 0 && onDisarmTrap) {
@@ -249,16 +163,11 @@ export function BattlemapTokenRadialMenu({
 
     return list;
   }, [
-    adjacentDisarmableContainerTraps,
-    adjacentContainers,
     adjacentDisarmableTraps,
     canJoinCombat,
     isGm,
     onClose,
     onDisarmTrap,
-    onDisarmContainerTrap,
-    onPickLockContainer,
-    onForceOpenContainer,
     onJoinCombat,
     onMove,
     onRemove,
@@ -281,7 +190,7 @@ export function BattlemapTokenRadialMenu({
         className="pointer-events-none absolute"
         style={{ left: anchor.x, top: anchor.y }}
       >
-        {!settingsOpen && !disarmPickerOpen && !containerPickerOpen ? (
+        {!settingsOpen && !disarmPickerOpen ? (
           <div className="pointer-events-auto relative h-0 w-0">
             {items.map((item, index) => {
               const angle =
@@ -315,48 +224,6 @@ export function BattlemapTokenRadialMenu({
             >
               <X className="h-4 w-4" />
             </button>
-          </div>
-        ) : containerPickerOpen ? (
-          <div className="pointer-events-auto absolute left-1/2 top-1/2 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hero-border bg-background-card p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                {containerAction === "pick"
-                  ? "Schloss knacken"
-                  : containerAction === "force"
-                    ? "Gewaltsam öffnen"
-                    : "Falle entschärfen"}
-              </h3>
-              <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <ul className="max-h-48 space-y-1 overflow-y-auto">
-              {(containerAction === "disarm"
-                ? adjacentDisarmableContainerTraps
-                : containerAction === "pick"
-                  ? adjacentContainers.filter((c) => c.is_locked)
-                  : adjacentContainers).map((container) => (
-                <li key={container.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!token.character_id) return;
-                      if (containerAction === "pick") {
-                        onPickLockContainer?.(container, token.character_id);
-                      } else if (containerAction === "force") {
-                        onForceOpenContainer?.(container, token.character_id);
-                      } else {
-                        onDisarmContainerTrap?.(container, token.character_id);
-                      }
-                      onClose();
-                    }}
-                    className="w-full rounded border border-hero-dark px-3 py-2 text-left font-libre text-sm text-gray-200 hover:border-hero-vibrant hover:text-accent-gold"
-                  >
-                    {container.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
           </div>
         ) : disarmPickerOpen ? (
           <div className="pointer-events-auto absolute left-1/2 top-1/2 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hero-border bg-background-card p-4 shadow-2xl">

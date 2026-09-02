@@ -1,19 +1,29 @@
 /**
- * BattlemapContainerOverlayLayer — Behälter auf der Battlemap (Kiste, Fass, etc.)
+ * BattlemapContainerOverlayLayer — runde Behälter-Tokens auf der Battlemap.
  */
 "use client";
 
 import type { CSSProperties } from "react";
-import { Box, Eye, EyeOff, Lock, LockOpen, Skull, Trash2, Zap, Wrench } from "lucide-react";
+import {
+  Barrel,
+  Box,
+  EyeOff,
+  Lock,
+  LockOpen,
+  Package,
+  Skull,
+  Archive,
+} from "lucide-react";
 import type {
+  BattlemapContainerType,
   BattlemapGridConfig,
   SessionBattlemapContainer,
 } from "@/src/lib/session/battlemap-types";
 import { gridToPixel } from "@/src/lib/session/battlemap-grid";
 import {
   CONTAINER_TYPE_LABELS,
+  canPlayerInteractWithContainer,
   containerTrapDisarmPending,
-  isAdjacentToContainer,
   isContainerVisibleToPlayers,
 } from "@/src/lib/session/battlemap-container-model";
 
@@ -24,16 +34,19 @@ type Props = {
   containers: SessionBattlemapContainer[];
   config: BattlemapGridConfig;
   isGm?: boolean;
+  /** SL-Auswählen-Tool aktiv */
   interactive?: boolean;
-  playerDisarmActive?: boolean;
+  /** Spieler: eigener Token vorhanden → Interaktion möglich wenn benachbart */
+  playerInteractActive?: boolean;
   ownCharacterGrid?: { x: number; y: number } | null;
   selectedContainerId?: string | null;
   onSelectContainer?: (containerId: string | null) => void;
-  onDeleteContainer?: (containerId: string) => void;
-  onMarkTrapDiscovered?: (containerId: string) => void;
-  onMarkContainerDiscovered?: (containerId: string) => void;
-  onTriggerTrap?: (containerId: string) => void;
-  onDisarmTrap?: (containerId: string) => void;
+  /** Klick öffnet Radial (Spieler benachbart / SL immer bei sichtbaren). */
+  onContainerOpenMenu?: (
+    container: SessionBattlemapContainer,
+    clientX: number,
+    clientY: number,
+  ) => void;
 };
 
 function cellBox(
@@ -50,22 +63,40 @@ function cellBox(
   };
 }
 
+function ContainerGlyph({
+  type,
+  className,
+}: {
+  type: BattlemapContainerType;
+  className?: string;
+}) {
+  switch (type) {
+    case "barrel":
+      return <Barrel className={className} />;
+    case "crate":
+      return <Package className={className} />;
+    case "urn":
+    case "sarcophagus":
+      return <Archive className={className} />;
+    case "chest":
+    case "other":
+    default:
+      return <Box className={className} />;
+  }
+}
+
 export function BattlemapContainerOverlayLayer({
   containers,
   config,
   isGm = false,
   interactive = false,
-  playerDisarmActive = false,
+  playerInteractActive = false,
   ownCharacterGrid = null,
   selectedContainerId = null,
   onSelectContainer,
-  onDeleteContainer,
-  onMarkTrapDiscovered,
-  onMarkContainerDiscovered,
-  onTriggerTrap,
-  onDisarmTrap,
+  onContainerOpenMenu,
 }: Props) {
-  const canInteract = Boolean(isGm && interactive);
+  const canGmSelect = Boolean(isGm && interactive);
   const visible = containers.filter((c) => {
     if (isGm) return true;
     return isContainerVisibleToPlayers(c);
@@ -75,8 +106,10 @@ export function BattlemapContainerOverlayLayer({
 
   return (
     <div
-      className={`absolute inset-0 ${canInteract ? "z-[48]" : "z-[36]"} pointer-events-none`}
-      aria-hidden={!canInteract}
+      className={`absolute inset-0 ${
+        canGmSelect || playerInteractActive ? "z-[48]" : "z-[36]"
+      } pointer-events-none`}
+      aria-hidden={!(canGmSelect || playerInteractActive)}
     >
       {visible.map((container) => {
         const selected = selectedContainerId === container.id;
@@ -87,26 +120,29 @@ export function BattlemapContainerOverlayLayer({
         const hiddenUndiscovered =
           container.is_hidden && !container.is_discovered;
         const fill = trapTriggered
-          ? "bg-red-600/30 border-red-400/60"
+          ? "border-red-400/80 bg-red-950/85"
           : container.is_open
-            ? "bg-emerald-600/15 border-emerald-400/40"
+            ? "border-emerald-400/70 bg-emerald-950/80"
             : trapDetected && trapDisarmed
-              ? "bg-amber-500/20 border-amber-300/50"
+              ? "border-amber-300/60 bg-amber-950/75"
               : trapDetected
-                ? "bg-amber-500/25 border-amber-300/60"
+                ? "border-amber-300/70 bg-amber-950/80"
                 : hiddenUndiscovered
-                  ? "bg-slate-900/25 border-slate-600/40 border-dashed opacity-50"
-                  : "bg-slate-800/40 border-slate-500/50 border-dashed";
+                  ? "border-slate-600/50 bg-slate-950/60 opacity-55 border-dashed"
+                  : "border-slate-400/55 bg-slate-900/80";
 
-        const playerCanDisarm =
-          playerDisarmActive &&
+        const playerCanOpen =
+          playerInteractActive &&
           !isGm &&
-          hasTrap &&
-          trapDetected &&
-          !trapTriggered &&
-          !trapDisarmed &&
           ownCharacterGrid != null &&
-          isAdjacentToContainer(container, ownCharacterGrid.x, ownCharacterGrid.y);
+          canPlayerInteractWithContainer(
+            container,
+            ownCharacterGrid.x,
+            ownCharacterGrid.y,
+          );
+
+        const gmCanOpen = isGm && Boolean(onContainerOpenMenu);
+        const clickable = playerCanOpen || gmCanOpen || canGmSelect;
 
         const typeLabel = CONTAINER_TYPE_LABELS[container.container_type] ?? "Behälter";
         const pending = containerTrapDisarmPending(container);
@@ -115,120 +151,65 @@ export function BattlemapContainerOverlayLayer({
           <div key={container.id} className="contents">
             <div
               style={cellBox(container.grid_x, container.grid_y, config)}
-              className={`absolute box-border border ${fill} ${
-                selected ? SELECTED_RING : ""
-              } ${canInteract || playerCanDisarm ? "pointer-events-auto cursor-pointer" : ""}`}
+              className={`absolute box-border flex items-center justify-center ${
+                clickable ? "pointer-events-auto cursor-pointer" : ""
+              }`}
               onClick={(e) => {
                 e.stopPropagation();
-                if (playerCanDisarm && onDisarmTrap) {
-                  onDisarmTrap(container.id);
+                if (playerCanOpen && onContainerOpenMenu) {
+                  onContainerOpenMenu(container, e.clientX, e.clientY);
                   return;
                 }
-                if (canInteract) onSelectContainer?.(container.id);
+                if (gmCanOpen && onContainerOpenMenu) {
+                  onContainerOpenMenu(container, e.clientX, e.clientY);
+                  if (canGmSelect) onSelectContainer?.(container.id);
+                  return;
+                }
+                if (canGmSelect) onSelectContainer?.(container.id);
               }}
               title={`${typeLabel}: ${container.name}${
                 hiddenUndiscovered ? " (versteckt)" : ""
+              } · ${container.hp_current}/${container.hp_max} TP${
+                pending ? " · Entschärfen…" : ""
               }`}
             >
-              <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-0.5">
+              <div
+                className={`relative grid h-[78%] w-[78%] place-items-center rounded-full border-2 shadow-md ${fill} ${
+                  selected ? SELECTED_RING : ""
+                }`}
+              >
                 {container.is_open ? (
-                  <LockOpen className="h-3.5 w-3.5 text-emerald-300/90" />
+                  <LockOpen className="h-[42%] w-[42%] text-emerald-300" />
                 ) : container.is_locked ? (
-                  <Lock className="h-3.5 w-3.5 text-amber-300/90" />
-                ) : (
-                  <Box className="h-3.5 w-3.5 text-slate-300/90" />
-                )}
+                  <Lock className="absolute right-[8%] top-[8%] h-[28%] w-[28%] text-amber-300" />
+                ) : null}
+                <ContainerGlyph
+                  type={container.container_type}
+                  className={`h-[48%] w-[48%] ${
+                    container.is_open
+                      ? "text-emerald-200/90"
+                      : trapTriggered
+                        ? "text-red-200"
+                        : "text-slate-100/90"
+                  }`}
+                />
                 {isGm && hiddenUndiscovered ? (
-                  <EyeOff className="h-2.5 w-2.5 text-slate-400" />
+                  <EyeOff className="absolute bottom-[6%] left-[10%] h-[22%] w-[22%] text-slate-400" />
                 ) : null}
                 {hasTrap && trapTriggered ? (
-                  <Skull className="h-3 w-3 text-red-400" />
+                  <Skull className="absolute bottom-[6%] right-[8%] h-[26%] w-[26%] text-red-400" />
                 ) : hasTrap && trapDetected ? (
-                  <span className="font-barlow text-[7px] font-bold uppercase text-amber-200">
+                  <span className="absolute bottom-[4%] left-1/2 -translate-x-1/2 font-barlow text-[7px] font-bold uppercase text-amber-200">
                     Falle
+                  </span>
+                ) : null}
+                {isGm ? (
+                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 translate-y-full whitespace-nowrap rounded bg-background-dark/90 px-0.5 font-barlow text-[7px] font-bold text-gray-300">
+                    {container.hp_current}/{container.hp_max}
                   </span>
                 ) : null}
               </div>
             </div>
-
-            {canInteract && selected ? (
-              <div
-                style={{
-                  ...cellBox(container.grid_x, container.grid_y, config),
-                  transform: "translateY(-100%)",
-                }}
-                className="pointer-events-auto absolute flex items-center gap-0.5 p-0.5"
-              >
-                {hiddenUndiscovered ? (
-                  <button
-                    type="button"
-                    title="Behälter entdeckt markieren"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkContainerDiscovered?.(container.id);
-                    }}
-                    className="grid h-6 w-6 place-items-center rounded border border-sky-600/60 bg-sky-950/90 text-sky-200 hover:border-sky-400"
-                  >
-                    <Eye className="h-3 w-3" />
-                  </button>
-                ) : null}
-                {hasTrap && !trapDetected ? (
-                  <button
-                    type="button"
-                    title="Falle entdeckt"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkTrapDiscovered?.(container.id);
-                    }}
-                    className="grid h-6 w-6 place-items-center rounded border border-amber-600/60 bg-amber-950/90 text-amber-200 hover:border-amber-400"
-                  >
-                    <Eye className="h-3 w-3" />
-                  </button>
-                ) : null}
-                {hasTrap && !trapTriggered && !trapDisarmed ? (
-                  <button
-                    type="button"
-                    title="Falle auslösen"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTriggerTrap?.(container.id);
-                    }}
-                    className="grid h-6 w-6 place-items-center rounded border border-red-700/60 bg-red-950/90 text-red-300 hover:border-red-500"
-                  >
-                    <Zap className="h-3 w-3" />
-                  </button>
-                ) : null}
-                {hasTrap && trapDetected && !trapTriggered && !trapDisarmed ? (
-                  <button
-                    type="button"
-                    title="Entschärfen"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDisarmTrap?.(container.id);
-                    }}
-                    className="grid h-6 w-6 place-items-center rounded border border-emerald-700/60 bg-emerald-950/90 text-emerald-300 hover:border-emerald-500"
-                  >
-                    <Wrench className="h-3 w-3" />
-                  </button>
-                ) : null}
-                {pending ? (
-                  <span className="rounded bg-accent-gold/20 px-1 font-barlow text-[7px] font-bold uppercase text-accent-gold">
-                    Entschärfen…
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  title="Behälter löschen"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteContainer?.(container.id);
-                  }}
-                  className="grid h-6 w-6 place-items-center rounded border border-red-800/60 bg-red-950/90 text-red-400 hover:border-red-500"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            ) : null}
           </div>
         );
       })}

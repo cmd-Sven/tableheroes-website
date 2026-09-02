@@ -87,6 +87,11 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     x: number;
     y: number;
   } | null>(null);
+  const [containerRadial, setContainerRadial] = useState<{
+    container: SessionBattlemapContainer;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const activeBattlemapId = liveState?.active_battlemap_id ?? null;
   const activeWorldMapId = liveState?.active_world_map_id ?? null;
@@ -183,6 +188,8 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
     setSelectedBattlemapPropId,
     tokenRadial,
     setTokenRadial,
+    containerRadial,
+    setContainerRadial,
     activeBattlemapId,
     activeWorldMapId,
     activeBattlemap,

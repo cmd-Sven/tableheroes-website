@@ -10,6 +10,7 @@ import type {
 } from "@/src/lib/session/battlemap-types";
 import {
   CONTAINER_TYPE_LABELS,
+  defaultContainerHp,
   defaultForceOpenDc,
 } from "@/src/lib/session/battlemap-container-model";
 import {
@@ -37,6 +38,8 @@ export type ContainerWizardDraft = {
   containerType: BattlemapContainerType;
   isLocked: boolean;
   forceOpenDc: number;
+  hpCurrent: number;
+  hpMax: number;
   hasTrap: boolean;
   trapName: string;
   trapDescription: string;
@@ -122,6 +125,8 @@ const emptyDraft = (type: BattlemapContainerType = "chest"): ContainerWizardDraf
   containerType: type,
   isLocked: true,
   forceOpenDc: defaultForceOpenDc(type),
+  hpCurrent: defaultContainerHp(type),
+  hpMax: defaultContainerHp(type),
   hasTrap: false,
   trapName: "",
   trapDescription: "",
@@ -265,6 +270,8 @@ export function ContainerWizardModal({
           containerType,
           isLocked: out.isLocked ?? true,
           forceOpenDc: out.forceOpenDc ?? defaultForceOpenDc(containerType),
+          hpCurrent: defaultContainerHp(containerType),
+          hpMax: defaultContainerHp(containerType),
           hasTrap: out.hasTrap === true && trap != null,
           trapName: trap?.name ?? "",
           trapDescription: trap?.description ?? "",
@@ -348,6 +355,8 @@ export function ContainerWizardModal({
           gridY,
           isLocked: draft.isLocked,
           forceOpenDc: draft.forceOpenDc,
+          hpCurrent: draft.hpCurrent,
+          hpMax: draft.hpMax,
           isHidden: draft.isHidden,
           detectionDc: draft.isHidden ? draft.detectionDc : 15,
           hasTrap: draft.hasTrap,
@@ -467,10 +476,13 @@ export function ContainerWizardModal({
                 value={draft.containerType}
                 onChange={(e) => {
                   const t = e.target.value as BattlemapContainerType;
+                  const hp = defaultContainerHp(t);
                   setDraft((p) => ({
                     ...p,
                     containerType: t,
                     forceOpenDc: defaultForceOpenDc(t),
+                    hpCurrent: hp,
+                    hpMax: hp,
                   }));
                 }}
                 className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
@@ -495,6 +507,47 @@ export function ContainerWizardModal({
                     forceOpenDc: Math.max(1, Math.min(40, Number(e.target.value))),
                   }))
                 }
+                className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                TP aktuell
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={9999}
+                value={draft.hpCurrent}
+                onChange={(e) =>
+                  setDraft((p) => ({
+                    ...p,
+                    hpCurrent: Math.max(0, Math.min(9999, Number(e.target.value) || 0)),
+                  }))
+                }
+                className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                TP Maximum
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                value={draft.hpMax}
+                onChange={(e) => {
+                  const max = Math.max(1, Math.min(9999, Number(e.target.value) || 1));
+                  setDraft((p) => ({
+                    ...p,
+                    hpMax: max,
+                    hpCurrent: Math.min(p.hpCurrent, max),
+                  }));
+                }}
                 className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
               />
             </label>

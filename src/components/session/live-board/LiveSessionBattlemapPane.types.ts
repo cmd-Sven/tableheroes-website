@@ -144,6 +144,13 @@ export type LiveSessionBattlemapPaneProps = {
   setTokenRadial: Dispatch<
     SetStateAction<{ token: SessionBattlemapToken; x: number; y: number } | null>
   >;
+  setContainerRadial: Dispatch<
+    SetStateAction<{
+      container: SessionBattlemapContainer;
+      x: number;
+      y: number;
+    } | null>
+  >;
   setLiveState: Dispatch<SetStateAction<LiveState | null>>;
   liveStateRef: MutableRefObject<LiveState | null>;
 };

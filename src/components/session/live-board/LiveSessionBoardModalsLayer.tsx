@@ -6,8 +6,10 @@
 import { DiceRollOverlay } from "@/src/components/session/dice/DiceRollOverlay";
 import { LiveSessionModals } from "./LiveSessionModals";
 import { LiveSessionTokenRadialMenuHost } from "./LiveSessionTokenRadialMenuHost";
+import { LiveSessionContainerRadialMenuHost } from "./LiveSessionContainerRadialMenuHost";
 import { useLiveSessionBoardContext } from "./LiveSessionBoardContext";
 import { useTrapDisarmModalSync } from "./useTrapDisarmModalSync";
+import { findAdjacentCharacterIdForContainer } from "@/src/lib/session/battlemap-container-model";
 
 export function LiveSessionBoardModalsLayer() {
   const {
@@ -198,6 +200,8 @@ export function LiveSessionBoardModalsLayer() {
       setSelectedBattlemapPropId,
       tokenRadial,
       setTokenRadial,
+      containerRadial,
+      setContainerRadial,
       activeBattlemapId,
       activeWorldMapId,
       activeBattlemap,
@@ -216,6 +220,10 @@ export function LiveSessionBoardModalsLayer() {
       handleMarkerClearAll,
       handleTrapDelete,
       handleTrapClearAll,
+      handleContainerDelete,
+      handleContainerTrapMarkDiscovered,
+      handleContainerMarkDiscovered,
+      handleContainerTrapTrigger,
       handleContainerPickLock,
       handleContainerForceOpen,
       handleBattlemapPropDrop,
@@ -397,10 +405,32 @@ export function LiveSessionBoardModalsLayer() {
         combatParticipantNpcIds={combatParticipantNpcIds}
         addCombatToken={addCombatToken}
         battlemapTraps={battlemapTraps}
-        battlemapContainers={battlemapContainers}
+        setTrapDisarmTarget={setTrapDisarmTarget}
+      />
+
+      <LiveSessionContainerRadialMenuHost
+        containerRadial={containerRadial}
+        setContainerRadial={setContainerRadial}
+        isGM={isGM}
+        actorCharacterId={
+          containerRadial
+            ? findAdjacentCharacterIdForContainer(
+                battlemapTokens,
+                containerRadial.container,
+                currentPlayerCharacter?.id ?? null,
+              )
+            : null
+        }
+        sessionId={sessionId}
+        startTransition={startTransition}
+        setBattlemapContainers={setBattlemapContainers}
         setTrapDisarmTarget={setTrapDisarmTarget}
         handleContainerPickLock={handleContainerPickLock}
         handleContainerForceOpen={handleContainerForceOpen}
+        onMarkTrapDiscovered={handleContainerTrapMarkDiscovered}
+        onMarkContainerDiscovered={handleContainerMarkDiscovered}
+        onTriggerTrap={handleContainerTrapTrigger}
+        onDelete={handleContainerDelete}
       />
     </>
   );

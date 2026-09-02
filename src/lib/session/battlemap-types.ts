@@ -189,6 +189,10 @@ export type SessionBattlemapContainer = {
   is_locked: boolean;
   is_open: boolean;
   force_open_dc: number;
+  /** Aktuelle TP (SL trackt Schaden bei gewaltsamem Öffnen). */
+  hp_current: number;
+  /** Maximale TP. */
+  hp_max: number;
   /** Versteckt → Spieler sehen ihn erst nach Entdeckung; PP nur dann. */
   is_hidden: boolean;
   /** Versteckter Behälter wurde entdeckt. */

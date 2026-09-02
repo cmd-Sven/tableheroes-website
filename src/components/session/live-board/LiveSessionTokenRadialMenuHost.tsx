@@ -12,12 +12,9 @@ import {
   updateBattlemapTokenSettings,
 } from "@/src/lib/actions/battlemap-actions";
 import type {
-  SessionBattlemapContainer,
   SessionBattlemapToken,
   SessionBattlemapTrap,
-  TrapDisarmTarget,
 } from "@/src/lib/session/battlemap-types";
-import { containerToVirtualTrap } from "@/src/lib/session/battlemap-container-model";
 import { isCombatTokenUsed } from "./live-session-combat-utils";
 import type { CombatTokenPayload, LiveState, PartyCharacter } from "./live-session-types";
 
@@ -48,10 +45,9 @@ export type LiveSessionTokenRadialMenuHostProps = {
   combatParticipantNpcIds: Set<string>;
   addCombatToken: (payload: CombatTokenPayload) => Promise<void> | void;
   battlemapTraps: SessionBattlemapTrap[];
-  battlemapContainers: SessionBattlemapContainer[];
-  setTrapDisarmTarget: Dispatch<SetStateAction<TrapDisarmTarget | null>>;
-  handleContainerPickLock: (containerId: string, characterId: string) => void;
-  handleContainerForceOpen: (containerId: string, characterId: string) => void;
+  setTrapDisarmTarget: Dispatch<
+    SetStateAction<import("@/src/lib/session/battlemap-types").TrapDisarmTarget | null>
+  >;
 };
 
 export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenuHostProps) {
@@ -76,15 +72,12 @@ export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenu
     combatParticipantNpcIds,
     addCombatToken,
     battlemapTraps,
-    battlemapContainers,
     setTrapDisarmTarget,
-    handleContainerPickLock,
-    handleContainerForceOpen,
   } = props;
 
   return (
     <>
-{tokenRadial ? (
+      {tokenRadial ? (
         <BattlemapTokenRadialMenu
           token={tokenRadial.token}
           anchor={{ x: tokenRadial.x, y: tokenRadial.y }}
@@ -204,27 +197,8 @@ export function LiveSessionTokenRadialMenuHost(props: LiveSessionTokenRadialMenu
             });
           }}
           battlemapTraps={battlemapTraps}
-          battlemapContainers={battlemapContainers}
           onDisarmTrap={(trap, characterId) => {
             setTrapDisarmTarget({ trap, characterId });
-            setTokenRadial(null);
-          }}
-          onDisarmContainerTrap={(container, characterId) => {
-            const trap = containerToVirtualTrap(container);
-            if (!trap) return;
-            setTrapDisarmTarget({
-              trap,
-              characterId,
-              sourceContainerId: container.id,
-            });
-            setTokenRadial(null);
-          }}
-          onPickLockContainer={(container, characterId) => {
-            handleContainerPickLock(container.id, characterId);
-            setTokenRadial(null);
-          }}
-          onForceOpenContainer={(container, characterId) => {
-            handleContainerForceOpen(container.id, characterId);
             setTokenRadial(null);
           }}
         />

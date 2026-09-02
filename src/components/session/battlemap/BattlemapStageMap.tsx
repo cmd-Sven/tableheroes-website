@@ -149,11 +149,11 @@ export type BattlemapStageMapProps = {
   onTrapTrigger?: (trapId: string) => void;
   onTrapDisarm?: (trapId: string) => void;
   onSelectContainer?: (containerId: string | null) => void;
-  onContainerDelete?: (containerId: string) => void;
-  onContainerTrapMarkDiscovered?: (containerId: string) => void;
-  onContainerMarkDiscovered?: (containerId: string) => void;
-  onContainerTrapTrigger?: (containerId: string) => void;
-  onContainerTrapDisarm?: (containerId: string) => void;
+  onContainerOpenMenu?: (
+    container: import("@/src/lib/session/battlemap-types").SessionBattlemapContainer,
+    clientX: number,
+    clientY: number,
+  ) => void;
   playerDisarmActive?: boolean;
   ownCharacterGrid?: { x: number; y: number } | null;
   onTokenMove?: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
@@ -258,11 +258,7 @@ export function BattlemapStageMap({
   onTrapTrigger,
   onTrapDisarm,
   onSelectContainer,
-  onContainerDelete,
-  onContainerTrapMarkDiscovered,
-  onContainerMarkDiscovered,
-  onContainerTrapTrigger,
-  onContainerTrapDisarm,
+  onContainerOpenMenu,
   playerDisarmActive = false,
   ownCharacterGrid = null,
   onTokenMove,
@@ -595,15 +591,11 @@ export function BattlemapStageMap({
             config={config}
             isGm={isGm}
             interactive={containerInteractive ?? false}
-            playerDisarmActive={playerDisarmActive}
+            playerInteractActive={playerDisarmActive}
             ownCharacterGrid={ownCharacterGrid}
             selectedContainerId={selectedContainerId}
             onSelectContainer={layerSelect.onSelectContainer}
-            onDeleteContainer={onContainerDelete}
-            onMarkTrapDiscovered={onContainerTrapMarkDiscovered}
-            onMarkContainerDiscovered={onContainerMarkDiscovered}
-            onTriggerTrap={onContainerTrapTrigger}
-            onDisarmTrap={onContainerTrapDisarm}
+            onContainerOpenMenu={onContainerOpenMenu}
           />
           <BattlemapTokenLayer
             tokens={tokens}

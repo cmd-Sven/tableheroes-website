@@ -51,8 +51,33 @@ export const DEFAULT_FORCE_OPEN_DC: Record<BattlemapContainerType, number> = {
   other: 12,
 };
 
+/** Standard-TP je Behältertyp. */
+export const DEFAULT_CONTAINER_HP: Record<BattlemapContainerType, number> = {
+  chest: 27,
+  barrel: 15,
+  crate: 20,
+  urn: 8,
+  sarcophagus: 40,
+  other: 20,
+};
+
 export function defaultForceOpenDc(type: BattlemapContainerType): number {
   return DEFAULT_FORCE_OPEN_DC[type] ?? 12;
+}
+
+export function defaultContainerHp(type: BattlemapContainerType): number {
+  return DEFAULT_CONTAINER_HP[type] ?? 20;
+}
+
+/** Spieler darf Behälter anklicken (Radial), wenn benachbart und sichtbar/noch nicht offen. */
+export function canPlayerInteractWithContainer(
+  container: SessionBattlemapContainer,
+  gridX: number,
+  gridY: number,
+): boolean {
+  if (container.is_open) return false;
+  if (container.is_hidden && !container.is_discovered) return false;
+  return isAdjacentToContainer(container, gridX, gridY);
 }
 
 export function parseContainerTrapConfig(
@@ -192,6 +217,23 @@ export function findAdjacentDisarmableContainerTraps(
   gridY: number,
 ): SessionBattlemapContainer[] {
   return containers.filter((c) => isContainerTrapDisarmableByPlayerAt(c, gridX, gridY));
+}
+
+/** Charakter-Token neben dem Behälter (für Radial-Aktionen). */
+export function findAdjacentCharacterIdForContainer(
+  tokens: Array<{ character_id: string | null; grid_x: number; grid_y: number }>,
+  container: Pick<SessionBattlemapContainer, "grid_x" | "grid_y">,
+  preferredCharacterId?: string | null,
+): string | null {
+  const adjacent = tokens.filter(
+    (t) =>
+      Boolean(t.character_id) &&
+      isAdjacentToContainer(container, t.grid_x, t.grid_y),
+  );
+  if (preferredCharacterId && adjacent.some((t) => t.character_id === preferredCharacterId)) {
+    return preferredCharacterId;
+  }
+  return adjacent[0]?.character_id ?? null;
 }
 
 export function canOpenContainer(container: SessionBattlemapContainer): boolean {
