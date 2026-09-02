@@ -18,7 +18,9 @@ import {
   attemptContainerForceOpen,
   attemptContainerPickLock,
   checkContainerTrapsOnProximity,
+  checkHiddenContainersOnProximity,
 } from "@/src/lib/actions/battlemap-container-actions";
+import { parseContainerLootConfig } from "@/src/lib/session/battlemap-container-loot";
 import {
   isWithinMovementRange,
   movementCellsForBurst,
@@ -163,6 +165,32 @@ export function useLiveSessionBattlemapHandlers({
     [activeBattlemapId, applyTrapDetectionResult, sessionId],
   );
 
+  const runHiddenContainerProximityCheck = useCallback(
+    async (characterId: string, gridX: number, gridY: number) => {
+      if (!activeBattlemapId) return;
+      try {
+        const result = await checkHiddenContainersOnProximity({
+          sessionId,
+          battlemapId: activeBattlemapId,
+          characterId,
+          gridX,
+          gridY,
+        });
+        if (result.kind === "discovered") {
+          setBattlemapContainers((prev) =>
+            upsertBattlemapContainer(prev, result.container),
+          );
+          toast.message(
+            `${result.characterName} entdeckt versteckten Behälter „${result.container.name}" (PP ${result.passivePerception} ≥ SG ${result.container.detection_dc}).`,
+          );
+        }
+      } catch {
+        /* optional */
+      }
+    },
+    [activeBattlemapId, sessionId, setBattlemapContainers],
+  );
+
   const runContainerTrapProximityCheck = useCallback(
     async (characterId: string, gridX: number, gridY: number) => {
       if (!activeBattlemapId) return;
@@ -194,6 +222,7 @@ export function useLiveSessionBattlemapHandlers({
       if (!activeBattlemapId) return;
       try {
         await runTrapProximityCheck(characterId, gridX, gridY);
+        await runHiddenContainerProximityCheck(characterId, gridX, gridY);
         await runContainerTrapProximityCheck(characterId, gridX, gridY);
         const result = await checkBattlemapTrapsOnEnter({
           sessionId,
@@ -231,6 +260,7 @@ export function useLiveSessionBattlemapHandlers({
       activeBattlemapId,
       applyTrapDetectionResult,
       runTrapProximityCheck,
+      runHiddenContainerProximityCheck,
       runContainerTrapProximityCheck,
       sessionId,
       setBattlemapTraps,
@@ -529,7 +559,19 @@ export function useLiveSessionBattlemapHandlers({
             });
             toast.error(`Falle in „${result.container.name}" ausgelöst!`);
           } else {
-            toast.success(`„${result.container.name}" geöffnet.`);
+            const loot = parseContainerLootConfig(result.container.ai_payload);
+            const hasLoot =
+              loot.lootMode !== "empty" &&
+              (loot.lootPublished ||
+                loot.resolvedItems.length > 0 ||
+                loot.lootItems.length > 0 ||
+                loot.goldGp > 0 ||
+                loot.lootMode === "preset");
+            toast.success(
+              hasLoot
+                ? `„${result.container.name}" geöffnet — Beute erscheint auf der Bühne.`
+                : `„${result.container.name}" geöffnet.`,
+            );
           }
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Schloss knacken fehlgeschlagen.");
@@ -579,7 +621,19 @@ export function useLiveSessionBattlemapHandlers({
             });
             toast.error(`Falle in „${result.container.name}" ausgelöst!`);
           } else {
-            toast.success(`„${result.container.name}" gewaltsam geöffnet.`);
+            const loot = parseContainerLootConfig(result.container.ai_payload);
+            const hasLoot =
+              loot.lootMode !== "empty" &&
+              (loot.lootPublished ||
+                loot.resolvedItems.length > 0 ||
+                loot.lootItems.length > 0 ||
+                loot.goldGp > 0 ||
+                loot.lootMode === "preset");
+            toast.success(
+              hasLoot
+                ? `„${result.container.name}" gewaltsam geöffnet — Beute erscheint auf der Bühne.`
+                : `„${result.container.name}" gewaltsam geöffnet.`,
+            );
           }
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Öffnen fehlgeschlagen.");

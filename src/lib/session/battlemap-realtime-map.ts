@@ -388,6 +388,9 @@ export function mapBattlemapContainerRow(
     is_locked: row.is_locked === true,
     is_open: row.is_open === true,
     force_open_dc: Math.max(1, Math.min(40, Math.round(Number(row.force_open_dc ?? 15)))),
+    is_hidden: row.is_hidden === true,
+    is_discovered: row.is_discovered === true,
+    detection_dc: Math.max(1, Math.min(40, Math.round(Number(row.detection_dc ?? 15)))),
     has_trap: row.has_trap === true,
     trap_config:
       row.trap_config && typeof row.trap_config === "object"
@@ -425,6 +428,9 @@ export function upsertBattlemapContainer(
     cur.grid_y === container.grid_y &&
     cur.is_open === container.is_open &&
     cur.is_locked === container.is_locked &&
+    cur.is_hidden === container.is_hidden &&
+    cur.is_discovered === container.is_discovered &&
+    cur.detection_dc === container.detection_dc &&
     cur.is_trap_detected === container.is_trap_detected &&
     cur.is_trap_disarmed === container.is_trap_disarmed &&
     cur.is_trap_triggered === container.is_trap_triggered &&

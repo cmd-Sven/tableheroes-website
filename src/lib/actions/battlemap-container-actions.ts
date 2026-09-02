@@ -31,6 +31,23 @@ import {
   type ContainerTrapConfig,
 } from "@/src/lib/session/battlemap-container-model";
 import {
+  buildContainerLootDraft,
+  parseContainerLootConfig,
+  type ContainerLootConfig,
+} from "@/src/lib/session/battlemap-container-loot";
+import {
+  lootItemToJson,
+  LOOT_UNIDENTIFIED_DESC_FALLBACK,
+  LOOT_UNIDENTIFIED_NAME_FALLBACK,
+  type LootDraftPayload,
+} from "@/src/lib/loot/loot-item-model";
+import {
+  inferLootInventoryCategory,
+  normalizeLootInventoryCategory,
+} from "@/src/lib/characters/dnd5e/loot-to-inventory";
+import type { Json } from "@/src/lib/database.types";
+import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
+import {
   parseTrapAiPayload,
   trapDisarmPending,
   type TrapDisarmPending,
@@ -121,6 +138,9 @@ function normalizeContainer(row: Record<string, unknown>): SessionBattlemapConta
     is_locked: row.is_locked === true,
     is_open: row.is_open === true,
     force_open_dc: Math.max(1, Math.min(40, Math.round(Number(row.force_open_dc ?? 15)))),
+    is_hidden: row.is_hidden === true,
+    is_discovered: row.is_discovered === true,
+    detection_dc: Math.max(1, Math.min(40, Math.round(Number(row.detection_dc ?? 15)))),
     has_trap: row.has_trap === true,
     trap_config:
       row.trap_config && typeof row.trap_config === "object"
@@ -315,10 +335,15 @@ export async function createBattlemapContainer(input: {
   gridY: number;
   isLocked?: boolean;
   forceOpenDc?: number;
+  /** Default false = sichtbar für alle. */
+  isHidden?: boolean;
+  detectionDc?: number;
   hasTrap?: boolean;
   trapConfig?: Partial<ContainerTrapConfig>;
   loreContext?: string | null;
   aiPayload?: Record<string, unknown>;
+  /** Loot-Konfiguration (wird unter ai_payload.loot gespeichert) */
+  loot?: ContainerLootConfig | null;
 }): Promise<SessionBattlemapContainer> {
   const supabase = await createClient();
   const {
@@ -353,6 +378,19 @@ export async function createBattlemapContainer(input: {
       }
     : {};
 
+  const basePayload = { ...(input.aiPayload ?? {}) };
+  if (input.loot) {
+    basePayload.loot = {
+      lootMode: input.loot.lootMode,
+      lootPreset: input.loot.lootPreset,
+      lootItems: input.loot.lootItems,
+      goldGp: input.loot.goldGp,
+      resolvedItems: input.loot.resolvedItems,
+      lootPublished: false,
+      lootStageId: null,
+    };
+  }
+
   const { data, error } = await (supabase as any)
     .from("session_battlemap_containers")
     .insert({
@@ -367,10 +405,16 @@ export async function createBattlemapContainer(input: {
       is_locked: input.isLocked === true,
       is_open: false,
       force_open_dc: Math.max(1, Math.min(40, Math.round(forceOpenDc))),
+      is_hidden: input.isHidden === true,
+      is_discovered: false,
+      detection_dc: Math.max(
+        1,
+        Math.min(40, Math.round(input.detectionDc ?? 15)),
+      ),
       has_trap: input.hasTrap === true,
       trap_config: trapConfig,
       lore_context: input.loreContext ?? null,
-      ai_payload: input.aiPayload ?? {},
+      ai_payload: basePayload,
     })
     .select("*")
     .single();
@@ -496,6 +540,131 @@ export async function checkContainerTrapsOnProximity(input: {
   return { kind: "none" };
 }
 
+async function markContainerDiscoveredInternal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  container: SessionBattlemapContainer,
+  sessionId: string,
+  characterName: string,
+  source: "passive" | "gm",
+): Promise<SessionBattlemapContainer> {
+  const { data, error } = await (supabase as any)
+    .from("session_battlemap_containers")
+    .update({
+      is_discovered: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", container.id)
+    .eq("session_id", sessionId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  const updated = normalizeContainer(data as Record<string, unknown>);
+  try {
+    await appendSessionActivity({
+      sessionId,
+      text: `${characterName} entdeckt versteckten Behälter „${container.name}“ (${source === "passive" ? "passiv" : "SL"}).`,
+      type: "container_discovered",
+      meta: { container_id: container.id, source },
+    });
+  } catch {
+    /* optional */
+  }
+  return updated;
+}
+
+export type HiddenContainerProximityResult =
+  | { kind: "none" }
+  | {
+      kind: "discovered";
+      container: SessionBattlemapContainer;
+      passivePerception: number;
+      characterName: string;
+      source: "passive";
+    };
+
+/** Passive Perception: nur versteckte, unentdeckte Behälter in Nachbarschaft. */
+export async function checkHiddenContainersOnProximity(input: {
+  sessionId: string;
+  battlemapId: string;
+  characterId: string;
+  gridX: number;
+  gridY: number;
+}): Promise<HiddenContainerProximityResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+
+  const { passivePerception, characterName } = await loadPassivePerception(
+    supabase,
+    input.characterId,
+  );
+
+  const { data: discoveredId, error: rpcErr } = await (supabase as any).rpc(
+    "discover_hidden_battlemap_container_near",
+    {
+      p_session_id: input.sessionId,
+      p_battlemap_id: input.battlemapId,
+      p_grid_x: input.gridX,
+      p_grid_y: input.gridY,
+      p_passive_perception: passivePerception,
+    },
+  );
+  if (rpcErr) throw new Error(rpcErr.message);
+  if (!discoveredId) return { kind: "none" };
+
+  const container = await loadContainerRow(
+    supabase,
+    String(discoveredId),
+    input.sessionId,
+  );
+
+  try {
+    await appendSessionActivity({
+      sessionId: input.sessionId,
+      text: `${characterName} entdeckt versteckten Behälter „${container.name}“ (passiv, PP ${passivePerception}).`,
+      type: "container_discovered",
+      meta: { container_id: container.id, source: "passive" },
+    });
+  } catch {
+    /* optional */
+  }
+
+  return {
+    kind: "discovered",
+    container,
+    passivePerception,
+    characterName,
+    source: "passive",
+  };
+}
+
+/** SL markiert versteckten Behälter als entdeckt. */
+export async function markContainerDiscovered(input: {
+  sessionId: string;
+  containerId: string;
+  characterName?: string;
+}): Promise<SessionBattlemapContainer> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert.");
+  await assertSessionGm(input.sessionId, user.id);
+
+  const container = await loadContainerRow(supabase, input.containerId, input.sessionId);
+  if (!container.is_hidden || container.is_discovered) return container;
+
+  return markContainerDiscoveredInternal(
+    supabase,
+    container,
+    input.sessionId,
+    input.characterName?.trim() || "Die Gruppe",
+    "gm",
+  );
+}
+
 export async function markContainerTrapDiscovered(input: {
   sessionId: string;
   containerId: string;
@@ -596,6 +765,171 @@ export type ContainerOpenResult =
   | { kind: "opened"; container: SessionBattlemapContainer }
   | { kind: "trap_triggered"; container: SessionBattlemapContainer; trap: SessionBattlemapTrap; characterName: string; characterId: string; passivePerception: number };
 
+/** Nach erfolgreichem Öffnen: Inhalt persistieren und ggf. auf die Loot-Bühne legen. */
+async function revealContainerLootOnOpen(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  container: SessionBattlemapContainer,
+  sessionId: string,
+): Promise<SessionBattlemapContainer> {
+  const loot = parseContainerLootConfig(container.ai_payload);
+  if (loot.lootMode === "empty" || loot.lootPublished) {
+    return container;
+  }
+
+  const draft = buildContainerLootDraft(container.name, loot);
+  if (!draft) {
+    const nextLoot: ContainerLootConfig = {
+      ...loot,
+      lootPublished: true,
+      lootStageId: null,
+    };
+    return updateContainerAiPayload(supabase, container, sessionId, {
+      loot: nextLoot,
+    });
+  }
+
+  const lootWithResolved: ContainerLootConfig = {
+    ...loot,
+    resolvedItems: draft.items,
+    goldGp: draft.gp,
+  };
+
+  const stageResult = await publishBattlemapContainerLootToStage(
+    supabase,
+    sessionId,
+    container.campaign_id,
+    draft,
+  );
+
+  if (!stageResult.ok) {
+    const persisted = await updateContainerAiPayload(
+      supabase,
+      container,
+      sessionId,
+      { loot: lootWithResolved },
+    );
+    try {
+      await appendSessionActivity({
+        sessionId,
+        text: `„${container.name}“ geöffnet — Inhalt gespeichert (${draft.items.length} Gegenstände, ${draft.gp} gp). Bühne: ${stageResult.error}`,
+        type: "container_opened",
+        meta: { container_id: container.id },
+      });
+    } catch {
+      /* optional */
+    }
+    return persisted;
+  }
+
+  const nextLoot: ContainerLootConfig = {
+    ...lootWithResolved,
+    lootPublished: true,
+    lootStageId: stageResult.containerId,
+  };
+
+  const updated = await updateContainerAiPayload(supabase, container, sessionId, {
+    loot: nextLoot,
+  });
+
+  try {
+    await appendSessionActivity({
+      sessionId,
+      text: `„${container.name}“ geöffnet — Beute erscheint auf der Bühne (${draft.items.length} Gegenstände${draft.gp ? `, ${draft.gp} gp` : ""}).`,
+      type: "container_opened",
+      meta: {
+        container_id: container.id,
+        loot_stage_id: stageResult.containerId,
+      },
+    });
+  } catch {
+    /* optional */
+  }
+
+  return updated;
+}
+
+/**
+ * Loot-Gun-Pipeline ohne SL-Gate — Aufrufer hat bereits Session-Zugriff
+ * (Behälter öffnen durch Spieler oder SL).
+ */
+async function publishBattlemapContainerLootToStage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  campaignId: string,
+  draft: LootDraftPayload,
+): Promise<{ ok: true; containerId: string } | { ok: false; error: string }> {
+  try {
+    const gp = Math.max(0, Math.round(draft.gp));
+    const sp = Math.max(0, Math.round(draft.sp));
+    const itemsJson = draft.items.map((it) => {
+      const isMagical = Boolean(it.isMagical);
+      const mundaneName =
+        (it.mundaneName ?? "").trim() ||
+        (isMagical ? LOOT_UNIDENTIFIED_NAME_FALLBACK : it.name);
+      const mundaneDesc =
+        (it.mundaneDesc ?? "").trim() ||
+        (isMagical ? LOOT_UNIDENTIFIED_DESC_FALLBACK : it.desc);
+      const inventoryCategory = normalizeLootInventoryCategory(
+        it.inventoryCategory,
+        inferLootInventoryCategory(it.name, it.desc, isMagical, it.kind),
+      );
+      return lootItemToJson({
+        ...it,
+        mundaneName: mundaneName.slice(0, 160),
+        mundaneDesc: mundaneDesc.slice(0, 800),
+        inventoryCategory,
+        identified: !isMagical,
+      });
+    });
+
+    const { data: ins, error: insErr } = await (supabase as any)
+      .from("campaign_loot_containers")
+      .insert({
+        campaign_id: campaignId,
+        name: draft.name.trim().slice(0, 160),
+        gp_remaining: gp,
+        sp_remaining: sp,
+        items_json: itemsJson as unknown as Json,
+        chest_opened: false,
+      })
+      .select("id")
+      .single();
+
+    if (insErr || !ins) {
+      return { ok: false, error: insErr?.message ?? "Beute-Container konnte nicht angelegt werden." };
+    }
+
+    const containerId = String((ins as { id: string }).id);
+
+    const { error: upErr } = await (supabase as any)
+      .from("session_live_states")
+      .update({ current_loot_id: containerId, loot_hide_npcs: true })
+      .eq("session_id", sessionId);
+
+    if (upErr) {
+      await (supabase as any).from("campaign_loot_containers").delete().eq("id", containerId);
+      return { ok: false, error: upErr.message ?? "Live-State konnte nicht verknüpft werden." };
+    }
+
+    try {
+      await createSystemLog(
+        sessionId,
+        "loot_publish",
+        `Battlemap-Behälter: „${draft.name.trim()}“ erscheint auf der Bühne (${itemsJson.length} Gegenstände${gp || sp ? `, ${gp} gp / ${sp} sp` : ""}).`,
+      );
+    } catch {
+      /* optional */
+    }
+
+    return { ok: true, containerId };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Unbekannter Fehler.",
+    };
+  }
+}
+
 async function unsafeContainerAction(
   supabase: Awaited<ReturnType<typeof createClient>>,
   container: SessionBattlemapContainer,
@@ -637,7 +971,9 @@ async function unsafeContainerAction(
     .select("*")
     .single();
   if (error) throw new Error(error.message);
-  return { kind: "opened", container: normalizeContainer(data as Record<string, unknown>) };
+  const opened = normalizeContainer(data as Record<string, unknown>);
+  const withLoot = await revealContainerLootOnOpen(supabase, opened, sessionId);
+  return { kind: "opened", container: withLoot };
 }
 
 /** Schloss knacken — triggert Falle wenn nicht entschärft/entdeckt. */
@@ -713,7 +1049,8 @@ export async function openBattlemapContainer(input: {
     .select("*")
     .single();
   if (error) throw new Error(error.message);
-  return normalizeContainer(data as Record<string, unknown>);
+  const opened = normalizeContainer(data as Record<string, unknown>);
+  return revealContainerLootOnOpen(supabase, opened, input.sessionId);
 }
 
 /** Container-Falle: Entschärfungs-Session öffnen. */

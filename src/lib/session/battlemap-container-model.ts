@@ -181,6 +181,7 @@ export function findAdjacentInteractableContainers(
   return containers.filter((c) => {
     if (!isAdjacentToContainer(c, gridX, gridY)) return false;
     if (c.is_open) return false;
+    if (c.is_hidden && !c.is_discovered) return false;
     return true;
   });
 }
@@ -203,4 +204,28 @@ export function containerTrapWouldTriggerOnUnsafeAction(
   container: SessionBattlemapContainer,
 ): boolean {
   return containerTrapActive(container);
+}
+
+/** Spieler sehen sichtbare Behälter oder entdeckte Versteckte. */
+export function isContainerVisibleToPlayers(
+  container: Pick<SessionBattlemapContainer, "is_hidden" | "is_discovered" | "is_open">,
+): boolean {
+  if (container.is_open) return true;
+  if (!container.is_hidden) return true;
+  return container.is_discovered === true;
+}
+
+/** Passive Perception nur bei versteckten, noch nicht entdeckten Behältern. */
+export function canPassivelyDiscoverHiddenContainer(
+  container: Pick<
+    SessionBattlemapContainer,
+    "is_hidden" | "is_discovered" | "detection_dc" | "grid_x" | "grid_y"
+  >,
+  gridX: number,
+  gridY: number,
+  passivePerception: number,
+): boolean {
+  if (!container.is_hidden || container.is_discovered) return false;
+  if (!isAdjacentToContainer(container, gridX, gridY)) return false;
+  return passivePerception >= Math.max(1, container.detection_dc ?? 15);
 }

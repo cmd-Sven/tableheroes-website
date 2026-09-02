@@ -122,6 +122,7 @@ export type BattlemapStageProps = {
   onContainerToolCancel?: () => void;
   onContainerDelete?: (containerId: string) => void;
   onContainerTrapMarkDiscovered?: (containerId: string) => void;
+  onContainerMarkDiscovered?: (containerId: string) => void;
   onContainerTrapTrigger?: (containerId: string) => void;
   onContainerTrapDisarm?: (containerId: string) => void;
   onCancelPlacement?: () => void;

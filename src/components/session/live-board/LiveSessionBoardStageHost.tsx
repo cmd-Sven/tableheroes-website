@@ -155,6 +155,7 @@ export function LiveSessionBoardStageHost() {
       handleTrapTrigger,
       handleContainerDelete,
       handleContainerTrapMarkDiscovered,
+      handleContainerMarkDiscovered,
       handleContainerTrapTrigger,
       handleContainerPickLock,
       handleContainerForceOpen,
@@ -394,6 +395,7 @@ export function LiveSessionBoardStageHost() {
               handleTrapTrigger={handleTrapTrigger}
               handleContainerDelete={handleContainerDelete}
               handleContainerTrapMarkDiscovered={handleContainerTrapMarkDiscovered}
+              handleContainerMarkDiscovered={handleContainerMarkDiscovered}
               handleContainerTrapTrigger={handleContainerTrapTrigger}
               handleContainerPickLock={handleContainerPickLock}
               handleContainerForceOpen={handleContainerForceOpen}

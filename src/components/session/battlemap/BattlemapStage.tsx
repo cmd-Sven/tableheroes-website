@@ -68,6 +68,7 @@ export function BattlemapStage({
   onContainerToolCancel,
   onContainerDelete,
   onContainerTrapMarkDiscovered,
+  onContainerMarkDiscovered,
   onContainerTrapTrigger,
   onContainerTrapDisarm,
   onCancelPlacement,
@@ -525,6 +526,7 @@ export function BattlemapStage({
         onSelectContainer={onSelectContainer}
         onContainerDelete={onContainerDelete}
         onContainerTrapMarkDiscovered={onContainerTrapMarkDiscovered}
+        onContainerMarkDiscovered={onContainerMarkDiscovered}
         onContainerTrapTrigger={onContainerTrapTrigger}
         onContainerTrapDisarm={onContainerTrapDisarm}
         playerDisarmActive={playerDisarmActive}

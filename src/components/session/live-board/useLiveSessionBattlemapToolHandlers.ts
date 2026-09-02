@@ -25,6 +25,7 @@ import {
 import {
   clearBattlemapContainers,
   listBattlemapContainers,
+  markContainerDiscovered,
   markContainerTrapDiscovered,
   removeBattlemapContainer,
   triggerContainerTrapManually,
@@ -409,6 +410,28 @@ export function useLiveSessionBattlemapToolHandlers({
     [sessionId, setBattlemapContainers, startTransition],
   );
 
+  const handleContainerMarkDiscovered = useCallback(
+    (containerId: string) => {
+      startTransition(async () => {
+        try {
+          const updated = await markContainerDiscovered({
+            sessionId,
+            containerId,
+          });
+          setBattlemapContainers((prev) =>
+            prev.map((c) => (c.id === updated.id ? updated : c)),
+          );
+          toast.success(`„${updated.name}" als entdeckt markiert.`);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Behälter konnte nicht markiert werden.",
+          );
+        }
+      });
+    },
+    [sessionId, setBattlemapContainers, startTransition],
+  );
+
   const handleContainerTrapTrigger = useCallback(
     (containerId: string) => {
       if (!isGM) return;
@@ -500,6 +523,7 @@ export function useLiveSessionBattlemapToolHandlers({
     handleContainerDelete,
     handleContainerClearAll,
     handleContainerTrapMarkDiscovered,
+    handleContainerMarkDiscovered,
     handleContainerTrapTrigger,
     handleBattlemapPropDrop,
     handleBattlemapPropResize,

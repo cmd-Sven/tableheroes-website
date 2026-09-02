@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, X } from "lucide-react";
+import { Package, Search, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
   BattlemapContainerType,
@@ -12,6 +12,16 @@ import {
   CONTAINER_TYPE_LABELS,
   defaultForceOpenDc,
 } from "@/src/lib/session/battlemap-container-model";
+import {
+  CONTAINER_LOOT_PRESET_LABELS,
+  EMPTY_CONTAINER_LOOT,
+  generatePresetLootItems,
+  searchLootCatalogOptions,
+  type ContainerLootCatalogRef,
+  type ContainerLootConfig,
+  type ContainerLootMode,
+  type ContainerLootPreset,
+} from "@/src/lib/session/battlemap-container-loot";
 import { generateContainerWithAI } from "@/src/lib/actions/battlemap-container-ai";
 import { createBattlemapContainer } from "@/src/lib/actions/battlemap-container-actions";
 import {
@@ -19,6 +29,7 @@ import {
   parseTrapStatusEffect,
   type CharacterConditionKey,
 } from "@/src/lib/characters/condition-tokens";
+import type { LootItemRow } from "@/src/lib/loot/loot-item-model";
 
 export type ContainerWizardDraft = {
   name: string;
@@ -39,6 +50,14 @@ export type ContainerWizardDraft = {
   trapSaveAbility: string;
   trapSaveDC: number;
   trapStatusEffect: CharacterConditionKey | "";
+  lootMode: ContainerLootMode;
+  lootPreset: ContainerLootPreset;
+  lootItems: ContainerLootCatalogRef[];
+  goldGp: number;
+  resolvedItems: LootItemRow[];
+  /** false = sichtbar (Default), true = versteckt */
+  isHidden: boolean;
+  detectionDc: number;
 };
 
 type Props = {
@@ -63,6 +82,13 @@ const CONTAINER_TYPES: BattlemapContainerType[] = [
   "other",
 ];
 
+const LOOT_PRESETS: ContainerLootPreset[] = [
+  "junk",
+  "modest",
+  "magical",
+  "gold_valuable",
+];
+
 function parseDamageField(raw: string): { damage: string; damageType: string } {
   const trimmed = raw.trim();
   const m = trimmed.match(/^(\d+d\d+(?:\s*[+-]\s*\d+)?)\s*(.*)$/i);
@@ -81,6 +107,13 @@ function saveTypeToAbility(saveType: string): string {
   if (s.startsWith("wis")) return "wis";
   if (s.startsWith("cha")) return "cha";
   return "dex";
+}
+
+function newLootId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `loot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 const emptyDraft = (type: BattlemapContainerType = "chest"): ContainerWizardDraft => ({
@@ -102,13 +135,52 @@ const emptyDraft = (type: BattlemapContainerType = "chest"): ContainerWizardDraf
   trapSaveAbility: "dex",
   trapSaveDC: 13,
   trapStatusEffect: "",
+  lootMode: "preset",
+  lootPreset: "modest",
+  lootItems: [],
+  goldGp: 0,
+  resolvedItems: [],
+  isHidden: false,
+  detectionDc: 15,
 });
+
+function draftToLootConfig(draft: ContainerWizardDraft, targetLevel: number): ContainerLootConfig {
+  if (draft.lootMode === "empty") {
+    return { ...EMPTY_CONTAINER_LOOT };
+  }
+  if (draft.lootMode === "catalog") {
+    return {
+      ...EMPTY_CONTAINER_LOOT,
+      lootMode: "catalog",
+      lootItems: draft.lootItems,
+      goldGp: draft.goldGp,
+      resolvedItems: [],
+    };
+  }
+  // preset: wenn KI resolvedItems geliefert hat, behalten; sonst leer → Auflösung beim Öffnen
+  let resolved = draft.resolvedItems;
+  let gold = draft.goldGp;
+  if (resolved.length === 0 && draft.goldGp <= 0) {
+    // Vorschau-Auflösung speichern, damit SL den Inhalt vorab sieht und er beim Öffnen stabil bleibt
+    const generated = generatePresetLootItems(draft.lootPreset, targetLevel);
+    resolved = generated.items;
+    gold = generated.goldGp;
+  }
+  return {
+    ...EMPTY_CONTAINER_LOOT,
+    lootMode: "preset",
+    lootPreset: draft.lootPreset,
+    lootItems: [],
+    goldGp: gold,
+    resolvedItems: resolved,
+  };
+}
 
 export function ContainerWizardModal({
   open,
   onClose,
   sessionId,
-  campaignId,
+  campaignId: _campaignId,
   battlemapId,
   gridX,
   gridY,
@@ -119,13 +191,27 @@ export function ContainerWizardModal({
   const [draft, setDraft] = useState<ContainerWizardDraft>(emptyDraft());
   const [aiHint, setAiHint] = useState("");
   const [aiDifficulty, setAiDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogKind, setCatalogKind] = useState<string | "all">("all");
   const [pending, startTransition] = useTransition();
+
+  const catalogOptions = useMemo(
+    () => searchLootCatalogOptions(catalogQuery, catalogKind),
+    [catalogQuery, catalogKind],
+  );
+
+  const catalogKinds = useMemo(() => {
+    const all = searchLootCatalogOptions("", "all");
+    return [...new Set(all.map((o) => o.kind))].sort();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     setDraft(emptyDraft());
     setAiHint("");
     setAiDifficulty("medium");
+    setCatalogQuery("");
+    setCatalogKind("all");
   }, [open, gridX, gridY]);
 
   if (!open) return null;
@@ -139,6 +225,8 @@ export function ContainerWizardModal({
           difficulty: aiDifficulty,
           locationLoreContext,
           containerType: draft.containerType,
+          lootMode: draft.lootMode,
+          lootPreset: draft.lootMode === "preset" ? draft.lootPreset : null,
         });
         const typeRaw = String(out.containerType ?? draft.containerType);
         const containerType = CONTAINER_TYPES.includes(typeRaw as BattlemapContainerType)
@@ -149,6 +237,28 @@ export function ContainerWizardModal({
           ? parseTrapStatusEffect(trap.statusEffect)
           : "";
         const parsed = trap ? parseDamageField(trap.damage) : null;
+
+        let resolvedItems: LootItemRow[] = draft.resolvedItems;
+        let goldGp = draft.goldGp;
+        if (draft.lootMode === "preset" && out.loot) {
+          goldGp = Math.max(0, Math.round(Number(out.loot.goldGp ?? 0)));
+          resolvedItems = (out.loot.items ?? []).map((it) => ({
+            id: newLootId(),
+            name: String(it.name ?? "Gegenstand").slice(0, 160),
+            desc: String(it.desc ?? ""),
+            rarity: String(it.rarity ?? "common").toLowerCase(),
+            price: Math.max(0, Math.round(Number(it.price ?? 0))),
+            isMagical: Boolean(it.isMagical),
+            identified: !Boolean(it.isMagical),
+            kind: it.kind,
+          }));
+          if (resolvedItems.length === 0) {
+            const fallback = generatePresetLootItems(draft.lootPreset, targetLevel);
+            resolvedItems = fallback.items;
+            if (goldGp <= 0) goldGp = fallback.goldGp;
+          }
+        }
+
         setDraft({
           name: out.name,
           description: out.description ?? "",
@@ -168,6 +278,13 @@ export function ContainerWizardModal({
           trapSaveAbility: trap ? saveTypeToAbility(trap.saveType) : "dex",
           trapSaveDC: trap?.dc ?? 13,
           trapStatusEffect: statusEffect ?? "",
+          lootMode: draft.lootMode,
+          lootPreset: draft.lootPreset,
+          lootItems: draft.lootItems,
+          goldGp,
+          resolvedItems,
+          isHidden: draft.isHidden,
+          detectionDc: draft.detectionDc,
         });
         toast.success("Behälter per KI erzeugt — bitte prüfen.");
       } catch (e) {
@@ -176,13 +293,51 @@ export function ContainerWizardModal({
     });
   }
 
+  function addCatalogItem(ref: {
+    archetypeKey: string;
+    catalogId: string;
+    name: string;
+    isMagical: boolean;
+  }) {
+    setDraft((p) => {
+      const existing = p.lootItems.find(
+        (x) => x.archetypeKey === ref.archetypeKey && x.catalogId === ref.catalogId,
+      );
+      if (existing) {
+        return {
+          ...p,
+          lootMode: "catalog",
+          lootItems: p.lootItems.map((x) =>
+            x.id === existing.id
+              ? { ...x, quantity: Math.min(20, x.quantity + 1) }
+              : x,
+          ),
+        };
+      }
+      const next: ContainerLootCatalogRef = {
+        id: newLootId(),
+        archetypeKey: ref.archetypeKey,
+        catalogId: ref.catalogId,
+        name: ref.name,
+        quantity: 1,
+        isMagical: ref.isMagical,
+      };
+      return { ...p, lootMode: "catalog", lootItems: [...p.lootItems, next] };
+    });
+  }
+
   function save() {
     if (!draft.name.trim()) {
       toast.message("Bitte einen Namen vergeben.");
       return;
     }
+    if (draft.lootMode === "catalog" && draft.lootItems.length === 0 && draft.goldGp <= 0) {
+      toast.message("Katalog-Inhalt: mindestens einen Gegenstand oder Gold wählen.");
+      return;
+    }
     startTransition(async () => {
       try {
+        const loot = draftToLootConfig(draft, targetLevel);
         const created = await createBattlemapContainer({
           sessionId,
           battlemapId,
@@ -193,6 +348,8 @@ export function ContainerWizardModal({
           gridY,
           isLocked: draft.isLocked,
           forceOpenDc: draft.forceOpenDc,
+          isHidden: draft.isHidden,
+          detectionDc: draft.isHidden ? draft.detectionDc : 15,
           hasTrap: draft.hasTrap,
           trapConfig: draft.hasTrap
             ? {
@@ -212,6 +369,7 @@ export function ContainerWizardModal({
               }
             : undefined,
           loreContext: locationLoreContext || null,
+          loot,
         });
         toast.success(`„${created.name}" platziert.`);
         onCreated(created.id);
@@ -351,6 +509,63 @@ export function ContainerWizardModal({
             Verschlossen
           </label>
 
+          <div className="space-y-2 rounded-lg border border-hero-border/40 bg-hero-dark/10 p-3">
+            <p className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+              Sichtbarkeit
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDraft((p) => ({ ...p, isHidden: false }))}
+                className={`rounded border px-2.5 py-1 font-barlow text-[10px] font-bold uppercase ${
+                  !draft.isHidden
+                    ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
+                    : "border-hero-border text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Sichtbar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraft((p) => ({ ...p, isHidden: true }))}
+                className={`rounded border px-2.5 py-1 font-barlow text-[10px] font-bold uppercase ${
+                  draft.isHidden
+                    ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
+                    : "border-hero-border text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Versteckt
+              </button>
+            </div>
+            {draft.isHidden ? (
+              <label className="block">
+                <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                  Entdeckungs-SG (Passive Perception)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={40}
+                  value={draft.detectionDc}
+                  onChange={(e) =>
+                    setDraft((p) => ({
+                      ...p,
+                      detectionDc: Math.max(1, Math.min(40, Number(e.target.value) || 15)),
+                    }))
+                  }
+                  className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
+                />
+                <p className="mt-1 font-libre text-[11px] text-gray-500">
+                  Nur benachbart und bei PP ≥ SG sichtbar. SL kann jederzeit als entdeckt markieren.
+                </p>
+              </label>
+            ) : (
+              <p className="font-libre text-[11px] text-gray-500">
+                Für alle auf der Battlemap sichtbar — keine Wahrnehmungsprüfung nötig.
+              </p>
+            )}
+          </div>
+
           <label className="flex items-center gap-2 text-sm text-gray-200">
             <input
               type="checkbox"
@@ -426,6 +641,279 @@ export function ContainerWizardModal({
               </select>
             </div>
           ) : null}
+
+          {/* Inhalt */}
+          <div className="space-y-3 rounded-lg border border-hero-border/40 bg-hero-dark/10 p-3">
+            <p className="flex items-center gap-2 font-cinzel text-sm font-bold text-accent-gold">
+              <Package className="h-4 w-4" />
+              Inhalt
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ["empty", "Leer"],
+                  ["preset", "Preset"],
+                  ["catalog", "Aus Katalog"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      lootMode: mode,
+                      resolvedItems: mode === "preset" ? p.resolvedItems : [],
+                    }))
+                  }
+                  className={`rounded border px-2.5 py-1 font-barlow text-[10px] font-bold uppercase ${
+                    draft.lootMode === mode
+                      ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
+                      : "border-hero-border text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {draft.lootMode === "preset" ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {LOOT_PRESETS.map((preset) => (
+                    <label
+                      key={preset}
+                      className={`flex cursor-pointer items-center gap-2 rounded border px-2 py-1.5 text-xs ${
+                        draft.lootPreset === preset
+                          ? "border-hero-vibrant/60 bg-hero-vibrant/10 text-gray-100"
+                          : "border-hero-dark text-gray-400"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="lootPreset"
+                        checked={draft.lootPreset === preset}
+                        onChange={() =>
+                          setDraft((p) => ({
+                            ...p,
+                            lootPreset: preset,
+                            resolvedItems: [],
+                            goldGp: 0,
+                          }))
+                        }
+                      />
+                      {CONTAINER_LOOT_PRESET_LABELS[preset]}
+                    </label>
+                  ))}
+                </div>
+                {draft.resolvedItems.length > 0 || draft.goldGp > 0 ? (
+                  <div className="rounded border border-hero-dark/60 bg-slate-900/50 p-2">
+                    <p className="font-barlow text-[10px] font-bold uppercase text-gray-500">
+                      Vorschau
+                    </p>
+                    {draft.goldGp > 0 ? (
+                      <p className="mt-1 font-libre text-xs text-accent-gold">
+                        {draft.goldGp} gp
+                      </p>
+                    ) : null}
+                    <ul className="mt-1 space-y-0.5">
+                      {draft.resolvedItems.map((it) => (
+                        <li key={it.id} className="font-libre text-xs text-gray-300">
+                          {it.name}
+                          {it.isMagical ? (
+                            <span className="ml-1 text-accent-gold">★</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      className="mt-2 font-barlow text-[10px] font-bold uppercase text-gray-500 hover:text-gray-300"
+                      onClick={() =>
+                        setDraft((p) => ({ ...p, resolvedItems: [], goldGp: 0 }))
+                      }
+                    >
+                      Vorschau zurücksetzen (neu beim Platzieren)
+                    </button>
+                  </div>
+                ) : (
+                  <p className="font-libre text-[11px] text-gray-500">
+                    Inhalt wird beim Platzieren aus dem Preset erzeugt (oder per KI).
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {draft.lootMode === "catalog" ? (
+              <div className="space-y-2">
+                <label className="block">
+                  <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
+                    Gold (gp)
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={draft.goldGp}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        goldGp: Math.max(0, Math.round(Number(e.target.value) || 0)),
+                      }))
+                    }
+                    className="mt-1 w-full rounded border border-hero-dark bg-slate-900 p-2 text-sm text-white"
+                  />
+                </label>
+
+                {draft.lootItems.length > 0 ? (
+                  <ul className="space-y-1">
+                    {draft.lootItems.map((it) => (
+                      <li
+                        key={it.id}
+                        className="flex items-center justify-between gap-2 rounded border border-hero-border/30 bg-slate-900/40 px-2 py-1.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-barlow text-xs font-bold text-white">
+                            {it.name}
+                            {it.isMagical ? (
+                              <span className="ml-1 text-accent-gold">★</span>
+                            ) : null}
+                          </p>
+                          <p className="font-libre text-[10px] text-gray-500">×{it.quantity}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="rounded border border-hero-dark px-1.5 text-xs text-gray-300"
+                            onClick={() =>
+                              setDraft((p) => ({
+                                ...p,
+                                lootItems: p.lootItems.map((x) =>
+                                  x.id === it.id
+                                    ? { ...x, quantity: Math.max(1, x.quantity - 1) }
+                                    : x,
+                                ),
+                              }))
+                            }
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-hero-dark px-1.5 text-xs text-gray-300"
+                            onClick={() =>
+                              setDraft((p) => ({
+                                ...p,
+                                lootItems: p.lootItems.map((x) =>
+                                  x.id === it.id
+                                    ? { ...x, quantity: Math.min(20, x.quantity + 1) }
+                                    : x,
+                                ),
+                              }))
+                            }
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded p-1 text-gray-500 hover:text-red-400"
+                            onClick={() =>
+                              setDraft((p) => ({
+                                ...p,
+                                lootItems: p.lootItems.filter((x) => x.id !== it.id),
+                              }))
+                            }
+                            aria-label="Entfernen"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="font-libre text-[11px] text-gray-500">
+                    Noch keine Gegenstände — unten im Katalog wählen.
+                  </p>
+                )}
+
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                  <input
+                    value={catalogQuery}
+                    onChange={(e) => setCatalogQuery(e.target.value)}
+                    placeholder="D&D-Gegenstand suchen…"
+                    className="w-full rounded border border-hero-dark bg-slate-900 py-1.5 pl-8 pr-2 text-xs text-white"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogKind("all")}
+                    className={`rounded border px-1.5 py-0.5 font-barlow text-[9px] font-bold uppercase ${
+                      catalogKind === "all"
+                        ? "border-hero-vibrant text-hero-vibrant"
+                        : "border-hero-border text-gray-500"
+                    }`}
+                  >
+                    Alle
+                  </button>
+                  {catalogKinds.map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setCatalogKind(kind)}
+                      className={`rounded border px-1.5 py-0.5 font-barlow text-[9px] font-bold uppercase ${
+                        catalogKind === kind
+                          ? "border-hero-vibrant text-hero-vibrant"
+                          : "border-hero-border text-gray-500"
+                      }`}
+                    >
+                      {kind}
+                    </button>
+                  ))}
+                </div>
+                <ul className="max-h-40 space-y-1 overflow-y-auto">
+                  {catalogOptions.map((opt) => (
+                    <li key={opt.refId}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          addCatalogItem({
+                            archetypeKey: opt.archetypeKey,
+                            catalogId: opt.catalogId,
+                            name: opt.name,
+                            isMagical: opt.isMagical,
+                          })
+                        }
+                        className="flex w-full items-start justify-between gap-2 rounded border border-hero-border/30 px-2 py-1.5 text-left hover:border-hero-vibrant/50 hover:bg-hero-vibrant/5"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-barlow text-xs font-bold text-white">
+                            {opt.name}
+                          </span>
+                          <span className="font-libre text-[10px] text-gray-500">
+                            {opt.inventoryCategory}
+                            {opt.damage ? ` · ${opt.damage}` : ""}
+                            {opt.priceGp > 0 ? ` · ${opt.priceGp} gp` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-barlow text-[10px] font-bold uppercase text-hero-vibrant">
+                          +
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {draft.lootMode === "empty" ? (
+              <p className="font-libre text-[11px] text-gray-500">
+                Kein Inhalt — Behälter bleibt leer.
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-hero-border/40 px-5 py-3">

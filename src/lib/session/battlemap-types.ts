@@ -189,6 +189,12 @@ export type SessionBattlemapContainer = {
   is_locked: boolean;
   is_open: boolean;
   force_open_dc: number;
+  /** Versteckt → Spieler sehen ihn erst nach Entdeckung; PP nur dann. */
+  is_hidden: boolean;
+  /** Versteckter Behälter wurde entdeckt. */
+  is_discovered: boolean;
+  /** SG für Entdeckung (versteckte Behälter). */
+  detection_dc: number;
   has_trap: boolean;
   trap_config: Record<string, unknown>;
   is_trap_detected: boolean;

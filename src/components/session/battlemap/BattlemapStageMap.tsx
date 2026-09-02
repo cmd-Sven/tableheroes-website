@@ -151,6 +151,7 @@ export type BattlemapStageMapProps = {
   onSelectContainer?: (containerId: string | null) => void;
   onContainerDelete?: (containerId: string) => void;
   onContainerTrapMarkDiscovered?: (containerId: string) => void;
+  onContainerMarkDiscovered?: (containerId: string) => void;
   onContainerTrapTrigger?: (containerId: string) => void;
   onContainerTrapDisarm?: (containerId: string) => void;
   playerDisarmActive?: boolean;
@@ -259,6 +260,7 @@ export function BattlemapStageMap({
   onSelectContainer,
   onContainerDelete,
   onContainerTrapMarkDiscovered,
+  onContainerMarkDiscovered,
   onContainerTrapTrigger,
   onContainerTrapDisarm,
   playerDisarmActive = false,
@@ -599,6 +601,7 @@ export function BattlemapStageMap({
             onSelectContainer={layerSelect.onSelectContainer}
             onDeleteContainer={onContainerDelete}
             onMarkTrapDiscovered={onContainerTrapMarkDiscovered}
+            onMarkContainerDiscovered={onContainerMarkDiscovered}
             onTriggerTrap={onContainerTrapTrigger}
             onDisarmTrap={onContainerTrapDisarm}
           />

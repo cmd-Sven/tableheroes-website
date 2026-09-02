@@ -93,6 +93,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
     handleTrapTrigger,
     handleContainerDelete,
     handleContainerTrapMarkDiscovered,
+    handleContainerMarkDiscovered,
     handleContainerTrapTrigger,
     handleContainerPickLock,
     handleContainerForceOpen,
@@ -396,6 +397,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       onContainerToolCancel={() => setContainerTool(null)}
       onContainerDelete={handleContainerDelete}
       onContainerTrapMarkDiscovered={handleContainerTrapMarkDiscovered}
+      onContainerMarkDiscovered={handleContainerMarkDiscovered}
       onContainerTrapTrigger={handleContainerTrapTrigger}
       onContainerTrapDisarm={(containerId) => {
         const container = battlemapContainers.find((c) => c.id === containerId) ?? null;

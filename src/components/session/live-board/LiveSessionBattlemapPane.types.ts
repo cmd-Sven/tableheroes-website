@@ -127,6 +127,7 @@ export type LiveSessionBattlemapPaneProps = {
   handleTrapTrigger: (trapId: string) => void;
   handleContainerDelete: (containerId: string) => void;
   handleContainerTrapMarkDiscovered: (containerId: string) => void;
+  handleContainerMarkDiscovered: (containerId: string) => void;
   handleContainerTrapTrigger: (containerId: string) => void;
   handleContainerPickLock: (containerId: string, characterId: string) => void;
   handleContainerForceOpen: (containerId: string, characterId: string) => void;

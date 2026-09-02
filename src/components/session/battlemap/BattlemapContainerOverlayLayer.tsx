@@ -4,7 +4,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Box, Eye, Lock, LockOpen, Skull, Trash2, Zap, Wrench } from "lucide-react";
+import { Box, Eye, EyeOff, Lock, LockOpen, Skull, Trash2, Zap, Wrench } from "lucide-react";
 import type {
   BattlemapGridConfig,
   SessionBattlemapContainer,
@@ -14,6 +14,7 @@ import {
   CONTAINER_TYPE_LABELS,
   containerTrapDisarmPending,
   isAdjacentToContainer,
+  isContainerVisibleToPlayers,
 } from "@/src/lib/session/battlemap-container-model";
 
 const SELECTED_RING =
@@ -30,6 +31,7 @@ type Props = {
   onSelectContainer?: (containerId: string | null) => void;
   onDeleteContainer?: (containerId: string) => void;
   onMarkTrapDiscovered?: (containerId: string) => void;
+  onMarkContainerDiscovered?: (containerId: string) => void;
   onTriggerTrap?: (containerId: string) => void;
   onDisarmTrap?: (containerId: string) => void;
 };
@@ -59,15 +61,14 @@ export function BattlemapContainerOverlayLayer({
   onSelectContainer,
   onDeleteContainer,
   onMarkTrapDiscovered,
+  onMarkContainerDiscovered,
   onTriggerTrap,
   onDisarmTrap,
 }: Props) {
   const canInteract = Boolean(isGm && interactive);
   const visible = containers.filter((c) => {
     if (isGm) return true;
-    if (c.is_open) return true;
-    if (c.trap_visible_to_players || c.is_trap_triggered) return true;
-    return false;
+    return isContainerVisibleToPlayers(c);
   });
 
   if (visible.length === 0) return null;
@@ -83,6 +84,8 @@ export function BattlemapContainerOverlayLayer({
         const trapTriggered = container.is_trap_triggered;
         const trapDetected = container.is_trap_detected;
         const trapDisarmed = container.is_trap_disarmed;
+        const hiddenUndiscovered =
+          container.is_hidden && !container.is_discovered;
         const fill = trapTriggered
           ? "bg-red-600/30 border-red-400/60"
           : container.is_open
@@ -91,7 +94,9 @@ export function BattlemapContainerOverlayLayer({
               ? "bg-amber-500/20 border-amber-300/50"
               : trapDetected
                 ? "bg-amber-500/25 border-amber-300/60"
-                : "bg-slate-800/40 border-slate-500/50 border-dashed";
+                : hiddenUndiscovered
+                  ? "bg-slate-900/25 border-slate-600/40 border-dashed opacity-50"
+                  : "bg-slate-800/40 border-slate-500/50 border-dashed";
 
         const playerCanDisarm =
           playerDisarmActive &&
@@ -121,7 +126,9 @@ export function BattlemapContainerOverlayLayer({
                 }
                 if (canInteract) onSelectContainer?.(container.id);
               }}
-              title={`${typeLabel}: ${container.name}`}
+              title={`${typeLabel}: ${container.name}${
+                hiddenUndiscovered ? " (versteckt)" : ""
+              }`}
             >
               <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-0.5">
                 {container.is_open ? (
@@ -131,6 +138,9 @@ export function BattlemapContainerOverlayLayer({
                 ) : (
                   <Box className="h-3.5 w-3.5 text-slate-300/90" />
                 )}
+                {isGm && hiddenUndiscovered ? (
+                  <EyeOff className="h-2.5 w-2.5 text-slate-400" />
+                ) : null}
                 {hasTrap && trapTriggered ? (
                   <Skull className="h-3 w-3 text-red-400" />
                 ) : hasTrap && trapDetected ? (
@@ -149,6 +159,19 @@ export function BattlemapContainerOverlayLayer({
                 }}
                 className="pointer-events-auto absolute flex items-center gap-0.5 p-0.5"
               >
+                {hiddenUndiscovered ? (
+                  <button
+                    type="button"
+                    title="Behälter entdeckt markieren"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkContainerDiscovered?.(container.id);
+                    }}
+                    className="grid h-6 w-6 place-items-center rounded border border-sky-600/60 bg-sky-950/90 text-sky-200 hover:border-sky-400"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </button>
+                ) : null}
                 {hasTrap && !trapDetected ? (
                   <button
                     type="button"
