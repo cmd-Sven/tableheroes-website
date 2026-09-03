@@ -44,6 +44,8 @@ import type {
 } from "@/src/lib/session/battlemap-types";
 import type { MapDrawTool, SessionMapDrawStroke } from "@/src/lib/session/map-draw-types";
 import { WorldMapLiveStage } from "@/src/components/world-maps/WorldMapLiveStage";
+import { WeatherPngIcon } from "@/src/components/session/live-board/WeatherPngIcon";
+import type { WeatherIconOption } from "@/src/components/session/live-board/live-session-types";
 
 type Props = {
   worldMapId: string;
@@ -51,6 +53,8 @@ type Props = {
   campaignId: string;
   sessionId: string;
   isGm: boolean;
+  weatherVisual?: WeatherIconOption | null;
+  temperatureValue?: number | null;
   fogTool?: BattlemapFogTool;
   effectTool?: BattlemapEffectTool;
   markerTool?: BattlemapMarkerTool;
@@ -81,6 +85,8 @@ export function LiveWorldMapOverlay({
   campaignId,
   sessionId,
   isGm,
+  weatherVisual = null,
+  temperatureValue = null,
   fogTool = null,
   effectTool = null,
   markerTool = null,
@@ -407,19 +413,34 @@ export function LiveWorldMapOverlay({
   return (
     <div className="absolute inset-0 z-[45] flex flex-col bg-black/95 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="font-barlow text-sm font-bold uppercase text-hero-vibrant">
-          {map?.title ?? "Weltkarte"}
-          {!isGm && (
-            <span className="ml-2 text-xs font-normal normal-case text-gray-400">
-              (Gruppenicon verschieben · POIs sichtbar)
-            </span>
-          )}
+        <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
+          <div className="font-barlow text-sm font-bold uppercase text-hero-vibrant">
+            {map?.title ?? "Weltkarte"}
+          </div>
+          {weatherVisual ? (
+            <div
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-gold/50 bg-black/75 px-2.5 py-1.5 shadow-lg backdrop-blur-sm"
+              title={`${weatherVisual.label} · ${temperatureValue ?? "—"} °C`}
+            >
+              <span className="relative block h-9 w-9 shrink-0 drop-shadow-[0_0_12px_rgba(202,185,38,0.4)]">
+                <WeatherPngIcon option={weatherVisual} sizeClassName="h-full w-full" />
+              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold">
+                  {weatherVisual.label}
+                </span>
+                <span className="font-barlow text-lg font-extrabold tabular-nums text-white">
+                  {temperatureValue != null ? `${temperatureValue} °C` : "— °C"}
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
         {isGm && onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 text-xs text-gray-300 hover:text-white"
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-hero-border px-2 py-1 text-xs text-gray-300 hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
             Ansicht beenden

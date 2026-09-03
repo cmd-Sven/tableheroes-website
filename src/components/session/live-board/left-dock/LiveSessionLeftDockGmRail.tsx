@@ -121,11 +121,21 @@ export function LiveSessionLeftDockGmRail({
         className="h-auto min-h-11 py-1.5"
       >
         <span className="flex flex-col items-center gap-0.5">
-          <span className="relative block h-7 w-7">{weatherIcon}</span>
+          <span
+            className={`relative block ${
+              worldMapActive ? "h-9 w-9" : "h-7 w-7"
+            }`}
+          >
+            {weatherIcon}
+          </span>
           <TimeIcon
-            className={`h-3.5 w-3.5 ${SESSION_DAY_PHASE_META[dayPhase].iconClassName}`}
+            className={`${worldMapActive ? "h-4 w-4" : "h-3.5 w-3.5"} ${SESSION_DAY_PHASE_META[dayPhase].iconClassName}`}
           />
-          <span className="font-barlow text-[8px] font-bold tabular-nums text-accent-gold">
+          <span
+            className={`font-barlow font-bold tabular-nums text-accent-gold ${
+              worldMapActive ? "text-[11px]" : "text-[8px]"
+            }`}
+          >
             {temperatureValue}°
           </span>
         </span>

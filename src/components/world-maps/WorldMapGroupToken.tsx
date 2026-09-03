@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Flame, Tent, Users, X } from "lucide-react";
 
 type Props = {
@@ -12,10 +12,11 @@ type Props = {
   cellSize: number;
   isCamping: boolean;
   isGm: boolean;
-  /** Spieler und GM dürfen das Gruppenicon ziehen (default: isGm). */
+  /** Nur SL darf ziehen (default: isGm). */
   canMove?: boolean;
   onToggleCamping: (next: boolean) => void;
   onMoveToPixel?: (clientX: number, clientY: number) => void;
+  onDragActiveChange?: (active: boolean) => void;
 };
 
 export function WorldMapGroupToken({
@@ -27,6 +28,7 @@ export function WorldMapGroupToken({
   canMove,
   onToggleCamping,
   onMoveToPixel,
+  onDragActiveChange,
 }: Props) {
   const allowMove = canMove ?? isGm;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,10 +50,23 @@ export function WorldMapGroupToken({
 
   const size = Math.max(28, Math.min(48, cellSize * 0.85));
 
+  function endDrag(e: ReactPointerEvent<HTMLButtonElement>) {
+    const wasDrag = dragRef.current?.moved;
+    const wasActive = dragRef.current != null;
+    dragRef.current = null;
+    if (wasActive) onDragActiveChange?.(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    return wasDrag;
+  }
+
   return (
     <div
       ref={rootRef}
-      className="absolute z-20"
+      className="absolute z-[55]"
       style={{
         left,
         top,
@@ -66,16 +81,32 @@ export function WorldMapGroupToken({
           isCamping
             ? "border-orange-400 bg-hero-dark text-orange-300"
             : "border-accent-gold bg-hero-dark text-accent-gold"
-        } ${allowMove ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
+        } ${
+          allowMove
+            ? "cursor-grab active:cursor-grabbing"
+            : isGm
+              ? "cursor-pointer"
+              : "pointer-events-none"
+        }`}
         title={isCamping ? "Gruppe kampiert" : "Gruppe"}
         onPointerDown={(e) => {
-          if (!allowMove || e.button !== 0) return;
+          if (!allowMove || e.button !== 0) {
+            if (isGm && e.button === 0) {
+              e.stopPropagation();
+              e.preventDefault();
+            }
+            return;
+          }
           e.stopPropagation();
+          e.preventDefault();
           dragRef.current = { startX: e.clientX, startY: e.clientY, moved: false };
+          onDragActiveChange?.(true);
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
           if (!dragRef.current || !onMoveToPixel) return;
+          e.stopPropagation();
+          e.preventDefault();
           const dx = e.clientX - dragRef.current.startX;
           const dy = e.clientY - dragRef.current.startY;
           if (dx * dx + dy * dy > 16) {
@@ -84,17 +115,14 @@ export function WorldMapGroupToken({
           }
         }}
         onPointerUp={(e) => {
-          const wasDrag = dragRef.current?.moved;
-          dragRef.current = null;
-          try {
-            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-          } catch {
-            /* ignore */
-          }
+          const wasDrag = endDrag(e);
           if (!wasDrag && isGm) {
             e.stopPropagation();
             setMenuOpen((v) => !v);
           }
+        }}
+        onPointerCancel={(e) => {
+          endDrag(e);
         }}
       >
         {isCamping ? <Flame className="h-4 w-4" /> : <Users className="h-4 w-4" />}

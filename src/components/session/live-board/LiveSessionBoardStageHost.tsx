@@ -75,6 +75,7 @@ export function LiveSessionBoardStageHost() {
       partyTrayMode,
       setPartyTrayMode,
       weatherCondition,
+      temperatureValue,
       setInventoryCharacter,
       showDnd5eSheet,
     },
@@ -372,6 +373,8 @@ export function LiveSessionBoardStageHost() {
               worldMapPoiDeleteReq={worldMapPoiDeleteReq}
               drawUndoReq={drawUndoReq}
               drawClearReq={drawClearReq}
+              weatherVisual={weatherVisual}
+              temperatureValue={temperatureValue}
               trapWizardCell={trapWizardCell}
               setTrapWizardCell={setTrapWizardCell}
               containerWizardCell={containerWizardCell}

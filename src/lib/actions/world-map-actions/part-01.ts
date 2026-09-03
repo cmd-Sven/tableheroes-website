@@ -227,8 +227,8 @@ export async function setWorldMapGroupToken(input: {
 }
 
 /**
- * Spieler oder GM: Gruppentoken-Position verschieben (RPC, umgeht GM-only UPDATE-RLS).
- * Camping-Status bleibt unverändert.
+ * Spieler dürfen das Gruppentoken nicht verschieben — nur SL (Welt-/Kampagnen-GM).
+ * RPC umgeht GM-only UPDATE-RLS für Kampagnen-SL, die nicht world.gm_id sind.
  */
 export async function moveWorldMapGroupToken(input: {
   mapId: string;

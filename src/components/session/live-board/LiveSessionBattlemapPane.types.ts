@@ -97,6 +97,8 @@ export type LiveSessionBattlemapPaneProps = {
   worldMapPoiDeleteReq: number;
   drawUndoReq: number;
   drawClearReq: number;
+  weatherVisual: import("./live-session-types").WeatherIconOption;
+  temperatureValue: number;
   trapWizardCell: { gridX: number; gridY: number } | null;
   setTrapWizardCell: Dispatch<SetStateAction<{ gridX: number; gridY: number } | null>>;
   containerWizardCell: { gridX: number; gridY: number } | null;

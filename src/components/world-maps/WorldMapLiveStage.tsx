@@ -128,6 +128,7 @@ export function WorldMapLiveStage({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapSize, setMapSize] = useState({ width: 1200, height: 800 });
   const [pending, startTransition] = useTransition();
+  const [groupTokenDragging, setGroupTokenDragging] = useState(false);
   const [selectedFogId, setSelectedFogId] = useState<string | null>(null);
   const [fogDraft, setFogDraft] = useState<{
     shape: "rect" | "circle";
@@ -190,7 +191,45 @@ export function WorldMapLiveStage({
   }, []);
 
   const panDisabled =
-    fogDrawActive || effectDrawActive || drawActive || poiPlaceActive;
+    fogDrawActive ||
+    effectDrawActive ||
+    drawActive ||
+    poiPlaceActive ||
+    groupTokenDragging;
+
+  const placePoiAtClient = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!poiPlaceActive || !isWorldMapPoiPlaceIcon(poiTool)) return;
+      const cell = cellFromClient(clientX, clientY);
+      if (!cell) return;
+      startTransition(async () => {
+        try {
+          const saved = await upsertWorldMapMarker({
+            worldId,
+            mapId: map.id,
+            icon: poiTool,
+            name: WORLD_MAP_ICON_LABELS[poiTool],
+            gridX: cell.gridX,
+            gridY: cell.gridY,
+            isVisibleToPlayers: true,
+          });
+          onMarkersChange([...markers, saved]);
+          toast.success("POI gesetzt.");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Fehler.");
+        }
+      });
+    },
+    [
+      cellFromClient,
+      map.id,
+      markers,
+      onMarkersChange,
+      poiPlaceActive,
+      poiTool,
+      worldId,
+    ],
+  );
 
   return (
     <div className="relative h-full overflow-hidden rounded border border-hero-border bg-black">
@@ -239,29 +278,13 @@ export function WorldMapLiveStage({
             }}
             onClick={(e) => {
               if (!isGm) return;
-              const cell = cellFromClient(e.clientX, e.clientY);
-              if (!cell) return;
-
               if (poiPlaceActive && isWorldMapPoiPlaceIcon(poiTool)) {
-                startTransition(async () => {
-                  try {
-                    const saved = await upsertWorldMapMarker({
-                      worldId,
-                      mapId: map.id,
-                      icon: poiTool,
-                      name: WORLD_MAP_ICON_LABELS[poiTool],
-                      gridX: cell.gridX,
-                      gridY: cell.gridY,
-                      isVisibleToPlayers: true,
-                    });
-                    onMarkersChange([...markers, saved]);
-                    toast.success("POI gesetzt.");
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Fehler.");
-                  }
-                });
+                // Placement is handled by the dedicated hit layer / pointerDown.
+                e.preventDefault();
                 return;
               }
+              const cell = cellFromClient(e.clientX, e.clientY);
+              if (!cell) return;
 
               if (markerTool && markerTool !== "select") {
                 onEffectMarkerCreate({
@@ -272,6 +295,13 @@ export function WorldMapLiveStage({
               }
             }}
             onPointerDown={(e) => {
+              if (poiPlaceActive && isWorldMapPoiPlaceIcon(poiTool)) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                placePoiAtClient(e.clientX, e.clientY);
+                return;
+              }
               if (drawActive) {
                 drawHandlers.onPointerDown(e);
                 return;
@@ -441,13 +471,17 @@ export function WorldMapLiveStage({
                   key={m.id}
                   type="button"
                   disabled={pending}
-                  className={`absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow ${
+                  className={`absolute z-[50] flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow ${
                     selected
                       ? "border-accent-gold bg-hero-vibrant text-black ring-2 ring-accent-gold/60"
                       : hidden
                         ? "border-dashed border-amber-400/80 bg-black/70 text-amber-300"
                         : "border-hero-vibrant bg-hero-dark text-hero-vibrant"
-                  } ${isGm ? "cursor-pointer" : "pointer-events-none"}`}
+                  } ${
+                    isGm && !poiPlaceActive
+                      ? "cursor-pointer"
+                      : "pointer-events-none"
+                  }`}
                   style={{
                     left: pos.x + config.cellSizePx / 2,
                     top: pos.y + config.cellSizePx / 2,
@@ -519,6 +553,19 @@ export function WorldMapLiveStage({
               );
             })}
 
+            {poiPlaceActive ? (
+              <div
+                className="absolute inset-0 z-[48] cursor-crosshair"
+                aria-hidden
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  placePoiAtClient(e.clientX, e.clientY);
+                }}
+              />
+            ) : null}
+
             {groupPixel && (isGm || map.group_token_visible) && (
               <WorldMapGroupToken
                 left={groupPixel.x + config.cellSizePx / 2}
@@ -526,7 +573,8 @@ export function WorldMapLiveStage({
                 cellSize={config.cellSizePx}
                 isCamping={map.group_token_is_camping}
                 isGm={isGm}
-                canMove
+                canMove={isGm}
+                onDragActiveChange={setGroupTokenDragging}
                 onToggleCamping={(next) => {
                   if (!isGm) return;
                   startTransition(async () => {
@@ -546,6 +594,7 @@ export function WorldMapLiveStage({
                   });
                 }}
                 onMoveToPixel={(clientX, clientY) => {
+                  if (!isGm) return;
                   const cell = cellFromClient(clientX, clientY);
                   if (!cell) return;
                   startTransition(async () => {

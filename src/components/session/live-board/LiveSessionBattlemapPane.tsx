@@ -48,6 +48,8 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
     worldMapPoiDeleteReq,
     drawUndoReq,
     drawClearReq,
+    weatherVisual,
+    temperatureValue,
   } = props;
 
   return (
@@ -60,6 +62,8 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
           campaignId={campaignId}
           sessionId={sessionId}
           isGm={isGM}
+          weatherVisual={weatherVisual}
+          temperatureValue={temperatureValue}
           fogTool={null}
           effectTool={null}
           markerTool={null}
