@@ -33,6 +33,7 @@ type Props = {
   handRaiseCount?: number;
   downtimeActive?: boolean;
   lootActive?: boolean;
+  worldMapActive?: boolean;
   onToggleMain: (id: MainSidePanelId) => void;
 };
 
@@ -85,6 +86,7 @@ export function LiveSessionSideRail({
   handRaiseCount = 0,
   downtimeActive = false,
   lootActive = false,
+  worldMapActive = false,
   onToggleMain,
 }: Props) {
   const mainItems: RailItem[] = [
@@ -139,7 +141,7 @@ export function LiveSessionSideRail({
           },
           {
             id: "travel",
-            label: "Reise & FAP",
+            label: worldMapActive ? "Reise & FAP" : "Stadt-FAP",
             icon: Route,
             active: mainPanel === "travel",
             onClick: () => onToggleMain("travel"),

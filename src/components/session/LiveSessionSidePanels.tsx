@@ -99,6 +99,7 @@ type Props = {
   activeLootId: string | null;
   onClearStageLoot: () => void;
   onLootPublished: () => void | Promise<void>;
+  worldMapActive?: boolean;
 };
 
 export function LiveSessionSidePanels({
@@ -157,6 +158,7 @@ export function LiveSessionSidePanels({
   activeLootId,
   onClearStageLoot,
   onLootPublished,
+  worldMapActive = false,
 }: Props) {
   const showMain = mainPanel != null;
   const showPanelStack = showMain;
@@ -281,10 +283,12 @@ export function LiveSessionSidePanels({
                           <Map className="h-4 w-4 shrink-0 text-accent-gold" />
                           <div>
                             <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">
-                              Reise &amp; FAP
+                              {worldMapActive ? "Reise & FAP" : "Stadt-FAP"}
                             </h2>
                             <p className="font-libre text-[10px] text-gray-500">
-                              Reisetage, Gruppe, Rationen
+                              {worldMapActive
+                                ? "Reisetage, Wetter, Rationen"
+                                : "Stadtaufenthalt, Schlaf, Proben"}
                             </p>
                           </div>
                         </div>
@@ -308,6 +312,7 @@ export function LiveSessionSidePanels({
                           fapAllocations={fapAllocations}
                           onReload={onTravelReload}
                           layout="sidebar"
+                          worldMapActive={worldMapActive}
                         />
                       </div>
                     </div>
@@ -362,6 +367,7 @@ export function LiveSessionSidePanels({
           handRaiseCount={handRaises.length}
           downtimeActive={downtimeActive}
           lootActive={lootActive}
+          worldMapActive={worldMapActive}
           onToggleMain={onToggleMain}
         />
       </div>

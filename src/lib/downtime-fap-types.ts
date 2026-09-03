@@ -7,12 +7,18 @@ export type FapAllocationLine = {
   fap: number;
   /** character_items.id — Fortschritt auf Langzeit-Item */
   targetItemId?: string;
+  /** Optional: Fertigkeit für eine Probe (Foundry-Key, z. B. prf) */
+  skillKey?: string;
+  /** SL-Notiz / Proben-Hinweis */
+  skillNote?: string;
 };
 
 /** Pro Charakter-ID in session_live_states.fap_allocations */
 export type FapCharacterDayState = {
   status: "planning" | "ready";
   allocations: FapAllocationLine[];
+  /** SL hat die Planung gesehen/bestätigt */
+  confirmed?: boolean;
 };
 
 export type FapAllocationsMap = Record<string, FapCharacterDayState>;
@@ -29,12 +35,42 @@ export function isFapCharacterDayState(value: unknown): value is FapCharacterDay
   });
 }
 
+export function parseFapAllocationLine(raw: unknown): FapAllocationLine | null {
+  if (!raw || typeof raw !== "object") return null;
+  const l = raw as Record<string, unknown>;
+  if (typeof l.activity !== "string" || typeof l.fap !== "number" || !Number.isFinite(l.fap)) {
+    return null;
+  }
+  const skillKey =
+    typeof l.skillKey === "string" && l.skillKey.trim() ? l.skillKey.trim() : undefined;
+  const skillNote =
+    typeof l.skillNote === "string" && l.skillNote.trim() ? l.skillNote.trim() : undefined;
+  const targetItemId =
+    typeof l.targetItemId === "string" && l.targetItemId.trim().length >= 20
+      ? l.targetItemId.trim()
+      : undefined;
+  return {
+    activity: l.activity,
+    fap: l.fap,
+    targetItemId,
+    skillKey,
+    skillNote,
+  };
+}
+
 export function parseFapAllocations(raw: Json | undefined | null): FapAllocationsMap {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: FapAllocationsMap = {};
   for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
     if (!key || !isFapCharacterDayState(val)) continue;
-    out[key] = val;
+    const v = val as FapCharacterDayState;
+    out[key] = {
+      status: v.status,
+      allocations: v.allocations
+        .map(parseFapAllocationLine)
+        .filter((line): line is FapAllocationLine => line != null),
+      confirmed: v.confirmed === true,
+    };
   }
   return out;
 }

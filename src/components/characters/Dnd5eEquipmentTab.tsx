@@ -151,6 +151,7 @@ export function Dnd5eEquipmentTab({
             sleep_debt_fap: payload.sleep_debt_fap,
             rations_count: payload.rations_count,
             starvation_days: payload.starvation_days,
+            consecutive_short_sleep_days: payload.consecutive_short_sleep_days,
           });
         }
         const current = normalizeEquipmentState(sheet.equipment);

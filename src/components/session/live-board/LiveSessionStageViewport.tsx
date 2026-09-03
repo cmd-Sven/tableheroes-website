@@ -159,8 +159,9 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                   config={liveState.downtime_config}
                   currentDay={liveState.downtime_current_day ?? 1}
                   totalDays={liveState.downtime_total_days ?? 1}
+                  showTravelDetails={Boolean(liveState.active_world_map_id)}
                 />
-                {liveState.downtime_config.mode === "travel" ? (
+                {liveState.downtime_config.mode === "travel" && liveState.active_world_map_id ? (
                   <TravelStageCalendar
                     config={liveState.downtime_config}
                     currentDay={liveState.downtime_current_day ?? 1}
@@ -244,7 +245,8 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                   liveState?.is_combat_mode
                     ? "pt-44"
                     : liveState?.downtime_active &&
-                        liveState.downtime_config?.mode === "travel"
+                        liveState.downtime_config?.mode === "travel" &&
+                        liveState.active_world_map_id
                       ? "pt-56"
                       : liveState?.downtime_active
                         ? "pt-36"

@@ -39,6 +39,7 @@ const ACTIVITY_TYPES = new Set([
   "attack_hit",
   "attack_miss",
   "skill_check",
+  "fap_skill_request",
   "saving_throw",
   "damage_roll",
   // Legacy / alternate type strings from older clients

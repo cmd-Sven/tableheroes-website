@@ -1,11 +1,10 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Loader2, Map, Play, SkipForward, Square, X } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Loader2, Map, Play, Square, X } from "lucide-react";
 import {
   distributeRations,
   endDowntime,
-  nextDowntimeDay,
   startDowntime,
 } from "@/src/lib/actions/downtime-actions";
 import type { FapAllocationsMap } from "@/src/lib/downtime-fap-types";
@@ -24,12 +23,12 @@ import {
   travelFapCostPerDay,
   travelProgressPct,
   type DowntimeConfig,
-  type DowntimeMode,
   type ProvisionsMode,
   type TravelPace,
   type TravelTransport,
 } from "@/src/lib/travel-fap-config";
 import { TravelDayGmWorkflow } from "@/src/components/session/TravelDayGmWorkflow";
+import { CityStayGmPanel, startCityStayConfig } from "@/src/components/session/CityStayGmPanel";
 
 type PartyCharacter = {
   id: string;
@@ -48,6 +47,8 @@ type Props = {
   fapAllocations: FapAllocationsMap;
   onReload: () => void | Promise<void>;
   layout?: "sidebar" | "modal";
+  /** Weltkarte aktiv → Reise-Workflow; sonst Stadt-FAP */
+  worldMapActive?: boolean;
 };
 
 function formatAllocations(allocations: { activity: string; fap: number }[]) {
@@ -70,16 +71,26 @@ export function TravelDowntimeGmPanel({
   fapAllocations,
   onReload,
   layout = "sidebar",
+  worldMapActive = false,
 }: Props) {
   const isModal = layout === "modal";
-  const [setup, setSetup] = useState<DowntimeConfig>(() => defaultDowntimeConfig("travel"));
+  const travelUi = worldMapActive;
+  const [setup, setSetup] = useState<DowntimeConfig>(() =>
+    defaultDowntimeConfig(travelUi ? "travel" : "leisure"),
+  );
   const [daysInput, setDaysInput] = useState("3");
+  const [cityName, setCityName] = useState("");
   const [distanceInput, setDistanceInput] = useState("90");
   const [isPending, startTransition] = useTransition();
   const [huntOpen, setHuntOpen] = useState(false);
   const [huntDraft, setHuntDraft] = useState<Record<string, number>>({});
   const [isDistributing, startDistributing] = useTransition();
   const [openEnded, setOpenEnded] = useState(false);
+
+  useEffect(() => {
+    if (downtimeActive) return;
+    setSetup((s) => ({ ...s, mode: travelUi ? "travel" : "leisure" }));
+  }, [travelUi, downtimeActive]);
 
   const activeConfig = downtimeConfig ?? defaultDowntimeConfig();
   const currentDayLog = getDayLog(activeConfig, downtimeCurrentDay);
@@ -126,7 +137,7 @@ export function TravelDowntimeGmPanel({
   }
 
   function handleStart() {
-    const mode = setup.mode;
+    const mode = travelUi ? "travel" : "leisure";
     let days = Math.max(1, Math.min(60, Math.round(Number(daysInput) || 1)));
     if (mode === "travel") {
       if (setup.pace === "extreme") {
@@ -135,15 +146,18 @@ export function TravelDowntimeGmPanel({
         days = Math.max(days, estimatedDays);
       }
     }
-    const config: DowntimeConfig = {
-      ...setup,
-      openEnded: mode === "travel" ? openEnded : false,
-      distanceKm:
-        mode === "travel" && !openEnded ? Math.max(0, Number(distanceInput) || 0) : undefined,
-      calendarSlots: mode === "travel" && openEnded ? Math.max(days, 5) : undefined,
-      kmTraveled: 0,
-      dayLogs: [],
-    };
+    const config: DowntimeConfig =
+      mode === "leisure"
+        ? startCityStayConfig(cityName)
+        : {
+            ...setup,
+            mode: "travel",
+            openEnded,
+            distanceKm: !openEnded ? Math.max(0, Number(distanceInput) || 0) : undefined,
+            calendarSlots: openEnded ? Math.max(days, 5) : undefined,
+            kmTraveled: 0,
+            dayLogs: [],
+          };
     void run(() => startDowntime(sessionId, days, config));
   }
 
@@ -157,195 +171,184 @@ export function TravelDowntimeGmPanel({
         <div className="mb-2 flex items-center gap-2">
           <Map className="h-4 w-4 text-accent-gold" />
           <span className="font-barlow text-[10px] font-bold uppercase text-gray-400">
-            Reise & FAP
+            {travelUi ? "Reise & FAP" : "Stadt-FAP"}
           </span>
         </div>
       ) : null}
 
-      {!downtimeActive ? (
+      {(!downtimeActive && !travelUi) ||
+      (downtimeActive && activeConfig.mode === "leisure") ? (
+        <CityStayGmPanel
+          sessionId={sessionId}
+          partyCharacters={partyCharacters}
+          downtimeActive={downtimeActive}
+          downtimeCurrentDay={downtimeCurrentDay}
+          downtimeTotalDays={downtimeTotalDays}
+          downtimeConfig={activeConfig}
+          fapAllocations={fapAllocations}
+          onReload={onReload}
+          isPending={isPending}
+          run={run}
+          layout={layout}
+          daysInput={daysInput}
+          setDaysInput={setDaysInput}
+          cityName={cityName}
+          setCityName={setCityName}
+          onStartCityStay={handleStart}
+          onEnd={() => {
+            if (!window.confirm("Stadtaufenthalt vorzeitig beenden?")) return;
+            void run(() => endDowntime(sessionId));
+          }}
+        />
+      ) : !downtimeActive ? (
         <div className={isModal ? "space-y-4" : "space-y-3"}>
+          <p className="font-libre text-[11px] text-gray-400">
+            Reise starten: Tempo, Wetter und Kilometer. Stadt-FAP liegt auf Bühne/Battlemap.
+          </p>
+
           <fieldset>
             <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-              Modus
+              Reisetempo
             </legend>
-            <div className="mt-1 flex gap-2">
-              {(["travel", "leisure"] as DowntimeMode[]).map((m) => (
+            <div className="mt-1 grid grid-cols-1 gap-1.5">
+              {(Object.keys(TRAVEL_PACE_LABELS) as TravelPace[]).map((pace) => (
                 <button
-                  key={m}
+                  key={pace}
                   type="button"
-                  onClick={() => setSetup((s) => ({ ...s, mode: m }))}
-                  className={`flex-1 rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase ${
-                    setup.mode === m
-                      ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
-                      : "border-hero-border/40 text-gray-400 hover:border-hero-border"
+                  onClick={() => setSetup((s) => ({ ...s, pace }))}
+                  className={`rounded border px-2 py-2 text-left font-libre text-[11px] ${
+                    setup.pace === pace
+                      ? "border-hero-vibrant/60 bg-hero-vibrant/10 text-gray-100"
+                      : "border-hero-border/30 text-gray-400"
                   }`}
                 >
-                  {m === "travel" ? "Reise" : "Freizeit"}
+                  <span className="font-barlow font-bold uppercase">
+                    {TRAVEL_PACE_LABELS[pace]}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] text-gray-500">
+                    {pace === "normal" && "3 FAP Reise · 3 FAP frei · 30/70 km (Fuß/Pferd)"}
+                    {pace === "fast" && "4 FAP Reise · 2 FAP Schlaf Pflicht · +1 Erschöpfung/Tag"}
+                    {pace === "extreme" && "Max. 3 Tage · 5 Erschöpfung gesamt"}
+                  </span>
                 </button>
               ))}
             </div>
           </fieldset>
 
-          {setup.mode === "travel" ? (
-            <>
-              <fieldset>
-                <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                  Reisetempo
-                </legend>
-                <div className="mt-1 grid grid-cols-1 gap-1.5">
-                  {(Object.keys(TRAVEL_PACE_LABELS) as TravelPace[]).map((pace) => (
-                    <button
-                      key={pace}
-                      type="button"
-                      onClick={() => setSetup((s) => ({ ...s, pace }))}
-                      className={`rounded border px-2 py-2 text-left font-libre text-[11px] ${
-                        setup.pace === pace
-                          ? "border-hero-vibrant/60 bg-hero-vibrant/10 text-gray-100"
-                          : "border-hero-border/30 text-gray-400"
-                      }`}
-                    >
-                      <span className="font-barlow font-bold uppercase">
-                        {TRAVEL_PACE_LABELS[pace]}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-gray-500">
-                        {pace === "normal" && "3 FAP Reise · 3 FAP frei · 30/70 km (Fuß/Pferd)"}
-                        {pace === "fast" && "4 FAP Reise · 2 FAP Schlaf Pflicht · +1 Erschöpfung/Tag"}
-                        {pace === "extreme" && "Max. 3 Tage · 5 Erschöpfung gesamt"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                  Fortbewegung
-                </legend>
-                <div className="mt-1 flex gap-2">
-                  {(Object.keys(TRAVEL_TRANSPORT_LABELS) as TravelTransport[]).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setSetup((s) => ({ ...s, transport: t }))}
-                      className={`flex-1 rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase ${
-                        setup.transport === t
-                          ? "border-accent-gold/60 bg-accent-gold/10 text-accent-gold"
-                          : "border-hero-border/40 text-gray-400"
-                      }`}
-                    >
-                      {TRAVEL_TRANSPORT_LABELS[t]}
-                      <span className="mt-0.5 block font-libre text-[9px] font-normal normal-case text-gray-500">
-                        {kmPerDayForTransport(t)} km/Tag
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                  Proviant
-                </legend>
-                <div className="mt-1 flex gap-2">
-                  {(Object.keys(PROVISIONS_LABELS) as ProvisionsMode[]).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setSetup((s) => ({ ...s, provisions: p }))}
-                      className={`flex-1 rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase ${
-                        setup.provisions === p
-                          ? "border-amber-600/60 bg-amber-950/40 text-amber-100"
-                          : "border-hero-border/40 text-gray-400"
-                      }`}
-                    >
-                      {PROVISIONS_LABELS[p]}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block">
-                  <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                    Von
+          <fieldset>
+            <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+              Fortbewegung
+            </legend>
+            <div className="mt-1 flex gap-2">
+              {(Object.keys(TRAVEL_TRANSPORT_LABELS) as TravelTransport[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setSetup((s) => ({ ...s, transport: t }))}
+                  className={`flex-1 rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase ${
+                    setup.transport === t
+                      ? "border-accent-gold/60 bg-accent-gold/10 text-accent-gold"
+                      : "border-hero-border/40 text-gray-400"
+                  }`}
+                >
+                  {TRAVEL_TRANSPORT_LABELS[t]}
+                  <span className="mt-0.5 block font-libre text-[9px] font-normal normal-case text-gray-500">
+                    {kmPerDayForTransport(t)} km/Tag
                   </span>
-                  <input
-                    value={setup.fromLocation ?? ""}
-                    onChange={(e) =>
-                      setSetup((s) => ({ ...s, fromLocation: e.target.value }))
-                    }
-                    className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-libre text-sm text-white"
-                    placeholder="Stadt A"
-                  />
-                </label>
-                <label className="block">
-                  <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                    Nach
-                  </span>
-                  <input
-                    value={setup.toLocation ?? ""}
-                    onChange={(e) => setSetup((s) => ({ ...s, toLocation: e.target.value }))}
-                    className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-libre text-sm text-white"
-                    placeholder="Stadt B"
-                  />
-                </label>
-              </div>
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-              <label className="block">
-                <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-                  Strecke (km)
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={distanceInput}
-                  onChange={(e) => setDistanceInput(e.target.value)}
-                  disabled={openEnded}
-                  className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-barlow text-sm text-white disabled:opacity-50"
-                />
-                {openEnded ? (
-                  <p className="mt-1 font-libre text-[10px] text-accent-gold">
-                    Offenes Ziel — Fortschritt in km, Dauer unbekannt
-                  </p>
-                ) : (
-                  <p className="mt-1 font-libre text-[10px] text-gray-500">
-                    Geschätzt ~{estimatedDays} Tag{estimatedDays === 1 ? "" : "e"} bei{" "}
-                    {TRAVEL_TRANSPORT_LABELS[setup.transport ?? "foot"]}
-                  </p>
-                )}
-              </label>
+          <fieldset>
+            <legend className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+              Proviant
+            </legend>
+            <div className="mt-1 flex gap-2">
+              {(Object.keys(PROVISIONS_LABELS) as ProvisionsMode[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setSetup((s) => ({ ...s, provisions: p }))}
+                  className={`flex-1 rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase ${
+                    setup.provisions === p
+                      ? "border-amber-600/60 bg-amber-950/40 text-amber-100"
+                      : "border-hero-border/40 text-gray-400"
+                  }`}
+                >
+                  {PROVISIONS_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-              <label className="flex cursor-pointer items-center gap-2 rounded border border-hero-border/30 px-2 py-2">
-                <input
-                  type="checkbox"
-                  checked={openEnded}
-                  onChange={(e) => setOpenEnded(e.target.checked)}
-                  className="accent-hero-vibrant"
-                />
-                <span className="font-libre text-[11px] text-gray-300">
-                  Offenes Ziel (Dauer unbekannt)
-                </span>
-              </label>
-            </>
-          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">Von</span>
+              <input
+                value={setup.fromLocation ?? ""}
+                onChange={(e) => setSetup((s) => ({ ...s, fromLocation: e.target.value }))}
+                className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-libre text-sm text-white"
+                placeholder="Stadt A"
+              />
+            </label>
+            <label className="block">
+              <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">Nach</span>
+              <input
+                value={setup.toLocation ?? ""}
+                onChange={(e) => setSetup((s) => ({ ...s, toLocation: e.target.value }))}
+                className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-libre text-sm text-white"
+                placeholder="Stadt B"
+              />
+            </label>
+          </div>
 
           <label className="block">
             <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
-              {setup.mode === "leisure" ? "Freizeittage" : "Reisetage (min.)"}
+              Strecke (km)
+            </span>
+            <input
+              type="number"
+              min={0}
+              value={distanceInput}
+              onChange={(e) => setDistanceInput(e.target.value)}
+              disabled={openEnded}
+              className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-barlow text-sm text-white disabled:opacity-50"
+            />
+            {openEnded ? (
+              <p className="mt-1 font-libre text-[10px] text-accent-gold">
+                Offenes Ziel — Fortschritt in km, Dauer unbekannt
+              </p>
+            ) : (
+              <p className="mt-1 font-libre text-[10px] text-gray-500">
+                Geschätzt ~{estimatedDays} Tag{estimatedDays === 1 ? "" : "e"} bei{" "}
+                {TRAVEL_TRANSPORT_LABELS[setup.transport ?? "foot"]}
+              </p>
+            )}
+          </label>
+
+          <label className="flex cursor-pointer items-center gap-2 rounded border border-hero-border/30 px-2 py-2">
+            <input
+              type="checkbox"
+              checked={openEnded}
+              onChange={(e) => setOpenEnded(e.target.checked)}
+              className="accent-hero-vibrant"
+            />
+            <span className="font-libre text-[11px] text-gray-300">Offenes Ziel (Dauer unbekannt)</span>
+          </label>
+
+          <label className="block">
+            <span className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+              Reisetage (min.)
             </span>
             <input
               type="number"
               min={1}
-              max={setup.mode === "travel" && setup.pace === "extreme" ? 3 : 60}
+              max={setup.pace === "extreme" ? 3 : 60}
               value={daysInput}
               onChange={(e) => setDaysInput(e.target.value)}
               className="mt-1 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 font-barlow text-sm text-white"
             />
-            {setup.mode === "leisure" ? (
-              <p className="mt-1 font-libre text-[10px] text-accent-gold">
-                = {Math.max(1, Number(daysInput) || 1) * 6} FAP gesamt
-              </p>
-            ) : null}
           </label>
 
           <button
@@ -355,14 +358,14 @@ export function TravelDowntimeGmPanel({
             className={`flex w-full items-center justify-center gap-2 rounded border border-accent-gold/60 bg-accent-gold/15 font-barlow font-extrabold uppercase text-accent-gold hover:bg-accent-gold/25 disabled:opacity-50 ${isModal ? "py-3 text-xs" : "py-2 text-[10px]"}`}
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {setup.mode === "leisure" ? "Freizeit starten" : "Reise starten"}
+            Reise starten
           </button>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="rounded border border-hero-border/40 bg-background-dark/50 px-2 py-2">
             <p className="font-barlow text-[10px] font-bold uppercase text-accent-gold">
-              {activeConfig.mode === "leisure" ? "Freizeit" : "Reise"} · Tag {downtimeCurrentDay}/
+              Reise · Tag {downtimeCurrentDay}/
               {activeConfig.openEnded
                 ? calendarDayCount(activeConfig, downtimeCurrentDay, downtimeTotalDays)
                 : downtimeTotalDays}
@@ -370,28 +373,22 @@ export function TravelDowntimeGmPanel({
             <p className="mt-0.5 font-libre text-[11px] text-gray-400">
               {formatTravelSummary(activeConfig)}
             </p>
-            {activeConfig.mode === "travel" ? (
-              <>
-                <p className="mt-1 font-libre text-[10px] text-gray-500">
-                  {travelCost} FAP Reise · {playerBudget} FAP Spieler-Budget/Tag
-                </p>
-                {(activeConfig.kmTraveled ?? 0) > 0 || activeConfig.distanceKm ? (
-                  <p className="mt-1 font-libre text-[10px] text-hero-vibrant">
-                    {activeConfig.kmTraveled ?? 0} km zurückgelegt
-                    {activeConfig.distanceKm
-                      ? ` · ${progressPct ?? 0}% von ${activeConfig.distanceKm} km`
-                      : activeConfig.openEnded
-                        ? " · Ziel offen"
-                        : ""}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="mt-1 font-libre text-[10px] text-gray-500">6 FAP/Tag (volles Budget)</p>
-            )}
+            <p className="mt-1 font-libre text-[10px] text-gray-500">
+              {travelCost} FAP Reise · {playerBudget} FAP Spieler-Budget/Tag
+            </p>
+            {(activeConfig.kmTraveled ?? 0) > 0 || activeConfig.distanceKm ? (
+              <p className="mt-1 font-libre text-[10px] text-hero-vibrant">
+                {activeConfig.kmTraveled ?? 0} km zurückgelegt
+                {activeConfig.distanceKm
+                  ? ` · ${progressPct ?? 0}% von ${activeConfig.distanceKm} km`
+                  : activeConfig.openEnded
+                    ? " · Ziel offen"
+                    : ""}
+              </p>
+            ) : null}
           </div>
 
-          {activeConfig.mode === "travel" ? (
+          {travelUi ? (
             <TravelDayGmWorkflow
               sessionId={sessionId}
               config={activeConfig}
@@ -401,7 +398,8 @@ export function TravelDowntimeGmPanel({
             />
           ) : (
             <p className="font-libre text-[11px] text-gray-400">
-              Freizeit-Modus: Spieler planen 6 FAP/Tag. Nutze „Nächsten Tag“ wenn alle fertig sind.
+              Wetter, Lager und Kilometer steuerst du auf der Weltkarte. Hier nur Gruppen-FAP der
+              Reise.
             </p>
           )}
 
@@ -418,7 +416,7 @@ export function TravelDowntimeGmPanel({
                 >
                   <span className="font-barlow font-bold text-accent-gold">{pc.name}</span>
                   <span className="text-gray-500"> — {status}</span>
-                  <span className="ml-1 text-gray-400">🎒 {pc.rations_count ?? 0}/10</span>
+                  <span className="ml-1 text-gray-400">ðŸŽ’ {pc.rations_count ?? 0}/10</span>
                   {(pc.starvation_days ?? 0) > 0 ? (
                     <span className="ml-1 rounded bg-red-950/90 px-1 font-barlow text-[8px] font-bold uppercase text-red-200">
                       Hunger {pc.starvation_days}T
@@ -445,33 +443,21 @@ export function TravelDowntimeGmPanel({
             </button>
           ) : null}
 
-          <div className="flex flex-col gap-2">
-            {activeConfig.mode === "leisure" ? (
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => run(() => nextDowntimeDay(sessionId))}
-                className={`flex items-center justify-center gap-2 rounded border border-hero-vibrant/60 bg-hero-vibrant/15 font-barlow font-extrabold uppercase text-hero-vibrant hover:bg-hero-vibrant/25 disabled:opacity-50 ${isModal ? "py-3 text-xs" : "py-2 text-[10px]"}`}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
-                Nächsten Tag auswerten
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                if (!window.confirm("Reise/Freizeit vorzeitig beenden?")) return;
-                void run(() => endDowntime(sessionId));
-              }}
-              className={`flex items-center justify-center gap-2 rounded border border-red-800/60 bg-red-950/40 font-barlow font-extrabold uppercase text-red-200 hover:bg-red-900/50 disabled:opacity-50 ${isModal ? "py-3 text-xs" : "py-2 text-[10px]"}`}
-            >
-              <Square className="h-4 w-4" />
-              Beenden
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              if (!window.confirm("Reise vorzeitig beenden?")) return;
+              void run(() => endDowntime(sessionId));
+            }}
+            className={`flex w-full items-center justify-center gap-2 rounded border border-red-800/60 bg-red-950/40 font-barlow font-extrabold uppercase text-red-200 hover:bg-red-900/50 disabled:opacity-50 ${isModal ? "py-3 text-xs" : "py-2 text-[10px]"}`}
+          >
+            <Square className="h-4 w-4" />
+            Beenden
+          </button>
         </div>
       )}
+
 
       {huntOpen ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 px-3 py-6">

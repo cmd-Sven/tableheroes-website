@@ -2,12 +2,17 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
+import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
+import { clampExhaustionLevel } from "@/src/lib/characters/dnd5e/exhaustion";
+import { DND5E_SKILL_BY_KEY } from "@/src/lib/characters/dnd5e/skills";
 import {
-  FAP_DAILY_TOTAL,
+  applyCitySleepNight,
+  CITY_SLEEP_FULL_FAP,
+  CITY_SLEEP_SHORT_FAP,
+} from "@/src/lib/city-fap-sleep";
+import {
   fapAllocationsToJson,
-  maxNonSleepFapBudget,
   parseFapAllocations,
-  requiredSleepFap,
   sleepFapSum,
   nonSleepFapSum,
   type FapAllocationLine,
@@ -23,7 +28,6 @@ import {
   maxTravelDaysForPace,
   parseDowntimeConfig,
   playerFapBudgetForDay,
-  playerFapBudgetPerDay,
   type DowntimeConfig,
   type TravelDayLog,
 } from "@/src/lib/travel-fap-config";
@@ -108,14 +112,51 @@ async function fetchPlayerCharacterIds(
 }
 
 function normalizeAllocationsInput(raw: FapAllocationLine[]): FapAllocationLine[] {
-  return raw.map((line) => ({
-    activity: String(line.activity ?? "").trim() || "Aktion",
-    fap: Math.max(0, Math.round(Number(line.fap) || 0)),
-    targetItemId:
-      line.targetItemId && String(line.targetItemId).trim().length >= 20
-        ? String(line.targetItemId).trim()
-        : undefined,
-  }));
+  return raw.map((line) => {
+    const skillRaw = String(line.skillKey ?? "").trim();
+    const skillKey =
+      skillRaw && skillRaw in DND5E_SKILL_BY_KEY ? skillRaw : undefined;
+    const skillNote = String(line.skillNote ?? "").trim() || undefined;
+    return {
+      activity: String(line.activity ?? "").trim() || "Aktion",
+      fap: Math.max(0, Math.round(Number(line.fap) || 0)),
+      targetItemId:
+        line.targetItemId && String(line.targetItemId).trim().length >= 20
+          ? String(line.targetItemId).trim()
+          : undefined,
+      skillKey,
+      skillNote,
+    };
+  });
+}
+
+function readExhaustionFromSheet(sheet: Record<string, unknown> | null | undefined): number {
+  const combat =
+    sheet?.combat && typeof sheet.combat === "object"
+      ? (sheet.combat as Record<string, unknown>)
+      : {};
+  return clampExhaustionLevel(combat.exhaustionLevel);
+}
+
+async function writeExhaustionLevel(
+  supabase: SessionCtx["supabase"],
+  charId: string,
+  sheet: Record<string, unknown>,
+  nextEx: number,
+): Promise<void> {
+  const combat =
+    sheet.combat && typeof sheet.combat === "object"
+      ? (sheet.combat as Record<string, unknown>)
+      : {};
+  await (supabase as any)
+    .from("characters")
+    .update({
+      sheet_data: {
+        ...sheet,
+        combat: { ...combat, exhaustionLevel: clampExhaustionLevel(nextEx) },
+      },
+    })
+    .eq("id", charId);
 }
 
 export async function startDowntime(
@@ -126,7 +167,7 @@ export async function startDowntime(
   try {
     const ctx = await loadSessionContext(sessionId);
     if (!ctx.isGM) {
-      return { ok: false, error: "Nur der Spielleiter kann eine Reise starten." };
+      return { ok: false, error: "Nur der Spielleiter kann Stadtaufenthalt oder Reise starten." };
     }
 
     const config = { ...defaultDowntimeConfig(), ...configInput };
@@ -255,6 +296,12 @@ export async function submitFapAllocation(
     if (sleepSum < needSleep) {
       return { ok: false, error: `Mindestens ${needSleep} FAP müssen auf „Schlaf“ entfallen.` };
     }
+    if (config.mode === "leisure" && sleepSum > CITY_SLEEP_FULL_FAP) {
+      return {
+        ok: false,
+        error: `Im Stadtaufenthalt höchstens ${CITY_SLEEP_FULL_FAP} FAP Schlaf pro Tag (oder ${CITY_SLEEP_SHORT_FAP} FAP Kurzschlaf).`,
+      };
+    }
 
     const starvationDays = Math.max(0, Math.round(Number(ch.starvation_days ?? 0)));
     const maxNonSleep = Math.max(0, playerBudget - needSleep - starvationDays);
@@ -294,7 +341,10 @@ export async function submitFapAllocation(
     const currentMap = parseFapAllocations(
       (liveRaw as { fap_allocations?: import("@/src/lib/database.types").Json }).fap_allocations,
     );
-    const nextMap: FapAllocationsMap = { ...currentMap, [charId]: { status: "ready", allocations: normalized } };
+    const nextMap: FapAllocationsMap = {
+      ...currentMap,
+      [charId]: { status: "ready", allocations: normalized, confirmed: ctx.isGM },
+    };
 
     const { error: upErr } = await (ctx.supabase as any).from("session_live_states").update({
       fap_allocations: fapAllocationsToJson(nextMap),
@@ -351,49 +401,63 @@ export async function nextDowntimeDay(
     const exhaustionGain = exhaustionGainForDay(paceConfig, currentDay, totalDays);
 
     const map = parseFapAllocations(live.fap_allocations as any);
+    const isLeisure = config.mode === "leisure";
 
     for (const [charId, state] of Object.entries(map)) {
       if (state.status !== "ready") continue;
 
-      const { data: chRaw } = await ctx.supabase
-        .from("characters")
-        .select("sleep_debt_fap")
-        .eq("id", charId)
-        .single();
-
-      const debt = Number((chRaw as { sleep_debt_fap?: number } | null)?.sleep_debt_fap ?? 0);
-      const sleepSum = sleepFapSum(state.allocations);
-      const need = mandatorySleepFap(paceConfig, debt);
-      const nextDebt = sleepSum < need ? debt + 3 : 0;
-
-      await (ctx.supabase as any)
-        .from("characters")
-        .update({ sleep_debt_fap: nextDebt })
-        .eq("id", charId);
-
-      if (exhaustionGain > 0) {
-        const { data: sheetRow } = await ctx.supabase
+      if (isLeisure) {
+        const { data: chRaw } = await (ctx.supabase as any)
           .from("characters")
-          .select("sheet_data")
+          .select("consecutive_short_sleep_days, sheet_data")
           .eq("id", charId)
           .single();
-        const sheet = (sheetRow as { sheet_data?: Record<string, unknown> } | null)?.sheet_data;
-        const combat =
-          sheet?.combat && typeof sheet.combat === "object"
-            ? (sheet.combat as Record<string, unknown>)
-            : {};
-        const curEx = Math.max(0, Math.round(Number(combat.exhaustionLevel ?? 0)));
-        const nextEx = Math.min(10, curEx + exhaustionGain);
-        if (nextEx !== curEx && sheet) {
-          await (ctx.supabase as any)
+        const ch = chRaw as {
+          consecutive_short_sleep_days?: number | null;
+          sheet_data?: Record<string, unknown> | null;
+        } | null;
+        const sheet = ch?.sheet_data && typeof ch.sheet_data === "object" ? ch.sheet_data : {};
+        const outcome = applyCitySleepNight({
+          sleepFap: sleepFapSum(state.allocations),
+          consecutiveShortSleepDays: Number(ch?.consecutive_short_sleep_days ?? 0),
+          exhaustionLevel: readExhaustionFromSheet(sheet),
+        });
+        await (ctx.supabase as any)
+          .from("characters")
+          .update({ consecutive_short_sleep_days: outcome.consecutiveShortSleepDays })
+          .eq("id", charId);
+        if (outcome.exhaustionDelta !== 0 && sheet) {
+          await writeExhaustionLevel(ctx.supabase, charId, sheet, outcome.exhaustionLevel);
+        }
+      } else {
+        const { data: chRaw } = await ctx.supabase
+          .from("characters")
+          .select("sleep_debt_fap")
+          .eq("id", charId)
+          .single();
+
+        const debt = Number((chRaw as { sleep_debt_fap?: number } | null)?.sleep_debt_fap ?? 0);
+        const sleepSum = sleepFapSum(state.allocations);
+        const need = mandatorySleepFap(paceConfig, debt);
+        const nextDebt = sleepSum < need ? debt + 3 : 0;
+
+        await (ctx.supabase as any)
+          .from("characters")
+          .update({ sleep_debt_fap: nextDebt })
+          .eq("id", charId);
+
+        if (exhaustionGain > 0) {
+          const { data: sheetRow } = await (ctx.supabase as any)
             .from("characters")
-            .update({
-              sheet_data: {
-                ...sheet,
-                combat: { ...combat, exhaustionLevel: nextEx },
-              },
-            })
-            .eq("id", charId);
+            .select("sheet_data")
+            .eq("id", charId)
+            .single();
+          const sheet = (sheetRow as { sheet_data?: Record<string, unknown> } | null)?.sheet_data;
+          const curEx = readExhaustionFromSheet(sheet ?? undefined);
+          const nextEx = Math.min(10, curEx + exhaustionGain);
+          if (nextEx !== curEx && sheet) {
+            await writeExhaustionLevel(ctx.supabase, charId, sheet, nextEx);
+          }
         }
       }
 
@@ -429,34 +493,38 @@ export async function nextDowntimeDay(
       }
     }
 
-    const characterIds = await fetchPlayerCharacterIds(ctx.supabase, ctx.campaignId);
-    for (const rid of characterIds) {
-      const { data: survRow } = await ctx.supabase
-        .from("characters")
-        .select("rations_count, starvation_days")
-        .eq("id", rid)
-        .single();
-
-      const row = survRow as {
-        rations_count?: number | null;
-        starvation_days?: number | null;
-      } | null;
-
-      const r = Math.min(10, Math.max(0, Math.round(Number(row?.rations_count ?? 0))));
-      const s = Math.max(0, Math.round(Number(row?.starvation_days ?? 0)));
-
-      if (r > 0) {
-        await (ctx.supabase as any)
+    if (!isLeisure) {
+      const characterIdsForRations = await fetchPlayerCharacterIds(ctx.supabase, ctx.campaignId);
+      for (const rid of characterIdsForRations) {
+        const { data: survRow } = await ctx.supabase
           .from("characters")
-          .update({ rations_count: r - 1, starvation_days: 0 })
-          .eq("id", rid);
-      } else {
-        await (ctx.supabase as any)
-          .from("characters")
-          .update({ starvation_days: s + 1 })
-          .eq("id", rid);
+          .select("rations_count, starvation_days")
+          .eq("id", rid)
+          .single();
+
+        const row = survRow as {
+          rations_count?: number | null;
+          starvation_days?: number | null;
+        } | null;
+
+        const r = Math.min(10, Math.max(0, Math.round(Number(row?.rations_count ?? 0))));
+        const s = Math.max(0, Math.round(Number(row?.starvation_days ?? 0)));
+
+        if (r > 0) {
+          await (ctx.supabase as any)
+            .from("characters")
+            .update({ rations_count: r - 1, starvation_days: 0 })
+            .eq("id", rid);
+        } else {
+          await (ctx.supabase as any)
+            .from("characters")
+            .update({ starvation_days: s + 1 })
+            .eq("id", rid);
+        }
       }
     }
+
+    const characterIds = await fetchPlayerCharacterIds(ctx.supabase, ctx.campaignId);
 
     const nextDay = Math.max(1, Number(live.downtime_current_day ?? 1) + 1);
     let total = Math.max(1, Number(live.downtime_total_days ?? 1));
@@ -670,6 +738,153 @@ export async function distributeRations(
         return { ok: false, error: upErr.message ?? "Rationen konnten nicht gespeichert werden." };
       }
     }
+
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export type FapPartyMemberStatus = {
+  id: string;
+  name: string;
+  exhaustionLevel: number;
+  consecutiveShortSleepDays: number;
+};
+
+export async function getFapPartySnapshot(
+  sessionId: string,
+): Promise<{ ok: true; members: FapPartyMemberStatus[] } | { ok: false; error: string }> {
+  try {
+    const ctx = await loadSessionContext(sessionId);
+    if (!ctx.isGM) {
+      return { ok: false, error: "Nur der Spielleiter sieht die Gruppenübersicht." };
+    }
+    const ids = await fetchPlayerCharacterIds(ctx.supabase, ctx.campaignId);
+    if (ids.length === 0) return { ok: true, members: [] };
+
+    const { data, error } = await (ctx.supabase as any)
+      .from("characters")
+      .select("id, name, consecutive_short_sleep_days, sheet_data")
+      .in("id", ids);
+
+    if (error) {
+      return { ok: false, error: error.message ?? "Gruppe konnte nicht geladen werden." };
+    }
+
+    const members: FapPartyMemberStatus[] = ((data ?? []) as {
+      id: string;
+      name: string;
+      consecutive_short_sleep_days?: number | null;
+      sheet_data?: Record<string, unknown> | null;
+    }[]).map((row) => ({
+      id: String(row.id),
+      name: String(row.name ?? "Charakter"),
+      exhaustionLevel: readExhaustionFromSheet(row.sheet_data ?? undefined),
+      consecutiveShortSleepDays: Math.max(
+        0,
+        Math.round(Number(row.consecutive_short_sleep_days ?? 0)),
+      ),
+    }));
+
+    return { ok: true, members };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function confirmFapAllocation(
+  sessionId: string,
+  characterId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await loadSessionContext(sessionId);
+    if (!ctx.isGM) {
+      return { ok: false, error: "Nur der Spielleiter kann Planungen bestätigen." };
+    }
+    const charId = String(characterId).trim();
+    const { data: liveRaw, error: liveError } = await (ctx.supabase as any)
+      .from("session_live_states")
+      .select("downtime_active, fap_allocations")
+      .eq("session_id", sessionId)
+      .single();
+
+    if (liveError || !liveRaw || !(liveRaw as { downtime_active?: boolean }).downtime_active) {
+      return { ok: false, error: "Keine aktive Downtime." };
+    }
+
+    const map = parseFapAllocations(
+      (liveRaw as { fap_allocations?: unknown }).fap_allocations as any,
+    );
+    const state = map[charId];
+    if (!state || state.status !== "ready") {
+      return { ok: false, error: "Noch keine eingereichte Planung für diesen Charakter." };
+    }
+
+    map[charId] = { ...state, confirmed: true };
+    const { error: upErr } = await (ctx.supabase as any)
+      .from("session_live_states")
+      .update({ fap_allocations: fapAllocationsToJson(map) })
+      .eq("session_id", sessionId);
+
+    if (upErr) {
+      return { ok: false, error: upErr.message ?? "Bestätigen fehlgeschlagen." };
+    }
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unbekannter Fehler.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function requestFapSkillCheck(
+  sessionId: string,
+  input: {
+    characterId: string;
+    characterName: string;
+    activity: string;
+    skillKey: string;
+    dc?: number;
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await loadSessionContext(sessionId);
+    if (!ctx.isGM) {
+      return { ok: false, error: "Nur der Spielleiter kann eine Probe anfordern." };
+    }
+
+    const skillKey = String(input.skillKey ?? "").trim();
+    const skill =
+      skillKey in DND5E_SKILL_BY_KEY
+        ? DND5E_SKILL_BY_KEY[skillKey as keyof typeof DND5E_SKILL_BY_KEY]
+        : null;
+    if (!skill) {
+      return { ok: false, error: "Ungültige Fertigkeit." };
+    }
+
+    const activity = String(input.activity ?? "").trim() || "Aktivität";
+    const name = String(input.characterName ?? "").trim() || "Charakter";
+    const dc =
+      input.dc != null && Number.isFinite(Number(input.dc))
+        ? Math.round(Number(input.dc))
+        : undefined;
+    const dcPart = dc != null ? ` (SG ${dc})` : "";
+
+    await appendSessionActivity({
+      sessionId,
+      type: "fap_skill_request",
+      text: `SL fordert Probe: ${name} — ${skill.labelDe}${dcPart} für „${activity}“.`,
+      characterId: String(input.characterId).trim() || undefined,
+      characterName: name,
+      notifyGm: false,
+      meta: {
+        skillKey,
+        activity,
+        dc: dc ?? null,
+      },
+    });
 
     return { ok: true };
   } catch (e: unknown) {

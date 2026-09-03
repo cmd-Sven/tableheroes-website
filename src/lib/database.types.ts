@@ -1010,6 +1010,7 @@ export type Database = {
           race: string | null
           rations_count: number
           sleep_debt_fap: number
+          consecutive_short_sleep_days: number
           starvation_days: number
           status: string | null
           user_id: string | null
@@ -1052,6 +1053,7 @@ export type Database = {
           race?: string | null
           rations_count?: number
           sleep_debt_fap?: number
+          consecutive_short_sleep_days?: number
           starvation_days?: number
           status?: string | null
           user_id?: string | null
@@ -1094,6 +1096,7 @@ export type Database = {
           race?: string | null
           rations_count?: number
           sleep_debt_fap?: number
+          consecutive_short_sleep_days?: number
           starvation_days?: number
           status?: string | null
           user_id?: string | null

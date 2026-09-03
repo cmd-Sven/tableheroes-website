@@ -379,7 +379,7 @@ export async function getCharacterInventory(
 
   const { data: chSleep, error: sleepErr } = await supabase
     .from("characters")
-    .select("sleep_debt_fap, rations_count, starvation_days")
+    .select("sleep_debt_fap, rations_count, starvation_days, consecutive_short_sleep_days")
     .eq("id", characterId)
     .single();
 
@@ -391,6 +391,7 @@ export async function getCharacterInventory(
     sleep_debt_fap?: number | null;
     rations_count?: number | null;
     starvation_days?: number | null;
+    consecutive_short_sleep_days?: number | null;
   } | null;
 
   return {
@@ -399,6 +400,10 @@ export async function getCharacterInventory(
     sleep_debt_fap: Math.max(0, Math.round(Number(chRow?.sleep_debt_fap ?? 0))),
     rations_count: Math.min(10, Math.max(0, Math.round(Number(chRow?.rations_count ?? 0)))),
     starvation_days: Math.max(0, Math.round(Number(chRow?.starvation_days ?? 0))),
+    consecutive_short_sleep_days: Math.max(
+      0,
+      Math.round(Number(chRow?.consecutive_short_sleep_days ?? 0)),
+    ),
   };
 }
 

@@ -324,6 +324,7 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
             await refreshLiveState();
             router.refresh();
           }}
+          worldMapActive={Boolean(liveState?.active_world_map_id)}
           activeLootId={liveState?.current_loot_id ?? null}
           onClearStageLoot={() => {
             updateLiveState({ current_loot_id: null, loot_hide_npcs: false });

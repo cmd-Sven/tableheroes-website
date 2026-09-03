@@ -15,12 +15,18 @@ type Props = {
   config: DowntimeConfig;
   currentDay: number;
   totalDays: number;
+  showTravelDetails?: boolean;
 };
 
 /** Bühnen-Overlay — kompakte Infos oben; Kalender auf der Bühne */
-export function TravelModeStageBanner({ config, currentDay, totalDays }: Props) {
+export function TravelModeStageBanner({
+  config,
+  currentDay,
+  totalDays,
+  showTravelDetails = false,
+}: Props) {
   const isLeisure = config.mode === "leisure";
-  const isTravelStage = !isLeisure;
+  const isTravelStage = !isLeisure && showTravelDetails;
   const dayLog = getDayLog(config, currentDay);
   const paceConfig = { ...config, pace: dayLog?.pace ?? config.pace };
   const travelCost = travelFapCostPerDay(paceConfig);
@@ -34,7 +40,7 @@ export function TravelModeStageBanner({ config, currentDay, totalDays }: Props) 
         <div className="flex items-center gap-2">
           <Map className="h-5 w-5 text-accent-gold" />
           <span className="font-barlow text-sm font-extrabold uppercase tracking-wide text-accent-gold">
-            {isLeisure ? "Freizeit-Modus" : "Reise-Modus"}
+            {isLeisure ? "Stadtaufenthalt" : "Reise-Modus"}
           </span>
         </div>
         <p className="text-center font-libre text-xs text-gray-300">

@@ -193,8 +193,9 @@ export function playerFapBudgetPerDay(config: DowntimeConfig): number {
   return budget;
 }
 
-/** Mindest-Schlaf-FAP bei schneller Reise */
+/** Mindest-Schlaf-FAP: Stadt 2 (Kurzschlaf erlaubt), Reise 2 bzw. 3 bei Defizit */
 export function mandatorySleepFap(config: DowntimeConfig, sleepDebtFap: number): number {
+  if (config.mode === "leisure") return 2;
   const base = sleepDebtFap > 0 ? 3 : 2;
   if (config.mode === "travel" && config.pace === "fast") {
     return Math.max(base, 2);
@@ -289,7 +290,8 @@ export function travelProgressPct(config: DowntimeConfig): number | null {
 
 export function formatTravelSummary(config: DowntimeConfig): string {
   if (config.mode === "leisure") {
-    return "Freizeit (volle 6 FAP/Tag)";
+    const loc = config.fromLocation?.trim();
+    return loc ? `Stadtaufenthalt in ${loc} (6 FAP/Tag)` : "Stadtaufenthalt (volle 6 FAP/Tag)";
   }
   const parts = [
     TRAVEL_PACE_LABELS[config.pace ?? "normal"],

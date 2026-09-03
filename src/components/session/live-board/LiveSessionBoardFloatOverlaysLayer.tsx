@@ -347,7 +347,7 @@ export function LiveSessionBoardFloatOverlaysLayer() {
             onClick={() => setDowntimePlayerDismissed(false)}
             className="fixed bottom-6 left-1/2 z-95 -translate-x-1/2 rounded-full border border-accent-gold bg-background-card/95 px-5 py-2.5 font-barlow text-xs font-extrabold uppercase text-accent-gold shadow-xl backdrop-blur hover:bg-accent-gold/20"
           >
-            FAP / Reisetag planen
+            FAP / {liveState.downtime_config?.mode === "leisure" ? "Stadt-Tag" : "Reisetag"} planen
           </button>
         )}
 
@@ -363,6 +363,7 @@ export function LiveSessionBoardFloatOverlaysLayer() {
             downtimeActive={!!liveState.downtime_active}
             downtimeConfig={liveState.downtime_config ?? null}
             downtimeCurrentDay={liveState.downtime_current_day ?? 1}
+            downtimeTotalDays={liveState.downtime_total_days ?? 1}
             planningStatus={liveState.fap_allocations[currentPlayerCharacter.id]?.status ?? null}
             onClose={() => setDowntimePlayerDismissed(true)}
             onSubmitted={async () => {

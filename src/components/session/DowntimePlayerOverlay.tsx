@@ -5,11 +5,7 @@ import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { getCharacterInventory } from "@/src/lib/actions/character-inventory-actions";
 import { submitFapAllocation } from "@/src/lib/actions/downtime-actions";
 import {
-  FAP_DAILY_TOTAL,
-  maxNonSleepFapBudget,
-  minSleepFapForStarvation,
   nonSleepFapSum,
-  requiredSleepFap,
   sleepFapSum,
   type FapAllocationLine,
 } from "@/src/lib/downtime-fap-types";
@@ -21,15 +17,28 @@ import {
   travelFapCostPerDay,
   type DowntimeConfig,
 } from "@/src/lib/travel-fap-config";
+import { remainingStayFap } from "@/src/lib/city-fap-sleep";
+import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import type { CharacterItem } from "@/src/types/inventory";
 
-const GENERAL_ACTIVITIES = [
+const TRAVEL_ACTIVITIES = [
   "Schlaf",
   "Wache halten",
   "Jagen",
   "Kochen",
   "Lager sortieren",
   "Sozialisieren",
+  "Item studieren",
+];
+
+const CITY_ACTIVITIES = [
+  "Schlaf",
+  "Auftreten (Markt)",
+  "Handwerk",
+  "Einkaufen",
+  "Recherchieren",
+  "Sozialisieren",
+  "Training",
   "Item studieren",
 ];
 
@@ -42,6 +51,7 @@ type Props = {
   downtimeActive: boolean;
   downtimeConfig?: DowntimeConfig | null;
   downtimeCurrentDay?: number;
+  downtimeTotalDays?: number;
   /** Bereits „ready“ für heute — Overlay nur Planung */
   planningStatus: "planning" | "ready" | null;
   onClose: () => void;
@@ -59,6 +69,7 @@ export function DowntimePlayerOverlay({
   downtimeActive,
   downtimeConfig = null,
   downtimeCurrentDay = 1,
+  downtimeTotalDays = 1,
   planningStatus,
   onClose,
   onSubmitted,
@@ -69,6 +80,7 @@ export function DowntimePlayerOverlay({
   const playerBudget = playerFapBudgetForDay(config, dayLog);
   const travelCost = travelFapCostPerDay(paceConfig);
   const [isPending, startTransition] = useTransition();
+  const [consecutiveShortSleep, setConsecutiveShortSleep] = useState(0);
   const [sleepDebt, setSleepDebt] = useState(0);
   const [rationsCount, setRationsCount] = useState(0);
   const [starvationDays, setStarvationDays] = useState(0);
@@ -85,19 +97,20 @@ export function DowntimePlayerOverlay({
     try {
       const inv = await getCharacterInventory(characterId);
       setSleepDebt(inv.sleep_debt_fap ?? 0);
+      setConsecutiveShortSleep(inv.consecutive_short_sleep_days ?? 0);
       setRationsCount(inv.rations_count ?? 0);
       setStarvationDays(inv.starvation_days ?? 0);
       const need = mandatorySleepFap(config, inv.sleep_debt_fap ?? 0);
-      const starv = Math.max(0, Math.round(inv.starvation_days ?? 0));
       const sleepFap = Math.min(playerBudget, Math.max(need, 2));
       const wakeFap = Math.max(0, playerBudget - sleepFap);
       const projects = inv.items.filter(
         (it) => it.target_fap > 0 && it.current_fap < it.target_fap,
       );
       setStudyItems(projects);
+      const secondActivity = config.mode === "leisure" ? "Sozialisieren" : "Wache halten";
       setLines([
         { activity: "Schlaf", fap: sleepFap },
-        { activity: "Wache halten", fap: wakeFap },
+        { activity: secondActivity, fap: wakeFap },
       ]);
     } catch {
       setLines([{ activity: "Schlaf", fap: 2 }, emptyLine()]);
@@ -111,15 +124,23 @@ export function DowntimePlayerOverlay({
     void load();
   }, [downtimeActive, characterId, load]);
 
+  const isLeisure = config.mode === "leisure";
+  const activities = isLeisure ? CITY_ACTIVITIES : TRAVEL_ACTIVITIES;
   const totalFap = lines.reduce((s, l) => s + Math.max(0, Math.round(l.fap)), 0);
   const sleepSum = sleepFapSum(lines);
   const nonSleepSum = nonSleepFapSum(lines);
+  const stayRemaining = remainingStayFap({
+    currentDay: downtimeCurrentDay,
+    totalDays: downtimeTotalDays,
+    allocatedToday: totalFap,
+  });
 
   const canSubmit =
     downtimeActive &&
     planningStatus === "planning" &&
     totalFap === playerBudget &&
     sleepSum >= needSleep &&
+    (!isLeisure || sleepSum <= 3) &&
     nonSleepSum <= maxNonSleep &&
     lines.every((l) => {
       if (l.activity === "Item studieren") {
@@ -154,28 +175,33 @@ export function DowntimePlayerOverlay({
         <div className="mb-4 flex items-start justify-between gap-2">
           <div>
             <h2 className="font-barlow text-lg font-extrabold uppercase tracking-wide text-hero-vibrant">
-              {config.mode === "leisure" ? "Freizeittag planen" : "Reisetag planen"}
+              {isLeisure ? "Stadt-Tag planen" : "Reisetag planen"}
             </h2>
             <p className="font-libre text-sm text-gray-300">{characterName}</p>
             <p className="mt-1 font-libre text-xs text-gray-500">
-              {config.mode === "travel" ? (
+              {isLeisure ? (
+                <>
+                  Tag {downtimeCurrentDay}/{downtimeTotalDays} ·{" "}
+                  <strong className="text-accent-gold">{playerBudget} FAP</strong> heute · noch{" "}
+                  <strong className="text-hero-vibrant">{stayRemaining} FAP</strong> im Aufenthalt.
+                  Schlaf 2 FAP (Kurzschlaf) oder 3 FAP (Erholung).
+                  {consecutiveShortSleep > 0
+                    ? ` Bisher ${consecutiveShortSleep} Kurzschlaf-Nacht${consecutiveShortSleep === 1 ? "" : "e"} hintereinander.`
+                    : ""}
+                </>
+              ) : config.mode === "travel" ? (
                 <>
                   {travelCost} FAP Reise (automatisch) ·{" "}
                   <strong className="text-accent-gold">{playerBudget} FAP</strong> zum Verteilen
-                </>
-              ) : (
-                <>
-                  <strong className="text-accent-gold">{playerBudget} FAP</strong> pro Tag (6
-                  Abschnitte)
-                </>
-              )}{" "}
-              — mindestens {needSleep} FAP für{" "}
-              <span className="text-accent-gold">Schlaf</span>
-              {sleepDebt > 0 ? " (Schlafdefizit)" : ""}.
-              {starvationDays > 0 ? (
-                <>
-                  {" "}
-                  Außerhalb von „Schlaf“ höchstens {maxNonSleep} FAP (Hunger-Malus).
+                  — mindestens {needSleep} FAP für{" "}
+                  <span className="text-accent-gold">Schlaf</span>
+                  {sleepDebt > 0 ? " (Schlafdefizit)" : ""}.
+                  {starvationDays > 0 ? (
+                    <>
+                      {" "}
+                      Außerhalb von „Schlaf“ höchstens {maxNonSleep} FAP (Hunger-Malus).
+                    </>
+                  ) : null}
                 </>
               ) : null}
             </p>
@@ -199,16 +225,17 @@ export function DowntimePlayerOverlay({
           </div>
         ) : null}
 
-        <p
-          className={`mb-3 font-barlow text-sm font-bold uppercase tracking-wide ${rationLineClass}`}
-        >
-          🎒 Rationen: {rationsCount}/10
-        </p>
+        {!isLeisure ? (
+          <p
+            className={`mb-3 font-barlow text-sm font-bold uppercase tracking-wide ${rationLineClass}`}
+          >
+            🎒 Rationen: {rationsCount}/10
+          </p>
+        ) : null}
 
         {planningStatus === "ready" ? (
           <p className="font-libre text-sm text-accent-gold">
-            Deine Planung für heute ist eingereicht. Warte auf den Spielleiter für den nächsten
-            Reisetag.
+            Deine Planung für heute ist eingereicht. Warte auf den Spielleiter.
           </p>
         ) : (
           <>
@@ -239,6 +266,7 @@ export function DowntimePlayerOverlay({
                                   activity,
                                   targetItemId:
                                     activity === "Item studieren" ? l.targetItemId : undefined,
+                                  skillKey: activity === "Schlaf" ? undefined : l.skillKey,
                                 }
                               : l,
                           ),
@@ -246,13 +274,54 @@ export function DowntimePlayerOverlay({
                       }}
                       className="mt-0.5 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-accent-gold"
                     >
-                      {GENERAL_ACTIVITIES.map((a) => (
+                      {activities.map((a) => (
                         <option key={a} value={a}>
                           {a}
                         </option>
                       ))}
                     </select>
                   </label>
+                  {line.activity !== "Schlaf" ? (
+                    <label className="min-w-[140px] flex-1 font-libre text-[10px] text-gray-400">
+                      Probe (optional)
+                      <select
+                        value={line.skillKey ?? ""}
+                        onChange={(e) => {
+                          const skillKey = e.target.value || undefined;
+                          setLines((prev) =>
+                            prev.map((l, i) => (i === idx ? { ...l, skillKey } : l)),
+                          );
+                        }}
+                        className="mt-0.5 w-full rounded border border-hero-dark bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-accent-gold"
+                      >
+                        <option value="">Keine</option>
+                        {DND5E_SKILLS.map((s) => (
+                          <option key={s.key} value={s.key}>
+                            {s.labelDe}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : isLeisure ? (
+                    <div className="flex gap-1 self-end pb-0.5">
+                      {([2, 3] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() =>
+                            setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, fap: n } : l)))
+                          }
+                          className={`rounded border px-2 py-1.5 font-barlow text-[10px] font-bold uppercase ${
+                            line.fap === n
+                              ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                              : "border-hero-border/40 text-gray-400"
+                          }`}
+                        >
+                          {n} FAP
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   {line.activity === "Item studieren" ? (
                     <label className="min-w-[160px] flex-1 font-libre text-[10px] text-gray-400">
                       Item
@@ -317,6 +386,12 @@ export function DowntimePlayerOverlay({
             {sleepSum < needSleep ? (
               <p className="mt-2 font-libre text-xs text-amber-300">
                 Zu wenig Schlaf-FAP (aktuell {sleepSum}, benötigt {needSleep}).
+              </p>
+            ) : null}
+
+            {isLeisure && sleepSum > 3 ? (
+              <p className="mt-2 font-libre text-xs text-amber-300">
+                Stadt: höchstens 3 FAP Schlaf pro Tag (aktuell {sleepSum}).
               </p>
             ) : null}
 

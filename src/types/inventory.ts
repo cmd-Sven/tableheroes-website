@@ -42,6 +42,8 @@ export type CharacterInventoryPayload = {
   rations_count: number;
   /** Tage ohne Ration hintereinander. */
   starvation_days: number;
+  /** Stadt-FAP: aufeinanderfolgende Kurzschlaf-Nächte (2 FAP). */
+  consecutive_short_sleep_days: number;
 };
 
 export const INVENTORY_CATEGORIES: InventoryCategory[] = [
