@@ -10,6 +10,8 @@ export type CommunityEvent = {
   start_time: string;
   end_time: string | null;
   location: string | null;
+  /** Optionales Termin-/Beitragsbild (öffentliche URL). */
+  image_url: string | null;
   status: CommunityEventStatus;
   rsvp_deadline_days: number | null;
   is_live: boolean;
@@ -26,6 +28,7 @@ export type CommunityEventInsert = {
   start_time: string;
   end_time: string;
   location?: string | null;
+  image_url?: string | null;
   rsvp_deadline_days?: 1 | 2 | 3 | null;
   is_live?: boolean;
   visible_on_landing?: boolean;

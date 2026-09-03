@@ -434,3 +434,29 @@ export async function uploadWorldMapImage(
   const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
 }
+
+/** Community-Terminbild: `{userId}/community-events/{eventId|new-…}/cover-{ts}.webp` */
+export async function uploadCommunityEventImage(
+  file: File,
+  options?: { eventId?: string | null },
+): Promise<{ path: string; publicUrl: string } | { error: string }> {
+  const prepared = await prepareImageForProfileUpload(file);
+  if ("error" in prepared) return { error: prepared.error };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Nicht angemeldet." };
+
+  const segment = options?.eventId?.trim()
+    ? options.eventId.trim()
+    : `new-${crypto.randomUUID()}`;
+  const path = `${user.id}/community-events/${segment}/cover-${Date.now()}.webp`;
+
+  const uploadError = await uploadPreparedImage(path, prepared.file);
+  if (uploadError) return uploadError;
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}

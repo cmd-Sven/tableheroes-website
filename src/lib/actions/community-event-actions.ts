@@ -113,6 +113,7 @@ export async function createCommunityEvent(
         start_time: input.start_time,
         end_time: input.end_time,
         location: input.location?.trim() || null,
+        image_url: input.image_url?.trim() || null,
         rsvp_deadline_days: input.rsvp_deadline_days ?? 2,
         is_live: input.is_live ?? true,
         visible_on_landing: input.visible_on_landing ?? false,
@@ -150,6 +151,7 @@ export async function updateCommunityEvent(
     if (input.start_time !== undefined) patch.start_time = input.start_time;
     if (input.end_time !== undefined) patch.end_time = input.end_time;
     if (input.location !== undefined) patch.location = input.location?.trim() || null;
+    if (input.image_url !== undefined) patch.image_url = input.image_url?.trim() || null;
     if (input.rsvp_deadline_days !== undefined) patch.rsvp_deadline_days = input.rsvp_deadline_days;
     if (input.is_live !== undefined) patch.is_live = input.is_live;
     if (input.visible_on_landing !== undefined) patch.visible_on_landing = input.visible_on_landing;
@@ -310,6 +312,7 @@ export async function createGmPlanningEvent(
       start_time: input.start_time,
       end_time: input.end_time,
       location: input.location?.trim() || null,
+      image_url: input.image_url?.trim() || null,
       rsvp_deadline_days: input.rsvp_deadline_days ?? 2,
       is_live: input.is_live ?? true,
       visible_on_landing: input.visible_on_landing ?? true,
@@ -355,6 +358,7 @@ export async function updateGmPlanningEvent(
     if (input.start_time !== undefined) patch.start_time = input.start_time;
     if (input.end_time !== undefined) patch.end_time = input.end_time;
     if (input.location !== undefined) patch.location = input.location?.trim() || null;
+    if (input.image_url !== undefined) patch.image_url = input.image_url?.trim() || null;
     if (input.rsvp_deadline_days !== undefined) patch.rsvp_deadline_days = input.rsvp_deadline_days;
     if (input.is_live !== undefined) patch.is_live = input.is_live;
     if (input.visible_on_landing !== undefined) patch.visible_on_landing = input.visible_on_landing;

@@ -16,6 +16,7 @@ import {
   type CommunityEvent,
   type CommunityEventKind,
 } from "@/src/lib/community-events/types";
+import { CommunityEventImageField } from "@/src/components/community-events/CommunityEventImageField";
 
 type Props = {
   initialEvents: CommunityEvent[];
@@ -29,6 +30,7 @@ type FormState = {
   dateTime: string;
   duration: number;
   location: string;
+  image_url: string;
   rsvpDeadlineDays: "1" | "2" | "3" | "none";
   isLive: boolean;
   visible_on_landing: boolean;
@@ -51,6 +53,7 @@ function defaultForm(): FormState {
     dateTime: toLocalDateTime(next.toISOString()),
     duration: 3,
     location: "",
+    image_url: "",
     rsvpDeadlineDays: "2",
     isLive: true,
     visible_on_landing: true,
@@ -107,6 +110,7 @@ export function AdminEventsClient({ initialEvents, initialRsvpCounts }: Props) {
             )
           : 3,
       location: event.location ?? "",
+      image_url: event.image_url ?? "",
       rsvpDeadlineDays:
         event.rsvp_deadline_days === 1
           ? "1"
@@ -142,6 +146,7 @@ export function AdminEventsClient({ initialEvents, initialRsvpCounts }: Props) {
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       location: form.location.trim() || null,
+      image_url: form.image_url.trim() || null,
       rsvp_deadline_days:
         form.rsvpDeadlineDays === "none" ? null : (Number(form.rsvpDeadlineDays) as 1 | 2 | 3),
       is_live: form.isLive,
@@ -300,6 +305,11 @@ export function AdminEventsClient({ initialEvents, initialRsvpCounts }: Props) {
                 className="w-full rounded border border-hero-dark bg-slate-900 px-3 py-2 text-white"
               />
             </div>
+            <CommunityEventImageField
+              imageUrl={form.image_url}
+              onImageUrlChange={(url) => setForm((f) => ({ ...f, image_url: url }))}
+              eventId={editingId}
+            />
             <div>
               <label className="mb-1 block font-barlow text-xs font-bold uppercase text-gray-400">
                 Anmeldefrist

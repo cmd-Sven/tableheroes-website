@@ -13,6 +13,7 @@ import {
   Sparkles,
   User,
   UserPlus,
+  X,
 } from "lucide-react";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
 import { SlotProgressBar } from "@/src/components/marketing/SessionTicketCardParts";
@@ -27,6 +28,7 @@ import {
 } from "@/src/lib/marketing/load-landing-session-tickets";
 
 const RUNES = ["ᚱ", "ᚦ", "ᚨ", "ᚲ", "ᚾ", "ᚺ", "ᛃ", "ᛟ"];
+const DESC_PREVIEW_CHARS = 180;
 
 type LandingTerminItem =
   | { kind: "session"; id: string; sortTime: number; ticket: SessionTicket }
@@ -163,14 +165,23 @@ function SessionCard({ ticket }: { ticket: SessionTicket }) {
   );
 }
 
-function EventCard({ event }: { event: CommunityEvent }) {
+function EventCard({
+  event,
+  onOpenDetail,
+}: {
+  event: CommunityEvent;
+  onOpenDetail: (event: CommunityEvent) => void;
+}) {
   const { date, time } = formatEventWhen(event.start_time);
   const kind = COMMUNITY_EVENT_KIND_LABELS[event.event_kind] ?? event.event_kind;
   const isPlanning = event.event_kind === "Spielplanung";
+  const coverUrl = event.image_url?.trim() || null;
+  const description = event.description?.trim() ?? "";
+  const isLong = description.length > DESC_PREVIEW_CHARS;
 
   return (
     <article
-      className={`flex h-full min-h-[28rem] w-[min(88vw,22rem)] shrink-0 snap-center flex-col rounded-xl border p-5 shadow-lg sm:w-[min(44vw,22rem)] lg:w-[min(30vw,22rem)] ${
+      className={`flex h-full min-h-[28rem] w-[min(88vw,22rem)] shrink-0 snap-center flex-col overflow-hidden rounded-xl border shadow-lg sm:w-[min(44vw,22rem)] lg:w-[min(30vw,22rem)] ${
         isPlanning
           ? "border-accent-gold/40 bg-accent-gold/5"
           : "border-hero-border/40 bg-background-card/90"
@@ -181,41 +192,197 @@ function EventCard({ event }: { event: CommunityEvent }) {
         backgroundPosition: "center",
       }}
     >
-      <p className="font-barlow text-[10px] font-bold uppercase tracking-wider text-hero-vibrant">
-        {isPlanning ? "Einladung · Spielplanung" : kind}
-      </p>
-      <h3 className="mt-1 font-cinzel text-xl font-bold text-white">{event.title}</h3>
-      {event.description ? (
-        <p className="mt-2 line-clamp-4 font-libre text-sm text-gray-400">{event.description}</p>
-      ) : (
-        <p className="mt-2 font-libre text-sm text-gray-500">
-          Community-Termin — werde Mitglied und nimm teil.
-        </p>
-      )}
-      <div className="mt-auto space-y-1.5 pt-6 font-barlow text-xs text-gray-300">
-        <p className="flex items-center gap-2">
-          <Calendar className="h-3.5 w-3.5 text-accent-gold" />
-          {date}
-        </p>
-        <p className="flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-accent-gold" />
-          {time} Uhr
-        </p>
-        {event.location ? (
-          <p className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-accent-gold" />
-            {event.location}
+      {coverUrl ? (
+        <button
+          type="button"
+          onClick={() => onOpenDetail(event)}
+          className="relative aspect-[16/10] w-full shrink-0 overflow-hidden text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-hero-vibrant"
+          aria-label={`${event.title} – Details öffnen`}
+        >
+          <Image
+            src={coverUrl}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 88vw, 22rem"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <p className="absolute bottom-3 left-4 right-4 font-barlow text-[10px] font-bold uppercase tracking-wider text-hero-vibrant drop-shadow">
+            {isPlanning ? "Einladung · Spielplanung" : kind}
+          </p>
+        </button>
+      ) : null}
+
+      <div className="flex flex-1 flex-col p-5">
+        {!coverUrl ? (
+          <p className="font-barlow text-[10px] font-bold uppercase tracking-wider text-hero-vibrant">
+            {isPlanning ? "Einladung · Spielplanung" : kind}
           </p>
         ) : null}
+        <h3
+          className={`font-cinzel text-xl font-bold text-white ${coverUrl ? "" : "mt-1"}`}
+        >
+          {event.title}
+        </h3>
+        {description ? (
+          <p className="mt-2 line-clamp-4 font-libre text-sm text-gray-400">{description}</p>
+        ) : (
+          <p className="mt-2 font-libre text-sm text-gray-500">
+            Community-Termin — werde Mitglied und nimm teil.
+          </p>
+        )}
+        {description || coverUrl ? (
+          <button
+            type="button"
+            onClick={() => onOpenDetail(event)}
+            className="mt-2 self-start font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold transition-colors hover:text-white"
+          >
+            {isLong || coverUrl ? "Mehr lesen" : "Details"}
+          </button>
+        ) : null}
+        <div className="mt-auto space-y-1.5 pt-6 font-barlow text-xs text-gray-300">
+          <p className="flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-accent-gold" />
+            {date}
+          </p>
+          <p className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-accent-gold" />
+            {time} Uhr
+          </p>
+          {event.location ? (
+            <p className="flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-accent-gold" />
+              {event.location}
+            </p>
+          ) : null}
+        </div>
+        <Link
+          href="/signup"
+          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/15 px-4 py-2.5 font-barlow text-xs font-bold uppercase text-hero-vibrant transition-colors hover:bg-hero-vibrant/25"
+        >
+          <UserPlus className="h-4 w-4" />
+          Registrieren &amp; teilnehmen
+        </Link>
       </div>
-      <Link
-        href="/signup"
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/15 px-4 py-2.5 font-barlow text-xs font-bold uppercase text-hero-vibrant transition-colors hover:bg-hero-vibrant/25"
-      >
-        <UserPlus className="h-4 w-4" />
-        Registrieren &amp; teilnehmen
-      </Link>
     </article>
+  );
+}
+
+function CommunityEventDetailModal({
+  event,
+  onClose,
+}: {
+  event: CommunityEvent;
+  onClose: () => void;
+}) {
+  const { date, time } = formatEventWhen(event.start_time);
+  const endMeta = event.end_time ? formatEventWhen(event.end_time) : null;
+  const kind = COMMUNITY_EVENT_KIND_LABELS[event.event_kind] ?? event.event_kind;
+  const isPlanning = event.event_kind === "Spielplanung";
+  const coverUrl = event.image_url?.trim() || null;
+  const description = event.description?.trim() || null;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="community-event-modal-title"
+    >
+      <div
+        className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-hero-dark bg-background-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundImage: "url('/images/dark-marmor.webp')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold"
+          aria-label="Schließen"
+        >
+          <X className="h-6 w-6" />
+        </button>
+
+        {coverUrl ? (
+          <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden border-b border-hero-border/50 bg-black/50">
+            <Image
+              src={coverUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 42rem"
+              priority
+            />
+          </div>
+        ) : null}
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <p className="font-barlow text-[10px] font-bold uppercase tracking-wider text-hero-vibrant">
+            {isPlanning ? "Einladung · Spielplanung" : kind}
+          </p>
+          <h2
+            id="community-event-modal-title"
+            className="mt-2 font-cinzel text-2xl font-bold text-accent-gold"
+          >
+            {event.title}
+          </h2>
+
+          <div className="mt-4 space-y-1.5 font-barlow text-sm text-gray-300">
+            <p className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0 text-accent-gold" />
+              {date}
+            </p>
+            <p className="flex items-center gap-2">
+              <Clock className="h-4 w-4 shrink-0 text-accent-gold" />
+              {time} Uhr
+              {endMeta ? ` – ${endMeta.time} Uhr` : ""}
+            </p>
+            {event.location ? (
+              <p className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 shrink-0 text-accent-gold" />
+                {event.location}
+              </p>
+            ) : null}
+          </div>
+
+          {description ? (
+            <p className="mt-5 whitespace-pre-wrap font-libre text-base leading-relaxed text-gray-200">
+              {description}
+            </p>
+          ) : (
+            <p className="mt-5 font-libre text-sm text-gray-500">
+              Community-Termin — werde Mitglied und nimm teil.
+            </p>
+          )}
+
+          <Link
+            href="/signup"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded border border-hero-vibrant/50 bg-hero-vibrant/15 px-4 py-3 font-barlow text-sm font-bold uppercase text-hero-vibrant transition-colors hover:bg-hero-vibrant/25 sm:w-auto"
+          >
+            <UserPlus className="h-4 w-4" />
+            Registrieren &amp; teilnehmen
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -224,7 +391,16 @@ export function TermineUndRundenSection({ events }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CommunityEvent | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const openEventDetail = useCallback((event: CommunityEvent) => {
+    setSelectedEvent(event);
+  }, []);
+
+  const closeEventDetail = useCallback(() => {
+    setSelectedEvent(null);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -385,7 +561,7 @@ export function TermineUndRundenSection({ events }: Props) {
                   </div>
                 ) : (
                   <div key={item.id} data-termin-card>
-                    <EventCard event={item.event} />
+                    <EventCard event={item.event} onOpenDetail={openEventDetail} />
                   </div>
                 ),
               )}
@@ -393,6 +569,10 @@ export function TermineUndRundenSection({ events }: Props) {
           </div>
         ) : null}
       </div>
+
+      {selectedEvent ? (
+        <CommunityEventDetailModal event={selectedEvent} onClose={closeEventDetail} />
+      ) : null}
 
       {/* Dekoration */}
       <div className="pointer-events-none absolute left-4 top-1/2 z-20 hidden -translate-y-1/2 lg:block">
