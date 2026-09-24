@@ -2,6 +2,8 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getPendingApplications } from "@/src/lib/queries/application-queries";
 import { parseChronicleStateRow } from "@/src/lib/session-chronicle/parse-db";
 import { countPendingInboxItems } from "@/src/lib/session-chronicle/inbox";
+import { isSessionStatusLive } from "@/src/lib/session-status";
+import { isStaleLiveSession } from "@/src/lib/session-focus";
 
 export type GMNotification = {
   id: string;
@@ -9,6 +11,7 @@ export type GMNotification = {
     | "application"
     | "character_update"
     | "session_completed"
+    | "session_open"
     | "chronicle_inbox"
     | "system";
   message: string;
@@ -189,11 +192,62 @@ export async function getGMNotifications(
     });
   }
 
-  notifications.sort(
+  const { data: openLiveRaw } = await (supabase.from("sessions") as any)
+    .select("id, title, start_time, status, campaign_id")
+    .in("campaign_id", campaignIds)
+    .order("start_time", { ascending: false })
+    .limit(40);
+
+  const now = new Date();
+  const openRows = ((openLiveRaw as any[]) || [])
+    .filter((sess) => isSessionStatusLive(sess.status))
+    .map((sess) => ({
+      sess,
+      stale: isStaleLiveSession(
+        { status: sess.status, start_time: sess.start_time },
+        now,
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.stale !== b.stale) return a.stale ? -1 : 1;
+      return (
+        new Date(b.sess.start_time ?? 0).getTime() -
+        new Date(a.sess.start_time ?? 0).getTime()
+      );
+    });
+
+  const openSessionNotes: GMNotification[] = openRows.map(({ sess, stale }) => {
+    const campaignName = campaignMap.get(sess.campaign_id) ?? "Kampagne";
+    const title = String(sess.title || "Session").trim();
+    const when = sess.start_time
+      ? new Intl.DateTimeFormat("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date(sess.start_time))
+      : "";
+    return {
+      id: `open-sess-${sess.id}`,
+      type: "session_open" as const,
+      message: stale
+        ? `Verwaiste Live-Session „${title}" (${when}) in ${campaignName} ist noch nicht abgeschlossen`
+        : `Laufende Session „${title}" (${when}) in ${campaignName} ist noch offen`,
+      href: `/dashboard/campaigns/${sess.campaign_id}?tab=sessions`,
+      campaignId: sess.campaign_id,
+      campaignName,
+      actorName: null,
+      actorAvatarUrl: null,
+      createdAt: sess.start_time ?? now.toISOString(),
+    };
+  });
+
+  const otherNotes = notifications.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  return notifications.slice(0, 15);
+  return [...openSessionNotes, ...otherNotes].slice(0, 20);
 }
 
 export async function getGMRecipients(

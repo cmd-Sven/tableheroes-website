@@ -370,20 +370,44 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
             </div>
           ) : sched && nextSessionLocal ? (
             <div className="flex flex-col items-stretch sm:items-end gap-2">
-              <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
-                {nextSessionLocal.pendingCount === 1
-                  ? "Es fehlt noch 1 Spieler"
-                  : `Es fehlen noch ${nextSessionLocal.pendingCount} Spieler`}{" "}
-                (Zusage oder deine Freigabe unten)
-              </span>
-              <button
-                type="button"
-                disabled
-                className="inline-flex items-center justify-center gap-2 rounded border border-gray-600 bg-gray-800/50 px-5 py-2.5 font-barlow font-bold uppercase text-xs text-gray-500 cursor-not-allowed"
-                title="Alle Spieler müssen zugesagt haben oder du markierst sie in der Liste als dabei."
-              >
-                Session starten
-              </button>
+              {!nextSessionLocal.gmPrepComplete ? (
+                <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
+                  Planung noch nicht abgeschlossen
+                </span>
+              ) : null}
+              {(nextSessionLocal.pendingCount ?? 0) > 0 ? (
+                <span className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-barlow text-xs uppercase text-amber-200 text-center sm:text-right">
+                  {nextSessionLocal.pendingCount === 1
+                    ? "1 Spieler ohne Rückmeldung"
+                    : `${nextSessionLocal.pendingCount} Spieler ohne Rückmeldung`}
+                  {" "}
+                  (−2 Punkte beim Start)
+                </span>
+              ) : null}
+              {nextSessionLocal.gmPrepComplete ? (
+                <button
+                  type="button"
+                  onClick={() => handleStart(nextSessionLocal.id)}
+                  disabled={isPending}
+                  className="inline-flex items-center justify-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant px-5 py-2.5 font-barlow font-bold uppercase text-sm text-black hover:bg-yellow-500 transition-colors disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Rocket className="h-4 w-4" />
+                  )}
+                  Session starten
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handlePrepComplete(nextSessionLocal.id)}
+                  disabled={isPending}
+                  className="inline-flex items-center justify-center gap-2 rounded border border-hero-border bg-hero-dark px-5 py-2.5 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:border-hero-vibrant disabled:opacity-50"
+                >
+                  Planung abschließen
+                </button>
+              )}
             </div>
           ) : (
             <Link

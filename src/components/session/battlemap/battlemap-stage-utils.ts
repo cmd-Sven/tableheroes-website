@@ -142,11 +142,12 @@ export type BattlemapStageProps = {
   onFogShapeDelete?: (shapeId: string) => void;
   onFogToolCancel?: () => void;
   /** Freihändig zeichnen */
-  drawTool?: "draw" | null;
+  drawTool?: import("@/src/lib/session/map-draw-types").MapDrawTool;
   drawColor?: string;
   drawWidth?: number;
   drawStrokes?: import("@/src/lib/session/map-draw-types").SessionMapDrawStroke[];
   onDrawStroke?: (points: import("@/src/lib/session/map-draw-types").MapDrawPoint[]) => void;
+  onErasePoint?: (point: import("@/src/lib/session/map-draw-types").MapDrawPoint) => void;
   onTokenMove?: (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
   onPropDrop?: (draft: GmPropPlacementDraft, posX: number, posY: number) => void;
   onPropResize?: (propId: string, delta: number) => void;

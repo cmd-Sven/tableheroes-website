@@ -73,4 +73,6 @@ export type UpcomingSession = {
   location?: string | null;
   /** GM-Spielplanung vor Kampagnenstart — Einladungs-Optik im Dashboard. */
   isPlanningInvitation?: boolean;
+  /** false solange der GM die Planung nicht abgeschlossen hat. */
+  gmPrepComplete?: boolean;
 };

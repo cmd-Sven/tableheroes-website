@@ -42,7 +42,7 @@ export function useLiveSessionBattlemapState(liveState: LiveState | null) {
   const [markerTool, setMarkerTool] = useState<BattlemapMarkerTool>(null);
   const [trapTool, setTrapTool] = useState<BattlemapTrapTool>(null);
   const [containerTool, setContainerTool] = useState<BattlemapContainerTool>(null);
-  const [drawTool, setDrawTool] = useState<"draw" | null>(null);
+  const [drawTool, setDrawTool] = useState<import("@/src/lib/session/map-draw-types").MapDrawTool>(null);
   const [drawColor, setDrawColor] = useState("#cab926");
   const [drawWidth, setDrawWidth] = useState(4);
   const [drawStrokeCount, setDrawStrokeCount] = useState(0);

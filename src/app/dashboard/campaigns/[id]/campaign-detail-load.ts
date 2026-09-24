@@ -16,6 +16,7 @@ import { getQuests } from "./quest-queries";
 import {
   isOnSessionRsvpRoster,
   isPlayerReadyForSessionStart,
+  hasPlayerRsvpResponse,
 } from "./session-rsvp-readiness";
 import { getCampaignGalleryImages } from "./gallery-queries";
 import { getWorldsByGm } from "./world-queries";
@@ -304,13 +305,11 @@ export async function loadCampaignDetailPageData(
         const byUser = new Map(sessionRows.map((row) => [row.user_id, row]));
         const playerIds = [...memberIds];
         const pendingCount = playerIds.filter(
-          (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
+          (uid) => !hasPlayerRsvpResponse(byUser.get(uid)),
         ).length;
         return {
           ...s,
-          canStart:
-            pendingCount === 0 &&
-            (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
+          canStart: (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false,
           pendingCount,
           hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
         };

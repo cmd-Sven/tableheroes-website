@@ -12,10 +12,12 @@ import {
   clearMapDrawStrokes,
   createMapDrawStroke,
   listMapDrawStrokes,
+  removeMapDrawStroke,
   undoLastMapDrawStroke,
 } from "@/src/lib/actions/map-draw-actions";
 import {
   normalizeMapDrawStroke,
+  strokeHitsEraser,
   type MapDrawPoint,
   type SessionMapDrawStroke,
 } from "@/src/lib/session/map-draw-types";
@@ -179,6 +181,40 @@ export function useBattlemapDrawSync({
     });
   }, [drawClearReq, isGM, activeWorldMapId, activeBattlemapId, sessionId]);
 
+  const strokesRef = useRef(drawStrokes);
+  strokesRef.current = drawStrokes;
+  const erasingIds = useRef(new Set<string>());
+
+  const handleEraseAt = useCallback(
+    (point: MapDrawPoint) => {
+      if (!activeBattlemapId || !isGM) return;
+      const radius = Math.max(12, drawWidth * 1.8);
+      const hits = strokesRef.current.filter(
+        (stroke) => !erasingIds.current.has(stroke.id) && strokeHitsEraser(stroke, point, radius),
+      );
+      if (hits.length === 0) return;
+      const hitIds = new Set(hits.map((stroke) => stroke.id));
+      for (const id of hitIds) erasingIds.current.add(id);
+      setDrawStrokes((prev) => {
+        const next = prev.filter((stroke) => !hitIds.has(stroke.id));
+        queueMicrotask(() => syncCountRef.current(next.length));
+        return next;
+      });
+      startTransition(async () => {
+        for (const stroke of hits) {
+          try {
+            await removeMapDrawStroke(stroke.id, sessionId);
+          } catch (e) {
+            erasingIds.current.delete(stroke.id);
+            toast.error(e instanceof Error ? e.message : "Radieren fehlgeschlagen.");
+            void reloadDraw();
+          }
+        }
+      });
+    },
+    [activeBattlemapId, drawWidth, isGM, reloadDraw, sessionId, startTransition],
+  );
+
   const handleDrawStroke = useCallback(
     (points: MapDrawPoint[]) => {
       if (!activeBattlemapId || !isGM) return;
@@ -204,5 +240,5 @@ export function useBattlemapDrawSync({
     [activeBattlemapId, isGM, startTransition, sessionId, drawColor, drawWidth],
   );
 
-  return { drawStrokes, handleDrawStroke };
+  return { drawStrokes, handleDrawStroke, handleEraseAt };
 }

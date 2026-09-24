@@ -141,11 +141,16 @@ export async function deleteSession(sessionId: string) {
   if (!user) throw new Error("Nicht authentifiziert.");
 
   const { data: sessionRaw } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, title")
+    .select("id, campaign_id, title, status")
     .eq("id", sessionId)
     .single();
 
-  const session = sessionRaw as { id: string; campaign_id: string; title: string | null } | null;
+  const session = sessionRaw as {
+    id: string;
+    campaign_id: string;
+    title: string | null;
+    status?: string | null;
+  } | null;
   if (!session) throw new Error("Session nicht gefunden.");
 
   const { data: campaignRaw } = await (supabase.from("campaigns") as any)
@@ -168,7 +173,11 @@ export async function deleteSession(sessionId: string) {
     .eq("session_id", sessionId)
     .in("rsvp_status", ["Zusage", "Via Online"]);
 
-  if (acceptedRsvps && (acceptedRsvps as any[]).length > 0) {
+  if (
+    acceptedRsvps &&
+    (acceptedRsvps as any[]).length > 0 &&
+    !isSessionStatusTerminal(session.status)
+  ) {
     throw new Error(
       "Der Termin kann nicht gelöscht werden, da bereits Spieler zugesagt haben. Bitte nutze stattdessen „Absagen“, damit zugesagte Spieler benachrichtigt werden."
     );

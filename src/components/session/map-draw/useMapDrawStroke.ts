@@ -10,7 +10,9 @@ type Args = {
   enabled: boolean;
   mapWidth: number;
   mapHeight: number;
+  mode?: "draw" | "erase";
   onStrokeComplete: (points: MapDrawPoint[]) => void;
+  onErasePoint?: (point: MapDrawPoint) => void;
 };
 
 function clientToMapPx(
@@ -32,13 +34,18 @@ export function useMapDrawStroke({
   enabled,
   mapWidth,
   mapHeight,
+  mode = "draw",
   onStrokeComplete,
+  onErasePoint,
 }: Args) {
   const [draftPoints, setDraftPoints] = useState<MapDrawPoint[] | null>(null);
   const draftRef = useRef<MapDrawPoint[] | null>(null);
   const drawingRef = useRef(false);
   const onCompleteRef = useRef(onStrokeComplete);
+  const onEraseRef = useRef(onErasePoint);
   onCompleteRef.current = onStrokeComplete;
+  onEraseRef.current = onErasePoint;
+  const erasing = mode === "erase";
 
   const setDraft = useCallback((next: MapDrawPoint[] | null) => {
     draftRef.current = next;
@@ -53,9 +60,13 @@ export function useMapDrawStroke({
       e.preventDefault();
       e.currentTarget.setPointerCapture(e.pointerId);
       drawingRef.current = true;
+      if (erasing) {
+        onEraseRef.current?.(pt);
+        return;
+      }
       setDraft([pt]);
     },
-    [enabled, mapHeight, mapWidth, setDraft],
+    [enabled, erasing, mapHeight, mapWidth, setDraft],
   );
 
   const onPointerMove = useCallback(
@@ -63,6 +74,10 @@ export function useMapDrawStroke({
       if (!enabled || !drawingRef.current) return;
       const pt = clientToMapPx(e.clientX, e.clientY, e.currentTarget, mapWidth, mapHeight);
       if (!pt) return;
+      if (erasing) {
+        onEraseRef.current?.(pt);
+        return;
+      }
       const prev = draftRef.current;
       if (!prev || prev.length === 0) {
         setDraft([pt]);
@@ -74,7 +89,7 @@ export function useMapDrawStroke({
       if (dx * dx + dy * dy < 4) return;
       setDraft([...prev, pt]);
     },
-    [enabled, mapHeight, mapWidth, setDraft],
+    [enabled, erasing, mapHeight, mapWidth, setDraft],
   );
 
   const finish = useCallback(
@@ -88,12 +103,11 @@ export function useMapDrawStroke({
       }
       const prev = draftRef.current;
       setDraft(null);
-      // Parent-Updates niemals im setState-Updater — sonst setState-während-Render.
-      if (prev && prev.length >= 2) {
+      if (!erasing && prev && prev.length >= 2) {
         queueMicrotask(() => onCompleteRef.current(prev));
       }
     },
-    [setDraft],
+    [erasing, setDraft],
   );
 
   return {

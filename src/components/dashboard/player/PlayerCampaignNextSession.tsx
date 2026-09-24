@@ -27,12 +27,6 @@ type Props = {
   requiresCharacter?: boolean;
 };
 
-const RSVP_OPTIONS: { value: RsvpStatus; label: string }[] = [
-  { value: "Zusage", label: "Zusage" },
-  { value: "Absage", label: "Absage" },
-  { value: "Via Online", label: "Via Online" },
-];
-
 function feedbackMessage(status: RsvpStatus): string {
   switch (status) {
     case "Zusage":
@@ -88,9 +82,8 @@ export function PlayerCampaignNextSession({
   }).format(startDate);
   const { formattedTime } = formatSessionDateTimeDe(session.start_time);
 
-  const handleRsvpChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as RsvpStatus;
-    if (!value) return;
+  const chooseRsvp = (value: RsvpStatus) => {
+    if (!value || isPending) return;
     setFeedback(null);
     setOptimisticRsvp(value);
     startTransition(async () => {
@@ -194,34 +187,53 @@ export function PlayerCampaignNextSession({
                     {feedback}
                   </div>
                 )}
-                <label className="block font-barlow font-bold text-xs uppercase text-gray-500 mb-1">
-                  Deine Teilnahme
-                </label>
-                <select
-                  value={displayRsvp ?? ""}
-                  onChange={handleRsvpChange}
-                  disabled={isPending}
-                  className="w-full max-w-xs rounded border border-hero-dark bg-slate-900/90 px-3 py-2.5 font-barlow font-bold text-sm text-white focus:border-hero-vibrant outline-none disabled:opacity-50"
-                >
-                  <option value="">Bitte wählen…</option>
-                  {RSVP_OPTIONS.map((opt) => (
-                    <option
-                      key={opt.value}
-                      value={opt.value}
+                <p className="mb-2 font-libre text-xs text-gray-400">
+                  Rechtzeitig innerhalb der Frist: 10 Punkte. Danach: 5 Punkte. Ohne Rückmeldung: −2 Punkte.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => chooseRsvp("Zusage")}
+                    className={`rounded px-4 py-2 font-barlow text-xs font-bold uppercase ${
+                      displayRsvp === "Zusage"
+                        ? "bg-hero-vibrant text-black"
+                        : "border border-hero-vibrant/50 text-hero-vibrant hover:bg-hero-vibrant/15"
+                    }`}
+                  >
+                    Zusagen
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => chooseRsvp("Absage")}
+                    className={`rounded px-4 py-2 font-barlow text-xs font-bold uppercase ${
+                      displayRsvp === "Absage"
+                        ? "bg-red-800 text-white"
+                        : "border border-red-700/60 text-red-200 hover:bg-red-950/40"
+                    }`}
+                  >
+                    Absagen
+                  </button>
+                  {session.is_live !== false ? (
+                    <button
+                      type="button"
                       disabled={
-                        opt.value === "Via Online" &&
-                        viaOnlineTaken &&
-                        displayRsvp !== "Via Online"
+                        isPending || (viaOnlineTaken && displayRsvp !== "Via Online")
                       }
+                      onClick={() => chooseRsvp("Via Online")}
+                      className={`rounded px-4 py-2 font-barlow text-xs font-bold uppercase disabled:opacity-40 ${
+                        displayRsvp === "Via Online"
+                          ? "bg-accent-gold text-black"
+                          : "border border-accent-gold/50 text-accent-gold hover:bg-accent-gold/10"
+                      }`}
                     >
-                      {opt.value === "Via Online" &&
-                      viaOnlineTaken &&
-                      displayRsvp !== "Via Online"
-                        ? "Via Online (belegt)"
-                        : opt.label}
-                    </option>
-                  ))}
-                </select>
+                      {viaOnlineTaken && displayRsvp !== "Via Online"
+                        ? "Via Online belegt"
+                        : "Via Online"}
+                    </button>
+                  ) : null}
+                </div>
               </>
             )}
           </div>

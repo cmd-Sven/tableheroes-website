@@ -76,7 +76,7 @@ async function fetchSessionsForCampaignIds(
 
   const { data: d1, error: e1 } = await applyFilters(
     (supabase.from("sessions") as any).select(
-      "id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live",
+      "id, title, start_time, end_time, status, campaign_id, type, rsvp_deadline_days, is_live, gm_prep_complete",
     ),
   );
 
@@ -545,6 +545,8 @@ export async function getUpcomingSessionsForUser(
       viaOnlineTaken,
       sessionType: parseSessionType(s.type),
       requiresCharacter: sessionRequiresCharacter(s.type),
+      gmPrepComplete:
+        typeof s.gm_prep_complete === "boolean" ? s.gm_prep_complete : undefined,
     };
   });
 

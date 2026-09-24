@@ -96,6 +96,7 @@ export function BattlemapStage({
   drawWidth = 4,
   drawStrokes = [],
   onDrawStroke,
+  onErasePoint,
 }: BattlemapStageProps) {
   const config = battlemap.grid_config;
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -159,6 +160,7 @@ export function BattlemapStage({
   );
   const shapeDrawActive = fogDrawActive || effectDrawActive;
   const freehandDrawActive = Boolean(isGm && drawTool === "draw" && onDrawStroke);
+  const freehandEraseActive = Boolean(isGm && drawTool === "erase" && onErasePoint);
   const fogInteractive = Boolean(
     isGm &&
       fogTool === "select" &&
@@ -234,7 +236,8 @@ export function BattlemapStage({
     markerPlaceActive ||
     trapPlaceActive ||
     containerPlaceActive ||
-    freehandDrawActive;
+    freehandDrawActive ||
+    freehandEraseActive;
 
   const movingGmToken = gmMoveTokenId
     ? tokens.find((t) => t.id === gmMoveTokenId) ?? null
@@ -455,6 +458,8 @@ export function BattlemapStage({
         propDropHighlight={propDropHighlight}
         shapeDrawActive={shapeDrawActive}
         freehandDrawActive={freehandDrawActive}
+        freehandEraseActive={freehandEraseActive}
+        onErasePoint={onErasePoint}
         drawColor={drawColor}
         drawWidth={drawWidth}
         drawStrokes={drawStrokes}

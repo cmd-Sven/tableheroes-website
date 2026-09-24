@@ -466,6 +466,13 @@ export function LiveSessionLeftDockToolFlyoutPortal({
           >
             <Pencil className="h-4 w-4" />
           </ToolFlyoutButton>
+          <ToolFlyoutButton
+            label="Striche wegradieren"
+            active={drawTool === "erase"}
+            onClick={() => onDrawToolChange(drawTool === "erase" ? null : "erase")}
+          >
+            <Eraser className="h-4 w-4 text-sky-300" />
+          </ToolFlyoutButton>
           <div className="flex items-center gap-1 px-1">
             {MAP_DRAW_PRESET_COLORS.map((c) => (
               <button
@@ -506,7 +513,7 @@ export function LiveSessionLeftDockToolFlyoutPortal({
             tone="danger"
             onClick={() => onDrawClearAll?.()}
           >
-            <Eraser className={`h-4 w-4 ${drawCount > 0 ? "text-red-300" : "opacity-40"}`} />
+            <Trash2 className={`h-4 w-4 ${drawCount > 0 ? "text-red-300" : "opacity-40"}`} />
           </ToolFlyoutButton>
         </motion.div>
       ) : null}

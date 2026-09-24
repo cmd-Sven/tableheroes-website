@@ -14,6 +14,15 @@ export function isPlayerReadyForSessionStart(
   return playing || !!row.gm_confirmed;
 }
 
+/** Spieler hat zu- oder abgesagt (inkl. Via Online). Absage zählt als Rückmeldung. */
+export function hasPlayerRsvpResponse(
+  row: { rsvp_status?: string | null } | null | undefined,
+): boolean {
+  if (!row?.rsvp_status) return false;
+  const st = String(row.rsvp_status);
+  return st === "Zusage" || st === "Absage" || st === "Via Online";
+}
+
 /**
  * Wer erscheint in der Session-RSVP-Liste (inkl. manuelle GM-Bestätigung).
  * Der SL selbst ist normalerweise kein Teilnehmer — außer er hat einen

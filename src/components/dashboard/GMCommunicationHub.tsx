@@ -15,6 +15,7 @@ import {
   Users,
   User,
   Scroll,
+  Radio,
   ShieldCheck,
   ExternalLink,
   BookOpen,
@@ -46,6 +47,8 @@ function NotificationIcon({ type }: { type: GMNotification["type"] }) {
       return <ScrollText className="h-4 w-4 text-accent-gold" />;
     case "session_completed":
       return <CheckCircle2 className="h-4 w-4 text-hero-vibrant" />;
+    case "session_open":
+      return <Radio className="h-4 w-4 text-amber-300" />;
     case "chronicle_inbox":
       return <BookOpen className="h-4 w-4 text-sky-300" />;
     default:
@@ -61,6 +64,8 @@ function notificationTypeLabel(type: GMNotification["type"]): string {
       return "Charakter";
     case "session_completed":
       return "Session";
+    case "session_open":
+      return "Offen";
     case "chronicle_inbox":
       return "Chronist";
     default:
@@ -76,6 +81,8 @@ function notificationTypeBadgeClass(type: GMNotification["type"]): string {
       return "bg-accent-gold/10 text-accent-gold border-accent-gold/30";
     case "session_completed":
       return "bg-hero-vibrant/10 text-hero-vibrant border-hero-vibrant/30";
+    case "session_open":
+      return "bg-amber-950/50 text-amber-200 border-amber-600/50";
     case "chronicle_inbox":
       return "bg-sky-950/40 text-sky-300 border-sky-700/40";
     default:
@@ -159,7 +166,13 @@ function NotificationsTab({
         }).format(new Date(n.createdAt));
 
         const inner = (
-          <div className="flex items-start gap-3 p-4 hover:bg-white/[0.02] transition-colors group">
+          <div
+            className={`flex items-start gap-3 p-4 transition-colors group ${
+              n.type === "session_open"
+                ? "bg-amber-950/25 hover:bg-amber-950/40"
+                : "hover:bg-white/[0.02]"
+            }`}
+          >
             {n.actorAvatarUrl ? (
               <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-hero-border/40 bg-background-dark">
                 <Image

@@ -18,8 +18,8 @@ export type SessionMapDrawStroke = {
   updated_at?: string;
 };
 
-/** null = aus; draw = zeichnen; erase = letzten Stroke löschen via UI */
-export type MapDrawTool = "draw" | null;
+/** null = aus; draw = Linie; erase = einzelne Striche wegradieren */
+export type MapDrawTool = "draw" | "erase" | null;
 
 export const MAP_DRAW_DEFAULT_COLOR = "#cab926";
 export const MAP_DRAW_DEFAULT_WIDTH = 4;
@@ -62,4 +62,32 @@ export function normalizeMapDrawStroke(row: Record<string, unknown>): SessionMap
     created_at: row.created_at != null ? String(row.created_at) : undefined,
     updated_at: row.updated_at != null ? String(row.updated_at) : undefined,
   };
+}
+
+function distToSegment(p: MapDrawPoint, a: MapDrawPoint, b: MapDrawPoint): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** true, wenn der Radierer einen Strich trifft (inkl. Strichstärke). */
+export function strokeHitsEraser(
+  stroke: SessionMapDrawStroke,
+  point: MapDrawPoint,
+  radius: number,
+): boolean {
+  const pts = stroke.points;
+  if (pts.length === 0) return false;
+  const reach = radius + stroke.stroke_width / 2;
+  if (pts.length === 1) {
+    const only = pts[0]!;
+    return Math.hypot(point.x - only.x, point.y - only.y) <= reach;
+  }
+  for (let i = 1; i < pts.length; i += 1) {
+    if (distToSegment(point, pts[i - 1]!, pts[i]!) <= reach) return true;
+  }
+  return false;
 }

@@ -69,10 +69,12 @@ export type BattlemapStageMapProps = {
   propDropHighlight: boolean;
   shapeDrawActive: boolean;
   freehandDrawActive?: boolean;
+  freehandEraseActive?: boolean;
   drawColor?: string;
   drawWidth?: number;
   drawStrokes?: import("@/src/lib/session/map-draw-types").SessionMapDrawStroke[];
   onDrawStroke?: (points: import("@/src/lib/session/map-draw-types").MapDrawPoint[]) => void;
+  onErasePoint?: (point: import("@/src/lib/session/map-draw-types").MapDrawPoint) => void;
   placementActive: boolean;
   shapeSelectActive: boolean;
   markerPlaceActive: boolean;
@@ -193,10 +195,12 @@ export function BattlemapStageMap({
   propDropHighlight,
   shapeDrawActive,
   freehandDrawActive = false,
+  freehandEraseActive = false,
   drawColor = "#cab926",
   drawWidth = 4,
   drawStrokes = [],
   onDrawStroke,
+  onErasePoint,
   placementActive,
   shapeSelectActive,
   markerPlaceActive,
@@ -284,11 +288,14 @@ export function BattlemapStageMap({
     onSelectContainer,
   });
 
+  const inkActive = freehandDrawActive || freehandEraseActive;
   const { draftPoints, drawHandlers } = useMapDrawStroke({
-    enabled: freehandDrawActive,
+    enabled: inkActive,
+    mode: freehandEraseActive ? "erase" : "draw",
     mapWidth: mapSize.width,
     mapHeight: mapSize.height,
     onStrokeComplete: (points) => onDrawStroke?.(points),
+    onErasePoint,
   });
 
   const canDragToken = useCallback(
@@ -426,28 +433,31 @@ export function BattlemapStageMap({
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverCell(null)}
           onPointerDown={
-            freehandDrawActive
+            inkActive
               ? drawHandlers.onPointerDown
               : shapeDrawActive
                 ? handleShapePointerDown
                 : undefined
           }
           onPointerMove={
-            freehandDrawActive
+            inkActive
               ? drawHandlers.onPointerMove
               : shapeDrawActive
                 ? handleShapePointerMove
                 : undefined
           }
           onPointerUp={
-            freehandDrawActive
+            inkActive
               ? drawHandlers.onPointerUp
               : shapeDrawActive
                 ? handleShapePointerUp
                 : undefined
           }
+          onPointerLeave={
+            inkActive ? drawHandlers.onPointerCancel : undefined
+          }
           onPointerCancel={
-            freehandDrawActive
+            inkActive
               ? drawHandlers.onPointerCancel
               : shapeDrawActive
                 ? cancelShapeDraw

@@ -1,22 +1,20 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check, Pencil } from "lucide-react";
-import { SessionEditModal } from "@/src/components/dashboard/SessionEditModal";
-import { canEditSessionSchedule, isSessionStatusScheduled } from "@/src/lib/session-status";
+import { Calendar, Clock, Swords, Shield, Zap, ChevronRight, AlertTriangle, CheckCircle, Check } from "lucide-react";
+import { isSessionStatusScheduled } from "@/src/lib/session-status";
 import type {
   UpcomingSession,
   SessionParticipant,
   SessionRsvp,
   RsvpStatus,
 } from "@/src/lib/types/dashboard-widgets";
-import { setSessionRsvp, setGmConfirmed, updateSessionRsvpSettings } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import { setSessionRsvp } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import { setCommunityEventRsvp } from "@/src/lib/actions/community-event-actions";
-import { isPlayerReadyForSessionStart } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
-import { applyGmConfirmToSessionRsvp } from "@/src/lib/session-rsvp/gm-confirm-optimistic";
+import { hasPlayerRsvpResponse } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
 import { getSessionTypeLabel } from "@/src/lib/session-type";
 import { APP_TIMEZONE, formatSessionTimeDe } from "@/src/lib/datetime/berlin";
 
@@ -96,12 +94,6 @@ function ParticipantAvatar({ p }: { p: SessionParticipant }) {
   );
 }
 
-const RSVP_OPTIONS: { value: RsvpStatus; label: string }[] = [
-  { value: "Zusage", label: "Zusage" },
-  { value: "Absage", label: "Absage" },
-  { value: "Via Online", label: "Via Online" },
-];
-
 function isPlayingRsvp(status: RsvpStatus | null | undefined): boolean {
   return status === "Zusage" || status === "Via Online";
 }
@@ -147,9 +139,7 @@ function SessionRowPlayer({
   const formattedDate = formatUpcomingSessionDate(session.startTime);
   const formattedTime = formatSessionTimeDe(session.startTime);
 
-  const handleRsvpChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as RsvpStatus;
-    if (!value) return;
+  const submitRsvp = (value: RsvpStatus) => {
     startTransition(async () => {
       const res = session.isCommunityEvent
         ? await setCommunityEventRsvp(session.id, value, { isLive: session.isLive })
@@ -337,32 +327,49 @@ function SessionRowPlayer({
                 </Link>
               </p>
             ) : (
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {deadlineHighlight && (
                   <span className="flex items-center gap-1.5 font-barlow font-bold text-amber-400 text-xs uppercase">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Anmeldefrist!
+                    Anmeldefrist
                   </span>
                 )}
-                <select
-                  value={session.userRsvp ?? ""}
-                  onChange={handleRsvpChange}
+                <button
+                  type="button"
                   disabled={isPending}
-                  className="flex-1 max-w-[180px] rounded border border-hero-border bg-slate-900/80 px-3 py-2 font-barlow font-bold text-xs text-white focus:border-hero-vibrant outline-none disabled:opacity-50"
+                  onClick={() => submitRsvp("Zusage")}
+                  className={`rounded px-3 py-1.5 font-barlow text-[10px] font-bold uppercase ${
+                    session.userRsvp === "Zusage"
+                      ? "bg-hero-vibrant text-black"
+                      : "border border-hero-vibrant/50 text-hero-vibrant"
+                  }`}
                 >
-                  <option value="">Deine Teilnahme…</option>
-                  {RSVP_OPTIONS.map((opt) => (
-                    <option
-                      key={opt.value}
-                      value={opt.value}
-                      disabled={opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"}
-                    >
-                      {opt.value === "Via Online" && session.viaOnlineTaken && session.userRsvp !== "Via Online"
-                        ? "Via Online (ausgebucht)"
-                        : opt.label}
-                    </option>
-                  ))}
-                </select>
+                  Zusagen
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => submitRsvp("Absage")}
+                  className={`rounded px-3 py-1.5 font-barlow text-[10px] font-bold uppercase ${
+                    session.userRsvp === "Absage"
+                      ? "bg-red-800 text-white"
+                      : "border border-red-700/60 text-red-200"
+                  }`}
+                >
+                  Absagen
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending || (session.viaOnlineTaken && session.userRsvp !== "Via Online")}
+                  onClick={() => submitRsvp("Via Online")}
+                  className={`rounded px-3 py-1.5 font-barlow text-[10px] font-bold uppercase disabled:opacity-40 ${
+                    session.userRsvp === "Via Online"
+                      ? "bg-accent-gold text-black"
+                      : "border border-accent-gold/40 text-accent-gold"
+                  }`}
+                >
+                  Via Online
+                </button>
               </div>
             )}
           </div>
@@ -375,185 +382,76 @@ function SessionRowPlayer({
 /* ------------------------------------------------------------------ */
 /* Session-Karte (GM: RSVPs, Deadline, Bestätigung)                   */
 /* ------------------------------------------------------------------ */
-function SessionRowGM({
-  session,
-  onEditSchedule,
-}: {
-  session: UpcomingSession;
-  onEditSchedule?: () => void;
-}) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
-  const [rsvpsLocal, setRsvpsLocal] = useState(session.rsvps);
-
-  useEffect(() => {
-    if (confirmingUserId) return;
-    setRsvpsLocal(session.rsvps);
-  }, [session.id, session.rsvps, confirmingUserId]);
-
-  const startDate = new Date(session.startTime);
+function SessionRowGM({ session }: { session: UpcomingSession }) {
   const isLive = session.status === "Live";
   const isScheduled = isSessionStatusScheduled(session.status);
-
   const formattedDate = formatUpcomingSessionDate(session.startTime);
   const formattedTime = formatSessionTimeDe(session.startTime);
-
-  const allReadyForSessionStart =
-    rsvpsLocal.length > 0 &&
-    rsvpsLocal.every((r) =>
-      isPlayerReadyForSessionStart({
-        rsvp_status: r.rsvpStatus,
-        gm_confirmed: r.gmConfirmed,
-      }),
-    );
-
-  const handleGmConfirm = (userId: string, confirmed: boolean) => {
-    if (confirmingUserId) return;
-
-    const rollback = rsvpsLocal;
-    setRsvpsLocal((prev) =>
-      prev.map((r) => (r.userId === userId ? applyGmConfirmToSessionRsvp(r) : r)),
-    );
-
-    setConfirmingUserId(userId);
-    void (async () => {
-      try {
-        const res = await setGmConfirmed(session.id, userId, confirmed);
-        if (!res.success) {
-          throw new Error(res.error || "Speichern fehlgeschlagen.");
-        }
-      } catch (err: unknown) {
-        setRsvpsLocal(rollback);
-        alert(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
-      } finally {
-        setConfirmingUserId(null);
-      }
-    })();
-  };
-
-  const handleDeadlineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    const days = val === "" ? null : (Number(val) as 1 | 2 | 3);
-    startTransition(async () => {
-      const res = await updateSessionRsvpSettings(session.id, days, session.isLive);
-      if (!res.success || res.error) {
-        alert(res.error || "Anmeldefrist konnte nicht gespeichert werden.");
-        return;
-      }
-      router.refresh();
-    });
-  };
+  const pendingReplies = session.rsvps.filter((r) => !hasPlayerRsvpResponse({ rsvp_status: r.rsvpStatus })).length;
+  const planningOpen = session.gmPrepComplete === false;
+  const sessionTabHref = `/dashboard/campaigns/${session.campaignId}?tab=sessions`;
 
   return (
-    <div className="group relative block overflow-hidden rounded-lg border border-hero-border/30 bg-background-dark/30">
+    <div className="relative overflow-hidden rounded-lg border border-hero-border/30 bg-background-dark/30">
       <div className="relative z-10 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="font-barlow font-bold text-[10px] uppercase tracking-wider text-hero-vibrant/80 mb-0.5">
+            <p className="mb-0.5 font-barlow text-[10px] font-bold uppercase tracking-wider text-hero-vibrant/80">
               {session.campaignName}
             </p>
-            <h3 className="font-cinzel font-bold text-base text-white">
+            <h3 className="font-cinzel text-base font-bold text-white">
               {session.title || "Nächste Session"}
             </h3>
-            <p className="font-libre text-xs text-gray-500 mt-1">
+            <p className="mt-1 font-libre text-xs text-gray-500">
               {formattedDate} • {formattedTime} Uhr
             </p>
-            {isScheduled && !session.isCommunityEvent && onEditSchedule ? (
-              <button
-                type="button"
-                onClick={onEditSchedule}
-                className="mt-2 inline-flex items-center gap-1.5 rounded border border-hero-border/50 bg-hero-dark/40 px-2.5 py-1 font-barlow text-[10px] font-bold uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant transition-colors"
-              >
-                <Pencil className="h-3 w-3" />
-                Termin ändern
-              </button>
-            ) : null}
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 font-barlow font-bold uppercase text-[10px] ${
-            isLive ? "bg-red-900/60 text-red-300" : "bg-blue-900/40 text-blue-300"
-          }`}>
+          <span
+            className={`shrink-0 rounded-full px-3 py-1 font-barlow text-[10px] font-bold uppercase ${
+              isLive ? "bg-red-900/60 text-red-300" : "bg-blue-900/40 text-blue-300"
+            }`}
+          >
             {session.status}
           </span>
         </div>
 
-        {isScheduled && (
-          <>
-            {/* Anmeldefrist */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="font-barlow font-bold text-[10px] uppercase text-gray-500">Anmeldefrist:</span>
-              <select
-                value={session.rsvpDeadlineDays ?? ""}
-                onChange={handleDeadlineChange}
-                disabled={isPending}
-                className="rounded border border-hero-border bg-slate-900 px-2 py-1 font-barlow text-xs text-white"
-              >
-                <option value="">Keine</option>
-                <option value="1">1 Tag vorher</option>
-                <option value="2">2 Tage vorher</option>
-                <option value="3">3 Tage vorher</option>
-              </select>
-            </div>
+        {isScheduled ? (
+          <ul className="mb-4 space-y-2">
+            {planningOpen ? (
+              <li className="flex items-start gap-2 rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-libre text-sm text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                Planung noch nicht abgeschlossen
+              </li>
+            ) : null}
+            {pendingReplies > 0 ? (
+              <li className="flex items-start gap-2 rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 font-libre text-sm text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                {pendingReplies === 1
+                  ? "Noch 1 Spieler ohne Rückmeldung"
+                  : `Noch ${pendingReplies} Spieler ohne Rückmeldung`}
+              </li>
+            ) : session.rsvps.length > 0 ? (
+              <li className="flex items-start gap-2 rounded border border-hero-vibrant/40 bg-hero-vibrant/10 px-3 py-2 font-libre text-sm text-hero-vibrant">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                Alle Spieler haben geantwortet
+              </li>
+            ) : null}
+          </ul>
+        ) : null}
 
-            {/* RSVP-Liste */}
-            <div className="border-t border-hero-border/20 pt-3 space-y-2">
-              {rsvpsLocal.map((r) => (
-                <div key={r.userId} className="flex items-center justify-between gap-2">
-                  <span className="font-libre text-sm text-gray-300 truncate">
-                    {r.characterName || r.username}
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`font-barlow text-[10px] uppercase ${
-                      r.gmConfirmed
-                        ? "text-hero-vibrant"
-                        : r.rsvpStatus === "Zusage" || r.rsvpStatus === "Via Online"
-                        ? "text-hero-vibrant"
-                        : r.rsvpStatus === "Absage"
-                        ? "text-red-400"
-                        : "text-gray-500"
-                    }`}>
-                      {r.gmConfirmed && r.rsvpStatus === "Absage"
-                        ? "GM-Freigabe"
-                        : (r.rsvpStatus ?? "—")}
-                    </span>
-                    {!isPlayerReadyForSessionStart({
-                      rsvp_status: r.rsvpStatus,
-                      gm_confirmed: r.gmConfirmed,
-                    }) ? (
-                      <button
-                        type="button"
-                        onClick={() => handleGmConfirm(r.userId, true)}
-                        disabled={confirmingUserId === r.userId}
-                        className="rounded bg-amber-900/40 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-amber-400 hover:bg-amber-800/50 disabled:opacity-50"
-                      >
-                        {confirmingUserId === r.userId ? "…" : "Als dabei markieren"}
-                      </button>
-                    ) : (
-                      <span className="rounded bg-hero-vibrant/20 px-2 py-0.5 font-barlow font-bold text-[10px] uppercase text-hero-vibrant">
-                        ✓ Start OK
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Alle bereit */}
-            {allReadyForSessionStart && (
-              <div className="mt-3 flex items-center gap-2 rounded bg-hero-vibrant/20 border border-hero-vibrant/50 px-3 py-2">
-                <CheckCircle className="h-5 w-5 text-hero-vibrant shrink-0" />
-                <span className="font-barlow font-bold text-sm text-hero-vibrant uppercase">
-                  Alle Spieler sind für den Start markiert (Zusage oder deine Freigabe).
-                </span>
-              </div>
-            )}
-          </>
-        )}
+        {session.campaignId ? (
+          <Link
+            href={sessionTabHref}
+            className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/15 px-4 py-2 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/25"
+          >
+            Zum Session-Tab
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        ) : null}
       </div>
     </div>
   );
 }
-
 /* ------------------------------------------------------------------ */
 /* Vergangene Session (read-only, kein Betreten)                       */
 /* ------------------------------------------------------------------ */
@@ -628,7 +526,6 @@ export function UpcomingSessionsCard({
   isGM = false,
   rsvpBlockedCampaignIds = [],
 }: Props) {
-  const router = useRouter();
   if (sessions.length === 0) {
     return (
       <div className="w-full p-4">
@@ -651,23 +548,13 @@ export function UpcomingSessionsCard({
 
   const displaySessions = showAll ? sessions : sessions.slice(0, maxVisible);
   const hasMore = !showAll && sessions.length > maxVisible;
-
   const blockedSet = new Set(rsvpBlockedCampaignIds);
-  const [editingSession, setEditingSession] = useState<UpcomingSession | null>(null);
 
   return (
     <div className="w-full p-4 space-y-3">
       {displaySessions.map((s) =>
         isGM ? (
-          <SessionRowGM
-            key={s.id}
-            session={s}
-            onEditSchedule={
-              !s.isCommunityEvent && canEditSessionSchedule(s.status)
-                ? () => setEditingSession(s)
-                : undefined
-            }
-          />
+          <SessionRowGM key={s.id} session={s} />
         ) : (
           <SessionRowPlayer
             key={s.id}
@@ -685,24 +572,6 @@ export function UpcomingSessionsCard({
           <ChevronRight className="h-4 w-4" />
         </Link>
       )}
-      {editingSession ? (
-        <SessionEditModal
-          session={{
-            id: editingSession.id,
-            title: editingSession.title,
-            start_time: editingSession.startTime,
-            end_time: editingSession.endTime,
-            status: editingSession.status,
-          }}
-          campaignId={editingSession.campaignId}
-          isOpen
-          onClose={() => setEditingSession(null)}
-          onSuccess={() => {
-            setEditingSession(null);
-            router.refresh();
-          }}
-        />
-      ) : null}
     </div>
   );
 }

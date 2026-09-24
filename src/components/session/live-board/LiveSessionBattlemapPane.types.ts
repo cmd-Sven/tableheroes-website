@@ -79,7 +79,7 @@ export type LiveSessionBattlemapPaneProps = {
   setTrapTool: Dispatch<SetStateAction<BattlemapTrapTool>>;
   containerTool: BattlemapContainerTool;
   setContainerTool: Dispatch<SetStateAction<BattlemapContainerTool>>;
-  drawTool: "draw" | null;
+  drawTool: import("@/src/lib/session/map-draw-types").MapDrawTool;
   drawColor: string;
   drawWidth: number;
   poiTool: import("@/src/lib/world-maps/types").WorldMapPoiTool;

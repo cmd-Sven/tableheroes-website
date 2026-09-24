@@ -111,7 +111,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
   } = props;
 
   const [playerMoveMaxCells, setPlayerMoveMaxCells] = useState<number | null>(null);
-  const { drawStrokes, handleDrawStroke } = useBattlemapDrawSync({
+  const { drawStrokes, handleDrawStroke, handleEraseAt } = useBattlemapDrawSync({
     sessionId,
     activeBattlemapId,
     activeWorldMapId,
@@ -171,6 +171,7 @@ export function LiveSessionBattlemapStageHost(props: LiveSessionBattlemapPanePro
       drawWidth={drawWidth}
       drawStrokes={drawStrokes}
       onDrawStroke={handleDrawStroke}
+      onErasePoint={handleEraseAt}
       disableSpacePan={Boolean(trapWizardCell || containerWizardCell)}
       selectedEffectTemplateId={selectedEffectTemplateId}
       selectedMarkerId={selectedMarkerId}

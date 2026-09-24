@@ -91,6 +91,7 @@ type Props = {
   }) => void;
   onEffectMarkerDelete: (id: string) => void;
   onDrawStroke: (points: MapDrawPoint[]) => void;
+  onErasePoint?: (point: MapDrawPoint) => void;
 };
 
 export function WorldMapLiveStage({
@@ -122,6 +123,7 @@ export function WorldMapLiveStage({
   onEffectMarkerCreate,
   onEffectMarkerDelete,
   onDrawStroke,
+  onErasePoint,
 }: Props) {
   const config = map.grid_config;
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
@@ -161,14 +163,18 @@ export function WorldMapLiveStage({
   const fogDrawActive = Boolean(isGm && fogTool && fogTool !== "select");
   const effectDrawActive = Boolean(isGm && effectTool && effectTool !== "select");
   const drawActive = Boolean(isGm && drawTool === "draw");
+  const eraseActive = Boolean(isGm && drawTool === "erase");
+  const inkActive = drawActive || eraseActive;
   const poiPlaceActive = Boolean(isGm && isWorldMapPoiPlaceIcon(poiTool));
   const poiSelectActive = Boolean(isGm && poiTool === "select");
 
   const { draftPoints, drawHandlers } = useMapDrawStroke({
-    enabled: drawActive,
+    enabled: inkActive,
+    mode: eraseActive ? "erase" : "draw",
     mapWidth: mapSize.width,
     mapHeight: mapSize.height,
     onStrokeComplete: onDrawStroke,
+    onErasePoint,
   });
 
   const cellFromClient = useCallback(
@@ -193,7 +199,7 @@ export function WorldMapLiveStage({
   const panDisabled =
     fogDrawActive ||
     effectDrawActive ||
-    drawActive ||
+    inkActive ||
     poiPlaceActive ||
     groupTokenDragging;
 
@@ -274,7 +280,7 @@ export function WorldMapLiveStage({
             style={{
               width: mapSize.width,
               height: mapSize.height,
-              cursor: drawActive || poiPlaceActive ? "crosshair" : undefined,
+              cursor: inkActive || poiPlaceActive ? "crosshair" : undefined,
             }}
             onClick={(e) => {
               if (!isGm) return;
@@ -302,7 +308,7 @@ export function WorldMapLiveStage({
                 placePoiAtClient(e.clientX, e.clientY);
                 return;
               }
-              if (drawActive) {
+              if (inkActive) {
                 drawHandlers.onPointerDown(e);
                 return;
               }
@@ -345,7 +351,7 @@ export function WorldMapLiveStage({
               }
             }}
             onPointerMove={(e) => {
-              if (drawActive) {
+              if (inkActive) {
                 drawHandlers.onPointerMove(e);
                 return;
               }
@@ -384,7 +390,7 @@ export function WorldMapLiveStage({
               }
             }}
             onPointerUp={(e) => {
-              if (drawActive) {
+              if (inkActive) {
                 drawHandlers.onPointerUp(e);
                 return;
               }
@@ -401,7 +407,7 @@ export function WorldMapLiveStage({
               }
             }}
             onPointerCancel={(e) => {
-              if (drawActive) drawHandlers.onPointerCancel(e);
+              if (inkActive) drawHandlers.onPointerCancel(e);
               fogOriginRef.current = null;
               setFogDraft(null);
               effectOriginRef.current = null;

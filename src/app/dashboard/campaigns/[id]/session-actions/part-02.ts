@@ -27,7 +27,7 @@ export async function startSession(sessionId: string) {
 
   // 2. Load Session with Campaign
   const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, gm_prep_complete, title")
+    .select("id, campaign_id, status, gm_prep_complete, title, start_time, rsvp_deadline_days")
     .eq("id", sessionId)
     .single();
 
@@ -38,6 +38,8 @@ export async function startSession(sessionId: string) {
     status: string;
     gm_prep_complete?: boolean | null;
     title?: string | null;
+    start_time?: string | null;
+    rsvp_deadline_days?: number | null;
   } | null;
 
   if (sessionError || !session) {
@@ -70,6 +72,8 @@ export async function startSession(sessionId: string) {
       "Die Session kann erst starten, wenn du die Planung abgeschlossen hast (Button „Planung abschließen“ auf der Kampagne oder bei den Terminen).",
     );
   }
+
+  const wasScheduled = isSessionStatusScheduled(session.status);
 
   // 4. Update Session Status to Live + Gäste-Join-Token
   const guestJoinToken = randomBytes(24).toString("hex");
@@ -129,6 +133,19 @@ export async function startSession(sessionId: string) {
   // router.push auf /session/...; die Zielseite lädt frisch, die Kampagne beim nächsten Besuch.
 
   after(async () => {
+    if (wasScheduled && session.start_time) {
+      const { settleRsvpDeadlinePoints } = await import(
+        "@/src/lib/session-participation/rsvp-deadline-points"
+      );
+      await settleRsvpDeadlinePoints({
+        sessionId,
+        campaignId: session.campaign_id,
+        sessionTitle: session.title ?? null,
+        startTime: session.start_time,
+        deadlineDays: session.rsvp_deadline_days ?? null,
+        awardedBy: user.id,
+      });
+    }
     const admin = createAdminClient();
     const { notifySessionLiveEmails } = await import("@/src/lib/email/dispatch");
     await notifySessionLiveEmails({

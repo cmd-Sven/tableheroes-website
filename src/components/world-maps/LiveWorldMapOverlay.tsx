@@ -31,6 +31,7 @@ import {
   clearMapDrawStrokes,
   createMapDrawStroke,
   listMapDrawStrokes,
+  removeMapDrawStroke,
   undoLastMapDrawStroke,
 } from "@/src/lib/actions/map-draw-actions";
 import type { WorldMap, WorldMapMarker, WorldMapPoiTool } from "@/src/lib/world-maps/types";
@@ -42,7 +43,7 @@ import type {
   SessionBattlemapFogShape,
   SessionBattlemapMarker,
 } from "@/src/lib/session/battlemap-types";
-import type { MapDrawTool, SessionMapDrawStroke } from "@/src/lib/session/map-draw-types";
+import { strokeHitsEraser, type MapDrawTool, type SessionMapDrawStroke } from "@/src/lib/session/map-draw-types";
 import { WorldMapLiveStage } from "@/src/components/world-maps/WorldMapLiveStage";
 import { WeatherPngIcon } from "@/src/components/session/live-board/WeatherPngIcon";
 import type { WeatherIconOption } from "@/src/components/session/live-board/live-session-types";
@@ -116,6 +117,9 @@ export function LiveWorldMapOverlay({
   const [effectTemplates, setEffectTemplates] = useState<SessionBattlemapEffectTemplate[]>([]);
   const [effectMarkers, setEffectMarkers] = useState<SessionBattlemapMarker[]>([]);
   const [drawStrokes, setDrawStrokes] = useState<SessionMapDrawStroke[]>([]);
+  const drawStrokesRef = useRef(drawStrokes);
+  drawStrokesRef.current = drawStrokes;
+  const erasingIds = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const supabase = useRef(createClient()).current;
@@ -591,6 +595,32 @@ export function LiveWorldMapOverlay({
                   });
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "Zeichnen fehlgeschlagen.");
+                }
+              });
+            }}
+            onErasePoint={(point) => {
+              const radius = Math.max(12, drawWidth * 1.8);
+              const hits = drawStrokesRef.current.filter(
+                (stroke) =>
+                  !erasingIds.current.has(stroke.id) && strokeHitsEraser(stroke, point, radius),
+              );
+              if (hits.length === 0) return;
+              const hitIds = new Set(hits.map((stroke) => stroke.id));
+              for (const id of hitIds) erasingIds.current.add(id);
+              setDrawStrokes((prev) => {
+                const next = prev.filter((stroke) => !hitIds.has(stroke.id));
+                queueMicrotask(() => onDrawCountChange?.(next.length));
+                return next;
+              });
+              startTransition(async () => {
+                for (const stroke of hits) {
+                  try {
+                    await removeMapDrawStroke(stroke.id, sessionId);
+                  } catch (e) {
+                    erasingIds.current.delete(stroke.id);
+                    toast.error(e instanceof Error ? e.message : "Radieren fehlgeschlagen.");
+                    void reloadOverlays();
+                  }
                 }
               });
             }}

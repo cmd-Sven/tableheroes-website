@@ -3,7 +3,7 @@ import { partitionCampaignSessionsForTab } from "@/src/lib/session-focus";
 import { isSessionStatusScheduled } from "@/src/lib/session-status";
 import {
   isOnSessionRsvpRoster,
-  isPlayerReadyForSessionStart,
+  hasPlayerRsvpResponse,
 } from "./session-rsvp-readiness";
 import { sessionSupportsLiveBoard } from "@/src/lib/session-type";
 
@@ -108,12 +108,12 @@ export async function loadUpcomingSessionsWithRsvpForGm(
       const byUser = new Map(sessionRows.map((r) => [r.user_id, r]));
       const playerIds = [...memberIds];
       const pendingCount = playerIds.filter(
-        (uid) => !isPlayerReadyForSessionStart(byUser.get(uid)),
+        (uid) => !hasPlayerRsvpResponse(byUser.get(uid)),
       ).length;
       const prepOk = (s as { gm_prep_complete?: boolean }).gm_prep_complete !== false;
       return {
         ...s,
-        canStart: isGameSession && pendingCount === 0 && prepOk,
+        canStart: isGameSession && prepOk,
         pendingCount: isGameSession ? pendingCount : 0,
         hasAcceptedRsvps: acceptedRsvpsBySession.get(s.id) ?? false,
       };

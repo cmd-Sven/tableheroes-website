@@ -91,8 +91,8 @@ export type LiveSessionLeftDockSessionProps = {
   >;
   selectedContainerId: string | null;
   setSelectedContainerId: Dispatch<SetStateAction<string | null>>;
-  drawTool: "draw" | null;
-  setDrawTool: Dispatch<SetStateAction<"draw" | null>>;
+  drawTool: import("@/src/lib/session/map-draw-types").MapDrawTool;
+  setDrawTool: Dispatch<SetStateAction<import("@/src/lib/session/map-draw-types").MapDrawTool>>;
   drawColor: string;
   setDrawColor: Dispatch<SetStateAction<string>>;
   drawWidth: number;
