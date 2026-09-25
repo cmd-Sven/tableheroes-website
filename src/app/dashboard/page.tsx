@@ -182,6 +182,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           hasNewAchievements={playerData.hasNewAchievements}
           newestAchievement={playerData.newestAchievement}
           hasNewLore={playerData.hasNewLore}
+          knowledgeConsumedToday={playerData.knowledgeConsumedToday}
           upcomingSessions={playerData.upcomingSessions}
           isBacker={!!viewProfile?.is_backer}
           backerSince={viewProfile?.backer_since ?? null}
@@ -436,6 +437,7 @@ async function loadPlayerDashboardData(userId: string) {
     discoverableCampaigns,
     openCampaignsParticipantIds,
     randomLoreEntry: loreResult.entry,
+    knowledgeConsumedToday: loreResult.consumedToday,
     dailyComic,
     dashboardNews: newsResult.posts,
     hasNewNews: newsResult.hasNewContent,

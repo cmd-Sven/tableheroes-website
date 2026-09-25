@@ -124,6 +124,7 @@ type Props = {
     description?: string | null;
   } | null;
   hasNewLore: boolean;
+  knowledgeConsumedToday?: boolean;
   upcomingSessions: UpcomingSession[];
   isBacker?: boolean;
   backerSince?: string | null;
@@ -161,7 +162,7 @@ export function DashboardClient({
   hasNewNews,
   hasNewAchievements,
   newestAchievement = null,
-  hasNewLore,
+  knowledgeConsumedToday = false,
   upcomingSessions,
   isBacker,
   backerSince,
@@ -197,11 +198,6 @@ export function DashboardClient({
     await markWidgetAsRead("achievement");
     router.refresh();
   };
-  const handleMarkLoreRead = async () => {
-    await markWidgetAsRead("lore");
-    router.refresh();
-  };
-
   const cards = [
     {
       id: "upcoming-sessions",
@@ -294,8 +290,8 @@ export function DashboardClient({
       content: (
         <LoreSnippetCard
           entry={randomLoreEntry}
-          hasNewContent={viewOnly ? false : hasNewLore}
-          onMarkAsRead={viewOnly ? undefined : handleMarkLoreRead}
+          consumedToday={knowledgeConsumedToday}
+          viewOnly={viewOnly}
         />
       ),
       colSpan: 1 as const,

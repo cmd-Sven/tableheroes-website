@@ -12,7 +12,7 @@ export type DashboardLoreEntry = {
   id: string;
   name: string;
   imageUrl: string | null;
-  type: "lore" | "npc" | "faction";
+  type: "lore" | "npc" | "faction" | "location";
   campaignId: string;
   campaignName: string;
 };

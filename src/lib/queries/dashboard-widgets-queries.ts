@@ -190,145 +190,19 @@ export async function getRandomLoreSnippet(userId: string): Promise<{
   return { snippet, hasNewContent };
 }
 
-type RevealedEntry = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  type: "lore" | "npc" | "faction";
-  campaignId: string;
-  campaignName: string;
-};
-
 /**
- * Lädt einen zufälligen sichtbaren Eintrag (Lore, NPC, Fraktion, Ort, Rasse, etc.)
+ * Lädt einen zufälligen sichtbaren Eintrag (Lore, NPC, Fraktion, Ort)
  * aus Kampagnen, denen der Spieler beigetreten ist.
  * Nur Einträge, die für Spieler freigegeben sind (campaign_visibility.is_revealed).
  */
 export async function getRandomLoreEntry(userId: string): Promise<{
   entry: DashboardLoreEntry | null;
   hasNewContent: boolean;
+  consumedToday: boolean;
 }> {
-  const supabase = await createClient();
-
-  const { data: userRow } = await (supabase.from("users") as any)
-    .select("last_lore_view")
-    .eq("id", userId)
-    .maybeSingle();
-  const lastView = (userRow as any)?.last_lore_view ?? null;
-
-  const { data: memberships } = await (supabase.from("campaign_members") as any)
-    .select("campaign_id")
-    .eq("user_id", userId)
-    .in("status", ["Approved", "Active"]);
-
-  const campaignIds = [
-    ...new Set(
-      ((memberships as any[]) || [])
-        .map((m: any) => m.campaign_id)
-        .filter(Boolean)
-    ),
-  ];
-  if (campaignIds.length === 0) return { entry: null, hasNewContent: false };
-
-  const { data: campaigns } = await (supabase.from("campaigns") as any)
-    .select("id, name, world_id")
-    .in("id", campaignIds);
-
-  const allRevealed: RevealedEntry[] = [];
-
-  await Promise.all(
-    (campaigns || []).map(async (camp: { id: string; name?: string | null; world_id?: string | null }) => {
-      const worldId = (camp as any).world_id;
-      const campaignId = (camp as any).id;
-      const campaignName = (camp as any).name ?? "Kampagne";
-
-      const [loreVisibility, npcVisibility, factionVisibility] = await Promise.all([
-        getVisibilityForCampaign(campaignId, "lore"),
-        worldId ? getVisibilityForCampaign(campaignId, "npc") : Promise.resolve({}),
-        getVisibilityForCampaign(campaignId, "faction"),
-      ]);
-
-      const batch: RevealedEntry[] = [];
-
-      if (worldId) {
-        const loreRevealedIds = Object.entries(loreVisibility)
-          .filter(([, v]) => v)
-          .map(([entityId]) => entityId);
-        if (loreRevealedIds.length > 0) {
-          const { data: loreRows } = await (supabase.from("world_lore") as any)
-            .select("id, name, image_url")
-            .in("id", loreRevealedIds);
-          (loreRows || []).forEach((row: any) => {
-            batch.push({
-              id: row.id,
-              name: row.name ?? "Lore",
-              imageUrl: row.image_url ?? null,
-              type: "lore",
-              campaignId,
-              campaignName,
-            });
-          });
-        }
-
-        const npcRevealedIds = Object.entries(npcVisibility)
-          .filter(([, v]) => v)
-          .map(([entityId]) => entityId);
-        if (npcRevealedIds.length > 0) {
-          const { data: npcRows } = await (supabase.from("npcs") as any)
-            .select("id, name, image_url")
-            .in("id", npcRevealedIds)
-            .eq("world_id", worldId);
-          (npcRows || []).forEach((row: any) => {
-            batch.push({
-              id: row.id,
-              name: row.name ?? "NPC",
-              imageUrl: row.image_url ?? null,
-              type: "npc",
-              campaignId,
-              campaignName,
-            });
-          });
-        }
-      }
-
-      const factionRevealedIds = Object.entries(factionVisibility)
-        .filter(([, v]) => v)
-        .map(([entityId]) => entityId);
-      if (factionRevealedIds.length > 0) {
-        const { data: factionRows } = await (supabase.from("factions") as any)
-          .select("id, name, image_url")
-          .in("id", factionRevealedIds)
-          .eq("campaign_id", campaignId);
-        (factionRows || []).forEach((row: any) => {
-          batch.push({
-            id: row.id,
-            name: row.name ?? "Fraktion",
-            imageUrl: row.image_url ?? null,
-            type: "faction",
-            campaignId,
-            campaignName,
-          });
-        });
-      }
-
-      allRevealed.push(...batch);
-    }),
-  );
-
-  if (allRevealed.length === 0) return { entry: null, hasNewContent: false };
-
-  const picked = allRevealed[Math.floor(Math.random() * allRevealed.length)];
-
-  const entry: DashboardLoreEntry = {
-    id: picked.id,
-    name: picked.name,
-    imageUrl: picked.imageUrl,
-    type: picked.type,
-    campaignId: picked.campaignId,
-    campaignName: picked.campaignName,
-  };
-
-  return { entry, hasNewContent: false };
+  const { getKnowledgeSuggestion } = await import("@/src/lib/dashboard/knowledge-suggestion");
+  const suggestion = await getKnowledgeSuggestion(userId);
+  return { entry: suggestion.entry, hasNewContent: false, consumedToday: suggestion.consumedToday };
 }
 
 /**
