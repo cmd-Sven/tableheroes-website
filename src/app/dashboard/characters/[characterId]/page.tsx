@@ -9,10 +9,13 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ characterId: string }>;
+  searchParams: Promise<{ tab?: string }>;
 };
 
-export default async function PlayerCharacterDetailPage({ params }: Props) {
+export default async function PlayerCharacterDetailPage({ params, searchParams }: Props) {
   const { characterId } = await params;
+  const { tab } = await searchParams;
+  const initialSheetTab = tab === "equipment" ? "equipment" : "attributes";
   const supabase = await createClient();
   const {
     data: { user },
@@ -63,6 +66,7 @@ export default async function PlayerCharacterDetailPage({ params }: Props) {
         progressionLocked={payload.progressionLocked}
         progressionLockMessage={payload.progressionLockMessage}
         campaignSystem={payload.campaignSystem}
+        initialSheetTab={initialSheetTab}
       />
     </div>
   );

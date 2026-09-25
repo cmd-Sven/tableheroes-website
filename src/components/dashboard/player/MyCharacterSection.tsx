@@ -122,6 +122,7 @@ type Props = {
   /** GM testet die Spieler-Ansicht: Profil nur lesen, D&D-Blatt bearbeitbar */
   gmPreviewMode?: boolean;
   gmEditorHref?: string;
+  initialSheetTab?: "attributes" | "equipment" | "spells" | "biography" | "tuv";
 };
 
 export function MyCharacterSection({
@@ -139,6 +140,7 @@ export function MyCharacterSection({
   campaignSystem = null,
   gmPreviewMode = false,
   gmEditorHref,
+  initialSheetTab = "attributes",
 }: Props) {
   const characterId = String(character?.id ?? "").trim();
   const router = useRouter();
@@ -591,6 +593,7 @@ export function MyCharacterSection({
               <Dnd5eCharacterSheetPanelWithLocale
                 campaignId={campaignId}
                 characterId={characterId}
+                initialTab={initialSheetTab}
                 biographyCulture={{
                   campaignId,
                   characterId,

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { User, Sword, Trash2 } from "lucide-react";
+import { User, Sword, Trash2, ScrollText, Backpack } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCharacter } from "@/src/app/dashboard/characters/actions";
 import { PrivateInventoryModal } from "@/src/components/inventory/PrivateInventoryModal";
@@ -46,13 +46,25 @@ const getStatusLabel = (status?: string): string => {
   }
 };
 
+const panelActionClass =
+  "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-hero-border/40 bg-background-dark px-4 py-2.5 font-barlow text-xs font-bold uppercase tracking-wide text-gray-100 transition-colors hover:border-white/35 hover:bg-hero-dark disabled:cursor-not-allowed disabled:opacity-50";
+
 type Props = {
   characters: HeroSliderCharacter[];
   /** Nur anzeigen, wenn der Nutzer Besitzer ist (z. B. eigenes Dashboard). Auf Profil anderer Nutzer false. */
   allowDelete?: boolean;
+  /** Charakterblatt und Inventar als eigene Buttons. */
+  showSheetLinks?: boolean;
+  /** Überschrift weglassen, wenn die umgebende Karte sie schon trägt. */
+  hideHeading?: boolean;
 };
 
-export function HeroSlider({ characters, allowDelete = false }: Props) {
+export function HeroSlider({
+  characters,
+  allowDelete = false,
+  showSheetLinks = false,
+  hideHeading = false,
+}: Props) {
   const router = useRouter();
   const [deleteModal, setDeleteModal] = useState<HeroSliderCharacter | null>(
     null,
@@ -82,20 +94,22 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
   if (characters.length === 0) return null;
 
   return (
-    <section className="rounded-lg border border-hero-dark bg-background-card p-6">
-      <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
-        <Sword className="h-6 w-6 text-accent-gold" />
-        Meine Helden
-      </h2>
+    <section className={hideHeading ? "" : "rounded-lg border border-hero-dark bg-background-card p-6"}>
+      {hideHeading ? null : (
+        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+          <Sword className="h-6 w-6 text-accent-gold" />
+          Meine Helden
+        </h2>
+      )}
       <div className="overflow-x-auto pb-4 -mx-2 scrollbar-thin scrollbar-thumb-hero-border scrollbar-track-transparent">
         <div className="flex gap-4 min-w-max px-2">
           {characters.map((c) => (
             <div
               key={c.id}
-              className="shrink-0 w-[200px] rounded-lg border border-hero-border/40 bg-hero-dark/30 overflow-hidden hover:border-hero-vibrant transition-colors group relative"
+              className="shrink-0 w-[260px] rounded-lg border border-hero-border/40 bg-hero-dark/30 overflow-hidden hover:border-hero-vibrant transition-colors group relative"
             >
               <Link
-                href={`/dashboard/campaigns/${c.campaignId}`}
+                href={showSheetLinks ? `/dashboard/characters/${c.id}` : `/dashboard/campaigns/${c.campaignId}`}
                 className="block"
               >
                 <div className="relative h-24 bg-hero-dark/50 flex items-center justify-center">
@@ -136,7 +150,19 @@ export function HeroSlider({ characters, allowDelete = false }: Props) {
                   </span>
                 </div>
               </Link>
-              {allowDelete && c.canDelete !== false && (
+              {showSheetLinks ? (
+                <div className="space-y-2 px-3 pb-3">
+                  <Link href={`/dashboard/characters/${c.id}`} className={panelActionClass}>
+                    <ScrollText className="h-4 w-4 text-sky-300" />
+                    Zum Charakterblatt
+                  </Link>
+                  <Link href={`/dashboard/characters/${c.id}?tab=equipment`} className={panelActionClass}>
+                    <Backpack className="h-4 w-4 text-amber-400" />
+                    Zum Inventar
+                  </Link>
+                </div>
+              ) : null}
+              {allowDelete && c.canDelete !== false && !showSheetLinks && (
                 <>
                   <button
                     type="button"

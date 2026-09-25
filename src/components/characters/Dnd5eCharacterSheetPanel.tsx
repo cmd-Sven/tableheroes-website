@@ -569,6 +569,8 @@ type Props = {
     allocations?: FapAllocationLine[];
   } | null;
   onSaved?: () => void;
+  /** Öffnet direkt einen Reiter, z. B. das Inventar. */
+  initialTab?: SheetTab;
 };
 
 export function Dnd5eCharacterSheetPanelWithLocale(props: Props) {
@@ -593,6 +595,7 @@ export function Dnd5eCharacterSheetPanel({
   liveSessionMode = false,
   downtimeContext = null,
   onSaved,
+  initialTab = "attributes",
 }: Props) {
   const {
     t,
@@ -624,7 +627,7 @@ export function Dnd5eCharacterSheetPanel({
     description: string | null;
   } | null>(null);
   const [featPicker, setFeatPicker] = useState<null | "add" | number>(null);
-  const [activeTab, setActiveTab] = useState<SheetTab>("attributes");
+  const [activeTab, setActiveTab] = useState<SheetTab>(initialTab);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [customProfDraft, setCustomProfDraft] = useState<{

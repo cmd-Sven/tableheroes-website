@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { SidebarWidthProvider } from "@/src/components/dashboard/SidebarWidthProvider";
 import { getPendingApplicationsCount } from "@/src/lib/queries/application-queries";
 import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
+import { awardDailyVisitPoints } from "@/src/lib/dashboard/daily-visit-points";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function DashboardLayout({
     supabase.from("users") as any
   )
     .select(
-      "id, username, display_name, role, primary_role, avatar_url, status"
+      "id, username, display_name, role, primary_role, avatar_url, status, preferences"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -50,6 +51,10 @@ export default async function DashboardLayout({
 
   const status = profile?.status ?? "approved";
   const isPendingOrRejected = status === "pending" || status === "rejected";
+  const isPlayer = (profile?.primary_role ?? "Player") === "Player";
+  if (!isPendingOrRejected && isPlayer) {
+    await awardDailyVisitPoints(user.id, (profileRaw as { preferences?: unknown } | null)?.preferences);
+  }
 
   // userData 1:1 aus Profil + Auth (kein Mapping, das Felder weglässt)
   const userData = {

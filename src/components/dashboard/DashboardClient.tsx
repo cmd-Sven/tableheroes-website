@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { markWidgetAsRead } from "@/src/lib/actions/user-actions";
 import { PlayerHeader } from "@/src/components/dashboard/PlayerHeader";
-import { PlayerCharacterQuickStrip } from "@/src/components/dashboard/PlayerCharacterQuickStrip";
 import { DashboardCard } from "@/src/components/dashboard/DashboardCard";
 import { DraggableCardGrid } from "@/src/components/dashboard/DraggableCardGrid";
 import type { LayoutItem } from "@/src/lib/utils/layout-engine";
@@ -251,7 +250,12 @@ export function DashboardClient({
       icon: <Sword className="h-5 w-5" />,
       content: (
         <div className="w-full p-4">
-          <HeroSlider characters={heroCharacters} allowDelete={!viewOnly} />
+          <HeroSlider
+            characters={heroCharacters}
+            allowDelete={!viewOnly}
+            showSheetLinks
+            hideHeading
+          />
         </div>
       ),
       colSpan: 1 as const,
@@ -331,8 +335,6 @@ export function DashboardClient({
         />
       )}
       <PlayerHeader {...profileHeader} />
-
-      <PlayerCharacterQuickStrip characters={heroCharacters} />
 
       {newAcceptances.length > 0 && !viewOnly && (
         <div className="space-y-4">
