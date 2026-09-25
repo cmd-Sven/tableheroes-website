@@ -139,6 +139,8 @@ type Props = {
   playerDashboardTutorialDismissed?: boolean;
   /** Aktive Kampagnen-Umfragen */
   activePolls?: CampaignPoll[];
+  /** GM sieht das Dashboard eines anderen Spielers, ohne dessen Daten zu ändern. */
+  viewOnly?: boolean;
 };
 
 export function DashboardClient({
@@ -170,6 +172,7 @@ export function DashboardClient({
   openCampaignsParticipantIds = [],
   playerDashboardTutorialDismissed = false,
   activePolls = [],
+  viewOnly = false,
 }: Props) {
   const router = useRouter();
   const [showAchievementModal, setShowAchievementModal] = useState(false);
@@ -207,6 +210,7 @@ export function DashboardClient({
       content: (
         <UpcomingSessionsCard
           sessions={upcomingSessions}
+          actionsLocked={viewOnly}
           rsvpBlockedCampaignIds={pendingCharacterCampaigns.map((c) => c.campaignId)}
         />
       ),
@@ -232,8 +236,8 @@ export function DashboardClient({
       content: (
         <AchievementsCard
           achievements={achievements}
-          hasNewContent={hasNewAchievements}
-          onMarkAsRead={handleMarkAchievementRead}
+          hasNewContent={viewOnly ? false : hasNewAchievements}
+          onMarkAsRead={viewOnly ? undefined : handleMarkAchievementRead}
         />
       ),
       colSpan: 1 as const,
@@ -251,7 +255,7 @@ export function DashboardClient({
       icon: <Sword className="h-5 w-5" />,
       content: (
         <div className="w-full p-4">
-          <HeroSlider characters={heroCharacters} allowDelete />
+          <HeroSlider characters={heroCharacters} allowDelete={!viewOnly} />
         </div>
       ),
       colSpan: 1 as const,
@@ -277,8 +281,8 @@ export function DashboardClient({
       content: (
         <NewsInfoCard
           posts={dashboardNews}
-          hasNewContent={hasNewNews}
-          onMarkAsRead={handleMarkNewsRead}
+          hasNewContent={viewOnly ? false : hasNewNews}
+          onMarkAsRead={viewOnly ? undefined : handleMarkNewsRead}
         />
       ),
       colSpan: 1 as const,
@@ -290,8 +294,8 @@ export function DashboardClient({
       content: (
         <LoreSnippetCard
           entry={randomLoreEntry}
-          hasNewContent={hasNewLore}
-          onMarkAsRead={handleMarkLoreRead}
+          hasNewContent={viewOnly ? false : hasNewLore}
+          onMarkAsRead={viewOnly ? undefined : handleMarkLoreRead}
         />
       ),
       colSpan: 1 as const,
@@ -307,7 +311,7 @@ export function DashboardClient({
       id: "campaign-polls",
       title: "Umfragen",
       icon: <BarChart3 className="h-5 w-5" />,
-      content: <CampaignPollsCard polls={activePolls} />,
+      content: <CampaignPollsCard polls={activePolls} viewOnly={viewOnly} />,
       colSpan: 1 as const,
     },
     {
@@ -324,7 +328,7 @@ export function DashboardClient({
       <PlayerDashboardTutorial
         initialDismissed={playerDashboardTutorialDismissed}
       />
-      {showAchievementModal && newestAchievement && (
+      {showAchievementModal && newestAchievement && !viewOnly && (
         <AchievementCongratulationsModal
           achievement={newestAchievement}
           onClose={handleAchievementModalClose}
@@ -334,7 +338,7 @@ export function DashboardClient({
 
       <PlayerCharacterQuickStrip characters={heroCharacters} />
 
-      {newAcceptances.length > 0 && (
+      {newAcceptances.length > 0 && !viewOnly && (
         <div className="space-y-4">
           {newAcceptances.map((a) => (
             <AcceptanceNotification
@@ -350,7 +354,7 @@ export function DashboardClient({
       <DraggableCardGrid
         cards={cards}
         initialLayout={dashboardLayout}
-        readOnly={false}
+        readOnly={viewOnly}
       />
 
       {/* Offene Kampagnen: immer unten, volle Breite (3 Spalten) */}

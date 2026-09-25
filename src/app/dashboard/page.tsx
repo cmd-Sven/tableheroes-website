@@ -19,6 +19,10 @@ import { getPointsLog } from "@/src/lib/queries/point-queries";
 import { DashboardClient } from "@/src/components/dashboard/DashboardClient";
 import { GMDashboardClient } from "@/src/components/dashboard/GMDashboardClient";
 import { PlayerDashboardPreviewBanner } from "@/src/components/dashboard/PlayerDashboardPreviewBanner";
+import { PlayerPreviewPicker } from "@/src/components/dashboard/PlayerPreviewPicker";
+import { listRegisteredPlayersForPreview } from "@/src/lib/queries/player-preview-queries";
+import { createAdminClient } from "@/src/lib/supabase/server";
+import { runWithServiceDb } from "@/src/lib/supabase/request-db";
 import type { HeroSliderCharacter } from "@/src/components/dashboard/HeroSlider";
 
 type UserProfile = {
@@ -50,8 +54,11 @@ type UserProfile = {
 };
 
 type DashboardPageProps = {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; as?: string }>;
 };
+
+const PLAYER_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const supabase = await createClient();
@@ -61,7 +68,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (!user) return null;
 
-  const { view: viewParam } = await searchParams;
+  const { view: viewParam, as: asParam } = await searchParams;
 
   const { data: profileRaw } = await (supabase.from("users") as any)
     .select("*")
@@ -72,9 +79,36 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const isGM =
     profile?.primary_role === "GameMaster" || profile?.primary_role === "Admin";
   const forcePlayerView = isGM && viewParam === "player";
+  const previewUserId =
+    forcePlayerView && asParam && PLAYER_ID_RE.test(asParam) ? asParam : null;
 
-  const totalPoints = Number(profile?.total_points) || 0;
-  const lifetimePoints = Number(profile?.lifetime_points) || 0;
+  if (forcePlayerView && !previewUserId) {
+    const players = await listRegisteredPlayersForPreview();
+    return <PlayerPreviewPicker players={players} />;
+  }
+
+  let viewProfile = profile;
+  let viewUserId = user.id;
+  if (previewUserId) {
+    const admin = createAdminClient();
+    const target = await runWithServiceDb(admin, async () => {
+      const { data } = await (admin.from("users") as any)
+        .select("*")
+        .eq("id", previewUserId)
+        .eq("primary_role", "Player")
+        .maybeSingle();
+      return (data as UserProfile | null) ?? null;
+    });
+    if (!target) {
+      const players = await listRegisteredPlayersForPreview();
+      return <PlayerPreviewPicker players={players} />;
+    }
+    viewProfile = target;
+    viewUserId = previewUserId;
+  }
+
+  const totalPoints = Number(viewProfile?.total_points) || 0;
+  const lifetimePoints = Number(viewProfile?.lifetime_points) || 0;
   const rank = getRankFromPoints(lifetimePoints);
   const favoriteAchievements: {
     id: string;
@@ -83,47 +117,52 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }[] = [];
 
   if (!isGM || forcePlayerView) {
-    const playerData = await loadPlayerDashboardData(user.id);
-    const achievementMode = profile?.profile_achievement_mode ?? "newest";
-    const favAchievementId = profile?.selected_achievement_id ?? null;
+    const playerData = previewUserId
+      ? await runWithServiceDb(createAdminClient(), () => loadPlayerDashboardData(viewUserId))
+      : await loadPlayerDashboardData(viewUserId);
+    const achievementMode = viewProfile?.profile_achievement_mode ?? "newest";
+    const favAchievementId = viewProfile?.selected_achievement_id ?? null;
     const favoriteAchievementsResolved =
       achievementMode === "specific" && favAchievementId
         ? playerData.achievements.filter((a) => a.id === favAchievementId)
         : playerData.achievements.slice(0, 3);
     const profileHeader = {
       username:
-        (profile as { display_name?: string | null })?.display_name ??
-        profile?.username ??
+        (viewProfile as { display_name?: string | null })?.display_name ??
+        viewProfile?.username ??
         null,
-      avatarUrl: profile?.avatar_url ?? null,
-      avatarShape: (profile?.avatar_shape as "circle" | "square") ?? "circle",
-      avatarPositionX: profile?.avatar_position_x ?? 50,
-      avatarPositionY: profile?.avatar_position_y ?? 50,
-      backgroundType: (profile?.profile_background_url ? "image" : "color") as
+      avatarUrl: viewProfile?.avatar_url ?? null,
+      avatarShape: (viewProfile?.avatar_shape as "circle" | "square") ?? "circle",
+      avatarPositionX: viewProfile?.avatar_position_x ?? 50,
+      avatarPositionY: viewProfile?.avatar_position_y ?? 50,
+      backgroundType: (viewProfile?.profile_background_url ? "image" : "color") as
         | "color"
         | "image",
-      backgroundColor: profile?.profile_background ?? null,
-      backgroundImageUrl: profile?.profile_background_url ?? null,
-      bannerPositionX: profile?.banner_position_x ?? 50,
-      bannerPositionY: profile?.banner_position_y ?? 50,
-      memberSince: profile?.created_at ?? null,
+      backgroundColor: viewProfile?.profile_background ?? null,
+      backgroundImageUrl: viewProfile?.profile_background_url ?? null,
+      bannerPositionX: viewProfile?.banner_position_x ?? 50,
+      bannerPositionY: viewProfile?.banner_position_y ?? 50,
+      memberSince: viewProfile?.created_at ?? null,
       rank,
       lifetimePoints,
       totalPoints,
       favoriteAchievements: favoriteAchievementsResolved,
-      showRank: profile?.show_rank ?? true,
-      showPoints: profile?.show_points ?? true,
-      slogan: profile?.slogan ?? null,
-      showSlogan: !!profile?.show_slogan,
+      showRank: viewProfile?.show_rank ?? true,
+      showPoints: viewProfile?.show_points ?? true,
+      slogan: viewProfile?.slogan ?? null,
+      showSlogan: !!viewProfile?.show_slogan,
     };
     return (
       <div className="space-y-8">
-        {forcePlayerView ? <PlayerDashboardPreviewBanner /> : null}
+        {forcePlayerView ? (
+          <PlayerDashboardPreviewBanner playerLabel={profileHeader.username} />
+        ) : null}
         <DashboardClient
+          viewOnly={!!previewUserId}
           profileHeader={profileHeader}
           dashboardLayout={
-            Array.isArray(profile?.dashboard_layout)
-              ? (profile.dashboard_layout as
+            Array.isArray(viewProfile?.dashboard_layout)
+              ? (viewProfile.dashboard_layout as
                   | import("@/src/lib/utils/layout-engine").LayoutItem[]
                   | string[])
               : undefined
@@ -144,8 +183,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           newestAchievement={playerData.newestAchievement}
           hasNewLore={playerData.hasNewLore}
           upcomingSessions={playerData.upcomingSessions}
-          isBacker={!!profile?.is_backer}
-          backerSince={profile?.backer_since ?? null}
+          isBacker={!!viewProfile?.is_backer}
+          backerSince={viewProfile?.backer_since ?? null}
           pointsHistory={playerData.pointsHistory}
           unreadInboxMessages={playerData.unreadInboxMessages}
           sessionConfirmationPending={playerData.sessionConfirmationPending}
@@ -155,7 +194,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           activePolls={playerData.activePolls}
           playerDashboardTutorialDismissed={
             forcePlayerView ||
-            !!profile?.player_dashboard_tutorial_dismissed
+            !!viewProfile?.player_dashboard_tutorial_dismissed
           }
         />
       </div>

@@ -37,6 +37,8 @@ type Props = {
   isGM?: boolean;
   /** Kampagnen-IDs ohne Charakter: RSVP ausgeblendet, Hinweis statt Dropdown */
   rsvpBlockedCampaignIds?: string[];
+  /** Vorschau eines fremden Dashboards: keine RSVP-Aktionen */
+  actionsLocked?: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -127,9 +129,11 @@ function participantFromRsvp(
 function SessionRowPlayer({
   session,
   rsvpBlocked,
+  actionsLocked = false,
 }: {
   session: UpcomingSession;
   rsvpBlocked?: boolean;
+  actionsLocked?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -313,7 +317,7 @@ function SessionRowPlayer({
         </Link>
 
         {/* RSVP Dropdown (nur bei geplanten Sessions) */}
-        {isScheduled && (
+        {isScheduled && !actionsLocked && (
           <div className="mt-3 pt-3 border-t border-hero-border/20" onClick={(e) => e.stopPropagation()}>
             {showCharacterBlock ? (
               <p className="font-libre text-xs text-gray-400 leading-relaxed">
@@ -525,6 +529,7 @@ export function UpcomingSessionsCard({
   maxVisible = 2,
   isGM = false,
   rsvpBlockedCampaignIds = [],
+  actionsLocked = false,
 }: Props) {
   if (sessions.length === 0) {
     return (
@@ -559,11 +564,12 @@ export function UpcomingSessionsCard({
           <SessionRowPlayer
             key={s.id}
             session={s}
+            actionsLocked={actionsLocked}
             rsvpBlocked={blockedSet.has(s.campaignId)}
           />
         )
       )}
-      {hasMore && (
+      {hasMore && !actionsLocked && (
         <Link
           href="/dashboard/sessions"
           className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-hero-border/40 bg-hero-dark/30 font-barlow font-bold uppercase text-sm text-hero-vibrant hover:bg-hero-dark/50 hover:border-hero-vibrant/60 transition-colors"

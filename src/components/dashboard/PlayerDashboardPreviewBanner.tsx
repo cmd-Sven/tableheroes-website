@@ -6,7 +6,10 @@ import { Eye, X } from "lucide-react";
 type Props = {
   /** Ziel beim Verlassen der Vorschau */
   exitHref?: string;
-  /** Optionaler Zusatzlink, z. B. Nachrichten */
+  /** Zurück zur Spielerliste */
+  listHref?: string;
+  /** Name des Kontos, dessen Dashboard gerade offen ist */
+  playerLabel?: string | null;
   messagesHref?: string;
 };
 
@@ -15,6 +18,8 @@ type Props = {
  */
 export function PlayerDashboardPreviewBanner({
   exitHref = "/dashboard",
+  listHref = "/dashboard?view=player",
+  playerLabel = null,
   messagesHref = "/dashboard/messages",
 }: Props) {
   return (
@@ -26,22 +31,31 @@ export function PlayerDashboardPreviewBanner({
         <Eye className="mt-0.5 h-5 w-5 shrink-0 text-accent-gold" aria-hidden />
         <div className="min-w-0">
           <p className="font-barlow text-sm font-extrabold uppercase tracking-wide text-accent-gold">
-            Vorschau: Spieler-Dashboard
+            {playerLabel ? `Spieleransicht: ${playerLabel}` : "Vorschau: Spieler-Dashboard"}
           </p>
           <p className="mt-0.5 font-libre text-xs leading-relaxed text-gray-200">
-            Du siehst das klassische Spieler-Layout (Widgets, Postfach, Kampagnen).
-            Nachrichten und Inhalte gehören zu deinem eigenen Account — keine
-            Impersonation eines anderen Spielers.
+            {playerLabel
+              ? "Das ist das Dashboard dieses Spielers. Zusagen, Abstimmungen und Layout-Änderungen sind gesperrt."
+              : "Du siehst das klassische Spieler-Layout. Aktionen laufen weiter über dein eigenes Konto."}
           </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={messagesHref}
-          className="inline-flex items-center rounded border border-hero-border/70 bg-background-dark/80 px-3 py-1.5 font-barlow text-[11px] font-bold uppercase tracking-wide text-gray-100 hover:border-hero-vibrant hover:text-hero-vibrant"
-        >
-          Nachrichten
-        </Link>
+        {playerLabel ? (
+          <Link
+            href={listHref}
+            className="inline-flex items-center rounded border border-hero-border/70 bg-background-dark/80 px-3 py-1.5 font-barlow text-[11px] font-bold uppercase tracking-wide text-gray-100 hover:border-hero-vibrant hover:text-hero-vibrant"
+          >
+            Spielerliste
+          </Link>
+        ) : (
+          <Link
+            href={messagesHref}
+            className="inline-flex items-center rounded border border-hero-border/70 bg-background-dark/80 px-3 py-1.5 font-barlow text-[11px] font-bold uppercase tracking-wide text-gray-100 hover:border-hero-vibrant hover:text-hero-vibrant"
+          >
+            Nachrichten
+          </Link>
+        )}
         <Link
           href={exitHref}
           className="inline-flex items-center gap-1.5 rounded border border-accent-gold/80 bg-accent-gold/20 px-3 py-1.5 font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold hover:bg-accent-gold/30"

@@ -2,9 +2,13 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Database } from "../database.types";
+import { getDbOverride } from "@/src/lib/supabase/request-db";
 
-/** Server-Client mit Anon-Key (unterliegt RLS). */
+/** Server-Client mit Anon-Key (unterliegt RLS). In der Spieler-Vorschau der Service-Client. */
 export async function createClient() {
+  const override = getDbOverride();
+  if (override) return override as unknown as Awaited<ReturnType<typeof createServerClient<Database>>>;
+
   const cookieStore = await cookies();
 
   return createServerClient<Database>(

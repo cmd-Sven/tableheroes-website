@@ -7,6 +7,7 @@ import { CampaignPollVoteForm } from "@/src/components/campaigns/CampaignPollVot
 
 type Props = {
   polls: CampaignPoll[];
+  viewOnly?: boolean;
 };
 
 function formatRemaining(closesAt: string): string {
@@ -18,7 +19,7 @@ function formatRemaining(closesAt: string): string {
   return `noch ${days} Tag${days === 1 ? "" : "e"}`;
 }
 
-export function CampaignPollsCard({ polls }: Props) {
+export function CampaignPollsCard({ polls, viewOnly = false }: Props) {
   const openPolls = polls.filter((p) => p.isOpen);
   const pendingVote = openPolls.filter((p) => !p.hasParticipated);
 
@@ -65,7 +66,13 @@ export function CampaignPollsCard({ polls }: Props) {
               {poll.allowFreeText && <span>· Freitext möglich</span>}
             </p>
           </div>
-          <CampaignPollVoteForm poll={poll} showOtherResponses />
+          {viewOnly ? (
+            <p className="font-libre text-xs text-gray-400">
+              Abstimmung ist in der Spieleransicht gesperrt.
+            </p>
+          ) : (
+            <CampaignPollVoteForm poll={poll} showOtherResponses />
+          )}
         </div>
       ))}
     </div>
