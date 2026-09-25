@@ -1,25 +1,24 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { CITY_CENTER } from "../aurenfurt-layout";
-import { findDistrict, type CityDistrictId } from "../aurenfurt-districts";
+import { findBuilding } from "../aurenfurt-districts";
 
 export function useHoloCityView() {
-  const [focusedId, setFocusedId] = useState<CityDistrictId | null>(null);
-  const focused = findDistrict(focusedId);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const focused = useMemo(() => findBuilding(focusedId), [focusedId]);
+  const hovered = useMemo(() => findBuilding(hoveredId), [hoveredId]);
 
-  const camera = useMemo(() => {
-    if (!focused) return { scale: 1, x: 0, y: 0 };
-    const dx = CITY_CENTER.x - focused.label.x;
-    const dy = CITY_CENTER.y - focused.label.y;
-    return { scale: focused.id === "palast" ? 1.65 : 1.85, x: dx * 0.55, y: dy * 0.55 };
-  }, [focused]);
-
-  const focus = useCallback((id: CityDistrictId) => {
-    setFocusedId((current) => (current === id ? null : id));
+  const focus = useCallback((id: string | null) => {
+    setFocusedId((current) => {
+      if (id == null) return null;
+      return current === id ? null : id;
+    });
   }, []);
 
-  const clear = useCallback(() => setFocusedId(null), []);
+  const hover = useCallback((id: string | null) => {
+    setHoveredId(id);
+  }, []);
 
-  return { focusedId, focused, camera, focus, clear };
+  return { focusedId, focused, hovered, focus, hover };
 }
