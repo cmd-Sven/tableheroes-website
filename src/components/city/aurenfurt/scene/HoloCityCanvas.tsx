@@ -3,13 +3,15 @@
 import { Component, Suspense, useEffect, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { HoloCityScene } from "./HoloCityScene";
+import { CityModel } from "../CityModel";
+import type { HoloSelection } from "../aurenfurt-districts";
 import { HoloFocusRig } from "./HoloFocusRig";
 
 type Props = {
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  onHover: (id: string | null) => void;
+  selection: HoloSelection | null;
+  hovered: HoloSelection | null;
+  onSelect: (selection: HoloSelection | null) => void;
+  onHover: (selection: HoloSelection | null) => void;
 };
 
 type BoundaryProps = { children: ReactNode };
@@ -41,7 +43,7 @@ function CursorReset() {
   return null;
 }
 
-export default function HoloCityCanvas({ selectedId, onSelect, onHover }: Props) {
+export default function HoloCityCanvas({ selection, hovered, onSelect, onHover }: Props) {
   return (
     <HoloCityErrorBoundary>
       <Suspense
@@ -65,15 +67,15 @@ export default function HoloCityCanvas({ selectedId, onSelect, onHover }: Props)
           <directionalLight position={[-4.2, 2.4, -1.6]} intensity={0.3} color="#9fd8ff" />
           <pointLight position={[0, -0.7, 0]} intensity={1.8} color="#37d7ff" distance={8} />
           <Suspense fallback={null}>
-            <HoloCityScene selectedId={selectedId} onSelect={onSelect} onHover={onHover} />
+            <CityModel selection={selection} hovered={hovered} onSelect={onSelect} onHover={onHover} />
           </Suspense>
-          <HoloFocusRig selectedId={selectedId} />
+          <HoloFocusRig selection={selection} />
           <OrbitControls
             makeDefault
             enablePan={false}
             enableDamping
             dampingFactor={0.08}
-            autoRotate={!selectedId}
+            autoRotate={!selection}
             autoRotateSpeed={0.28}
             minPolarAngle={0.52}
             maxPolarAngle={1.15}

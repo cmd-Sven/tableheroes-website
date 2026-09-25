@@ -1,24 +1,25 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { findBuilding } from "../aurenfurt-districts";
+import {
+  sameSelection,
+  subjectFromSelection,
+  type HoloSelection,
+} from "../aurenfurt-districts";
 
 export function useHoloCityView() {
-  const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const focused = useMemo(() => findBuilding(focusedId), [focusedId]);
-  const hovered = useMemo(() => findBuilding(hoveredId), [hoveredId]);
+  const [selection, setSelection] = useState<HoloSelection | null>(null);
+  const [hovered, setHovered] = useState<HoloSelection | null>(null);
+  const subject = useMemo(() => subjectFromSelection(selection), [selection]);
+  const hoveredSubject = useMemo(() => subjectFromSelection(hovered), [hovered]);
 
-  const focus = useCallback((id: string | null) => {
-    setFocusedId((current) => {
-      if (id == null) return null;
-      return current === id ? null : id;
-    });
+  const focus = useCallback((next: HoloSelection | null) => {
+    setSelection((current) => (sameSelection(current, next) ? null : next));
   }, []);
 
-  const hover = useCallback((id: string | null) => {
-    setHoveredId(id);
+  const hover = useCallback((next: HoloSelection | null) => {
+    setHovered(next);
   }, []);
 
-  return { focusedId, focused, hovered, focus, hover };
+  return { selection, hovered, subject, hoveredSubject, focus, hover };
 }
