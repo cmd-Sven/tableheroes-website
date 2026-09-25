@@ -1,5 +1,4 @@
 import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
-import { getVisibilityForCampaign } from "@/src/app/dashboard/campaigns/[id]/campaign-visibility-queries";
 import { isLocationType } from "@/src/lib/lore-types";
 import { getBerlinParts } from "@/src/lib/datetime/berlin";
 import type { DashboardLoreEntry } from "@/src/lib/types/dashboard-widgets";
@@ -68,6 +67,7 @@ function toEntry(stored: StoredSuggestion): DashboardLoreEntry {
 
 async function loadPool(userId: string): Promise<DashboardLoreEntry[]> {
   const supabase = await createClient();
+  const db = tryCreateAdminClient() ?? supabase;
   const { data: memberships } = await (supabase.from("campaign_members") as any)
     .select("campaign_id")
     .eq("user_id", userId)
@@ -78,87 +78,81 @@ async function loadPool(userId: string): Promise<DashboardLoreEntry[]> {
   ] as string[];
   if (campaignIds.length === 0) return [];
 
-  const { data: campaigns } = await (supabase.from("campaigns") as any)
-    .select("id, name, world_id")
-    .in("id", campaignIds);
+  const [{ data: campaigns }, { data: visibilityRows }] = await Promise.all([
+    (db.from("campaigns") as any).select("id, name, world_id").in("id", campaignIds),
+    (db.from("campaign_visibility") as any)
+      .select("campaign_id, entity_id, entity_type")
+      .in("campaign_id", campaignIds)
+      .eq("is_revealed", true)
+      .in("entity_type", ["lore", "npc", "faction"]),
+  ]);
+
+  const campaignById = new Map<string, { name: string; worldId: string | null }>();
+  for (const camp of (campaigns as { id: string; name?: string | null; world_id?: string | null }[]) || []) {
+    campaignById.set(camp.id, { name: camp.name ?? "Kampagne", worldId: camp.world_id ?? null });
+  }
+
+  const idsByType = { lore: new Set<string>(), npc: new Set<string>(), faction: new Set<string>() };
+  const campaignsByEntity = new Map<string, string[]>();
+  for (const row of (visibilityRows as { campaign_id: string; entity_id: string; entity_type: string }[]) || []) {
+    if (row.entity_type !== "lore" && row.entity_type !== "npc" && row.entity_type !== "faction") continue;
+    idsByType[row.entity_type].add(row.entity_id);
+    const key = `${row.entity_type}:${row.entity_id}`;
+    const list = campaignsByEntity.get(key) ?? [];
+    list.push(row.campaign_id);
+    campaignsByEntity.set(key, list);
+  }
 
   const pool: DashboardLoreEntry[] = [];
+  const pushForCampaigns = (
+    entityType: "lore" | "npc" | "faction" | "location",
+    entityId: string,
+    name: string,
+    imageUrl: string | null,
+    worldId?: string | null,
+  ) => {
+    const lookup = entityType === "location" ? "lore" : entityType;
+    const campaignIdsForEntity = campaignsByEntity.get(`${lookup}:${entityId}`) ?? [];
+    for (const campaignId of campaignIdsForEntity) {
+      const campaign = campaignById.get(campaignId);
+      if (!campaign) continue;
+      if (worldId && campaign.worldId && campaign.worldId !== worldId) continue;
+      pool.push({
+        id: entityId,
+        name,
+        imageUrl,
+        type: entityType,
+        campaignId,
+        campaignName: campaign.name,
+      });
+    }
+  };
 
-  await Promise.all(
-    ((campaigns as { id: string; name?: string | null; world_id?: string | null }[]) || []).map(
-      async (camp) => {
-        const campaignId = camp.id;
-        const campaignName = camp.name ?? "Kampagne";
-        const worldId = camp.world_id ?? null;
-        const [loreVisibility, npcVisibility, factionVisibility] = await Promise.all([
-          getVisibilityForCampaign(campaignId, "lore"),
-          worldId ? getVisibilityForCampaign(campaignId, "npc") : Promise.resolve({}),
-          getVisibilityForCampaign(campaignId, "faction"),
-        ]);
+  const loreIds = [...idsByType.lore];
+  const npcIds = [...idsByType.npc];
+  const factionIds = [...idsByType.faction];
+  const [loreRes, npcRes, factionRes] = await Promise.all([
+    loreIds.length
+      ? (db.from("world_lore") as any).select("id, name, image_url, type, world_id").in("id", loreIds)
+      : Promise.resolve({ data: [] }),
+    npcIds.length
+      ? (db.from("npcs") as any).select("id, name, image_url, world_id").in("id", npcIds)
+      : Promise.resolve({ data: [] }),
+    factionIds.length
+      ? (db.from("factions") as any).select("id, name, image_url, world_id").in("id", factionIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-        const loreIds = Object.entries(loreVisibility)
-          .filter(([, revealed]) => revealed)
-          .map(([id]) => id);
-        if (worldId && loreIds.length > 0) {
-          const { data: loreRows } = await (supabase.from("world_lore") as any)
-            .select("id, name, image_url, type")
-            .in("id", loreIds)
-            .eq("world_id", worldId);
-          for (const row of (loreRows as any[]) || []) {
-            const kind = isLocationType(String(row.type ?? "")) ? "location" : "lore";
-            pool.push({
-              id: row.id,
-              name: row.name ?? (kind === "location" ? "Ort" : "Lore"),
-              imageUrl: row.image_url ?? null,
-              type: kind,
-              campaignId,
-              campaignName,
-            });
-          }
-        }
-
-        const npcIds = Object.entries(npcVisibility)
-          .filter(([, revealed]) => revealed)
-          .map(([id]) => id);
-        if (worldId && npcIds.length > 0) {
-          const { data: npcRows } = await (supabase.from("npcs") as any)
-            .select("id, name, image_url")
-            .in("id", npcIds)
-            .eq("world_id", worldId);
-          for (const row of (npcRows as any[]) || []) {
-            pool.push({
-              id: row.id,
-              name: row.name ?? "NPC",
-              imageUrl: row.image_url ?? null,
-              type: "npc",
-              campaignId,
-              campaignName,
-            });
-          }
-        }
-
-        const factionIds = Object.entries(factionVisibility)
-          .filter(([, revealed]) => revealed)
-          .map(([id]) => id);
-        if (factionIds.length > 0) {
-          const { data: factionRows } = await (supabase.from("factions") as any)
-            .select("id, name, image_url")
-            .in("id", factionIds)
-            .eq("campaign_id", campaignId);
-          for (const row of (factionRows as any[]) || []) {
-            pool.push({
-              id: row.id,
-              name: row.name ?? "Fraktion",
-              imageUrl: row.image_url ?? null,
-              type: "faction",
-              campaignId,
-              campaignName,
-            });
-          }
-        }
-      },
-    ),
-  );
+  for (const row of (loreRes.data as any[]) || []) {
+    const kind = isLocationType(String(row.type ?? "")) ? "location" : "lore";
+    pushForCampaigns(kind, row.id, row.name ?? (kind === "location" ? "Ort" : "Lore"), row.image_url ?? null, row.world_id);
+  }
+  for (const row of (npcRes.data as any[]) || []) {
+    pushForCampaigns("npc", row.id, row.name ?? "NPC", row.image_url ?? null, row.world_id);
+  }
+  for (const row of (factionRes.data as any[]) || []) {
+    pushForCampaigns("faction", row.id, row.name ?? "Fraktion", row.image_url ?? null, row.world_id);
+  }
 
   return pool;
 }
