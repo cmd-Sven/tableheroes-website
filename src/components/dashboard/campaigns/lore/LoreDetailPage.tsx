@@ -15,6 +15,9 @@ import { LoreGMNotes } from "./LoreGMNotes";
 import { isLocationType } from "@/src/lib/lore-types";
 import { NpcSceneAppearances } from "@/src/components/dashboard/campaigns/npcs/NpcSceneAppearances";
 import type { SceneMediaAppearance } from "@/src/lib/scene-media-types";
+import { HoloCityEnterButton } from "@/src/components/city/aurenfurt/HoloCityEnterButton";
+import { HoloCityMap } from "@/src/components/city/aurenfurt/HoloCityMap";
+import { isAurenfurtLore } from "@/src/components/city/aurenfurt/aurenfurt-districts";
 
 type LoreEntry = {
   id: string;
@@ -120,6 +123,7 @@ export function LoreDetailPage({
   const router = useRouter();
   const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
   const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
+  const [cityOpen, setCityOpen] = useState(false);
 
   // Safe check: Ensure lore exists
   if (!initialLore || !initialLore.name) {
@@ -156,6 +160,14 @@ export function LoreDetailPage({
     additional_images: parseAdditionalImages(initialLore.additional_images),
   };
 
+  if (isAurenfurtLore(lore) && cityOpen) {
+    return (
+      <div className="space-y-4">
+        <HoloCityMap onLeave={() => setCityOpen(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -166,6 +178,12 @@ export function LoreDetailPage({
         breadcrumb={breadcrumb}
         parentOptions={parentOptions}
       />
+
+      {isAurenfurtLore(lore) ? (
+        <div className="flex justify-start">
+          <HoloCityEnterButton onEnter={() => setCityOpen(true)} />
+        </div>
+      ) : null}
 
       {/* Content */}
       <div className="grid gap-6 lg:grid-cols-3">

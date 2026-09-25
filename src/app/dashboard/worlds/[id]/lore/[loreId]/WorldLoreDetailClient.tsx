@@ -12,6 +12,9 @@ import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import { updateLoreEntry } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
 import { normalizeImageDisplay } from "@/src/lib/image-display";
 import { SUGGESTED_PARENT_TYPES, SUGGESTED_CHILD_TYPES, isLocationType } from "@/src/lib/lore-types";
+import { HoloCityEnterButton } from "@/src/components/city/aurenfurt/HoloCityEnterButton";
+import { HoloCityMap } from "@/src/components/city/aurenfurt/HoloCityMap";
+import { isAurenfurtLore } from "@/src/components/city/aurenfurt/aurenfurt-districts";
 
 type LoreData = {
   name: string;
@@ -118,6 +121,8 @@ export function WorldLoreDetailClient({
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [selectedOrphanId, setSelectedOrphanId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; description: string; index: number } | null>(null);
+  const [cityOpen, setCityOpen] = useState(false);
+  const showCity = isAurenfurtLore({ id: loreId, name: lore.name });
   const descriptionHasToc = useMemo(
     () => hasDocumentHeadings(lore.description),
     [lore.description],
@@ -193,6 +198,10 @@ export function WorldLoreDetailClient({
     })),
   ].filter((img) => img.url?.trim());
 
+  if (showCity && cityOpen) {
+    return <HoloCityMap onLeave={() => setCityOpen(false)} />;
+  }
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -230,6 +239,11 @@ export function WorldLoreDetailClient({
           <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant mb-4">
             {lore.name}
           </h1>
+          {showCity ? (
+            <div className="mb-6">
+              <HoloCityEnterButton onEnter={() => setCityOpen(true)} />
+            </div>
+          ) : null}
           {/* Gottheits-Details (World View) */}
           {lore.type === "Gottheit" && deityDetails && (
             <div className="mb-4 space-y-3">
