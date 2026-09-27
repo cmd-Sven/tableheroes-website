@@ -1,0 +1,51 @@
+"use client";
+
+import { useMemo } from "react";
+import type { CityDistrictId } from "../aurenfurt-districts";
+import {
+  factionLeadersForDistrict,
+  operatorForLocation,
+  withDistrictModulation,
+  type AurenfurtNpc,
+} from "../aurenfurt-npcs";
+import { utcToday } from "../aurenfurt-history";
+
+export type DistrictNpcs = {
+  /** Anführer von Fraktionen mit Präsenz im Viertel */
+  leaders: AurenfurtNpc[];
+  /** Betreiber der aktuell gewählten Key-Location */
+  operator: AurenfurtNpc | null;
+};
+
+/**
+ * Liefert Anführer des Viertels und den Betreiber der gewählten Location.
+ * Einfluss/Intel werden leicht an Tages-Kennzahlen moduliert; Identität bleibt stabil.
+ */
+export function useDistrictNpcs(
+  districtId: CityDistrictId | null,
+  buildingId: string | null = null,
+): DistrictNpcs {
+  const today = useMemo(() => utcToday(), []);
+
+  return useMemo(() => {
+    if (!districtId) {
+      return {
+        leaders: [],
+        operator: buildingId
+          ? (() => {
+              const op = operatorForLocation(buildingId);
+              return op ? withDistrictModulation(op, today) : null;
+            })()
+          : null,
+      };
+    }
+
+    const leaders = factionLeadersForDistrict(districtId).map((npc) =>
+      withDistrictModulation(npc, today),
+    );
+    const rawOperator = operatorForLocation(buildingId);
+    const operator = rawOperator ? withDistrictModulation(rawOperator, today) : null;
+
+    return { leaders, operator };
+  }, [districtId, buildingId, today]);
+}

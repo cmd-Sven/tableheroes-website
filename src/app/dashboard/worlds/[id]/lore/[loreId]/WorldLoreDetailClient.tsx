@@ -199,7 +199,7 @@ export function WorldLoreDetailClient({
   ].filter((img) => img.url?.trim());
 
   if (showCity && cityOpen) {
-    return <HoloCityMap onLeave={() => setCityOpen(false)} />;
+    return <HoloCityMap worldId={worldId} onLeave={() => setCityOpen(false)} />;
   }
 
   return (

@@ -43,6 +43,16 @@ export type CityDistrict = {
   sim: SimProfile;
 };
 
+export type LandmarkModel = "wirtshaus" | "kraemer";
+
+export type ProsperityLevel = 1 | 2 | 3 | 4 | 5;
+
+/** Kurzer spielmechanischer Bonus für das Viertel. */
+export type SpecialBonus = {
+  name: string;
+  effect: string;
+};
+
 export type CityBuilding = {
   id: string;
   name: string;
@@ -51,7 +61,14 @@ export type CityBuilding = {
   u: number;
   v: number;
   summary: string;
-  sim: SimProfile;
+  /** Echtes GLB, einmal auf der Tafel. */
+  landmark?: LandmarkModel;
+  /** Fraktions-ID aus `aurenfurt-factions` (z. B. rotes-auge). */
+  guildId: string;
+  prosperityLevel: ProsperityLevel;
+  /** Brandherd für Unruhen/Kriminalität, 0–100. */
+  isHotspot: number;
+  specialBonus: SpecialBonus;
 };
 
 export type SimSubject = {
@@ -60,7 +77,6 @@ export type SimSubject = {
   name: string;
   kicker: string;
   summary: string;
-  sim: SimProfile;
   districtId: CityDistrictId;
 };
 
@@ -78,7 +94,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Blaue Dächer und Gärten im Norden. Die Häuser halten die Gassen sauber und die Tore zu.",
-    sim: sim(12, 76, 8, 82, 14, 84, [{ name: "Salons der Häuser", strength: 24 }]),
+    sim: sim(12, 76, 8, 82, 14, 84, 14, [{ name: "Salons der Häuser", strength: 24 }]),
   },
   {
     id: "tempelbezirk",
@@ -89,7 +105,10 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Goldkuppeln im Osten. Pilger füllen die Höfe, und nicht jede Liturgie ist die offizielle.",
-    sim: sim(16, 86, 29, 73, 33, 68, [{ name: "Goldene Liturgie", strength: 36 }]),
+    sim: sim(16, 86, 29, 73, 33, 68, 34, [
+      { name: "Goldene Liturgie", strength: 36 },
+      { name: "Silberne Rose gegen das Konklave", strength: 44 },
+    ]),
   },
   {
     id: "handwerkerviertel",
@@ -100,7 +119,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Essen und Kontore vor der Südostmauer. Die Zünfte wiegen mehr als die Garde.",
-    sim: sim(41, 37, 17, 44, 42, 74, [{ name: "Zunftkeller", strength: 57 }]),
+    sim: sim(41, 37, 17, 44, 42, 74, 27, [{ name: "Zunftkeller", strength: 57 }]),
   },
   {
     id: "suedtor",
@@ -111,7 +130,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Löwentor und Prozessionsallee. Hier kommt die Stadt hinein, und nicht alles wird verzollt.",
-    sim: sim(34, 44, 15, 71, 79, 61, [{ name: "Löwentor-Schmuggler", strength: 48 }]),
+    sim: sim(34, 44, 15, 71, 79, 61, 36, [{ name: "Löwentor-Schmuggler", strength: 48 }]),
   },
   {
     id: "unterstadt",
@@ -122,7 +141,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Dichte rote Dächer im Südwesten. Zu viele Menschen, zu wenig Wachen, zu laute Keller.",
-    sim: sim(72, 18, 56, 21, 88, 26, [
+    sim: sim(72, 18, 56, 21, 88, 26, 68, [
       { name: "Flüstern der Roten Gassen", strength: 74 },
       { name: "Malanthir-Zellen", strength: 63 },
     ]),
@@ -136,11 +155,12 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: 0,
     outer: PALACE_OUTER,
     summary: "Die goldene Zentralkuppel. Vattrak ist hier am ruhigsten, die Garde am dichtesten.",
-    sim: sim(6, 94, 11, 96, 5, 91, [{ name: "Hofkanzlei", strength: 19 }]),
+    sim: sim(6, 94, 11, 96, 5, 91, 12, [{ name: "Hofkanzlei", strength: 19 }]),
   },
 ];
 
 export const CITY_BUILDINGS: CityBuilding[] = [
+  // —— Palast ——
   {
     id: "goldkuppel",
     name: "Goldene Kuppel",
@@ -149,8 +169,63 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.47,
     summary: "Thronsaal unter der Kuppel. Jeder Bogen hat eine Wache, jeder Flur ein Protokoll.",
-    sim: sim(4, 96, 7, 98, 2, 93, [{ name: "Hofkanzlei", strength: 16 }]),
+    guildId: "haeuser-des-nordens",
+    prosperityLevel: 5,
+    isHotspot: 8,
+    specialBonus: {
+      name: "Hofprotokoll",
+      effect: "Verhandlungen im Palast starten mit +1 auf Einschüchterung durch Rang.",
+    },
   },
+  {
+    id: "hofwache",
+    name: "Hofwache der Stadtwachen",
+    kind: "gate",
+    districtId: "palast",
+    u: 0.46,
+    v: 0.52,
+    summary: "Wachstube am inneren Ring. Hier meldet die Garde dem Hof, und Willkür trägt ein Siegel.",
+    guildId: "stadtwachen",
+    prosperityLevel: 4,
+    isHotspot: 18,
+    specialBonus: {
+      name: "Alarmglocke",
+      effect: "Einmal pro Szene kann die Gruppe die Garde in 1 Runde herbeirufen.",
+    },
+  },
+  {
+    id: "hofkanzlei",
+    name: "Hofkanzlei",
+    kind: "manor",
+    districtId: "palast",
+    u: 0.54,
+    v: 0.52,
+    summary: "Akten, Siegel und stille Türen. Wer hier schreibt, formt die Stadt, bevor sie es merkt.",
+    guildId: "haeuser-des-nordens",
+    prosperityLevel: 5,
+    isHotspot: 12,
+    specialBonus: {
+      name: "Siegelrecht",
+      effect: "Offizielle Schreiben aus der Kanzlei senken Garde-Kontrollen im Zielviertel.",
+    },
+  },
+  {
+    id: "silberkapelle",
+    name: "Kapelle der Silbernen Rose",
+    kind: "temple",
+    districtId: "palast",
+    u: 0.5,
+    v: 0.4,
+    summary: "Kleine Hofkapelle mit offenen Türen. Elysia-Flüstern unter kaiserlichem Stuck.",
+    guildId: "bund-silberne-rose",
+    prosperityLevel: 4,
+    isHotspot: 22,
+    specialBonus: {
+      name: "Hoffnungsschwur",
+      effect: "Ein kurzes Gebet entfernt 1 Stufe Erschöpfung nach einer gescheiterten Probe.",
+    },
+  },
+  // —— Adelsviertel ——
   {
     id: "nordtor",
     name: "Nordtor",
@@ -159,7 +234,13 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.1,
     summary: "Das nördliche Tor. Wer hier durchwill, hat entweder ein Wappen oder eine sehr gute Erklärung.",
-    sim: sim(13, 71, 6, 86, 18, 70, []),
+    guildId: "stadtwachen",
+    prosperityLevel: 4,
+    isHotspot: 20,
+    specialBonus: {
+      name: "Wappenkontrolle",
+      effect: "Mit Adelsausweis entfällt die erste Zollprobe am Nordtor.",
+    },
   },
   {
     id: "blaue-gaerten",
@@ -169,7 +250,13 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.4,
     v: 0.3,
     summary: "Heckenhöfe der Häuser. Nach Sonnenuntergang schließt das letzte Gitter.",
-    sim: sim(8, 80, 5, 77, 9, 82, [{ name: "Salons der Häuser", strength: 28 }]),
+    guildId: "haeuser-des-nordens",
+    prosperityLevel: 5,
+    isHotspot: 10,
+    specialBonus: {
+      name: "Salonluft",
+      effect: "Heimliche Gespräche in den Gärten gelten als unbemerkt, solange niemand die Gitter stört.",
+    },
   },
   {
     id: "blauer-hirsch",
@@ -178,9 +265,33 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     districtId: "adelsviertel",
     u: 0.58,
     v: 0.3,
-    summary: "Leises Haus, teure Krüge. Die Garde trinkt hier umsonst, solange niemand laut wird.",
-    sim: sim(18, 66, 9, 64, 16, 73, [{ name: "Salons der Häuser", strength: 20 }]),
+    summary:
+      "Leises Haus, teure Krüge. Die Goldkelchen spielen hier für Adelsohren — und lauschen für das Haus der Seide.",
+    guildId: "goldkelchen",
+    prosperityLevel: 4,
+    isHotspot: 28,
+    specialBonus: {
+      name: "Bardenohren",
+      effect: "Ein Auftritt der Goldkelchen liefert 1 belastbares Gerücht aus dem Adelsviertel.",
+    },
   },
+  {
+    id: "seidensalon",
+    name: "Seidensalon der Nordhäuser",
+    kind: "manor",
+    districtId: "adelsviertel",
+    u: 0.45,
+    v: 0.22,
+    summary: "Empfangszimmer mit Seidenbahnen. Das Haus der Seide verkauft hier Rang und Stoffe zugleich.",
+    guildId: "haus-der-seide",
+    prosperityLevel: 5,
+    isHotspot: 16,
+    specialBonus: {
+      name: "Standgebühr",
+      effect: "Handel mit Adel: +1 auf Überzeugen, wenn Luxusware im Spiel ist.",
+    },
+  },
+  // —— Tempelbezirk ——
   {
     id: "tempel",
     name: "Goldene Tempelkuppel",
@@ -189,7 +300,13 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.74,
     v: 0.42,
     summary: "Die große Ostkuppel. Tagsüber Pilger, nachts eine Liturgie, die nicht im Kalender steht.",
-    sim: sim(10, 90, 34, 70, 28, 66, [{ name: "Goldene Liturgie", strength: 48 }]),
+    guildId: "konklave-ewige-ordnung",
+    prosperityLevel: 4,
+    isHotspot: 35,
+    specialBonus: {
+      name: "Gezähltes Schicksal",
+      effect: "Einmal pro Tag darf eine Probe neu gewürfelt werden — das Ergebnis zählt.",
+    },
   },
   {
     id: "ostbrunnen",
@@ -199,8 +316,47 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.64,
     v: 0.34,
     summary: "Brunnen zwischen Palastgärten und Tempeln. Opfergaben verschwinden schneller als Wasser.",
-    sim: sim(15, 74, 22, 68, 30, 58, [{ name: "Goldene Liturgie", strength: 21 }]),
+    guildId: "bund-silberne-rose",
+    prosperityLevel: 3,
+    isHotspot: 30,
+    specialBonus: {
+      name: "Opferstille",
+      effect: "Eine Opfergabe am Brunnen senkt Malanthir-Spuren in der nächsten Szene um eine Stufe.",
+    },
   },
+  {
+    id: "rose-hof",
+    name: "Hof der Silbernen Rose",
+    kind: "temple",
+    districtId: "tempelbezirk",
+    u: 0.78,
+    v: 0.36,
+    summary: "Offener Kreuzgang mit weißen Rosen. Hier predigen Elysia-Anhänger gegen gezähltes Schicksal.",
+    guildId: "bund-silberne-rose",
+    prosperityLevel: 3,
+    isHotspot: 40,
+    specialBonus: {
+      name: "Offene Höfe",
+      effect: "Verbündete der Rose erhalten Unterschlupf ohne Informationsabfluss an die Garde.",
+    },
+  },
+  {
+    id: "konklave-saal",
+    name: "Saal der Ewigen Ordnung",
+    kind: "temple",
+    districtId: "tempelbezirk",
+    u: 0.7,
+    v: 0.48,
+    summary: "Geschlossener Chorraum. Chromus-Liturgie tickt in Kerzen und Zahlen.",
+    guildId: "konklave-ewige-ordnung",
+    prosperityLevel: 4,
+    isHotspot: 38,
+    specialBonus: {
+      name: "Liturgiezwang",
+      effect: "Gegner in Sichtweite leiden −1 auf Willenskraft, solange der Chor singt.",
+    },
+  },
+  // —— Handwerkerviertel ——
   {
     id: "schmiede",
     name: "Große Schmiede",
@@ -209,7 +365,13 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.7,
     v: 0.64,
     summary: "Esse an der Südostmauer. Die Zunft kauft Erz, bevor die Garde Fragen stellt.",
-    sim: sim(44, 31, 14, 38, 34, 81, [{ name: "Esse-Zunft", strength: 62 }]),
+    guildId: "zunftbund",
+    prosperityLevel: 3,
+    isHotspot: 32,
+    specialBonus: {
+      name: "Zunftesse",
+      effect: "Waffen und Werkzeuge reparieren kostet die Hälfte der üblichen Zeit.",
+    },
   },
   {
     id: "zunft",
@@ -219,8 +381,47 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.6,
     v: 0.6,
     summary: "Schreibstube und Lager der Zünfte. Verträge gelten hier mehr als Wappen.",
-    sim: sim(32, 42, 12, 49, 27, 86, [{ name: "Zunftkeller", strength: 70 }]),
+    guildId: "zunftbund",
+    prosperityLevel: 3,
+    isHotspot: 36,
+    specialBonus: {
+      name: "Vertragssiegel",
+      effect: "Ein Zunftvertrag gilt vor Hof und Garde als bindender als ein Adelswort.",
+    },
   },
+  {
+    id: "seidenkontor",
+    name: "Kontor des Hauses der Seide",
+    kind: "market",
+    districtId: "handwerkerviertel",
+    u: 0.65,
+    v: 0.56,
+    summary: "Stand und Schreibstube am Handwerkermarkt. Hohe Gebühren, längere Reichweite bis in die blauen Salons.",
+    guildId: "haus-der-seide",
+    prosperityLevel: 4,
+    isHotspot: 28,
+    specialBonus: {
+      name: "Seidennetz",
+      effect: "Handelsproben am Markt erhalten +1, wenn das Haus der Seide als Mittler genannt wird.",
+    },
+  },
+  {
+    id: "gauklerbuehne",
+    name: "Gauklerbühne der Goldkelchen",
+    kind: "guild",
+    districtId: "handwerkerviertel",
+    u: 0.55,
+    v: 0.66,
+    summary: "Bretter vor den Essen. Die Goldkelchen tanzen laut — und tragen leise Botschaften.",
+    guildId: "goldkelchen",
+    prosperityLevel: 2,
+    isHotspot: 44,
+    specialBonus: {
+      name: "Gaukelspiel",
+      effect: "Während eines Auftritts gelten Ablenkungsmanöver im Viertel als erleichtert.",
+    },
+  },
+  // —— Südtor (bestehende Orte) ——
   {
     id: "loewentor",
     name: "Löwentor",
@@ -229,7 +430,13 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.9,
     summary: "Zwei Löwen am Südausgang. Zoll und Garde teilen sich den Torbogen, die Schmuggler die Schatten.",
-    sim: sim(36, 46, 13, 78, 84, 64, [{ name: "Löwentor-Schmuggler", strength: 55 }]),
+    guildId: "stadtwachen",
+    prosperityLevel: 2,
+    isHotspot: 55,
+    specialBonus: {
+      name: "Zollschatten",
+      effect: "Schmuggelproben am Löwentor erhalten +1 bei Nacht oder starkem Regen.",
+    },
   },
   {
     id: "allee",
@@ -239,8 +446,16 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.54,
     v: 0.72,
     summary: "An der grünen Prozessionsallee. Händler trinken, bevor sie das Tor nehmen.",
-    sim: sim(30, 40, 16, 52, 61, 58, [{ name: "Löwentor-Schmuggler", strength: 33 }]),
+    landmark: "wirtshaus",
+    guildId: "goldkelchen",
+    prosperityLevel: 2,
+    isHotspot: 48,
+    specialBonus: {
+      name: "Torgerücht",
+      effect: "Ein Abend an der Allee liefert Nachrichten über ankommende Karawanen und Flüchtlinge.",
+    },
   },
+  // —— Unterstadt ——
   {
     id: "westmarkt",
     name: "Westmarkt",
@@ -248,8 +463,16 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     districtId: "unterstadt",
     u: 0.34,
     v: 0.62,
-    summary: "Stände vor den roten Dächern. Ware, Diebstahl und Gerüchte liegen auf demselben Tuch.",
-    sim: sim(64, 22, 28, 24, 81, 47, [{ name: "Flüstern der Roten Gassen", strength: 46 }]),
+    summary:
+      "Stände vor den roten Dächern. Das Haus der Seide hält den teuersten Stand — Ware, Diebstahl und Gerüchte teilen sich das Tuch.",
+    landmark: "kraemer",
+    guildId: "haus-der-seide",
+    prosperityLevel: 2,
+    isHotspot: 62,
+    specialBonus: {
+      name: "Marktwucher",
+      effect: "Preise am Westmarkt schwanken: Würfel 1W6 — ungerade = −20 %, gerade = +20 %.",
+    },
   },
   {
     id: "rote-laterne",
@@ -259,10 +482,45 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.31,
     v: 0.74,
     summary: "Eng, laut, und die Wache kommt spät. Im Keller wird Malanthir nicht nur geflüstert.",
-    sim: sim(81, 11, 70, 12, 76, 19, [
-      { name: "Keller der Roten Laterne", strength: 82 },
-      { name: "Malanthir-Zellen", strength: 68 },
-    ]),
+    guildId: "rotes-auge",
+    prosperityLevel: 1,
+    isHotspot: 78,
+    specialBonus: {
+      name: "Kellerflüstern",
+      effect: "Kontakte zum Roten Auge starten vertrauensvoller; Garde-Proben hier sind erschwert.",
+    },
+  },
+  {
+    id: "malanthir-umschlagplatz",
+    name: "Malanthir-Umschlagplatz",
+    kind: "guild",
+    districtId: "unterstadt",
+    u: 0.28,
+    v: 0.68,
+    summary: "Verdeckter Hof des Roten Auges. Kisten ohne Siegel, Wege ohne Namen, Ware die niemand sehen soll.",
+    guildId: "rotes-auge",
+    prosperityLevel: 1,
+    isHotspot: 88,
+    specialBonus: {
+      name: "Schwarzer Umschlag",
+      effect: "Verbotene Güter können einmal pro Nacht ohne öffentliche Spur umgeschlagen werden.",
+    },
+  },
+  {
+    id: "wachenstube-rot",
+    name: "Wachstube Rote Gassen",
+    kind: "gate",
+    districtId: "unterstadt",
+    u: 0.38,
+    v: 0.7,
+    summary: "Dünn besetzte Stube der Stadtwachen. Unterwandert, überfordert — und trotzdem da.",
+    guildId: "stadtwachen",
+    prosperityLevel: 1,
+    isHotspot: 70,
+    specialBonus: {
+      name: "Bestechliche Patrouille",
+      effect: "Mit Gold oder Drohung lässt sich eine Patrouille für eine Szene abziehen.",
+    },
   },
 ];
 
@@ -296,7 +554,6 @@ export function subjectFromSelection(selection: HoloSelection | null): SimSubjec
       name: district.name,
       kicker: "Viertel",
       summary: district.summary,
-      sim: district.sim,
       districtId: district.id,
     };
   }
@@ -309,7 +566,6 @@ export function subjectFromSelection(selection: HoloSelection | null): SimSubjec
     name: building.name,
     kicker: district?.name ?? "Ort",
     summary: building.summary,
-    sim: building.sim,
     districtId: building.districtId,
   };
 }

@@ -5,6 +5,7 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { DoubleSide } from "three";
 import type { BuildingKind, CityBuilding } from "../aurenfurt-districts";
 import { surfacePoint } from "./diorama-geometry";
+import { HoloLandmarkMesh } from "./HoloLandmarkMesh";
 
 type Props = {
   building: CityBuilding;
@@ -44,7 +45,7 @@ export function HoloBuildingMarker({ building, selected, onSelect, onHover }: Pr
       onPointerOut={out}
     >
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <ringGeometry args={[0.07, 0.11, 20]} />
+        <ringGeometry args={building.landmark ? [0.18, 0.24] : [0.07, 0.11]} />
         <meshBasicMaterial
           color={selected ? "#ffe7a3" : "#9af6ff"}
           transparent
@@ -52,15 +53,21 @@ export function HoloBuildingMarker({ building, selected, onSelect, onHover }: Pr
           side={DoubleSide}
         />
       </mesh>
-      <BuildingShape kind={building.kind} selected={selected} />
-      <mesh position={[0, 0.36, 0]}>
-        <cylinderGeometry args={[0.012, 0.012, selected ? 0.58 : 0.4, 6]} />
-        <meshBasicMaterial color={selected ? "#ffe7a3" : "#9af6ff"} transparent opacity={0.92} />
-      </mesh>
-      <mesh position={[0, selected ? 0.66 : 0.56, 0]}>
-        <sphereGeometry args={[0.034, 10, 10]} />
-        <meshBasicMaterial color={selected ? "#fff4c8" : "#e9fdff"} />
-      </mesh>
+      {building.landmark ? (
+        <HoloLandmarkMesh model={building.landmark} />
+      ) : (
+        <>
+          <BuildingShape kind={building.kind} selected={selected} />
+          <mesh position={[0, 0.36, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, selected ? 0.58 : 0.4, 6]} />
+            <meshBasicMaterial color={selected ? "#ffe7a3" : "#9af6ff"} transparent opacity={0.92} />
+          </mesh>
+          <mesh position={[0, selected ? 0.66 : 0.56, 0]}>
+            <sphereGeometry args={[0.034, 10, 10]} />
+            <meshBasicMaterial color={selected ? "#fff4c8" : "#e9fdff"} />
+          </mesh>
+        </>
+      )}
       <mesh visible={false} position={[0, 0.32, 0]}>
         <sphereGeometry args={[0.36, 10, 10]} />
         <meshBasicMaterial />

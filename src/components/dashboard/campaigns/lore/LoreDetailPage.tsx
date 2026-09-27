@@ -163,7 +163,7 @@ export function LoreDetailPage({
   if (isAurenfurtLore(lore) && cityOpen) {
     return (
       <div className="space-y-4">
-        <HoloCityMap onLeave={() => setCityOpen(false)} />
+        <HoloCityMap campaignId={campaignId} onLeave={() => setCityOpen(false)} />
       </div>
     );
   }
