@@ -322,6 +322,60 @@ export default async function SessionPage({ params, searchParams }: Props) {
     }
   }
 
+  // Tray-RPC liefert für Spieler nur Zusagen/Via Online/gm_confirmed; Session-Start
+  // erlaubt inzwischen unbestätigte Spieler. Eigenen PC nachladen, damit Gruß/Avatar
+  // nicht auf „Held“ fallen — ohne unbestätigte Fremde in die öffentliche Tray-Liste.
+  if (!partyCharacters.some((pc) => pc.playerUserId === user.id)) {
+    const { data: ownMember } = await (supabase.from("campaign_members") as any)
+      .select("character_id")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", user.id)
+      .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"])
+      .not("character_id", "is", null)
+      .maybeSingle();
+
+    const ownCharacterId =
+      ownMember?.character_id != null ? String(ownMember.character_id) : null;
+
+    if (ownCharacterId) {
+      const alreadyListed = partyCharacters.some((pc) => pc.id === ownCharacterId);
+      if (alreadyListed) {
+        partyCharacters = partyCharacters.map((pc) =>
+          pc.id === ownCharacterId ? { ...pc, playerUserId: user.id } : pc,
+        );
+      } else {
+        const { data: ownChar } = await (supabase.from("characters") as any)
+          .select(
+            "id, name, class, race, level, avatar_url, rations_count, starvation_days",
+          )
+          .eq("id", ownCharacterId)
+          .eq("campaign_id", campaignId)
+          .maybeSingle();
+
+        if (ownChar) {
+          const c = ownChar as Record<string, unknown>;
+          partyCharacters = [
+            ...partyCharacters,
+            {
+              id: String(c.id),
+              name: String(c.name ?? ""),
+              class: c.class != null ? String(c.class) : null,
+              race: c.race != null ? String(c.race) : null,
+              level:
+                typeof c.level === "number" && Number.isFinite(c.level)
+                  ? c.level
+                  : null,
+              avatar_url: c.avatar_url != null ? String(c.avatar_url) : null,
+              avatar_display: null,
+              playerUserId: user.id,
+              ...survivalFromPartyRow(c),
+            },
+          ];
+        }
+      }
+    }
+  }
+
   if (partyCharacters.length > 0) {
     const dispMap = await fetchAvatarDisplayMapForCampaign(
       supabase,
