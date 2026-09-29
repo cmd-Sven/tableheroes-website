@@ -18,7 +18,8 @@ type Props = {
   className: string;
   readOnly: boolean;
   onSheetChange: (sheet: Dnd5eSheetData) => void;
-  onPersist?: () => void;
+  /** Sheet-Override vermeidet Stale-State (setSheet hat noch nicht gerendert). */
+  onPersist?: (nextSheet: Dnd5eSheetData) => void;
 };
 
 export function CharacterRestPanel({
@@ -52,7 +53,7 @@ export function CharacterRestPanel({
     if (!confirm(t("rest.longRestConfirm"))) return;
     const next = applyLongRest(sheet, className);
     onSheetChange(next);
-    onPersist?.();
+    onPersist?.(next);
   }
 
   function rollPreview() {
@@ -70,7 +71,7 @@ export function CharacterRestPanel({
     onSheetChange(result.sheet);
     setHitDiceModal(false);
     setBusy(false);
-    onPersist?.();
+    onPersist?.(result.sheet);
     if (result.hitDiceSpent > 0) {
       const rollText =
         result.rolls.length > 0 ? ` (${result.rolls.join(" + ")})` : "";
@@ -82,7 +83,7 @@ export function CharacterRestPanel({
     const result = applyShortRest(sheet, className, conScore, 0);
     onSheetChange(result.sheet);
     setHitDiceModal(false);
-    onPersist?.();
+    onPersist?.(result.sheet);
   }
 
   return (

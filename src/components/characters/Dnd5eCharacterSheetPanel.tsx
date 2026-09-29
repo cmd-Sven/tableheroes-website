@@ -640,6 +640,7 @@ export function Dnd5eCharacterSheetPanel({
   const [backgroundHelpId, setBackgroundHelpId] = useState<string | null>(null);
   const [inventoryItems, setInventoryItems] = useState<CharacterItem[]>([]);
   const equipmentPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingEquipmentRef = useRef<Dnd5eEquipmentState | null>(null);
 
   const reloadInventoryItems = useCallback(async () => {
     try {
@@ -1103,13 +1104,18 @@ export function Dnd5eCharacterSheetPanel({
     if (readOnly) return;
 
     const normalized = normalizeEquipmentState(equipment);
+    pendingEquipmentRef.current = normalized;
     if (equipmentPersistTimerRef.current) {
       clearTimeout(equipmentPersistTimerRef.current);
     }
     equipmentPersistTimerRef.current = setTimeout(() => {
+      const toSave = pendingEquipmentRef.current;
+      pendingEquipmentRef.current = null;
+      equipmentPersistTimerRef.current = null;
+      if (!toSave) return;
       startTransition(async () => {
         try {
-          await saveCharacterEquipment(characterId, normalized);
+          await saveCharacterEquipment(characterId, toSave);
           onSaved?.();
         } catch (e: unknown) {
           toast.error(
@@ -1124,13 +1130,29 @@ export function Dnd5eCharacterSheetPanel({
     return () => {
       if (equipmentPersistTimerRef.current) {
         clearTimeout(equipmentPersistTimerRef.current);
+        equipmentPersistTimerRef.current = null;
+      }
+      const pending = pendingEquipmentRef.current;
+      pendingEquipmentRef.current = null;
+      if (pending) {
+        void saveCharacterEquipment(characterId, pending).catch(() => {
+          /* Unmount: Fehler nicht toasten */
+        });
       }
     };
+    // Nur beim Unmount flushen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSave(silent = false, sheetOverride?: Dnd5eSheetData) {
     const activeSheet = sheetOverride ?? sheet;
     if (!activeSheet || !payload) return;
+    // Pending Equipment-Debounce abbrechen: Full-Save enthält equipment aus dem Sheet.
+    if (equipmentPersistTimerRef.current) {
+      clearTimeout(equipmentPersistTimerRef.current);
+      equipmentPersistTimerRef.current = null;
+    }
+    pendingEquipmentRef.current = null;
     startTransition(async () => {
       let sheetToSave = activeSheet;
       if (inventoryItems.length > 0) {
@@ -2401,7 +2423,7 @@ export function Dnd5eCharacterSheetPanel({
                   className={meta.className}
                   readOnly={readOnly}
                   onSheetChange={setSheet}
-                  onPersist={() => handleSave(true)}
+                  onPersist={(nextSheet) => handleSave(true, nextSheet)}
                 />
               ) : null}
 
