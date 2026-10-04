@@ -14,7 +14,12 @@ import { normalizeImageDisplay } from "@/src/lib/image-display";
 import { SUGGESTED_PARENT_TYPES, SUGGESTED_CHILD_TYPES, isLocationType } from "@/src/lib/lore-types";
 import { HoloCityEnterButton } from "@/src/components/city/aurenfurt/HoloCityEnterButton";
 import { HoloCityMap } from "@/src/components/city/aurenfurt/HoloCityMap";
-import { isAurenfurtLore } from "@/src/components/city/aurenfurt/aurenfurt-districts";
+import { isAurenfurtLore, type CityDistrictId } from "@/src/components/city/aurenfurt/aurenfurt-districts";
+import { AurenfurtBuildingStreetBlock } from "@/src/components/city/aurenfurt/AurenfurtBuildingStreetBlock";
+import { PoiInfluencesSection } from "@/src/components/city/aurenfurt/PoiInfluencesSection";
+import type { AurenfurtPoiLoreExtras } from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
+import { POI_LOCATION_TYPES } from "@/src/lib/lore-types";
+import type { PoiInfluence } from "@/src/components/city/aurenfurt/aurenfurt-map-pois";
 
 type LoreData = {
   name: string;
@@ -72,6 +77,8 @@ type Props = {
   loreId: string;
   backHref: string;
   backLabel: string;
+  /** World-Owner / Spielleiter / Admin – Editor nur für diese Rollen. */
+  isGm?: boolean;
   isLocation?: boolean;
   parent?: { id: string; name: string; type?: string } | null;
   loreType?: string;
@@ -93,6 +100,17 @@ type Props = {
     spokenByCultures?: Array<{ id: string; name: string }>;
     spokenByRaces?: Array<{ id: string; name: string }>;
   };
+  /** Aurenfurt-Kartengebäude: Straße / Aktiv-Status */
+  aurenfurtBuilding?: {
+    streetId: string | null;
+    fromEditor: boolean;
+    districtId: string | null;
+    active: boolean;
+    mapU: number | null;
+    mapV: number | null;
+  } | null;
+  /** Besonderer Ort (POI): Art + Einflussfaktoren */
+  aurenfurtPoi?: AurenfurtPoiLoreExtras | null;
 };
 
 export function WorldLoreDetailClient({
@@ -101,6 +119,7 @@ export function WorldLoreDetailClient({
   loreId,
   backHref,
   backLabel,
+  isGm = false,
   isLocation = false,
   parent = null,
   loreType = lore.type,
@@ -113,6 +132,8 @@ export function WorldLoreDetailClient({
   religionDeityLore = null,
   deityDetails = null,
   loreMetadata = {},
+  aurenfurtBuilding = null,
+  aurenfurtPoi = null,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -123,14 +144,17 @@ export function WorldLoreDetailClient({
   const [lightboxImage, setLightboxImage] = useState<{ url: string; description: string; index: number } | null>(null);
   const [cityOpen, setCityOpen] = useState(false);
   const showCity = isAurenfurtLore({ id: loreId, name: lore.name });
+  const npcCreateAllowed = !aurenfurtBuilding?.fromEditor || aurenfurtBuilding.active;
+  const displayType = aurenfurtPoi?.kind ?? lore.type;
+  const poiInfluences: PoiInfluence[] = aurenfurtPoi?.influences ?? [];
   const descriptionHasToc = useMemo(
     () => hasDocumentHeadings(lore.description),
     [lore.description],
   );
 
   const { entities } = useWorldEntities(worldId);
-  const suggestedParents = SUGGESTED_PARENT_TYPES[lore.type] ?? [];
-  const suggestedChildren = SUGGESTED_CHILD_TYPES[lore.type] ?? [];
+  const suggestedParents = SUGGESTED_PARENT_TYPES[displayType] ?? SUGGESTED_PARENT_TYPES[lore.type] ?? [];
+  const suggestedChildren = SUGGESTED_CHILD_TYPES[displayType] ?? SUGGESTED_CHILD_TYPES[lore.type] ?? [];
   const storiesAndLegends = childEntries.filter((c) => c.type === "Geschichten & Legenden");
   const locationChildren = childEntries.filter((c) => c.type !== "Geschichten & Legenden" && isLocationType(c.type));
   const canHaveParent = suggestedParents.length > 0;
@@ -199,7 +223,7 @@ export function WorldLoreDetailClient({
   ].filter((img) => img.url?.trim());
 
   if (showCity && cityOpen) {
-    return <HoloCityMap worldId={worldId} onLeave={() => setCityOpen(false)} />;
+    return <HoloCityMap worldId={worldId} isGm={isGm} onLeave={() => setCityOpen(false)} />;
   }
 
   return (
@@ -233,7 +257,7 @@ export function WorldLoreDetailClient({
           <div className="flex items-center gap-2 mb-2">
             <MapPin className="h-5 w-5 text-accent-gold" />
             <span className="px-2 py-1 rounded text-xs font-barlow font-bold uppercase border border-hero-border bg-hero-dark/50 text-hero-vibrant">
-              {lore.type}
+              {aurenfurtPoi ? `Besonderer Ort · ${displayType}` : displayType}
             </span>
           </div>
           <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant mb-4">
@@ -243,6 +267,21 @@ export function WorldLoreDetailClient({
             <div className="mb-6">
               <HoloCityEnterButton onEnter={() => setCityOpen(true)} />
             </div>
+          ) : null}
+          {aurenfurtBuilding && !aurenfurtPoi ? (
+            <AurenfurtBuildingStreetBlock
+              locationId={loreId}
+              worldId={worldId}
+              districtId={(aurenfurtBuilding.districtId as CityDistrictId | null) ?? null}
+              mapU={aurenfurtBuilding.mapU}
+              mapV={aurenfurtBuilding.mapV}
+              streetId={aurenfurtBuilding.streetId}
+              fromEditor={aurenfurtBuilding.fromEditor}
+              isGm={isGm}
+            />
+          ) : null}
+          {poiInfluences.length > 0 ? (
+            <PoiInfluencesSection influences={poiInfluences} className="mb-6" />
           ) : null}
           {/* Gottheits-Details (World View) */}
           {lore.type === "Gottheit" && deityDetails && (
@@ -896,12 +935,16 @@ export function WorldLoreDetailClient({
             )}
             {locationChildren.length > 0 && (
               <ul className="mt-4 space-y-2">
-                {locationChildren.map((c) => (
+                {locationChildren.map((c) => {
+                  const isPoi = (POI_LOCATION_TYPES as readonly string[]).includes(c.type);
+                  return (
                   <li key={c.id} className="flex items-center justify-between gap-2 py-2 border-b border-hero-dark/50 last:border-0">
                     <Link href={`/dashboard/worlds/${worldId}/lore/${c.id}`} className="font-libre text-hero-vibrant hover:underline">
                       {c.name}
                     </Link>
-                    <span className="text-xs text-gray-500">{c.type}</span>
+                    <span className={`text-xs ${isPoi ? "font-barlow font-bold uppercase text-accent-gold" : "text-gray-500"}`}>
+                      {isPoi ? `Besonderer Ort · ${c.type}` : c.type}
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleUnlinkChild(c.id)}
@@ -911,7 +954,8 @@ export function WorldLoreDetailClient({
                       Entkoppeln
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
             {!canHaveChildren && locationChildren.length === 0 && (
@@ -992,22 +1036,46 @@ export function WorldLoreDetailClient({
                 )}
                 <Link
                   href={"/dashboard/worlds/" + worldId + "/npcs/create?locationId=" + loreId}
-                  className="inline-flex items-center gap-2 text-sm text-hero-vibrant hover:underline"
+                  className={`inline-flex items-center gap-2 text-sm ${
+                    npcCreateAllowed
+                      ? "text-hero-vibrant hover:underline"
+                      : "pointer-events-none text-gray-500 opacity-60"
+                  }`}
+                  aria-disabled={!npcCreateAllowed}
+                  title={
+                    npcCreateAllowed
+                      ? undefined
+                      : "Gebäude inaktiv: zuerst eine Straße im Lore-Eintrag zuordnen."
+                  }
+                  onClick={(e) => {
+                    if (!npcCreateAllowed) e.preventDefault();
+                  }}
                 >
                   <Plus className="h-4 w-4" />
                   NPC hier platzieren
                 </Link>
+                {!npcCreateAllowed ? (
+                  <p className="font-libre text-xs text-amber-400/90 mt-1">
+                    Keine NPCs möglich — Gebäude ohne Straßen-Zuordnung ist inaktiv.
+                  </p>
+                ) : null}
               </div>
             ) : (
               <>
                 <p className="font-libre text-gray-500 italic mb-2">Keine NPCs mit diesem Ort verknüpft.</p>
-                <Link
-                  href={"/dashboard/worlds/" + worldId + "/npcs/create?locationId=" + loreId}
-                  className="inline-flex items-center gap-2 text-sm text-hero-vibrant hover:underline"
-                >
-                  <Plus className="h-4 w-4" />
-                  NPC hinzufügen
-                </Link>
+                {npcCreateAllowed ? (
+                  <Link
+                    href={"/dashboard/worlds/" + worldId + "/npcs/create?locationId=" + loreId}
+                    className="inline-flex items-center gap-2 text-sm text-hero-vibrant hover:underline"
+                  >
+                    <Plus className="h-4 w-4" />
+                    NPC hinzufügen
+                  </Link>
+                ) : (
+                  <p className="font-libre text-xs text-amber-400/90">
+                    NPC hinzufügen deaktiviert — Gebäude ohne Straßen-Zuordnung ist inaktiv.
+                  </p>
+                )}
               </>
             )}
           </div>

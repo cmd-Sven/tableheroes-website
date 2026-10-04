@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FolderTree, Link2, Search, Link2Off, Star, MapPin, Loader2 } from "lucide-react";
 import { updateLoreEntry, toggleLoreFavorite } from "@/src/app/dashboard/campaigns/[id]/lore-actions";
+import { POI_LOCATION_TYPES } from "@/src/lib/lore-types";
 
 type LoreEntry = {
   id: string;
@@ -330,8 +331,14 @@ export function LoreHierarchyManager({ lore, childEntries, isGM, campaignId, orp
                     <h3 className="font-cinzel font-bold text-lg text-gray-900 group-hover:text-accent-gold transition-colors mb-2">
                       {child.name}
                     </h3>
-                    <p className="font-libre text-gray-700 text-sm">
-                      {child.type}
+                    <p className={`font-libre text-sm ${
+                      (POI_LOCATION_TYPES as readonly string[]).includes(child.type)
+                        ? "font-barlow font-bold uppercase text-amber-800"
+                        : "text-gray-700"
+                    }`}>
+                      {(POI_LOCATION_TYPES as readonly string[]).includes(child.type)
+                        ? `Besonderer Ort · ${child.type}`
+                        : child.type}
                     </p>
                     {!child.is_revealed && isGM && (
                       <span className="inline-block mt-2 px-2 py-0.5 rounded bg-red-900/50 border border-red-700 text-red-300 text-xs font-barlow font-bold uppercase">

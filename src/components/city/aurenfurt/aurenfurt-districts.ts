@@ -11,6 +11,7 @@ export type CityDistrictId =
   | "suedtor"
   | "adelsviertel"
   | "tempelbezirk"
+  | "akademieviertel"
   | "unterstadt"
   | "handwerkerviertel"
   | "palast";
@@ -28,7 +29,8 @@ export type BuildingKind =
 
 export type HoloSelection =
   | { type: "district"; id: CityDistrictId }
-  | { type: "building"; id: string };
+  | { type: "building"; id: string }
+  | { type: "poi"; id: string };
 
 /** Winkel: 0° Norden, im Uhrzeigersinn. inner/outer als Anteil am Mauer-Radius. */
 export type CityDistrict = {
@@ -40,10 +42,11 @@ export type CityDistrict = {
   end: number;
   inner: number;
   outer: number;
+  /** Zellen und das frühere Porträt. Die angezeigten Zähler rechnet `aurenfurt-city-sim`. */
   sim: SimProfile;
 };
 
-export type LandmarkModel = "wirtshaus" | "kraemer";
+export type LandmarkModel = "wirtshaus" | "kraemer" | "nordtor" | "suedtor" | "wachturm" | "palais" | "kapelle" | "hofkanzlei" | "observatorium";
 
 export type ProsperityLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -69,6 +72,12 @@ export type CityBuilding = {
   /** Brandherd für Unruhen/Kriminalität, 0–100. */
   isHotspot: number;
   specialBonus: SpecialBonus;
+  /** Feste Gebäudekategorie (Editor / Lore-Typ). */
+  category?: string;
+  /** Straßen-Id aus aurenfurt-streets-v1; ohne → inaktiv bei Editor-Gebäuden. */
+  streetId?: string | null;
+  /** Über den Viertel-Karten-Editor angelegt. */
+  fromEditor?: boolean;
 };
 
 export type SimSubject = {
@@ -101,13 +110,28 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     name: "Tempelbezirk",
     tint: "#f0d85a",
     start: 32,
-    end: 112,
+    end: 76,
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Goldkuppeln im Osten. Pilger füllen die Höfe, und nicht jede Liturgie ist die offizielle.",
     sim: sim(16, 86, 29, 73, 33, 68, 34, [
       { name: "Goldene Liturgie", strength: 36 },
       { name: "Silberne Rose gegen das Konklave", strength: 44 },
+    ]),
+  },
+  {
+    id: "akademieviertel",
+    name: "Akademieviertel",
+    tint: "#8eb4f0",
+    start: 76,
+    end: 112,
+    inner: RING_INNER,
+    outer: RING_OUTER,
+    summary:
+      "Observatorium, Schwertschule und Bibliothek zwischen Tempel und Handwerk. Weiße Magie, Ausbildung und Archive — Versuchung hinter Sternenkammern, nicht auf der Straße.",
+    sim: sim(22, 80, 30, 72, 12, 70, 18, [
+      { name: "Sternenkammer", strength: 36 },
+      { name: "Archivversuchung", strength: 28 },
     ]),
   },
   {
@@ -154,29 +178,13 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     end: 360,
     inner: 0,
     outer: PALACE_OUTER,
-    summary: "Die goldene Zentralkuppel. Vattrak ist hier am ruhigsten, die Garde am dichtesten.",
+    summary: "Der Festungspalast im Zentrum. Vattrak ist hier am ruhigsten, die Garde am dichtesten.",
     sim: sim(6, 94, 11, 96, 5, 91, 12, [{ name: "Hofkanzlei", strength: 19 }]),
   },
 ];
 
 export const CITY_BUILDINGS: CityBuilding[] = [
   // —— Palast ——
-  {
-    id: "goldkuppel",
-    name: "Goldene Kuppel",
-    kind: "palace",
-    districtId: "palast",
-    u: 0.5,
-    v: 0.47,
-    summary: "Thronsaal unter der Kuppel. Jeder Bogen hat eine Wache, jeder Flur ein Protokoll.",
-    guildId: "haeuser-des-nordens",
-    prosperityLevel: 5,
-    isHotspot: 8,
-    specialBonus: {
-      name: "Hofprotokoll",
-      effect: "Verhandlungen im Palast starten mit +1 auf Einschüchterung durch Rang.",
-    },
-  },
   {
     id: "hofwache",
     name: "Hofwache der Stadtwachen",
@@ -201,6 +209,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.54,
     v: 0.52,
     summary: "Akten, Siegel und stille Türen. Wer hier schreibt, formt die Stadt, bevor sie es merkt.",
+    landmark: "hofkanzlei",
     guildId: "haeuser-des-nordens",
     prosperityLevel: 5,
     isHotspot: 12,
@@ -217,6 +226,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.4,
     summary: "Kleine Hofkapelle mit offenen Türen. Elysia-Flüstern unter kaiserlichem Stuck.",
+    landmark: "kapelle",
     guildId: "bund-silberne-rose",
     prosperityLevel: 4,
     isHotspot: 22,
@@ -234,6 +244,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.1,
     summary: "Das nördliche Tor. Wer hier durchwill, hat entweder ein Wappen oder eine sehr gute Erklärung.",
+    landmark: "nordtor",
     guildId: "stadtwachen",
     prosperityLevel: 4,
     isHotspot: 20,
@@ -356,6 +367,59 @@ export const CITY_BUILDINGS: CityBuilding[] = [
       effect: "Gegner in Sichtweite leiden −1 auf Willenskraft, solange der Chor singt.",
     },
   },
+  // —— Akademieviertel ——
+  {
+    id: "observatorium",
+    name: "Das magische Observatorium von Aurenfurt",
+    kind: "temple",
+    districtId: "akademieviertel",
+    u: 0.72,
+    v: 0.48,
+    summary:
+      "Kuppel und Sternenkammer der Magieakademie. Hier wird Vattrak gelehrt — und manches, das nicht im Lehrplan steht.",
+    landmark: "observatorium",
+    guildId: "zirkel-observatorium",
+    prosperityLevel: 4,
+    isHotspot: 34,
+    specialBonus: {
+      name: "Sternenkammer",
+      effect: "Einmal pro Nacht darf eine Magie-Probe mit +1 gewürfelt werden, wenn der Himmel klar ist.",
+    },
+  },
+  {
+    id: "schwertschule",
+    name: "Die Schwertschule von Aurenfurt",
+    kind: "manor",
+    districtId: "akademieviertel",
+    u: 0.68,
+    v: 0.54,
+    summary:
+      "Militärakademie für Gardisten und Wachleute. Drillhöfe, Stangen und der Geruch von Öl und Disziplin.",
+    guildId: "stadtwachen",
+    prosperityLevel: 3,
+    isHotspot: 28,
+    specialBonus: {
+      name: "Wachnachwuchs",
+      effect: "Verbündete der Garde erhalten hier eine freie Ausbildungsszene ohne öffentliche Aufmerksamkeit.",
+    },
+  },
+  {
+    id: "grosse-bibliothek",
+    name: "Die Große Bibliothek von Aurenfurt",
+    kind: "guild",
+    districtId: "akademieviertel",
+    u: 0.66,
+    v: 0.5,
+    summary:
+      "Wissensspeicher zwischen den Konfessionen und der Akademie. Regale, Register — und Abschriften, die niemand ausleihen darf.",
+    guildId: "zirkel-observatorium",
+    prosperityLevel: 4,
+    isHotspot: 26,
+    specialBonus: {
+      name: "Archivzugang",
+      effect: "Eine Rechercheprobe in der Bibliothek gilt als erleichtert, wenn der Zirkel als Mittler genannt wird.",
+    },
+  },
   // —— Handwerkerviertel ——
   {
     id: "schmiede",
@@ -430,6 +494,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.5,
     v: 0.9,
     summary: "Zwei Löwen am Südausgang. Zoll und Garde teilen sich den Torbogen, die Schmuggler die Schatten.",
+    landmark: "suedtor",
     guildId: "stadtwachen",
     prosperityLevel: 2,
     isHotspot: 55,
@@ -529,13 +594,13 @@ export function findDistrict(id: string | null) {
   return AURENFURT_DISTRICTS.find((district) => district.id === id) ?? null;
 }
 
-export function findBuilding(id: string | null) {
+export function findBuilding(id: string | null, buildings: CityBuilding[] = CITY_BUILDINGS) {
   if (!id) return null;
-  return CITY_BUILDINGS.find((building) => building.id === id) ?? null;
+  return buildings.find((building) => building.id === id) ?? null;
 }
 
-export function buildingsInDistrict(id: CityDistrictId) {
-  return CITY_BUILDINGS.filter((building) => building.districtId === id);
+export function buildingsInDistrict(id: CityDistrictId, buildings: CityBuilding[] = CITY_BUILDINGS) {
+  return buildings.filter((building) => building.districtId === id);
 }
 
 export function sameSelection(a: HoloSelection | null, b: HoloSelection | null) {
@@ -543,7 +608,17 @@ export function sameSelection(a: HoloSelection | null, b: HoloSelection | null) 
   return a.type === b.type && a.id === b.id;
 }
 
-export function subjectFromSelection(selection: HoloSelection | null): SimSubject | null {
+export function subjectFromSelection(
+  selection: HoloSelection | null,
+  buildings: CityBuilding[] = CITY_BUILDINGS,
+  pois: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    description: string;
+    districtId: CityDistrictId;
+  }> = [],
+): SimSubject | null {
   if (!selection) return null;
   if (selection.type === "district") {
     const district = findDistrict(selection.id);
@@ -557,7 +632,19 @@ export function subjectFromSelection(selection: HoloSelection | null): SimSubjec
       districtId: district.id,
     };
   }
-  const building = findBuilding(selection.id);
+  if (selection.type === "poi") {
+    const poi = pois.find((entry) => entry.id === selection.id);
+    if (!poi) return null;
+    return {
+      id: poi.id,
+      type: "poi",
+      name: poi.name,
+      kicker: poi.kind,
+      summary: poi.description,
+      districtId: poi.districtId,
+    };
+  }
+  const building = findBuilding(selection.id, buildings);
   if (!building) return null;
   const district = findDistrict(building.districtId);
   return {

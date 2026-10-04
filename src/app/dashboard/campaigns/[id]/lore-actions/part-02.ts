@@ -190,14 +190,21 @@ export async function getChildLoreEntries(
 
   const childIds = list.map((c: any) => c.id);
   let latestSecretDiscoveredAt: Record<string, string> = {};
+  const poiKindById = new Map<string, string>();
 
   if (childIds.length > 0) {
-    const { data: recentSecrets } = await (supabase.from("secrets") as any)
-      .select("entity_id, discovered_at")
-      .eq("entity_type", "lore")
-      .in("entity_id", childIds)
-      .not("discovered_at", "is", null)
-      .order("discovered_at", { ascending: false });
+    const [{ data: recentSecrets }, { data: poiRows }] = await Promise.all([
+      (supabase.from("secrets") as any)
+        .select("entity_id, discovered_at")
+        .eq("entity_type", "lore")
+        .in("entity_id", childIds)
+        .not("discovered_at", "is", null)
+        .order("discovered_at", { ascending: false }),
+      (supabase.from("locations") as any)
+        .select("id, map_poi_kind")
+        .in("id", childIds)
+        .not("map_poi_kind", "is", null),
+    ]);
 
     if (recentSecrets) {
       for (const secret of recentSecrets as any[]) {
@@ -206,6 +213,10 @@ export async function getChildLoreEntries(
           latestSecretDiscoveredAt[loreEntityId] = secret.discovered_at;
         }
       }
+    }
+
+    for (const row of (poiRows || []) as Array<{ id: string; map_poi_kind: string | null }>) {
+      if (row.map_poi_kind) poiKindById.set(row.id, row.map_poi_kind);
     }
   }
 
@@ -216,9 +227,12 @@ export async function getChildLoreEntries(
     const isNew = entry.created_at
       ? (Date.now() - new Date(entry.created_at).getTime()) / (1000 * 60 * 60) < 48
       : false;
+    const poiKind = poiKindById.get(entry.id);
 
     return {
       ...entry,
+      // POI-Art (Brunnen, Statue, …) statt generischem „Ort“ / Gebäude-Typ
+      type: poiKind || entry.type,
       is_favorite: favoriteIds.has(entry.id),
       latest_secret_discovered_at: latestSecretDiscoveredAt[entry.id] || null,
       has_recent_secret: hasRecentSecret && !isNew,

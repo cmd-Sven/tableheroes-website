@@ -22,6 +22,14 @@ import {
 import { uploadNpcPortrait } from "@/src/lib/profile-media";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "./NpcPortraitUploadField";
+import { NpcCitySimulationFields } from "@/src/components/worlds/npc-wizard/NpcCitySimulationFields";
+import {
+  EMPTY_CITY_SIMULATION,
+  citySimulationFromDb,
+  citySimulationToDb,
+  refineCitySimulationPayload,
+  type CitySimulationFields,
+} from "@/src/lib/npcs/city-simulation";
 
 type NPC = {
   id?: string;
@@ -68,6 +76,8 @@ type Props = {
   defaultFactionId?: string;
   defaultDescription?: string;
   /** Vorgeschlagenes Geheimnis aus dem KI-Wizard; wird beim Erstellen gespeichert, wenn campaignId gesetzt ist. */
+  /** Optional: Gottheiten aus Welt-Lore für Stadt-Sim. */
+  deitiesOptions?: Array<{ id: string; name: string }>;
   suggestedSecret?: { title: string; content: string } | null;
 };
 
@@ -90,7 +100,7 @@ const ALIGNMENTS = [
   "Chaotic Evil",
 ];
 
-export function NPCForm({ campaignId, worldId, initialData, hookContext, factions, locations, shops = [], onSuccess, onCreated, defaultRole, defaultLocationId, defaultName, defaultFactionId, defaultDescription, suggestedSecret }: Props) {
+export function NPCForm({ campaignId, worldId, initialData, hookContext, factions, locations, shops = [], onSuccess, onCreated, defaultRole, defaultLocationId, defaultName, defaultFactionId, defaultDescription, suggestedSecret, deitiesOptions = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -98,6 +108,9 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const isEditMode = !!(initialData?.id && initialData.id.trim() !== "");
   const showAdvancedSections = isEditMode || !!hookContext || !!initialData;
+  const [citySim, setCitySim] = useState<CitySimulationFields>(() =>
+    citySimulationFromDb(initialData as any),
+  );
 
   // Context NPCs State
   const [imageDisplay, setImageDisplay] = useState<ImageDisplaySettings>({ ...DEFAULT_IMAGE_DISPLAY });
@@ -246,6 +259,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           .image_upload_rights_confirmed === true,
       );
       setUploadRightsConfirmed(false);
+      setCitySim(citySimulationFromDb(initialData as any));
     } else {
       setFormData({
         name: "",
@@ -274,6 +288,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         check_results: [],
       });
       setImageDisplay({ ...DEFAULT_IMAGE_DISPLAY });
+      setCitySim({ ...EMPTY_CITY_SIMULATION });
     }
   }, [initialData]);
 
@@ -389,6 +404,12 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           throw new Error("Bitte wähle ein Shop-Template für diesen Händler aus.");
         }
 
+        const citySimCheck = refineCitySimulationPayload(citySim);
+        if (!citySimCheck.ok) {
+          throw new Error(citySimCheck.error);
+        }
+        const citySimDb = citySimulationToDb(citySimCheck.data);
+
         let resolvedImageUrl = formData.image_url.trim() || null;
         if (portraitFile) {
           if (!effectiveWorldId) {
@@ -477,6 +498,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           hidden_agenda: formData.hidden_agenda || undefined,
           true_nature: formData.true_nature || undefined,
           check_results: formData.check_results && formData.check_results.length > 0 ? formData.check_results : undefined,
+          ...citySimDb,
         };
 
         if (isEditMode && initialData?.id && initialData.id.trim() !== "") {
@@ -1062,6 +1084,12 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
             />
           </>
         )}
+
+        <NpcCitySimulationFields
+          value={citySim}
+          onChange={setCitySim}
+          deities={deitiesOptions}
+        />
 
         {/* Footer */}
         <div className="flex justify-end gap-3 pt-4 border-t border-hero-border/20">

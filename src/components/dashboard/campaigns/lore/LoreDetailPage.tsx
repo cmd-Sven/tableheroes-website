@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { SecretsManager } from "@/src/components/dashboard/campaigns/secrets/SecretsManager";
 import { UniversalSecretModal } from "@/src/components/dashboard/campaigns/secrets/UniversalSecretModal";
 import { NPCCarousel } from "@/src/components/dashboard/campaigns/npcs/NPCCarousel";
@@ -17,7 +17,10 @@ import { NpcSceneAppearances } from "@/src/components/dashboard/campaigns/npcs/N
 import type { SceneMediaAppearance } from "@/src/lib/scene-media-types";
 import { HoloCityEnterButton } from "@/src/components/city/aurenfurt/HoloCityEnterButton";
 import { HoloCityMap } from "@/src/components/city/aurenfurt/HoloCityMap";
-import { isAurenfurtLore } from "@/src/components/city/aurenfurt/aurenfurt-districts";
+import { isAurenfurtLore, type CityDistrictId } from "@/src/components/city/aurenfurt/aurenfurt-districts";
+import { AurenfurtBuildingStreetBlock } from "@/src/components/city/aurenfurt/AurenfurtBuildingStreetBlock";
+import { PoiInfluencesSection } from "@/src/components/city/aurenfurt/PoiInfluencesSection";
+import type { AurenfurtPoiLoreExtras } from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
 
 type LoreEntry = {
   id: string;
@@ -93,6 +96,8 @@ type Props = {
   lore: LoreEntry;
   campaignId: string;
   isGM: boolean;
+  /** Viertel-Editor auf der Aurenfurt-Karte (SL und Admin). Default: isGM. */
+  canEditCityMap?: boolean;
   locationNPCs?: LocationNPCs | null;
   sceneAppearances?: SceneMediaAppearance[];
   childEntries?: Array<{ id: string; name: string; type: string; image_url: string | null; is_revealed: boolean; created_at?: string; is_favorite?: boolean; published_at?: string; latest_secret_discovered_at?: string | null; has_recent_secret?: boolean }>;
@@ -103,12 +108,23 @@ type Props = {
   religionDeityLore?: ReligionDeityLoreLink;
   deityDetails?: DeityDetails;
   loreMetadata?: LoreMetadata;
+  worldId?: string | null;
+  aurenfurtBuilding?: {
+    streetId: string | null;
+    fromEditor: boolean;
+    districtId: string | null;
+    active: boolean;
+    mapU: number | null;
+    mapV: number | null;
+  } | null;
+  aurenfurtPoi?: AurenfurtPoiLoreExtras | null;
 };
 
 export function LoreDetailPage({ 
   lore: initialLore, 
   campaignId, 
-  isGM, 
+  isGM,
+  canEditCityMap,
   locationNPCs = { residents: [], guests: [] },
   sceneAppearances = [],
   childEntries = [],
@@ -119,11 +135,16 @@ export function LoreDetailPage({
   religionDeityLore = null,
   deityDetails = null,
   loreMetadata = {},
+  worldId = null,
+  aurenfurtBuilding = null,
+  aurenfurtPoi = null,
 }: Props) {
   const router = useRouter();
   const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
   const [secretsRefreshKey, setSecretsRefreshKey] = useState(0);
   const [cityOpen, setCityOpen] = useState(false);
+  const showCityEditor = canEditCityMap ?? isGM;
+  const npcCreateAllowed = !aurenfurtBuilding?.fromEditor || aurenfurtBuilding.active;
 
   // Safe check: Ensure lore exists
   if (!initialLore || !initialLore.name) {
@@ -163,7 +184,12 @@ export function LoreDetailPage({
   if (isAurenfurtLore(lore) && cityOpen) {
     return (
       <div className="space-y-4">
-        <HoloCityMap campaignId={campaignId} onLeave={() => setCityOpen(false)} />
+        <HoloCityMap
+          campaignId={campaignId}
+          worldId={worldId}
+          isGm={showCityEditor}
+          onLeave={() => setCityOpen(false)}
+        />
       </div>
     );
   }
@@ -182,6 +208,25 @@ export function LoreDetailPage({
       {isAurenfurtLore(lore) ? (
         <div className="flex justify-start">
           <HoloCityEnterButton onEnter={() => setCityOpen(true)} />
+        </div>
+      ) : null}
+
+      {aurenfurtBuilding && worldId && !aurenfurtPoi ? (
+        <AurenfurtBuildingStreetBlock
+          locationId={lore.id}
+          worldId={worldId}
+          districtId={(aurenfurtBuilding.districtId as CityDistrictId | null) ?? null}
+          mapU={aurenfurtBuilding.mapU}
+          mapV={aurenfurtBuilding.mapV}
+          streetId={aurenfurtBuilding.streetId}
+          fromEditor={aurenfurtBuilding.fromEditor}
+          isGm={isGM}
+        />
+      ) : null}
+
+      {aurenfurtPoi && aurenfurtPoi.influences.length > 0 ? (
+        <div className="rounded-lg border border-hero-border bg-background-card p-6">
+          <PoiInfluencesSection influences={aurenfurtPoi.influences} />
         </div>
       ) : null}
 
@@ -790,6 +835,23 @@ export function LoreDetailPage({
       {(locationNPCs?.guests?.length ?? 0) > 0 && (
         <NPCCarousel residents={locationNPCs?.guests || []} isGM={isGM} campaignId={campaignId} title="Aktuelle Gäste" />
       )}
+      {isGM && isLocationType(lore.type) && worldId ? (
+        <div className="rounded-lg border border-hero-dark bg-background-card p-4">
+          {npcCreateAllowed ? (
+            <Link
+              href={`/dashboard/worlds/${worldId}/npcs/create?locationId=${lore.id}`}
+              className="inline-flex items-center gap-2 text-sm text-hero-vibrant hover:underline font-barlow font-bold uppercase"
+            >
+              <Plus className="h-4 w-4" />
+              NPC an diesem Ort anlegen
+            </Link>
+          ) : (
+            <p className="font-libre text-sm text-amber-400/90">
+              NPC anlegen deaktiviert — Gebäude ohne Straßen-Zuordnung ist inaktiv.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {isLocationType(lore.type) && sceneAppearances.length > 0 && (
         <NpcSceneAppearances

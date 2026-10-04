@@ -10,7 +10,8 @@ export type FactionId =
   | "haeuser-des-nordens"
   | "bund-silberne-rose"
   | "konklave-ewige-ordnung"
-  | "zunftbund";
+  | "zunftbund"
+  | "zirkel-observatorium";
 
 /** Religiöse/ideologische Ausrichtung — typisiert an der Projekt-Lore. */
 export type IdeologyAlignment =
@@ -135,13 +136,14 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
     name: "Aurenfurter Stadtwachen",
     role: "Lokale Exekutive unter den kaiserlichen Gardisten — neigt zu Willkür.",
     ideologyAlignment: "imperial",
-    districtIds: ["palast", "adelsviertel", "suedtor", "unterstadt"],
+    districtIds: ["palast", "adelsviertel", "suedtor", "unterstadt", "akademieviertel"],
     baseLegality: 55,
     links: [
       { targetId: "haeuser-des-nordens", kind: "subordinate", strength: 70 },
       { targetId: "rotes-auge", kind: "infiltrated", strength: 58 },
       { targetId: "zunftbund", kind: "tension", strength: 38 },
       { targetId: "konklave-ewige-ordnung", kind: "ally", strength: 32 },
+      { targetId: "zirkel-observatorium", kind: "ally", strength: 48 },
     ],
   },
   {
@@ -169,6 +171,7 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
       { targetId: "konklave-ewige-ordnung", kind: "rival", strength: 82 },
       { targetId: "haeuser-des-nordens", kind: "tension", strength: 28 },
       { targetId: "goldkelchen", kind: "ally", strength: 22 },
+      { targetId: "zirkel-observatorium", kind: "tension", strength: 36 },
     ],
   },
   {
@@ -182,6 +185,7 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
       { targetId: "bund-silberne-rose", kind: "rival", strength: 82 },
       { targetId: "stadtwachen", kind: "ally", strength: 32 },
       { targetId: "haeuser-des-nordens", kind: "tension", strength: 34 },
+      { targetId: "zirkel-observatorium", kind: "tension", strength: 40 },
     ],
   },
   {
@@ -195,6 +199,20 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
       { targetId: "haus-der-seide", kind: "tension", strength: 46 },
       { targetId: "stadtwachen", kind: "tension", strength: 38 },
       { targetId: "haeuser-des-nordens", kind: "rival", strength: 30 },
+    ],
+  },
+  {
+    id: "zirkel-observatorium",
+    name: "Zirkel des Observatoriums",
+    role: "Magier und Archivare der Akademie: legale weiße Magie, Sternenkammer und Lehrstuhl zwischen den Konfessionen.",
+    ideologyAlignment: "neutral",
+    districtIds: ["akademieviertel"],
+    baseLegality: 58,
+    links: [
+      { targetId: "stadtwachen", kind: "ally", strength: 48 },
+      { targetId: "bund-silberne-rose", kind: "tension", strength: 36 },
+      { targetId: "konklave-ewige-ordnung", kind: "tension", strength: 40 },
+      { targetId: "rotes-auge", kind: "rival", strength: 44 },
     ],
   },
 ] as const;
@@ -246,6 +264,7 @@ function standingFromSims(blueprint: FactionBlueprint, day: number): StandingCor
   const tempel = districtMetricsOn("tempelbezirk", day);
   const palast = districtMetricsOn("palast", day);
   const suedtor = districtMetricsOn("suedtor", day);
+  const akademie = districtMetricsOn("akademieviertel", day);
 
   switch (blueprint.id) {
     case "rotes-auge": {
@@ -278,7 +297,15 @@ function standingFromSims(blueprint: FactionBlueprint, day: number): StandingCor
       };
     }
     case "stadtwachen": {
-      const guard = mean([palast.guard, adel.guard, suedtor.guard, handwerk.guard, unterstadt.guard, tempel.guard]);
+      const guard = mean([
+        palast.guard,
+        adel.guard,
+        suedtor.guard,
+        handwerk.guard,
+        unterstadt.guard,
+        tempel.guard,
+        akademie.guard,
+      ]);
       const corruption = mean([unterstadt.malanthir, unterstadt.crime]) * 0.2;
       return {
         power: clamp01(guard * 0.75 + palast.guard * 0.15 - corruption),
@@ -321,6 +348,16 @@ function standingFromSims(blueprint: FactionBlueprint, day: number): StandingCor
         legality: blendLegality(blueprint.baseLegality, [handwerk], 0.2, 0.1),
         economicImpact: clamp01(handwerk.economy * 0.65 + cellar * 0.2),
         linkFactor: 0.88 + handwerk.economy / 450,
+      };
+    }
+    case "zirkel-observatorium": {
+      const stern = cellStrength(akademie, "Sternenkammer");
+      const archiv = cellStrength(akademie, "Archivversuchung");
+      return {
+        power: clamp01(akademie.vattrak * 0.45 + stern * 0.25 + akademie.economy * 0.15 + archiv * 0.1),
+        legality: blendLegality(blueprint.baseLegality, [akademie], 0.15, 0.2),
+        economicImpact: clamp01(akademie.economy * 0.5 + akademie.vattrak * 0.15 + 12),
+        linkFactor: 0.88 + akademie.vattrak / 450,
       };
     }
   }

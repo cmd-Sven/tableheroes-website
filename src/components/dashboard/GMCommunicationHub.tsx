@@ -19,12 +19,15 @@ import {
   ShieldCheck,
   ExternalLink,
   BookOpen,
+  MapPin,
 } from "lucide-react";
 import {
   sendMessage,
   type GMNotification,
   type GMRecipientCampaign,
 } from "@/src/lib/actions/message-actions";
+import { dismissAurenfurtBuildingNpcHint } from "@/src/components/city/aurenfurt/aurenfurt-map-building-actions";
+import { useRouter } from "next/navigation";
 
 // ============================================================================
 // Types
@@ -51,6 +54,8 @@ function NotificationIcon({ type }: { type: GMNotification["type"] }) {
       return <Radio className="h-4 w-4 text-amber-300" />;
     case "chronicle_inbox":
       return <BookOpen className="h-4 w-4 text-sky-300" />;
+    case "building_npc":
+      return <MapPin className="h-4 w-4 text-amber-400" />;
     default:
       return <Bell className="h-4 w-4 text-gray-400" />;
   }
@@ -68,6 +73,8 @@ function notificationTypeLabel(type: GMNotification["type"]): string {
       return "Offen";
     case "chronicle_inbox":
       return "Chronist";
+    case "building_npc":
+      return "Gebäude";
     default:
       return "System";
   }
@@ -85,6 +92,8 @@ function notificationTypeBadgeClass(type: GMNotification["type"]): string {
       return "bg-amber-950/50 text-amber-200 border-amber-600/50";
     case "chronicle_inbox":
       return "bg-sky-950/40 text-sky-300 border-sky-700/40";
+    case "building_npc":
+      return "bg-amber-950/50 text-amber-300 border-amber-600/40";
     default:
       return "bg-gray-800/40 text-gray-400 border-gray-600/30";
   }
@@ -137,6 +146,9 @@ function NotificationsTab({
 }: {
   notifications: GMNotification[];
 }) {
+  const router = useRouter();
+  const [pendingDismiss, startDismiss] = useTransition();
+
   if (notifications.length === 0) {
     return (
       <div className="flex items-center gap-4 p-6">
@@ -165,10 +177,29 @@ function NotificationsTab({
           minute: "2-digit",
         }).format(new Date(n.createdAt));
 
+        const dismissBtn =
+          n.type === "building_npc" && n.dismissLocationId ? (
+            <button
+              type="button"
+              disabled={pendingDismiss}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startDismiss(async () => {
+                  await dismissAurenfurtBuildingNpcHint(n.dismissLocationId!);
+                  router.refresh();
+                });
+              }}
+              className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-hero-border/40 bg-background-dark px-2 py-1 font-barlow text-[10px] font-bold uppercase text-gray-400 hover:text-accent-gold"
+            >
+              Erledigt
+            </button>
+          ) : null;
+
         const inner = (
           <div
             className={`flex items-start gap-3 p-4 transition-colors group ${
-              n.type === "session_open"
+              n.type === "session_open" || n.type === "building_npc"
                 ? "bg-amber-950/25 hover:bg-amber-950/40"
                 : "hover:bg-white/[0.02]"
             }`}
@@ -208,23 +239,30 @@ function NotificationsTab({
               </p>
             </div>
 
-            {n.href ? (
-              <span className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-hero-border/50 bg-background-dark px-2.5 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-300 group-hover:border-accent-gold/50 group-hover:text-accent-gold">
-                <ExternalLink className="h-3 w-3" />
-                Ansehen
-              </span>
-            ) : null}
+            <div className="flex flex-col items-end gap-1">
+              {n.href ? (
+                <span className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-hero-border/50 bg-background-dark px-2.5 py-1.5 font-barlow text-[10px] font-bold uppercase text-gray-300 group-hover:border-accent-gold/50 group-hover:text-accent-gold">
+                  <ExternalLink className="h-3 w-3" />
+                  Ansehen
+                </span>
+              ) : null}
+            </div>
           </div>
         );
 
-        return n.href ? (
-          <li key={n.id}>
-            <Link href={n.href} className="block">
-              {inner}
-            </Link>
+        return (
+          <li key={n.id} className="relative">
+            {n.href ? (
+              <Link href={n.href} className="block">
+                {inner}
+              </Link>
+            ) : (
+              inner
+            )}
+            {dismissBtn ? (
+              <div className="absolute right-4 bottom-3 z-10">{dismissBtn}</div>
+            ) : null}
           </li>
-        ) : (
-          <li key={n.id}>{inner}</li>
         );
       })}
     </ul>

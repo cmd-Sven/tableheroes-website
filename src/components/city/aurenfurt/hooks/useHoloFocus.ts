@@ -3,24 +3,46 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { findBuilding, findDistrict, type HoloSelection } from "../aurenfurt-districts";
-import { districtAnchor, surfacePoint } from "../scene/diorama-geometry";
+import { resolveBuildingUv, type BuildingPositions } from "../aurenfurt-building-positions";
+import { findBuilding, findDistrict, type CityBuilding, type HoloSelection } from "../aurenfurt-districts";
+import type { DistrictPolygons } from "../aurenfurt-district-polygons";
+import { districtAnchor, polygonAnchor, surfacePoint } from "../scene/diorama-geometry";
 
 type Controls = { target: THREE.Vector3 } | null;
 
-export function useHoloFocus(selection: HoloSelection | null) {
+type Options = {
+  /** Während Straßenzeichnen: kein Fokus-Flug (Kamera steuert StreetDrawCameraRig). */
+  paused?: boolean;
+  buildings?: CityBuilding[];
+  pois?: Array<{ id: string; u: number; v: number }>;
+};
+
+export function useHoloFocus(
+  selection: HoloSelection | null,
+  polygons?: DistrictPolygons | null,
+  buildingPositions?: BuildingPositions | null,
+  options?: Options,
+) {
   const camera = useThree((state) => state.camera);
   const get = useThree((state) => state.get);
+  const paused = options?.paused ?? false;
+  const buildings = options?.buildings;
+  const pois = options?.pois;
   const home = useMemo(() => new THREE.Vector3(0, 0.12, 0), []);
-  const focus = useMemo(() => resolveFocus(selection), [selection]);
+  const focus = useMemo(
+    () => resolveFocus(selection, polygons, buildingPositions, buildings, pois),
+    [buildingPositions, buildings, pois, polygons, selection],
+  );
   const until = useRef(0);
   const selectionKey = selection ? `${selection.type}:${selection.id}` : "home";
 
   useEffect(() => {
+    if (paused) return;
     until.current = performance.now() + 1300;
-  }, [selectionKey]);
+  }, [paused, selectionKey]);
 
   useFrame((_, delta) => {
+    if (paused) return;
     const controls = get().controls as Controls;
     if (!controls?.target) return;
     const settling = performance.now() < until.current;
@@ -39,17 +61,33 @@ export function useHoloFocus(selection: HoloSelection | null) {
   });
 }
 
-function resolveFocus(selection: HoloSelection | null) {
+function resolveFocus(
+  selection: HoloSelection | null,
+  polygons?: DistrictPolygons | null,
+  buildingPositions?: BuildingPositions | null,
+  buildings?: CityBuilding[],
+  pois?: Array<{ id: string; u: number; v: number }> | null,
+) {
   if (!selection) return null;
+  if (selection.type === "poi") {
+    const poi = pois?.find((entry) => entry.id === selection.id);
+    if (!poi) return null;
+    return { point: surfacePoint(poi.u, poi.v), distance: 3.2 };
+  }
   if (selection.type === "building") {
-    const building = findBuilding(selection.id);
+    const building = findBuilding(selection.id, buildings);
     if (!building) return null;
-    return { point: surfacePoint(building.u, building.v), distance: 3.4 };
+    const uv = resolveBuildingUv(building, buildingPositions);
+    return { point: surfacePoint(uv.u, uv.v), distance: 3.4 };
   }
   const district = findDistrict(selection.id);
   if (!district) return null;
+  const ring = polygons?.[district.id]?.points;
   return {
-    point: districtAnchor(district.start, district.end, district.inner, district.outer),
+    point:
+      ring && ring.length >= 3
+        ? polygonAnchor(ring)
+        : districtAnchor(district.start, district.end, district.inner, district.outer),
     distance: district.id === "palast" ? 3.8 : 4.7,
   };
 }

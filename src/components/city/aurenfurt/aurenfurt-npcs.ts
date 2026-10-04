@@ -16,8 +16,14 @@ import {
   findFaction,
   type FactionId,
 } from "./aurenfurt-factions";
+import { bindNpcSnaps } from "./aurenfurt-city-sim";
 import { districtMetricsOn, utcToday } from "./aurenfurt-history";
 import type { KeyLocation } from "./aurenfurt-locations";
+import type {
+  CityEventCard,
+  CityInfluenceTier,
+  CitySimulationFields,
+} from "@/src/lib/npcs/city-simulation";
 
 export const NPC_PORTRAIT_PLACEHOLDER = "/images/npcs/npc-platzhalter.png";
 
@@ -122,6 +128,18 @@ export type AurenfurtNpc = {
   intelValue: number;
   disposition: NpcDisposition;
   portraitUrl: string;
+
+  // —— Stadt-Simulation (wie Wizard / DB) ——
+  forCitySimulation: true;
+  cityInfluenceTier: CityInfluenceTier;
+  cityAxisLoyalCriminal: number;
+  cityAxisGreedyAltruist: number;
+  cityAxisPiousSkeptic: number;
+  cityAxisSuperstitionReason: number;
+  cityDeity: string | null;
+  cityFactionId: FactionId | null;
+  cityAgenda: string;
+  cityEventDeck: CityEventCard[];
 };
 
 /** Prefill-Form für den Narrative-/KI-NPC-Wizard. */
@@ -182,10 +200,11 @@ export const FACTION_HQ_LOCATION: Record<FactionId, string> = {
   goldkelchen: "gauklerbuehne",
   "haus-der-seide": "seidenkontor",
   stadtwachen: "hofwache",
-  "haeuser-des-nordens": "goldkuppel",
+  "haeuser-des-nordens": "98fd35d1-f789-4c91-afef-0215ed4b21e7",
   "bund-silberne-rose": "rose-hof",
   "konklave-ewige-ordnung": "konklave-saal",
   zunftbund: "zunft",
+  "zirkel-observatorium": "observatorium",
 };
 
 function clamp01(value: number) {
@@ -217,9 +236,143 @@ export function npcDetailHref(
   return null;
 }
 
+const DEITY_BY_IDEOLOGY: Record<string, string | null> = {
+  elysia: "Elysia",
+  chromus: "Chromus",
+  malanthir: "Malanthir",
+  imperial: null,
+  guild: null,
+  neutral: null,
+};
+
+/**
+ * Stadt-Sim-Startwerte für Karten-NPCs aus Fraktion, Rolle und Agenda.
+ */
+export function citySimFromAurenfurtSeed(seed: {
+  mapRoles: NpcMapRole[];
+  factionId: FactionId;
+  role: string;
+  agenda: string;
+  alignment: NpcAlignment;
+}): CitySimulationFields {
+  const isLeader = seed.mapRoles.includes("leader");
+  const factionBp = AURENFURT_FACTIONS.find((f) => f.id === seed.factionId);
+  const ideology = factionBp?.ideologyAlignment ?? "neutral";
+  const roleL = `${seed.role}`.toLowerCase();
+
+  let cityInfluenceTier: CityInfluenceTier = "local";
+  if (isLeader && (seed.factionId === "haeuser-des-nordens" || /könig|herrscher|herzog/.test(roleL))) {
+    cityInfluenceTier = "apex_global";
+  } else if (isLeader || /anführer|meister|abtiss|hauptmann|kommandant|gilde|zunft/.test(roleL)) {
+    cityInfluenceTier = "authority_faction";
+  } else if (/händler|kauf|kontor|wirt|schmied|markt/.test(roleL)) {
+    cityInfluenceTier = "regional_economy";
+  }
+
+  let loyalCriminal = 0;
+  let greedyAltruist = 0;
+  let piousSkeptic = 0;
+  let superstitionReason = 0;
+
+  switch (seed.factionId) {
+    case "rotes-auge":
+      loyalCriminal = isLeader ? 4 : 3;
+      greedyAltruist = -3;
+      piousSkeptic = -3;
+      superstitionReason = -2;
+      break;
+    case "goldkelchen":
+      loyalCriminal = 1;
+      greedyAltruist = -1;
+      piousSkeptic = 1;
+      superstitionReason = 0;
+      break;
+    case "haus-der-seide":
+      loyalCriminal = 0;
+      greedyAltruist = -4;
+      piousSkeptic = 2;
+      superstitionReason = 2;
+      cityInfluenceTier = isLeader ? "authority_faction" : "regional_economy";
+      break;
+    case "stadtwachen":
+      loyalCriminal = -4;
+      greedyAltruist = -1;
+      piousSkeptic = 0;
+      superstitionReason = 1;
+      cityInfluenceTier = "authority_faction";
+      break;
+    case "haeuser-des-nordens":
+      loyalCriminal = -2;
+      greedyAltruist = -2;
+      piousSkeptic = 1;
+      superstitionReason = 2;
+      cityInfluenceTier = isLeader ? "apex_global" : "authority_faction";
+      break;
+    case "bund-silberne-rose":
+      loyalCriminal = -2;
+      greedyAltruist = 3;
+      piousSkeptic = -4;
+      superstitionReason = -1;
+      cityInfluenceTier = "authority_faction";
+      break;
+    case "konklave-ewige-ordnung":
+      loyalCriminal = -3;
+      greedyAltruist = -1;
+      piousSkeptic = -4;
+      superstitionReason = 3;
+      cityInfluenceTier = "authority_faction";
+      break;
+    case "zunftbund":
+      loyalCriminal = -1;
+      greedyAltruist = -2;
+      piousSkeptic = 1;
+      superstitionReason = 2;
+      cityInfluenceTier = isLeader ? "authority_faction" : "regional_economy";
+      break;
+    case "zirkel-observatorium":
+      loyalCriminal = -1;
+      greedyAltruist = 1;
+      piousSkeptic = 2;
+      superstitionReason = 4;
+      cityInfluenceTier = isLeader ? "authority_faction" : "regional_economy";
+      break;
+    default:
+      break;
+  }
+
+  if (/wirt|taverne|gast/.test(roleL)) {
+    cityInfluenceTier = "local";
+    greedyAltruist = Math.min(greedyAltruist, -1);
+  }
+  if (/schmugg|krimin|dieb|räuber/.test(roleL)) {
+    loyalCriminal = Math.max(loyalCriminal, 3);
+  }
+  if (/garde|wache|gardist/.test(roleL)) {
+    loyalCriminal = Math.min(loyalCriminal, -3);
+    cityInfluenceTier = "authority_faction";
+  }
+
+  const deity = DEITY_BY_IDEOLOGY[ideology] ?? null;
+  const cityDeity = piousSkeptic <= -1 ? deity : null;
+
+  return {
+    forCitySimulation: true,
+    cityInfluenceTier,
+    cityAxisLoyalCriminal: loyalCriminal,
+    cityAxisGreedyAltruist: greedyAltruist,
+    cityAxisPiousSkeptic: piousSkeptic,
+    cityAxisSuperstitionReason: superstitionReason,
+    cityDeity,
+    cityFactionId: seed.factionId,
+    cityAgenda: seed.agenda,
+    cityEventDeck: [],
+  };
+}
+
 function buildNpc(seed: NpcSeed): AurenfurtNpc {
   const faction = factionName(seed.factionId);
   const place = locationName(seed.locationId);
+  const citySim = citySimFromAurenfurtSeed(seed);
   return {
     id: seed.id,
     mapRoles: [...seed.mapRoles],
@@ -257,6 +410,16 @@ function buildNpc(seed: NpcSeed): AurenfurtNpc {
     intelValue: clamp01(seed.intelValue),
     disposition: seed.disposition,
     portraitUrl: NPC_PORTRAIT_PLACEHOLDER,
+    forCitySimulation: true,
+    cityInfluenceTier: citySim.cityInfluenceTier!,
+    cityAxisLoyalCriminal: citySim.cityAxisLoyalCriminal!,
+    cityAxisGreedyAltruist: citySim.cityAxisGreedyAltruist!,
+    cityAxisPiousSkeptic: citySim.cityAxisPiousSkeptic!,
+    cityAxisSuperstitionReason: citySim.cityAxisSuperstitionReason!,
+    cityDeity: citySim.cityDeity,
+    cityFactionId: seed.factionId,
+    cityAgenda: seed.agenda,
+    cityEventDeck: [],
   };
 }
 
@@ -469,56 +632,6 @@ const FACTION_LEADER_SEEDS: readonly NpcSeed[] = [
     disposition: "bestechlich",
   },
   {
-    id: "npc-leader-haeuser-des-nordens",
-    mapRoles: ["leader", "operator"],
-    districtId: "palast",
-    factionId: "haeuser-des-nordens",
-    locationId: "goldkuppel",
-    name: "Lady Isolde von Nordwacht",
-    title: "Sprecherin der Nordhäuser",
-    role: "Anführerin der Häuser des Nordens",
-    race: "Mensch",
-    alignment: "Lawful Neutral",
-    description:
-      "Isolde spricht unter der Goldenen Kuppel für die blauen Salons: Hofnähe, Gärten und Druck auf Garde und Markt.",
-    appearance:
-      "Hohe Frisur mit Silberkamm, kobaltblaues Gewand, kühle Augen, Stimme wie Glas.",
-    personality_traits: "Elegant, unnahbar, denkt in Allianzen und Erblinien.",
-    gm_notes: "Patron der Stadtwachen; Spannung zu beiden Tempelorden.",
-    true_nature: "Machtpolitikerin hinter Höflichkeit.",
-    hidden_agenda: "Tempelstreit als Hebel nutzen und Seidenhaus als Verbündeten halten.",
-    secret_entry: "Hofprotokolle werden so geschrieben, dass Rivalen zu spät kommen.",
-    hooks: [
-      {
-        name: "Kanzler Orwin",
-        role: "Hofschreiber",
-        description: "Fertigt Siegel — und vergisst auf Befehl Namen.",
-        is_alive: true,
-      },
-    ],
-    checks: [
-      {
-        type: "Persuasion",
-        dc: 16,
-        result: "Sie gewährt Audienz — gegen Gefälligkeiten für die Salons.",
-        is_critical: false,
-      },
-      {
-        type: "History",
-        dc: 14,
-        result: "Ihr Haus hält alte Schulden über drei Generationen.",
-        is_critical: false,
-      },
-    ],
-    influence: 88,
-    loyalty: 80,
-    agenda: "Hofmacht und Gartenpolitik der Nordhäuser absichern.",
-    darkSecret:
-      "Sie hat eine Chromus-Schriftrolle aus dem Tempelbezirk gestohlen, um das Konklave zu erpressen.",
-    intelValue: 45,
-    disposition: "misstrauisch",
-  },
-  {
     id: "npc-leader-bund-silberne-rose",
     mapRoles: ["leader", "operator"],
     districtId: "tempelbezirk",
@@ -668,6 +781,56 @@ const FACTION_LEADER_SEEDS: readonly NpcSeed[] = [
     intelValue: 57,
     disposition: "neutral",
   },
+  {
+    id: "npc-leader-zirkel-observatorium",
+    mapRoles: ["leader", "operator"],
+    districtId: "akademieviertel",
+    factionId: "zirkel-observatorium",
+    locationId: "observatorium",
+    name: "Magisterin Lyra Sternenwacht",
+    title: "Hüterin der Sternenkammer",
+    role: "Anführerin des Zirkels des Observatoriums",
+    race: "Mensch",
+    alignment: "Lawful Neutral",
+    description:
+      "Lyra leitet das magische Observatorium: weiße Magie, Lehrstühle und eine Kuppel, die nachts mehr sieht als der Hof zugibt.",
+    appearance:
+      "Silbernes Haar im Stirnreif, sternbestickte Robe, kühle Augen, Finger voller Kreide und Messingringe.",
+    personality_traits: "Präzise, geduldig mit Schülern, scharf gegen Konfessionsdruck in den Sälen.",
+    gm_notes: "Spannung zu Rose und Konklave; Allianz zur Schwertschule der Stadtwachen.",
+    true_nature: "Bewahrerin legaler Magie — und stiller Schiedsrichter zwischen den Kulten.",
+    hidden_agenda: "Den Zirkel unabhängig halten und verbotene Abschriften nur unter Siegel halten.",
+    secret_entry: "In der Sternenkammer liegen Messungen, die Malanthir-Spuren am Nachthimmel zeigen.",
+    hooks: [
+      {
+        name: "Novize Corin",
+        role: "Sternenschüler",
+        description: "Führt nächtliche Messungen — und schweigt über fehlende Seiten im Logbuch.",
+        is_alive: true,
+      },
+    ],
+    checks: [
+      {
+        type: "Arcana",
+        dc: 15,
+        result: "Ihre Formeln sind Vattrak-rein — bis auf eine korrigierte Zeile am Rand.",
+        is_critical: false,
+      },
+      {
+        type: "Insight",
+        dc: 16,
+        result: "Sie weicht aus, wenn nach dem versiegelten Archivschrank gefragt wird.",
+        is_critical: false,
+      },
+    ],
+    influence: 74,
+    loyalty: 86,
+    agenda: "Akademieautonomie und weiße Magie gegen Kultzwang schützen.",
+    darkSecret:
+      "Sie bewahrt eine verbotene Malanthir-Abschrift in der Sternenkammer — „zum Studium“, sagt sie, und niemandem sonst.",
+    intelValue: 72,
+    disposition: "misstrauisch",
+  },
 ] as const;
 
 /** Betreiber nur für Orte ohne Anführer-HQ-Überlappung. */
@@ -686,7 +849,7 @@ const OPERATOR_ONLY_SEEDS: readonly NpcSeed[] = [
     description: "Aldric führt Siegel und Akten der Hofkanzlei — und formt die Stadt, bevor sie es merkt.",
     appearance: "Dünne Finger, Tintenflecken, Brille aus Messing, graue Robe.",
     personality_traits: "Pedantisch, leise, genießt Macht ohne Titel.",
-    gm_notes: "Loyal zu Isolde, verkauft gelegentlich Abschriften.",
+    gm_notes: "Loyal zum Kaiser, verkauft gelegentlich Abschriften.",
     true_nature: "Informationshändler hinter Beamtenmaske.",
     hidden_agenda: "Wichtige Siegel verzögern, wenn Gold fließt.",
     secret_entry: "Doppelte Kopien heikler Erlasse liegen in seinem Privattresor.",
@@ -716,7 +879,7 @@ const OPERATOR_ONLY_SEEDS: readonly NpcSeed[] = [
     description: "Mira hält die Hofkapelle offen — Elysia-Flüstern unter kaiserlichem Stuck.",
     appearance: "Sanfte Gesichtszüge, silberner Kelch am Gürtel, weiße Stola.",
     personality_traits: "Mitfühlend, behutsam, politisch vorsichtig am Hof.",
-    gm_notes: "Brücke zwischen Rose und Palast; beobachtet Isolde.",
+    gm_notes: "Brücke zwischen Rose und Palast; beobachtet den Kaiser.",
     true_nature: "Hoffnungsträgerin, die Angst vor dem Konklave hat.",
     hidden_agenda: "Hofbedienstete der Rose zuführen.",
     secret_entry: "Beichtgeheimnisse notiert sie in einem Codebuch.",
@@ -746,7 +909,7 @@ const OPERATOR_ONLY_SEEDS: readonly NpcSeed[] = [
     description: "Torvald prüft Wappen und Ausreden am Nordtor — oft zu streng, selten gerecht.",
     appearance: "Rote Nase, blanke Helmspange, Speer immer greifbereit.",
     personality_traits: "Misstrauisch, stolz, leicht beleidigt.",
-    gm_notes: "Willkür bei Nicht-Adligen; respektiert Isolde.",
+    gm_notes: "Willkür bei Nicht-Adligen; respektiert den Kaiser.",
     true_nature: "Kleiner Tyrann mit Siegel.",
     hidden_agenda: "Adelsgunst erlangen durch harte Kontrollen.",
     secret_entry: "Manche Wappen lässt er gegen Wein durch.",
@@ -779,7 +942,7 @@ const OPERATOR_ONLY_SEEDS: readonly NpcSeed[] = [
     gm_notes: "Weiß, wer nachts die Gitter nutzt.",
     true_nature: "Schweigepflichtiger Zeuge der Salons.",
     hidden_agenda: "Gartengeheimnisse nur teuer verkaufen.",
-    secret_entry: "Ein Seiteneingang ist nur ihr und Isolde bekannt.",
+    secret_entry: "Ein Seiteneingang ist nur ihr und dem Hof bekannt.",
     hooks: [{ name: null, role: "Lehrling", description: "Harkt Laub und hört Küsse.", is_alive: true }],
     checks: [
       { type: "Stealth", dc: 14, result: "Sie bemerkt Eindringlinge früher als die Wache.", is_critical: false },
@@ -1092,6 +1255,106 @@ const OPERATOR_ONLY_SEEDS: readonly NpcSeed[] = [
     intelValue: 80,
     disposition: "bestechlich",
   },
+  {
+    id: "npc-op-schwertschule",
+    mapRoles: ["operator"],
+    districtId: "akademieviertel",
+    factionId: "stadtwachen",
+    locationId: "schwertschule",
+    name: "Meister Torven Klingentreu",
+    title: "Drillmeister der Schwertschule",
+    role: "Betreiber der Schwertschule von Aurenfurt",
+    race: "Mensch",
+    alignment: "Lawful Neutral",
+    description:
+      "Torven bildet Gardisten und Wachleute auf dem Drillhof aus. Wer bei ihm besteht, trägt Disziplin — und manchmal eine Schuld.",
+    appearance:
+      "Grauer Zopf, vernarbte Unterarme, Ausbildungsrock der Stadtwachen, Stimme wie ein Kommandoruf.",
+    personality_traits: "Streng, gerecht unter Rekruten, pragmatisch gegenüber dem Hof.",
+    gm_notes: "Unter Brann; liefert Wachnachwuchs für Akademie und Palast.",
+    true_nature: "Soldat, der Ordnung über Ideale stellt.",
+    hidden_agenda: "Gute Plätze an Rekruten mit nützlichen Gönnern vergeben.",
+    secret_entry: "In seinem Schreibtisch liegen Empfehlungsschreiben gegen Gefälligkeiten.",
+    hooks: [
+      {
+        name: "Rekrutin Hale",
+        role: "Schülerin",
+        description: "Talentiert — und schuldet Torven mehr als Schweiß.",
+        is_alive: true,
+      },
+    ],
+    checks: [
+      {
+        type: "Athletics",
+        dc: 13,
+        result: "Er respektiert, wer den Drill ohne Jammern übersteht.",
+        is_critical: false,
+      },
+      {
+        type: "Insight",
+        dc: 15,
+        result: "Seine Härte weicht, wenn von „besonderen Empfehlungen“ die Rede ist.",
+        is_critical: false,
+      },
+    ],
+    influence: 58,
+    loyalty: 72,
+    agenda: "Wachnachwuchs formen und die Schule unverzichtbar halten.",
+    darkSecret:
+      "Er vergibt Ausbildungsplätze gegen Gefälligkeiten an Adels- und Hofkontakte — und streicht die Namen aus den Listen.",
+    intelValue: 54,
+    disposition: "opportunistisch",
+  },
+  {
+    id: "npc-op-grosse-bibliothek",
+    mapRoles: ["operator"],
+    districtId: "akademieviertel",
+    factionId: "zirkel-observatorium",
+    locationId: "grosse-bibliothek",
+    name: "Archivarin Selene Quillweiß",
+    title: "Hüterin der Großen Bibliothek",
+    role: "Betreiberin der Großen Bibliothek von Aurenfurt",
+    race: "Halbelfin",
+    alignment: "True Neutral",
+    description:
+      "Selene führt Register und Lesesäle zwischen den Konfessionen. Wer liest, was sie freigibt, sieht die Stadt klarer — und manchmal zu klar.",
+    appearance:
+      "Staubige Finger, Brillenkette, graue Robe mit Zirkelsiegel, Stimme leise wie Pergament.",
+    personality_traits: "Zurückhaltend, ordentlich, unnachgiebig bei verbotenen Bänden.",
+    gm_notes: "Loyal zu Lyra; hält Rose und Konklave auf Distanz im Lesesaal.",
+    true_nature: "Archivwächterin, die Wissen als Waffe und Last kennt.",
+    hidden_agenda: "Konfessionsstreit aus den Regalen halten, ohne Lyra bloßzustellen.",
+    secret_entry: "Ein Nebenregal führt zu Abschriften, die nicht im öffentlichen Katalog stehen.",
+    hooks: [
+      {
+        name: "Schreiber Fenn",
+        role: "Kopist",
+        description: "Kopiert für den Zirkel — und vergisst gelegentlich Seiten.",
+        is_alive: true,
+      },
+    ],
+    checks: [
+      {
+        type: "Investigation",
+        dc: 14,
+        result: "Fehlende Signaturen verraten, welche Bände „ausgeliehen“ wurden.",
+        is_critical: false,
+      },
+      {
+        type: "Persuasion",
+        dc: 15,
+        result: "Sie öffnet mehr Regale, wenn der Zirkel als Bürge genannt wird.",
+        is_critical: false,
+      },
+    ],
+    influence: 52,
+    loyalty: 78,
+    agenda: "Archiv und Katalog gegen Kultzugriff schützen.",
+    darkSecret:
+      "Sie hat eine konfessionelle Kampfschrift doppelt kopiert und eine Fassung in der Sternenkammer versteckt — ohne Lyras Wissen.",
+    intelValue: 68,
+    disposition: "neutral",
+  },
 ] as const;
 
 function assertCoverage(npcs: AurenfurtNpc[]) {
@@ -1197,6 +1460,50 @@ export function generateNpcs(): AurenfurtNpc[] {
     byId.set(fallback.id, fallback);
   }
 
+  const kaiser = buildNpc({
+    id: "npc-kaiser-artheus",
+    mapRoles: ["leader", "operator"],
+    districtId: "palast",
+    factionId: "haeuser-des-nordens",
+    locationId: "98fd35d1-f789-4c91-afef-0215ed4b21e7",
+    name: "Kaiser Artheus Flammguard der Zweite",
+    title: "Kaiser von Aurelis",
+    role: "Kaiser",
+    race: "Mensch",
+    alignment: "Lawful Neutral",
+    description:
+      "Artheus Flammguard der Zweite sitzt im Festungspalast und spricht Recht für die ganze Stadt. Sein Wort wird Gesetz, sein Befehl geht an Garde, Zölle und den knappen Vattrak-Vorrat.",
+    appearance: "Hager, grau an den Schläfen, der Mantel mit dem Flammenwappen schwer auf den Schultern.",
+    personality_traits: "Gemessen, ungeduldig gegen Widerspruch, präzise in jeder Formulierung.",
+    gm_notes:
+      "Mächtigste Figur der Stadtsimulation. Gesetze und Befehle legt der SL als Stadtereignis aus. Der Katalogeintrag ist der Betreiber des Festungspalasts.",
+    true_nature: "Der Thron ist seine Waffe. Wer ihn bedient, bedient die Stadt.",
+    hidden_agenda: "Den Vorrat und die Garde so verteilen, dass kein Viertel stark genug wird, ihm zu widersprechen.",
+    secret_entry: "Eine private Treppe führt von seinem Arbeitszimmer in den inneren Hof der Wache.",
+    hooks: [
+      {
+        role: "Audienz",
+        description: "Wer ein Gesetz will, muss es vor ihm in einem Satz sagen können.",
+        is_alive: true,
+      },
+    ],
+    checks: [],
+    influence: 96,
+    loyalty: 90,
+    agenda: "Gesetze erlassen und Befehle erteilen, die die ganze Stadt binden.",
+    darkSecret:
+      "Er hat schon einmal Malanthir in einer Nacht der Knappheit an die Hofwache ausgeben lassen und die Spur im Protokoll getilgt.",
+    intelValue: 28,
+    disposition: "misstrauisch",
+  });
+  kaiser.cityInfluenceTier = "apex_global";
+  kaiser.cityAxisLoyalCriminal = -5;
+  kaiser.cityAxisGreedyAltruist = -2;
+  kaiser.cityAxisPiousSkeptic = -1;
+  kaiser.cityAxisSuperstitionReason = 3;
+  kaiser.cityAgenda = "Gesetze erlassen, Befehle erteilen und den Vattrak-Vorrat nach seinem Rang verteilen.";
+  byId.set(kaiser.id, kaiser);
+
   const npcs = [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
   assertCoverage(npcs);
   return npcs;
@@ -1251,6 +1558,26 @@ export function npcForFaction(factionId: FactionId) {
  * Moduliert Einfluss/Intel leicht an Viertel-Kennzahlen.
  * Identität und darkSecret bleiben unverändert.
  */
+function clampAxis(value: number) {
+  return Math.max(-5, Math.min(5, Math.round(value)));
+}
+
+/** Anhaltendes Malanthir schiebt die Gesinnung von gut nach böse, ohne den Katalog zu überschreiben. */
+function corruptAlignment(alignment: NpcAlignment, malanthir: number): NpcAlignment {
+  const steps = malanthir >= 70 ? 2 : malanthir >= 42 ? 1 : 0;
+  if (steps === 0) return alignment;
+  let order: "Lawful" | "Neutral" | "Chaotic" = "Neutral";
+  let moral = 1;
+  if (alignment.startsWith("Lawful")) order = "Lawful";
+  else if (alignment.startsWith("Chaotic")) order = "Chaotic";
+  if (alignment.includes("Good")) moral = 0;
+  else if (alignment.includes("Evil")) moral = 2;
+  moral = Math.min(2, moral + steps);
+  if (order === "Neutral" && moral === 1) return "True Neutral";
+  const moralWord = moral === 0 ? "Good" : moral === 2 ? "Evil" : "Neutral";
+  return `${order} ${moralWord}` as NpcAlignment;
+}
+
 export function withDistrictModulation(npc: AurenfurtNpc, day = utcToday()): AurenfurtNpc {
   const sim = districtMetricsOn(npc.districtId, day);
   const standing = findFaction(npc.factionId, day);
@@ -1258,16 +1585,22 @@ export function withDistrictModulation(npc: AurenfurtNpc, day = utcToday()): Aur
     ? (standing.power * 0.08 + standing.economicImpact * 0.05)
     : 0;
   const intelBoost = sim.crime * 0.12 + sim.malanthir * 0.05;
+  const rot = sim.malanthir / 100;
 
   return {
     ...npc,
+    alignment: corruptAlignment(npc.alignment, sim.malanthir),
     influenceAndLoyalty: {
       ...npc.influenceAndLoyalty,
       influence: clamp01(npc.influenceAndLoyalty.influence * 0.9 + influenceBoost),
-      loyalty: npc.influenceAndLoyalty.loyalty,
+      loyalty: clamp01(npc.influenceAndLoyalty.loyalty * (1 - rot * 0.55) + sim.vattrak * 0.04),
       agenda: npc.influenceAndLoyalty.agenda,
     },
     intelValue: clamp01(npc.intelValue * 0.88 + intelBoost),
+    cityAxisLoyalCriminal: clampAxis(npc.cityAxisLoyalCriminal + rot * 3.2),
+    cityAxisGreedyAltruist: clampAxis(npc.cityAxisGreedyAltruist - rot * 3.2),
+    cityAxisSuperstitionReason: clampAxis(npc.cityAxisSuperstitionReason - rot * 2.4),
+    cityAxisPiousSkeptic: clampAxis(npc.cityAxisPiousSkeptic + rot * 1.2),
   };
 }
 
@@ -1332,3 +1665,24 @@ export function npcCatalogStats(): NpcCatalogStats {
 export function operatorForKeyLocation(location: KeyLocation | null) {
   return operatorForLocation(location?.id ?? null);
 }
+
+const NPC_TIER_WEIGHT: Record<CityInfluenceTier, number> = {
+  local: 1,
+  regional_economy: 2,
+  authority_faction: 3,
+  apex_global: 5,
+};
+
+bindNpcSnaps(
+  allAurenfurtNpcs()
+    .filter((npc) => npc.forCitySimulation)
+    .map((npc) => ({
+      districtId: npc.districtId,
+      loyalCriminal: npc.cityAxisLoyalCriminal,
+      greedyAltruist: npc.cityAxisGreedyAltruist,
+      influence: npc.influenceAndLoyalty.influence,
+      tierWeight: NPC_TIER_WEIGHT[npc.cityInfluenceTier] ?? 1,
+      tier: npc.cityInfluenceTier,
+      locationId: npc.locationId,
+    })),
+);

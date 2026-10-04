@@ -44,6 +44,13 @@ import {
   type NpcTokenBorder,
 } from "@/src/lib/npcs/npc-sheet-types";
 import { generateNpcCombatSheet } from "@/src/app/dashboard/worlds/world-npc-actions";
+import { NpcCitySimulationFields } from "@/src/components/worlds/npc-wizard/NpcCitySimulationFields";
+import {
+  EMPTY_CITY_SIMULATION,
+  citySimulationToDb,
+  refineCitySimulationPayload,
+  type CitySimulationFields,
+} from "@/src/lib/npcs/city-simulation";
 
 const RELATION_TYPES = [
   "Vater", "Mutter", "Sohn", "Tochter",
@@ -140,6 +147,7 @@ export function NarrativeNPCWizard({
   const [linkedNpcId, setLinkedNpcId] = useState<string | null>(null);
   const [linkedNpcRelationType, setLinkedNpcRelationType] = useState<string>("Andere");
   const [worldNPCs, setWorldNPCs] = useState<Array<{ id: string; name: string }>>([]);
+  const [citySim, setCitySim] = useState<CitySimulationFields>({ ...EMPTY_CITY_SIMULATION });
 
   useEffect(() => {
     if (!portraitFile) {
@@ -325,6 +333,12 @@ export function NarrativeNPCWizard({
           ? mergeNpcSheetWithDefaults(combatSheet)
           : null;
 
+        const citySimCheck = refineCitySimulationPayload(citySim);
+        if (!citySimCheck.ok) {
+          throw new Error(citySimCheck.error);
+        }
+        const citySimDb = citySimulationToDb(citySimCheck.data);
+
         const npc = await createNPC({
           world_id: worldId,
           name: step1Name.trim() || persona.name,
@@ -355,6 +369,7 @@ export function NarrativeNPCWizard({
           token_size_category: sheetPayload?.sizeCategory ?? "medium",
           sheet_data: sheetPayload,
           sheet_source: sheetPayload ? "ai_wizard" : null,
+          ...citySimDb,
         });
 
         const createdName = (step1Name.trim() || persona?.name || "").toLowerCase();
@@ -622,6 +637,12 @@ export function NarrativeNPCWizard({
                 </div>
               </div>
             </div>
+
+            <NpcCitySimulationFields
+              value={citySim}
+              onChange={setCitySim}
+              deities={deities}
+            />
 
             {/* Existierenden NPC verbinden */}
             {worldNPCs.length > 0 && (

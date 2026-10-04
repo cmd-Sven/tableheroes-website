@@ -13,6 +13,7 @@ export type GMNotification = {
     | "session_completed"
     | "session_open"
     | "chronicle_inbox"
+    | "building_npc"
     | "system";
   message: string;
   href: string | null;
@@ -21,6 +22,8 @@ export type GMNotification = {
   actorName: string | null;
   actorAvatarUrl: string | null;
   createdAt: string;
+  /** Optional: erledigt-markierbar (z. B. Gebäude ohne NPC). */
+  dismissLocationId?: string | null;
 };
 
 export type GMRecipientCampaign = {
@@ -247,7 +250,71 @@ export async function getGMNotifications(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  return [...openSessionNotes, ...otherNotes].slice(0, 20);
+  // Aurenfurt: Editor-Gebäude ohne NPCs (nur SL-Dashboard, nicht auf der Karte)
+  const buildingNpcNotes: GMNotification[] = [];
+  try {
+    const { AURENFURT_WORLD_ID } = await import(
+      "@/src/components/city/aurenfurt/aurenfurt-district-lore-ids"
+    );
+    const { data: editorBuildings } = await (supabase.from("locations") as any)
+      .select("id, name, created_at, npc_hint_dismissed_at, world_id")
+      .eq("world_id", AURENFURT_WORLD_ID)
+      .eq("created_via_map_editor", true)
+      .is("npc_hint_dismissed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const buildingRows = (editorBuildings as any[]) || [];
+    if (buildingRows.length > 0) {
+      const buildingIds = buildingRows.map((b) => b.id as string);
+      const { data: npcRows } = await (supabase.from("npcs") as any)
+        .select("id, home_location_id, current_location_id")
+        .eq("world_id", AURENFURT_WORLD_ID)
+        .or(
+          `home_location_id.in.(${buildingIds.join(",")}),current_location_id.in.(${buildingIds.join(",")})`,
+        );
+
+      const covered = new Set<string>();
+      for (const npc of (npcRows as any[]) || []) {
+        if (npc.home_location_id) covered.add(npc.home_location_id);
+        if (npc.current_location_id) covered.add(npc.current_location_id);
+      }
+
+      // Welt muss dem User gehören (oder Admin) — prüfe worlds.gm_id
+      const { data: worldRow } = await (supabase.from("worlds") as any)
+        .select("id, gm_id")
+        .eq("id", AURENFURT_WORLD_ID)
+        .maybeSingle();
+      const { data: profile } = await (supabase.from("users") as any)
+        .select("primary_role")
+        .eq("id", userId)
+        .maybeSingle();
+      const isAdmin = (profile as { primary_role?: string } | null)?.primary_role === "Admin";
+      const ownsWorld = worldRow && String(worldRow.gm_id) === String(userId);
+
+      if (ownsWorld || isAdmin) {
+        for (const building of buildingRows) {
+          if (covered.has(building.id)) continue;
+          buildingNpcNotes.push({
+            id: `building-npc-${building.id}`,
+            type: "building_npc",
+            message: `Gebäude „${building.name}" hat noch keine NPCs! Lege über den Lore-Eintrag mindestens einen NPC an.`,
+            href: `/dashboard/worlds/${AURENFURT_WORLD_ID}/lore/${building.id}`,
+            campaignId: null,
+            campaignName: null,
+            actorName: null,
+            actorAvatarUrl: null,
+            createdAt: building.created_at ?? new Date().toISOString(),
+            dismissLocationId: building.id,
+          });
+        }
+      }
+    }
+  } catch {
+    // Spalten fehlen oder Query fehlgeschlagen — Dashboard bleibt nutzbar.
+  }
+
+  return [...openSessionNotes, ...buildingNpcNotes, ...otherNotes].slice(0, 25);
 }
 
 export async function getGMRecipients(

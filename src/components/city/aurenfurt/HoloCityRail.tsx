@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Church, Crown, DoorOpen, Hammer, Landmark, Undo2, Warehouse } from "lucide-react";
+import { Church, Crown, DoorOpen, GraduationCap, Hammer, Landmark, Undo2, Warehouse } from "lucide-react";
 import {
   AURENFURT_DISTRICTS,
   type CityDistrictId,
@@ -14,6 +14,7 @@ import { SIM_METERS, type SimProfile } from "./aurenfurt-sim";
 const DISTRICT_ICON: Record<CityDistrictId, LucideIcon> = {
   adelsviertel: Crown,
   tempelbezirk: Church,
+  akademieviertel: GraduationCap,
   handwerkerviertel: Hammer,
   suedtor: DoorOpen,
   unterstadt: Warehouse,
@@ -42,7 +43,8 @@ export function HoloCityRail({ selection, subject, sim, scopeLabel, onSelect, on
           const Icon = DISTRICT_ICON[district.id];
           const active =
             (selection?.type === "district" && selection.id === district.id) ||
-            (selection?.type === "building" && subject?.districtId === district.id);
+            (selection?.type === "building" && subject?.districtId === district.id) ||
+            (selection?.type === "poi" && subject?.districtId === district.id);
           return (
             <RailButton
               key={district.id}

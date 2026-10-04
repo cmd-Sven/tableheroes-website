@@ -1,7 +1,8 @@
 import * as THREE from "three";
+import type { UvPoint } from "../aurenfurt-district-polygons";
 import { arcSpan, polarToImage, wedgeAnchor } from "../aurenfurt-layout";
 
-/** Aufsicht public/images/cities/aurenfurt.jpg, aus Aurenfurt.png 1697×927. */
+/** Aufsicht public/images/cities/aurenfurt.jpg, 1697×927. */
 const IMAGE_ASPECT = 927 / 1697;
 
 export const DIORAMA_WIDTH = 8.8;
@@ -83,4 +84,41 @@ export function createDistrictGeometry(start: number, end: number, inner: number
 export function districtAnchor(start: number, end: number, inner: number, outer: number) {
   const { u, v } = wedgeAnchor(start, end, inner, outer);
   return surfacePoint(u, v);
+}
+
+/** Hit-Mesh und sichtbares Overlay aus dem editierbaren UV-Polygon. */
+export function createPolygonDistrictGeometry(points: UvPoint[]) {
+  if (points.length < 3) {
+    return new THREE.BufferGeometry();
+  }
+
+  const lift = 0.045;
+  const positions: number[] = [];
+  for (const point of points) {
+    pushSurface(positions, point.u, point.v, lift);
+  }
+
+  const contour = points.map((point) => new THREE.Vector2(point.u, point.v));
+  const faces = THREE.ShapeUtils.triangulateShape(contour, []);
+  const indices: number[] = [];
+  for (const face of faces) {
+    indices.push(face[0], face[1], face[2]);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+export function polygonAnchor(points: UvPoint[]) {
+  if (points.length === 0) return surfacePoint(0.5, 0.5);
+  let u = 0;
+  let v = 0;
+  for (const point of points) {
+    u += point.u;
+    v += point.v;
+  }
+  return surfacePoint(u / points.length, v / points.length);
 }

@@ -41,7 +41,7 @@ function asFactionId(id: string): FactionId {
 }
 
 /**
- * Reichert ein Gebäude aus `CITY_BUILDINGS` um den Anzeigenamen der Gilde an.
+ * Reichert ein Gebäude aus der Gebäude-Liste um den Anzeigenamen der Gilde an.
  * Keine Kriminalitäts-/Wetter-Zeitreihen an Gebäuden.
  */
 export function generateKeyLocation(building: CityBuilding): KeyLocation {
@@ -59,22 +59,32 @@ export function generateKeyLocation(building: CityBuilding): KeyLocation {
   };
 }
 
-export function allKeyLocations(): KeyLocation[] {
-  return CITY_BUILDINGS.map(generateKeyLocation);
+export function allKeyLocations(buildings: CityBuilding[] = CITY_BUILDINGS): KeyLocation[] {
+  return buildings.map(generateKeyLocation);
 }
 
-export function keyLocationsInDistrict(districtId: CityDistrictId): KeyLocation[] {
-  return buildingsInDistrict(districtId).map(generateKeyLocation);
+export function keyLocationsInDistrict(
+  districtId: CityDistrictId,
+  buildings: CityBuilding[] = CITY_BUILDINGS,
+): KeyLocation[] {
+  return buildingsInDistrict(districtId, buildings).map(generateKeyLocation);
 }
 
-export function findKeyLocation(id: string | null): KeyLocation | null {
-  const building = findBuilding(id);
+export function findKeyLocation(
+  id: string | null,
+  buildings: CityBuilding[] = CITY_BUILDINGS,
+): KeyLocation | null {
+  const building = findBuilding(id, buildings);
   if (!building) return null;
   return generateKeyLocation(building);
 }
 
-export function districtHasEnoughKeyLocations(districtId: CityDistrictId, min = 4) {
-  return keyLocationsInDistrict(districtId).length >= min;
+export function districtHasEnoughKeyLocations(
+  districtId: CityDistrictId,
+  min = 4,
+  buildings: CityBuilding[] = CITY_BUILDINGS,
+) {
+  return keyLocationsInDistrict(districtId, buildings).length >= min;
 }
 
 /** Prüft die fünf Hauptviertel (ohne Südtor). */

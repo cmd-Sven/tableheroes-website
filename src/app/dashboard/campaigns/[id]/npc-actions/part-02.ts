@@ -193,6 +193,16 @@ export async function updateNPC(
     token_size_category?: string | null;
     sheet_data?: unknown | null;
     sheet_source?: string | null;
+    for_city_simulation?: boolean;
+    city_influence_tier?: string | null;
+    city_axis_loyal_criminal?: number | null;
+    city_axis_greedy_altruist?: number | null;
+    city_axis_pious_skeptic?: number | null;
+    city_axis_superstition_reason?: number | null;
+    city_deity?: string | null;
+    city_faction_id?: string | null;
+    city_agenda?: string | null;
+    city_event_deck?: unknown;
   }
 ) {
   const supabase = await createClient();

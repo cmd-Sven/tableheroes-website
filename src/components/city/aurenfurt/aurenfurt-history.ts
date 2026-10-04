@@ -1,5 +1,15 @@
 import { AURENFURT_DISTRICTS, type CityDistrictId } from "./aurenfurt-districts";
-import { meanSim, type SimProfile, type UndergroundCell } from "./aurenfurt-sim";
+import {
+  buildingWeights,
+  citySimVersion,
+  simulateCityRange,
+  type HistoryShift,
+} from "./aurenfurt-city-sim";
+import type { SimProfile, UndergroundCell } from "./aurenfurt-sim";
+import { formatDay, parseDay, utcToday } from "./aurenfurt-time";
+import { bindWeatherWinter, weatherOn } from "./aurenfurt-weather";
+
+export { formatDay, parseDay, utcToday };
 
 /** Stand der Viertel-Profile. Laufende Ereignisse bleiben ab ihrem Plateau wirksam. */
 export const HISTORY_ANCHOR = "2026-09-26";
@@ -24,8 +34,8 @@ export type HistoryEvent = {
 };
 
 /**
- * Die Viertel-Profile in `aurenfurt-districts` sind der Stand von HISTORY_ANCHOR.
- * Ein vergangener Tag ist dieser Stand plus die Differenz der damals und heute wirksamen Ereignisse.
+ * Geschichtsereignisse verschieben die aus Inhalt und Magie errechneten Ziele.
+ * Am Anker 26.09.2026 ist ihre Differenz null, damit der heutige Stand das Ergebnis der Verteilung bleibt.
  */
 export const AURENFURT_HISTORY: HistoryEvent[] = [
   {
@@ -39,6 +49,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { refugees: 16, crime: 6, economy: -6, guard: -4, unemployment: 10 },
       handwerkerviertel: { refugees: 8, economy: -4, unemployment: 6 },
       tempelbezirk: { refugees: 6, vattrak: -3, unemployment: 5 },
+      akademieviertel: { refugees: 4, economy: -3, unemployment: 4, vattrak: -2 },
       adelsviertel: { refugees: 3, guard: 4, unemployment: 2 },
       palast: { refugees: 2, guard: 4, unemployment: 1 },
     },
@@ -54,6 +65,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { economy: -12, crime: 6, vattrak: -6, unemployment: 8 },
       handwerkerviertel: { economy: -14, vattrak: -6, unemployment: 8 },
       tempelbezirk: { economy: -8, vattrak: -4, unemployment: 6 },
+      akademieviertel: { economy: -7, vattrak: -3, unemployment: 5 },
       adelsviertel: { economy: -6, vattrak: -3, unemployment: 3 },
       palast: { economy: -4, vattrak: -2, unemployment: 2 },
     },
@@ -69,6 +81,14 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { economy: -12, crime: 8, unemployment: 12 },
       handwerkerviertel: { economy: -10, crime: 4, unemployment: 10 },
       tempelbezirk: { economy: -6, vattrak: -4, refugees: 4, unemployment: 8 },
+      akademieviertel: {
+        economy: -9,
+        unemployment: 11,
+        crime: 3,
+        malanthir: 4,
+        vattrak: -3,
+        cells: [{ name: "Archivversuchung", delta: 8 }],
+      },
       adelsviertel: { economy: -4, unemployment: 4 },
       palast: { economy: -3, malanthir: 2, unemployment: 3 },
     },
@@ -83,6 +103,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       unterstadt: { crime: 14, malanthir: 8, guard: -4, unemployment: 6, cells: [{ name: "Flüstern der Roten Gassen", delta: 10 }] },
       suedtor: { crime: 8, guard: 4, unemployment: 4 },
       handwerkerviertel: { crime: 6, unemployment: 4, cells: [{ name: "Zunftkeller", delta: 6 }] },
+      akademieviertel: { crime: 4, guard: 5, unemployment: 3 },
       palast: { guard: 8, malanthir: 3 },
       adelsviertel: { guard: 6, crime: 2, unemployment: 2 },
     },
@@ -98,6 +119,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { guard: 12, crime: -4, economy: -8 },
       handwerkerviertel: { guard: 8, economy: -6 },
       tempelbezirk: { guard: 6, vattrak: -3 },
+      akademieviertel: { guard: 8, economy: -4, vattrak: -2 },
       adelsviertel: { guard: 8, economy: -3 },
       palast: { guard: 6, vattrak: 2 },
     },
@@ -112,6 +134,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { economy: 20, vattrak: 10, refugees: -8, crime: -4, cells: [{ name: "Löwentor-Schmuggler", delta: -8 }] },
       handwerkerviertel: { economy: 12, vattrak: 5 },
       unterstadt: { economy: 8, refugees: -4, vattrak: 4 },
+      akademieviertel: { economy: 7, vattrak: 4 },
       adelsviertel: { economy: 6 },
       palast: { economy: 4, vattrak: 3 },
       tempelbezirk: { vattrak: 3 },
@@ -127,6 +150,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { guard: 8, economy: -8, refugees: 6, unemployment: 8 },
       unterstadt: { crime: 6, economy: -6, refugees: 4, unemployment: 10 },
       handwerkerviertel: { economy: -10, guard: 4, unemployment: 12, cells: [{ name: "Zunftkeller", delta: 8 }] },
+      akademieviertel: { economy: -5, guard: 5, unemployment: 7 },
       adelsviertel: { guard: 4, unemployment: 2 },
       palast: { guard: 6, unemployment: 1 },
       tempelbezirk: { refugees: 3, unemployment: 4 },
@@ -142,6 +166,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       suedtor: { economy: 14, vattrak: 6 },
       adelsviertel: { economy: 12, vattrak: 6, cells: [{ name: "Salons der Häuser", delta: 6 }] },
       handwerkerviertel: { economy: 8 },
+      akademieviertel: { economy: 5, vattrak: 3 },
       palast: { vattrak: 4, economy: 3 },
       tempelbezirk: { vattrak: 2 },
     },
@@ -157,6 +182,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       unterstadt: { refugees: 10, crime: 8, malanthir: 6, economy: -6, unemployment: 12, cells: [{ name: "Malanthir-Zellen", delta: 8 }] },
       handwerkerviertel: { economy: -10, unemployment: 10 },
       tempelbezirk: { refugees: 6, vattrak: -4, unemployment: 6 },
+      akademieviertel: { economy: -6, refugees: 4, vattrak: -3, unemployment: 7, malanthir: 3 },
       palast: { vattrak: -5, malanthir: 4, unemployment: 3 },
       adelsviertel: { economy: -4, vattrak: -3, unemployment: 4 },
     },
@@ -170,6 +196,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     impact: {
       handwerkerviertel: { crime: 16, malanthir: 8, economy: -6, guard: 10, cells: [{ name: "Zunftkeller", delta: 8 }] },
       suedtor: { crime: 6, guard: 6 },
+      akademieviertel: { guard: 6, crime: 3, malanthir: 2 },
       palast: { guard: 8, malanthir: 5 },
       unterstadt: { crime: 4, malanthir: 3 },
     },
@@ -190,6 +217,15 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
           { name: "Silberne Rose gegen das Konklave", delta: 44 },
         ],
       },
+      akademieviertel: {
+        malanthir: 8,
+        vattrak: -5,
+        crime: 2,
+        cells: [
+          { name: "Sternenkammer", delta: 10 },
+          { name: "Archivversuchung", delta: 12 },
+        ],
+      },
       palast: { malanthir: 4, vattrak: -3 },
       adelsviertel: { malanthir: 2, cells: [{ name: "Salons der Häuser", delta: 8 }] },
       unterstadt: { malanthir: 4 },
@@ -207,6 +243,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       unterstadt: { refugees: 8, crime: 8, economy: -4, unemployment: 10 },
       handwerkerviertel: { refugees: 6, economy: -3, unemployment: 6 },
       tempelbezirk: { refugees: 4, unemployment: 4 },
+      akademieviertel: { refugees: 3, unemployment: 3, guard: 2 },
       adelsviertel: { refugees: 2, unemployment: 2 },
     },
   },
@@ -221,6 +258,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       adelsviertel: { guard: 14, crime: -2 },
       suedtor: { guard: 16, crime: -4 },
       tempelbezirk: { guard: 12 },
+      akademieviertel: { guard: 14, crime: -3 },
       handwerkerviertel: { guard: 10, crime: -3 },
       unterstadt: { guard: 8, crime: -2 },
     },
@@ -236,6 +274,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       unterstadt: { unemployment: -18, guard: 6, economy: 4 },
       suedtor: { unemployment: -12, guard: 8, economy: 3 },
       handwerkerviertel: { unemployment: -10, guard: 5, economy: 5 },
+      akademieviertel: { unemployment: -14, guard: 6, economy: 4 },
       tempelbezirk: { unemployment: -8, guard: 4, economy: 2 },
       adelsviertel: { unemployment: -6, guard: 4, economy: 2 },
       palast: { unemployment: -8, guard: 5, economy: 2 },
@@ -251,28 +290,13 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
       unterstadt: { economy: -16, crime: 6, cells: [{ name: "Flüstern der Roten Gassen", delta: 6 }] },
       handwerkerviertel: { economy: -12 },
       suedtor: { economy: -4, crime: 5, cells: [{ name: "Löwentor-Schmuggler", delta: 10 }] },
+      akademieviertel: { economy: -4 },
       adelsviertel: { economy: -4 },
       tempelbezirk: { economy: -3 },
       palast: { economy: -2 },
     },
   },
 ];
-
-export function parseDay(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return Date.UTC(year, month - 1, day);
-}
-
-export function formatDay(utc: number) {
-  const date = new Date(utc);
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${date.getUTCFullYear()}-${month}-${day}`;
-}
-
-export function utcToday(now = new Date()) {
-  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-}
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -312,60 +336,128 @@ function wobble(districtId: string, day: number, key: string) {
   return ((hash >>> 0) / 4294967295 - 0.5) * 2.4;
 }
 
-function restOf(districtId: CityDistrictId): SimProfile {
-  const district = AURENFURT_DISTRICTS.find((entry) => entry.id === districtId);
-  if (!district) {
-    return { crime: 0, vattrak: 0, malanthir: 0, guard: 0, refugees: 0, economy: 0, unemployment: 0, underground: [] };
-  }
-  return district.sim;
-}
+const HISTORY_SHIFT_KEYS = ["crime", "guard", "refugees", "economy", "unemployment"] as const;
 
-export function districtMetricsOn(districtId: CityDistrictId, day = utcToday()): SimProfile {
+function historyShift(districtId: CityDistrictId, day: number): HistoryShift {
   const anchor = parseDay(HISTORY_ANCHOR);
-  const rest = restOf(districtId);
-  const values: Record<MetricKey, number> = {
-    crime: rest.crime,
-    vattrak: rest.vattrak,
-    malanthir: rest.malanthir,
-    guard: rest.guard,
-    refugees: rest.refugees,
-    economy: rest.economy,
-    unemployment: rest.unemployment,
+  const shift: HistoryShift = {
+    crime: 0,
+    guard: 0,
+    refugees: 0,
+    economy: 0,
+    unemployment: 0,
+    cells: [],
   };
-  const cells = new Map(rest.underground.map((cell) => [cell.name, cell.strength]));
-
   for (const event of AURENFURT_HISTORY) {
     const deltaWeight = eventWeight(event, day) - eventWeight(event, anchor);
     if (!deltaWeight) continue;
     const impact = event.impact[districtId];
     if (!impact) continue;
-    for (const key of METRIC_KEYS) {
-      values[key] += (impact[key] ?? 0) * deltaWeight;
+    for (const key of HISTORY_SHIFT_KEYS) {
+      shift[key] += (impact[key] ?? 0) * deltaWeight;
     }
     for (const cell of impact.cells ?? []) {
-      cells.set(cell.name, (cells.get(cell.name) ?? 0) + cell.delta * deltaWeight);
+      const existing = shift.cells.find((entry) => entry.name === cell.name);
+      if (existing) existing.delta += cell.delta * deltaWeight;
+      else shift.cells.push({ name: cell.name, delta: cell.delta * deltaWeight });
     }
   }
+  return shift;
+}
 
-  const underground: UndergroundCell[] = [...cells.entries()].flatMap(([name, strength]) => {
-    if (strength < 1) return [];
-    return [{ name, strength: clamp(strength + wobble(districtId, day, name)) }];
+type CitySeries = Map<number, Record<CityDistrictId, SimProfile>>;
+
+let cachedSeries: { version: number; end: number; series: CitySeries } | null = null;
+
+function citySeries(through: number) {
+  const end = Math.max(utcToday(), through);
+  const currentVersion = citySimVersion();
+  if (cachedSeries && cachedSeries.version === currentVersion && cachedSeries.end >= end) {
+    return cachedSeries.series;
+  }
+  const series = simulateCityRange({
+    from: parseDay(HISTORY_START),
+    to: end,
+    dayMs: DAY_MS,
+    today: utcToday(),
+    anchor: parseDay(HISTORY_ANCHOR),
+    weatherKind: (day) => weatherOn(day).kind,
+    eventWeight: (id, day) => {
+      const event = AURENFURT_HISTORY.find((entry) => entry.id === id);
+      return event ? eventWeight(event, day) : 0;
+    },
+    historyShift,
   });
+  cachedSeries = { version: currentVersion, end, series };
+  return series;
+}
 
+function profileOn(districtId: CityDistrictId, day: number): SimProfile {
+  const series = citySeries(day);
+  const row = series.get(day)?.[districtId];
+  if (!row) {
+    return {
+      crime: 0,
+      vattrak: 0,
+      malanthir: 0,
+      guard: 0,
+      refugees: 0,
+      economy: 0,
+      unemployment: 0,
+      underground: [],
+    };
+  }
   return {
-    crime: clamp(values.crime + wobble(districtId, day, "crime")),
-    vattrak: clamp(values.vattrak + wobble(districtId, day, "vattrak")),
-    malanthir: clamp(values.malanthir + wobble(districtId, day, "malanthir")),
-    guard: clamp(values.guard + wobble(districtId, day, "guard")),
-    refugees: clamp(values.refugees + wobble(districtId, day, "refugees")),
-    economy: clamp(values.economy + wobble(districtId, day, "economy")),
-    unemployment: clamp(values.unemployment + wobble(districtId, day, "unemployment")),
-    underground,
+    crime: clamp(row.crime + wobble(districtId, day, "crime")),
+    vattrak: clamp(row.vattrak + wobble(districtId, day, "vattrak")),
+    malanthir: clamp(row.malanthir + wobble(districtId, day, "malanthir")),
+    guard: clamp(row.guard + wobble(districtId, day, "guard")),
+    refugees: clamp(row.refugees + wobble(districtId, day, "refugees")),
+    economy: clamp(row.economy + wobble(districtId, day, "economy")),
+    unemployment: clamp(row.unemployment + wobble(districtId, day, "unemployment")),
+    underground: row.underground.map((cell) => ({
+      name: cell.name,
+      strength: clamp(cell.strength + wobble(districtId, day, cell.name)),
+    })),
   };
 }
 
-export function cityMetricsOn(day = utcToday()) {
-  return meanSim(AURENFURT_DISTRICTS.map((district) => districtMetricsOn(district.id, day)));
+export function districtMetricsOn(districtId: CityDistrictId, day = utcToday()): SimProfile {
+  return profileOn(districtId, day);
+}
+
+export function cityMetricsOn(day = utcToday()): SimProfile {
+  const weights = buildingWeights();
+  const profiles = AURENFURT_DISTRICTS.map((district) => ({
+    weight: weights[district.id] ?? 1,
+    sim: districtMetricsOn(district.id, day),
+  }));
+  const weightSum = profiles.reduce((sum, entry) => sum + entry.weight, 0) || 1;
+  const avg = (pick: (profile: SimProfile) => number) =>
+    Math.round(profiles.reduce((sum, entry) => sum + pick(entry.sim) * entry.weight, 0) / weightSum);
+  const cellNames = new Set(profiles.flatMap((entry) => entry.sim.underground.map((cell) => cell.name)));
+  const underground: UndergroundCell[] = [...cellNames].flatMap((name) => {
+    let strength = 0;
+    let seen = 0;
+    for (const entry of profiles) {
+      const cell = entry.sim.underground.find((item) => item.name === name);
+      if (!cell) continue;
+      strength += cell.strength * entry.weight;
+      seen += entry.weight;
+    }
+    if (seen === 0) return [];
+    return [{ name, strength: clamp(strength / seen) }];
+  });
+  return {
+    crime: avg((profile) => profile.crime),
+    vattrak: avg((profile) => profile.vattrak),
+    malanthir: avg((profile) => profile.malanthir),
+    guard: avg((profile) => profile.guard),
+    refugees: avg((profile) => profile.refugees),
+    economy: avg((profile) => profile.economy),
+    unemployment: avg((profile) => profile.unemployment),
+    underground,
+  };
 }
 
 export type DistrictDay = SimProfile & { day: string };
@@ -389,3 +481,8 @@ export function influencesOn(districtId: CityDistrictId | null, day = utcToday()
     return Boolean(event.impact[districtId]);
   }).map((event) => ({ id: event.id, title: event.title, summary: event.summary }));
 }
+
+bindWeatherWinter((day) => {
+  const winter = AURENFURT_HISTORY.find((event) => event.id === "winter");
+  return winter ? eventWeight(winter, day) : 0;
+});

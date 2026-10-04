@@ -1,4 +1,11 @@
-import { AURENFURT_HISTORY, eventWeight, formatDay, parseDay, utcToday } from "./aurenfurt-history";
+import { formatDay, parseDay, utcToday } from "./aurenfurt-time";
+
+let winterOf: (day: number) => number = () => 0;
+
+/** Historie setzt das, sobald die Ereignisgewichte stehen. Vermeidet einen Importkreis. */
+export function bindWeatherWinter(fn: (day: number) => number) {
+  winterOf = fn;
+}
 
 export type WeatherKind = "clear" | "cloudy" | "fog" | "rain" | "storm" | "snow" | "frost" | "heat";
 
@@ -28,7 +35,6 @@ export const AURENFURT_LIVE_COORDINATES = { latitude: 52.2799, longitude: 8.0472
 
 export type LiveWeatherProvider = (signal?: AbortSignal) => Promise<DayWeather | null>;
 
-const WINTER = AURENFURT_HISTORY.find((event) => event.id === "winter");
 const DAY_MS = 86_400_000;
 
 function unit(text: string) {
@@ -74,7 +80,7 @@ export function weatherOn(day = utcToday()): DayWeather {
   const noise = unit(`wx|${day}`);
   const wet = unit(`wet|${day}`);
   const angle = ((dayOfYear - 200) / 365) * Math.PI * 2;
-  const winter = WINTER ? eventWeight(WINTER, day) : 0;
+  const winter = winterOf(day);
   const tempC = Math.round(10 + 11 * Math.cos(angle) + (noise - 0.5) * 7 - 12 * winter);
   const kind = kindFromClimate(tempC, wet, noise, winter, date.getUTCMonth());
   return {

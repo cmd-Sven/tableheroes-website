@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ExternalLink, X } from "lucide-react";
 import { synthesizePlaceBrief } from "./aurenfurt-brief";
-import { type HoloSelection, type SimSubject } from "./aurenfurt-districts";
+import { findBuilding, type HoloSelection, type LandmarkModel, type SimSubject } from "./aurenfurt-districts";
+
+const HoloLandmarkPreview = dynamic(() => import("./scene/HoloLandmarkPreview"), {
+  ssr: false,
+});
 import {
   factionName,
   RELATIONSHIP_LABELS,
@@ -26,6 +31,12 @@ import { loreExcerpt, type AurenfurtPlaceLore } from "./aurenfurt-lore";
 import { SIM_METERS, type SimProfile } from "./aurenfurt-sim";
 import type { DayWeather } from "./aurenfurt-weather";
 import { SimKpiBar } from "@/src/components/ui/KpiIcons";
+import {
+  formatInfluenceDelta,
+  influenceInWords,
+  sumPoiInfluences,
+  type AurenfurtMapPoi,
+} from "./aurenfurt-map-pois";
 
 type Props = {
   subject: SimSubject | null;
@@ -46,6 +57,11 @@ type Props = {
   npcLinkContext?: NpcDetailLinkContext;
   /** Betrachteter Kalendertag `YYYY-MM-DD` für Diagramm-Marke */
   viewDay?: string;
+  isGm?: boolean;
+  selectedPoi?: AurenfurtMapPoi | null;
+  districtPois?: AurenfurtMapPoi[];
+  /** 3D-Modell des gewählten Gebäudes, auch wenn es nur im Editor liegt. */
+  landmark?: LandmarkModel | null;
   onClose: () => void;
   onSelect: (selection: HoloSelection) => void;
 };
@@ -453,6 +469,10 @@ export function HoloOverlay({
   operator = null,
   npcLinkContext = {},
   viewDay,
+  isGm = false,
+  selectedPoi = null,
+  districtPois = [],
+  landmark = null,
   onClose,
   onSelect,
 }: Props) {
@@ -470,7 +490,7 @@ export function HoloOverlay({
   };
 
   const brief = useMemo(() => {
-    if (!subject) return null;
+    if (!subject || subject.type === "poi") return null;
     return synthesizePlaceBrief({
       placeName: subject.name,
       scope: subject.type === "building" ? "building" : "district",
@@ -493,6 +513,82 @@ export function HoloOverlay({
     }
     return [];
   }, [subject, operator, leaders]);
+
+  const districtPoiTotals = useMemo(() => sumPoiInfluences(districtPois), [districtPois]);
+
+  const landmarkModel: LandmarkModel | undefined =
+    landmark ?? (subject?.type === "building" ? findBuilding(subject.id)?.landmark : undefined);
+
+  if (subject?.type === "poi" && selectedPoi) {
+    return (
+      <AnimatePresence>
+        <motion.aside
+          key={`poi:${selectedPoi.id}`}
+          initial={{ opacity: 0, x: -48 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -48 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="pointer-events-auto relative z-[80] flex h-full max-h-full w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0 flex-col overflow-hidden border-r border-hero-border/40 bg-linear-to-b from-background-card/98 via-background-card/95 to-background-dark/98 shadow-2xl backdrop-blur-md"
+        >
+          <div className="flex shrink-0 items-start justify-between gap-2 border-b border-hero-border/40 px-3 py-2">
+            <div className="min-w-0">
+              <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                {selectedPoi.kind}
+              </p>
+              <h2 className="truncate font-cinzel text-lg font-bold text-accent-gold">{selectedPoi.name}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded p-1 text-gray-400 hover:text-white"
+              aria-label="Auswahl aufheben"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pt-3 pb-4">
+            {selectedPoi.imageUrl ? (
+              <div className="relative aspect-[2.4/1] max-h-28 overflow-hidden rounded border border-accent-gold/40">
+                <Image
+                  src={selectedPoi.imageUrl}
+                  alt={selectedPoi.name}
+                  fill
+                  sizes="24rem"
+                  className="object-cover"
+                />
+              </div>
+            ) : null}
+            {selectedPoi.description ? (
+              <p className="font-libre text-sm leading-relaxed text-gray-200">
+                {selectedPoi.description}
+              </p>
+            ) : null}
+            {selectedPoi.influences.length > 0 ? (
+              <div>
+                <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                  Einfluss
+                </p>
+                <ul className="space-y-1">
+                  {selectedPoi.influences.map((entry) => (
+                    <li key={`${entry.aspect}-${entry.delta}`} className="font-libre text-xs text-gray-300">
+                      {influenceInWords(entry)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onSelect({ type: "district", id: selectedPoi.districtId })}
+              className="font-barlow text-[10px] font-bold uppercase tracking-wide text-cyan-200 hover:text-white"
+            >
+              Viertel öffnen
+            </button>
+          </div>
+        </motion.aside>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -539,6 +635,10 @@ export function HoloOverlay({
                     className="object-cover"
                   />
                 </div>
+              ) : null}
+
+              {landmarkModel ? (
+                <HoloLandmarkPreview key={subject.id} model={landmarkModel} />
               ) : null}
 
               <p className="font-libre text-sm leading-relaxed text-gray-200">
@@ -596,6 +696,24 @@ export function HoloOverlay({
                 <p className="font-libre text-xs leading-relaxed text-gray-500">
                   {loreExcerpt(lore.description, subject.summary)}
                 </p>
+              ) : null}
+
+              {isGm && subject.type === "district" && districtPoiTotals.length > 0 ? (
+                <div className="rounded border border-accent-gold/30 bg-accent-gold/5 px-2 py-2">
+                  <p className="mb-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                    POI-Einfluss (Summe)
+                  </p>
+                  <ul className="space-y-0.5">
+                    {districtPoiTotals.map((entry) => (
+                      <li
+                        key={entry.aspect}
+                        className="font-libre text-xs text-gray-300"
+                      >
+                        {formatInfluenceDelta(entry)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
 
               <AnalysisPanel

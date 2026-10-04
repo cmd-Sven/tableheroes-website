@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { CityDistrictId } from "../aurenfurt-districts";
+import type { CityBuilding, CityDistrictId } from "../aurenfurt-districts";
 import {
   findKeyLocation,
   keyLocationsInDistrict,
@@ -20,18 +20,20 @@ export type DistrictKeyLocations = {
 export function useKeyLocations(
   districtId: CityDistrictId | null,
   buildingId: string | null = null,
+  buildings?: CityBuilding[],
 ): DistrictKeyLocations {
   return useMemo(() => {
     if (!districtId) {
       return {
         locations: [],
-        selected: buildingId ? findKeyLocation(buildingId) : null,
+        selected: buildingId ? findKeyLocation(buildingId, buildings) : null,
       };
     }
-    const locations = keyLocationsInDistrict(districtId);
+    const locations = keyLocationsInDistrict(districtId, buildings);
     const selected = buildingId
-      ? locations.find((location) => location.id === buildingId) ?? findKeyLocation(buildingId)
+      ? locations.find((location) => location.id === buildingId) ??
+        findKeyLocation(buildingId, buildings)
       : null;
     return { locations, selected };
-  }, [districtId, buildingId]);
+  }, [districtId, buildingId, buildings]);
 }

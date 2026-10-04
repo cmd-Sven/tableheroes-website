@@ -13,11 +13,13 @@ import {
 
 type Props = {
   onClear: () => void;
+  /** False während Straßenzeichnen — Plattform frisst keine Klicks. */
+  interactive?: boolean;
 };
 
-export function HoloPlatform({ onClear }: Props) {
+export function HoloPlatform({ onClear, interactive = true }: Props) {
   const geometry = useMemo(() => createDomedCityGeometry(), []);
-  const texture = useTexture("/images/cities/aurenfurt.jpg");
+  const texture = useTexture("/images/cities/aurenfurt.jpg?v=detail-20261001");
   const gl = useThree((state) => state.gl);
 
   useLayoutEffect(() => {
@@ -35,10 +37,14 @@ export function HoloPlatform({ onClear }: Props) {
         position={[0, 0.012, 0]}
         castShadow={false}
         receiveShadow={false}
-        onClick={(event) => {
-          event.stopPropagation();
-          onClear();
-        }}
+        onClick={
+          interactive
+            ? (event) => {
+                event.stopPropagation();
+                onClear();
+              }
+            : undefined
+        }
       >
         <meshStandardMaterial
           map={texture}

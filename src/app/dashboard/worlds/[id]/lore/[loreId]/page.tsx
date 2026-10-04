@@ -4,6 +4,10 @@ import { getLoreById, getChildLoreEntries, getLoreEntriesForParentByWorld, getOr
 import { getNPCsByLocationForWorld, getFactionsByLocationId } from "@/src/app/dashboard/worlds/world-location-actions";
 import { isLocationType } from "@/src/lib/lore-types";
 import { WorldLoreDetailClient } from "./WorldLoreDetailClient";
+import {
+  buildingMetaFromLocationRow,
+  poiExtrasFromLocationRow,
+} from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;
@@ -18,12 +22,21 @@ export default async function WorldLoreDetailPage({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const { data: worldRaw } = await (supabase.from("worlds") as any)
-    .select("id, name, gm_id")
-    .eq("id", worldId)
-    .single();
+  const [{ data: worldRaw }, { data: profileRaw }] = await Promise.all([
+    (supabase.from("worlds") as any).select("id, name, gm_id").eq("id", worldId).single(),
+    (supabase.from("users") as any).select("primary_role").eq("id", user.id).single(),
+  ]);
 
-  if (!worldRaw || (worldRaw as { gm_id: string }).gm_id !== user.id) notFound();
+  const world = worldRaw as { id: string; name: string; gm_id: string | null } | null;
+  const profile = profileRaw as { primary_role?: string } | null;
+  const isAdmin = profile?.primary_role === "Admin";
+  const isWorldGm =
+    world?.gm_id != null && String(world.gm_id) === String(user.id);
+
+  if (!world || (!isWorldGm && !isAdmin)) notFound();
+
+  /** Viertel-Editor: Welt-SL und Admin. */
+  const isGm = isWorldGm || isAdmin;
 
   let lore: any;
   try {
@@ -232,12 +245,34 @@ export default async function WorldLoreDetailPage({ params }: Props) {
     } catch {}
   }
 
+  let aurenfurtBuilding: {
+    streetId: string | null;
+    fromEditor: boolean;
+    districtId: string | null;
+    active: boolean;
+    mapU: number | null;
+    mapV: number | null;
+  } | null = null;
+  let aurenfurtPoi: ReturnType<typeof poiExtrasFromLocationRow> = null;
+  if (isLocation) {
+    const { data: locMeta } = await (supabase.from("locations") as any)
+      .select(
+        "aurenfurt_street_id, created_via_map_editor, map_district_id, map_u, map_v, map_poi_kind, map_poi_influences",
+      )
+      .eq("id", loreId)
+      .maybeSingle();
+    aurenfurtPoi = poiExtrasFromLocationRow(locMeta);
+    aurenfurtBuilding = buildingMetaFromLocationRow(locMeta);
+  }
+
+  const displayType = aurenfurtPoi?.kind ?? lore.type;
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <WorldLoreDetailClient
         lore={{
           name: lore.name,
-          type: lore.type,
+          type: displayType,
           description: lore.description,
           image_url: lore.image_url,
           image_display: lore.image_display,
@@ -249,9 +284,10 @@ export default async function WorldLoreDetailPage({ params }: Props) {
         loreId={loreId}
         backHref={backHref}
         backLabel={backLabel}
+        isGm={isGm}
         isLocation={isLocation}
         parent={parent}
-        loreType={lore.type}
+        loreType={displayType}
         childEntries={childEntries}
         locationNPCs={locationNPCs}
         factionsByLocation={factionsByLocation}
@@ -261,6 +297,8 @@ export default async function WorldLoreDetailPage({ params }: Props) {
         religionDeityLore={religionDeityLore}
         deityDetails={deityDetails}
         loreMetadata={loreMetadata}
+        aurenfurtBuilding={aurenfurtBuilding}
+        aurenfurtPoi={aurenfurtPoi}
       />
     </div>
   );

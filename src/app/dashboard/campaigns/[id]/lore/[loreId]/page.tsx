@@ -7,6 +7,11 @@ import { getVisibilityForCampaign } from "../../campaign-visibility-queries";
 import { getNPCsByLocation } from "../../location-actions";
 import { isLocationType } from "@/src/lib/lore-types";
 import { getLoreSceneAppearances } from "../../scene-media-actions";
+import { isCampaignGm } from "@/src/lib/campaign-gm";
+import {
+  buildingMetaFromLocationRow,
+  poiExtrasFromLocationRow,
+} from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;
@@ -22,21 +27,32 @@ export default async function LoreDetailPageRoute({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  // 2. Check if user has access to campaign
-  const { data: campaignRaw } = await (supabase.from("campaigns") as any)
-    .select("id, gm_id")
-    .eq("id", campaignId)
-    .single();
+  // 2. Check if user has access to campaign (SL via gm_id/owner_id, Admin, oder Mitglied)
+  const [{ data: campaignRaw }, { data: profileRaw }] = await Promise.all([
+    (supabase.from("campaigns") as any)
+      .select("id, gm_id, owner_id")
+      .eq("id", campaignId)
+      .single(),
+    (supabase.from("users") as any).select("primary_role").eq("id", user.id).single(),
+  ]);
 
   // Expliziter Cast gegen 'never'
-  const campaign = campaignRaw as { id: string; gm_id: string } | null;
+  const campaign = campaignRaw as {
+    id: string;
+    gm_id: string | null;
+    owner_id?: string | null;
+  } | null;
+  const profile = profileRaw as { primary_role?: string } | null;
+  const isAdmin = profile?.primary_role === "Admin";
 
   if (!campaign) redirect("/dashboard");
 
-  const isGM = campaign.gm_id === user.id;
+  const isGM = isCampaignGm(campaign, user.id);
+  /** Viertel-Editor: Spielleiter und Admin, nicht reine Spieler. */
+  const canEditCityMap = isGM || isAdmin;
 
-  // 3. Check membership (if not GM)
-  if (!isGM) {
+  // 3. Check membership (if not GM and not Admin)
+  if (!isGM && !isAdmin) {
     const { data: membershipRaw } = await (supabase.from("campaign_members") as any)
       .select("status")
       .eq("campaign_id", campaignId)
@@ -410,11 +426,37 @@ export default async function LoreDetailPageRoute({ params }: Props) {
     sceneAppearances = await getLoreSceneAppearances(campaignId, loreId).catch(() => []);
   }
 
+  const worldId = ((lore as any).world_id as string | null) ?? null;
+  let aurenfurtBuilding: {
+    streetId: string | null;
+    fromEditor: boolean;
+    districtId: string | null;
+    active: boolean;
+    mapU: number | null;
+    mapV: number | null;
+  } | null = null;
+  let aurenfurtPoi: ReturnType<typeof poiExtrasFromLocationRow> = null;
+  if (isLocationType((lore as any).type)) {
+    const { data: locMeta } = await (supabase.from("locations") as any)
+      .select(
+        "aurenfurt_street_id, created_via_map_editor, map_district_id, map_u, map_v, map_poi_kind, map_poi_influences",
+      )
+      .eq("id", loreId)
+      .maybeSingle();
+    aurenfurtPoi = poiExtrasFromLocationRow(locMeta);
+    aurenfurtBuilding = buildingMetaFromLocationRow(locMeta);
+  }
+
+  const loreForPage = aurenfurtPoi
+    ? { ...loreWithVisibility, parent, type: aurenfurtPoi.kind }
+    : { ...loreWithVisibility, parent };
+
   return (
     <LoreDetailPage
-      lore={{ ...loreWithVisibility, parent } as any}
+      lore={loreForPage as any}
       campaignId={campaignId}
       isGM={isGM}
+      canEditCityMap={canEditCityMap}
       locationNPCs={safeLocationNPCs}
       sceneAppearances={sceneAppearances}
       childEntries={childEntries}
@@ -425,6 +467,9 @@ export default async function LoreDetailPageRoute({ params }: Props) {
       religionDeityLore={religionDeityLore}
       deityDetails={deityDetails}
       loreMetadata={loreMetadata}
+      worldId={worldId}
+      aurenfurtBuilding={aurenfurtBuilding}
+      aurenfurtPoi={aurenfurtPoi}
     />
   );
 }

@@ -1669,12 +1669,18 @@ export type Database = {
         Row: {
           additional_images: Json | null
           allow_pc_origin: boolean | null
+          aurenfurt_street_id: string | null
           created_at: string | null
+          created_via_map_editor: boolean
           description: string | null
           gm_notes: string | null
           id: string
           image_url: string | null
+          map_district_id: string | null
+          map_u: number | null
+          map_v: number | null
           name: string
+          npc_hint_dismissed_at: string | null
           parent_location_id: string | null
           type: string | null
           world_id: string
@@ -1682,12 +1688,18 @@ export type Database = {
         Insert: {
           additional_images?: Json | null
           allow_pc_origin?: boolean | null
+          aurenfurt_street_id?: string | null
           created_at?: string | null
+          created_via_map_editor?: boolean
           description?: string | null
           gm_notes?: string | null
           id?: string
           image_url?: string | null
+          map_district_id?: string | null
+          map_u?: number | null
+          map_v?: number | null
           name: string
+          npc_hint_dismissed_at?: string | null
           parent_location_id?: string | null
           type?: string | null
           world_id: string
@@ -1695,12 +1707,18 @@ export type Database = {
         Update: {
           additional_images?: Json | null
           allow_pc_origin?: boolean | null
+          aurenfurt_street_id?: string | null
           created_at?: string | null
+          created_via_map_editor?: boolean
           description?: string | null
           gm_notes?: string | null
           id?: string
           image_url?: string | null
+          map_district_id?: string | null
+          map_u?: number | null
+          map_v?: number | null
           name?: string
+          npc_hint_dismissed_at?: string | null
           parent_location_id?: string | null
           type?: string | null
           world_id?: string

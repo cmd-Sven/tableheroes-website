@@ -68,6 +68,16 @@ export async function createNPC(formData: {
   token_size_category?: string | null;
   sheet_data?: unknown | null;
   sheet_source?: string | null;
+  for_city_simulation?: boolean;
+  city_influence_tier?: string | null;
+  city_axis_loyal_criminal?: number | null;
+  city_axis_greedy_altruist?: number | null;
+  city_axis_pious_skeptic?: number | null;
+  city_axis_superstition_reason?: number | null;
+  city_deity?: string | null;
+  city_faction_id?: string | null;
+  city_agenda?: string | null;
+  city_event_deck?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -297,6 +307,20 @@ export async function createNPC(formData: {
       ? formData.sheet_source?.trim() || "manual"
       : null,
     sheet_synced_at: formData.sheet_data ? new Date().toISOString() : null,
+    for_city_simulation: formData.for_city_simulation ?? false,
+    city_influence_tier: formData.city_influence_tier ?? null,
+    city_axis_loyal_criminal: formData.city_axis_loyal_criminal ?? null,
+    city_axis_greedy_altruist: formData.city_axis_greedy_altruist ?? null,
+    city_axis_pious_skeptic: formData.city_axis_pious_skeptic ?? null,
+    city_axis_superstition_reason: formData.city_axis_superstition_reason ?? null,
+    city_deity: formData.city_deity?.trim() ? formData.city_deity.trim() : null,
+    city_faction_id: formData.city_faction_id?.trim()
+      ? formData.city_faction_id.trim()
+      : null,
+    city_agenda: formData.city_agenda?.trim() ? formData.city_agenda.trim() : null,
+    city_event_deck: Array.isArray(formData.city_event_deck)
+      ? formData.city_event_deck
+      : [],
   };
 
   console.log("🔍 [createNPC] Insert payload:", {

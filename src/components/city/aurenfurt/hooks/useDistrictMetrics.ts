@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import type { CityDistrictId } from "../aurenfurt-districts";
+import { citySimVersion, subscribeCitySim } from "../aurenfurt-city-sim";
 import {
   cityMetricsOn,
   districtMetricsOn,
@@ -28,6 +29,7 @@ export function useDistrictMetrics(
 ): DistrictMetrics {
   const viewDay = useMemo(() => parseDay(dayIso), [dayIso]);
   const seriesEnd = useMemo(() => utcToday(), []);
+  const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
 
   return useMemo(() => {
     if (!districtId) {
@@ -42,5 +44,5 @@ export function useDistrictMetrics(
       series: districtSeries(districtId, undefined, seriesEnd),
       influences: influencesOn(districtId, viewDay),
     };
-  }, [districtId, viewDay, seriesEnd]);
+  }, [districtId, viewDay, seriesEnd, simVersion]);
 }
