@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Dices, Loader2, Swords, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   formatInitiativeDisplay,
   parseInitiativeLabel,
@@ -41,6 +42,12 @@ type Props = {
   onPrevTurn: () => void;
   onNextTurn: () => void;
   onUpdateInitiative: (participantId: string, label: string) => void | Promise<void>;
+  /**
+   * Hauptbühne ohne Battlemap: Initiative wird eingetragen, nicht gewürfelt.
+   * Spieler sehen nur die Reihenfolge, der SL die Eingabe.
+   */
+  manualEntry?: boolean;
+  onRemoveParticipant?: (participantId: string) => void | Promise<void>;
 };
 
 function hasRolled(p: CombatHudParticipant): boolean {
@@ -63,6 +70,8 @@ export function CombatInitiativeHud({
   onPrevTurn,
   onNextTurn,
   onUpdateInitiative,
+  manualEntry = false,
+  onRemoveParticipant,
 }: Props) {
   const [initiativeDrafts, setInitiativeDrafts] = useState<Record<string, string>>({});
   const [endingTurn, startEndingTurn] = useTransition();
@@ -106,14 +115,21 @@ export function CombatInitiativeHud({
   async function commitInitiative(participant: CombatHudParticipant) {
     const raw =
       initiativeDrafts[participant.id] ??
-      formatInitiativeDisplay(participant.initiative_label, participant.initiative_value);
+      (hasRolled(participant)
+        ? formatInitiativeDisplay(participant.initiative_label, participant.initiative_value)
+        : "");
+    if (!raw.trim() || raw.trim() === "—") return;
     const parsed = parseInitiativeLabel(raw);
+    if (manualEntry && !/^\d+(?:-\d+)?$/.test(parsed.display)) {
+      toast.error("Bitte eine Initiative-Zahl eintragen, zum Beispiel 17 oder 17-1.");
+      return;
+    }
     setInitiativeDrafts((prev) => ({ ...prev, [participant.id]: parsed.display }));
     await onUpdateInitiative(participant.id, parsed.display);
   }
 
   return (
-    <div className="pointer-events-none flex flex-col items-center gap-2">
+    <div className="pointer-events-none flex w-full max-w-4xl flex-col items-center gap-2">
       <div className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-hero-border/40 bg-background-dark/55 px-3 py-2.5 shadow-2xl backdrop-blur-md">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2">
@@ -127,7 +143,8 @@ export function CombatInitiativeHud({
               </span>
             ) : (
               <span className="font-libre text-[10px] text-gray-400">
-                {participants.filter(hasRolled).length} / {participants.length} gewürfelt
+                {participants.filter(hasRolled).length} / {participants.length}{" "}
+                {manualEntry ? "eingetragen" : "gewürfelt"}
               </span>
             )}
           </div>
@@ -140,7 +157,9 @@ export function CombatInitiativeHud({
               title={
                 allRolled
                   ? "Kampf starten"
-                  : "Alle Teilnehmer müssen zuerst Initiative würfeln"
+                  : manualEntry
+                    ? "Alle Teilnehmer brauchen eine Initiative-Zahl"
+                    : "Alle Teilnehmer müssen zuerst Initiative würfeln"
               }
               className="rounded-lg border border-hero-vibrant/70 bg-hero-vibrant/20 px-3 py-1.5 font-barlow text-[11px] font-extrabold uppercase tracking-wide text-hero-vibrant shadow-md transition-opacity disabled:cursor-not-allowed disabled:opacity-35"
             >
@@ -151,8 +170,11 @@ export function CombatInitiativeHud({
 
         {participants.length === 0 ? (
           <p className="px-2 py-4 text-center font-libre text-xs text-gray-400">
-            Keine Teilnehmer auf der Karte. Stelle sicher, dass Spieler-Tokens auf der
-            aktiven Battlemap liegen — oder füge Tokens über „Am Kampf teilnehmen“ hinzu.
+            {manualEntry
+              ? isGM
+                ? "Keine anwesenden Spieler in der Live-Session. Nimm NPCs oder Monster-Marker in die Initiative auf."
+                : "Die Initiative wird vorbereitet."
+              : "Keine Teilnehmer auf der Karte. Stelle sicher, dass Spieler-Tokens auf der aktiven Battlemap liegen — oder füge Tokens über „Am Kampf teilnehmen“ hinzu."}
           </p>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-1 pt-1">
@@ -161,6 +183,7 @@ export function CombatInitiativeHud({
               const active =
                 combatStarted && participant.id === activeParticipantId;
               const canRoll =
+                !manualEntry &&
                 !combatStarted &&
                 !rolled &&
                 (isGM ||
@@ -236,6 +259,18 @@ export function CombatInitiativeHud({
                     ) : null}
                   </div>
 
+                  {manualEntry && isGM && onRemoveParticipant ? (
+                    <button
+                      type="button"
+                      onClick={() => void onRemoveParticipant(participant.id)}
+                      title="Aus der Initiative nehmen"
+                      aria-label={`${participant.name} aus der Initiative nehmen`}
+                      className="absolute right-0 top-3 z-30 grid h-5 w-5 place-items-center rounded-full border border-red-900/80 bg-background-dark text-red-200 hover:border-red-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+
                   <p className="w-full truncate text-center font-barlow text-[10px] font-bold uppercase text-gray-200">
                     {participant.name}
                   </p>
@@ -244,7 +279,8 @@ export function CombatInitiativeHud({
                     <input
                       type="text"
                       inputMode="numeric"
-                      disabled={(!rolled && !combatStarted) || isRolling}
+                      placeholder={manualEntry ? "Init" : undefined}
+                      disabled={(!manualEntry && !rolled && !combatStarted) || isRolling}
                       value={
                         isRolling
                           ? "…"
@@ -254,7 +290,9 @@ export function CombatInitiativeHud({
                                   participant.initiative_label,
                                   participant.initiative_value,
                                 )
-                              : "—")
+                              : manualEntry
+                                ? ""
+                                : "—")
                       }
                       onChange={(e) =>
                         setInitiativeDrafts((prev) => ({
@@ -263,7 +301,7 @@ export function CombatInitiativeHud({
                         }))
                       }
                       onBlur={() => {
-                        if (rolled || combatStarted) void commitInitiative(participant);
+                        if (manualEntry || rolled || combatStarted) void commitInitiative(participant);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -275,6 +313,15 @@ export function CombatInitiativeHud({
                     />
                   ) : isRolling ? (
                     <span className="font-libre text-[9px] text-accent-gold">…</span>
+                  ) : manualEntry ? (
+                    <span className="font-barlow text-[11px] font-bold text-accent-gold">
+                      {rolled
+                        ? formatInitiativeDisplay(
+                            participant.initiative_label,
+                            participant.initiative_value,
+                          )
+                        : "—"}
+                    </span>
                   ) : rolled && combatStarted ? null : rolled ? (
                     <span className="font-barlow text-[10px] font-bold text-hero-vibrant">
                       ✓

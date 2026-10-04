@@ -92,9 +92,13 @@ export function useLiveSessionPreload({
 
   /** Erstes Mal: Video bis „Abenteuer fortsetzen“. Danach direkt der Tisch. */
   const showLoadingScreen = introGate === "play" && !preloadDismissed;
+  const rememberLiveSessionIntro = useCallback(() => {
+    markLiveSessionIntroSeen(introSeenKey);
+  }, [introSeenKey]);
   const dismissLoadingScreen = useCallback(() => {
+    markLiveSessionIntroSeen(introSeenKey);
     setPreloadDismissed(true);
-  }, []);
+  }, [introSeenKey]);
 
   useEffect(() => {
     if (!preload.done || battlemapTokens.length === 0) return;
@@ -109,5 +113,5 @@ export function useLiveSessionPreload({
     }
   }, [preload.done, battlemapTokens]);
 
-  return { preload, showLoadingScreen, dismissLoadingScreen };
+  return { preload, showLoadingScreen, dismissLoadingScreen, rememberLiveSessionIntro };
 }

@@ -140,7 +140,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     startTransition,
   });
 
-  const { preload, showLoadingScreen, dismissLoadingScreen } = useLiveSessionPreload({
+  const { preload, showLoadingScreen, dismissLoadingScreen, rememberLiveSessionIntro } = useLiveSessionPreload({
     liveState,
     activeBattlemap: battlemap.activeBattlemap,
     allCampaignNpcs,
@@ -219,6 +219,9 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     campaignNpcs,
     sortedActiveNpcs: derived.sortedActiveNpcs,
     battlemapTokens: battlemap.battlemapTokens,
+    battlemapActive: battlemap.battlemapActive,
+    presentUserIds,
+    stageParty: derived.displayPartyCharacters,
     updateLiveState,
     writeSystemLog,
     pendingInitiativeToastRef,
@@ -294,6 +297,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     preload,
     showLoadingScreen,
     dismissLoadingScreen,
+    rememberLiveSessionIntro,
     derived,
     combat,
     stageActions,

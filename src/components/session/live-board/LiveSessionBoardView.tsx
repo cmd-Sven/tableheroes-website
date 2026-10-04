@@ -44,6 +44,7 @@ export function LiveSessionBoardView() {
     isGM,
     showLoadingScreen,
     dismissLoadingScreen,
+    rememberLiveSessionIntro,
     liveChannelRef,
     bootstrap: { liveStateLoadError, resolveLiveStateBase },
     chronicle: {
@@ -87,6 +88,7 @@ export function LiveSessionBoardView() {
               <LiveSessionLoadingScreen
                 characterName={adventureReadyName}
                 onContinue={dismissLoadingScreen}
+                onIntroSettled={rememberLiveSessionIntro}
               />
             ) : null}
             <div className="pointer-events-none absolute inset-0 z-0 bg-linear-to-b from-background-dark via-emerald-950/90 to-black" />

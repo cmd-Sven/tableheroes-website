@@ -9,6 +9,7 @@ import { setCombatInitiative } from "@/src/lib/actions/combat-initiative-actions
 import { parseInitiativeLabel } from "@/src/lib/combat-initiative";
 import type { ActiveCombatTurnHighlight } from "@/src/lib/combat-initiative";
 import { CombatInitiativeHud } from "@/src/components/session/CombatInitiativeHud";
+import { StageInitiativeComposer } from "@/src/components/session/StageInitiativeComposer";
 import { LiveStageShopOverlay } from "@/src/app/session/[sessionId]/LiveStageShopOverlay";
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { StageSceneCard, type StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
@@ -63,6 +64,14 @@ export type LiveSessionStageViewportContentProps = {
   prevCombatTurn: () => void;
   nextCombatTurn: () => void;
   battlemapActive: boolean;
+  campaignNpcs: CampaignNpc[];
+  addStageNpcParticipant: (npcId: string, initiativeLabel: string) => Promise<boolean>;
+  addStageMonsterMarker: (
+    name: string,
+    markerNumber: number,
+    initiativeLabel: string,
+  ) => Promise<boolean>;
+  removeCombatParticipant: (participantId: string) => void | Promise<void>;
   stageHasDeckContent: boolean;
   partyTrayMode: PartyTrayMode;
   campaignId: string;
@@ -115,6 +124,10 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
     prevCombatTurn,
     nextCombatTurn,
     battlemapActive,
+    campaignNpcs,
+    addStageNpcParticipant,
+    addStageMonsterMarker,
+    removeCombatParticipant,
     stageHasDeckContent,
     partyTrayMode,
     campaignId,
@@ -177,7 +190,7 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
               />
             ) : null}
             {liveState?.is_combat_mode ? (
-              <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-3">
+              <div className="absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-2 px-3">
                 <CombatInitiativeHud
                   participants={sortedCombatParticipants}
                   combatStarted={combatStarted}
@@ -190,6 +203,10 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                   isGM={isGM}
                   ownCharacterName={currentPlayerCharacter?.name ?? null}
                   rollingParticipantId={rollingInitiativeId}
+                  manualEntry={!battlemapActive}
+                  onRemoveParticipant={
+                    isGM && !battlemapActive ? removeCombatParticipant : undefined
+                  }
                   onRollInitiative={handleRollInitiative}
                   onStartCombat={beginCombatEncounter}
                   onEndCombat={endCombatEncounter}
@@ -222,6 +239,18 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                     }
                   }}
                 />
+                {isGM && !battlemapActive ? (
+                  <StageInitiativeComposer
+                    npcs={campaignNpcs.map((npc) => ({
+                      id: String(npc.id),
+                      name: npc.name,
+                      title: npc.title,
+                    }))}
+                    npcIdsInInitiative={combatParticipantNpcIds}
+                    onAddNpc={addStageNpcParticipant}
+                    onAddMarker={addStageMonsterMarker}
+                  />
+                ) : null}
               </div>
             ) : null}
             {/* Battlemap owns the viewport — stage deck UI must not sit on top and steal clicks. */}
@@ -243,7 +272,9 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                       : "pb-72 md:pb-80"
                 } ${
                   liveState?.is_combat_mode
-                    ? "pt-44"
+                    ? isGM && !battlemapActive
+                      ? "pt-[28rem]"
+                      : "pt-44"
                     : liveState?.downtime_active &&
                         liveState.downtime_config?.mode === "travel" &&
                         liveState.active_world_map_id

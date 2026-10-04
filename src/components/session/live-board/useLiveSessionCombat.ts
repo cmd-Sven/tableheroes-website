@@ -16,6 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   compareCombatHudOrder,
   hasRolledCombatInitiative,
+  parseInitiativeLabel,
   resolveActiveCombatTurnHighlight,
 } from "@/src/lib/combat-initiative";
 import {
@@ -23,10 +24,14 @@ import {
   rollCombatInitiative,
 } from "@/src/lib/actions/combat-initiative-actions";
 import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+import { normalizePhysicallyPresentUserIds } from "./live-session-normalize";
 import {
   normalizeCombatParticipants,
   buildNpcCombatToken,
+  explicitInitiativeDisplay,
+  formatMonsterMarkerName,
   isCombatTokenUsed,
+  presentStagePlayerTokens,
 } from "./live-session-combat-utils";
 import type {
   CampaignNpc,
@@ -48,6 +53,11 @@ type Params = {
   campaignNpcs: CampaignNpc[];
   sortedActiveNpcs: CampaignNpc[];
   battlemapTokens: SessionBattlemapToken[];
+  /** false = Hauptbühne (physischer Tisch), Initiative ohne Karten-Tokens. */
+  battlemapActive: boolean;
+  presentUserIds: Set<string>;
+  /** Party inkl. Platzhalter-Sitze, wie in der Heldenleiste. */
+  stageParty: PartyCharacter[];
   updateLiveState: (patch: Partial<LiveState>, baseOverride?: LiveState) => void;
   writeSystemLog: (type: string, text: string) => void;
   pendingInitiativeToastRef: React.MutableRefObject<{
@@ -69,6 +79,9 @@ export function useLiveSessionCombat({
   campaignNpcs,
   sortedActiveNpcs,
   battlemapTokens,
+  battlemapActive,
+  presentUserIds,
+  stageParty,
   updateLiveState,
   writeSystemLog,
   pendingInitiativeToastRef,
@@ -76,6 +89,52 @@ export function useLiveSessionCombat({
 }: Params) {
   const [combatParticipants, setCombatParticipants] = useState<CombatParticipant[]>([]);
   const combatParticipantsLoadGenRef = useRef(0);
+  const stageOpChainRef = useRef<Promise<void>>(Promise.resolve());
+  const stagePresenceGenRef = useRef(0);
+  const stagePresenceAppliedRef = useRef<string | null>(null);
+  const stagePartyRef = useRef(stageParty);
+  const presentUserIdsRef = useRef(presentUserIds);
+  const battlemapActiveRef = useRef(battlemapActive);
+  stagePartyRef.current = stageParty;
+  presentUserIdsRef.current = presentUserIds;
+  battlemapActiveRef.current = battlemapActive;
+
+  const presentKey = useMemo(() => {
+    const online = Array.from(presentUserIds).sort().join(",");
+    const physical = [...(liveState?.physically_present_user_ids ?? [])]
+      .map(String)
+      .sort()
+      .join(",");
+    const party = stageParty
+      .map(
+        (pc) =>
+          `${pc.id}\t${pc.name}\t${pc.playerUserId ?? ""}\t${pc.isSessionDummy ? "1" : "0"}`,
+      )
+      .join("\n");
+    return `${online}|${physical}|${party}`;
+  }, [presentUserIds, liveState?.physically_present_user_ids, stageParty]);
+
+  function enqueueStageOp(op: () => Promise<void>): Promise<void> {
+    const run = stageOpChainRef.current.then(op, op);
+    stageOpChainRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  function stagePresentPayloads(): CombatTokenPayload[] {
+    const physical = new Set(
+      normalizePhysicallyPresentUserIds(
+        liveStateRef.current?.physically_present_user_ids,
+      ),
+    );
+    return presentStagePlayerTokens(
+      stagePartyRef.current,
+      presentUserIdsRef.current,
+      physical,
+    );
+  }
 
   useEffect(() => {
     if (isGuest) return;
@@ -116,6 +175,27 @@ export function useLiveSessionCombat({
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase]);
+
+  useEffect(() => {
+    if (isGuest || !isGM || battlemapActive) return;
+    if (!liveState?.is_combat_mode || liveState.combat_started) {
+      stagePresenceAppliedRef.current = null;
+      return;
+    }
+    const desiredKey = stagePresentPayloads()
+      .map((token) => token.name)
+      .join("\n");
+    if (stagePresenceAppliedRef.current === desiredKey) return;
+    const gen = ++stagePresenceGenRef.current;
+    void enqueueStageOp(async () => {
+      if (gen !== stagePresenceGenRef.current) return;
+      if (battlemapActiveRef.current) return;
+      const live = liveStateRef.current;
+      if (!live?.is_combat_mode || live.combat_started) return;
+      await addMissingStagePlayers();
+      stagePresenceAppliedRef.current = desiredKey;
+    });
+  }, [isGuest, isGM, battlemapActive, liveState?.is_combat_mode, liveState?.combat_started, presentKey]);
 
   const sortedCombatParticipants = useMemo(
     () =>
@@ -247,8 +327,106 @@ export function useLiveSessionCombat({
     };
   }
 
+  async function insertCombatRows(
+    rows: ReturnType<typeof participantInsertRow>[],
+  ): Promise<CombatParticipant[] | null> {
+    const { data, error } = await ((supabase as any).from("combat_participants") as any)
+      .insert(rows)
+      .select("*");
+    if (error) {
+      toast.error(error.message);
+      return null;
+    }
+    return normalizeCombatParticipants(data ?? []);
+  }
+
+  function participantInsertRow(
+    token: CombatTokenPayload,
+    sortOrder: number,
+    initiativeLabel: string | null,
+  ) {
+    const parsed = initiativeLabel ? parseInitiativeLabel(initiativeLabel) : null;
+    return {
+      session_id: sessionId,
+      name: token.name,
+      type: token.type,
+      npc_id: token.npc_id ?? null,
+      side: token.side ?? null,
+      initiative_value: parsed?.base ?? 0,
+      initiative_label: parsed?.display ?? null,
+      sort_order: sortOrder,
+      image_url: token.image_url,
+      is_active: true,
+      conditions: [] as string[],
+    };
+  }
+
+  async function addMissingStagePlayers() {
+    const desired = stagePresentPayloads();
+    if (desired.length === 0) return;
+    const { data, error } = await ((supabase as any).from("combat_participants") as any)
+      .select("id, name, type, is_active")
+      .eq("session_id", sessionId)
+      .eq("is_active", true);
+    if (error) return;
+    const active = Array.isArray(data) ? data : [];
+    const taken = new Set(
+      active
+        .filter((row: { type?: string }) => row.type === "player")
+        .map((row: { name?: string }) => String(row.name ?? "")),
+    );
+    const missing = desired.filter((token) => !taken.has(token.name));
+    if (missing.length === 0) return;
+    const created = await insertCombatRows(
+      missing.map((token, index) =>
+        participantInsertRow(token, active.length + index, null),
+      ),
+    );
+    if (!created) return;
+    combatParticipantsLoadGenRef.current += 1;
+    setCombatParticipants((prev) => {
+      const ids = new Set(prev.map((p) => p.id));
+      return [...prev, ...created.filter((row) => !ids.has(row.id))];
+    });
+  }
+
+  async function seedStageCombatParticipants() {
+    if (!isGM) return;
+    await enqueueStageOp(async () => {
+      stagePresenceGenRef.current += 1;
+      await ((supabase as any).from("combat_participants") as any)
+        .update({ is_active: false })
+        .eq("session_id", sessionId);
+      combatParticipantsLoadGenRef.current += 1;
+
+      const desired = stagePresentPayloads();
+      stagePresenceAppliedRef.current = desired.map((token) => token.name).join("\n");
+      if (desired.length === 0) {
+        setCombatParticipants([]);
+        toast.message(
+          "Keine anwesenden Spieler. NPCs und Monster-Marker kannst du in der Initiative hinzufügen.",
+        );
+        return;
+      }
+
+      const created = await insertCombatRows(
+        desired.map((token, index) => participantInsertRow(token, index, null)),
+      );
+      if (!created) {
+        stagePresenceAppliedRef.current = null;
+        return;
+      }
+      combatParticipantsLoadGenRef.current += 1;
+      setCombatParticipants(created);
+    });
+  }
+
   async function seedCombatParticipantsFromBattlemap() {
     if (!isGM) return;
+    if (!battlemapActive) {
+      await seedStageCombatParticipants();
+      return;
+    }
 
     const payloads: CombatTokenPayload[] = [];
     const seenNames = new Set<string>();
@@ -389,7 +567,11 @@ export function useLiveSessionCombat({
       sortedCombatParticipants.length > 0 &&
       sortedCombatParticipants.every((p) => hasRolledCombatInitiative(p));
     if (!allRolled) {
-      toast.error("Alle Teilnehmer müssen zuerst Initiative würfeln.");
+      toast.error(
+        battlemapActive
+          ? "Alle Teilnehmer müssen zuerst Initiative würfeln."
+          : "Alle Teilnehmer brauchen eine Initiative-Zahl.",
+      );
       return;
     }
     updateLiveState({
@@ -459,6 +641,89 @@ export function useLiveSessionCombat({
     }
   }
 
+  async function addStageNpcParticipant(
+    npcId: string,
+    initiativeLabel: string,
+  ): Promise<boolean> {
+    if (!isGM || battlemapActiveRef.current) return false;
+    const display = explicitInitiativeDisplay(initiativeLabel);
+    if (!display) {
+      toast.error("Bitte eine Initiative-Zahl eintragen, zum Beispiel 17 oder 17-1.");
+      return false;
+    }
+    const npc = campaignNpcs.find((row) => String(row.id) === npcId);
+    if (!npc) {
+      toast.error("NPC nicht gefunden.");
+      return false;
+    }
+    if (combatParticipantNpcIds.has(String(npc.id))) {
+      toast.error(`${npc.name} ist schon in der Initiative.`);
+      return false;
+    }
+    const created = await insertCombatRows([
+      participantInsertRow(
+        buildNpcCombatToken(npc),
+        combatParticipants.length,
+        display,
+      ),
+    ]);
+    if (!created) return false;
+    combatParticipantsLoadGenRef.current += 1;
+    setCombatParticipants((prev) => [...prev, ...created]);
+    toast.success(`${npc.name} ist in der Initiative.`);
+    return true;
+  }
+
+  async function addStageMonsterMarker(
+    name: string,
+    markerNumber: number,
+    initiativeLabel: string,
+  ): Promise<boolean> {
+    if (!isGM || battlemapActiveRef.current) return false;
+    const markerName = formatMonsterMarkerName(name, markerNumber);
+    if (!markerName) {
+      toast.error("Für den Marker brauchst du einen Namen und eine Nummer ab 1.");
+      return false;
+    }
+    const display = explicitInitiativeDisplay(initiativeLabel);
+    if (!display) {
+      toast.error("Bitte eine Initiative-Zahl eintragen, zum Beispiel 17 oder 17-1.");
+      return false;
+    }
+    if (combatParticipantNames.has(markerName)) {
+      toast.error(`${markerName} ist schon in der Initiative.`);
+      return false;
+    }
+    const created = await insertCombatRows([
+      participantInsertRow(
+        { type: "monster", name: markerName, image_url: null, side: null },
+        combatParticipants.length,
+        display,
+      ),
+    ]);
+    if (!created) return false;
+    combatParticipantsLoadGenRef.current += 1;
+    setCombatParticipants((prev) => [...prev, ...created]);
+    toast.success(`${markerName} ist in der Initiative.`);
+    return true;
+  }
+
+  async function removeCombatParticipant(participantId: string) {
+    if (!isGM) return;
+    const target = combatParticipants.find((p) => p.id === participantId);
+    const { error } = await ((supabase as any).from("combat_participants") as any)
+      .update({ is_active: false })
+      .eq("id", participantId)
+      .eq("session_id", sessionId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    combatParticipantsLoadGenRef.current += 1;
+    setCombatParticipants((prev) => prev.filter((p) => p.id !== participantId));
+    if (target) toast.success(`${target.name} ist aus der Initiative.`);
+  }
+
   return {
     combatParticipants,
     setCombatParticipants,
@@ -483,5 +748,8 @@ export function useLiveSessionCombat({
     nextCombatTurn,
     prevCombatTurn,
     handlePlayerEndTurn,
+    addStageNpcParticipant,
+    addStageMonsterMarker,
+    removeCombatParticipant,
   };
 }

@@ -25,6 +25,7 @@ export function LiveSessionBoardStageHost() {
       guestSlotIndex,
       forcePlayerView,
       userId,
+      allCampaignNpcs,
       loreLocationOptions,
       sessionLocationLoreReadable,
       campaignShops,
@@ -214,6 +215,9 @@ export function LiveSessionBoardStageHost() {
       nextCombatTurn,
       prevCombatTurn,
       handlePlayerEndTurn,
+      addStageNpcParticipant,
+      addStageMonsterMarker,
+      removeCombatParticipant,
     },
     stageActions: {
       placeOnStage,
@@ -253,8 +257,9 @@ export function LiveSessionBoardStageHost() {
           updateLiveState={updateLiveState}
           fateGmSettingsOpen={fateGmSettingsOpen}
           setFateGmSettingsOpen={setFateGmSettingsOpen}
-          sessionId={sessionId}
-          seedCombatParticipantsFromBattlemap={seedCombatParticipantsFromBattlemap}
+      sessionId={sessionId}
+      battlemapActive={battlemapActive}
+      seedCombatParticipantsFromBattlemap={seedCombatParticipantsFromBattlemap}
           endCombatEncounter={endCombatEncounter}
           writeSystemLog={writeSystemLog}
           setNpcSearchModalOpen={setNpcSearchModalOpen}
@@ -450,6 +455,10 @@ export function LiveSessionBoardStageHost() {
               prevCombatTurn={prevCombatTurn}
               nextCombatTurn={nextCombatTurn}
               battlemapActive={battlemapActive}
+              campaignNpcs={allCampaignNpcs}
+              addStageNpcParticipant={addStageNpcParticipant}
+              addStageMonsterMarker={addStageMonsterMarker}
+              removeCombatParticipant={removeCombatParticipant}
               stageHasDeckContent={stageHasDeckContent}
               partyTrayMode={partyTrayMode}
               campaignId={campaignId}

@@ -30,6 +30,7 @@ export type LiveSessionTopToolbarHostProps = {
   fateGmSettingsOpen: boolean;
   setFateGmSettingsOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   sessionId: string;
+  battlemapActive: boolean;
   seedCombatParticipantsFromBattlemap: () => void;
   endCombatEncounter: () => void;
   writeSystemLog: (type: string, text: string) => void;
@@ -79,6 +80,7 @@ export function LiveSessionTopToolbarHost({
   fateGmSettingsOpen,
   setFateGmSettingsOpen,
   sessionId,
+  battlemapActive,
   seedCombatParticipantsFromBattlemap,
   endCombatEncounter,
   writeSystemLog,
@@ -167,7 +169,9 @@ export function LiveSessionTopToolbarHost({
           });
           writeSystemLog(
             "combat_start",
-            "Der Spielleiter leitet einen Kampf ein — Initiative würfeln!",
+            battlemapActive
+              ? "Der Spielleiter leitet einen Kampf ein — Initiative würfeln!"
+              : "Der Spielleiter leitet einen Kampf ein — Initiative auf der Bühne eintragen.",
           );
           void seedCombatParticipantsFromBattlemap();
         } else {
