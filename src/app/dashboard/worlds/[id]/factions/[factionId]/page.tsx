@@ -18,6 +18,9 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { getFactionById } from "@/src/app/dashboard/campaigns/[id]/factions-actions";
+import { CityFactionLorePanel } from "@/src/components/city/aurenfurt/CityFactionLorePanel";
+import { findFaction, isCityFactionId } from "@/src/components/city/aurenfurt/aurenfurt-factions";
+import { formatDay, utcToday } from "@/src/components/city/aurenfurt/aurenfurt-time";
 
 type Props = {
   params: Promise<{ id: string; factionId: string }>;
@@ -34,6 +37,12 @@ const STATUS_COLORS: Record<string, string> = {
 function getStatusBadgeColor(status: string | null) {
   if (!status) return "bg-gray-800/50 text-gray-300 border-gray-700";
   return STATUS_COLORS[status] ?? "bg-gray-800/50 text-gray-300 border-gray-700";
+}
+
+function formatGermanDay(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day) return iso;
+  return `${day}.${month}.${year}`;
 }
 
 /** Parst "Wichtige Persönlichkeiten"-Text in Name + Beschreibung (wie Kampagnen-Detailseite). */
@@ -103,6 +112,27 @@ export default async function WorldFactionDetailPage({ params }: Props) {
   const membersFromText = parseImportantMembers(f.important_npcs_info).map((m) => ({ ...m, npc_id: null as string | null }));
   const importantMembers: Array<{ name: string; description: string; npc_id: string | null }> =
     membersFromPlanned.length > 0 ? membersFromPlanned : membersFromText;
+  const catalogId = typeof f.aurenfurt_catalog_id === "string" ? f.aurenfurt_catalog_id : null;
+  const cityStanding = isCityFactionId(catalogId) ? findFaction(catalogId) : null;
+  const cityNpcs: Array<{ id: string; name: string; title?: string | null; role?: string | null }> = Array.isArray(
+    f.npcs,
+  )
+    ? f.npcs
+    : [];
+  let cityFactionRecordIds: Record<string, string> = {};
+  if (cityStanding) {
+    const { data: linked } = await (supabase.from("factions") as any)
+      .select("id, aurenfurt_catalog_id")
+      .eq("world_id", worldId)
+      .not("aurenfurt_catalog_id", "is", null);
+    if (Array.isArray(linked)) {
+      cityFactionRecordIds = Object.fromEntries(
+        linked
+          .filter((row: { id?: string; aurenfurt_catalog_id?: string | null }) => row.id && row.aurenfurt_catalog_id)
+          .map((row: { id: string; aurenfurt_catalog_id: string }) => [row.aurenfurt_catalog_id, row.id]),
+      );
+    }
+  }
 
   const hasExtended =
     (f.appearance && f.appearance.trim() !== "") ||
@@ -169,6 +199,11 @@ export default async function WorldFactionDetailPage({ params }: Props) {
                   {f.current_status}
                 </span>
               )}
+              {f.alignment ? (
+                <span className="px-2 py-1 rounded text-xs font-barlow font-bold uppercase border border-accent-gold/50 text-accent-gold">
+                  {f.alignment}
+                </span>
+              ) : null}
             </div>
             <h1 className="font-barlow font-extrabold text-3xl uppercase tracking-wide text-hero-vibrant mb-2">
               {f.name}
@@ -200,6 +235,38 @@ export default async function WorldFactionDetailPage({ params }: Props) {
         </div>
         </div>
       </div>
+
+      {cityStanding ? (
+        <CityFactionLorePanel
+          worldId={worldId}
+          standing={cityStanding}
+          dayLabel={formatGermanDay(formatDay(utcToday()))}
+          factionRecordIds={cityFactionRecordIds}
+        />
+      ) : null}
+
+      {cityNpcs.length > 0 ? (
+        <section className="rounded-lg border border-hero-border bg-background-card p-6 shadow-lg">
+          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            Mitglieder in der Stadt
+          </h2>
+          <ul className="space-y-2">
+            {cityNpcs.map((npc) => (
+              <li key={npc.id}>
+                <Link
+                  href={`/dashboard/worlds/${worldId}/npcs/${npc.id}`}
+                  className="font-cinzel text-sm font-bold text-accent-gold hover:underline"
+                >
+                  {npc.name}
+                </Link>
+                {npc.role || npc.title ? (
+                  <p className="font-libre text-sm text-gray-300">{npc.title ? `${npc.title} · ` : ""}{npc.role ?? ""}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Beschreibung */}
       <div
@@ -239,6 +306,14 @@ export default async function WorldFactionDetailPage({ params }: Props) {
           ) : (
             <p className="font-libre text-gray-500 italic">Keine Beschreibung.</p>
           )}
+          {f.goals ? (
+            <p className="mt-4 font-libre text-gray-200 leading-relaxed">
+              <span className="mr-2 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                Auftrag
+              </span>
+              {f.goals}
+            </p>
+          ) : null}
         </div>
       </div>
 

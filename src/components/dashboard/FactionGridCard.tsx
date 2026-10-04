@@ -22,6 +22,7 @@ type Faction = {
   banner_display?: unknown;
   member_count?: number;
   is_revealed?: boolean;
+  aurenfurt_catalog_id?: string | null;
 };
 
 type Props = {
@@ -171,6 +172,11 @@ export function FactionGridCard({ faction, worldId, campaignId, isGM, onDelete, 
         {faction.type && (
           <p className="font-barlow text-sm text-gray-600 italic mb-1">{faction.type}</p>
         )}
+        {faction.aurenfurt_catalog_id ? (
+          <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-[#217d42] mb-1">
+            Stadtsimulation
+          </p>
+        ) : null}
         {faction.member_count != null && (
           <p className="font-libre text-xs text-gray-600">
             {faction.member_count} {faction.member_count === 1 ? "Mitglied" : "Mitglieder"}

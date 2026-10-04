@@ -47,6 +47,7 @@ type Props = {
   weatherSeries: DayWeather[];
   influences: ActiveInfluence[];
   factions: FactionStanding[];
+  factionRecordIds?: Record<string, string>;
   locations: KeyLocation[];
   selectedLocation: KeyLocation | null;
   /** Anführer mit Fraktionspräsenz im Viertel */
@@ -161,10 +162,24 @@ function formatLegality(value: number) {
   return String(value);
 }
 
-function FactionCard({ faction }: { faction: FactionStanding }) {
+function FactionCard({
+  faction,
+  href,
+}: {
+  faction: FactionStanding;
+  href: string | null;
+}) {
   return (
     <li className="border-b border-hero-border/20 pb-2 last:border-b-0 last:pb-0">
-      <h3 className="font-cinzel text-sm font-bold text-accent-gold">{faction.name}</h3>
+      <h3 className="font-cinzel text-sm font-bold text-accent-gold">
+        {href ? (
+          <Link href={href} className="hover:underline">
+            {faction.name}
+          </Link>
+        ) : (
+          faction.name
+        )}
+      </h3>
       <p className="mt-0.5 font-libre text-sm leading-relaxed text-gray-300">{faction.role}</p>
       <p className="mt-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-cyan-200/80">
         {faction.ideologyLabel}
@@ -334,6 +349,8 @@ function AnalysisPanel({
   weatherSeries,
   influences,
   factions,
+  factionRecordIds = {},
+  worldId = null,
   selectedLocation,
   chart,
   onToggleChart,
@@ -349,6 +366,8 @@ function AnalysisPanel({
   weatherSeries: DayWeather[];
   influences: ActiveInfluence[];
   factions: FactionStanding[];
+  factionRecordIds?: Record<string, string>;
+  worldId?: string | null;
   selectedLocation: KeyLocation | null;
   chart: ChartMetric | null;
   onToggleChart: (metric: ChartMetric) => void;
@@ -441,9 +460,14 @@ function AnalysisPanel({
                   Fraktionen & Gilden
                 </p>
                 <ul className="space-y-3">
-                  {factions.map((faction) => (
-                    <FactionCard key={faction.id} faction={faction} />
-                  ))}
+                  {factions.map((faction) => {
+                    const recordId = factionRecordIds[faction.id];
+                    const href =
+                      worldId && recordId
+                        ? `/dashboard/worlds/${worldId}/factions/${recordId}`
+                        : null;
+                    return <FactionCard key={faction.id} faction={faction} href={href} />;
+                  })}
                 </ul>
               </div>
             ) : null}
@@ -463,6 +487,7 @@ export function HoloOverlay({
   weatherSeries,
   influences,
   factions,
+  factionRecordIds = {},
   locations,
   selectedLocation,
   leaders = [],
@@ -726,6 +751,8 @@ export function HoloOverlay({
                 weatherSeries={weatherSeries}
                 influences={influences}
                 factions={factions}
+                factionRecordIds={factionRecordIds}
+                worldId={npcLinkContext.worldId ?? null}
                 selectedLocation={selectedLocation}
                 chart={chart}
                 onToggleChart={toggleChart}

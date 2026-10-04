@@ -1343,6 +1343,7 @@ export type Database = {
           alignment: string | null
           allow_pc_join_on_creation: boolean | null
           appearance: string | null
+          aurenfurt_catalog_id: string | null
           banner_url: string | null
           banner_display: Json | null
           banner_is_ai_generated: boolean
@@ -1373,6 +1374,7 @@ export type Database = {
           alignment?: string | null
           allow_pc_join_on_creation?: boolean | null
           appearance?: string | null
+          aurenfurt_catalog_id?: string | null
           banner_url?: string | null
           banner_display?: Json | null
           banner_is_ai_generated?: boolean
@@ -1403,6 +1405,7 @@ export type Database = {
           alignment?: string | null
           allow_pc_join_on_creation?: boolean | null
           appearance?: string | null
+          aurenfurt_catalog_id?: string | null
           banner_url?: string | null
           banner_display?: Json | null
           banner_is_ai_generated?: boolean

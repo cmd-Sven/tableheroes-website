@@ -14,6 +14,7 @@ type Faction = {
   current_status: string | null;
   description: string | null;
   member_count?: number;
+  aurenfurt_catalog_id?: string | null;
 };
 
 type Props = {

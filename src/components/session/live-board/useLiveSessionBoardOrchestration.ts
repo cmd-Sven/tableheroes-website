@@ -146,6 +146,8 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     allCampaignNpcs,
     partyCharacters,
     battlemapTokens: battlemap.battlemapTokens,
+    userId,
+    isGuest,
   });
 
   const derived = useLiveSessionDerivedState({

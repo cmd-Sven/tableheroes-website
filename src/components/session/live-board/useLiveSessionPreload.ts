@@ -3,10 +3,38 @@
  */
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { usePreloadSessionAssets } from "@/src/hooks/usePreloadSessionAssets";
 import type { CampaignNpc, LiveState, PartyCharacter } from "./live-session-types";
 import type { SessionBattlemap, SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
+
+/** Einmal pro Account. Gäste ohne Account teilen sich den Key auf diesem Browser. */
+const LIVE_SESSION_INTRO_SEEN_KEY = "th:live-session-intro-seen";
+
+function liveSessionIntroSeenKey(userId: string | null | undefined, isGuest: boolean): string {
+  const id = userId?.trim();
+  if (!isGuest && id) return `${LIVE_SESSION_INTRO_SEEN_KEY}:${id}`;
+  return LIVE_SESSION_INTRO_SEEN_KEY;
+}
+
+function readLiveSessionIntroSeen(key: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markLiveSessionIntroSeen(key: string): void {
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    /* Privater Modus oder voller Speicher — Intro darf trotzdem weiterlaufen. */
+  }
+}
+
+type IntroGate = "pending" | "play" | "skip";
 
 type Params = {
   liveState: LiveState | null;
@@ -14,6 +42,8 @@ type Params = {
   allCampaignNpcs: CampaignNpc[];
   partyCharacters: PartyCharacter[];
   battlemapTokens: SessionBattlemapToken[];
+  userId?: string | null;
+  isGuest?: boolean;
 };
 
 export function useLiveSessionPreload({
@@ -22,6 +52,8 @@ export function useLiveSessionPreload({
   allCampaignNpcs,
   partyCharacters,
   battlemapTokens,
+  userId,
+  isGuest = false,
 }: Params) {
   const preloadManifest = useMemo(() => {
     if (!liveState) return null;
@@ -41,9 +73,25 @@ export function useLiveSessionPreload({
 
   const preload = usePreloadSessionAssets(preloadManifest);
   const [preloadDismissed, setPreloadDismissed] = useState(false);
+  const [introGate, setIntroGate] = useState<IntroGate>("pending");
+  const introSeenKey = liveSessionIntroSeenKey(userId, isGuest);
 
-  /** Cinematic intro stays until the player explicitly continues after the video. */
-  const showLoadingScreen = !preloadDismissed;
+  useLayoutEffect(() => {
+    if (readLiveSessionIntroSeen(introSeenKey)) {
+      setIntroGate("skip");
+      return;
+    }
+
+    setIntroGate("play");
+    // Nach dem Effect schreiben, damit Strict-Mode-Remounts das Video nicht überspringen.
+    const timeoutId = window.setTimeout(() => {
+      markLiveSessionIntroSeen(introSeenKey);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [introSeenKey]);
+
+  /** Erstes Mal: Video bis „Abenteuer fortsetzen“. Danach direkt der Tisch. */
+  const showLoadingScreen = introGate === "play" && !preloadDismissed;
   const dismissLoadingScreen = useCallback(() => {
     setPreloadDismissed(true);
   }, []);

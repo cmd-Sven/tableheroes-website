@@ -50,7 +50,7 @@ import {
   WALL_THICKNESS_DEFAULT,
   defaultWall,
 } from "./aurenfurt-walls";
-import { loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
+import { loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
 import { loadAurenfurtPlaceLore } from "./load-aurenfurt-place-lore";
 import {
   createAurenfurtMapBuilding,
@@ -115,6 +115,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     buildings,
   );
   const [npcRecordIds, setNpcRecordIds] = useState<Record<string, string> | null>(null);
+  const [factionRecordIds, setFactionRecordIds] = useState<Record<string, string>>({});
   const districtNpcs = useDistrictNpcs(
     view.subject?.districtId ?? null,
     view.subject?.type === "building" ? view.subject.id : null,
@@ -240,6 +241,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       })
       .catch(() => {
         if (active) setNpcRecordIds({});
+      });
+    loadAurenfurtFactionRecordIds()
+      .then((rows) => {
+        if (active) setFactionRecordIds(rows);
+      })
+      .catch(() => {
+        if (active) setFactionRecordIds({});
       });
     return () => {
       active = false;
@@ -852,6 +860,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         weatherSeries={climate.series}
         influences={metrics.influences}
         factions={districtFactions.factions}
+        factionRecordIds={factionRecordIds}
         locations={keyLocations.locations}
         selectedLocation={keyLocations.selected}
         leaders={districtNpcs.leaders}

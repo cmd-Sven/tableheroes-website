@@ -396,3 +396,9 @@ export function findFaction(id: FactionId, day = utcToday()) {
 export function factionName(id: FactionId) {
   return AURENFURT_FACTIONS.find((entry) => entry.id === id)?.name ?? id;
 }
+
+const CITY_FACTION_IDS = new Set<string>(AURENFURT_FACTIONS.map((entry) => entry.id));
+
+export function isCityFactionId(value: string | null | undefined): value is FactionId {
+  return typeof value === "string" && CITY_FACTION_IDS.has(value);
+}
