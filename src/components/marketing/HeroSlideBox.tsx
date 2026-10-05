@@ -6,11 +6,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
   Calendar,
+  Map,
   Monitor,
   ScrollText,
   Sparkles,
   Swords,
   Trophy,
+  type LucideIcon,
 } from "lucide-react";
 
 type HeroSlideId = "updates" | "features" | "membership";
@@ -79,38 +81,103 @@ export function HeroSlideBox() {
   );
 }
 
+type HeroUpdate = {
+  id: string;
+  kicker: string;
+  title: string;
+  icon: LucideIcon;
+  body: string;
+  points?: readonly string[];
+  note?: string;
+};
+
+const HERO_UPDATES: readonly HeroUpdate[] = [
+  {
+    id: "battlemap",
+    kicker: "Neuestes Update",
+    title: "Battlemap",
+    icon: Map,
+    body: "Table-Heroes simuliert nun eine eigene Battlemap für Online-Sitzungen und am Tisch.",
+    points: [
+      "Token platzieren und bewegen",
+      "Würfeltool",
+      "Anzeige der Initiativereihenfolge",
+      "Anzeige von Fog of War",
+      "Kampfverlauf im Chat",
+    ],
+  },
+  {
+    id: "chronist",
+    kicker: "Vorheriges Update",
+    title: "Der Chronist",
+    icon: Bot,
+    body: "Unser Chronist hört während eurer Session mit, fasst das Geschehen zusammen und stellt daraus ein Spieler-Recap zusammen — damit ihr vor dem nächsten Termin wieder wisst, wer was getan hat und wohin die Geschichte geht.",
+    note: "Der GM prüft und gibt das Recap frei — ihr findet es in eurer Kampagne, sobald es veröffentlicht ist.",
+  },
+];
+
 function UpdatesSlide() {
+  const [index, setIndex] = useState(0);
+  const update = HERO_UPDATES[index] ?? HERO_UPDATES[0];
+  const otherIndex = index === 0 ? 1 : 0;
+  const other = HERO_UPDATES[otherIndex];
+  const Icon = update.icon;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-          style={{
-            border: "1px solid rgba(202, 185, 38, 0.45)",
-            backgroundColor: "rgba(202, 185, 38, 0.15)",
-          }}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={update.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="space-y-3"
         >
-          <Bot className="h-4 w-4" style={{ color: "#cab926" }} aria-hidden />
-        </div>
-        <div>
-          <p
-            className="font-barlow text-[10px] font-bold uppercase tracking-widest"
-            style={{ color: "rgba(202, 185, 38, 0.85)" }}
-          >
-            Neuestes Update
-          </p>
-          <h3 className="font-cinzel text-base font-bold text-white sm:text-lg">Der Chronist</h3>
-        </div>
-      </div>
-      <p className="font-libre text-xs leading-relaxed text-gray-300 sm:text-sm">
-        Unser Chronist hört während eurer Session mit, fasst das Geschehen zusammen und stellt
-        daraus ein Spieler-Recap zusammen — damit ihr vor dem nächsten Termin wieder wisst, wer
-        was getan hat und wohin die Geschichte geht.
-      </p>
-      <p className="font-libre text-[11px] leading-relaxed text-gray-500">
-        Der GM prüft und gibt das Recap frei — ihr findet es in eurer Kampagne, sobald es
-        veröffentlicht ist.
-      </p>
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{
+                border: "1px solid rgba(202, 185, 38, 0.45)",
+                backgroundColor: "rgba(202, 185, 38, 0.15)",
+              }}
+            >
+              <Icon className="h-4 w-4" style={{ color: "#cab926" }} aria-hidden />
+            </div>
+            <div>
+              <p
+                className="font-barlow text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: "rgba(202, 185, 38, 0.85)" }}
+              >
+                {update.kicker}
+              </p>
+              <h3 className="font-cinzel text-base font-bold text-white sm:text-lg">{update.title}</h3>
+            </div>
+          </div>
+          <p className="font-libre text-xs leading-relaxed text-gray-300 sm:text-sm">{update.body}</p>
+          {update.points ? (
+            <ul className="space-y-1">
+              {update.points.map((point) => (
+                <li key={point} className="flex items-start gap-2 font-libre text-[11px] leading-snug text-gray-300 sm:text-xs">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full" style={{ backgroundColor: "#cab926" }} aria-hidden />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {update.note ? (
+            <p className="font-libre text-[11px] leading-relaxed text-gray-500">{update.note}</p>
+          ) : null}
+        </motion.div>
+      </AnimatePresence>
+      <button
+        type="button"
+        onClick={() => setIndex(otherIndex)}
+        className="font-barlow text-[10px] font-bold uppercase tracking-wide underline-offset-2 hover:underline"
+        style={{ color: "#cab926" }}
+      >
+        {other.kicker}: {other.title}
+      </button>
     </div>
   );
 }
