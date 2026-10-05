@@ -39,7 +39,10 @@ export function truncateSpeechBubbleText(
 
 export function dispatchAvatarSpeechBubble(detail: AvatarSpeechBubbleDetail): void {
   if (typeof window === "undefined") return;
-  const text = truncateSpeechBubbleText(detail.text);
+  const text =
+    detail.kind === "dice"
+      ? detail.text.replace(/\s+/g, " ").trim()
+      : truncateSpeechBubbleText(detail.text);
   if (!text || !detail.characterId) return;
   window.dispatchEvent(
     new CustomEvent(AVATAR_SPEECH_BUBBLE_EVENT, {

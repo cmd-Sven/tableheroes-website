@@ -111,7 +111,7 @@ export const characterSheetMessagesDe = {
   "combat.deathSaveSuccesses": "Erfolge",
   "combat.deathSaveFailures": "Fehlschläge",
   "combat.exhaustion": "Erschöpfung",
-  "combat.exhaustionHint": "2024: −1 auf W20-Proben und −1,50 m Tempo je Stufe (max. 10 = Tod). Lange Rast: −1 Stufe.",
+  "combat.exhaustionHint": "Stufe 1–5: Malus = Stufe × −2 auf W20-Proben und Zauber-SG. Stufe 6: Tod (LP 0), kein weiterer Würfelmalus. Bewegung −1,50 m je Stufe (bei Tod 0). Lange Rast: −1 Stufe.",
 
   "rest.title": "Rast",
   "rest.hint": "Kurze Rast (1 h): Trefferwürfel einsetzen, kurz-Rast-Ressourcen. Lange Rast (8 h): LP voll, alle TW zurück, 1 Stufe Erschöpfung weniger, Zauberplätze & Todesrettungen.",

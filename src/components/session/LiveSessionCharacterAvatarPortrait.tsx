@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, ImageIcon, Swords } from "lucide-react";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
+import { DiceChatText } from "@/src/components/session/activity/DiceChatText";
 import { DiceGlyph } from "@/src/components/session/dice/DiceGlyph";
 import type { LiveAvatarStatus } from "@/src/lib/actions/live-session-avatar-actions";
 import {
@@ -174,21 +175,25 @@ export function LiveSessionCharacterAvatarPortrait({
                           return null;
                         }
                         return (
-                          <p className="text-center font-barlow text-[10px] font-bold uppercase tracking-wide leading-tight text-accent-gold/95">
-                            {speechBubble.text}
+                          <p className="break-words text-center font-barlow text-[10px] font-bold uppercase tracking-wide leading-tight text-accent-gold/95">
+                            <DiceChatText text={speechBubble.text} />
                           </p>
                         );
                       })()}
                     </div>
                   ) : (
                     <p
-                      className={`text-center leading-snug ${
+                      className={`break-words text-center leading-snug ${
                         speechBubble.kind === "dice"
                           ? "font-barlow text-xs font-bold uppercase tracking-wide"
                           : "font-libre text-[11px]"
                       }`}
                     >
-                      {speechBubble.text}
+                      {speechBubble.kind === "dice" ? (
+                        <DiceChatText text={speechBubble.text} />
+                      ) : (
+                        speechBubble.text
+                      )}
                     </p>
                   )}
                 </div>

@@ -104,31 +104,61 @@ function formatModPart(modifier: number): string {
   return modifier > 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`;
 }
 
-/** Chat-/Overlay-Breakdown: „14 + 3 = 17“ bzw. „[4 + 6] + 2 = 12“. */
+/** Chat-Term, z. B. „Erschöpfung −4“. Leer, wenn kein Malus. */
+export function formatExhaustionChatTerm(penalty: number): string {
+  const n = Math.round(penalty);
+  if (!n) return "";
+  const sign = n < 0 ? "−" : "+";
+  return `Erschöpfung ${sign}${Math.abs(n)}`;
+}
+
+/** Passt zu formatExhaustionChatTerm — nur dieser Anteil wird im Chat rot. */
+export const EXHAUSTION_CHAT_TERM_RE = /Erschöpfung [+−]\d+/g;
+
+/**
+ * Modifikatorenkette. `modifier` enthält den Erschöpfungsmalus bereits.
+ * Erschöpfung wird als eigener Term ausgewiesen, nicht in die andere Zahl gefaltet.
+ */
+function formatModifierChain(modifier: number, exhaustionPenalty = 0): string {
+  const exh = Math.round(exhaustionPenalty) || 0;
+  const base = modifier - exh;
+  const parts: string[] = [];
+  if (base > 0) parts.push(` + ${base}`);
+  else if (base < 0) parts.push(` − ${Math.abs(base)}`);
+  const exhTerm = formatExhaustionChatTerm(exh);
+  if (exhTerm) parts.push(` + ${exhTerm}`);
+  return parts.join("");
+}
+
+/** Chat-/Overlay-Breakdown: „14 + 3 = 17“ bzw. „15 + 5 + Erschöpfung −4 = 16“. */
 export function formatDiceBreakdown(
   rolls: number[],
   usedRoll: number,
   modifier: number,
-  opts?: { mode?: DiceRollMode; dice?: number },
+  opts?: { mode?: DiceRollMode; dice?: number; exhaustionPenalty?: number },
 ): string {
-  const modStr = formatModPart(modifier);
+  const exhaustionPenalty = opts?.exhaustionPenalty ?? 0;
+  const modStr = formatModifierChain(modifier, exhaustionPenalty);
   const mode = opts?.mode ?? "normal";
   const dice = opts?.dice ?? rolls.length;
+  const hasTerms = modifier !== 0 || exhaustionPenalty !== 0;
 
   if (mode === "advantage" || mode === "disadvantage") {
     const tag = mode === "advantage" ? "VOR" : "NACH";
     const parts = rolls.map((r) => String(r));
-    const pick = `${usedRoll}${modStr} = ${usedRoll + modifier}`;
+    const pick = hasTerms
+      ? `${usedRoll}${modStr} = ${usedRoll + modifier}`
+      : `${usedRoll}`;
     return `${tag}: [${parts.join(" / ")}] → ${pick}`;
   }
 
   if (dice > 1 || rolls.length > 1) {
     const sum = rolls.reduce((a, b) => a + b, 0);
-    if (modifier === 0) return `[${rolls.join(" + ")}] = ${sum}`;
+    if (!hasTerms) return `[${rolls.join(" + ")}] = ${sum}`;
     return `[${rolls.join(" + ")}]${modStr} = ${sum + modifier}`;
   }
 
-  if (modifier === 0) return `${usedRoll}`;
+  if (!hasTerms) return `${usedRoll}`;
   return `${usedRoll}${modStr} = ${usedRoll + modifier}`;
 }
 
@@ -166,6 +196,7 @@ export function executeDicePool(
   mode: DiceRollMode = "normal",
   rng: () => number = Math.random,
   seed?: string,
+  exhaustionPenalty = 0,
 ): DiceRollOutcome {
   const pool = normalizeDicePool(groups);
   if (pool.length === 0) {
@@ -221,12 +252,13 @@ export function executeDicePool(
   const isFumble = onlySingleD20 && usedRoll === 1;
   const primarySides = pool[0]!.sides;
   const formula = formatDicePoolFormula(pool, modifier);
-  const modStr = formatModPart(modifier);
+  const modStr = formatModifierChain(modifier, exhaustionPenalty);
   const display =
     chatChunks.length === 1 && !applyAdv
       ? formatDiceBreakdown(rolls, usedRoll, modifier, {
           mode,
           dice: pool[0]!.count,
+          exhaustionPenalty,
         })
       : `${chatChunks.join(" + ")}${modStr} = ${total}`;
 
@@ -253,6 +285,7 @@ export function executeDiceRoll(
   mode: DiceRollMode = "normal",
   rng: () => number = Math.random,
   seed?: string,
+  exhaustionPenalty = 0,
 ): DiceRollOutcome {
   return executeDicePool(
     [{ count: parsed.dice, sides: parsed.sides }],
@@ -260,6 +293,7 @@ export function executeDiceRoll(
     mode,
     rng,
     seed,
+    exhaustionPenalty,
   );
 }
 

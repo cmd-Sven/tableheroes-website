@@ -332,12 +332,12 @@ const CURATED_QUICK_RULEBOOK_ENTRIES: QuickRuleEntry[] = [
   rule({
     id: "exhaustion",
     category: "condition",
-    titleDe: "Erschöpfung (2024)",
-    titleEn: "Exhaustion (2024)",
+    titleDe: "Erschöpfung",
+    titleEn: "Exhaustion",
     summaryDe:
-      "D&D 2024: Stufen 1–6. Stufe 1: Nachteil auf Attributswürfe. Stufe 2: Bewegungsrate halbiert. Stufe 3: Nachteil auf Angriffs- und Rettungswürfe. Stufe 4: Max TP halbiert. Stufe 5: Bewegungsrate 0. Stufe 6: Tod.",
+      "Stufen 0–6. Stufe 1–5: Malus = Stufe × −2 auf W20-Proben (Angriff, Fertigkeit, Rettung, Initiative) und auf die Zauber-SG. Stufe 6: Tod, kein weiterer Würfelmalus. Lange Rast senkt die Stufe um 1.",
     summaryEn:
-      "D&D 2024: Levels 1–6. L1: Disadvantage on ability checks. L2: Speed halved. L3: Disadvantage on attacks/saves. L4: Max HP halved. L5: Speed 0. L6: Death.",
+      "Levels 0–6. Levels 1–5: penalty = level × −2 on d20 tests (attacks, skills, saves, initiative) and on spell save DC. Level 6: death, no further die penalty. A long rest reduces the level by 1.",
     aliases: ["erschöpfung", "exhaustion", "exhausted", "müdigkeit"],
   }),
   rule({

@@ -44,6 +44,13 @@ import type {
 } from "@/src/lib/characters/dnd5e/types";
 import { DND5E_SKILLS } from "@/src/lib/characters/dnd5e/skills";
 import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
+import {
+  clampExhaustionLevel,
+  combatWithExhaustionLevel,
+  EXHAUSTION_MAX,
+  exhaustionD20Penalty,
+  isDeadFromExhaustion,
+} from "@/src/lib/characters/dnd5e/exhaustion";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { FoundryProgressionLockNotice } from "@/src/components/foundry/FoundryProgressionLockNotice";
 import { CharacterAvatarImage } from "@/src/components/dashboard/player/CharacterAvatarImage";
@@ -804,6 +811,13 @@ export function Dnd5eCharacterSheetPanel({
     value: Dnd5eSheetData["combat"][K],
   ) {
     if (!sheet) return;
+    if (key === "exhaustionLevel") {
+      setSheet({
+        ...sheet,
+        combat: combatWithExhaustionLevel(sheet.combat, value),
+      });
+      return;
+    }
     setSheet({ ...sheet, combat: { ...sheet.combat, [key]: value } });
   }
 
@@ -2479,16 +2493,25 @@ export function Dnd5eCharacterSheetPanel({
                     </span>
                     {readOnly ? (
                       <p className="font-barlow text-xl font-bold text-white">
-                        {sheet.combat.exhaustionLevel ?? 0}
+                        {clampExhaustionLevel(sheet.combat.exhaustionLevel)}
                       </p>
                     ) : (
                       <NumberInput
-                        value={sheet.combat.exhaustionLevel ?? 0}
+                        value={clampExhaustionLevel(sheet.combat.exhaustionLevel)}
                         min={0}
-                        max={10}
+                        max={EXHAUSTION_MAX}
                         onChange={(v) => updateCombat("exhaustionLevel", v)}
                       />
                     )}
+                    {isDeadFromExhaustion(sheet.combat.exhaustionLevel ?? 0) ? (
+                      <p className="font-barlow text-[10px] font-bold uppercase text-red-400">
+                        Tod — Lebenspunkte 0
+                      </p>
+                    ) : clampExhaustionLevel(sheet.combat.exhaustionLevel) > 0 ? (
+                      <p className="font-libre text-[9px] text-gray-400">
+                        W20-Malus −{Math.abs(exhaustionD20Penalty(sheet.combat.exhaustionLevel ?? 0))}
+                      </p>
+                    ) : null}
                     <p className="font-libre text-[9px] text-gray-500 leading-snug">
                       {t("combat.exhaustionHint")}
                     </p>

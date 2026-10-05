@@ -1,6 +1,15 @@
-/** D&D 5e 2024 Exhaustion: 1–10 levels, −1 per level on d20 tests, −5 ft speed per level, death at 10. */
+/**
+ * Erschöpfung: 6 Stufen.
+ * Stufe 0: kein Malus.
+ * Stufe 1–5: Würfelmalus = Stufe × −2 (W20-Proben und Zauber-SG).
+ * Stufe 6: Tod. Kein weiterer Würfelmalus — der Charakter ist tot.
+ * Bewegung: −5 Fuß / −1,5 m je Stufe 1–5; bei Tod Bewegung 0.
+ */
 
-export const EXHAUSTION_MAX = 10;
+export const EXHAUSTION_MAX = 6;
+
+/** Letzte Stufe mit Würfelmalus. Darüber ist der Charakter tot. */
+export const EXHAUSTION_PENALTY_MAX_LEVEL = 5;
 
 export function clampExhaustionLevel(raw: unknown): number {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -8,18 +17,27 @@ export function clampExhaustionLevel(raw: unknown): number {
   return Math.max(0, Math.min(EXHAUSTION_MAX, Math.round(n)));
 }
 
-/** Penalty applied to d20 tests (ability checks, attacks, saves) and spell DCs. Negative number. */
+/**
+ * Malus auf W20-Proben (Fertigkeit, Rettung, Angriff, Initiative) und Zauber-SG.
+ * Negativ oder 0. Stufe 6 (Tod) gibt keinen weiteren Würfelmalus.
+ */
 export function exhaustionD20Penalty(level: number): number {
-  return -clampExhaustionLevel(level);
+  const lvl = clampExhaustionLevel(level);
+  if (lvl <= 0 || lvl > EXHAUSTION_PENALTY_MAX_LEVEL) return 0;
+  return lvl * -2;
 }
 
 export function exhaustionSpeedPenaltyFeet(level: number): number {
-  return clampExhaustionLevel(level) * 5;
+  const lvl = clampExhaustionLevel(level);
+  if (lvl <= 0 || lvl > EXHAUSTION_PENALTY_MAX_LEVEL) return 0;
+  return lvl * 5;
 }
 
-/** −1,5 m je Stufe (Anzeige). */
+/** −1,5 m je Stufe 1–5 (Anzeige). */
 export function exhaustionSpeedPenaltyMeters(level: number): number {
-  return clampExhaustionLevel(level) * 1.5;
+  const lvl = clampExhaustionLevel(level);
+  if (lvl <= 0 || lvl > EXHAUSTION_PENALTY_MAX_LEVEL) return 0;
+  return lvl * 1.5;
 }
 
 export function isDeadFromExhaustion(level: number): boolean {
@@ -31,8 +49,30 @@ export function reduceExhaustionOnLongRest(level: number): number {
 }
 
 /**
- * Farbskala für Badge / UI: Stufe 1 mild (gelbgrün) → Stufe 10 kritisch (tiefrot).
- * HSL: Hue 85→0, Saturation/Lightness steigen leicht.
+ * Setzt die Stufe (0–6). Stufe 6 setzt aktuelle LP auf 0 — dasselbe Todesmodell
+ * wie bisher (kein separates Charakter-Status-Flag).
+ */
+export function combatWithExhaustionLevel<T extends { exhaustionLevel?: number; hpCurrent: number }>(
+  combat: T,
+  rawLevel: unknown,
+): T {
+  const level = clampExhaustionLevel(rawLevel);
+  return {
+    ...combat,
+    exhaustionLevel: level,
+    ...(isDeadFromExhaustion(level) ? { hpCurrent: 0 } : {}),
+  };
+}
+
+/** Klemmt eine gespeicherte Stufe und wendet Tod (LP 0) an, falls Stufe 6. */
+export function normalizeExhaustionCombat<
+  T extends { exhaustionLevel?: number; hpCurrent: number },
+>(combat: T): T {
+  return combatWithExhaustionLevel(combat, combat.exhaustionLevel);
+}
+
+/**
+ * Farbskala für Badge / UI: Stufe 1 mild (gelbgrün) → Stufe 6 Tod (tiefrot).
  */
 export function exhaustionBadgeColors(level: number): {
   bg: string;
@@ -50,21 +90,21 @@ export function exhaustionBadgeColors(level: number): {
     };
   }
   const t = (lvl - 1) / (EXHAUSTION_MAX - 1);
-  const hue = Math.round(85 - t * 85); // gelbgrün → rot
+  const hue = Math.round(85 - t * 85);
   const sat = Math.round(70 + t * 25);
   const light = Math.round(42 - t * 12);
   const bg = `hsla(${hue}, ${sat}%, ${light}%, 0.95)`;
   const border = `hsla(${hue}, ${Math.min(100, sat + 10)}%, ${Math.min(70, light + 22)}%, 0.95)`;
-  const text = lvl >= 7 ? "#fff5f5" : "#0b0f0a";
+  const text = lvl >= 5 ? "#fff5f5" : "#0b0f0a";
   const glow = `hsla(${hue}, ${sat}%, ${light + 10}%, ${0.35 + t * 0.45})`;
   return { bg, border, text, glow };
 }
 
 export function formatExhaustionTooltipDe(level: number): string {
   const lvl = clampExhaustionLevel(level);
-  if (lvl <= 0) return "Keine Erschöpfung (2024).";
-  if (lvl >= EXHAUSTION_MAX) {
-    return "Erschöpfung Stufe 10 — automatischer Tod. Bewegung 0.";
+  if (lvl <= 0) return "Keine Erschöpfung.";
+  if (isDeadFromExhaustion(lvl)) {
+    return "Erschöpfung Stufe 6 — Tod. Kein weiterer Würfelmalus. Bewegung 0.";
   }
   const d20 = exhaustionD20Penalty(lvl);
   const meters = exhaustionSpeedPenaltyMeters(lvl);
@@ -80,9 +120,9 @@ export function formatExhaustionTooltipDe(level: number): string {
 
 export function formatExhaustionTooltipEn(level: number): string {
   const lvl = clampExhaustionLevel(level);
-  if (lvl <= 0) return "No exhaustion (2024).";
-  if (lvl >= EXHAUSTION_MAX) {
-    return "Exhaustion level 10 — automatic death. Speed 0.";
+  if (lvl <= 0) return "No exhaustion.";
+  if (isDeadFromExhaustion(lvl)) {
+    return "Exhaustion level 6 — death. No further die penalty. Speed 0.";
   }
   const d20 = exhaustionD20Penalty(lvl);
   return [

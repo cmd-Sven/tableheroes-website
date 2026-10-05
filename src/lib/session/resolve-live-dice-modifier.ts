@@ -31,6 +31,11 @@ export type ResolvedSheetModifier = {
   attackBonus?: number;
   source: "sheet" | "client" | "none";
   exhaustionLevel?: number;
+  /**
+   * Anteil, der bereits in `modifier` steckt und im Chat separat
+   * als „Erschöpfung −N“ gezeigt wird. 0, wenn nicht angewendet.
+   */
+  exhaustionPenalty?: number;
 };
 
 const SKILL_KEYS = new Set(Object.keys(DND5E_SKILL_BY_KEY));
@@ -74,7 +79,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     : 0;
 
   if (isGmDiceRollerId(input.characterId)) {
-    return { modifier: clientMod, source: "none", label: input.label };
+    return { modifier: clientMod, source: "none", label: input.label, exhaustionPenalty: 0 };
   }
 
   if (input.kind === "damage") {
@@ -82,6 +87,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       modifier: clientMod + bonusMalus,
       source: "client",
       label: input.label,
+      exhaustionPenalty: 0,
     };
   }
 
@@ -92,7 +98,7 @@ export async function resolveLiveDiceSheetModifier(input: {
     .maybeSingle();
 
   if (error || !chRaw) {
-    return { modifier: clientMod, source: "client", label: input.label };
+    return { modifier: clientMod, source: "client", label: input.label, exhaustionPenalty: 0 };
   }
 
   const level = Math.max(1, Math.floor(Number(chRaw.level) || 1));
@@ -107,15 +113,17 @@ export async function resolveLiveDiceSheetModifier(input: {
   if (input.kind === "dice") {
     // Freie Würfe: Erschöpfung nur auf W20-Proben (nicht auf reinen Schaden-Pools).
     const applyD20Extras = input.applyExhaustionToD20 !== false;
+    const appliedExhaustion = applyD20Extras ? exhaustionPenalty : 0;
     const mod =
-      (applyD20Extras && exhaustionPenalty !== 0
-        ? clientMod + exhaustionPenalty
-        : clientMod) + (applyD20Extras ? bonusMalus : 0);
+      clientMod +
+      appliedExhaustion +
+      (applyD20Extras ? bonusMalus : 0);
     return {
       modifier: mod,
       source: "client",
       label: input.label,
       exhaustionLevel,
+      exhaustionPenalty: appliedExhaustion,
     };
   }
 
@@ -127,6 +135,7 @@ export async function resolveLiveDiceSheetModifier(input: {
         source: "client",
         label: input.label,
         exhaustionLevel,
+        exhaustionPenalty,
       };
     }
     const total = derived.skills[key]?.total ?? 0;
@@ -136,6 +145,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       label: input.label ?? def.labelDe,
       source: "sheet",
       exhaustionLevel,
+      exhaustionPenalty,
     };
   }
 
@@ -147,6 +157,7 @@ export async function resolveLiveDiceSheetModifier(input: {
         source: "client",
         label: input.label,
         exhaustionLevel,
+        exhaustionPenalty,
       };
     }
     const total = derived.savingThrows[key]?.total ?? 0;
@@ -155,6 +166,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       label: input.label,
       source: "sheet",
       exhaustionLevel,
+      exhaustionPenalty,
     };
   }
 
@@ -203,6 +215,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       damage: matched?.damage ?? null,
       source: matched ? "sheet" : "client",
       exhaustionLevel,
+      exhaustionPenalty,
     };
   }
 
@@ -211,5 +224,6 @@ export async function resolveLiveDiceSheetModifier(input: {
     source: "client",
     label: input.label,
     exhaustionLevel,
+    exhaustionPenalty: 0,
   };
 }

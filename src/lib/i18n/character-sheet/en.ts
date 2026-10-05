@@ -111,7 +111,7 @@ export const characterSheetMessagesEn = {
   "combat.deathSaveSuccesses": "Successes",
   "combat.deathSaveFailures": "Failures",
   "combat.exhaustion": "Exhaustion",
-  "combat.exhaustionHint": "2024: −1 on d20 tests and −5 ft speed per level (max 10 = death). Long rest: −1 level.",
+  "combat.exhaustionHint": "Levels 1–5: penalty = level × −2 on d20 tests and spell DCs. Level 6: death (HP 0), no further die penalty. Speed −5 ft per level (0 at death). Long rest: −1 level.",
 
   "rest.title": "Rest",
   "rest.hint": "Short rest (1 h): spend hit dice, short-rest resources. Long rest (8 h): full HP, all hit dice back, reduce exhaustion by 1, spell slots & death saves reset.",

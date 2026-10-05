@@ -10,6 +10,7 @@ import {
 } from "@/src/lib/characters/dnd5e/defaults";
 import { computeDerivedDnd5eSheet } from "@/src/lib/characters/dnd5e/derived";
 import { withSyncedArmorClass } from "@/src/lib/characters/dnd5e/equipment";
+import { normalizeExhaustionCombat } from "@/src/lib/characters/dnd5e/exhaustion";
 import { isDnd5eCampaignSystem } from "@/src/lib/characters/dnd5e/formulas";
 import { loadCharacterItemsForSheetSync } from "@/src/lib/actions/character-inventory-actions";
 import type {
@@ -114,7 +115,11 @@ function buildSheetPayload(
 ): CharacterSheetPayload {
   const level = Math.max(1, Math.floor(Number(character.level) || 1));
   const parsed = parseSheetData(character.sheet_data);
-  const sheet = parsed ?? createEmptyDnd5eSheet(level);
+  const baseSheet = parsed ?? createEmptyDnd5eSheet(level);
+  const sheet = {
+    ...baseSheet,
+    combat: normalizeExhaustionCombat(baseSheet.combat),
+  };
   const overrides = (character.sheet_overrides ?? {}) as Dnd5eSheetOverrides;
 
   return {
@@ -263,6 +268,10 @@ export async function saveDnd5eCharacterSheet(
         ? Math.max(1, Math.floor(input.meta.level))
         : Math.max(1, Math.floor(Number(character.level) || 1));
     let mergedSheet = mergeSheetWithDefaults(input.sheet);
+    mergedSheet = {
+      ...mergedSheet,
+      combat: normalizeExhaustionCombat(mergedSheet.combat),
+    };
     const inventoryItems = await loadCharacterItemsForSheetSync(supabase, character.id);
     mergedSheet = withSyncedArmorClass(
       mergedSheet,

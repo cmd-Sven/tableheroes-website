@@ -11,7 +11,11 @@ import {
   setCharacterMoodState,
   toggleCharacterActiveCondition,
 } from "@/src/app/dashboard/campaigns/[id]/character-state-actions";
-import { clampExhaustionLevel, EXHAUSTION_MAX } from "@/src/lib/characters/dnd5e/exhaustion";
+import {
+  clampExhaustionLevel,
+  EXHAUSTION_MAX,
+  isDeadFromExhaustion,
+} from "@/src/lib/characters/dnd5e/exhaustion";
 import type { CharacterConditionKey } from "@/src/lib/characters/condition-tokens";
 import {
   MOOD_STATE_DEFINITIONS,
@@ -319,9 +323,11 @@ export function useLiveSessionCharacterAvatarHandlers({
         const next = await reload();
         broadcastDisplaySnapshot(next);
         toast.success(
-          nextLevel > 0
-            ? `Erschöpfung Stufe ${nextLevel}/${EXHAUSTION_MAX}`
-            : "Erschöpfung entfernt.",
+          isDeadFromExhaustion(nextLevel)
+            ? `Erschöpfung Stufe ${nextLevel}/${EXHAUSTION_MAX} — Tod.`
+            : nextLevel > 0
+              ? `Erschöpfung Stufe ${nextLevel}/${EXHAUSTION_MAX}`
+              : "Erschöpfung entfernt.",
         );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Erschöpfung fehlgeschlagen.");

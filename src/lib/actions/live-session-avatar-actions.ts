@@ -55,7 +55,7 @@ export type LiveAvatarStatus = {
   hpCurrent: number;
   hpMax: number;
   hpTemp: number;
-  /** 2024 Erschöpfung 0–10 */
+  /** Erschöpfung 0–6. Stufe 6 = Tod. */
   exhaustionLevel: number;
   displayAvatarUrl: string | null;
   /** Spieler-Gemüt (wird von GM-Zustand visuell überdeckt). */

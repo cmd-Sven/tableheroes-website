@@ -191,8 +191,8 @@ export type Dnd5eSheetData = {
     deathSaveSuccesses?: number;
     deathSaveFailures?: number;
     /**
-     * 2024 exhaustion (0–10). Each level: −1 on d20 tests, −5 ft speed.
-     * Level 10 is death. A Long Rest reduces the level by 1.
+     * Erschöpfung 0–6. Stufe 1–5: Würfelmalus = Stufe × −2, −5 ft speed.
+     * Stufe 6 ist Tod (LP 0), kein weiterer Würfelmalus. Lange Rast: −1 Stufe.
      */
     exhaustionLevel?: number;
   };

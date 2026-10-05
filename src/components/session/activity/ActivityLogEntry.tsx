@@ -5,6 +5,7 @@
 
 import { Trash2 } from "lucide-react";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
+import { DiceChatText } from "@/src/components/session/activity/DiceChatText";
 import { FALLBACK_PLAYER_COLOR } from "@/src/lib/session/class-player-color";
 import {
   formatPendingDiceChatText,
@@ -147,7 +148,7 @@ export function ActivityLogEntry({
         ) : null}
       </div>
       <p
-        className={`font-libre text-xs leading-snug ${
+        className={`break-words font-libre text-xs leading-snug ${
           isCrit
             ? "text-accent-gold font-bold"
             : isFumble
@@ -159,7 +160,7 @@ export function ActivityLogEntry({
       >
         {isCrit && entry.type !== "damage_roll" ? "⚡ KRITISCH! " : ""}
         {isFumble ? "💀 Patzer! " : ""}
-        {displayText}
+        <DiceChatText text={displayText} />
       </p>
       {spellMeta && spellDetails.length > 0 ? (
         <p className="mt-1 font-libre text-[10px] text-gray-500">{spellDetails.join(" · ")}</p>

@@ -4,7 +4,6 @@ import { randomBytes } from "crypto";
 import { createClient, tryCreateAdminClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { createSeededRng, executeDiceRoll } from "@/src/lib/session/dice-roll";
-import { formatSigned } from "@/src/lib/characters/dnd5e/formulas";
 import {
   createEmptyDnd5eSheet,
   parseSheetData,
@@ -71,13 +70,13 @@ function writeClient() {
 async function resolveCharacterInitiativeModifier(
   supabase: Awaited<ReturnType<typeof createClient>>,
   characterId: string | null,
-): Promise<number> {
-  if (!characterId) return 0;
+): Promise<{ modifier: number; exhaustionPenalty: number }> {
+  if (!characterId) return { modifier: 0, exhaustionPenalty: 0 };
   const { data } = await (supabase.from("characters") as any)
     .select("sheet_data, level, character_flaws")
     .eq("id", characterId)
     .maybeSingle();
-  if (!data) return 0;
+  if (!data) return { modifier: 0, exhaustionPenalty: 0 };
   const level = Math.max(1, Math.floor(Number(data.level) || 1));
   const sheet = parseSheetData(data.sheet_data) ?? createEmptyDnd5eSheet(level);
   const flaws = parseCharacterFlaws(data.character_flaws);
@@ -87,7 +86,12 @@ async function resolveCharacterInitiativeModifier(
     sheet.combat.speed ?? 0,
     flaws,
   );
-  return Math.round(adjusted.derived.initiative);
+  const exhaustionPenalty =
+    sheet.combat.initiativeOverride != null ? 0 : baseDerived.exhaustionPenalty;
+  return {
+    modifier: Math.round(adjusted.derived.initiative),
+    exhaustionPenalty,
+  };
 }
 
 function normalizeParticipantName(name: string): string {
@@ -201,9 +205,11 @@ export async function rollCombatInitiative(input: {
     isGm,
   );
 
-  const modifier = character
+  const initiativeMod = character
     ? await resolveCharacterInitiativeModifier(supabase, character.id)
-    : 0;
+    : { modifier: 0, exhaustionPenalty: 0 };
+  const modifier = initiativeMod.modifier;
+  const exhaustionPenalty = initiativeMod.exhaustionPenalty;
 
   const seed = randomBytes(16).toString("hex");
   const rng = createSeededRng(seed);
@@ -212,6 +218,7 @@ export async function rollCombatInitiative(input: {
     "normal",
     rng,
     seed,
+    exhaustionPenalty,
   );
   const natural = outcome.faces[0] ?? outcome.usedRoll;
   const total = outcome.total;
@@ -230,13 +237,10 @@ export async function rollCombatInitiative(input: {
 
   if (updErr) throw new Error(updErr.message);
 
-  const modLabel = modifier !== 0 ? ` (${formatSigned(modifier)})` : "";
   await appendSessionActivity({
     sessionId: input.sessionId,
     type: "dice",
-    text: `${participant.name} würfelt Initiative${modLabel}: ${natural}${
-      modifier !== 0 ? ` → ${total}` : ""
-    }`,
+    text: `${participant.name} würfelt Initiative: ${outcome.display}`,
     characterId: character?.id,
     characterName: participant.name,
     meta: {
@@ -248,7 +252,9 @@ export async function rollCombatInitiative(input: {
       modifier,
       usedRoll: natural,
       total,
+      display: outcome.display,
       kind: "initiative",
+      ...(exhaustionPenalty !== 0 ? { exhaustionPenalty } : {}),
     },
   }).catch(() => {
     /* Activity optional */

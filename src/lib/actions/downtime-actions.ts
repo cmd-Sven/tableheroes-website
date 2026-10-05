@@ -3,7 +3,11 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { appendSessionActivity } from "@/src/lib/actions/session-activity-actions";
-import { clampExhaustionLevel } from "@/src/lib/characters/dnd5e/exhaustion";
+import {
+  clampExhaustionLevel,
+  EXHAUSTION_MAX,
+  isDeadFromExhaustion,
+} from "@/src/lib/characters/dnd5e/exhaustion";
 import { DND5E_SKILL_BY_KEY } from "@/src/lib/characters/dnd5e/skills";
 import {
   applyCitySleepNight,
@@ -153,7 +157,11 @@ async function writeExhaustionLevel(
     .update({
       sheet_data: {
         ...sheet,
-        combat: { ...combat, exhaustionLevel: clampExhaustionLevel(nextEx) },
+        combat: {
+          ...combat,
+          exhaustionLevel: clampExhaustionLevel(nextEx),
+          ...(isDeadFromExhaustion(nextEx) ? { hpCurrent: 0 } : {}),
+        },
       },
     })
     .eq("id", charId);
@@ -454,7 +462,7 @@ export async function nextDowntimeDay(
             .single();
           const sheet = (sheetRow as { sheet_data?: Record<string, unknown> } | null)?.sheet_data;
           const curEx = readExhaustionFromSheet(sheet ?? undefined);
-          const nextEx = Math.min(10, curEx + exhaustionGain);
+          const nextEx = Math.min(EXHAUSTION_MAX, curEx + exhaustionGain);
           if (nextEx !== curEx && sheet) {
             await writeExhaustionLevel(ctx.supabase, charId, sheet, nextEx);
           }

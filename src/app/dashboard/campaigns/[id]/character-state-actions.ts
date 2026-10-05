@@ -16,8 +16,8 @@ import {
 } from "@/src/lib/characters/dnd5e/defaults";
 import {
   clampExhaustionLevel,
+  combatWithExhaustionLevel,
   EXHAUSTION_MAX,
-  isDeadFromExhaustion,
 } from "@/src/lib/characters/dnd5e/exhaustion";
 import {
   buildMoodTokenEditPrompt,
@@ -492,8 +492,8 @@ export async function addCharacterActiveCondition(input: {
 }
 
 /**
- * SL setzt Erschöpfungsstufe (2024: 0–10) auf dem Charakterbogen.
- * Stufe 10 → LP auf 0 (Tod).
+ * SL setzt Erschöpfungsstufe (0–6) auf dem Charakterbogen.
+ * Stufe 6 → aktuelle LP auf 0 (Tod). Kein separates Status-Flag.
  */
 export async function setCharacterExhaustionLevel(input: {
   campaignId: string;
@@ -514,13 +514,7 @@ export async function setCharacterExhaustionLevel(input: {
       ? mergeSheetWithDefaults(parsed)
       : createEmptyDnd5eSheet(1);
 
-    sheet.combat = {
-      ...sheet.combat,
-      exhaustionLevel: level,
-    };
-    if (isDeadFromExhaustion(level)) {
-      sheet.combat.hpCurrent = 0;
-    }
+    sheet.combat = combatWithExhaustionLevel(sheet.combat, level);
 
     const writeClient = resolveWriteClient(supabase, isGm, actorUserId, storageOwnerId);
     const { error } = await (writeClient.from("characters") as any)

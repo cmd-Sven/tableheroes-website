@@ -13,7 +13,9 @@ import {
 import {
   clampExhaustionLevel,
   EXHAUSTION_MAX,
+  exhaustionD20Penalty,
   formatExhaustionTooltipDe,
+  isDeadFromExhaustion,
 } from "@/src/lib/characters/dnd5e/exhaustion";
 import { ExhaustionBadge } from "@/src/components/session/ExhaustionBadge";
 import { MOOD_STATE_DEFINITIONS, type MoodStateKey } from "@/src/lib/characters/mood-states";
@@ -351,7 +353,7 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                       <div className="rounded border border-hero-border/50 bg-hero-dark/40 p-2">
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
-                            Erschöpfung (2024)
+                            Erschöpfung
                           </p>
                           <ExhaustionBadge
                             level={status?.exhaustionLevel ?? 0}
@@ -364,9 +366,11 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                           title={formatExhaustionTooltipDe(status?.exhaustionLevel ?? 0)}
                         >
                           Stufe {clampExhaustionLevel(status?.exhaustionLevel)} / {EXHAUSTION_MAX}
-                          {clampExhaustionLevel(status?.exhaustionLevel) > 0
-                            ? ` · W20 & SG ${clampExhaustionLevel(status?.exhaustionLevel) * -1}`
-                            : ""}
+                          {isDeadFromExhaustion(status?.exhaustionLevel ?? 0)
+                            ? " · Tod"
+                            : clampExhaustionLevel(status?.exhaustionLevel) > 0
+                              ? ` · W20 & SG ${exhaustionD20Penalty(status?.exhaustionLevel ?? 0)}`
+                              : ""}
                         </p>
                         <div className="flex items-center gap-2">
                           <button

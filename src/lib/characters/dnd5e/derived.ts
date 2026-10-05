@@ -21,6 +21,7 @@ import {
   clampExhaustionLevel,
   exhaustionD20Penalty,
   exhaustionSpeedPenaltyFeet,
+  isDeadFromExhaustion,
 } from "./exhaustion";
 
 export function computeDerivedDnd5eSheet(
@@ -77,18 +78,20 @@ export function computeDerivedDnd5eSheet(
     sheet.combat.initiativeOverride != null
       ? initiativeBase
       : initiativeBase + exhaustionPenalty;
-  const speed = speedValue(
-    sheet.combat.speed ?? 0,
-    exhaustionSpeedPenaltyFeet(exhaustionLevel),
-    sheet.combat.speedOverride,
-  );
+  const speed = isDeadFromExhaustion(exhaustionLevel)
+    ? 0
+    : speedValue(
+        sheet.combat.speed ?? 0,
+        exhaustionSpeedPenaltyFeet(exhaustionLevel),
+        sheet.combat.speedOverride,
+      );
 
   let derivedSpellSaveDc: number | null = null;
   let derivedSpellAttackBonus: number | null = null;
   if (sheet.spellcasting) {
     const castAbility = sheet.spellcasting.ability ?? "int";
     const castMod = abilityMods[castAbility];
-    // 2024: Exhaustion also reduces spell save DCs; spell attacks are d20 tests.
+    // Erschöpfung (Stufe 1–5) senkt auch die Zauber-SG; Zauberangriffe sind W20-Proben.
     derivedSpellSaveDc =
       spellSaveDc(pb, castMod, sheet.spellcasting.spellSaveDcOverride) +
       exhaustionPenalty;
