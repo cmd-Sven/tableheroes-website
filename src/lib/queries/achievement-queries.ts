@@ -1,8 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
-import {
-  getAchievementImageForName,
-  ACHIEVEMENT_IMAGE_FILENAMES,
-} from "@/src/lib/constants/achievements";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 
 /** Lädt alle vom User errungenen Achievements (join user_achievements + achievements). hasNewContent: true, wenn das neueste Achievement jünger ist als last_achievement_view. newestAchievement: das zuletzt vergebene Achievement (für Gratulation-Modal). */
 export async function getUserAchievements(userId: string): Promise<{
@@ -31,7 +28,7 @@ export async function getUserAchievements(userId: string): Promise<{
 
   let dataRes = await (supabase.from("user_achievements") as any)
     .select(
-      "achievement_id, awarded_at, achievements(id, name, icon, points_awarded, description)",
+      "achievement_id, awarded_at, achievements(id, name, icon, image_url, points_awarded, description)",
     )
     .eq("user_id", userId);
 
@@ -42,7 +39,7 @@ export async function getUserAchievements(userId: string): Promise<{
   ) {
     dataRes = await (supabase.from("user_achievements") as any)
       .select(
-        "achievement_id, awarded_at, achievements(id, name, icon, points_awarded)",
+        "achievement_id, awarded_at, achievements(id, name, icon, image_url, points_awarded)",
       )
       .eq("user_id", userId);
   }
@@ -81,14 +78,11 @@ export async function getUserAchievements(userId: string): Promise<{
     .map((a: any) => ({
       id: a.id,
       name: a.name,
-      image_url:
-        a.image_url ??
-        a.icon ??
-        (a.name &&
-          (getAchievementImageForName(a.name) ??
-            ACHIEVEMENT_IMAGE_FILENAMES[a.name] ??
-            null)) ??
-        null,
+      image_url: resolveAchievementImageFilename({
+        name: a.name,
+        icon: a.icon,
+        imageUrl: a.image_url,
+      }),
       points_awarded: Number(a.points_awarded) || 0,
       description: a.description ?? null,
     }));
@@ -103,14 +97,11 @@ export async function getUserAchievements(userId: string): Promise<{
       ? {
           id: a.id,
           name: a.name,
-          image_url:
-            a.image_url ??
-            a.icon ??
-            (a.name &&
-              (getAchievementImageForName(a.name) ??
-                ACHIEVEMENT_IMAGE_FILENAMES[a.name] ??
-                null)) ??
-            null,
+          image_url: resolveAchievementImageFilename({
+            name: a.name,
+            icon: a.icon,
+            imageUrl: a.image_url,
+          }),
           points_awarded: Number(a.points_awarded) || 0,
           description: a.description ?? null,
         }

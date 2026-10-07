@@ -131,9 +131,6 @@ function normalizeKey(s: string): string {
     .toLowerCase();
 }
 
-/** Prüft, ob der String wie ein Bild-Dateiname aussieht (mit Endung). */
-const IMAGE_EXT = /\.(png|webp|jpg|jpeg|gif)$/i;
-
 export function getAchievementImageForName(name: string): string | null {
   if (!name?.trim()) return null;
   if (_MAP[name]) return _MAP[name];
@@ -141,7 +138,5 @@ export function getAchievementImageForName(name: string): string | null {
   for (const [k, v] of Object.entries(_MAP)) {
     if (normalizeKey(k) === n) return v;
   }
-  // Fallback: Name ist evtl. schon der Dateiname (Custom-Achievements, Points-Katalog)
-  const trimmed = name.trim();
-  return IMAGE_EXT.test(trimmed) ? trimmed : `${trimmed}.png`;
+  return null;
 }

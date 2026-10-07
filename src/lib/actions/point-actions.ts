@@ -10,6 +10,7 @@ import {
   isSessionStatusScheduled,
   isSessionStatusTerminal,
 } from "@/src/lib/session-status";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 
 // PointLogEntry nicht re-exportieren: In "use server"-Modulen kann Turbopack
 // `export type { … }` fälschlich als Laufzeit-Export auswerten → ReferenceError.
@@ -136,7 +137,7 @@ export async function getMemberDetails(
   // Fetch achievements
   const { data: achData, error: achError } = await (supabase.from("user_achievements") as any)
     .select(
-      "id, awarded_at, achievements:achievement_id ( id, name, image_url, points_awarded )"
+      "id, awarded_at, achievements:achievement_id ( id, name, icon, image_url, points_awarded )"
     )
     .eq("user_id", userId)
     .order("awarded_at", { ascending: false });
@@ -150,7 +151,11 @@ export async function getMemberDetails(
     .map((row: any) => ({
       id: row.achievements.id,
       name: row.achievements.name,
-      imageUrl: row.achievements.image_url ?? null,
+      imageUrl: resolveAchievementImageFilename({
+        name: row.achievements.name,
+        icon: row.achievements.icon,
+        imageUrl: row.achievements.image_url,
+      }),
       pointsAwarded: row.achievements.points_awarded ?? 0,
     }));
 

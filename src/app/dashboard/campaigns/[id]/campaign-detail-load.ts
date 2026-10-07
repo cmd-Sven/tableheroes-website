@@ -23,6 +23,7 @@ import { getWorldsByGm } from "./world-queries";
 import { getCharacterWizardLoreData } from "./character-queries";
 import { getVisibilityForCampaign } from "./campaign-visibility-queries";
 import { serializeForClient } from "@/src/lib/serialize-for-flight";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 import { findLatestPublishedPlayerRecap } from "@/src/lib/session-chronicle/latest-published-recap";
 import { serializeCharacterForEditorClient } from "@/src/lib/characters/serialize-character-for-editor-client";
 import { resolveFoundryProgressionLock } from "@/src/lib/foundry-sync/progression-lock-server";
@@ -1119,17 +1120,22 @@ export async function loadCampaignDetailPageData(
   } | null = null;
   if (loadPlan.needsPlayerOverviewExtras) {
     const { data: uaRow } = await (supabase.from("user_achievements") as any)
-      .select("awarded_at, achievements(name, icon)")
+      .select("awarded_at, achievements(name, icon, image_url)")
       .eq("user_id", userId)
       .order("awarded_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const ach = (uaRow as { achievements?: { name?: string; icon?: string | null } } | null)
-      ?.achievements;
+    const ach = (uaRow as {
+      achievements?: { name?: string; icon?: string | null; image_url?: string | null };
+    } | null)?.achievements;
     if (ach && uaRow) {
       lastPlayerAchievement = {
         name: String(ach.name ?? ""),
-        icon: ach.icon != null ? String(ach.icon) : null,
+        icon: resolveAchievementImageFilename({
+          name: ach.name,
+          icon: ach.icon,
+          imageUrl: ach.image_url,
+        }),
         awarded_at: String((uaRow as { awarded_at?: string }).awarded_at ?? ""),
       };
     }

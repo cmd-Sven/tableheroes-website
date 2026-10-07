@@ -17,6 +17,7 @@ import {
   dedupeFoundryMappings,
   normalizeFoundryActorId,
 } from "./foundry-actor-id";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 
 type LoadOpts = {
   foundryActorId?: string | null;
@@ -169,7 +170,7 @@ export async function loadFoundryCampaignProfiles(
     const { data: achRows } = await (supabase as any)
       .from("user_achievements")
       .select(
-        "user_id, awarded_at, achievements:achievement_id ( id, name, image_url, points_awarded )",
+        "user_id, awarded_at, achievements:achievement_id ( id, name, icon, image_url, points_awarded )",
       )
       .in("user_id", userIds)
       .order("awarded_at", { ascending: false });
@@ -180,6 +181,7 @@ export async function loadFoundryCampaignProfiles(
       achievements: {
         id: string;
         name: string;
+        icon: string | null;
         image_url: string | null;
         points_awarded: number | null;
       } | null;
@@ -193,7 +195,11 @@ export async function loadFoundryCampaignProfiles(
         name: String(row.achievements.name ?? "Achievement"),
         points_awarded: Number(row.achievements.points_awarded) || 0,
         awarded_at: String(row.awarded_at),
-        image_url: row.achievements.image_url ?? null,
+        image_url: resolveAchievementImageFilename({
+          name: row.achievements.name,
+          icon: row.achievements.icon,
+          imageUrl: row.achievements.image_url,
+        }),
       });
       achievementsByUser.set(uid, list);
     }

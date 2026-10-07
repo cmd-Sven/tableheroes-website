@@ -2,7 +2,6 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getAllAchievements } from "@/src/lib/actions/achievement-actions";
 import { getUserAchievements } from "@/src/lib/queries/achievement-queries";
-import { getAchievementImageForName } from "@/src/lib/constants/achievements";
 import {
   AchievementsList,
   type AchievementWithStatus,
@@ -29,7 +28,7 @@ export default async function AchievementsPage() {
     id: a.id,
     name: a.name,
     points_awarded: a.points_awarded ?? 0,
-    image_url: getAchievementImageForName(a.name) ?? a.image_url ?? null,
+    image_url: a.image_url ?? null,
     description: a.description ?? null,
     unlocked: earnedIds.has(a.id),
   }));

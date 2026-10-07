@@ -22,7 +22,7 @@ import type {
 import { normalizeCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import type { CharacterSheetLocale } from "@/src/lib/i18n/character-sheet/types";
 import type { Dnd5eCharacterAchievement } from "@/src/lib/characters/dnd5e/types";
-import { getAchievementImageForName } from "@/src/lib/constants/achievements";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 import {
   resolveFoundryProgressionLock,
   stripFoundryLockedCharacterFields,
@@ -154,20 +154,24 @@ async function loadCharacterAchievements(
 ): Promise<Dnd5eCharacterAchievement[]> {
   if (!userId) return [];
   const { data, error } = await (supabase.from("user_achievements") as any)
-    .select("awarded_at, achievements(id, name, icon, points_awarded)")
+    .select("awarded_at, achievements(id, name, icon, image_url, points_awarded)")
     .eq("user_id", userId)
     .order("awarded_at", { ascending: false });
 
   if (error || !Array.isArray(data)) return [];
 
   return data
-    .map((row: { awarded_at?: string; achievements?: { id: string; name: string; icon?: string | null; points_awarded?: number } }) => {
+    .map((row: { awarded_at?: string; achievements?: { id: string; name: string; icon?: string | null; image_url?: string | null; points_awarded?: number } }) => {
       const a = row.achievements;
       if (!a?.id) return null;
       return {
         id: a.id,
         name: a.name,
-        imageUrl: getAchievementImageForName(a.name) ?? a.icon ?? null,
+        imageUrl: resolveAchievementImageFilename({
+          name: a.name,
+          icon: a.icon,
+          imageUrl: a.image_url,
+        }),
         awardedAt: row.awarded_at ?? null,
         pointsAwarded: Number(a.points_awarded) || 0,
       } satisfies Dnd5eCharacterAchievement;

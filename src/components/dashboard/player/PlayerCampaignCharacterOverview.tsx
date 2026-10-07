@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getAchievementImageSrc } from "@/src/types/achievement";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -512,7 +513,7 @@ export function PlayerCampaignCharacterOverview({
           <p className="font-barlow font-bold text-xs uppercase text-stone-400">Letztes Achievement</p>
         </div>
         {lastAchievement ? (
-          <p className="font-cinzel font-bold text-accent-gold">{lastAchievement.name}</p>
+          <LastAchievementLine achievement={lastAchievement} />
         ) : (
           <p className="font-libre text-sm text-stone-500 italic">Noch keins vergeben.</p>
         )}
@@ -582,5 +583,21 @@ export function PlayerCampaignCharacterOverview({
         </Link>
       </div>
     </section>
+  );
+}
+
+function LastAchievementLine({
+  achievement,
+}: {
+  achievement: { name: string; icon: string | null };
+}) {
+  const src = getAchievementImageSrc(achievement.icon);
+  return (
+    <div className="flex items-center gap-3">
+      {src ? (
+        <img src={src} alt="" className="h-12 w-12 shrink-0 rounded object-contain" />
+      ) : null}
+      <p className="font-cinzel font-bold text-accent-gold">{achievement.name}</p>
+    </div>
   );
 }

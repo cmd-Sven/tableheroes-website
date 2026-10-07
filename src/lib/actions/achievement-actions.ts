@@ -3,10 +3,7 @@
 import { createAdminClient, createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import {
-  getAchievementImageForName,
-  ACHIEVEMENT_IMAGE_FILENAMES,
-} from "@/src/lib/constants/achievements";
+import { resolveAchievementImageFilename } from "@/src/lib/achievements/resolve-achievement-image";
 import fs from "fs";
 import path from "path";
 
@@ -230,6 +227,7 @@ export async function createCustomAchievement(
     points_awarded: points,
     description: description?.trim() || null,
     icon: iconFilename,
+    image_url: iconFilename,
     is_custom: true,
   };
 
@@ -240,6 +238,7 @@ export async function createCustomAchievement(
       name: trimmedName,
       points_awarded: points,
       icon: iconFilename,
+      image_url: iconFilename,
     });
     error = errMinimal;
   }
@@ -277,7 +276,7 @@ export async function getAllAchievements(): Promise<
   const { data: dataFull, error: errorFull } = await (
     supabase.from("achievements") as any
   )
-    .select("id, name, points_awarded, icon, description, is_custom")
+    .select("id, name, points_awarded, icon, image_url, description, is_custom")
     .order("name");
 
   if (!errorFull && dataFull != null) {
@@ -286,7 +285,11 @@ export async function getAllAchievements(): Promise<
       id: r.id,
       name: r.name,
       points_awarded: Number(r.points_awarded) ?? 0,
-      image_url: getAchievementImageForName(r.name) ?? r.icon ?? null,
+      image_url: resolveAchievementImageFilename({
+        name: r.name,
+        icon: r.icon,
+        imageUrl: r.image_url,
+      }),
       description: r.description ?? null,
       is_custom: Boolean(r.is_custom),
     }));
@@ -303,7 +306,11 @@ export async function getAllAchievements(): Promise<
     id: r.id,
     name: r.name,
     points_awarded: Number(r.points_awarded) ?? 0,
-    image_url: getAchievementImageForName(r.name) ?? r.icon ?? null,
+    image_url: resolveAchievementImageFilename({
+      name: r.name,
+      icon: r.icon,
+      imageUrl: r.image_url,
+    }),
     description: null,
     is_custom: false,
   }));
