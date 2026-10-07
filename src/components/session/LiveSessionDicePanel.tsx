@@ -28,6 +28,22 @@ import type { SystemLogEntry } from "@/src/components/session/live-board/live-se
 const DICE_SIDES = [4, 6, 8, 10, 12, 20] as const;
 const MAX_POOL = 12;
 
+/**
+ * Barlow Condensed über die next/font-Variable.
+ * Die Klasse font-barlow erzeugt in diesem Tailwind-Setup kein font-family.
+ */
+const ROLL_BUTTON_FONT = {
+  fontFamily: "var(--font-barlow), sans-serif",
+} as const;
+
+/** Angriff auswürfeln — volle hero-vibrant-Fläche, helle Schrift. */
+const ATTACK_ROLL_BUTTON_CLASS =
+  "mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-md border-2 border-hero-vibrant bg-hero-vibrant px-3 py-2.5 font-barlow text-sm font-extrabold uppercase tracking-wide text-white transition-opacity enabled:hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed";
+
+/** Schaden auswürfeln — Goldfläche mit dunkler Schrift (besser lesbar als Gold auf Grün). */
+const DAMAGE_ROLL_BUTTON_CLASS =
+  "flex min-h-11 w-full flex-1 items-center justify-center gap-2 rounded-md border-2 border-accent-gold bg-accent-gold px-3 py-2.5 font-barlow text-sm font-extrabold uppercase tracking-wide text-background-dark transition-opacity enabled:hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed";
+
 type Props = {
   sessionId: string;
   campaignId: string;
@@ -483,9 +499,10 @@ export function LiveSessionDicePanel({
                   type="button"
                   disabled={dice.rollingAsGm || !dice.canRoll || dice.pending}
                   onClick={dice.handleAttackRoll}
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border border-accent-blood/60 bg-accent-blood/15 px-2 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-blood disabled:opacity-40"
+                  className={ATTACK_ROLL_BUTTON_CLASS}
+                  style={ROLL_BUTTON_FONT}
                 >
-                  <Swords className="h-3.5 w-3.5" />
+                  <Swords className="h-4 w-4" />
                   Angriff
                 </button>
               </>
@@ -511,7 +528,8 @@ export function LiveSessionDicePanel({
                             pendingRoll.weaponName,
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-1 rounded border border-accent-gold/70 bg-accent-gold/15 px-2 py-1.5 font-barlow text-[9px] font-bold uppercase text-accent-gold disabled:opacity-40"
+                        className={DAMAGE_ROLL_BUTTON_CLASS}
+                        style={ROLL_BUTTON_FONT}
                       >
                         Crit Schaden
                       </button>
@@ -527,7 +545,8 @@ export function LiveSessionDicePanel({
                             pendingRoll.weaponName,
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-1 rounded border border-accent-blood/60 bg-accent-blood/20 px-2 py-1.5 font-barlow text-[9px] font-bold uppercase text-accent-blood disabled:opacity-40"
+                        className={DAMAGE_ROLL_BUTTON_CLASS}
+                        style={ROLL_BUTTON_FONT}
                       >
                         Schaden
                       </button>
