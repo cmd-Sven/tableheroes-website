@@ -113,6 +113,7 @@ export function CombatInitiativeHud({
   }, [activeParticipantId, combatStarted, combatRound, currentTurnIndex]);
 
   async function commitInitiative(participant: CombatHudParticipant) {
+    if (!isGM) return;
     const raw =
       initiativeDrafts[participant.id] ??
       (hasRolled(participant)

@@ -214,6 +214,7 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                   onPrevTurn={prevCombatTurn}
                   onNextTurn={nextCombatTurn}
                   onUpdateInitiative={async (participantId, label) => {
+                    if (!isGM) return;
                     try {
                       await setCombatInitiative({
                         sessionId,

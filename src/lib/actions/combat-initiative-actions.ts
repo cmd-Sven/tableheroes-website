@@ -98,52 +98,119 @@ function normalizeParticipantName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+const PLAYABLE_MEMBER_STATUSES = [
+  "Accepted",
+  "Approved",
+  "Active",
+  "Drafting",
+  "In_Review",
+  "Changes_Proposed",
+];
+
+type ResolvedCharacter = {
+  id: string;
+  name: string;
+  playerUserId: string | null;
+};
+
+function mapCharacterRow(row: {
+  id?: unknown;
+  name?: unknown;
+  user_id?: unknown;
+}): ResolvedCharacter {
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ""),
+    playerUserId: row.user_id != null ? String(row.user_id) : null,
+  };
+}
+
+/**
+ * Der Account hängt an campaign_members.user_id bzw. characters.user_id.
+ * characters.player_user_id gibt es nicht — diese Abfrage ließ Spielerwürfe scheitern,
+ * während der SL den Fehler ignorierte und ohne Bogen-Bonus speicherte.
+ */
+async function findCharactersForUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  campaignId: string,
+  userId: string,
+): Promise<ResolvedCharacter[]> {
+  const { data: members } = await (supabase.from("campaign_members") as any)
+    .select("character_id")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId)
+    .in("status", PLAYABLE_MEMBER_STATUSES)
+    .not("character_id", "is", null);
+
+  const memberIds = [
+    ...new Set(
+      (Array.isArray(members) ? members : [])
+        .map((row: { character_id?: unknown }) =>
+          row.character_id != null ? String(row.character_id) : "",
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  if (memberIds.length > 0) {
+    const { data } = await (supabase.from("characters") as any)
+      .select("id, name, user_id")
+      .in("id", memberIds);
+    const rows = (Array.isArray(data) ? data : []).map(mapCharacterRow);
+    if (rows.length > 0) {
+      return rows.map((row: ResolvedCharacter) => ({ ...row, playerUserId: userId }));
+    }
+  }
+
+  const { data: owned } = await (supabase.from("characters") as any)
+    .select("id, name, user_id")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId);
+
+  return (Array.isArray(owned) ? owned : []).map(mapCharacterRow);
+}
+
+function pickCharacterForName(
+  rows: ResolvedCharacter[],
+  participantName: string,
+  allowSoleCharacter: boolean,
+): ResolvedCharacter | null {
+  const target = normalizeParticipantName(participantName);
+  const named = rows.find(
+    (row) => normalizeParticipantName(row.name) === target,
+  );
+  if (named) return named;
+  if (allowSoleCharacter && rows.length === 1) return rows[0] ?? null;
+  return null;
+}
+
 async function findCharacterForParticipant(
   supabase: Awaited<ReturnType<typeof createClient>>,
   campaignId: string,
   participant: ParticipantRow,
   userId: string,
   isGm: boolean,
-): Promise<{ id: string; name: string; playerUserId: string | null } | null> {
+): Promise<ResolvedCharacter | null> {
   if (participant.type !== "player") return null;
 
-  // Spieler: zuverlässig über Account — auch wenn Battlemap-Label vom Charakternamen abweicht.
   if (!isGm) {
-    const { data: ownChar } = await (supabase.from("characters") as any)
-      .select("id, name, player_user_id")
-      .eq("campaign_id", campaignId)
-      .eq("player_user_id", userId)
-      .maybeSingle();
-
-    if (!ownChar) {
+    const own = await findCharactersForUser(supabase, campaignId, userId);
+    const match = pickCharacterForName(own, participant.name, true);
+    if (!match) {
       throw new Error("Kein Charakter für deinen Account in dieser Kampagne gefunden.");
     }
-
-    return {
-      id: String(ownChar.id),
-      name: String(ownChar.name),
-      playerUserId: userId,
-    };
+    return match;
   }
 
-  const targetName = normalizeParticipantName(participant.name);
   const { data: chars } = await (supabase.from("characters") as any)
-    .select("id, name, player_user_id")
+    .select("id, name, user_id")
     .eq("campaign_id", campaignId);
 
-  const match = (Array.isArray(chars) ? chars : []).find(
-    (row: { name?: string | null }) =>
-      normalizeParticipantName(String(row.name ?? "")) === targetName,
+  return pickCharacterForName(
+    (Array.isArray(chars) ? chars : []).map(mapCharacterRow),
+    participant.name,
+    false,
   );
-
-  if (!match) return null;
-
-  return {
-    id: String(match.id),
-    name: String(match.name),
-    playerUserId:
-      match.player_user_id != null ? String(match.player_user_id) : null,
-  };
 }
 
 /**
@@ -318,12 +385,9 @@ export async function advanceCombatTurn(input: {
     ) {
       throw new Error("Du bist nicht am Zug.");
     }
-    const { data: ch } = await (supabase.from("characters") as any)
-      .select("id, player_user_id")
-      .eq("campaign_id", campaignId)
-      .eq("name", active.name)
-      .maybeSingle();
-    if (!ch || String(ch.player_user_id) !== user.id) {
+    const own = await findCharactersForUser(supabase, campaignId, user.id);
+    const match = pickCharacterForName(own, active.name, false);
+    if (!match) {
       throw new Error("Du bist nicht am Zug.");
     }
   }
