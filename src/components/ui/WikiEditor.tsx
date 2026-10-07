@@ -9,7 +9,7 @@ import {
 } from "react";
 import { EditorContent, ReactRenderer, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Extension, markInputRule } from "@tiptap/core";
+import { Extension, markInputRule, type Editor as CoreEditor } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Mention from "@tiptap/extension-mention";
@@ -33,7 +33,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { normalizeEscapedMarkdown } from "@/src/lib/markdown-normalize";
-import { WIKI_HEADING_PROSE_CLASSES } from "@/src/lib/wiki-heading-styles";
+import { splitHardBreaksInSelection } from "@/src/lib/split-hard-breaks";
 import type { EntityForMarkdownEditor } from "./MarkdownEditor";
 
 export type WikiMentionEntity = {
@@ -252,6 +252,46 @@ function buildEntityUrl(
   return null;
 }
 
+function runBlockFormat(
+  editor: Editor,
+  extend: (chain: ReturnType<Editor["chain"]>) => { run: () => boolean },
+) {
+  const chain = editor
+    .chain()
+    .focus()
+    .command(({ tr }) => {
+      splitHardBreaksInSelection(tr);
+      return true;
+    });
+  extend(chain).run();
+}
+
+const LoreBlockFormat = Extension.create({
+  name: "loreBlockFormat",
+  priority: 1000,
+
+  addKeyboardShortcuts() {
+    const format = (apply: (chain: ReturnType<CoreEditor["chain"]>) => { run: () => boolean }) =>
+      () => {
+        const chain = this.editor
+          .chain()
+          .focus()
+          .command(({ tr }) => {
+            splitHardBreaksInSelection(tr);
+            return true;
+          });
+        return apply(chain).run();
+      };
+
+    return {
+      "Mod-Alt-1": format((chain) => chain.toggleHeading({ level: 1 })),
+      "Mod-Alt-2": format((chain) => chain.toggleHeading({ level: 2 })),
+      "Mod-Alt-3": format((chain) => chain.toggleHeading({ level: 3 })),
+      "Mod-Shift-b": format((chain) => chain.toggleBlockquote()),
+    };
+  },
+});
+
 function ToolbarButton({
   onClick,
   active,
@@ -346,28 +386,28 @@ function WikiEditorToolbar({
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-accent-gold/20 bg-black/20 px-2 py-2">
       <ToolbarButton
-        onClick={() => editor.chain().focus().setParagraph().run()}
+        onClick={() => runBlockFormat(editor, (chain) => chain.setParagraph())}
         active={editor.isActive("paragraph")}
         title="Absatz"
       >
         <Pilcrow className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        onClick={() => runBlockFormat(editor, (chain) => chain.toggleHeading({ level: 1 }))}
         active={editor.isActive("heading", { level: 1 })}
         title="Überschrift 1"
       >
         <Heading1 className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        onClick={() => runBlockFormat(editor, (chain) => chain.toggleHeading({ level: 2 }))}
         active={editor.isActive("heading", { level: 2 })}
         title="Überschrift 2"
       >
         <Heading2 className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        onClick={() => runBlockFormat(editor, (chain) => chain.toggleHeading({ level: 3 }))}
         active={editor.isActive("heading", { level: 3 })}
         title="Überschrift 3"
       >
@@ -405,7 +445,7 @@ function WikiEditorToolbar({
         <ListOrdered className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        onClick={() => runBlockFormat(editor, (chain) => chain.toggleBlockquote())}
         active={editor.isActive("blockquote")}
         title="Zitat"
       >
@@ -622,6 +662,7 @@ export function WikiEditor({
         },
       }),
       WikiMarkdownInputRules,
+      LoreBlockFormat,
       Markdown.configure({
         html: true,
         tightLists: true,
@@ -636,7 +677,7 @@ export function WikiEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: `${minHeight} w-full max-w-none px-4 py-3 font-libre text-sm leading-relaxed text-gray-200 outline-none prose prose-invert ${WIKI_HEADING_PROSE_CLASSES} prose-a:text-hero-vibrant`,
+        class: `lore-editor ${minHeight} w-full max-w-none px-4 py-3 font-libre text-sm leading-relaxed text-gray-200 outline-none`,
         "data-placeholder": placeholder,
       },
     },

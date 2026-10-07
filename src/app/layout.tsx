@@ -21,7 +21,15 @@ const cinzel = Cinzel({
 const libre = Libre_Baskerville({
   subsets: ["latin"],
   weight: ["400", "700"],
+  style: "normal",
   variable: "--font-libre",
+});
+
+const libreItalic = Libre_Baskerville({
+  subsets: ["latin"],
+  weight: "400",
+  style: "italic",
+  variable: "--font-libre-italic",
 });
 
 export const metadata: Metadata = {
@@ -161,7 +169,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${barlow.variable} ${cinzel.variable} ${libre.variable} font-libre bg-background-dark text-gray-100`}
+        className={`${barlow.variable} ${cinzel.variable} ${libre.variable} ${libreItalic.variable} font-libre bg-background-dark text-gray-100`}
         suppressHydrationWarning={true}
       >
         {/* JSON-LD nur im body (vermeidet "script outside main document") */}

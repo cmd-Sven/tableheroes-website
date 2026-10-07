@@ -239,9 +239,21 @@ export function SmartText({
       h1: createHeading("h1"),
       h2: createHeading("h2"),
       h3: createHeading("h3"),
-      blockquote: createProcessor("blockquote"),
+      blockquote: ({ children }: { children?: React.ReactNode }) => (
+        <blockquote className="my-3 border-l-4 border-accent-gold py-0.5 pl-4 text-stone-300">
+          {entities.length
+            ? processChildren(children, entities, campaignId, worldId, false, openInNewTab)
+            : children}
+        </blockquote>
+      ),
       strong: createProcessor("strong"),
-      em: createProcessor("em"),
+      em: ({ children }: { children?: React.ReactNode }) => (
+        <em className="italic text-stone-200">
+          {entities.length
+            ? processChildren(children, entities, campaignId, worldId, false, openInNewTab)
+            : children}
+        </em>
+      ),
       a: ({
         href,
         children,
@@ -285,16 +297,14 @@ export function SmartText({
 
   return (
     <div
-      className={`w-full min-w-0 break-words font-libre text-[#e5e5e5] leading-relaxed prose prose-invert max-w-none
-        prose-p:my-2 prose-p:leading-relaxed
-        prose-strong:text-white prose-strong:font-bold
-        prose-em:text-gray-300 prose-em:italic
-        prose-ul:my-3 prose-ul:list-disc prose-ul:pl-6 prose-ul:space-y-1
-        prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-6 prose-ol:space-y-1
-        prose-blockquote:border-l-4 prose-blockquote:border-accent-gold prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-300 prose-blockquote:my-3
-        prose-a:text-hero-vibrant prose-a:hover:underline
-        ${largeImages ? "" : "prose-img:rounded-md prose-img:max-w-full prose-img:my-2"}
-        prose-hr:border-hero-border/70 prose-hr:my-6
+      className={`lore-rich-text w-full min-w-0 break-words font-libre text-[#e5e5e5] leading-relaxed max-w-none
+        [&_p]:my-2 [&_p]:leading-relaxed
+        [&_strong]:font-bold [&_strong]:text-white
+        [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6
+        [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6
+        [&_a]:text-hero-vibrant [&_a:hover]:underline
+        ${largeImages ? "" : "[&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-md"}
+        [&_hr]:my-6 [&_hr]:border-hero-border/70
         ${className}`}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
