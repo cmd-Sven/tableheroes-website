@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  BookOpen,
   Flag,
   HelpCircle,
   Home,
+  Map,
   Sparkles,
   Users,
   ArrowLeft,
@@ -38,7 +38,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       { id: "community", label: "Community", Icon: Users },
       { id: "features", label: "Plattform", Icon: Sparkles },
       { id: "gamification", label: "Deine Reise als Held", Icon: Trophy },
-      { id: "systems", label: "Systeme", Icon: BookOpen },
+      { id: "battlemap", label: "Battlemap", Icon: Map },
       { id: "impressions", label: "Impressionen", Icon: Images },
       { id: "faq", label: "FAQ", Icon: HelpCircle },
     ],
