@@ -23,6 +23,7 @@ import {
   updateRelationship,
   type Relationship,
 } from "@/src/app/dashboard/worlds/relationship-actions";
+import { bondSimReading } from "@/src/components/city/aurenfurt/aurenfurt-bonds";
 
 const RELATION_ROLES = [
   "Bruder",
@@ -55,11 +56,11 @@ const RELATION_ROLES = [
   "Auftraggeber",
 ] as const;
 
-type TargetNPC = { id: string; name: string; image_url?: string | null };
+type TargetNPC = { id: string; name: string; image_url?: string | null; inCitySim?: boolean };
 
 type Props = {
   worldId: string;
-  sourceNpc: { id: string; name: string; image_url?: string | null };
+  sourceNpc: { id: string; name: string; image_url?: string | null; inCitySim?: boolean };
   existingRelationship?: Relationship & {
     target_name?: string;
     target_image_url?: string | null;
@@ -105,6 +106,9 @@ export function RelationshipWizard({
   const [intensity, setIntensity] = useState(
     existingRelationship?.intensity ?? 0
   );
+  const [affectsCitySim, setAffectsCitySim] = useState(
+    existingRelationship?.affects_city_sim !== false
+  );
 
   // Step 3: Monologe
   const [monologueSource, setMonologueSource] = useState(
@@ -131,10 +135,11 @@ export function RelationshipWizard({
         onlyLocal
       );
       setNpcs(
-        list.map((n: any) => ({
+        list.map((n: { id: string; name: string; image_url?: string | null; for_city_simulation?: boolean | null }) => ({
           id: n.id,
           name: n.name,
           image_url: n.image_url ?? null,
+          inCitySim: Boolean(n.for_city_simulation),
         }))
       );
     } finally {
@@ -143,8 +148,15 @@ export function RelationshipWizard({
   }, [worldId, sourceNpc.id, onlyLocal]);
 
   useEffect(() => {
-    if (step === 1) loadNPCs();
-  }, [step, loadNPCs]);
+    loadNPCs();
+  }, [loadNPCs]);
+
+  useEffect(() => {
+    if (!selectedTarget) return;
+    const match = npcs.find((npc) => npc.id === selectedTarget.id);
+    if (!match || match.inCitySim === selectedTarget.inCitySim) return;
+    setSelectedTarget({ ...selectedTarget, inCitySim: match.inCitySim });
+  }, [npcs, selectedTarget]);
 
   const filteredNPCs = npcs.filter((n) =>
     n.name.toLowerCase().includes(npcSearch.toLowerCase())
@@ -171,6 +183,8 @@ export function RelationshipWizard({
   const canProceedStep1 = !!selectedTarget;
   const canProceedStep2 = sourceRole.trim() !== "";
   const canProceedStep3 = true;
+  const bothInCity = Boolean(sourceNpc.inCitySim && selectedTarget?.inCitySim);
+  const cityReading = bondSimReading(sourceRole, targetRole, intensity, bothInCity, affectsCitySim);
 
   const handleSave = async () => {
     if (!selectedTarget) return;
@@ -185,6 +199,7 @@ export function RelationshipWizard({
           monologue_target: monologueTarget,
           is_public: isPublic,
           public_description: publicDescription,
+          affects_city_sim: affectsCitySim,
         });
       } else {
         await createRelationship({
@@ -199,6 +214,7 @@ export function RelationshipWizard({
           monologue_target: monologueTarget,
           is_public: isPublic,
           public_description: publicDescription,
+          affects_city_sim: affectsCitySim,
         });
       }
       router.refresh();
@@ -350,8 +366,15 @@ export function RelationshipWizard({
                           <User className="h-4 w-4 text-gray-500" />
                         </div>
                       )}
-                      <span className="font-barlow font-bold text-xs text-white truncate">
-                        {n.name}
+                      <span className="min-w-0">
+                        <span className="block font-barlow font-bold text-xs text-white truncate">
+                          {n.name}
+                        </span>
+                        {n.inCitySim ? (
+                          <span className="block font-barlow text-[9px] uppercase tracking-wide text-accent-gold">
+                            Stadtsimulation
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   ))}
@@ -424,6 +447,22 @@ export function RelationshipWizard({
                     <span>+100 Seelenverwandte</span>
                   </div>
                 </div>
+                {cityReading ? (
+                  <p className="mt-3 font-libre text-sm text-gray-200 leading-relaxed">{cityReading}</p>
+                ) : null}
+                {bothInCity ? (
+                  <label className="mt-3 flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={affectsCitySim}
+                      onChange={(event) => setAffectsCitySim(event.target.checked)}
+                      className="rounded border-hero-dark text-hero-vibrant focus:ring-hero-vibrant"
+                    />
+                    <span className="font-barlow font-semibold text-xs uppercase text-gray-300">
+                      Wirkt in der Stadtsimulation
+                    </span>
+                  </label>
+                ) : null}
               </div>
             </div>
           )}
@@ -524,6 +563,10 @@ export function RelationshipWizard({
                   )}
                 </div>
               )}
+
+              {cityReading ? (
+                <p className="font-libre text-sm text-gray-200 leading-relaxed">{cityReading}</p>
+              ) : null}
 
               <div className="border-t border-hero-border pt-4 space-y-3">
                 <div className="flex items-center gap-3">

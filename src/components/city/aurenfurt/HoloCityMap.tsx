@@ -29,7 +29,7 @@ import { useWeatherFxControl } from "./hooks/useWeatherFxControl";
 import { resolveWeatherFx } from "./aurenfurt-weather-fx";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
-import { setCitySimLive, simBuildingFromCity } from "./aurenfurt-city-sim";
+import { bindCityBonds, setCitySimLive, simBuildingFromCity } from "./aurenfurt-city-sim";
 import { resolveBuildingUv } from "./aurenfurt-building-positions";
 import { useDistrictNpcs } from "./hooks/useDistrictNpcs";
 import { useBuildingPositions } from "./hooks/useBuildingPositions";
@@ -51,7 +51,7 @@ import {
   WALL_THICKNESS_DEFAULT,
   defaultWall,
 } from "./aurenfurt-walls";
-import { loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
+import { loadAurenfurtCityBonds, loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
 import { loadAurenfurtPlaceLore } from "./load-aurenfurt-place-lore";
 import {
   createAurenfurtMapBuilding,
@@ -260,6 +260,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       })
       .catch(() => {
         if (active) setFactionRecordIds({});
+      });
+    loadAurenfurtCityBonds()
+      .then((bonds) => {
+        if (active) bindCityBonds(bonds);
+      })
+      .catch(() => {
+        if (active) bindCityBonds([]);
       });
     return () => {
       active = false;

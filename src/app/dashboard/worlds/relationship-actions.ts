@@ -15,6 +15,7 @@ export type Relationship = {
   monologue_source: string;
   monologue_target: string;
   is_public: boolean;
+  affects_city_sim: boolean;
   public_description: string;
   history: Array<{
     date: string;
@@ -119,6 +120,7 @@ export async function createRelationship(params: {
   monologue_target: string;
   is_public: boolean;
   public_description?: string;
+  affects_city_sim?: boolean;
 }): Promise<Relationship> {
   const supabase = await createClient();
   await assertWorldGm(supabase, params.world_id);
@@ -151,6 +153,7 @@ export async function createRelationship(params: {
       monologue_source: params.monologue_source,
       monologue_target: params.monologue_target,
       is_public: params.is_public,
+      affects_city_sim: params.affects_city_sim !== false,
       public_description: params.public_description ?? "",
       history: [],
     })
@@ -176,6 +179,7 @@ export async function updateRelationship(
     monologue_target?: string;
     is_public?: boolean;
     public_description?: string;
+    affects_city_sim?: boolean;
   }
 ): Promise<void> {
   const supabase = await createClient();

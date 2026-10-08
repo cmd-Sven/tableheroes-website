@@ -339,7 +339,7 @@ export async function getWorldNPCsForRelations(
   worldId: string,
   currentNpcId: string,
   onlyLocal: boolean
-): Promise<Array<{ id: string; name: string; current_location_id: string | null }>> {
+): Promise<Array<{ id: string; name: string; current_location_id: string | null; for_city_simulation: boolean }>> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -362,7 +362,7 @@ export async function getWorldNPCsForRelations(
   }
 
   let query = (supabase.from("npcs") as any)
-    .select("id, name, current_location_id")
+    .select("id, name, current_location_id, for_city_simulation")
     .eq("world_id", worldId)
     .neq("id", currentNpcId)
     .order("name", { ascending: true });
@@ -376,6 +376,7 @@ export async function getWorldNPCsForRelations(
     id: String(n.id),
     name: String(n.name ?? "Unbenannt"),
     current_location_id: n.current_location_id ?? null,
+    for_city_simulation: Boolean(n.for_city_simulation),
   }));
 }
 

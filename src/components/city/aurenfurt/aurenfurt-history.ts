@@ -1,6 +1,8 @@
 import { AURENFURT_DISTRICTS, type CityDistrictId } from "./aurenfurt-districts";
+import { bondShiftForDistrict } from "./aurenfurt-bonds";
 import {
   buildingWeights,
+  cityBonds,
   citySimVersion,
   simulateCityRange,
   type HistoryShift,
@@ -392,6 +394,15 @@ function citySeries(through: number) {
   return series;
 }
 
+function bondRise(day: number) {
+  const today = utcToday();
+  const span = 13 * DAY_MS;
+  const start = today - span;
+  if (day <= start) return 0;
+  if (day >= today) return 1;
+  return (day - start) / span;
+}
+
 function profileOn(districtId: CityDistrictId, day: number): SimProfile {
   const series = citySeries(day);
   const row = series.get(day)?.[districtId];
@@ -407,11 +418,13 @@ function profileOn(districtId: CityDistrictId, day: number): SimProfile {
       underground: [],
     };
   }
+  const rise = bondRise(day);
+  const bond = bondShiftForDistrict(cityBonds(), districtId);
   return {
-    crime: clamp(row.crime + wobble(districtId, day, "crime")),
+    crime: clamp(row.crime + wobble(districtId, day, "crime") + bond.crime * rise),
     vattrak: clamp(row.vattrak + wobble(districtId, day, "vattrak")),
-    malanthir: clamp(row.malanthir + wobble(districtId, day, "malanthir")),
-    guard: clamp(row.guard + wobble(districtId, day, "guard")),
+    malanthir: clamp(row.malanthir + wobble(districtId, day, "malanthir") + bond.malanthir * rise),
+    guard: clamp(row.guard + wobble(districtId, day, "guard") + bond.guard * rise),
     refugees: clamp(row.refugees + wobble(districtId, day, "refugees")),
     economy: clamp(row.economy + wobble(districtId, day, "economy")),
     unemployment: clamp(row.unemployment + wobble(districtId, day, "unemployment")),

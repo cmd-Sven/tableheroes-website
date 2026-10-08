@@ -24,6 +24,7 @@ import {
 import type { DistrictPolygons } from "./aurenfurt-district-polygons";
 import { sectorField } from "./aurenfurt-sector-reach";
 import type { DistrictSectorsByDistrict } from "./aurenfurt-sectors";
+import type { CityBond } from "./aurenfurt-bonds";
 import type { SimProfile, UndergroundCell } from "./aurenfurt-sim";
 import type { WeatherKind } from "./aurenfurt-weather";
 import type { CityInfluenceTier } from "@/src/lib/npcs/city-simulation";
@@ -190,6 +191,7 @@ let live: CitySimLive = {
   polygons: null,
 };
 let npcSnaps: NpcSimSnap[] = [];
+let cityBondList: CityBond[] = [];
 
 function emit() {
   version += 1;
@@ -215,6 +217,16 @@ export function setCitySimLive(next: CitySimLive) {
 export function bindNpcSnaps(snaps: NpcSimSnap[]) {
   npcSnaps = snaps;
   emit();
+}
+
+export function bindCityBonds(next: CityBond[]) {
+  if (JSON.stringify(next) === JSON.stringify(cityBondList)) return;
+  cityBondList = next;
+  emit();
+}
+
+export function cityBonds() {
+  return cityBondList;
 }
 
 export function magicBucket(building: Pick<SimBuilding, "id" | "districtId" | "category">): MagicBucket {

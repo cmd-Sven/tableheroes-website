@@ -486,7 +486,7 @@ export function WorldNPCDetailClient({
           {wizardOpen && (
             <RelationshipWizard
               worldId={worldId}
-              sourceNpc={{ id: npc.id, name: npc.name, image_url: npc.image_url }}
+              sourceNpc={{ id: npc.id, name: npc.name, image_url: npc.image_url, inCitySim }}
               existingRelationship={editingRelationship ?? undefined}
               onClose={() => { setWizardOpen(false); setEditingRelationship(null); }}
               onSuccess={() => { setWizardOpen(false); setEditingRelationship(null); }}
