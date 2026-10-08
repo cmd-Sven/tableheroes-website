@@ -40,7 +40,7 @@ export type DiceRollOutcome = {
 };
 
 const ROLL_RE =
-  /^(?:\/roll\s+)?(?:(\d+)d(\d+)|w(\d+)|d(\d+))(?:\s*([+-]\s*\d+))?$/i;
+  /^(?:\/roll\s+)?(?:(\d+)[dw](\d+)|w(\d+)|d(\d+))(?:\s*([+-]\s*\d+))?$/i;
 
 /** Kompakte Mali/Boni-Eingabe: „+2“, „-1“, „+2-1“ → Summe. */
 export function parseBonusMalus(input: string): number {
@@ -55,7 +55,7 @@ export function parseBonusMalus(input: string): number {
 }
 
 export function parseRollCommand(input: string): ParsedRollCommand | null {
-  const trimmed = input.trim();
+  const trimmed = input.trim().replace(/[−–]/g, "-");
   const m = trimmed.match(ROLL_RE);
   if (m) {
     const dice = m[1] ? Math.max(1, parseInt(m[1], 10)) : 1;
@@ -65,8 +65,8 @@ export function parseRollCommand(input: string): ParsedRollCommand | null {
     return { dice, sides, modifier: Number.isFinite(modifier) ? modifier : 0 };
   }
 
-  // Schaden: „2d6+3“ / „1d8Feuer+3“ (nach Whitespace-Strip) / „1d8 − 1“
-  const damageM = trimmed.match(/(\d+)d(\d+)(?:[^\d+-]*([+-])\s*(\d+))?/i);
+  // Schaden: „2d6+3“, „1w8 Stich +4“, „1d8Feuer+3“ (auch nach Whitespace-Strip).
+  const damageM = trimmed.match(/(\d+)[dw](\d+)(?:[^\d+-]*([+-])\s*(\d+))?/i);
   if (damageM) {
     const dice = Math.max(1, parseInt(damageM[1], 10));
     const sides = Math.max(2, parseInt(damageM[2], 10));
