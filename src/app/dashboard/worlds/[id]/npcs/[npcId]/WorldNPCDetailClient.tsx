@@ -26,6 +26,8 @@ import { RelationshipWizard } from "@/src/components/worlds/RelationshipWizard";
 import { RelationshipCard } from "@/src/components/worlds/RelationshipCard";
 import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npcs/NpcPortraitAttribution";
 import { SmartText } from "@/src/components/ui/SmartText";
+import { NpcCitySimulationSheet } from "@/src/components/dashboard/campaigns/npc-detail/NpcCitySimulationSheet";
+import { citySimulationFromDb } from "@/src/lib/npcs/city-simulation";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import type { RelationshipWithNames } from "@/src/app/dashboard/worlds/relationship-actions";
 import type { WorldBlueprint } from "@/src/types/world";
@@ -75,6 +77,11 @@ export function WorldNPCDetailClient({
   const [togglingSecretId, setTogglingSecretId] = useState<string | null>(null);
   const [playerView, setPlayerView] = useState(false);
   const { entities } = useWorldEntities(worldId);
+  const citySim = citySimulationFromDb(npc);
+  const inCitySim = citySim.forCitySimulation;
+  const showCityTab = inCitySim && !(isGM && playerView);
+  const [sheetTab, setSheetTab] = useState<"profil" | "stadt">("profil");
+  const activeSheet = showCityTab && sheetTab === "stadt" ? "stadt" : "profil";
 
   // Relationship Wizard
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -210,11 +217,18 @@ export function WorldNPCDetailClient({
                 {[npc.title, npc.role].filter(Boolean).join(" · ")}
               </p>
             )}
-            {npc.status && (
-              <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs font-barlow uppercase bg-hero-dark text-gray-300">
-                {STATUS_LABELS[npc.status] ?? npc.status}
-              </span>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {npc.status ? (
+                <span className="inline-block px-2 py-0.5 rounded text-xs font-barlow uppercase bg-hero-dark text-gray-300">
+                  {STATUS_LABELS[npc.status] ?? npc.status}
+                </span>
+              ) : null}
+              {inCitySim && !playerView ? (
+                <span className="inline-block rounded border border-accent-gold/60 px-2 py-0.5 font-barlow text-xs font-bold uppercase text-accent-gold">
+                  Stadtsimulation Aurenfurt
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -237,6 +251,40 @@ export function WorldNPCDetailClient({
         </div>
       </div>
 
+      {showCityTab ? (
+        <div role="tablist" aria-label="NPC-Ansicht" className="flex border-b border-hero-border bg-black/30">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSheet === "profil"}
+            onClick={() => setSheetTab("profil")}
+            className={`flex-1 px-4 py-3 font-barlow text-sm font-bold uppercase tracking-wide ${
+              activeSheet === "profil"
+                ? "border-b-2 border-hero-vibrant text-hero-vibrant"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            NPC
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSheet === "stadt"}
+            onClick={() => setSheetTab("stadt")}
+            className={`flex-1 px-4 py-3 font-barlow text-sm font-bold uppercase tracking-wide ${
+              activeSheet === "stadt"
+                ? "border-b-2 border-hero-vibrant text-hero-vibrant"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Stadtsimulation
+          </button>
+        </div>
+      ) : null}
+
+      {activeSheet === "stadt" ? (
+        <NpcCitySimulationSheet cityName="Aurenfurt" fields={citySim} />
+      ) : (
       <div className="grid md:grid-cols-3 gap-0">
         {/* Main */}
         <div className="md:col-span-2 p-6 space-y-6">
@@ -514,6 +562,7 @@ export function WorldNPCDetailClient({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

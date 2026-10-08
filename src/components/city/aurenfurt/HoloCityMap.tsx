@@ -7,6 +7,7 @@ import { HoloCityRail } from "./HoloCityRail";
 import { HoloDayCalendar } from "./HoloDayCalendar";
 import { HoloOverlay } from "./HoloOverlay";
 import { HoloWeatherControl } from "./HoloWeatherControl";
+import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
@@ -85,6 +86,15 @@ const HoloCityCanvas = dynamic(() => import("./scene/HoloCityCanvas"), {
   loading: () => (
     <div className="flex h-full items-center justify-center font-barlow text-xs font-bold uppercase tracking-wide text-cyan-100/80">
       Diorama wird gehoben…
+    </div>
+  ),
+});
+
+const CityDashboard = dynamic(() => import("./CityDashboard"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold">
+      Stadtbericht wird gerechnet…
     </div>
   ),
 });
@@ -170,6 +180,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     polygons.polygons,
   ]);
   const { streetsVisible, toggleStreetsVisible } = useStreetsVisibility(isGm);
+  const [citySurface, setCitySurface] = useState<CitySurface>("map");
+  const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
   const [places, setPlaces] = useState<AurenfurtPlaceLore[]>([]);
   const [activeTool, setActiveTool] = useState<AurenfurtMapEditorTool | null>(null);
   const [editingDistrictId, setEditingDistrictId] = useState<CityDistrictId | null>(null);
@@ -848,9 +860,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         subject={view.subject}
         sim={metrics.sim}
         scopeLabel={view.subject ? (findDistrict(view.subject.districtId)?.name ?? "Viertel") : "Stadt gesamt"}
-        onSelect={view.focus}
+        onSelect={(selection) => {
+          view.focus(selection);
+          if (citySurface === "dashboard" && selection.type === "district") setDashboardScope(selection.id);
+        }}
         onLeave={onLeave}
       />
+      {citySurface === "map" ? (
       <HoloOverlay
         subject={view.subject}
         lore={view.subject ? findPlaceLore(places, view.subject.name) : null}
@@ -878,7 +894,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         onClose={() => view.focus(null)}
         onSelect={view.focus}
       />
+      ) : null}
       <div className="relative min-w-0 flex-1">
+        <div className={citySurface === "dashboard" ? "invisible absolute inset-0" : "h-full"}>
         <HoloCityCanvas
           selection={view.selection}
           hovered={view.hovered}
@@ -947,6 +965,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onSelectStreet={selectStreet}
         />
         <div className="pointer-events-none absolute left-4 top-4 z-10 space-y-2">
+          <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
           <div>
             <p className="font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
             <p className="font-libre text-sm text-gray-300">
@@ -994,6 +1013,23 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             onModeChange={weatherFx.setMode}
           />
         </div>
+        </div>
+        {citySurface === "dashboard" ? (
+          <CityDashboard
+            day={calendar.day}
+            minDay={calendar.minDay}
+            maxDay={calendar.maxDay}
+            isToday={calendar.isToday}
+            liveWeather={climate.current}
+            scopeId={dashboardScope}
+            onScopeId={setDashboardScope}
+            onDayChange={calendar.setDay}
+            onStepDay={calendar.stepDay}
+            onStepYear={calendar.stepYear}
+            onGoToday={calendar.goToday}
+            onShowMap={() => setCitySurface("map")}
+          />
+        ) : null}
       </div>
 
       {editorControls}
