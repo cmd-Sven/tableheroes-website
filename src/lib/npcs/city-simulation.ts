@@ -26,15 +26,107 @@ export const CITY_INFLUENCE_TIER_LABELS: Record<CityInfluenceTier, string> = {
 /** Ganzzahlig −5…+5 */
 export const CityAxisSchema = z.number().int().min(-5).max(5);
 
+export const CITY_METERS = [
+  "crime",
+  "guard",
+  "vattrak",
+  "malanthir",
+  "economy",
+  "unemployment",
+  "refugees",
+] as const;
+
+export type CityMeter = (typeof CITY_METERS)[number];
+
+export const CITY_METER_LABELS: Record<CityMeter, string> = {
+  crime: "Kriminalität",
+  guard: "Sicherheit",
+  vattrak: "Vattrak",
+  malanthir: "Malanthir",
+  economy: "Wirtschaft",
+  unemployment: "Arbeitslosigkeit",
+  refugees: "Flüchtlinge",
+};
+
+export const MeterConditionSchema = z.object({
+  meter: z.enum(CITY_METERS),
+  op: z.enum(["gt", "lt"]),
+  value: z.number().min(0).max(100),
+});
+
+export const MeterEffectSchema = z.object({
+  meter: z.enum(CITY_METERS),
+  delta: z.number().min(-20).max(20),
+});
+
+export type MeterCondition = z.infer<typeof MeterConditionSchema>;
+export type MeterEffect = z.infer<typeof MeterEffectSchema>;
+
+export const CARD_RANGES = ["district", "adjacent", "sector", "city"] as const;
+export type CardRange = (typeof CARD_RANGES)[number];
+
+export const CARD_RANGE_LABELS: Record<CardRange, string> = {
+  district: "Viertel des NPC",
+  adjacent: "Viertel und Nachbarn",
+  sector: "Sektor im Viertel",
+  city: "Ganze Stadt",
+};
+
 export const CityEventCardSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   text: z.string().min(1),
   trigger: z.string().optional().nullable(),
   sortOrder: z.number().int().min(0),
+  durationDays: z.number().int().min(1).max(90).optional(),
+  range: z.enum(CARD_RANGES).optional(),
+  sectorLabel: z.string().optional().nullable(),
+  extraDistrictIds: z.array(z.string()).max(6).optional(),
+  effects: z.array(MeterEffectSchema).max(4).optional(),
 });
 
 export type CityEventCard = z.infer<typeof CityEventCardSchema>;
+
+export const AbilityAxisSchema = z.enum([
+  "loyalCriminal",
+  "greedyAltruist",
+  "piousSkeptic",
+  "superstitionReason",
+]);
+
+export const NpcAbilitySchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  enabled: z.boolean(),
+  roleGate: z.string().nullable(),
+  factionGate: z.string().nullable(),
+  axisGate: z
+    .object({
+      axis: AbilityAxisSchema,
+      min: z.number().int().min(-5).max(5),
+      max: z.number().int().min(-5).max(5),
+    })
+    .nullable(),
+  conditions: z.array(MeterConditionSchema).max(4),
+  effects: z.array(MeterEffectSchema).max(4),
+  durationDays: z.number().int().min(1).max(60),
+  cooldownDays: z.number().int().min(1).max(180),
+  relationshipTarget: z.enum(["none", "same_faction", "rival_faction"]),
+  relationshipDelta: z.number().int().min(-30).max(30),
+  counterFactionId: z.string().nullable(),
+  counterDelayDays: z.number().int().min(1).max(30),
+  counterDurationDays: z.number().int().min(1).max(30),
+  counterEffects: z.array(MeterEffectSchema).max(3),
+});
+
+export type NpcAbility = z.infer<typeof NpcAbilitySchema>;
+
+export const CityCardPlaySchema = z.object({
+  cardId: z.string().min(1),
+  startedOn: z.string().min(8),
+});
+
+export type CityCardPlay = z.infer<typeof CityCardPlaySchema>;
 
 export const CITY_FACTION_IDS = AURENFURT_FACTIONS.map((f) => f.id) as [
   FactionId,
@@ -59,6 +151,8 @@ export const CitySimulationFieldsSchema = z.object({
   cityFactionId: CityFactionIdSchema.nullable(),
   cityAgenda: z.string().nullable(),
   cityEventDeck: z.array(CityEventCardSchema),
+  cityAbilities: z.array(NpcAbilitySchema),
+  cityCardPlays: z.array(CityCardPlaySchema),
 });
 
 export type CitySimulationFields = z.infer<typeof CitySimulationFieldsSchema>;
@@ -74,6 +168,8 @@ export const EMPTY_CITY_SIMULATION: CitySimulationFields = {
   cityFactionId: null,
   cityAgenda: null,
   cityEventDeck: [],
+  cityAbilities: [],
+  cityCardPlays: [],
 };
 
 export type CitySimulationDbColumns = {
@@ -87,6 +183,8 @@ export type CitySimulationDbColumns = {
   city_faction_id: string | null;
   city_agenda: string | null;
   city_event_deck: CityEventCard[];
+  city_abilities: NpcAbility[];
+  city_card_plays: CityCardPlay[];
 };
 
 export function citySimulationToDb(
@@ -104,6 +202,8 @@ export function citySimulationToDb(
     city_faction_id: fields.cityFactionId,
     city_agenda: fields.cityAgenda?.trim() ? fields.cityAgenda.trim() : null,
     city_event_deck: fields.cityEventDeck ?? [],
+    city_abilities: fields.cityAbilities ?? [],
+    city_card_plays: fields.cityCardPlays ?? [],
   };
 }
 
@@ -127,6 +227,8 @@ export function citySimulationFromDb(
         .filter((c): c is CityEventCard => c != null)
         .sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
+  const abilities = parseList(row.city_abilities, NpcAbilitySchema);
+  const plays = parseList(row.city_card_plays, CityCardPlaySchema);
 
   const factionRaw = row.city_faction_id;
   const factionParsed =
@@ -161,7 +263,17 @@ export function citySimulationFromDb(
     cityFactionId: factionParsed,
     cityAgenda: row.city_agenda ?? null,
     cityEventDeck: deck,
+    cityAbilities: abilities,
+    cityCardPlays: plays,
   };
+}
+
+function parseList<T>(raw: unknown, schema: z.ZodType<T>): T[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    const parsed = schema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /** Gläubig-Seite des Sliders (links = −5). */
@@ -179,6 +291,8 @@ export function refineCitySimulationPayload(
         ...fields,
         forCitySimulation: false,
         cityEventDeck: fields.cityEventDeck ?? [],
+        cityAbilities: fields.cityAbilities ?? [],
+        cityCardPlays: fields.cityCardPlays ?? [],
       },
     };
   }
@@ -200,6 +314,9 @@ export function refineCitySimulationPayload(
   if (!fields.cityAgenda?.trim()) {
     return { ok: false, error: "Bitte gib eine individuelle Zielvorgabe an." };
   }
+  if ((fields.cityAbilities ?? []).some((ability) => !ability.title.trim())) {
+    return { ok: false, error: "Jede Situationsfähigkeit braucht einen Titel." };
+  }
   if (requiresCityDeity(fields.cityAxisPiousSkeptic) && !fields.cityDeity?.trim()) {
     return {
       ok: false,
@@ -214,6 +331,8 @@ export function refineCitySimulationPayload(
       cityDeity: fields.cityDeity?.trim() || null,
       cityAgenda: fields.cityAgenda.trim(),
       cityEventDeck: fields.cityEventDeck ?? [],
+      cityAbilities: fields.cityAbilities ?? [],
+      cityCardPlays: fields.cityCardPlays ?? [],
     },
   };
 }
@@ -229,5 +348,50 @@ export function newCityEventCard(partial?: Partial<CityEventCard>): CityEventCar
     text: partial?.text ?? "",
     trigger: partial?.trigger ?? null,
     sortOrder: partial?.sortOrder ?? 0,
+    durationDays: partial?.durationDays,
+    range: partial?.range,
+    sectorLabel: partial?.sectorLabel ?? null,
+    extraDistrictIds: partial?.extraDistrictIds ?? [],
+    effects: partial?.effects ?? [],
+  };
+}
+
+export function defaultCardDuration(tier: CityInfluenceTier | null | undefined) {
+  if (tier === "apex_global") return 14;
+  if (tier === "authority_faction") return 10;
+  if (tier === "regional_economy") return 7;
+  return 3;
+}
+
+export function defaultCardRange(tier: CityInfluenceTier | null | undefined): CardRange {
+  if (tier === "apex_global") return "city";
+  if (tier === "authority_faction" || tier === "regional_economy") return "adjacent";
+  return "district";
+}
+
+function freshId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `card-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function newNpcAbility(partial?: Partial<NpcAbility>): NpcAbility {
+  return {
+    id: partial?.id ?? freshId(),
+    title: partial?.title ?? "",
+    enabled: partial?.enabled ?? true,
+    roleGate: partial?.roleGate ?? null,
+    factionGate: partial?.factionGate ?? null,
+    axisGate: partial?.axisGate ?? null,
+    conditions: partial?.conditions ?? [{ meter: "crime", op: "gt", value: 80 }],
+    effects: partial?.effects ?? [{ meter: "guard", delta: 6 }],
+    durationDays: partial?.durationDays ?? 5,
+    cooldownDays: partial?.cooldownDays ?? 14,
+    relationshipTarget: partial?.relationshipTarget ?? "none",
+    relationshipDelta: partial?.relationshipDelta ?? 0,
+    counterFactionId: partial?.counterFactionId ?? null,
+    counterDelayDays: partial?.counterDelayDays ?? 2,
+    counterDurationDays: partial?.counterDurationDays ?? 3,
+    counterEffects: partial?.counterEffects ?? [],
   };
 }

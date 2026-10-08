@@ -28,7 +28,6 @@ import { HoloDayCalendar } from "./HoloDayCalendar";
 import { SIM_METERS, type SimMeterKey } from "./aurenfurt-sim";
 import type { DayWeather, WeatherKind } from "./aurenfurt-weather";
 import { CityViewSwitch } from "./CityViewSwitch";
-
 const WEATHER_COLOR: Record<WeatherKind, string> = {
   clear: "#f0d85a",
   cloudy: "#94a3b8",
@@ -41,6 +40,12 @@ const WEATHER_COLOR: Record<WeatherKind, string> = {
 };
 
 type ChartMetric = SimMeterKey | "tension";
+type LineKey = SimMeterKey | "tension";
+
+const LINE_OPTIONS: { key: LineKey; label: string; stroke: string }[] = [
+  ...SIM_METERS.map((meter) => ({ key: meter.key, label: meter.label, stroke: meter.stroke })),
+  { key: "tension", label: "Spannung", stroke: "#f0a36b" },
+];
 
 type TipRow = { name?: string; value?: number | string; color?: string; dataKey?: string | number };
 
@@ -75,7 +80,7 @@ export default function CityDashboard({
 }: Props) {
   const [range, setRange] = useState<AnalyticsRange>("month");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("economy");
-  const [lines, setLines] = useState<SimMeterKey[]>(["economy", "crime", "guard"]);
+  const [lines, setLines] = useState<LineKey[]>(["economy", "crime", "guard", "tension"]);
   const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
 
   const report = useMemo(
@@ -187,7 +192,7 @@ export default function CityDashboard({
             note={range === "year" ? "Monatsmittel" : "Tageswerte"}
           >
             <div className="mb-3 flex flex-wrap gap-1.5">
-              {SIM_METERS.map((meter) => {
+              {LINE_OPTIONS.map((meter) => {
                 const on = lines.includes(meter.key);
                 return (
                   <button
@@ -218,7 +223,7 @@ export default function CityDashboard({
                   <XAxis dataKey="label" tick={{ fill: "#d1d5db", fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 100]} tick={{ fill: "#d1d5db", fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
                   <Tooltip content={<LineTooltip />} />
-                  {SIM_METERS.filter((meter) => lines.includes(meter.key)).map((meter) => (
+                  {LINE_OPTIONS.filter((meter) => lines.includes(meter.key)).map((meter) => (
                     <Line
                       key={meter.key}
                       type="monotone"
@@ -368,7 +373,7 @@ export default function CityDashboard({
             </tbody>
           </table>
           <p className="px-4 pb-3 font-libre text-xs leading-relaxed text-gray-400">
-            Spannung bündelt Kriminalität, Arbeitslosigkeit, Malanthir, Flucht, schwache Garde und schwache Wirtschaft.
+            Spannung bündelt Kriminalität, Arbeitslosigkeit, Malanthir, Flucht, schwache Garde und schwache Wirtschaft. Datierte Stadtgeschichten legen ihren eigenen Spannungswert oben drauf.
           </p>
         </section>
 

@@ -59,6 +59,11 @@ type Props = {
   editingSectors?: DistrictSector[];
   /** true = Vorschau vor dem Speichern (dezente Linien, keine Labels). */
   editingSectorsPreview?: boolean;
+  /** Sektoren des Viertels im Stadtereignis-Assistenten, anklickbar. */
+  eventPickSectors?: DistrictSector[];
+  eventSectorIds?: string[];
+  onPickEventSector?: (sector: DistrictSector) => void;
+  highlightDistricts?: boolean;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   buildingPositions: BuildingPositions;
@@ -112,6 +117,10 @@ export function CityModel({
   polygons,
   editingSectors = [],
   editingSectorsPreview = false,
+  eventPickSectors = [],
+  eventSectorIds = [],
+  onPickEventSector,
+  highlightDistricts = false,
   buildings,
   pois,
   buildingPositions,
@@ -177,6 +186,7 @@ export function CityModel({
               hovered={sameSelection(hovered, { type: "district", id: district.id })}
               showHandles={isEditing}
               editingActive={Boolean(editorTool === "districts" && editingDistrictId === district.id)}
+              highlight={highlightDistricts}
               suppressSelect={suppressSelect || mapLocked}
               onSelect={onSelect}
               onHover={onHover}
@@ -187,7 +197,14 @@ export function CityModel({
             />
           );
         })}
-        {editorTool === "districts" && editingDistrictId && editingSectors.length > 0 ? (
+        {eventPickSectors.length > 0 ? (
+          <DistrictSectorOverlay
+            sectors={eventPickSectors}
+            pickable
+            selectedIds={eventSectorIds}
+            onPick={onPickEventSector}
+          />
+        ) : editorTool === "districts" && editingDistrictId && editingSectors.length > 0 ? (
           <DistrictSectorOverlay sectors={editingSectors} preview={editingSectorsPreview} />
         ) : null}
         {buildings.map((building) => {

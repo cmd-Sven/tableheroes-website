@@ -19,6 +19,8 @@ type Props = {
   showHandles: boolean;
   /** Editor offen – gewählte Fläche bleibt sichtbar eingefärbt. */
   editingActive: boolean;
+  /** Ort-Schritt: Viertel bleiben sichtbar, damit der Klick trifft. */
+  highlight?: boolean;
   suppressSelect: boolean;
   onSelect: (selection: HoloSelection) => void;
   onHover: (selection: HoloSelection | null) => void;
@@ -37,6 +39,7 @@ export function DistrictNode({
   hovered,
   showHandles,
   editingActive,
+  highlight = false,
   suppressSelect,
   onSelect,
   onHover,
@@ -56,6 +59,10 @@ export function DistrictNode({
     ? hovered
       ? hoverOpacity
       : 0.28
+    : highlight
+      ? hovered
+        ? 0.42
+        : 0.24
     : selected
       ? 0.2
       : hovered

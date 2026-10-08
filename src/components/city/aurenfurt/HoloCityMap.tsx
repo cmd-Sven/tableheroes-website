@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { ScrollText } from "lucide-react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { HoloCityRail } from "./HoloCityRail";
@@ -11,6 +12,7 @@ import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
+import { CityEventWizard } from "./CityEventWizard";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import {
   CITY_BUILDINGS,
@@ -18,6 +20,7 @@ import {
   findDistrict,
   type CityBuilding,
   type CityDistrictId,
+  type HoloSelection,
 } from "./aurenfurt-districts";
 import { findPlaceLore, type AurenfurtPlaceLore } from "./aurenfurt-lore";
 import { pointInPolygon, type UvPoint } from "./aurenfurt-district-polygons";
@@ -29,7 +32,7 @@ import { useWeatherFxControl } from "./hooks/useWeatherFxControl";
 import { resolveWeatherFx } from "./aurenfurt-weather-fx";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
-import { bindCityBonds, setCitySimLive, simBuildingFromCity } from "./aurenfurt-city-sim";
+import { bindCityBonds, bindCityPressure, setCitySimLive, simBuildingFromCity } from "./aurenfurt-city-sim";
 import { resolveBuildingUv } from "./aurenfurt-building-positions";
 import { useDistrictNpcs } from "./hooks/useDistrictNpcs";
 import { useBuildingPositions } from "./hooks/useBuildingPositions";
@@ -51,7 +54,7 @@ import {
   WALL_THICKNESS_DEFAULT,
   defaultWall,
 } from "./aurenfurt-walls";
-import { loadAurenfurtCityBonds, loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
+import { loadAurenfurtCityBonds, loadAurenfurtCityPressure, loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
 import { loadAurenfurtPlaceLore } from "./load-aurenfurt-place-lore";
 import {
   createAurenfurtMapBuilding,
@@ -220,6 +223,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   const [savingPoi, startSavePoi] = useTransition();
   const [portalReady, setPortalReady] = useState(false);
   const [sectorPreviewSectors, setSectorPreviewSectors] = useState<DistrictSector[]>([]);
+  const [eventWizardOpen, setEventWizardOpen] = useState(false);
+  const [eventPlaceStep, setEventPlaceStep] = useState(false);
+  const [eventDistrictId, setEventDistrictId] = useState<CityDistrictId | null>(null);
+  const [eventSectorIds, setEventSectorIds] = useState<string[]>([]);
+  const [eventWholeCity, setEventWholeCity] = useState(false);
 
   const editorActive = isGm && activeTool !== null;
   const streetsLayerVisible = editorActive || streetsVisible;
@@ -267,6 +275,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       })
       .catch(() => {
         if (active) bindCityBonds([]);
+      });
+    loadAurenfurtCityPressure()
+      .then((pressure) => {
+        if (active) bindCityPressure(pressure.actors, pressure.events);
+      })
+      .catch(() => {
+        if (active) bindCityPressure([], []);
       });
     return () => {
       active = false;
@@ -860,6 +875,61 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         )
       : null;
 
+  const eventPickSectors =
+    eventWizardOpen && eventPlaceStep && eventDistrictId
+      ? (sectorsApi.sectorsByDistrict[eventDistrictId] ?? [])
+      : [];
+
+  const closeEventWizard = () => {
+    setEventWizardOpen(false);
+    setEventPlaceStep(false);
+    setEventDistrictId(null);
+    setEventSectorIds([]);
+    setEventWholeCity(false);
+  };
+
+  const onCanvasSelect = (selection: HoloSelection | null) => {
+    if (eventWizardOpen && eventPlaceStep) {
+      if (!selection) {
+        setEventWholeCity(true);
+        setEventDistrictId(null);
+        setEventSectorIds([]);
+        return;
+      }
+      const districtId =
+        selection.type === "district"
+          ? selection.id
+          : selection.type === "building"
+            ? (buildings.find((entry) => entry.id === selection.id)?.districtId ??
+              findBuilding(selection.id, buildings)?.districtId ??
+              null)
+            : selection.type === "poi"
+              ? (findPoi(pois, selection.id)?.districtId ?? null)
+              : null;
+      if (districtId) {
+        setEventWholeCity(false);
+        setEventDistrictId(districtId);
+        setEventSectorIds([]);
+      }
+      return;
+    }
+    view.focus(selection);
+  };
+
+  const onPickEventSector = (sector: DistrictSector) => {
+    setEventWholeCity(false);
+    setEventDistrictId(sector.districtId);
+    setEventSectorIds((current) =>
+      current.includes(sector.id) ? current.filter((id) => id !== sector.id) : [...current, sector.id],
+    );
+  };
+
+  const reloadCityPressure = () => {
+    void loadAurenfurtCityPressure()
+      .then((pressure) => bindCityPressure(pressure.actors, pressure.events))
+      .catch(() => bindCityPressure([], []));
+  };
+
   return (
     <div className="fixed inset-0 z-[80] flex bg-[#02080c]">
       <HoloCityRail
@@ -903,9 +973,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       />
       ) : null}
       <div className="relative min-w-0 flex-1">
-        <div className={citySurface === "dashboard" ? "invisible absolute inset-0" : "h-full"}>
+        <div className={citySurface === "dashboard" ? "invisible absolute inset-0" : eventPlaceStep ? "h-full cursor-crosshair" : "h-full"}>
         <HoloCityCanvas
-          selection={view.selection}
+          selection={
+            eventWizardOpen && eventPlaceStep && eventDistrictId
+              ? { type: "district", id: eventDistrictId }
+              : view.selection
+          }
           hovered={view.hovered}
           editorTool={isGm ? activeTool : null}
           editingDistrictId={
@@ -944,12 +1018,17 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
               (sectorsApi.sectorsByDistrict[editingDistrictId]?.length ?? 0) === 0 &&
               sectorPreviewSectors.length > 0,
           )}
+          eventPickSectors={eventPickSectors}
+          eventSectorIds={eventSectorIds}
+          onPickEventSector={onPickEventSector}
+          holdStill={eventPlaceStep}
+          highlightDistricts={eventPlaceStep}
           buildings={buildings.length > 0 ? buildings : CITY_BUILDINGS}
           pois={pois}
           buildingPositions={buildingPositions.positions}
           landmarkScales={landmarkScales.scales}
           landmarkRotations={landmarkRotations.rotations}
-          onSelect={view.focus}
+          onSelect={onCanvasSelect}
           onHover={view.hover}
           onMoveVertex={polygons.moveVertex}
           onMoveBuilding={buildingPositions.moveBuilding}
@@ -975,8 +1054,23 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
           <div>
             <p className="font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
+            {isGm ? (
+              <button
+                type="button"
+                aria-pressed={eventWizardOpen}
+                onClick={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
+                className={`pointer-events-auto mt-2 inline-flex items-center gap-2 rounded border border-accent-gold bg-background-card px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold ${
+                  eventWizardOpen ? "bg-hero-dark" : ""
+                }`}
+              >
+                <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
+                Stadtereignis
+              </button>
+            ) : null}
             <p className="font-libre text-sm text-gray-300">
-              {wallDrawActive
+              {eventWizardOpen && eventPlaceStep
+                ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
+                : wallDrawActive
                 ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
                 : placingBuildingActive
                 ? "Klicke im Viertel, um das Gebäude zu setzen."
@@ -1020,6 +1114,19 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             onModeChange={weatherFx.setMode}
           />
         </div>
+        {isGm && eventWizardOpen ? (
+          <CityEventWizard
+            day={calendar.day}
+            worldId={resolvedWorldId}
+            districtId={eventDistrictId}
+            wholeCity={eventWholeCity}
+            sectorIds={eventSectorIds}
+            sectors={eventPickSectors}
+            onPlaceStep={setEventPlaceStep}
+            onClose={closeEventWizard}
+            onSaved={reloadCityPressure}
+          />
+        ) : null}
         </div>
         {citySurface === "dashboard" ? (
           <CityDashboard

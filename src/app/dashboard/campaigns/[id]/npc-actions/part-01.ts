@@ -78,6 +78,8 @@ export async function createNPC(formData: {
   city_faction_id?: string | null;
   city_agenda?: string | null;
   city_event_deck?: unknown;
+  city_abilities?: unknown;
+  city_card_plays?: unknown;
 }) {
   const supabase = await createClient();
 
@@ -321,6 +323,8 @@ export async function createNPC(formData: {
     city_event_deck: Array.isArray(formData.city_event_deck)
       ? formData.city_event_deck
       : [],
+    city_abilities: Array.isArray(formData.city_abilities) ? formData.city_abilities : [],
+    city_card_plays: Array.isArray(formData.city_card_plays) ? formData.city_card_plays : [],
   };
 
   console.log("🔍 [createNPC] Insert payload:", {

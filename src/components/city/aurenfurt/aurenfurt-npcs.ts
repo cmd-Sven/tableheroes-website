@@ -366,6 +366,8 @@ export function citySimFromAurenfurtSeed(seed: {
     cityFactionId: seed.factionId,
     cityAgenda: seed.agenda,
     cityEventDeck: [],
+    cityAbilities: [],
+    cityCardPlays: [],
   };
 }
 

@@ -203,6 +203,8 @@ export async function updateNPC(
     city_faction_id?: string | null;
     city_agenda?: string | null;
     city_event_deck?: unknown;
+    city_abilities?: unknown;
+    city_card_plays?: unknown;
   }
 ) {
   const supabase = await createClient();

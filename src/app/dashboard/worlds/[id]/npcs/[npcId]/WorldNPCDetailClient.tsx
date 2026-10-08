@@ -283,7 +283,14 @@ export function WorldNPCDetailClient({
       ) : null}
 
       {activeSheet === "stadt" ? (
-        <NpcCitySimulationSheet cityName="Aurenfurt" fields={citySim} />
+        <NpcCitySimulationSheet
+          cityName="Aurenfurt"
+          fields={citySim}
+          npcId={npc.id}
+          worldId={worldId}
+          alive={npc.status === "Alive" || npc.status == null}
+          role={npc.role}
+        />
       ) : (
       <div className="grid md:grid-cols-3 gap-0">
         {/* Main */}

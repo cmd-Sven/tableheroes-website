@@ -13,6 +13,8 @@ export type SimProfile = {
   economy: number;
   unemployment: number;
   underground: UndergroundCell[];
+  /** Zusätzliche Spannung aus datierten Stadtgeschichten, oben auf die Formel. */
+  tensionBias?: number;
 };
 
 export function meanSim(profiles: SimProfile[]): SimProfile {

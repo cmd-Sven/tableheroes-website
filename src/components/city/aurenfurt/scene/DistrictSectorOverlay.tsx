@@ -1,22 +1,64 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { DistrictSector } from "../aurenfurt-sectors";
-import { surfacePoint } from "./diorama-geometry";
+import { createPolygonDistrictGeometry, surfacePoint } from "./diorama-geometry";
 
 type Props = {
   sectors: DistrictSector[];
   /** Vorschau vor dem Speichern: dezentere Linien, keine Labels. */
   preview?: boolean;
+  /** Klickbare Flächen, z. B. im Stadtereignis-Assistenten. */
+  pickable?: boolean;
+  selectedIds?: string[];
+  onPick?: (sector: DistrictSector) => void;
 };
 
+function SectorHit({
+  sector,
+  selected,
+  onPick,
+}: {
+  sector: DistrictSector;
+  selected: boolean;
+  onPick: (sector: DistrictSector) => void;
+}) {
+  const geometry = useMemo(() => createPolygonDistrictGeometry(sector.polygon), [sector.polygon]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  function pick(event: ThreeEvent<MouseEvent>) {
+    event.stopPropagation();
+    onPick(sector);
+  }
+
+  return (
+    <mesh geometry={geometry} position={[0, 0.035, 0]} renderOrder={5} onClick={pick}>
+      <meshBasicMaterial
+        color={selected ? "#cab926" : "#379806"}
+        transparent
+        opacity={selected ? 0.5 : 0.18}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 /**
- * Sektorgrenzen + Bezeichnungen nur für das gewählte Viertel.
- * Keine Pointer-Events – Viertel-Handles und Drag bleiben nutzbar.
+ * Sektorgrenzen und Bezeichnungen nur für das gewählte Viertel.
+ * Im Editor ohne Klicks, im Stadtereignis-Assistenten mit treffbaren Flächen.
  */
-export function DistrictSectorOverlay({ sectors, preview = false }: Props) {
+export function DistrictSectorOverlay({
+  sectors,
+  preview = false,
+  pickable = false,
+  selectedIds = [],
+  onPick,
+}: Props) {
   const lineObject = useMemo(() => {
     const positions: number[] = [];
     for (const sector of sectors) {
@@ -61,6 +103,16 @@ export function DistrictSectorOverlay({ sectors, preview = false }: Props) {
 
   return (
     <group>
+      {pickable && onPick
+        ? sectors.map((sector) => (
+            <SectorHit
+              key={sector.id}
+              sector={sector}
+              selected={selectedIds.includes(sector.id)}
+              onPick={onPick}
+            />
+          ))
+        : null}
       <primitive object={lineObject} />
       {!preview
         ? sectors.map((sector) => {

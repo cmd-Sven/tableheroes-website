@@ -3,12 +3,16 @@ import { bondShiftForDistrict } from "./aurenfurt-bonds";
 import {
   buildingWeights,
   cityBonds,
+  cityPressureActors,
+  cityPressureEvents,
   citySimVersion,
   simulateCityRange,
   type HistoryShift,
 } from "./aurenfurt-city-sim";
+import { foldCityPressure, type PressureBook } from "./aurenfurt-pressure";
 import type { SimProfile, UndergroundCell } from "./aurenfurt-sim";
 import { formatDay, parseDay, utcToday } from "./aurenfurt-time";
+import { chronicleMarksOn, chronicleShift } from "./aurenfurt-chronicle";
 import { bindWeatherWinter, weatherOn } from "./aurenfurt-weather";
 
 export { formatDay, parseDay, utcToday };
@@ -403,28 +407,26 @@ function bondRise(day: number) {
   return (day - start) / span;
 }
 
-function profileOn(districtId: CityDistrictId, day: number): SimProfile {
+const EMPTY_PROFILE: SimProfile = {
+  crime: 0,
+  vattrak: 0,
+  malanthir: 0,
+  guard: 0,
+  refugees: 0,
+  economy: 0,
+  unemployment: 0,
+  underground: [],
+};
+
+function rawProfile(districtId: CityDistrictId, day: number): SimProfile | null {
   const series = citySeries(day);
   const row = series.get(day)?.[districtId];
-  if (!row) {
-    return {
-      crime: 0,
-      vattrak: 0,
-      malanthir: 0,
-      guard: 0,
-      refugees: 0,
-      economy: 0,
-      unemployment: 0,
-      underground: [],
-    };
-  }
-  const rise = bondRise(day);
-  const bond = bondShiftForDistrict(cityBonds(), districtId);
+  if (!row) return null;
   return {
-    crime: clamp(row.crime + wobble(districtId, day, "crime") + bond.crime * rise),
+    crime: clamp(row.crime + wobble(districtId, day, "crime")),
     vattrak: clamp(row.vattrak + wobble(districtId, day, "vattrak")),
-    malanthir: clamp(row.malanthir + wobble(districtId, day, "malanthir") + bond.malanthir * rise),
-    guard: clamp(row.guard + wobble(districtId, day, "guard") + bond.guard * rise),
+    malanthir: clamp(row.malanthir + wobble(districtId, day, "malanthir")),
+    guard: clamp(row.guard + wobble(districtId, day, "guard")),
     refugees: clamp(row.refugees + wobble(districtId, day, "refugees")),
     economy: clamp(row.economy + wobble(districtId, day, "economy")),
     unemployment: clamp(row.unemployment + wobble(districtId, day, "unemployment")),
@@ -433,6 +435,73 @@ function profileOn(districtId: CityDistrictId, day: number): SimProfile {
       strength: clamp(cell.strength + wobble(districtId, day, cell.name)),
     })),
   };
+}
+
+let pressureCache: { version: number; book: PressureBook } | null = null;
+
+function pressureBook() {
+  const version = citySimVersion();
+  if (pressureCache?.version === version) return pressureCache.book;
+  const book = foldCityPressure({
+    from: parseDay(HISTORY_START),
+    to: utcToday(),
+    actors: cityPressureActors(),
+    events: cityPressureEvents(),
+    readMeters: (districtId, day) => {
+      const raw = rawProfile(districtId, day) ?? EMPTY_PROFILE;
+      const rise = bondRise(day);
+      const bond = bondShiftForDistrict(cityBonds(), districtId);
+      return {
+        crime: raw.crime + bond.crime * rise,
+        guard: raw.guard + bond.guard * rise,
+        vattrak: raw.vattrak,
+        malanthir: raw.malanthir + bond.malanthir * rise,
+        economy: raw.economy,
+        unemployment: raw.unemployment,
+        refugees: raw.refugees,
+      };
+    },
+  });
+  pressureCache = { version, book };
+  return book;
+}
+
+function bondsForDay(day: number) {
+  const bias = pressureBook().bias(day);
+  const bonds = cityBonds();
+  if (bias.length === 0) return bonds;
+  return bonds.map((bond) => {
+    let intensity = bond.intensity;
+    for (const entry of bias) {
+      if (entry.target === "same_faction" && bond.sameFaction) intensity += entry.delta;
+      if (entry.target === "rival_faction" && !bond.sameFaction) intensity += entry.delta;
+    }
+    return { ...bond, intensity: Math.max(-100, Math.min(100, intensity)) };
+  });
+}
+
+function profileOn(districtId: CityDistrictId, day: number): SimProfile {
+  const raw = rawProfile(districtId, day);
+  if (!raw) return EMPTY_PROFILE;
+  const rise = bondRise(day);
+  const bond = bondShiftForDistrict(bondsForDay(day), districtId);
+  const press = pressureBook().delta(districtId, day);
+  const chronicle = chronicleShift(districtId, day);
+  return {
+    crime: clamp(raw.crime + bond.crime * rise + press.crime + chronicle.crime),
+    vattrak: clamp(raw.vattrak + press.vattrak + chronicle.vattrak),
+    malanthir: clamp(raw.malanthir + bond.malanthir * rise + press.malanthir + chronicle.malanthir),
+    guard: clamp(raw.guard + bond.guard * rise + press.guard + chronicle.guard),
+    refugees: clamp(raw.refugees + press.refugees + chronicle.refugees),
+    economy: clamp(raw.economy + press.economy + chronicle.economy),
+    unemployment: clamp(raw.unemployment + press.unemployment + chronicle.unemployment),
+    underground: raw.underground,
+    tensionBias: chronicle.tension,
+  };
+}
+
+export function pressureNotesOn(day = utcToday()) {
+  return pressureBook().notes(day);
 }
 
 export function districtMetricsOn(districtId: CityDistrictId, day = utcToday()): SimProfile {
@@ -470,6 +539,7 @@ export function cityMetricsOn(day = utcToday()): SimProfile {
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
     underground,
+    tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };
 }
 
@@ -488,11 +558,17 @@ export function districtSeries(districtId: CityDistrictId, from = parseDay(HISTO
 export type ActiveInfluence = { id: string; title: string; summary: string };
 
 export function influencesOn(districtId: CityDistrictId | null, day = utcToday()): ActiveInfluence[] {
-  return AURENFURT_HISTORY.filter((event) => {
+  const history = AURENFURT_HISTORY.filter((event) => {
     if (eventWeight(event, day) < 0.2) return false;
     if (!districtId) return true;
     return Boolean(event.impact[districtId]);
   }).map((event) => ({ id: event.id, title: event.title, summary: event.summary }));
+  const chronicle = chronicleMarksOn(day, districtId).map((mark) => ({
+    id: mark.id,
+    title: mark.title,
+    summary: mark.summary,
+  }));
+  return [...history, ...chronicle];
 }
 
 bindWeatherWinter((day) => {

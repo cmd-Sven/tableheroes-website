@@ -8,6 +8,7 @@
 import { AURENFURT_DISTRICTS, type CityDistrictId } from "./aurenfurt-districts";
 import { buildingWeights, citySimVersion } from "./aurenfurt-city-sim";
 import { allFactionStandings } from "./aurenfurt-factions";
+import { chronicleInWindow } from "./aurenfurt-chronicle";
 import {
   AURENFURT_HISTORY,
   HISTORY_START,
@@ -60,6 +61,7 @@ export type AnalyticsPoint = {
   refugees: number;
   economy: number;
   unemployment: number;
+  tension: number;
 };
 
 export type DistrictRank = {
@@ -181,6 +183,7 @@ function weightedCity(bundle: DayBundle): SimProfile {
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
     underground,
+    tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };
 }
 
@@ -212,6 +215,7 @@ function averageProfiles(profiles: SimProfile[]): SimProfile {
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
     underground,
+    tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };
 }
 
@@ -223,7 +227,7 @@ export function tensionOf(profile: SimProfile) {
     profile.refugees * 0.12 +
     (100 - profile.guard) * 0.12 +
     (100 - profile.economy) * 0.08;
-  return clampScore(raw);
+  return clampScore(raw + (profile.tensionBias ?? 0));
 }
 
 function germanDay(iso: string) {
@@ -306,6 +310,7 @@ function pointFrom(label: string, profile: SimProfile): AnalyticsPoint {
     refugees: profile.refugees,
     economy: profile.economy,
     unemployment: profile.unemployment,
+    tension: tensionOf(profile),
   };
 }
 
@@ -392,13 +397,20 @@ function labelForKind(kind: WeatherKind) {
 }
 
 function eventsIn(days: number[], scopeId: CityDistrictId | null): AnalyticsEvent[] {
-  return AURENFURT_HISTORY.flatMap((event) => {
+  const history = AURENFURT_HISTORY.flatMap((event) => {
     let peak = 0;
     for (const day of days) peak = Math.max(peak, eventWeight(event, day));
     if (peak < 0.2) return [];
     if (scopeId && !event.impact[scopeId]) return [];
     return [{ id: event.id, title: event.title, summary: event.summary, weight: peak }];
-  }).sort((a, b) => b.weight - a.weight);
+  });
+  const chronicle = chronicleInWindow(days, scopeId).map((mark) => ({
+    id: mark.id,
+    title: mark.title,
+    summary: mark.summary,
+    weight: 1,
+  }));
+  return [...history, ...chronicle].sort((a, b) => b.weight - a.weight);
 }
 
 function signed(value: number) {

@@ -5,13 +5,11 @@ import type { FactionId } from "@/src/components/city/aurenfurt/aurenfurt-factio
 import {
   CITY_INFLUENCE_TIER_LABELS,
   CITY_INFLUENCE_TIERS,
-  type CityEventCard,
   type CityInfluenceTier,
   type CitySimulationFields,
-  newCityEventCard,
   requiresCityDeity,
 } from "@/src/lib/npcs/city-simulation";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { NpcCityPowers } from "@/src/components/worlds/npc-wizard/NpcCityPowers";
 
 type Props = {
   value: CitySimulationFields;
@@ -79,42 +77,6 @@ export function NpcCitySimulationFields({
   const showDetails = value.forCitySimulation;
   const deityRequired = requiresCityDeity(value.cityAxisPiousSkeptic);
 
-  const moveCard = (index: number, dir: -1 | 1) => {
-    const next = [...value.cityEventDeck].sort((a, b) => a.sortOrder - b.sortOrder);
-    const target = index + dir;
-    if (target < 0 || target >= next.length) return;
-    const tmp = next[index];
-    next[index] = next[target];
-    next[target] = tmp;
-    patch({
-      cityEventDeck: next.map((c, i) => ({ ...c, sortOrder: i })),
-    });
-  };
-
-  const updateCard = (index: number, partial: Partial<CityEventCard>) => {
-    const next = [...value.cityEventDeck].sort((a, b) => a.sortOrder - b.sortOrder);
-    next[index] = { ...next[index], ...partial };
-    patch({ cityEventDeck: next });
-  };
-
-  const removeCard = (index: number) => {
-    const next = [...value.cityEventDeck]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .filter((_, i) => i !== index)
-      .map((c, i) => ({ ...c, sortOrder: i }));
-    patch({ cityEventDeck: next });
-  };
-
-  const addCard = () => {
-    const sorted = [...value.cityEventDeck].sort((a, b) => a.sortOrder - b.sortOrder);
-    patch({
-      cityEventDeck: [
-        ...sorted,
-        newCityEventCard({ sortOrder: sorted.length }),
-      ],
-    });
-  };
-
   return (
     <div className={className ?? "space-y-4 rounded-lg border border-hero-border bg-slate-900/40 p-4"}>
       <div>
@@ -149,6 +111,8 @@ export function NpcCitySimulationFields({
                 cityAxisSuperstitionReason: value.cityAxisSuperstitionReason ?? 0,
                 cityAgenda: value.cityAgenda ?? "",
                 cityEventDeck: value.cityEventDeck ?? [],
+                cityAbilities: value.cityAbilities ?? [],
+                cityCardPlays: value.cityCardPlays ?? [],
               })
             }
             className={`rounded border px-3 py-2 font-barlow font-bold text-xs uppercase ${
@@ -282,89 +246,7 @@ export function NpcCitySimulationFields({
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="font-cinzel font-bold text-sm text-accent-gold">
-                Persönliches Ereigniskarten-Deck
-              </h4>
-              <button
-                type="button"
-                onClick={addCard}
-                className="inline-flex items-center gap-1 rounded border border-hero-border px-2 py-1 font-barlow font-bold text-xs uppercase text-gray-300 hover:border-hero-vibrant hover:text-hero-vibrant"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Karte
-              </button>
-            </div>
-            <p className="font-libre text-xs text-gray-500">
-              Leer starten ist erlaubt. Noch kein automatisches Ausspielen in der Live-Session.
-            </p>
-            {[...value.cityEventDeck]
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((card, index) => (
-                <div
-                  key={card.id}
-                  className="space-y-2 rounded border border-hero-dark bg-slate-950/50 p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-barlow text-xs uppercase text-gray-500">
-                      Karte {index + 1}
-                    </span>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moveCard(index, -1)}
-                        disabled={index === 0}
-                        className="rounded border border-hero-dark p-1 text-gray-400 hover:text-accent-gold disabled:opacity-30"
-                        aria-label="Nach oben"
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveCard(index, 1)}
-                        disabled={index >= value.cityEventDeck.length - 1}
-                        className="rounded border border-hero-dark p-1 text-gray-400 hover:text-accent-gold disabled:opacity-30"
-                        aria-label="Nach unten"
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeCard(index)}
-                        className="rounded border border-hero-dark p-1 text-gray-400 hover:text-accent-blood"
-                        aria-label="Löschen"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="text"
-                    value={card.title}
-                    onChange={(e) => updateCard(index, { title: e.target.value })}
-                    placeholder="Titel"
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                  />
-                  <textarea
-                    value={card.text}
-                    onChange={(e) => updateCard(index, { text: e.target.value })}
-                    rows={2}
-                    placeholder="Kartentext"
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm font-libre focus:border-hero-vibrant outline-none resize-y"
-                  />
-                  <input
-                    type="text"
-                    value={card.trigger ?? ""}
-                    onChange={(e) =>
-                      updateCard(index, { trigger: e.target.value || null })
-                    }
-                    placeholder="Auslöser (optional, ein Satz)"
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                  />
-                </div>
-              ))}
-          </div>
+          <NpcCityPowers value={value} onChange={onChange} />
         </div>
       )}
     </div>

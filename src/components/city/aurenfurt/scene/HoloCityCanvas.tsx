@@ -45,6 +45,12 @@ type Props = {
   editingSectors?: DistrictSector[];
   /** true = Vorschau vor dem Speichern (dezente Linien). */
   editingSectorsPreview?: boolean;
+  eventPickSectors?: DistrictSector[];
+  eventSectorIds?: string[];
+  onPickEventSector?: (sector: DistrictSector) => void;
+  /** Kamera bleibt stehen, z. B. während der Ort auf der Karte gewählt wird. */
+  holdStill?: boolean;
+  highlightDistricts?: boolean;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   buildingPositions: BuildingPositions;
@@ -127,6 +133,11 @@ export default function HoloCityCanvas({
   polygons,
   editingSectors = [],
   editingSectorsPreview = false,
+  eventPickSectors = [],
+  eventSectorIds = [],
+  onPickEventSector,
+  holdStill = false,
+  highlightDistricts = false,
   buildings,
   pois,
   buildingPositions,
@@ -236,6 +247,10 @@ export default function HoloCityCanvas({
               polygons={polygons}
               editingSectors={editingSectors}
               editingSectorsPreview={editingSectorsPreview}
+              eventPickSectors={eventPickSectors}
+              eventSectorIds={eventSectorIds}
+              onPickEventSector={onPickEventSector}
+              highlightDistricts={highlightDistricts}
               buildings={buildings}
               pois={pois}
               buildingPositions={buildingPositions}
@@ -279,7 +294,7 @@ export default function HoloCityCanvas({
             enableZoom={!rotateLocked}
             enableDamping={!cameraDrawLock}
             dampingFactor={0.08}
-            autoRotate={!selection && !editMode && !rotateLocked}
+            autoRotate={!selection && !editMode && !rotateLocked && !holdStill}
             autoRotateSpeed={0.28}
             minPolarAngle={0}
             maxPolarAngle={cameraDrawLock ? 0 : 1.15}
