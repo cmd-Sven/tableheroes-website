@@ -13,15 +13,12 @@ import {
 } from "../item-meta";
 import { defaultSpellAbilityForClass } from "../spellcasting";
 import {
-  cantripsKnownForClass,
-  cantripsKnownForThirdCaster,
   isThirdCasterSubclass,
   slotsForClassLevel,
-  spellListClassIdForSubclass,
   spellsKnownForClass,
   spellsKnownForThirdCaster,
 } from "./spell-slots";
-import { resolveClassId } from "./class-ids";
+import { CLASS_IDS, resolveClassId } from "./class-ids";
 import { CLASS_NAME_DE, CLASS_NAME_EN } from "./labels-de";
 import {
   getClassProgression,
@@ -343,10 +340,9 @@ export function canLearnSpellFromCatalog(
   characterLevel: number,
   subclass?: string | null,
 ): { ok: boolean; reason?: string } {
+  // Charakterblatt-Katalog: keine Klassenliste. Volk, Hintergrund und
+  // freie Wahl dürfen jeden Zauber und jeden Cantrip ins Buch legen.
   const classId = resolveClassId(className);
-  if (!classId) return { ok: false, reason: "no-class" };
-  const listClassId = spellListClassIdForSubclass(classId, subclass) ?? classId;
-  if (!def.classes.includes(listClassId)) return { ok: false, reason: "wrong-class" };
 
   const existing = sheet.spells ?? [];
   if (
@@ -368,14 +364,9 @@ export function canLearnSpellFromCatalog(
 
   const third = isThirdCasterSubclass(subclass);
 
+  // Cantrips are not capped by the class table — racial/background tricks
+  // (e.g. Mage Hand on a cleric) must stay addable.
   if (def.level <= 0) {
-    const cap = third
-      ? cantripsKnownForThirdCaster(characterLevel)
-      : cantripsKnownForClass(classId, characterLevel);
-    if (cap != null) {
-      const current = countSpellsOfLevel(existing, 0);
-      if (current >= cap) return { ok: false, reason: "cantrip-limit" };
-    }
     return { ok: true };
   }
 
@@ -408,8 +399,9 @@ export function canLearnSpellFromCatalog(
 }
 
 /**
- * Klassenliste für den Katalog-Picker.
- * Filtert nach verfügbarem Slot-Grad (Sheet ODER Klassenstufe), inkl. Cantrips.
+ * Voller Zauberkatalog für den Charakterblatt-Picker.
+ * Keine Klassen-, Volks- oder Hintergrundsliste — nur der verfügbare Slot-Grad
+ * begrenzt abgestufte Zauber. Cantrips (Grad 0) sind immer dabei.
  */
 export function catalogSpellsForPicker(
   className: string | null,
@@ -417,20 +409,55 @@ export function catalogSpellsForPicker(
   subclass?: string | null,
   characterLevel?: number,
 ): SpellDefinition[] {
-  const classId = resolveClassId(className);
-  if (!classId) return [];
-  const listClassId = spellListClassIdForSubclass(classId, subclass) ?? classId;
   const level = Math.max(1, Math.floor(characterLevel ?? 1));
   const maxLvl = effectiveMaxSlotLevel(sheet, className, level, subclass);
-  // Cantrips always; leveled spells only up to available slot grade.
-  // If somehow maxLvl is 0 (non-caster / L1 before slots), still show cantrips.
-  return getSpellsForClass(listClassId, maxLvl > 0 ? maxLvl : 0).sort(
-    (a, b) => a.level - b.level || a.nameEn.localeCompare(b.nameEn),
-  );
+  const cap = maxLvl > 0 ? maxLvl : 0;
+  return getSpells()
+    .filter((s) => s.level <= cap)
+    .sort((a, b) => a.level - b.level || a.nameEn.localeCompare(b.nameEn));
 }
 
 export function classDisplayName(classId: ClassId, locale: "de" | "en"): string {
   return locale === "de" ? CLASS_NAME_DE[classId] : CLASS_NAME_EN[classId];
+}
+
+/** Anzeigename im Zauberkatalog. Warlock heißt dort Hexenmeister, nicht Hexer. */
+const SPELL_CATALOG_CLASS_DE: Partial<Record<ClassId, string>> = {
+  warlock: "Hexenmeister",
+};
+
+const SPELL_CATALOG_CLASS_ORDER: ClassId[] = [
+  "cleric",
+  "paladin",
+  "bard",
+  "wizard",
+  "warlock",
+  "druid",
+  "ranger",
+  "sorcerer",
+  ...CLASS_IDS,
+];
+
+/** Alle Klassenlisten eines Zaubers, als Beschriftung — keine Auswahl-Sperre. */
+export function spellCatalogClassLabels(
+  classes: readonly string[],
+  locale: "de" | "en",
+): string[] {
+  const seen = new Set<ClassId>();
+  for (const raw of classes) {
+    const id = resolveClassId(raw) ?? (CLASS_IDS.includes(raw as ClassId) ? (raw as ClassId) : null);
+    if (id) seen.add(id);
+  }
+  return [...seen]
+    .sort(
+      (a, b) =>
+        SPELL_CATALOG_CLASS_ORDER.indexOf(a) - SPELL_CATALOG_CLASS_ORDER.indexOf(b),
+    )
+    .map((id) =>
+      locale === "de"
+        ? SPELL_CATALOG_CLASS_DE[id] ?? CLASS_NAME_DE[id]
+        : CLASS_NAME_EN[id],
+    );
 }
 
 function shopEntryToMeta(entry: ShopCatalogItem): Dnd5eItemMeta {

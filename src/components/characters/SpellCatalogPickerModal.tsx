@@ -7,12 +7,11 @@ import type { SpellDefinition } from "@/src/lib/characters/dnd5e/progression/typ
 import {
   canLearnSpellFromCatalog,
   catalogSpellsForPicker,
-  classDisplayName,
   countSpellsOfLevel,
   effectiveSlotMaxForLevel,
+  spellCatalogClassLabels,
   spellDefinitionToSheetEntry,
 } from "@/src/lib/characters/dnd5e/progression/catalog-bridge";
-import { resolveClassId } from "@/src/lib/characters/dnd5e/progression/class-ids";
 import { spellSchoolLabel } from "@/src/lib/characters/dnd5e/spellcasting";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
 
@@ -73,6 +72,7 @@ function CatalogSpellRow({
       ? def.descriptionDe?.trim() || def.descriptionEn?.trim() || null
       : def.descriptionEn?.trim() || def.descriptionDe?.trim() || null;
   const school = spellSchoolLabel(def.school, locale);
+  const classLabels = spellCatalogClassLabels(def.classes, locale);
 
   function reasonLabel(reason?: string): string {
     if (!reason) return "";
@@ -104,6 +104,11 @@ function CatalogSpellRow({
             {def.ritual ? ` · ${t("spells.ritual")}` : ""}
             {def.concentration ? ` · ${t("spells.concentration")}` : ""}
           </p>
+          {classLabels.length > 0 ? (
+            <p className="mt-0.5 font-barlow text-[10px] font-bold tracking-wide text-accent-gold">
+              {classLabels.join(" · ")}
+            </p>
+          ) : null}
           {allowAdd && !check.ok ? (
             <p className="mt-0.5 font-libre text-[10px] text-accent-blood">
               {reasonLabel(check.reason)}
@@ -166,11 +171,10 @@ export function SpellCatalogPickerModal({
   onClose,
   onAdd,
 }: Props) {
-  const { t, locale } = useCharacterSheetLocale();
+  const { t } = useCharacterSheetLocale();
   const allowAdd = browseOnly ? false : allowAddProp;
   const [query, setQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | "all">("all");
-  const classId = resolveClassId(characterClass);
 
   const all = useMemo(
     () => catalogSpellsForPicker(characterClass, sheet, characterSubclass, level),
@@ -210,10 +214,6 @@ export function SpellCatalogPickerModal({
     onAdd(spellDefinitionToSheetEntry(def));
   }
 
-  const classLabel = classId
-    ? classDisplayName(classId, locale)
-    : t("spellCatalog.noClass");
-
   return (
     <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-hero-border bg-background-card shadow-2xl">
@@ -224,7 +224,7 @@ export function SpellCatalogPickerModal({
               {browseOnly ? t("spellCatalog.titleBrowse") : t("spellCatalog.title")}
             </h2>
             <p className="mt-1 font-libre text-xs text-gray-400">
-              {t("spellCatalog.subtitle", { class: classLabel })}
+              {t("spellCatalog.subtitle")}
             </p>
           </div>
           <button
@@ -299,11 +299,7 @@ export function SpellCatalogPickerModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-3">
-          {!classId ? (
-            <p className="font-libre text-sm text-accent-blood">
-              {t("spellCatalog.pickClassFirst")}
-            </p>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="font-libre text-sm text-gray-500">{t("spellCatalog.empty")}</p>
           ) : (
             <ul className="space-y-2">

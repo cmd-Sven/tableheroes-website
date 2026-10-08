@@ -5,10 +5,11 @@ import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
   getItemDisplayCategory,
+  isMagicalItem,
   isStandardCategory,
 } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { ItemEffectInfoButton, MAGICAL_ITEM_RING_CLASS } from "./ItemEffectInfoButton";
 import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
-import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
 import type { InventoryCustomCategory } from "@/src/lib/characters/dnd5e/equipment-types";
 import { DRAG_MIME } from "@/src/lib/characters/dnd5e/slot-validation";
 import { setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
@@ -62,11 +63,10 @@ export function EquippedSlotTile({
   }
 
   const stats = resolveCharacterItemStats(item);
-  const meta = parseDnd5eMetaFromDescription(item.description);
   const cat = getItemDisplayCategory(item, customCategories);
   const Icon = isStandardCategory(cat) ? CATEGORY_ICONS[cat] : CATEGORY_ICONS.unknown;
   const colorClass = isStandardCategory(cat) ? CATEGORY_COLORS[cat] : CATEGORY_COLORS.unknown;
-  const isMagical = stats.isMagical || Boolean(meta?.isMagical);
+  const isMagical = isMagicalItem(item);
 
   function handleDragStart(e: React.DragEvent) {
     if (readOnly || disabled) {
@@ -102,12 +102,13 @@ export function EquippedSlotTile({
             : isDragOver
               ? "ring-2 ring-hero-vibrant/80"
               : isMagical
-                ? "ring-1 ring-accent-gold/80 shadow-[0_0_6px_rgba(202,185,38,0.3)]"
+                ? MAGICAL_ITEM_RING_CLASS
                 : ""
         } ${readOnly || disabled ? "cursor-default" : "cursor-pointer active:cursor-grabbing"}`}
       >
         <Icon className="h-5 w-5 shrink-0 opacity-95" />
       </button>
+      <ItemEffectInfoButton item={item} />
 
       <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 group-hover:block">
         <div className="max-w-[10rem] whitespace-normal rounded border border-hero-border bg-background-card px-2 py-1 shadow-lg">

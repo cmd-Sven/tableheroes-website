@@ -250,11 +250,13 @@ export async function resolveLiveDiceSheetModifier(input: {
       weaponFilter != null && weaponFilter.length > 0
         ? attacks.find((a) => a.name === weaponFilter) ?? attacks[0] ?? null
         : attacks[0] ?? null;
-    // Angriffswurf ist ein W20-Test → Erschöpfung abziehen (equipment-Bonus enthält sie nicht).
-    const bonus = (matched?.attackBonus ?? 0) + exhaustionPenalty + bonusMalus;
+    // Angriffswurf ist ein W20-Test → Erschöpfung nur in `modifier` (Wurf),
+    // nicht in `attackBonus`. Der Klammerwert im Chat bleibt Stärke/Übung/Magie.
+    const weaponBonus = (matched?.attackBonus ?? 0) + bonusMalus;
+    const bonus = weaponBonus + exhaustionPenalty;
     return {
       modifier: Math.round(bonus),
-      attackBonus: Math.round(bonus),
+      attackBonus: Math.round(weaponBonus),
       weaponName: matched?.name ?? input.weaponName ?? "Waffe",
       damage: matched?.damage ?? null,
       source: matched ? "sheet" : "client",

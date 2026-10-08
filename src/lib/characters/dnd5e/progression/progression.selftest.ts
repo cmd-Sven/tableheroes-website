@@ -24,6 +24,7 @@ import { getBackgrounds } from "./catalog";
 import {
   canLearnSpellFromCatalog,
   catalogSpellsForPicker,
+  spellCatalogClassLabels,
   effectiveSlotMaxForLevel,
   maxSlotLevelFromClass,
   spellDefinitionToSheetEntry,
@@ -826,8 +827,12 @@ function run() {
   assert.ok(wizCatalogL5.some((s) => s.level === 3), "wizard L5 sees 3rd-level spells");
   assert.ok(!wizCatalogL5.some((s) => s.level === 4), "wizard L5 has no 4th-level slots yet");
   assert.ok(
-    wizCatalogL5.every((s) => s.classes.includes("wizard")),
-    "wizard catalog only wizard-list spells",
+    wizCatalogL5.some((s) => s.id === "mage-hand"),
+    "catalog includes Mage Hand regardless of class list",
+  );
+  assert.ok(
+    wizCatalogL5.some((s) => !s.classes.includes("wizard")),
+    "wizard sheet catalog is not limited to the wizard list",
   );
   assert.ok(
     wizCatalogL5.every((s) => (s.descriptionDe?.trim() || s.descriptionEn?.trim())),
@@ -837,8 +842,39 @@ function run() {
   const clericCatalogL3 = catalogSpellsForPicker("cleric", emptyCasterSheet, "life", 3);
   assert.ok(clericCatalogL3.some((s) => s.level === 2), "cleric L3 sees 2nd-level spells");
   assert.ok(
-    clericCatalogL3.every((s) => s.classes.includes("cleric")),
-    "cleric catalog only cleric-list spells",
+    clericCatalogL3.some((s) => s.id === "mage-hand"),
+    "cleric catalog includes Mage Hand",
+  );
+  assert.ok(
+    clericCatalogL3.some((s) => !s.classes.includes("cleric")),
+    "cleric catalog is not limited to the cleric list",
+  );
+
+  const mageHand = getSpells().find((s) => s.id === "mage-hand");
+  assert.ok(mageHand, "Mage Hand exists in the spell catalog data");
+  assert.equal(mageHand!.level, 0);
+  assert.deepEqual(
+    spellCatalogClassLabels(mageHand!.classes, "de"),
+    ["Barde", "Magier", "Hexenmeister", "Zauberer"],
+    "Mage Hand lists every class in German",
+  );
+  assert.equal(
+    canLearnSpellFromCatalog(emptyCasterSheet, mageHand!, "cleric", 3, "life").ok,
+    true,
+    "cleric can add Mage Hand",
+  );
+  const clericCantripCap = cantripsKnownForClass("cleric", 3) ?? 3;
+  const cappedCantrips = getSpells()
+    .filter((s) => s.level === 0 && s.classes.includes("cleric"))
+    .slice(0, clericCantripCap);
+  const cappedCleric = {
+    ...emptyCasterSheet,
+    spells: cappedCantrips.map((s) => spellDefinitionToSheetEntry(s)),
+  };
+  assert.equal(
+    canLearnSpellFromCatalog(cappedCleric, mageHand!, "cleric", 3, "life").ok,
+    true,
+    "cleric at cantrip cap can still add Mage Hand",
   );
 
   const fireball = getSpells().find((s) => s.id === "fireball");

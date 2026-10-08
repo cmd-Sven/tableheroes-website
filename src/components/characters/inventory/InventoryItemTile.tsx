@@ -6,8 +6,11 @@ import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
   getItemDisplayCategory,
+  isMagicalItem,
   isStandardCategory,
 } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { getSpecialItemFlags } from "@/src/lib/characters/dnd5e/item-effect-info";
+import { ItemEffectInfoButton, MAGICAL_ITEM_RING_CLASS } from "./ItemEffectInfoButton";
 import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
 import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
 import type { InventoryCustomCategory } from "@/src/lib/characters/dnd5e/equipment-types";
@@ -43,7 +46,8 @@ export function InventoryItemTile({
   const cat = getItemDisplayCategory(item, customCategories);
   const Icon = isStandardCategory(cat) ? CATEGORY_ICONS[cat] : CATEGORY_ICONS.unknown;
   const colorClass = isStandardCategory(cat) ? CATEGORY_COLORS[cat] : CATEGORY_COLORS.unknown;
-  const isMagical = stats.isMagical || Boolean(meta?.isMagical);
+  const isMagical = isMagicalItem(item);
+  const hasEffectInfo = getSpecialItemFlags(item) != null;
   const isNew = isHighlighted || isRecentlyCreatedItem(item);
 
   function handleDragStart(e: React.DragEvent) {
@@ -74,16 +78,20 @@ export function InventoryItemTile({
         }}
         title={`${item.name}\n${stats.weightLb} lb${meta?.rarity ? ` · ${meta.rarity}` : ""}${meta?.valueGp ? ` · ${meta.valueGp} gp` : ""}${isMagical ? ` · ${t("inventory.magical")}` : ""}${isNew ? ` · ${t("inventory.newItem")}` : ""}`}
         className={`relative flex h-10 w-10 flex-col items-center justify-center rounded border transition-transform hover:scale-[1.06] ${colorClass} ${
-          isNew
-            ? "ring-2 ring-hero-vibrant/90 shadow-[0_0_10px_rgba(55,152,6,0.45)]"
-            : isMagical
-              ? "ring-1 ring-accent-gold/80 shadow-[0_0_6px_rgba(202,185,38,0.3)]"
+          isMagical
+            ? MAGICAL_ITEM_RING_CLASS
+            : isNew
+              ? "ring-2 ring-hero-vibrant/90 shadow-[0_0_10px_rgba(55,152,6,0.45)]"
               : ""
         } ${readOnly ? "cursor-default" : "cursor-pointer active:cursor-grabbing"}`}
       >
         <Icon className="h-5 w-5 shrink-0 opacity-95" />
         {quantity > 1 ? (
-          <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-hero-vibrant bg-background-card px-0.5 font-barlow text-[7px] font-bold text-hero-vibrant">
+          <span
+            className={`absolute flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-hero-vibrant bg-background-card px-0.5 font-barlow text-[7px] font-bold text-hero-vibrant ${
+              hasEffectInfo ? "-bottom-1 -right-1" : "-right-1 -top-1"
+            }`}
+          >
             {quantity}
           </span>
         ) : null}
@@ -93,6 +101,7 @@ export function InventoryItemTile({
           </span>
         ) : null}
       </button>
+      <ItemEffectInfoButton item={item} />
 
       <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 group-hover:block">
         <div className="whitespace-nowrap rounded border border-hero-border bg-background-card px-2 py-1 shadow-lg">

@@ -153,16 +153,20 @@ export function validateItemForSlot(
 }
 
 /**
- * Gürtel-Schnellzugriff: alles erlaubt außer Waffen, Rüstungen und Schilde.
+ * Gürtel-Schnellzugriff: Waffen sind erlaubt (D&D 2024, Wechsel ohne Extra-Aktion).
+ * Rüstungen und Schilde bleiben gesperrt.
  */
 export function validateItemForBelt(item: CharacterItem): SlotValidationResult {
   const stats = resolveCharacterItemStats(item);
   const n = item.name.toLowerCase();
 
-  if (stats.kind === "weapon" || item.category === "Weapon") {
+  if (stats.isShield) {
     return { valid: false, reason: "belt_forbidden" };
   }
-  if (stats.kind === "armor" || stats.isShield) {
+  if (stats.kind === "weapon" || item.category === "Weapon") {
+    return { valid: true };
+  }
+  if (stats.kind === "armor") {
     return { valid: false, reason: "belt_forbidden" };
   }
   if (
