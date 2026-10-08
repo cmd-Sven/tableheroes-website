@@ -17,6 +17,11 @@ import {
   clampExhaustionLevel,
   exhaustionD20Penalty,
 } from "@/src/lib/characters/dnd5e/exhaustion";
+import {
+  proficiencyBonus,
+  skillProficiencyBonus,
+} from "@/src/lib/characters/dnd5e/formulas";
+import { matchProficiencyEntry } from "@/src/lib/characters/dnd5e/progression/proficiencies-catalog";
 import { isGmDiceRollerId } from "@/src/lib/session/dice-skins";
 import type { CharacterItem, InventoryCategory } from "@/src/types/inventory";
 import { INVENTORY_CATEGORIES } from "@/src/types/inventory";
@@ -36,9 +41,29 @@ export type ResolvedSheetModifier = {
    * als „Erschöpfung −N“ gezeigt wird. 0, wenn nicht angewendet.
    */
   exhaustionPenalty?: number;
+  /**
+   * Anteil, der bereits in `modifier` steckt und im Chat separat
+   * als „Übung +N“ gezeigt wird. 0, wenn keine Übung greift.
+   */
+  proficiencyBonus?: number;
 };
 
 const SKILL_KEYS = new Set(Object.keys(DND5E_SKILL_BY_KEY));
+
+function toolProficiencyBonus(tools: string[], label: string, pb: number): number {
+  const needle = label.trim().toLowerCase();
+  if (!needle || pb <= 0) return 0;
+  for (const tool of tools) {
+    const raw = tool.trim();
+    if (!raw) continue;
+    const lower = raw.toLowerCase();
+    if (needle.includes(lower) || lower.includes(needle)) return pb;
+    const listed = matchProficiencyEntry(raw, "tools");
+    const asked = matchProficiencyEntry(label, "tools");
+    if (listed && asked && listed.id === asked.id) return pb;
+  }
+  return 0;
+}
 
 function isAbilityKey(v: string): v is AbilityKey {
   return (ABILITY_KEYS as readonly string[]).includes(v);
@@ -114,9 +139,14 @@ export async function resolveLiveDiceSheetModifier(input: {
     // Freie Würfe: Erschöpfung nur auf W20-Proben (nicht auf reinen Schaden-Pools).
     const applyD20Extras = input.applyExhaustionToD20 !== false;
     const appliedExhaustion = applyD20Extras ? exhaustionPenalty : 0;
+    const toolPb =
+      applyD20Extras && input.label
+        ? toolProficiencyBonus(sheet.proficiencies?.tools ?? [], input.label, proficiencyBonus(level))
+        : 0;
     const mod =
       clientMod +
       appliedExhaustion +
+      toolPb +
       (applyD20Extras ? bonusMalus : 0);
     return {
       modifier: mod,
@@ -124,6 +154,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       label: input.label,
       exhaustionLevel,
       exhaustionPenalty: appliedExhaustion,
+      proficiencyBonus: toolPb,
     };
   }
 
@@ -140,12 +171,23 @@ export async function resolveLiveDiceSheetModifier(input: {
     }
     const total = derived.skills[key]?.total ?? 0;
     const def = DND5E_SKILL_BY_KEY[key];
+    const skillEntry = sheet.skills[key] ?? { proficient: "none" as const };
+    const pb = proficiencyBonus(level);
+    const skillPb =
+      skillEntry.bonusOverride != null && !Number.isNaN(skillEntry.bonusOverride)
+        ? 0
+        : skillProficiencyBonus(skillEntry.proficient, pb);
+    const toolPb =
+      skillPb > 0
+        ? 0
+        : toolProficiencyBonus(sheet.proficiencies?.tools ?? [], def.labelDe, pb);
     return {
-      modifier: Math.round(total) + bonusMalus,
+      modifier: Math.round(total) + toolPb + bonusMalus,
       label: input.label ?? def.labelDe,
       source: "sheet",
       exhaustionLevel,
       exhaustionPenalty,
+      proficiencyBonus: skillPb || toolPb,
     };
   }
 
@@ -161,12 +203,14 @@ export async function resolveLiveDiceSheetModifier(input: {
       };
     }
     const total = derived.savingThrows[key]?.total ?? 0;
+    const saveProficient = sheet.savingThrows[key]?.proficient === true;
     return {
       modifier: Math.round(total) + bonusMalus,
       label: input.label,
       source: "sheet",
       exhaustionLevel,
       exhaustionPenalty,
+      proficiencyBonus: saveProficient ? proficiencyBonus(level) : 0,
     };
   }
 
@@ -216,6 +260,7 @@ export async function resolveLiveDiceSheetModifier(input: {
       source: matched ? "sheet" : "client",
       exhaustionLevel,
       exhaustionPenalty,
+      proficiencyBonus: matched?.proficiencyBonus ?? 0,
     };
   }
 

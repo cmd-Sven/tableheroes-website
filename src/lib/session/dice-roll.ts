@@ -115,16 +115,32 @@ export function formatExhaustionChatTerm(penalty: number): string {
 /** Passt zu formatExhaustionChatTerm — nur dieser Anteil wird im Chat rot. */
 export const EXHAUSTION_CHAT_TERM_RE = /Erschöpfung [+−]\d+/g;
 
+/** Übungsbonus aus dem Charakterblatt — im Chat blau. */
+export const PROFICIENCY_CHAT_TERM_RE = /Übung \+\d+/g;
+
+export function formatProficiencyChatTerm(bonus: number): string {
+  const n = Math.round(bonus);
+  if (n <= 0) return "";
+  return `Übung +${n}`;
+}
+
 /**
- * Modifikatorenkette. `modifier` enthält den Erschöpfungsmalus bereits.
- * Erschöpfung wird als eigener Term ausgewiesen, nicht in die andere Zahl gefaltet.
+ * Modifikatorenkette. `modifier` enthält Erschöpfung und Übung bereits.
+ * Beide werden als eigene Terme ausgewiesen, nicht in die andere Zahl gefaltet.
  */
-function formatModifierChain(modifier: number, exhaustionPenalty = 0): string {
+function formatModifierChain(
+  modifier: number,
+  exhaustionPenalty = 0,
+  proficiencyBonus = 0,
+): string {
   const exh = Math.round(exhaustionPenalty) || 0;
-  const base = modifier - exh;
+  const prof = Math.max(0, Math.round(proficiencyBonus) || 0);
+  const base = modifier - exh - prof;
   const parts: string[] = [];
   if (base > 0) parts.push(` + ${base}`);
   else if (base < 0) parts.push(` − ${Math.abs(base)}`);
+  const profTerm = formatProficiencyChatTerm(prof);
+  if (profTerm) parts.push(` + ${profTerm}`);
   const exhTerm = formatExhaustionChatTerm(exh);
   if (exhTerm) parts.push(` + ${exhTerm}`);
   return parts.join("");
@@ -135,13 +151,14 @@ export function formatDiceBreakdown(
   rolls: number[],
   usedRoll: number,
   modifier: number,
-  opts?: { mode?: DiceRollMode; dice?: number; exhaustionPenalty?: number },
+  opts?: { mode?: DiceRollMode; dice?: number; exhaustionPenalty?: number; proficiencyBonus?: number },
 ): string {
   const exhaustionPenalty = opts?.exhaustionPenalty ?? 0;
-  const modStr = formatModifierChain(modifier, exhaustionPenalty);
+  const proficiencyBonus = opts?.proficiencyBonus ?? 0;
+  const modStr = formatModifierChain(modifier, exhaustionPenalty, proficiencyBonus);
   const mode = opts?.mode ?? "normal";
   const dice = opts?.dice ?? rolls.length;
-  const hasTerms = modifier !== 0 || exhaustionPenalty !== 0;
+  const hasTerms = modifier !== 0 || exhaustionPenalty !== 0 || proficiencyBonus !== 0;
 
   if (mode === "advantage" || mode === "disadvantage") {
     const tag = mode === "advantage" ? "VOR" : "NACH";
@@ -197,6 +214,7 @@ export function executeDicePool(
   rng: () => number = Math.random,
   seed?: string,
   exhaustionPenalty = 0,
+  proficiencyBonus = 0,
 ): DiceRollOutcome {
   const pool = normalizeDicePool(groups);
   if (pool.length === 0) {
@@ -252,13 +270,14 @@ export function executeDicePool(
   const isFumble = onlySingleD20 && usedRoll === 1;
   const primarySides = pool[0]!.sides;
   const formula = formatDicePoolFormula(pool, modifier);
-  const modStr = formatModifierChain(modifier, exhaustionPenalty);
+  const modStr = formatModifierChain(modifier, exhaustionPenalty, proficiencyBonus);
   const display =
     chatChunks.length === 1 && !applyAdv
       ? formatDiceBreakdown(rolls, usedRoll, modifier, {
           mode,
           dice: pool[0]!.count,
           exhaustionPenalty,
+          proficiencyBonus,
         })
       : `${chatChunks.join(" + ")}${modStr} = ${total}`;
 
@@ -286,6 +305,7 @@ export function executeDiceRoll(
   rng: () => number = Math.random,
   seed?: string,
   exhaustionPenalty = 0,
+  proficiencyBonus = 0,
 ): DiceRollOutcome {
   return executeDicePool(
     [{ count: parsed.dice, sides: parsed.sides }],
@@ -294,6 +314,7 @@ export function executeDiceRoll(
     rng,
     seed,
     exhaustionPenalty,
+    proficiencyBonus,
   );
 }
 

@@ -7,6 +7,31 @@ import { parseDowntimeConfig } from "@/src/lib/travel-fap-config";
 import type { FateCoin } from "@/src/components/session/FateCoinsPool";
 import type { LiveState, StageVisibilityPatch } from "./live-session-types";
 
+/**
+ * Postgres-Payloads ersetzen die Zeile komplett. Fehlt `system_logs` im Payload,
+ * bleiben die lokalen Einträge. Frische lokale Würfe, die der Server noch nicht
+ * zurückgespielt hat, bleiben kurz erhalten, damit ein veraltetes Payload sie
+ * nicht wegwischt. Ältere lokale IDs, die der Server nicht mehr führt, fallen weg
+ * (Löschen / Leeren).
+ */
+export function mergeSystemLogs<T extends { id: string; at: string }>(
+  prev: T[] | null | undefined,
+  incoming: T[],
+  incomingPresent: boolean,
+): T[] {
+  const previous = prev ?? [];
+  if (!incomingPresent) return previous;
+  const byId = new Map<string, T>();
+  for (const entry of incoming) byId.set(entry.id, entry);
+  const cutoff = Date.now() - 20_000;
+  for (const entry of previous) {
+    if (byId.has(entry.id)) continue;
+    const at = Date.parse(entry.at);
+    if (Number.isFinite(at) && at >= cutoff) byId.set(entry.id, entry);
+  }
+  return [...byId.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(-120);
+}
+
 export function normalizePhysicallyPresentUserIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((x) => String(x)).filter((id) => id.length > 0);

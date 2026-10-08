@@ -55,7 +55,7 @@ export function CharacterFapPanel({
       aria-label="Freizeitaktionspunkte"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold">
+        <h3 className="min-w-0 font-barlow text-xs font-bold uppercase leading-tight tracking-wide text-accent-gold">
           FAP — Freizeitaktionspunkte
         </h3>
         {!isLeisure && currentDay > 0 ? (

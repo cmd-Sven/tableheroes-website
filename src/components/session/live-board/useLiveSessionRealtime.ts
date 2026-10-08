@@ -56,7 +56,13 @@ import type {
   SessionBattlemapFogShape,
 } from "@/src/lib/session/battlemap-types";
 import type { LiveState } from "./live-session-types";
-import { normalizeLiveRow, normalizeStageVisibilityPatch, liveStatePollFingerprint } from "./live-session-normalize";
+import { normalizeLiveRow, normalizeStageVisibilityPatch, liveStatePollFingerprint, mergeSystemLogs } from "./live-session-normalize";
+import {
+  SESSION_ACTIVITY_POSTED_BROADCAST,
+  SESSION_ACTIVITY_POSTED_EVENT,
+  isSessionActivityEntry,
+  type SessionActivityPostedDetail,
+} from "@/src/lib/session/session-activity-bridge";
 import type { LiveSessionBattlemapState } from "./useLiveSessionBattlemapState";
 
 type Params = {
@@ -114,8 +120,17 @@ export function useLiveSessionRealtime({
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { ok?: boolean; live_state?: unknown };
         if (data.ok && data.live_state) {
-          const next = normalizeLiveRow(data.live_state);
+          const raw = data.live_state as Record<string, unknown>;
+          const normalized = normalizeLiveRow(data.live_state);
           const prev = liveStateRef.current;
+          const next = {
+            ...normalized,
+            system_logs: mergeSystemLogs(
+              prev?.system_logs,
+              normalized.system_logs ?? [],
+              Array.isArray(raw.system_logs),
+            ),
+          };
           if (prev && liveStatePollFingerprint(prev) === liveStatePollFingerprint(next)) {
             return;
           }
@@ -154,10 +169,21 @@ export function useLiveSessionRealtime({
         },
         (payload) => {
           if (payload.new) {
-            const next = normalizeLiveRow(payload.new);
-            liveStateRef.current = next;
-            setLiveState(next);
-            setBackgroundUrl(next.background_url || null);
+            const raw = payload.new as Record<string, unknown>;
+            const normalized = normalizeLiveRow(payload.new);
+            setLiveState((prev) => {
+              const next = {
+                ...normalized,
+                system_logs: mergeSystemLogs(
+                  prev?.system_logs,
+                  normalized.system_logs ?? [],
+                  Array.isArray(raw.system_logs),
+                ),
+              };
+              liveStateRef.current = next;
+              return next;
+            });
+            setBackgroundUrl(normalized.background_url || null);
           }
         },
       )
@@ -432,6 +458,26 @@ export function useLiveSessionRealtime({
           void registerSessionOnlinePresence(sessionId);
         }
       })
+      .on("broadcast", { event: SESSION_ACTIVITY_POSTED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as {
+          entry?: unknown;
+          senderId?: unknown;
+        };
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        if (!isSessionActivityEntry(raw.entry)) return;
+        const entry = raw.entry;
+        setLiveState((prev) => {
+          if (!prev) return prev;
+          const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
+          if (logs.some((l) => l.id === entry.id)) return prev;
+          const next = {
+            ...prev,
+            system_logs: [...logs, entry].slice(-120),
+          };
+          liveStateRef.current = next;
+          return next;
+        });
+      })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ user_id: userId });
@@ -450,6 +496,23 @@ export function useLiveSessionRealtime({
       supabase.removeChannel(channel);
     };
   }, [sessionId, showNpcReaction, supabase, userId, isGM, isGuest]);
+
+  useEffect(() => {
+    if (isGuest) return;
+    function onLocalActivity(e: Event) {
+      const detail = (e as CustomEvent<SessionActivityPostedDetail>).detail;
+      if (!detail?.entry || detail.remote) return;
+      void liveChannelRef.current?.send({
+        type: "broadcast",
+        event: SESSION_ACTIVITY_POSTED_BROADCAST,
+        payload: { entry: detail.entry, senderId: userId },
+      });
+    }
+    window.addEventListener(SESSION_ACTIVITY_POSTED_EVENT, onLocalActivity);
+    return () => {
+      window.removeEventListener(SESSION_ACTIVITY_POSTED_EVENT, onLocalActivity);
+    };
+  }, [isGuest, userId, liveChannelRef]);
 
   return { presentUserIds };
 }

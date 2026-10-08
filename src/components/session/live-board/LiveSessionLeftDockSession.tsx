@@ -12,6 +12,7 @@ import { LiveSessionLeftDockChronistSlot } from "./left-dock/LiveSessionLeftDock
 import { LiveSessionLeftDockTableSlot } from "./left-dock/LiveSessionLeftDockTableSlot";
 import { LiveSessionLeftDockPartySlot } from "./left-dock/LiveSessionLeftDockPartySlot";
 import { WeatherPngIcon } from "./WeatherPngIcon";
+import { dispatchSessionActivityPosted } from "@/src/lib/session/session-activity-bridge";
 import type { LeftPanelId } from "@/src/components/session/live-session-side-types";
 import type { TopToolbarPanelId } from "@/src/components/session/live-session-side-types";
 import type { PartyTrayMode } from "./LiveSessionPartyTray";
@@ -326,6 +327,7 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
               prepTestCharacterId={prepTestCharacterId}
               onPrepTestCharacterChange={setPrepTestCharacterId}
               onActivityPosted={(entry) => {
+                dispatchSessionActivityPosted({ entry });
                 setLiveState((prev) => {
                   if (!prev) return prev;
                   const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];

@@ -193,6 +193,7 @@ export async function requestLiveDiceRoll(
 
   const modifier = sheetMod.modifier;
   const exhaustionPenalty = sheetMod.exhaustionPenalty ?? 0;
+  const proficiencyBonus = Math.max(0, Math.round(sheetMod.proficiencyBonus ?? 0));
   const label = sheetMod.label ?? input.label;
   const weaponName = sheetMod.weaponName ?? input.weaponName;
   const attackBonus = sheetMod.attackBonus ?? input.attackBonus ?? modifier;
@@ -201,8 +202,8 @@ export async function requestLiveDiceRoll(
   const seed = randomBytes(16).toString("hex");
   const rng = createSeededRng(seed);
   const outcome = usePool
-    ? executeDicePool(groups, modifier, mode, rng, seed, exhaustionPenalty)
-    : executeDiceRoll({ dice, sides, modifier }, mode, rng, seed, exhaustionPenalty);
+    ? executeDicePool(groups, modifier, mode, rng, seed, exhaustionPenalty, proficiencyBonus)
+    : executeDiceRoll({ dice, sides, modifier }, mode, rng, seed, exhaustionPenalty, proficiencyBonus);
 
   const { type, text } = buildActivityText(input.kind, characterName, outcome, {
     label,
@@ -234,6 +235,7 @@ export async function requestLiveDiceRoll(
     display: outcome.display,
   };
   if (exhaustionPenalty !== 0) meta.exhaustionPenalty = exhaustionPenalty;
+  if (proficiencyBonus > 0) meta.proficiencyBonus = proficiencyBonus;
   if (dropNx !== undefined) meta.dropNx = dropNx;
   if (dropNy !== undefined) meta.dropNy = dropNy;
   if (

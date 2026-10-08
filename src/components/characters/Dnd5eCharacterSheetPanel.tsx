@@ -2449,7 +2449,8 @@ export function Dnd5eCharacterSheetPanel({
                 />
               ) : null}
 
-              <section className="rounded-lg border border-hero-dark bg-background-card p-4 grid grid-cols-2 gap-4">
+              <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(13.5rem,1.35fr)]">
                 <HitDiceTracker
                   hitDice={sheet.combat.hitDice}
                   hitDiceRemaining={sheet.combat.hitDiceRemaining}
@@ -2516,26 +2517,23 @@ export function Dnd5eCharacterSheetPanel({
                       {t("combat.exhaustionHint")}
                     </p>
                   </label>
-                  {downtimeContext ? (
-                    <div className="mt-4">
-                      <CharacterFapPanel
-                        config={downtimeContext.config}
-                        currentDay={downtimeContext.currentDay}
-                        totalDays={downtimeContext.totalDays}
-                        allocations={downtimeContext.allocations}
-                        compact
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-4">
-                      <CharacterFapPanel
-                        config={{ mode: "leisure" }}
-                        totalDays={1}
-                        compact
-                      />
-                    </div>
-                  )}
                 </div>
+                </div>
+                {downtimeContext ? (
+                  <CharacterFapPanel
+                    config={downtimeContext.config}
+                    currentDay={downtimeContext.currentDay}
+                    totalDays={downtimeContext.totalDays}
+                    allocations={downtimeContext.allocations}
+                    compact
+                  />
+                ) : (
+                  <CharacterFapPanel
+                    config={{ mode: "leisure" }}
+                    totalDays={1}
+                    compact
+                  />
+                )}
               </section>
 
               <section className="rounded-lg border border-hero-dark bg-background-card p-4 space-y-3">

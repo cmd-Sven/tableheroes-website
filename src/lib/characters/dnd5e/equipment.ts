@@ -19,6 +19,7 @@ import { abilityModifier, formatSigned, proficiencyBonus } from "./formulas";
 import { parseFoundryItemTag } from "./item-meta";
 import { parseDnd5eMetaFromDescription } from "./item-meta";
 import { isSimpleWeaponName } from "./weapon-catalog-lookup";
+import { matchProficiencyEntry } from "./progression/proficiencies-catalog";
 import {
   inferContainerKind,
   parseAdditiveAcFormula,
@@ -683,6 +684,8 @@ export type WeaponAttackPreview = {
   itemId: string;
   name: string;
   attackBonus: number;
+  /** Anteil des Angriffsbonus, der aus der Waffenübung kommt. */
+  proficiencyBonus: number;
   damage: string;
   notes: string;
 };
@@ -755,6 +758,19 @@ function findCharacterItemByRef(
   return items.find((i) => parseFoundryItemTag(i.description) === ref);
 }
 
+const SIMPLE_WEAPON_IDS = new Set([
+  "weapon-club",
+  "weapon-dagger",
+  "weapon-dart",
+  "weapon-javelin",
+  "weapon-mace",
+  "weapon-quarterstaff",
+  "weapon-sickle",
+  "weapon-spear",
+  "weapon-sling",
+  "weapon-light-crossbow",
+]);
+
 function hasWeaponProficiency(
   sheet: Dnd5eSheetData,
   item: CharacterItem,
@@ -762,6 +778,25 @@ function hasWeaponProficiency(
 ): boolean {
   const weapons = sheet.proficiencies?.weapons ?? [];
   if (weapons.length === 0) return true;
+
+  const listed = new Set<string>();
+  for (const raw of weapons) {
+    const matched = matchProficiencyEntry(raw, "weapons");
+    if (matched) listed.add(matched.id);
+  }
+  const itemMatch = matchProficiencyEntry(item.name, "weapons");
+  if (itemMatch) {
+    if (listed.has(itemMatch.id)) return true;
+    if (listed.has("weapon-simple") && SIMPLE_WEAPON_IDS.has(itemMatch.id)) return true;
+    if (
+      listed.has("weapon-martial") &&
+      itemMatch.id !== "weapon-simple" &&
+      itemMatch.id !== "weapon-martial" &&
+      !SIMPLE_WEAPON_IDS.has(itemMatch.id)
+    ) {
+      return true;
+    }
+  }
 
   const n = item.name.toLowerCase();
   const joined = weapons.join(" ").toLowerCase();
@@ -863,16 +898,16 @@ export function computeEquippedWeaponAttacks(
       : useDex
         ? dexMod
         : strMod;
-    const prof = hasWeaponProficiency(sheet, item, stats) ? pb : 0;
+    const proficient = hasWeaponProficiency(sheet, item, stats);
+    const override =
+      sheetAttack?.attackBonusOverride != null &&
+      Number.isFinite(sheetAttack.attackBonusOverride);
+    const prof = proficient && !override ? pb : 0;
     const magicalBonus = resolveWeaponMagicalBonus(stats, item);
 
-    let attackBonus = abMod + prof + magicalBonus;
-    if (
-      sheetAttack?.attackBonusOverride != null &&
-      Number.isFinite(sheetAttack.attackBonusOverride)
-    ) {
-      attackBonus = Math.round(sheetAttack.attackBonusOverride);
-    }
+    const attackBonus = override
+      ? Math.round(sheetAttack!.attackBonusOverride!)
+      : abMod + prof + magicalBonus;
 
     const damageDice =
       stats.damage ??
@@ -901,6 +936,7 @@ export function computeEquippedWeaponAttacks(
       itemId: item.id,
       name: item.name,
       attackBonus,
+      proficiencyBonus: prof,
       damage,
       notes,
     });

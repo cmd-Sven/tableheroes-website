@@ -23,6 +23,7 @@ import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
 import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import type { FapAllocationsMap } from "@/src/lib/downtime-fap-types";
+import { dispatchSessionActivityPosted } from "@/src/lib/session/session-activity-bridge";
 import { normalizeLiveRow } from "./live-session-normalize";
 import type { CampaignCreature, CampaignNpc, LiveState, PartyCharacter } from "./live-session-types";
 
@@ -155,6 +156,7 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
           prepTestCharacterId={prepTestCharacterId}
           onPrepTestCharacterChange={setPrepTestCharacterId}
           onActivityPosted={(entry) => {
+            dispatchSessionActivityPosted({ entry });
             setLiveState((prev) => {
               if (!prev) return prev;
               const logs = Array.isArray(prev.system_logs) ? prev.system_logs : [];
