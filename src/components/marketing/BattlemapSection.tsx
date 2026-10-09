@@ -71,6 +71,13 @@ const SHOTS: readonly BattlemapShot[] = [
     width: 552,
     height: 809,
   },
+  {
+    src: "/images/marketing/avatar-rucksack-guertel.jpg",
+    alt: "Avatar mit Rucksack und Gürtel in der Live-Session",
+    caption: "Live-Session-Avatar mit Rucksack, Gürtel, Erschöpfung, Chronist und Webcam.",
+    width: 354,
+    height: 333,
+  },
 ];
 
 const FRAME_STYLE = {
