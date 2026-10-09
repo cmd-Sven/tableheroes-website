@@ -366,7 +366,7 @@ export function LiveSessionCharacterAvatarPortrait({
             onToggleWebcam();
           }}
           className={`absolute z-40 flex items-center justify-center rounded-full border border-accent-gold/70 bg-background-dark/95 text-accent-gold shadow-md transition-colors duration-200 hover:border-hero-vibrant hover:text-hero-vibrant ${
-            compact ? "right-9 top-0 h-6 w-6" : "right-16 top-1 h-8 w-8"
+            compact ? "-right-2 top-[3.25rem] h-6 w-6" : "-right-3 top-28 h-8 w-8"
           }`}
           title={webcamModeActive ? "Avatarbild anzeigen" : "Webcam anzeigen"}
           aria-label={webcamModeActive ? "Avatarbild anzeigen" : "Webcam anzeigen"}

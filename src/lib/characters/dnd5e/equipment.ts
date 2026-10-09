@@ -375,6 +375,19 @@ export function placeItemOnBelt(
   return next;
 }
 
+/** Dieselbe Item-Id auf den nächsten freien Gürtelplatz legen — kein zweites Item. */
+export function placeItemOnNextFreeBeltSlot(
+  equipment: Dnd5eEquipmentState,
+  itemId: string,
+): { ok: true; equipment: Dnd5eEquipmentState } | { ok: false; reason: "belt_full" } {
+  const cleared = normalizeEquipmentState(equipment).belt.map((id) =>
+    id === itemId ? null : id,
+  );
+  const index = cleared.findIndex((id) => !id);
+  if (index < 0) return { ok: false, reason: "belt_full" };
+  return { ok: true, equipment: placeItemOnBelt(equipment, index, itemId) };
+}
+
 export function canPlaceItemInContainer(
   container: Dnd5eEquipmentContainer,
   items: CharacterItem[],

@@ -16,17 +16,23 @@ import {
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Backpack, FlaskConical, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   getCharacterEquipmentPayload,
+  saveCharacterEquipment,
   type CharacterEquipmentPayload,
 } from "@/src/lib/actions/character-inventory-actions";
 import { useLiveSessionBeltItem } from "@/src/lib/actions/live-session-avatar-actions";
 import { EquippedSlotTile } from "@/src/components/characters/inventory/EquippedSlotTile";
+import {
+  ItemActionContextMenu,
+  type ItemActionMenuAnchor,
+} from "@/src/components/characters/inventory/ItemActionContextMenu";
 import { InventoryItemTile } from "@/src/components/characters/inventory/InventoryItemTile";
 import { getSpecialItemFlags } from "@/src/lib/characters/dnd5e/item-effect-info";
 import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
+import { unequipBeltToContainer } from "@/src/lib/characters/dnd5e/equipment";
 import { hasWaistBeltEquipped } from "@/src/lib/characters/dnd5e/slot-validation";
 import {
   CHARACTER_EQUIPMENT_CHANGED_EVENT,
@@ -85,14 +91,14 @@ export function PartyTrayBeltButton({
         whileHover={{ scale: 1.16, opacity: 1 }}
         transition={{ duration: 0.18 }}
         className={`absolute z-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-accent-gold ${
-          compact ? "-right-4 top-[42px]" : "-right-10 top-[78px]"
+          compact ? "-right-2.5 top-[42px]" : "-right-6 top-[78px]"
         }`}
       >
         <Image
           src="/images/session/guertel.png"
           alt=""
-          width={compact ? 52 : 112}
-          height={compact ? 43 : 92}
+          width={compact ? 31 : 67}
+          height={compact ? 26 : 55}
           className="pointer-events-none drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
         />
       </motion.button>
@@ -237,31 +243,24 @@ function BeltSlots({
   const [pending, startTransition] = useTransition();
   const [menu, setMenu] = useState<{
     item: CharacterItem;
-    x: number;
-    y: number;
+    anchor: ItemActionMenuAnchor;
   } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const itemMap = new Map(payload.items.filter((item) => !item.is_deleted).map((item) => [item.id, item]));
   const beltEquipped = hasWaistBeltEquipped(payload.equipment.slots);
 
-  useEffect(() => {
-    if (!menu) return;
-    function onPointerDown(e: MouseEvent) {
-      const target = e.target;
-      if (!(target instanceof Node)) return;
-      if (menuRef.current?.contains(target)) return;
-      setMenu(null);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenu(null);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menu]);
+  function openItemMenu(item: CharacterItem, el: EventTarget | null) {
+    if (!(el instanceof HTMLElement)) return;
+    const rect = el.getBoundingClientRect();
+    setMenu({
+      item,
+      anchor: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      },
+    });
+  }
 
   function consume(item: CharacterItem) {
     startTransition(async () => {
@@ -272,11 +271,32 @@ function BeltSlots({
           characterName,
           itemId: item.id,
         });
-        dispatchCharacterEquipmentChanged(characterId);
+        dispatchCharacterEquipmentChanged(characterId, "belt");
         setMenu(null);
         toast.success(t("inventory.consumeTitle", { name: item.name }));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Verbrauchen fehlgeschlagen.");
+      }
+    });
+  }
+
+  function stowInBackpack(item: CharacterItem) {
+    startTransition(async () => {
+      try {
+        const fresh = await getCharacterEquipmentPayload(characterId);
+        const index = fresh.equipment.belt.findIndex((id) => id === item.id);
+        if (index < 0) throw new Error("Gegenstand ist nicht am Gürtel.");
+        const next = unequipBeltToContainer(
+          fresh.equipment,
+          fresh.items.filter((entry) => !entry.is_deleted),
+          index,
+        );
+        await saveCharacterEquipment(characterId, next);
+        dispatchCharacterEquipmentChanged(characterId, "belt");
+        setMenu(null);
+        toast.success(t("inventory.stowedToBackpack", { name: item.name }));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Ablegen in den Rucksack fehlgeschlagen.");
       }
     });
   }
@@ -315,7 +335,6 @@ function BeltSlots({
               />
             );
           }
-          const isPotion = getSpecialItemFlags(item)?.isPotion === true;
           return (
             <InventoryItemTile
               key={item.id}
@@ -323,44 +342,40 @@ function BeltSlots({
               quantity={itemQuantity(item)}
               customCategories={payload.equipment.customCategories}
               readOnly
-              onContextMenu={
-                isPotion
-                  ? (e) => {
-                      setMenu({ item, x: e.clientX, y: e.clientY });
-                    }
-                  : undefined
-              }
+              onClick={(e) => openItemMenu(item, e.currentTarget)}
+              onContextMenu={(e) => openItemMenu(item, e.currentTarget)}
             />
           );
         })}
       </div>
-      {menu
-        ? createPortal(
-            <div
-              ref={menuRef}
-              data-belt-ui=""
-              className="fixed z-[230] min-w-[150px] rounded-lg border border-hero-border bg-background-card py-1 shadow-2xl"
-              style={{
-                left: Math.min(menu.x, window.innerWidth - 170),
-                top: Math.min(menu.y, window.innerHeight - 72),
-              }}
-            >
-              <p className="truncate border-b border-hero-border/40 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold">
-                {menu.item.name}
-                {itemQuantity(menu.item) > 1 ? ` ×${itemQuantity(menu.item)}` : ""}
-              </p>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => consume(menu.item)}
-                className="flex w-full items-center px-3 py-1.5 text-left font-barlow text-xs font-bold uppercase tracking-wide text-hero-vibrant transition-colors duration-200 hover:bg-hero-dark/60 disabled:opacity-40"
-              >
-                {t("inventory.consume")}
-              </button>
-            </div>,
-            document.body,
-          )
-        : null}
+      {menu ? (
+        <ItemActionContextMenu
+          beltUi
+          title={`${menu.item.name}${itemQuantity(menu.item) > 1 ? ` ×${itemQuantity(menu.item)}` : ""}`}
+          anchor={menu.anchor}
+          onClose={() => setMenu(null)}
+          items={[
+            ...(getSpecialItemFlags(menu.item)?.isPotion
+              ? [
+                  {
+                    id: "consume",
+                    label: t("inventory.consume"),
+                    icon: FlaskConical,
+                    disabled: pending,
+                    onSelect: () => consume(menu.item),
+                  },
+                ]
+              : []),
+            {
+              id: "stow",
+              label: t("inventory.stowToBackpack"),
+              icon: Backpack,
+              disabled: pending,
+              onSelect: () => stowInBackpack(menu.item),
+            },
+          ]}
+        />
+      ) : null}
     </>
   );
 }

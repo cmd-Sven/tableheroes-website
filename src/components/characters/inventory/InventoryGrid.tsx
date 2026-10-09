@@ -15,6 +15,7 @@ import {
   getContainerMaxCapacityLb,
   getUnassignedItems,
   placeItemInContainer,
+  placeItemOnNextFreeBeltSlot,
   removeItemFromEquipment,
   unequipLuggageContainer,
   wouldSelfContain,
@@ -22,7 +23,11 @@ import {
 import { MAX_LUGGAGE_SLOTS } from "@/src/lib/characters/dnd5e/equipment-types";
 import { getItemDisplayCategory, isMagicalItem, MAGICAL_FILTER_ID } from "@/src/lib/characters/dnd5e/inventory-categories";
 import { isLuggageItem } from "@/src/lib/characters/dnd5e/item-resolve";
-import { DRAG_MIME } from "@/src/lib/characters/dnd5e/slot-validation";
+import {
+  DRAG_MIME,
+  hasWaistBeltEquipped,
+  validateItemForBelt,
+} from "@/src/lib/characters/dnd5e/slot-validation";
 import { getDragItemId, setDragItemId } from "@/src/lib/characters/dnd5e/drag-state";
 import { toast } from "sonner";
 import {
@@ -48,6 +53,7 @@ import {
   InventoryItemContextMenu,
   type ContextMenuAction,
 } from "./InventoryItemContextMenu";
+import type { ItemActionMenuAnchor } from "./ItemActionContextMenu";
 import {
   ItemDeleteConfirmModal,
   ItemDuplicateConfirmModal,
@@ -143,8 +149,7 @@ export function InventoryGrid({
   const [page, setPage] = useState(0);
   const [contextMenu, setContextMenu] = useState<{
     stack: InventoryStack;
-    x: number;
-    y: number;
+    anchor: ItemActionMenuAnchor;
   } | null>(null);
   const [itemModal, setItemModal] = useState<ItemModal | null>(null);
   const [assignModal, setAssignModal] = useState<CharacterItem | null>(null);
@@ -238,8 +243,12 @@ export function InventoryGrid({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setContextMenu({
       stack,
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 4,
+      anchor: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      },
     });
   }
 
@@ -274,6 +283,24 @@ export function InventoryGrid({
       case "equipAsContainer":
         onEquipAsContainer?.(item);
         break;
+      case "placeOnBelt": {
+        if (!validateItemForBelt(item).valid) {
+          toast.error(t("equipment.beltForbidden"));
+          break;
+        }
+        if (!hasWaistBeltEquipped(equipment.slots)) {
+          toast.error(t("equipment.beltRequiresWaist"));
+          break;
+        }
+        const placed = placeItemOnNextFreeBeltSlot(equipment, item.id);
+        if (!placed.ok) {
+          toast.error(t("inventory.beltFull"));
+          break;
+        }
+        onEquipmentChange(placed.equipment);
+        toast.success(t("inventory.placedOnBelt", { name: item.name }));
+        break;
+      }
     }
   }
 
@@ -601,7 +628,7 @@ export function InventoryGrid({
       {contextMenu ? (
         <InventoryItemContextMenu
           stack={contextMenu.stack}
-          position={{ x: contextMenu.x, y: contextMenu.y }}
+          anchor={contextMenu.anchor}
           readOnly={readOnly}
           canGive={partyCharacters.length > 0 && Boolean(onGiveItem)}
           canEquipAsContainer={Boolean(

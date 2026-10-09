@@ -282,7 +282,7 @@ export function LiveSessionPartyTray({
                         <span
                           title="Chronist"
                           className={`pointer-events-none absolute z-40 text-accent-gold drop-shadow-[0_0_6px_rgba(202,185,38,0.9)] ${
-                            compact ? "right-0 top-0 text-sm" : "right-1 top-1 text-xl"
+                            compact ? "right-0 top-4 text-sm" : "right-1 top-8 text-xl"
                           }`}
                         >
                           🪶
@@ -292,8 +292,8 @@ export function LiveSessionPartyTray({
                         <button
                           type="button"
                           onClick={() => onAssignScribe(isScribe ? null : pid)}
-                          className={`absolute right-0 top-0 z-40 rounded-full border transition-colors duration-200 ${
-                            compact ? "p-1 text-[10px]" : "p-1.5 text-sm"
+                          className={`absolute z-40 rounded-full border transition-colors duration-200 ${
+                            compact ? "right-0 top-4 p-1 text-[10px]" : "right-1 top-8 p-1.5 text-sm"
                           } ${
                             isScribe
                               ? "border-accent-gold bg-accent-gold/20 text-accent-gold"

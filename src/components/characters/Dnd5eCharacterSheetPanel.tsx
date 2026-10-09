@@ -70,7 +70,10 @@ import {
   normalizeEquipmentState,
   withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
-import { CHARACTER_EQUIPMENT_CHANGED_EVENT } from "@/src/lib/session/character-radial-bridge";
+import {
+  CHARACTER_EQUIPMENT_CHANGED_EVENT,
+  dispatchCharacterEquipmentChanged,
+} from "@/src/lib/session/character-radial-bridge";
 import {
   getCharacterEquipmentPayload,
   saveCharacterEquipment,
@@ -717,17 +720,24 @@ export function Dnd5eCharacterSheetPanel({
 
   useEffect(() => {
     function onEquipmentChanged(e: Event) {
-      const detail = (e as CustomEvent<{ characterId?: string }>).detail;
+      const detail = (e as CustomEvent<{ characterId?: string; source?: string }>).detail;
       if (!detail?.characterId || detail.characterId !== characterId) return;
+      if (detail.source === "sheet") return;
       void (async () => {
         try {
           const data = await getCharacterEquipmentPayload(characterId);
           setInventoryItems((data.items ?? []).filter((item) => !item.is_deleted));
+          if (equipmentPersistTimerRef.current) {
+            clearTimeout(equipmentPersistTimerRef.current);
+            equipmentPersistTimerRef.current = null;
+          }
+          pendingEquipmentRef.current = null;
           setSheet((prev) => {
             if (!prev) return prev;
-            const nextBelt = normalizeEquipmentState(data.equipment).belt;
-            const current = normalizeEquipmentState(prev.equipment);
-            return { ...prev, equipment: { ...current, belt: nextBelt } };
+            return {
+              ...prev,
+              equipment: normalizeEquipmentState(data.equipment),
+            };
           });
         } catch {
           // Offener Bogen behält den letzten Stand, bis er neu geladen wird.
@@ -1154,6 +1164,7 @@ export function Dnd5eCharacterSheetPanel({
       startTransition(async () => {
         try {
           await saveCharacterEquipment(characterId, toSave);
+          dispatchCharacterEquipmentChanged(characterId, "sheet");
           onSaved?.();
         } catch (e: unknown) {
           toast.error(

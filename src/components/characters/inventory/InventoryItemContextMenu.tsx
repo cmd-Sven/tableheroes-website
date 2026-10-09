@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
   ArrowLeftRight,
   Backpack,
   Copy,
   Gift,
   Pencil,
+  Pocket,
   Scissors,
   Tags,
   Trash2,
 } from "lucide-react";
 import type { InventoryStack } from "@/src/lib/characters/dnd5e/inventory-stacking";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
+import {
+  ItemActionContextMenu,
+  type ItemActionMenuAnchor,
+  type ItemActionMenuEntry,
+} from "./ItemActionContextMenu";
 
 export type ContextMenuAction =
   | "edit"
@@ -22,11 +27,12 @@ export type ContextMenuAction =
   | "move"
   | "give"
   | "assignCategory"
-  | "equipAsContainer";
+  | "equipAsContainer"
+  | "placeOnBelt";
 
 type Props = {
   stack: InventoryStack;
-  position: { x: number; y: number };
+  anchor: ItemActionMenuAnchor;
   readOnly: boolean;
   canGive: boolean;
   canEquipAsContainer?: boolean;
@@ -36,7 +42,7 @@ type Props = {
 
 export function InventoryItemContextMenu({
   stack,
-  position,
+  anchor,
   readOnly,
   canGive,
   canEquipAsContainer = false,
@@ -44,77 +50,82 @@ export function InventoryItemContextMenu({
   onClose,
 }: Props) {
   const { t } = useCharacterSheetLocale();
-  const ref = useRef<HTMLDivElement>(null);
   const canSplit = stack.quantity > 1;
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [onClose]);
 
   if (readOnly) return null;
 
-  const items: {
-    action: ContextMenuAction;
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    danger?: boolean;
-    hidden?: boolean;
-  }[] = [
-    { action: "edit", label: t("equipment.edit"), icon: Pencil },
-    { action: "assignCategory", label: t("inventory.assignCategory"), icon: Tags },
+  const items: Array<ItemActionMenuEntry & { action: ContextMenuAction; hidden?: boolean }> = [
+    { action: "edit", id: "edit", label: t("equipment.edit"), icon: Pencil, onSelect: () => onAction("edit") },
+    {
+      action: "assignCategory",
+      id: "assignCategory",
+      label: t("inventory.assignCategory"),
+      icon: Tags,
+      onSelect: () => onAction("assignCategory"),
+    },
+    {
+      action: "placeOnBelt",
+      id: "placeOnBelt",
+      label: t("inventory.placeOnBelt"),
+      icon: Pocket,
+      onSelect: () => onAction("placeOnBelt"),
+    },
     {
       action: "equipAsContainer",
+      id: "equipAsContainer",
       label: t("inventory.equipAsContainer"),
       icon: Backpack,
       hidden: !canEquipAsContainer,
+      onSelect: () => onAction("equipAsContainer"),
     },
-    { action: "delete", label: t("equipment.delete"), icon: Trash2, danger: true },
-    { action: "duplicate", label: t("inventory.duplicate"), icon: Copy },
-    { action: "split", label: t("inventory.split"), icon: Scissors, hidden: !canSplit },
-    { action: "move", label: t("inventory.move"), icon: ArrowLeftRight },
-    { action: "give", label: t("inventory.give"), icon: Gift, hidden: !canGive },
+    {
+      action: "delete",
+      id: "delete",
+      label: t("equipment.delete"),
+      icon: Trash2,
+      danger: true,
+      onSelect: () => onAction("delete"),
+    },
+    {
+      action: "duplicate",
+      id: "duplicate",
+      label: t("inventory.duplicate"),
+      icon: Copy,
+      onSelect: () => onAction("duplicate"),
+    },
+    {
+      action: "split",
+      id: "split",
+      label: t("inventory.split"),
+      icon: Scissors,
+      hidden: !canSplit,
+      onSelect: () => onAction("split"),
+    },
+    {
+      action: "move",
+      id: "move",
+      label: t("inventory.move"),
+      icon: ArrowLeftRight,
+      onSelect: () => onAction("move"),
+    },
+    {
+      action: "give",
+      id: "give",
+      label: t("inventory.give"),
+      icon: Gift,
+      hidden: !canGive,
+      onSelect: () => onAction("give"),
+    },
   ];
 
-  return (
-    <div
-      ref={ref}
-      className="fixed z-90 min-w-[170px] rounded-lg border border-hero-border bg-background-card py-1 shadow-2xl"
-      style={{
-        left: Math.min(position.x, window.innerWidth - 190),
-        top: Math.min(position.y, window.innerHeight - 280),
-      }}
-    >
-      <p className="border-b border-hero-border/40 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase text-accent-gold truncate">
-        {stack.representative.name}
-        {stack.quantity > 1 ? ` ×${stack.quantity}` : ""}
-      </p>
+  const title = `${stack.representative.name}${stack.quantity > 1 ? ` ×${stack.quantity}` : ""}`;
 
-      {items
-        .filter((item) => !item.hidden)
-        .map(({ action, label, icon: Icon, danger }) => (
-          <button
-            key={action}
-            type="button"
-            onClick={() => onAction(action)}
-            className={`flex w-full items-center gap-2 px-3 py-1.5 font-libre text-xs hover:bg-hero-dark/60 ${
-              danger ? "text-red-400 hover:text-red-300" : "text-gray-300 hover:text-white"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
-    </div>
+  return (
+    <ItemActionContextMenu
+      title={title}
+      anchor={anchor}
+      items={items.filter((item) => !item.hidden)}
+      onClose={onClose}
+    />
   );
 }

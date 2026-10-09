@@ -86,9 +86,16 @@ export function dispatchCharacterDisplayChanged(
   window.dispatchEvent(new CustomEvent(CHARACTER_DISPLAY_CHANGED_EVENT, { detail }));
 }
 
-export function dispatchCharacterEquipmentChanged(characterId: string): void {
+export type CharacterEquipmentChangedSource = "sheet" | "inventory-modal" | "belt";
+
+export function dispatchCharacterEquipmentChanged(
+  characterId: string,
+  source?: CharacterEquipmentChangedSource,
+): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent(CHARACTER_EQUIPMENT_CHANGED_EVENT, { detail: { characterId } }),
+    new CustomEvent(CHARACTER_EQUIPMENT_CHANGED_EVENT, {
+      detail: { characterId, source },
+    }),
   );
 }

@@ -50,7 +50,10 @@ import {
 } from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import { CharacterSheetLocaleProvider } from "@/src/lib/i18n/character-sheet/context";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
-import { CHARACTER_EQUIPMENT_CHANGED_EVENT } from "@/src/lib/session/character-radial-bridge";
+import {
+  CHARACTER_EQUIPMENT_CHANGED_EVENT,
+  dispatchCharacterEquipmentChanged,
+} from "@/src/lib/session/character-radial-bridge";
 
 const COIN_FIELD_ORDER: DndCoinCode[] = ["pp", "gp", "ep", "sp", "cp"];
 
@@ -154,8 +157,9 @@ function SessionInventoryBody({
 
   useEffect(() => {
     function onEquipmentChanged(e: Event) {
-      const detail = (e as CustomEvent<{ characterId?: string }>).detail;
+      const detail = (e as CustomEvent<{ characterId?: string; source?: string }>).detail;
       if (detail?.characterId !== character.id) return;
+      if (detail.source === "inventory-modal") return;
       void reload();
     }
     window.addEventListener(CHARACTER_EQUIPMENT_CHANGED_EVENT, onEquipmentChanged);
@@ -178,6 +182,7 @@ function SessionInventoryBody({
     startSavingEquipment(async () => {
       try {
         await saveCharacterEquipment(character.id, normalized);
+        dispatchCharacterEquipmentChanged(character.id, "inventory-modal");
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Ausrüstung konnte nicht gespeichert werden.",
