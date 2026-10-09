@@ -8,6 +8,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Feather, Hand } from "lucide-react";
 import { LiveSessionCharacterAvatar } from "@/src/components/session/LiveSessionCharacterAvatar";
+import { PartyTrayBeltButton } from "./PartyTrayBeltButton";
 import { PartyTrayExhaustionBadge } from "./PartyTrayExhaustionBadge";
 import { FALLBACK_PLAYER_COLOR } from "@/src/lib/session/class-player-color";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
@@ -277,24 +278,22 @@ export function LiveSessionPartyTray({
                           ) : null}
                         </span>
                       ) : null}
-                      {isScribe && (
+                      {isScribe && !(isGM && pid) ? (
                         <span
                           title="Chronist"
-                          className={`absolute z-20 text-accent-gold drop-shadow-[0_0_6px_rgba(202,185,38,0.9)] ${
-                            compact
-                              ? "right-3 top-3 text-sm"
-                              : "right-7 top-6 text-xl"
+                          className={`pointer-events-none absolute z-40 text-accent-gold drop-shadow-[0_0_6px_rgba(202,185,38,0.9)] ${
+                            compact ? "right-0 top-0 text-sm" : "right-1 top-1 text-xl"
                           }`}
                         >
                           🪶
                         </span>
-                      )}
+                      ) : null}
                       {isGM && pid ? (
                         <button
                           type="button"
                           onClick={() => onAssignScribe(isScribe ? null : pid)}
-                          className={`absolute z-30 rounded-full border transition-colors ${
-                            compact ? "right-2 top-2 p-1 text-[10px]" : "right-6 top-6 p-2 text-sm"
+                          className={`absolute right-0 top-0 z-40 rounded-full border transition-colors duration-200 ${
+                            compact ? "p-1 text-[10px]" : "p-1.5 text-sm"
                           } ${
                             isScribe
                               ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
@@ -309,10 +308,13 @@ export function LiveSessionPartyTray({
                         </button>
                       ) : null}
                       {canOpenInventory ? (
-                        <button
+                        <motion.button
                           type="button"
                           onClick={() => onOpenInventory(pc)}
-                          className={`absolute z-20 cursor-pointer transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-accent-gold ${
+                          initial={{ scale: 1, opacity: 1 }}
+                          whileHover={{ scale: 1.16, opacity: 1 }}
+                          transition={{ duration: 0.18 }}
+                          className={`absolute z-20 cursor-pointer focus-visible:outline-2 focus-visible:outline-accent-gold ${
                             compact ? "-left-3 top-[38px]" : "-left-8 top-[70px]"
                           }`}
                           title={`Rucksack von ${pc.name} öffnen`}
@@ -323,9 +325,18 @@ export function LiveSessionPartyTray({
                             alt=""
                             width={compact ? 40 : 88}
                             height={compact ? 40 : 88}
-                            className="drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
+                            className="pointer-events-none drop-shadow-[0_3px_5px_rgba(0,0,0,0.85)]"
                           />
-                        </button>
+                        </motion.button>
+                      ) : null}
+                      {canOpenInventory ? (
+                        <PartyTrayBeltButton
+                          compact={compact}
+                          sessionId={sessionId}
+                          campaignId={campaignId}
+                          characterId={pc.id}
+                          characterName={pc.name}
+                        />
                       ) : null}
                       {!pc.isSessionDummy ? (
                         <PartyTrayExhaustionBadge

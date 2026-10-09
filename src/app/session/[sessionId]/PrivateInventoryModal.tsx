@@ -50,6 +50,7 @@ import {
 } from "@/src/lib/characters/dnd5e/inventory-item-ops";
 import { CharacterSheetLocaleProvider } from "@/src/lib/i18n/character-sheet/context";
 import { useCharacterSheetLocale } from "@/src/lib/i18n/character-sheet/context";
+import { CHARACTER_EQUIPMENT_CHANGED_EVENT } from "@/src/lib/session/character-radial-bridge";
 
 const COIN_FIELD_ORDER: DndCoinCode[] = ["pp", "gp", "ep", "sp", "cp"];
 
@@ -150,6 +151,16 @@ function SessionInventoryBody({
       .then(setPartyCharacters)
       .catch(() => setPartyCharacters([]));
   }, [initialPayload, character.id]);
+
+  useEffect(() => {
+    function onEquipmentChanged(e: Event) {
+      const detail = (e as CustomEvent<{ characterId?: string }>).detail;
+      if (detail?.characterId !== character.id) return;
+      void reload();
+    }
+    window.addEventListener(CHARACTER_EQUIPMENT_CHANGED_EVENT, onEquipmentChanged);
+    return () => window.removeEventListener(CHARACTER_EQUIPMENT_CHANGED_EVENT, onEquipmentChanged);
+  }, [character.id, reload]);
 
   const items = useMemo(
     () => (payload?.items ?? []).filter((item) => !item.is_deleted),

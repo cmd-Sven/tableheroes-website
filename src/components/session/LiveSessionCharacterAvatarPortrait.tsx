@@ -365,8 +365,8 @@ export function LiveSessionCharacterAvatarPortrait({
             e.stopPropagation();
             onToggleWebcam();
           }}
-          className={`absolute z-30 flex items-center justify-center rounded-full border border-accent-gold/70 bg-background-dark/95 text-accent-gold shadow-md hover:border-hero-border hover:text-hero-vibrant ${
-            compact ? "right-0 top-0 h-6 w-6" : "right-1 top-1 h-8 w-8"
+          className={`absolute z-40 flex items-center justify-center rounded-full border border-accent-gold/70 bg-background-dark/95 text-accent-gold shadow-md transition-colors duration-200 hover:border-hero-vibrant hover:text-hero-vibrant ${
+            compact ? "right-9 top-0 h-6 w-6" : "right-16 top-1 h-8 w-8"
           }`}
           title={webcamModeActive ? "Avatarbild anzeigen" : "Webcam anzeigen"}
           aria-label={webcamModeActive ? "Avatarbild anzeigen" : "Webcam anzeigen"}

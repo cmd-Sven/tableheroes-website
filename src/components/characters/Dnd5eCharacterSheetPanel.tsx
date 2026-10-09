@@ -70,6 +70,7 @@ import {
   normalizeEquipmentState,
   withSyncedArmorClass,
 } from "@/src/lib/characters/dnd5e/equipment";
+import { CHARACTER_EQUIPMENT_CHANGED_EVENT } from "@/src/lib/session/character-radial-bridge";
 import {
   getCharacterEquipmentPayload,
   saveCharacterEquipment,
@@ -713,6 +714,29 @@ export function Dnd5eCharacterSheetPanel({
     void reload();
     void reloadInventoryItems();
   }, [reload, reloadInventoryItems]);
+
+  useEffect(() => {
+    function onEquipmentChanged(e: Event) {
+      const detail = (e as CustomEvent<{ characterId?: string }>).detail;
+      if (!detail?.characterId || detail.characterId !== characterId) return;
+      void (async () => {
+        try {
+          const data = await getCharacterEquipmentPayload(characterId);
+          setInventoryItems((data.items ?? []).filter((item) => !item.is_deleted));
+          setSheet((prev) => {
+            if (!prev) return prev;
+            const nextBelt = normalizeEquipmentState(data.equipment).belt;
+            const current = normalizeEquipmentState(prev.equipment);
+            return { ...prev, equipment: { ...current, belt: nextBelt } };
+          });
+        } catch {
+          // Offener Bogen behält den letzten Stand, bis er neu geladen wird.
+        }
+      })();
+    }
+    window.addEventListener(CHARACTER_EQUIPMENT_CHANGED_EVENT, onEquipmentChanged);
+    return () => window.removeEventListener(CHARACTER_EQUIPMENT_CHANGED_EVENT, onEquipmentChanged);
+  }, [characterId]);
 
   const derived = useMemo(() => {
     if (!sheet) return null;

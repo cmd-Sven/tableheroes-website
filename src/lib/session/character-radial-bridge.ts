@@ -4,6 +4,9 @@ export const OPEN_CHARACTER_RADIAL_EVENT = "th:open-character-radial";
 /** Signalisiert, dass sich das Anzeige-Token (Gemüt/Zustand) geändert hat. */
 export const CHARACTER_DISPLAY_CHANGED_EVENT = "th:character-display-changed";
 
+/** Dieselbe Ausrüstung/Item-Menge hat sich geändert (Gürtel, Rucksack, Bogen). */
+export const CHARACTER_EQUIPMENT_CHANGED_EVENT = "th:character-equipment-changed";
+
 /** Session-Broadcast-Event (alle Clients in session_live_*). */
 export const CHARACTER_DISPLAY_CHANGED_BROADCAST = "character_display_changed";
 export const BATTLEMAP_TOKENS_CHANGED_BROADCAST = "battlemap_tokens_changed";
@@ -81,4 +84,11 @@ export function dispatchCharacterDisplayChanged(
 ): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(CHARACTER_DISPLAY_CHANGED_EVENT, { detail }));
+}
+
+export function dispatchCharacterEquipmentChanged(characterId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(CHARACTER_EQUIPMENT_CHANGED_EVENT, { detail: { characterId } }),
+  );
 }

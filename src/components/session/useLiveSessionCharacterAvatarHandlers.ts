@@ -59,9 +59,6 @@ type Args = {
   panel: RadialPanel;
   setPanel: React.Dispatch<React.SetStateAction<RadialPanel>>;
   setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  canControlWebcam?: boolean;
-  webcamActive?: boolean;
-  onToggleWebcam?: () => void;
 };
 
 export function useLiveSessionCharacterAvatarHandlers({
@@ -91,9 +88,6 @@ export function useLiveSessionCharacterAvatarHandlers({
   panel,
   setPanel,
   setMenuOpen,
-  canControlWebcam = false,
-  webcamActive = false,
-  onToggleWebcam,
 }: Args) {
   const [pending, startTransition] = useTransition();
 
@@ -150,8 +144,6 @@ export function useLiveSessionCharacterAvatarHandlers({
         combatMode,
       canJoinCombat,
       onJoinCombat,
-      canControlWebcam,
-      webcamActive,
       adjacentDisarmableTraps,
     }),
     [
@@ -165,8 +157,6 @@ export function useLiveSessionCharacterAvatarHandlers({
       combatMode,
       canJoinCombat,
       onJoinCombat,
-      canControlWebcam,
-      webcamActive,
       adjacentDisarmableTraps,
     ],
   );
@@ -184,12 +174,6 @@ export function useLiveSessionCharacterAvatarHandlers({
   function handleRadialClick(id: (typeof RADIAL_ITEMS)[number]["id"]) {
     if (id === "sheet") {
       openSheetTab();
-      return;
-    }
-    if (id === "webcam") {
-      onToggleWebcam?.();
-      setMenuOpen(false);
-      setPanel(null);
       return;
     }
     if (id === "join_combat") {

@@ -3,10 +3,7 @@
  */
 import {
   BookOpen,
-  Camera,
-  Heart,
   MapPin,
-  Package,
   ScrollText,
   Settings2,
   Shield,
@@ -64,9 +61,6 @@ export function buildVisibleRadialItems(args: {
   combatMode: boolean;
   canJoinCombat: boolean;
   onJoinCombat?: () => void;
-  /** Owner or GM may toggle avatar↔webcam mode. */
-  canControlWebcam?: boolean;
-  webcamActive?: boolean;
   adjacentDisarmableTraps?: SessionBattlemapTrap[];
 }) {
   const {
@@ -80,13 +74,10 @@ export function buildVisibleRadialItems(args: {
     combatMode,
     canJoinCombat,
     onJoinCombat,
-    canControlWebcam = false,
-    webcamActive = false,
     adjacentDisarmableTraps = [],
   } = args;
   const filtered = RADIAL_ITEMS.filter((item) => {
     if (item.id === "sheet") return showDnd5eSheet;
-    if (item.id === "webcam") return canControlWebcam;
     if (item.moodOnly) return true;
     if (item.gmOnly) return isGm;
     if (item.joinCombatOnly) return isGm && combatMode && canJoinCombat && Boolean(onJoinCombat);
@@ -109,14 +100,7 @@ export function buildVisibleRadialItems(args: {
       return hasClassAbilitiesHeuristic(className);
     }
     return true;
-  }).map((item) =>
-    item.id === "webcam"
-      ? {
-          ...item,
-          label: webcamActive ? "Avatarbild" : "Webcam",
-        }
-      : item,
-  );
+  });
   const count = filtered.length;
   if (count === 0) return filtered;
   return filtered.map((item, index) => ({
@@ -166,7 +150,7 @@ export type LiveSessionCharacterAvatarProps = {
 };
 
 export const RADIAL_ITEMS: {
-  id: Exclude<RadialPanel, null> | "sheet" | "token" | "join_combat" | "webcam";
+  id: Exclude<RadialPanel, null> | "sheet" | "token" | "join_combat";
   label: string;
   Icon: typeof Swords;
   angle: number;
@@ -177,11 +161,9 @@ export const RADIAL_ITEMS: {
   tokenOnly?: boolean;
   tokenSettingsOnly?: boolean;
   joinCombatOnly?: boolean;
-  webcamOnly?: boolean;
   disarmTrapOnly?: boolean;
 }[] = [
   { id: "sheet", label: "Charakterblatt", Icon: ScrollText, angle: -90 },
-  { id: "webcam", label: "Webcam", Icon: Camera, angle: -70, webcamOnly: true },
   { id: "mood", label: "Gemütszustand", Icon: Smile, angle: -45, moodOnly: true },
   { id: "gm_state", label: "Zustand (SL)", Icon: ShieldAlert, angle: -15, gmOnly: true },
   {
@@ -202,7 +184,6 @@ export const RADIAL_ITEMS: {
   { id: "loadouts", label: "Ausrüstungsset", Icon: Shield, angle: 75 },
   { id: "spells", label: "Zauberbuch", Icon: BookOpen, angle: 120, casterOnly: true },
   { id: "abilities", label: "Klassenfähigkeiten", Icon: Sparkles, angle: 165, abilitiesOnly: true },
-  { id: "belt", label: "Gürtel", Icon: Package, angle: 210 },
   {
     id: "disarm_trap",
     label: "Falle entschärfen",

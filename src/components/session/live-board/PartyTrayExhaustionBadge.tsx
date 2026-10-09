@@ -19,8 +19,7 @@ type Props = {
 };
 
 /**
- * Erschöpfung in der Party-Leiste: oben zwischen Rucksack und Avatar
- * (nicht im runden Portrait, damit nichts abgeschnitten wird).
+ * Erschöpfung in der Party-Leiste: über dem Rucksack, ohne ihn zu überdecken.
  */
 export function PartyTrayExhaustionBadge({ characterId, compact }: Props) {
   const [level, setLevel] = useState(0);
@@ -57,7 +56,7 @@ export function PartyTrayExhaustionBadge({ characterId, compact }: Props) {
   return (
     <div
       className={`pointer-events-auto absolute z-40 ${
-        compact ? "left-0 top-[34px]" : "left-1 top-[64px]"
+        compact ? "-left-1 top-0" : "-left-2 top-5"
       }`}
       aria-hidden={false}
     >

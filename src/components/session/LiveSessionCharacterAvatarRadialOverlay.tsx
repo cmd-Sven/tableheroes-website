@@ -143,14 +143,20 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                       onClick={() => handleRadialClick(item.id)}
                       title={item.label}
                       aria-label={item.label}
-                      className={`pointer-events-auto absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-xl transition-transform hover:scale-110 ${
-                        active
-                          ? "border-hero-vibrant bg-hero-vibrant/25 text-hero-vibrant"
-                          : "border-amber-700/80 bg-background-dark/95 text-accent-gold"
-                      }`}
+                      className="pointer-events-auto absolute h-11 w-11 -translate-x-1/2 -translate-y-1/2 disabled:opacity-40"
                       style={{ left: x, top: y }}
                     >
-                      <Icon className="h-5 w-5" />
+                      <motion.span
+                        whileHover={pending ? undefined : { scale: 1.12 }}
+                        transition={{ duration: 0.16 }}
+                        className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-xl transition-colors duration-200 ${
+                          active
+                            ? "border-hero-vibrant bg-hero-vibrant/30 text-hero-vibrant"
+                            : "border-amber-700/80 bg-background-dark/95 text-accent-gold hover:border-hero-vibrant hover:bg-hero-vibrant/25 hover:text-hero-vibrant"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </motion.span>
                     </button>
                   );
                 })}
@@ -160,8 +166,10 @@ export function LiveSessionCharacterAvatarRadialOverlay(props: LiveSessionCharac
                     setMenuOpen(false);
                     setPanel(null);
                   }}
-                  className="pointer-events-auto absolute left-0 top-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-600 bg-background-card text-gray-400"
+                  className="pointer-events-auto absolute left-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-accent-gold/70 bg-background-card text-gray-300 transition-colors duration-200 hover:border-hero-vibrant hover:text-hero-vibrant"
+                  style={{ top: -(92 + 22 + 28) }}
                   title="Schließen"
+                  aria-label="Schließen"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

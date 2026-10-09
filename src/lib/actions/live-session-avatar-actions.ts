@@ -13,6 +13,7 @@ import {
 import { ensureClassResources } from "@/src/lib/characters/dnd5e/rest";
 import { clampExhaustionLevel } from "@/src/lib/characters/dnd5e/exhaustion";
 import { isConsumableItem } from "@/src/lib/characters/dnd5e/inventory-categories";
+import { getSpecialItemFlags } from "@/src/lib/characters/dnd5e/item-effect-info";
 import { parseDnd5eMetaFromDescription } from "@/src/lib/characters/dnd5e/item-meta";
 import { resolveCharacterItemStats } from "@/src/lib/characters/dnd5e/item-resolve";
 import {
@@ -371,28 +372,29 @@ export async function useLiveSessionBeltItem(input: {
   let equipment = normalizeEquipmentState(sheet?.equipment);
   const beltIndex = equipment.belt.findIndex((id) => id === input.itemId);
   if (beltIndex < 0) throw new Error("Gegenstand ist nicht am Gürtel.");
+  if (!getSpecialItemFlags(item)?.isPotion) {
+    throw new Error("Nur Tränke können verbraucht werden.");
+  }
 
   await appendSessionActivity({
     sessionId: input.sessionId,
     type: "player_action",
-    text: `${input.characterName} benutzt: „${item.name}"`,
+    text: `${input.characterName} verbraucht: „${item.name}"`,
     characterId: input.characterId,
     characterName: input.characterName,
   });
 
-  if (isConsumableItem(item)) {
-    const remaining = await consumeFromStack(item, 1);
-    if (!remaining) {
-      equipment = placeItemOnBelt(equipment, beltIndex, null);
-      const merged = mergeSheetWithDefaults({
-        ...(sheet ?? {}),
-        equipment,
-      });
-      await (supabase as any)
-        .from("characters")
-        .update({ sheet_data: merged, sheet_source: "manual" })
-        .eq("id", input.characterId);
-    }
+  const remaining = await consumeFromStack(item, 1);
+  if (!remaining) {
+    equipment = placeItemOnBelt(equipment, beltIndex, null);
+    const merged = mergeSheetWithDefaults({
+      ...(sheet ?? {}),
+      equipment,
+    });
+    await (supabase as any)
+      .from("characters")
+      .update({ sheet_data: merged, sheet_source: "manual" })
+      .eq("id", input.characterId);
   }
 
   return getLiveSessionAvatarStatus(input.characterId);

@@ -89,11 +89,6 @@ export const LiveSessionCharacterAvatar = memo(function LiveSessionCharacterAvat
     panel: menu.panel,
     setPanel: menu.setPanel,
     setMenuOpen: menu.setMenuOpen,
-    canControlWebcam: webcamControl,
-    webcamActive: webcam.webcamModeActive,
-    onToggleWebcam: () => {
-      webcam.toggleDisplayMode();
-    },
   });
   reloadRef.current = handlers.reload;
 
