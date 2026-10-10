@@ -10,6 +10,7 @@ import {
   type SimSubject,
 } from "./aurenfurt-districts";
 import { SIM_METERS, type SimProfile } from "./aurenfurt-sim";
+import { CityHudChrome } from "./CityHudFrame";
 
 const DISTRICT_ICON: Record<CityDistrictId, LucideIcon> = {
   adelsviertel: Crown,
@@ -35,10 +36,11 @@ export function HoloCityRail({ selection, subject, sim, scopeLabel, onSelect, on
 
   return (
     <nav
-      className="pointer-events-auto relative z-[81] flex h-full w-11 shrink-0 flex-col overflow-hidden border-r border-hero-border/60 bg-background-dark/95 shadow-2xl backdrop-blur-md"
+      className="pointer-events-auto relative z-[81] flex h-full w-11 shrink-0 flex-col overflow-hidden bg-background-dark/95 shadow-2xl backdrop-blur-md"
       aria-label="Aurenfurt steuern"
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <CityHudChrome density="rail" />
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {AURENFURT_DISTRICTS.map((district) => {
           const Icon = DISTRICT_ICON[district.id];
           const active =
@@ -58,7 +60,7 @@ export function HoloCityRail({ selection, subject, sim, scopeLabel, onSelect, on
         })}
       </div>
 
-      <div className="shrink-0 border-t border-hero-border/40 py-1" title={kpiTitle}>
+      <div className="relative z-10 shrink-0 border-t border-hero-dark/50 py-1" title={kpiTitle}>
         <p className="px-0.5 text-center font-barlow text-[8px] font-bold uppercase leading-none tracking-wide text-cyan-200/80">
           KPI
         </p>
@@ -95,10 +97,10 @@ function RailButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`group relative grid h-11 w-11 shrink-0 place-items-center border transition-colors ${
+      className={`group relative z-10 grid h-11 w-11 shrink-0 place-items-center transition-colors ${
         active
-          ? "border-hero-vibrant bg-hero-vibrant/20 text-hero-vibrant"
-          : "border-hero-border/50 bg-background-card/95 text-gray-300 hover:border-hero-vibrant/70 hover:bg-emerald-950 hover:text-hero-vibrant"
+          ? "bg-hero-vibrant/20 text-hero-vibrant"
+          : "bg-transparent text-gray-300 hover:bg-emerald-950 hover:text-hero-vibrant"
       }`}
     >
       <span className="pointer-events-none absolute left-full z-20 ml-2 whitespace-nowrap rounded border border-hero-border/60 bg-background-card px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">

@@ -12,7 +12,7 @@ export function CityViewSwitch({ mode, onChange }: Props) {
     <div
       role="tablist"
       aria-label="Darstellung der Stadt"
-      className="pointer-events-auto inline-flex rounded-md border border-hero-border/70 bg-background-dark/95 p-0.5 shadow-lg backdrop-blur-md"
+      className="pointer-events-auto inline-flex rounded-md border border-hero-dark bg-background-dark/95 p-0.5 shadow-lg backdrop-blur-md"
     >
       {(
         [

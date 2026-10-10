@@ -14,6 +14,7 @@ import {
   type MeterEffect,
 } from "@/src/lib/npcs/city-simulation";
 import type { DistrictSector } from "./aurenfurt-sectors";
+import { CityHudFrame } from "./CityHudFrame";
 
 const FIELD =
   "w-full rounded bg-slate-900 border border-hero-dark p-2 text-sm text-white outline-none focus:border-hero-vibrant";
@@ -108,7 +109,9 @@ export function CityEventWizard({
   };
 
   return (
-    <section className="pointer-events-auto absolute bottom-4 left-4 z-20 w-[min(24rem,calc(100%-2rem))] max-h-[min(34rem,58vh)] overflow-y-auto rounded-md border border-accent-gold bg-background-card p-4 shadow-lg">
+    <section className="pointer-events-auto absolute bottom-4 left-4 z-20 w-[min(24rem,calc(100%-2rem))]">
+      <CityHudFrame density="card" className="shadow-lg">
+      <div className="max-h-[min(34rem,58vh)] overflow-y-auto px-4 pb-12 pt-12">
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-cinzel text-base font-bold text-accent-gold">Stadtereignis</h3>
         <button
@@ -264,6 +267,8 @@ export function CityEventWizard({
           </button>
         ) : null}
       </div>
+      </div>
+      </CityHudFrame>
     </section>
   );
 }

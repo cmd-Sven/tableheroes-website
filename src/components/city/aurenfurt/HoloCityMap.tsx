@@ -12,6 +12,7 @@ import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
+import { CityHudFrame } from "./CityHudFrame";
 import { CityEventWizard } from "./CityEventWizard";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import {
@@ -1050,37 +1051,39 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onPlacePoiPoint={placePoiPoint}
           onSelectStreet={selectStreet}
         />
-        <div className="pointer-events-none absolute left-4 top-4 z-10 space-y-2">
-          <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
-          <div>
-            <p className="font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
-            {isGm ? (
-              <button
-                type="button"
-                aria-pressed={eventWizardOpen}
-                onClick={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
-                className={`pointer-events-auto mt-2 inline-flex items-center gap-2 rounded border border-accent-gold bg-background-card px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold ${
-                  eventWizardOpen ? "bg-hero-dark" : ""
-                }`}
-              >
-                <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
-                Stadtereignis
-              </button>
-            ) : null}
-            <p className="font-libre text-sm text-gray-300">
-              {eventWizardOpen && eventPlaceStep
-                ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
-                : wallDrawActive
-                ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
-                : placingBuildingActive
-                ? "Klicke im Viertel, um das Gebäude zu setzen."
-                : placingPoiActive
-                  ? repositioningPoi
-                    ? "Klicke auf die Karte, um den Ort neu zu setzen."
-                    : "Klicke auf die Karte, um den besonderen Ort zu setzen."
-                  : (hint ?? view.subject?.name ?? "Viertel links wählen.")}
-            </p>
-          </div>
+        <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-sm flex-col items-start gap-2">
+          <CityHudFrame density="card" tone="dark" className="pointer-events-auto w-full shadow-lg">
+            <div className="px-4 pb-10 pt-12">
+              <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
+              <p className="mt-2 font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
+              {isGm ? (
+                <button
+                  type="button"
+                  aria-pressed={eventWizardOpen}
+                  onClick={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
+                  className={`mt-2 inline-flex items-center gap-2 bg-hero-dark px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold hover:bg-background-card ${
+                    eventWizardOpen ? "text-hero-vibrant" : ""
+                  }`}
+                >
+                  <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
+                  Stadtereignis
+                </button>
+              ) : null}
+              <p className="mt-1 font-libre text-sm leading-relaxed text-gray-200">
+                {eventWizardOpen && eventPlaceStep
+                  ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
+                  : wallDrawActive
+                  ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
+                  : placingBuildingActive
+                  ? "Klicke im Viertel, um das Gebäude zu setzen."
+                  : placingPoiActive
+                    ? repositioningPoi
+                      ? "Klicke auf die Karte, um den Ort neu zu setzen."
+                      : "Klicke auf die Karte, um den besonderen Ort zu setzen."
+                    : (hint ?? view.subject?.name ?? "Viertel links wählen.")}
+              </p>
+            </div>
+          </CityHudFrame>
           <HoloDayCalendar
             day={calendar.day}
             minDay={calendar.minDay}

@@ -27,6 +27,7 @@ import {
   type NpcDetailLinkContext,
 } from "./aurenfurt-npcs";
 import { HoloMetricChart, type ChartMetric } from "./HoloMetricChart";
+import { CityHudChrome } from "./CityHudFrame";
 import { loreExcerpt, type AurenfurtPlaceLore } from "./aurenfurt-lore";
 import { SIM_METERS, type SimProfile } from "./aurenfurt-sim";
 import type { DayWeather } from "./aurenfurt-weather";
@@ -553,9 +554,10 @@ export function HoloOverlay({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -48 }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-auto relative z-[80] flex h-full max-h-full w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0 flex-col overflow-hidden border-r border-hero-border/40 bg-linear-to-b from-background-card/98 via-background-card/95 to-background-dark/98 shadow-2xl backdrop-blur-md"
+          className="pointer-events-auto relative z-[80] flex h-full max-h-full w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0 flex-col overflow-hidden bg-linear-to-b from-background-card/98 via-background-card/95 to-background-dark/98 shadow-2xl backdrop-blur-md"
         >
-          <div className="flex shrink-0 items-start justify-between gap-2 border-b border-hero-border/40 px-3 py-2">
+          <CityHudChrome density="panel" />
+          <div className="relative z-10 flex shrink-0 items-start justify-between gap-2 border-b border-hero-dark/50 px-4 pb-2 pt-14">
             <div className="min-w-0">
               <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
                 {selectedPoi.kind}
@@ -571,7 +573,8 @@ export function HoloOverlay({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pt-3 pb-4">
+          <div className="min-h-0 flex-1 overflow-hidden px-4 pb-14 pt-3">
+            <div className="h-full space-y-3 overflow-y-auto">
             {selectedPoi.imageUrl ? (
               <div className="relative aspect-[2.4/1] max-h-28 overflow-hidden rounded border border-accent-gold/40">
                 <Image
@@ -609,6 +612,7 @@ export function HoloOverlay({
             >
               Viertel öffnen
             </button>
+            </div>
           </div>
         </motion.aside>
       </AnimatePresence>
@@ -624,9 +628,10 @@ export function HoloOverlay({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -48 }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-auto relative z-[80] flex h-full max-h-full w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0 flex-col overflow-hidden border-r border-hero-border/40 bg-linear-to-b from-background-card/98 via-background-card/95 to-background-dark/98 shadow-2xl backdrop-blur-md"
+          className="pointer-events-auto relative z-[80] flex h-full max-h-full w-sm max-w-[min(calc(100vw-2.75rem),24rem)] shrink-0 flex-col overflow-hidden bg-linear-to-b from-background-card/98 via-background-card/95 to-background-dark/98 shadow-2xl backdrop-blur-md"
         >
-          <div className="flex shrink-0 items-start justify-between gap-2 border-b border-hero-border/40 px-3 py-2">
+          <CityHudChrome density="panel" />
+          <div className="relative z-10 flex shrink-0 items-start justify-between gap-2 border-b border-hero-dark/50 px-4 pb-2 pt-14">
             <div className="min-w-0">
               <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-cyan-200">{subject.kicker}</p>
               <h2 className="truncate font-cinzel text-lg font-bold text-accent-gold">{subject.name}</h2>
@@ -641,9 +646,9 @@ export function HoloOverlay({
             </button>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-14">
             {/* Clean View — Kernfakten ohne Rohdaten-Wand */}
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pt-3 pb-1">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pt-3">
               <SimKpiBar
                 sim={sim}
                 weather={weather}

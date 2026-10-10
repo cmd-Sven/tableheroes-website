@@ -28,6 +28,7 @@ import { HoloDayCalendar } from "./HoloDayCalendar";
 import { SIM_METERS, type SimMeterKey } from "./aurenfurt-sim";
 import type { DayWeather, WeatherKind } from "./aurenfurt-weather";
 import { CityViewSwitch } from "./CityViewSwitch";
+import { CityHudChrome } from "./CityHudFrame";
 const WEATHER_COLOR: Record<WeatherKind, string> = {
   clear: "#f0d85a",
   cloudy: "#94a3b8",
@@ -99,15 +100,16 @@ export default function CityDashboard({
   const valueKey = range === "day" ? "current" : "average";
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-[#02080c] text-gray-200">
-      <header className="flex flex-wrap items-center gap-3 border-b border-hero-border/40 px-4 py-3">
+    <div className="absolute inset-0 z-10 flex flex-col bg-background-dark text-gray-200">
+      <CityHudChrome density="panel" />
+      <header className="relative z-10 flex flex-wrap items-center gap-3 border-b border-hero-dark/50 px-5 pb-3 pt-14">
         <div className="min-w-0">
           <p className="font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
           <h2 className="font-barlow text-xl font-extrabold uppercase tracking-wide text-hero-vibrant">Stadt-Dashboard</h2>
         </div>
         <CityViewSwitch mode="dashboard" onChange={(mode) => (mode === "map" ? onShowMap() : undefined)} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div role="tablist" aria-label="Zeitraum" className="inline-flex rounded-md border border-hero-border/60 bg-background-dark p-0.5">
+          <div role="tablist" aria-label="Zeitraum" className="inline-flex rounded-md border border-hero-dark bg-background-dark p-0.5">
             {ANALYTICS_RANGES.map((id) => (
               <button
                 key={id}
@@ -136,7 +138,7 @@ export default function CityDashboard({
         </div>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-hero-border/30 px-4 py-2 [scrollbar-width:thin]">
+      <div className="relative z-10 flex gap-2 overflow-x-auto border-b border-hero-dark/40 px-5 py-2 [scrollbar-width:thin]">
         <ScopeChip active={scopeId === null} label="Ganze Stadt" onClick={() => onScopeId(null)} />
         {AURENFURT_DISTRICTS.map((district) => (
           <ScopeChip
@@ -149,7 +151,8 @@ export default function CityDashboard({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-hidden px-5 pb-14 pt-4">
+        <div className="h-full overflow-y-auto">
         <p className="font-libre text-sm leading-relaxed text-gray-300">
           {report.periodLabel} · {report.scopeLabel} · {report.dayCount} {report.dayCount === 1 ? "Tag" : "Tage"} ·{" "}
           {report.compareLabel}. Jeder Tag folgt den Stadt-Ereignissen und dem simulierten Wetter.
@@ -424,6 +427,7 @@ export default function CityDashboard({
             </ul>
           </article>
         </section>
+        </div>
       </div>
     </div>
   );
