@@ -17,10 +17,10 @@ import {
 } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
-  AVATAR_WEBCAM_MASTER_BROADCAST,
   AVATAR_WEBCAM_MASTER_EVENT,
-  AVATAR_WEBCAM_MODE_BROADCAST,
   AVATAR_WEBCAM_MODE_EVENT,
+  dispatchAvatarWebcamMaster,
+  dispatchAvatarWebcamMode,
   type AvatarWebcamDisplayMode,
   type AvatarWebcamMasterDetail,
   type AvatarWebcamModeDetail,
@@ -53,7 +53,12 @@ export function PlayerAvatarCamSessionProvider({
 }: Props) {
   const [modes, setModes] = useState<ModesMap>({});
   const [masterEnabled, setMasterEnabled] = useState(true);
-  const modesBeforeMasterOffRef = useRef<ModesMap>({});
+  const modesRef = useRef<ModesMap>({});
+  const masterRef = useRef(true);
+  const modeSeqRef = useRef<Record<string, number>>({});
+  const masterSeqRef = useRef(0);
+  // Kanal bleibt am Provider, der Versand läuft über das Realtime-Hook (Outbox).
+  void liveChannelRef;
 
   const getMode = useCallback(
     (characterId: string): AvatarWebcamDisplayMode => {
@@ -63,113 +68,98 @@ export function PlayerAvatarCamSessionProvider({
     [masterEnabled, modes],
   );
 
-  const applyModeLocal = useCallback((characterId: string, mode: AvatarWebcamDisplayMode) => {
-    setModes((prev) => {
-      if (prev[characterId] === mode) return prev;
-      return { ...prev, [characterId]: mode };
-    });
+  const applyModeLocal = useCallback((characterId: string, mode: AvatarWebcamDisplayMode, seq?: number) => {
+    if (seq != null) {
+      const prevSeq = modeSeqRef.current[characterId] ?? 0;
+      if (seq < prevSeq) return;
+      modeSeqRef.current[characterId] = seq;
+    }
+    if (modesRef.current[characterId] === mode) return;
+    const next = { ...modesRef.current, [characterId]: mode };
+    modesRef.current = next;
+    setModes(next);
   }, []);
+
+  const publishMode = useCallback(
+    (characterId: string, mode: AvatarWebcamDisplayMode) => {
+      const seq = (modeSeqRef.current[characterId] ?? 0) + 1;
+      applyModeLocal(characterId, mode, seq);
+      dispatchAvatarWebcamMode({
+        characterId,
+        mode,
+        senderId: userId,
+        seq,
+        remote: false,
+      });
+    },
+    [applyModeLocal, userId],
+  );
+
+  const publishMaster = useCallback(
+    (enabled: boolean) => {
+      const seq = masterSeqRef.current + 1;
+      masterSeqRef.current = seq;
+      masterRef.current = enabled;
+      setMasterEnabled(enabled);
+      dispatchAvatarWebcamMaster({
+        enabled,
+        senderId: userId,
+        seq,
+        remote: false,
+      });
+    },
+    [userId],
+  );
 
   const setCharacterMode = useCallback(
     (characterId: string, mode: AvatarWebcamDisplayMode) => {
-      applyModeLocal(characterId, mode);
-      void liveChannelRef.current?.send({
-        type: "broadcast",
-        event: AVATAR_WEBCAM_MODE_BROADCAST,
-        payload: {
-          characterId,
-          mode,
-          senderId: userId,
-        } satisfies AvatarWebcamModeDetail,
-      });
+      publishMode(characterId, mode);
     },
-    [applyModeLocal, liveChannelRef, userId],
+    [publishMode],
   );
 
   const toggleCharacterMode = useCallback(
     (characterId: string) => {
-      const next: AvatarWebcamDisplayMode =
-        getMode(characterId) === "webcam" ? "avatar" : "webcam";
-      if (next === "webcam" && !masterEnabled) {
-        setMasterEnabled(true);
-        const restored = { ...modesBeforeMasterOffRef.current };
-        restored[characterId] = "webcam";
-        setModes(restored);
-        void liveChannelRef.current?.send({
-          type: "broadcast",
-          event: AVATAR_WEBCAM_MASTER_BROADCAST,
-          payload: { enabled: true, senderId: userId } satisfies AvatarWebcamMasterDetail,
-        });
-        void liveChannelRef.current?.send({
-          type: "broadcast",
-          event: AVATAR_WEBCAM_MODE_BROADCAST,
-          payload: {
-            characterId,
-            mode: "webcam",
-            senderId: userId,
-          } satisfies AvatarWebcamModeDetail,
-        });
-        return;
+      const showing: AvatarWebcamDisplayMode =
+        masterRef.current && modesRef.current[characterId] === "webcam" ? "webcam" : "avatar";
+      const next: AvatarWebcamDisplayMode = showing === "webcam" ? "avatar" : "webcam";
+      if (next === "webcam" && !masterRef.current) {
+        publishMaster(true);
       }
-      setCharacterMode(characterId, next);
+      publishMode(characterId, next);
     },
-    [getMode, liveChannelRef, masterEnabled, setCharacterMode, userId],
+    [publishMaster, publishMode],
   );
 
   const setAllWebcamsEnabled = useCallback(
     (enabled: boolean) => {
-      if (!enabled) {
-        setModes((prev) => {
-          modesBeforeMasterOffRef.current = { ...prev };
-          const next: ModesMap = {};
-          for (const id of Object.keys(prev)) {
-            next[id] = "avatar";
-          }
-          return next;
-        });
-        setMasterEnabled(false);
-      } else {
-        setMasterEnabled(true);
-        setModes({ ...modesBeforeMasterOffRef.current });
-      }
-      void liveChannelRef.current?.send({
-        type: "broadcast",
-        event: AVATAR_WEBCAM_MASTER_BROADCAST,
-        payload: { enabled, senderId: userId } satisfies AvatarWebcamMasterDetail,
-      });
+      publishMaster(enabled);
     },
-    [liveChannelRef, userId],
+    [publishMaster],
   );
 
   useEffect(() => {
     const onMode = (ev: Event) => {
       const detail = (ev as CustomEvent<AvatarWebcamModeDetail>).detail;
-      if (!detail?.characterId) return;
-      if (detail.remote && detail.senderId != null && String(detail.senderId) === userId) {
-        return;
-      }
-      applyModeLocal(detail.characterId, detail.mode === "webcam" ? "webcam" : "avatar");
+      if (!detail?.characterId || !detail.remote) return;
+      if (detail.senderId != null && String(detail.senderId) === userId) return;
+      applyModeLocal(
+        detail.characterId,
+        detail.mode === "webcam" ? "webcam" : "avatar",
+        typeof detail.seq === "number" ? detail.seq : undefined,
+      );
     };
     const onMaster = (ev: Event) => {
       const detail = (ev as CustomEvent<AvatarWebcamMasterDetail>).detail;
-      if (!detail) return;
-      if (detail.remote && detail.senderId != null && String(detail.senderId) === userId) {
-        return;
+      if (!detail?.remote) return;
+      if (detail.senderId != null && String(detail.senderId) === userId) return;
+      if (typeof detail.seq === "number") {
+        if (detail.seq < masterSeqRef.current) return;
+        masterSeqRef.current = detail.seq;
       }
-      if (detail.enabled === false) {
-        setModes((prev) => {
-          modesBeforeMasterOffRef.current = { ...prev };
-          const next: ModesMap = {};
-          for (const id of Object.keys(prev)) {
-            next[id] = "avatar";
-          }
-          return next;
-        });
-        setMasterEnabled(false);
-      } else {
-        setMasterEnabled(true);
-        setModes({ ...modesBeforeMasterOffRef.current });
-      }
+      const enabled = detail.enabled !== false;
+      masterRef.current = enabled;
+      setMasterEnabled(enabled);
     };
     window.addEventListener(AVATAR_WEBCAM_MODE_EVENT, onMode);
     window.addEventListener(AVATAR_WEBCAM_MASTER_EVENT, onMaster);

@@ -36,6 +36,31 @@ export function markDiceEntryRevealed(sourceId: string): void {
   emit();
 }
 
+const revealTimers = new Map<string, number>();
+
+/**
+ * Ein Timer pro Wurf. Neue Log-Referenzen dürfen ihn nicht zurücksetzen,
+ * sonst bleibt der Chat auf „würfelt …“ stehen.
+ */
+export function scheduleDiceRevealWatchdog(
+  entries: Array<{ id?: string | null; at?: string | null; meta?: unknown }>,
+): void {
+  if (typeof window === "undefined") return;
+  for (const entry of entries) {
+    const id = entry.id;
+    if (!id || revealTimers.has(id) || revealed.has(id)) continue;
+    if (!isDiceAnimMeta(entry.meta) || entry.meta.animate !== true) continue;
+    const at = entry.at ? Date.parse(entry.at) : Date.now();
+    const elapsed = Number.isFinite(at) ? Date.now() - at : 0;
+    const wait = Math.max(0, DICE_ANIMATION_STALE_MS - elapsed);
+    const timer = window.setTimeout(() => {
+      revealTimers.delete(id);
+      markDiceEntryRevealed(id);
+    }, wait + 40);
+    revealTimers.set(id, timer);
+  }
+}
+
 /** Globaler Listener (einmal mounten): Animation-Complete → Reveal (FX-Fallback). */
 export function useDiceRevealBridge() {
   useEffect(() => {

@@ -25,6 +25,7 @@ import {
   mapBattlemapTokenRow,
   mergeBattlemapTokenLists,
 } from "@/src/lib/session/battlemap-realtime-map";
+import { sendSessionBroadcast } from "@/src/lib/session/realtime-outbox";
 import type {
   SessionBattlemapEffectTemplate,
   SessionBattlemapFogShape,
@@ -186,26 +187,28 @@ export function useLiveSessionBattlemapSync({
       op?: BattlemapTokensChangedDetail["op"];
       token?: SessionBattlemapToken | null;
       tokenId?: string | null;
+      preview?: boolean;
+      optimistic?: boolean;
+      movedAt?: number | null;
     }) => {
       if (!activeBattlemapId) return;
       const op =
         detail?.op ??
         (detail?.token ? "upsert" : detail?.tokenId ? "delete" : "refresh");
-      void liveChannelRef.current?.send({
-        type: "broadcast",
-        event: BATTLEMAP_TOKENS_CHANGED_BROADCAST,
-        payload: {
-          battlemapId: activeBattlemapId,
-          op,
-          token: detail?.token
-            ? ({ ...detail.token } as unknown as Record<string, unknown>)
-            : null,
-          tokenId: detail?.tokenId ?? detail?.token?.id ?? null,
-          senderId: userId,
-        } satisfies BattlemapTokensChangedDetail,
-      });
+      sendSessionBroadcast(BATTLEMAP_TOKENS_CHANGED_BROADCAST, {
+        battlemapId: activeBattlemapId,
+        op,
+        token: detail?.token
+          ? ({ ...detail.token } as unknown as Record<string, unknown>)
+          : null,
+        tokenId: detail?.tokenId ?? detail?.token?.id ?? null,
+        senderId: userId,
+        preview: detail?.preview === true,
+        optimistic: detail?.optimistic === true,
+        movedAt: detail?.movedAt ?? null,
+      } satisfies BattlemapTokensChangedDetail);
     },
-    [activeBattlemapId, userId, liveChannelRef],
+    [activeBattlemapId, userId],
   );
 
   const notifyBattlemapFogChanged = useCallback(

@@ -62,6 +62,7 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startInFlightRef = useRef(false);
+  const cameraGenRef = useRef(0);
 
   useEffect(() => {
     setTitleState(readStoredTitle(userId));
@@ -89,6 +90,7 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
       return;
     }
 
+    const gen = ++cameraGenRef.current;
     startInFlightRef.current = true;
     setPhase("starting");
     setErrorHint(null);
@@ -99,9 +101,9 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
         audio: false,
       });
 
-      if (!enabled) {
+      if (gen !== cameraGenRef.current || !enabled) {
         stream.getTracks().forEach((t) => t.stop());
-        setPhase("idle");
+        if (gen === cameraGenRef.current) setPhase("idle");
         return;
       }
 
@@ -109,6 +111,7 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
       attachVideo(videoRef.current);
       setPhase("active");
     } catch (e: unknown) {
+      if (gen !== cameraGenRef.current) return;
       stopStream();
       const name =
         e && typeof e === "object" && "name" in e
@@ -131,11 +134,13 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
         );
       }
     } finally {
-      startInFlightRef.current = false;
+      if (gen === cameraGenRef.current) startInFlightRef.current = false;
     }
   }, [attachVideo, enabled, stopStream]);
 
   const stopCamera = useCallback(() => {
+    cameraGenRef.current += 1;
+    startInFlightRef.current = false;
     stopStream();
     setPhase("idle");
     setErrorHint(null);
@@ -175,6 +180,8 @@ export function useDungeonMasterCam({ enabled, userId }: UseDungeonMasterCamOpti
   // Tear down when GM mode ends / session provider unmounts.
   useEffect(() => {
     if (!enabled) {
+      cameraGenRef.current += 1;
+      startInFlightRef.current = false;
       stopStream();
       setPhase("idle");
       setErrorHint(null);

@@ -31,6 +31,11 @@ import {
 } from "./stage-loot-item-cards.utils";
 import { StageLootCoinBurst } from "./StageLootCoinBurst";
 import { StageLootFlipCard } from "./StageLootFlipCard";
+import {
+  dispatchLootStageChanged,
+  LOOT_STAGE_CHANGED_EVENT,
+  type LootStageChangedDetail,
+} from "@/src/lib/session/live-state-patch";
 
 type Props = {
   sessionId: string;
@@ -58,7 +63,9 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
   const [stageSize, setStageSize] = useState({ w: 360, h: 360 });
   const [coinBurstKey, setCoinBurstKey] = useState(0);
 
+  const loadGenRef = useRef(0);
   const loadRow = useCallback(async () => {
+    const gen = ++loadGenRef.current;
     setLoadError(null);
     const { data, error } = await (supabase as any)
       .from("campaign_loot_containers")
@@ -66,6 +73,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
       .eq("id", containerId)
       .maybeSingle();
 
+    if (gen !== loadGenRef.current) return;
     if (error) {
       setLoadError(error.message);
       setRow(null);
@@ -81,6 +89,16 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
   useEffect(() => {
     void loadRow();
   }, [loadRow]);
+
+  useEffect(() => {
+    function onLootChanged(ev: Event) {
+      const detail = (ev as CustomEvent<LootStageChangedDetail>).detail;
+      if (!detail?.remote || detail.containerId !== containerId) return;
+      void loadRow();
+    }
+    window.addEventListener(LOOT_STAGE_CHANGED_EVENT, onLootChanged);
+    return () => window.removeEventListener(LOOT_STAGE_CHANGED_EVENT, onLootChanged);
+  }, [containerId, loadRow]);
 
   useEffect(() => {
     const channel = supabase
@@ -168,6 +186,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success("Anfrage an den Spielleiter gesendet.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setIdentifyBusyId(null);
@@ -184,6 +203,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success("Gegenstand übernommen.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setClaimingId(null);
@@ -197,6 +217,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
       return;
     }
     toast.success("Gegenstand von der Bühne entfernt.");
+    dispatchLootStageChanged(containerId);
     await loadRow();
   }
 
@@ -209,6 +230,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success(success ? "Identifikation bestätigt." : "Identifikation abgelehnt.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setResolveBusyId(null);
@@ -229,6 +251,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success("Truhe geöffnet.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setOpenBusy(false);
@@ -248,6 +271,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success("Gold übernommen.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setGoldBusy(false);
@@ -263,6 +287,7 @@ export function StageLootItemCards({ sessionId, campaignId, containerId, charact
         return;
       }
       toast.success("Gold von der Bühne entfernt.");
+      dispatchLootStageChanged(containerId);
       await loadRow();
     } finally {
       setClearGoldBusy(false);

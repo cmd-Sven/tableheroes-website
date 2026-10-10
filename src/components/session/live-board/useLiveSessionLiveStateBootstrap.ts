@@ -7,7 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import type { LiveState } from "./live-session-types";
-import { isViableLiveState, normalizeLiveRow } from "./live-session-normalize";
+import { isViableLiveState, mergeSystemLogs, normalizeLiveRow } from "./live-session-normalize";
+import { mergeLiveStateRow } from "@/src/lib/session/live-state-patch";
 
 type Params = {
   sessionId: string;
@@ -123,12 +124,22 @@ export function useLiveSessionLiveStateBootstrap({
       .select("*")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (!error && data) {
-      const next = normalizeLiveRow(data);
-      liveStateRef.current = next;
-      setLiveState(next);
-      setBackgroundUrl(next.background_url || null);
-    }
+    if (error || !data) return;
+    const raw = data as Record<string, unknown>;
+    const normalized = normalizeLiveRow(data);
+    const prev = liveStateRef.current;
+    const withLogs = {
+      ...normalized,
+      system_logs: mergeSystemLogs(
+        prev?.system_logs,
+        normalized.system_logs ?? [],
+        Array.isArray(raw.system_logs),
+      ),
+    };
+    const next = prev ? mergeLiveStateRow(prev, withLogs, raw) : withLogs;
+    liveStateRef.current = next;
+    setLiveState(next);
+    setBackgroundUrl(next.background_url || null);
   }, [sessionId, supabase]);
 
   useEffect(() => {

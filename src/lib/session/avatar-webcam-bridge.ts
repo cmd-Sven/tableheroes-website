@@ -14,6 +14,8 @@ export type AvatarWebcamModeDetail = {
   characterId: string;
   mode: AvatarWebcamDisplayMode;
   senderId?: string | null;
+  /** Monoton pro Charakter — ältere Broadcasts dürfen den neueren Modus nicht zurücksetzen. */
+  seq?: number;
   /** true = from remote broadcast — do not re-broadcast */
   remote?: boolean;
 };
@@ -22,6 +24,7 @@ export type AvatarWebcamMasterDetail = {
   /** When false, all party webcams are forced off. */
   enabled: boolean;
   senderId?: string | null;
+  seq?: number;
   remote?: boolean;
 };
 

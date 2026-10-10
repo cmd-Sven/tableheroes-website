@@ -23,7 +23,7 @@ export function mergeSystemLogs<T extends { id: string; at: string }>(
   if (!incomingPresent) return previous;
   const byId = new Map<string, T>();
   for (const entry of incoming) byId.set(entry.id, entry);
-  const cutoff = Date.now() - 20_000;
+  const cutoff = Date.now() - 45_000;
   for (const entry of previous) {
     if (byId.has(entry.id)) continue;
     const at = Date.parse(entry.at);

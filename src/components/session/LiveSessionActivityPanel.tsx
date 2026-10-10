@@ -24,14 +24,9 @@ import {
   truncateSpeechBubbleText,
 } from "@/src/lib/session/avatar-speech-bubble";
 import {
-  isDiceEntryRevealed,
-  markDiceEntryRevealed,
+  scheduleDiceRevealWatchdog,
   useDiceRevealVersion,
 } from "@/src/lib/session/dice-reveal-store";
-import {
-  DICE_ANIMATION_STALE_MS,
-  isDiceAnimMeta,
-} from "@/src/lib/session/dice-animation";
 import {
   GM_DICE_ROLLER_ID,
   GM_DICE_ROLLER_NAME,
@@ -160,21 +155,7 @@ export function LiveSessionActivityPanel({
 
   // Liegt die 3D-Animation nicht (anderer Client, WebGL), das Ergebnis trotzdem zeigen.
   useEffect(() => {
-    const timers: number[] = [];
-    for (const entry of logs) {
-      if (!entry.id) continue;
-      if (!isDiceAnimMeta(entry.meta) || entry.meta.animate !== true) continue;
-      if (isDiceEntryRevealed(entry)) continue;
-      const at = entry.at ? Date.parse(entry.at) : Date.now();
-      const wait = Number.isFinite(at)
-        ? Math.max(0, DICE_ANIMATION_STALE_MS - (Date.now() - at))
-        : DICE_ANIMATION_STALE_MS;
-      const id = entry.id;
-      timers.push(window.setTimeout(() => markDiceEntryRevealed(id), wait + 40));
-    }
-    return () => {
-      for (const timer of timers) window.clearTimeout(timer);
-    };
+    scheduleDiceRevealWatchdog(logs);
   }, [logs]);
 
   function postActivity(

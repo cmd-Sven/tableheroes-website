@@ -17,7 +17,7 @@ import {
   confirmDiceDropPlacement,
   useDicePlacementPending,
 } from "@/src/lib/session/dice-placement-store";
-import { markDiceEntryRevealed } from "@/src/lib/session/dice-reveal-store";
+import { markDiceEntryRevealed, scheduleDiceRevealWatchdog } from "@/src/lib/session/dice-reveal-store";
 import {
   clientToDropNorm,
   dropNormToTablePoint,
@@ -301,6 +301,7 @@ export function DiceRollOverlay({ logs }: Props) {
         dispatchDiceAnimComplete(id);
       }
     }
+    scheduleDiceRevealWatchdog(logs);
   }, [logs, webgl]);
 
   const show3d = Boolean(active?.use3d && !canvasFailed);

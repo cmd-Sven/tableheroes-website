@@ -24,6 +24,7 @@ import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import type { FapAllocationsMap } from "@/src/lib/downtime-fap-types";
 import { dispatchSessionActivityPosted } from "@/src/lib/session/session-activity-bridge";
+import { dispatchSessionLivePatch } from "@/src/lib/session/live-state-patch";
 import { normalizeLiveRow } from "./live-session-normalize";
 import type { CampaignCreature, CampaignNpc, LiveState, PartyCharacter } from "./live-session-types";
 
@@ -334,6 +335,16 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
           }}
           onLootPublished={async () => {
             await refreshLiveState();
+            const next = liveStateRef.current;
+            if (next) {
+              dispatchSessionLivePatch({
+                patch: {
+                  current_loot_id: next.current_loot_id ?? null,
+                  loot_hide_npcs: Boolean(next.loot_hide_npcs),
+                },
+                sentAt: Date.now(),
+              });
+            }
             router.refresh();
           }}
         />

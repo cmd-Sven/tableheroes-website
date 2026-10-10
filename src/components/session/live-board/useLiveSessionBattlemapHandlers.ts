@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useCallback, type TransitionStartFunction } from "react";
+import { useCallback, useEffect, type TransitionStartFunction } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import {
@@ -31,6 +31,7 @@ import {
   clearPendingBattlemapTokenMove,
   placeBattlemapCharacterTokenClient,
   registerPendingBattlemapTokenMove,
+  setBattlemapTokenDragSync,
   upsertBattlemapContainer,
   upsertBattlemapToken,
   upsertBattlemapTrap,
@@ -45,6 +46,9 @@ type NotifyFns = {
     op?: "upsert" | "delete" | "refresh";
     token?: SessionBattlemapToken | null;
     tokenId?: string | null;
+    preview?: boolean;
+    optimistic?: boolean;
+    movedAt?: number | null;
   }) => void;
   notifyBattlemapFogChanged: (detail?: {
     op?: "upsert" | "delete" | "refresh";
@@ -458,6 +462,12 @@ export function useLiveSessionBattlemapHandlers({
         const characterId = token.character_id;
         const characterName = token.label ?? "Charakter";
         applyLocalMove(gridX, gridY);
+        notifyBattlemapTokensChanged({
+          op: "upsert",
+          token: { ...token, grid_x: gridX, grid_y: gridY },
+          optimistic: true,
+          movedAt: Date.now(),
+        });
         void (async () => {
           try {
             const placed = await placeBattlemapCharacterTokenClient(supabase, {
@@ -479,6 +489,12 @@ export function useLiveSessionBattlemapHandlers({
           } catch (e) {
             clearPendingBattlemapTokenMove(token.id);
             applyLocalMove(originGrid.grid_x, originGrid.grid_y);
+            notifyBattlemapTokensChanged({
+              op: "upsert",
+              token: { ...token, grid_x: originGrid.grid_x, grid_y: originGrid.grid_y },
+              optimistic: true,
+              movedAt: Date.now(),
+            });
             toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
           }
         })();
@@ -487,6 +503,12 @@ export function useLiveSessionBattlemapHandlers({
 
       if (!isGM) return;
       applyLocalMove(gridX, gridY);
+      notifyBattlemapTokensChanged({
+        op: "upsert",
+        token: { ...token, grid_x: gridX, grid_y: gridY },
+        optimistic: true,
+        movedAt: Date.now(),
+      });
       void (async () => {
         try {
           const placed = await placeBattlemapGmToken({
@@ -509,6 +531,12 @@ export function useLiveSessionBattlemapHandlers({
         } catch (e) {
           clearPendingBattlemapTokenMove(token.id);
           applyLocalMove(originGrid.grid_x, originGrid.grid_y);
+          notifyBattlemapTokensChanged({
+            op: "upsert",
+            token: { ...token, grid_x: originGrid.grid_x, grid_y: originGrid.grid_y },
+            optimistic: true,
+            movedAt: Date.now(),
+          });
           toast.error(e instanceof Error ? e.message : "Token konnte nicht gesetzt werden.");
         }
       })();
@@ -649,6 +677,24 @@ export function useLiveSessionBattlemapHandlers({
       startTransition,
     ],
   );
+
+  useEffect(() => {
+    setBattlemapTokenDragSync((token, gridX, gridY) => {
+      if (!activeBattlemapId) return;
+      if (token.grid_x === gridX && token.grid_y === gridY) return;
+      if (!isGM) {
+        if (liveStateRef.current?.battlemap_movement_paused) return;
+        if (!token.character_id || token.character_id !== ownCharacterId) return;
+      }
+      notifyBattlemapTokensChanged({
+        op: "upsert",
+        token: { ...token, grid_x: gridX, grid_y: gridY },
+        preview: true,
+        movedAt: Date.now(),
+      });
+    });
+    return () => setBattlemapTokenDragSync(null);
+  }, [activeBattlemapId, isGM, liveStateRef, notifyBattlemapTokensChanged, ownCharacterId]);
 
   return {
     startCharacterTokenPlacement,

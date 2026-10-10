@@ -52,6 +52,11 @@ export type BattlemapTokensChangedDetail = {
   tokenId?: string | null;
   /** Absender — Empfänger mit gleicher userId können lokal überspringen */
   senderId?: string | null;
+  /** Ziehgeste: noch nicht persistiert, nur Anzeige. */
+  preview?: boolean;
+  /** Optimistic vor dem RPC — Empfänger schützen die Zelle vor einem alten Postgres-Echo. */
+  optimistic?: boolean;
+  movedAt?: number | null;
 };
 
 export type BattlemapFogSyncOp = "upsert" | "delete" | "refresh";

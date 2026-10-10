@@ -60,17 +60,6 @@ export async function createSystemLog(
     writeClient = supabase;
   }
 
-  const { data: liveStateRaw, error: liveStateError } = await (writeClient.from(
-    "session_live_states",
-  ) as any)
-    .select("system_logs")
-    .eq("session_id", sessionId)
-    .maybeSingle();
-
-  if (liveStateError) {
-    throw new Error(liveStateError.message || "Chronik konnte nicht geladen werden.");
-  }
-
   const text =
     typeof value === "string"
       ? value
@@ -90,19 +79,45 @@ export async function createSystemLog(
     return null;
   }
 
-  const nextLogs = [
-    ...normalizeSystemLogs((liveStateRaw as { system_logs?: unknown } | null)?.system_logs),
-    nextLog,
-  ].slice(-80);
+  const { error: rpcErr } = await (supabase as any).rpc("append_session_system_log", {
+    p_session_id: sessionId,
+    p_entry: nextLog,
+  });
 
-  const { error: updateError } = await (writeClient.from(
-    "session_live_states",
-  ) as any)
-    .update({ system_logs: nextLogs })
-    .eq("session_id", sessionId);
+  if (rpcErr) {
+    const msg = String(rpcErr.message ?? "");
+    const missingRpc =
+      /append_session_system_log/i.test(msg) ||
+      /Could not find the function/i.test(msg) ||
+      rpcErr.code === "PGRST202" ||
+      rpcErr.code === "42883";
+    if (!missingRpc) {
+      throw new Error(msg || "System-Log konnte nicht gespeichert werden.");
+    }
 
-  if (updateError) {
-    throw new Error(updateError.message || "System-Log konnte nicht gespeichert werden.");
+    const { data: liveStateRaw, error: liveStateError } = await (writeClient.from(
+      "session_live_states",
+    ) as any)
+      .select("system_logs")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (liveStateError) {
+      throw new Error(liveStateError.message || "Chronik konnte nicht geladen werden.");
+    }
+
+    const nextLogs = [
+      ...normalizeSystemLogs((liveStateRaw as { system_logs?: unknown } | null)?.system_logs),
+      nextLog,
+    ].slice(-120);
+
+    const { error: updateError } = await (writeClient.from("session_live_states") as any)
+      .update({ system_logs: nextLogs })
+      .eq("session_id", sessionId);
+
+    if (updateError) {
+      throw new Error(updateError.message || "System-Log konnte nicht gespeichert werden.");
+    }
   }
 
   try {

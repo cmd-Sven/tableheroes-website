@@ -13,7 +13,12 @@ import {
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSystemLog } from "@/src/lib/actions/session-system-log-actions";
-import { normalizeStageVisibilityPatch } from "./live-session-normalize";
+import { dispatchSessionActivityPosted } from "@/src/lib/session/session-activity-bridge";
+import {
+  dispatchSessionLivePatch,
+  forgetLivePatch,
+  rememberLivePatch,
+} from "@/src/lib/session/live-state-patch";
 import type { LiveState } from "./live-session-types";
 
 type Params = {
@@ -35,16 +40,28 @@ export function useLiveSessionLiveStateMutations({
   liveStateRef,
   setLiveState,
   setBackgroundUrl,
-  liveChannelRef,
   resolveLiveStateBase,
   startTransition,
 }: Params) {
   const writeSystemLog = useCallback(
     (type: string, text: string) => {
       if (!isGM || !text.trim()) return;
-      void createSystemLog(sessionId, type, text).catch((error) => {
-        console.error("[LiveSessionBoard] createSystemLog:", error);
-      });
+      void createSystemLog(sessionId, type, text)
+        .then((entry) => {
+          if (!entry?.id || !entry.text) return;
+          dispatchSessionActivityPosted({
+            entry: {
+              id: String(entry.id),
+              at: String(entry.at),
+              text: String(entry.text),
+              type: String(entry.type ?? type),
+              author_name: entry.author_name != null ? String(entry.author_name) : "System",
+            },
+          });
+        })
+        .catch((error) => {
+          console.error("[LiveSessionBoard] createSystemLog:", error);
+        });
     },
     [isGM, sessionId],
   );
@@ -52,9 +69,23 @@ export function useLiveSessionLiveStateMutations({
   /** `baseOverride`: z. B. direkt nach resolveLiveStateBase, wenn React-State noch nachzieht */
   const updateLiveState = useCallback(
     (patch: Partial<LiveState>, baseOverride?: LiveState) => {
+      const known = baseOverride ?? liveStateRef.current;
+      let snapshot: LiveState | null = null;
+      if (known) {
+        snapshot = liveStateRef.current ?? known;
+        const next = { ...snapshot, ...patch };
+        liveStateRef.current = next;
+        setLiveState(next);
+        if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
+          setBackgroundUrl(next.background_url || null);
+        }
+        rememberLivePatch(patch);
+        dispatchSessionLivePatch({ patch, sentAt: Date.now() });
+      }
+
       startTransition(async () => {
         try {
-          let base = baseOverride ?? liveStateRef.current;
+          let base = known ?? liveStateRef.current;
           if (!base) {
             base = await resolveLiveStateBase();
           }
@@ -67,38 +98,36 @@ export function useLiveSessionLiveStateMutations({
             return;
           }
 
+          if (!known) {
+            const next = { ...base, ...patch };
+            liveStateRef.current = next;
+            setLiveState(next);
+            if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
+              setBackgroundUrl(next.background_url || null);
+            }
+            rememberLivePatch(patch);
+            dispatchSessionLivePatch({ patch, sentAt: Date.now() });
+            snapshot = base;
+          }
+
           const { error } = await (supabase.from("session_live_states") as any)
             .update(patch)
             .eq("session_id", sessionId);
 
           if (error) {
             console.error("Update Live State Error:", error);
+            forgetLivePatch(Object.keys(patch));
+            if (snapshot) {
+              liveStateRef.current = snapshot;
+              setLiveState(snapshot);
+              if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
+                setBackgroundUrl(snapshot.background_url || null);
+              }
+            }
             alert(error.message);
             return;
           }
 
-          const stageVisibilityPatch = normalizeStageVisibilityPatch(patch);
-
-          setLiveState((prev) => {
-            const mergeFrom = prev ?? base!;
-            const next = { ...mergeFrom, ...patch };
-            liveStateRef.current = next;
-            if (Object.prototype.hasOwnProperty.call(patch, "background_url")) {
-              setBackgroundUrl(next.background_url || null);
-            }
-            return next;
-          });
-
-          if (
-            Object.prototype.hasOwnProperty.call(stageVisibilityPatch, "visible_npc_ids") ||
-            Object.prototype.hasOwnProperty.call(stageVisibilityPatch, "visible_faction_ids")
-          ) {
-            void liveChannelRef.current?.send({
-              type: "broadcast",
-              event: "stage_visibility_changed",
-              payload: stageVisibilityPatch,
-            });
-          }
         } catch (err: any) {
           console.error(err);
           alert(err.message || "Fehler beim Aktualisieren des Session-Zustands.");
@@ -106,7 +135,6 @@ export function useLiveSessionLiveStateMutations({
       });
     },
     [
-      liveChannelRef,
       liveStateRef,
       resolveLiveStateBase,
       sessionId,

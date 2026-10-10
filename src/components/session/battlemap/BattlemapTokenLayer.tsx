@@ -19,6 +19,7 @@ import {
   type BattlemapTokenAttackFxDetail,
 } from "@/src/lib/session/battlemap-token-attack-fx";
 import { gridToPixel } from "@/src/lib/session/battlemap-grid";
+import { isTokenPreviewSnap } from "@/src/lib/session/battlemap-realtime-map";
 
 const TOKEN_DRAG_THRESHOLD_PX = 7;
 const TOKEN_MOVE_MIN_MS = 280;
@@ -351,6 +352,15 @@ const AnimatedToken = memo(function AnimatedToken({
 
   useEffect(() => {
     if (isDragging) return;
+
+    if (isTokenPreviewSnap(token.id)) {
+      const next = { x, y };
+      visualPosRef.current = next;
+      setVisualPos(next);
+      setIsAnimating(false);
+      prevGridRef.current = { gx: token.grid_x, gy: token.grid_y };
+      return;
+    }
 
     const current = visualPosRef.current;
     if (current.x === x && current.y === y) {

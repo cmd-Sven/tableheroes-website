@@ -28,6 +28,54 @@ export function clearPendingBattlemapTokenMove(tokenId: string): void {
   pendingTokenMoves.delete(tokenId);
 }
 
+const previewMoveAt = new Map<string, number>();
+const previewSnapUntil = new Map<string, number>();
+
+/** Während einer Live-Ziehgeste keine Layout-Animation — die Figur folgt der Zelle. */
+export function isTokenPreviewSnap(tokenId: string, now = Date.now()): boolean {
+  return (previewSnapUntil.get(tokenId) ?? 0) > now;
+}
+
+/**
+ * Broadcast einer Ziehgeste. Setzt nur die Zelle und merkt die Position als pending,
+ * damit ein älteres Postgres-Echo sie nicht zurückzieht.
+ */
+export function applyPreviewBattlemapTokenMove(
+  prev: SessionBattlemapToken[],
+  tokenId: string,
+  gridX: number,
+  gridY: number,
+  movedAt: number,
+): SessionBattlemapToken[] {
+  const last = previewMoveAt.get(tokenId) ?? 0;
+  if (movedAt < last) return prev;
+  previewMoveAt.set(tokenId, movedAt);
+  previewSnapUntil.set(tokenId, Date.now() + 500);
+  const idx = prev.findIndex((t) => t.id === tokenId);
+  if (idx < 0) return prev;
+  registerPendingBattlemapTokenMove(tokenId, gridX, gridY);
+  const current = prev[idx]!;
+  if (current.grid_x === gridX && current.grid_y === gridY) return prev;
+  const next = [...prev];
+  next[idx] = { ...current, grid_x: gridX, grid_y: gridY };
+  return next;
+}
+
+type TokenDragSync = (token: SessionBattlemapToken, gridX: number, gridY: number) => void;
+let tokenDragSync: TokenDragSync | null = null;
+
+export function setBattlemapTokenDragSync(fn: TokenDragSync | null): void {
+  tokenDragSync = fn;
+}
+
+export function emitBattlemapTokenDragSync(
+  token: SessionBattlemapToken,
+  gridX: number,
+  gridY: number,
+): void {
+  tokenDragSync?.(token, gridX, gridY);
+}
+
 function tokenUpdatedAtMs(token: SessionBattlemapToken): number | null {
   if (!token.updated_at) return null;
   const ms = Date.parse(token.updated_at);
@@ -60,6 +108,10 @@ function shouldRejectPendingRevert(
 ): boolean {
   const pending = pendingTokenMoves.get(tokenId);
   if (!pending) return false;
+  if (Date.now() - pending.since > 20_000) {
+    pendingTokenMoves.delete(tokenId);
+    return false;
+  }
 
   const currentAtPending =
     current.grid_x === pending.gridX && current.grid_y === pending.gridY;

@@ -26,7 +26,9 @@ import {
 } from "@/src/lib/session/character-radial-bridge";
 import {
   AVATAR_WEBCAM_MASTER_BROADCAST,
+  AVATAR_WEBCAM_MASTER_EVENT,
   AVATAR_WEBCAM_MODE_BROADCAST,
+  AVATAR_WEBCAM_MODE_EVENT,
   dispatchAvatarWebcamMaster,
   dispatchAvatarWebcamMode,
   type AvatarWebcamMasterDetail,
@@ -47,6 +49,7 @@ import {
 } from "@/src/lib/session/avatar-webcam-webrtc";
 import {
   applyBattlemapTokenUpdate,
+  applyPreviewBattlemapTokenMove,
   mapBattlemapTokenRow,
   mergeBattlemapTokenLists,
 } from "@/src/lib/session/battlemap-realtime-map";
@@ -57,6 +60,17 @@ import type {
 } from "@/src/lib/session/battlemap-types";
 import type { LiveState } from "./live-session-types";
 import { normalizeLiveRow, normalizeStageVisibilityPatch, liveStatePollFingerprint, mergeSystemLogs } from "./live-session-normalize";
+import {
+  applySessionLivePatch,
+  LOOT_STAGE_CHANGED_BROADCAST,
+  LOOT_STAGE_CHANGED_EVENT,
+  mergeLiveStateRow,
+  SESSION_LIVE_PATCH_BROADCAST,
+  SESSION_LIVE_PATCH_EVENT,
+  type LootStageChangedDetail,
+  type SessionLivePatchDetail,
+} from "@/src/lib/session/live-state-patch";
+import { markSessionBroadcastReady, sendSessionBroadcast } from "@/src/lib/session/realtime-outbox";
 import {
   SESSION_ACTIVITY_POSTED_BROADCAST,
   SESSION_ACTIVITY_POSTED_EVENT,
@@ -123,7 +137,7 @@ export function useLiveSessionRealtime({
           const raw = data.live_state as Record<string, unknown>;
           const normalized = normalizeLiveRow(data.live_state);
           const prev = liveStateRef.current;
-          const next = {
+          const withLogs = {
             ...normalized,
             system_logs: mergeSystemLogs(
               prev?.system_logs,
@@ -131,6 +145,7 @@ export function useLiveSessionRealtime({
               Array.isArray(raw.system_logs),
             ),
           };
+          const next = prev ? mergeLiveStateRow(prev, withLogs, raw) : withLogs;
           if (prev && liveStatePollFingerprint(prev) === liveStatePollFingerprint(next)) {
             return;
           }
@@ -172,7 +187,7 @@ export function useLiveSessionRealtime({
             const raw = payload.new as Record<string, unknown>;
             const normalized = normalizeLiveRow(payload.new);
             setLiveState((prev) => {
-              const next = {
+              const withLogs = {
                 ...normalized,
                 system_logs: mergeSystemLogs(
                   prev?.system_logs,
@@ -180,6 +195,7 @@ export function useLiveSessionRealtime({
                   Array.isArray(raw.system_logs),
                 ),
               };
+              const next = prev ? mergeLiveStateRow(prev, withLogs, raw) : withLogs;
               liveStateRef.current = next;
               return next;
             });
@@ -198,7 +214,10 @@ export function useLiveSessionRealtime({
 
         setLiveState((prev) => {
           if (!prev) return prev;
-          const next = normalizeLiveRow({ ...prev, ...patch });
+          const next = applySessionLivePatch(prev, {
+            patch,
+            sentAt: Date.now(),
+          });
           liveStateRef.current = next;
           return next;
         });
@@ -248,6 +267,7 @@ export function useLiveSessionRealtime({
           characterId,
           mode: raw.mode === "webcam" ? "webcam" : "avatar",
           senderId: raw.senderId != null ? String(raw.senderId) : null,
+          seq: typeof raw.seq === "number" ? raw.seq : undefined,
           remote: true,
         });
       })
@@ -257,6 +277,7 @@ export function useLiveSessionRealtime({
         dispatchAvatarWebcamMaster({
           enabled: raw.enabled !== false,
           senderId: raw.senderId != null ? String(raw.senderId) : null,
+          seq: typeof raw.seq === "number" ? raw.seq : undefined,
           remote: true,
         });
       })
@@ -327,6 +348,19 @@ export function useLiveSessionRealtime({
 
         if (op === "upsert" && raw.token && typeof raw.token === "object") {
           const token = mapBattlemapTokenRow(raw.token as Record<string, unknown>);
+          if (raw.preview || raw.optimistic) {
+            const movedAt = Number(raw.movedAt ?? Date.now());
+            setBattlemapTokens((prev) =>
+              applyPreviewBattlemapTokenMove(
+                prev,
+                token.id,
+                token.grid_x,
+                token.grid_y,
+                Number.isFinite(movedAt) ? movedAt : Date.now(),
+              ),
+            );
+            return;
+          }
           setBattlemapTokens((prev) => applyBattlemapTokenUpdate(prev, token));
           return;
         }
@@ -458,6 +492,37 @@ export function useLiveSessionRealtime({
           void registerSessionOnlinePresence(sessionId);
         }
       })
+      .on("broadcast", { event: SESSION_LIVE_PATCH_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as SessionLivePatchDetail;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        if (!raw.patch || typeof raw.patch !== "object") return;
+        setLiveState((prev) => {
+          if (!prev) return prev;
+          const next = applySessionLivePatch(prev, {
+            patch: raw.patch,
+            sentAt: Number(raw.sentAt) || Date.now(),
+            senderId: raw.senderId != null ? String(raw.senderId) : null,
+            remote: true,
+          });
+          liveStateRef.current = next;
+          if (Object.prototype.hasOwnProperty.call(raw.patch, "background_url")) {
+            setBackgroundUrl(next.background_url || null);
+          }
+          return next;
+        });
+      })
+      .on("broadcast", { event: LOOT_STAGE_CHANGED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as LootStageChangedDetail;
+        const containerId = raw.containerId != null ? String(raw.containerId) : "";
+        if (!containerId) return;
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        if (typeof window === "undefined") return;
+        window.dispatchEvent(
+          new CustomEvent(LOOT_STAGE_CHANGED_EVENT, {
+            detail: { containerId, senderId: raw.senderId, remote: true } satisfies LootStageChangedDetail,
+          }),
+        );
+      })
       .on("broadcast", { event: SESSION_ACTIVITY_POSTED_BROADCAST }, (payload) => {
         const raw = (payload.payload ?? {}) as {
           entry?: unknown;
@@ -480,6 +545,7 @@ export function useLiveSessionRealtime({
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
+          markSessionBroadcastReady(channel);
           await channel.track({ user_id: userId });
           if (!isGM) {
             void registerSessionOnlinePresence(sessionId);
@@ -490,6 +556,7 @@ export function useLiveSessionRealtime({
     liveChannelRef.current = channel;
 
     return () => {
+      markSessionBroadcastReady(null);
       if (liveChannelRef.current === channel) {
         liveChannelRef.current = null;
       }
@@ -502,17 +569,60 @@ export function useLiveSessionRealtime({
     function onLocalActivity(e: Event) {
       const detail = (e as CustomEvent<SessionActivityPostedDetail>).detail;
       if (!detail?.entry || detail.remote) return;
-      void liveChannelRef.current?.send({
-        type: "broadcast",
-        event: SESSION_ACTIVITY_POSTED_BROADCAST,
-        payload: { entry: detail.entry, senderId: userId },
+      sendSessionBroadcast(SESSION_ACTIVITY_POSTED_BROADCAST, {
+        entry: detail.entry,
+        senderId: userId,
+      });
+    }
+    function onLocalWebcamMode(e: Event) {
+      const detail = (e as CustomEvent<AvatarWebcamModeDetail>).detail;
+      if (!detail?.characterId || detail.remote) return;
+      sendSessionBroadcast(AVATAR_WEBCAM_MODE_BROADCAST, {
+        characterId: detail.characterId,
+        mode: detail.mode,
+        senderId: userId,
+        seq: detail.seq ?? null,
+      });
+    }
+    function onLocalWebcamMaster(e: Event) {
+      const detail = (e as CustomEvent<AvatarWebcamMasterDetail>).detail;
+      if (!detail || detail.remote) return;
+      sendSessionBroadcast(AVATAR_WEBCAM_MASTER_BROADCAST, {
+        enabled: detail.enabled !== false,
+        senderId: userId,
+        seq: detail.seq ?? null,
+      });
+    }
+    function onLocalLivePatch(e: Event) {
+      const detail = (e as CustomEvent<SessionLivePatchDetail>).detail;
+      if (!detail?.patch || detail.remote) return;
+      sendSessionBroadcast(SESSION_LIVE_PATCH_BROADCAST, {
+        patch: detail.patch,
+        sentAt: detail.sentAt,
+        senderId: userId,
+      });
+    }
+    function onLocalLoot(e: Event) {
+      const detail = (e as CustomEvent<LootStageChangedDetail>).detail;
+      if (!detail?.containerId || detail.remote) return;
+      sendSessionBroadcast(LOOT_STAGE_CHANGED_BROADCAST, {
+        containerId: detail.containerId,
+        senderId: userId,
       });
     }
     window.addEventListener(SESSION_ACTIVITY_POSTED_EVENT, onLocalActivity);
+    window.addEventListener(AVATAR_WEBCAM_MODE_EVENT, onLocalWebcamMode);
+    window.addEventListener(AVATAR_WEBCAM_MASTER_EVENT, onLocalWebcamMaster);
+    window.addEventListener(SESSION_LIVE_PATCH_EVENT, onLocalLivePatch);
+    window.addEventListener(LOOT_STAGE_CHANGED_EVENT, onLocalLoot);
     return () => {
       window.removeEventListener(SESSION_ACTIVITY_POSTED_EVENT, onLocalActivity);
+      window.removeEventListener(AVATAR_WEBCAM_MODE_EVENT, onLocalWebcamMode);
+      window.removeEventListener(AVATAR_WEBCAM_MASTER_EVENT, onLocalWebcamMaster);
+      window.removeEventListener(SESSION_LIVE_PATCH_EVENT, onLocalLivePatch);
+      window.removeEventListener(LOOT_STAGE_CHANGED_EVENT, onLocalLoot);
     };
-  }, [isGuest, userId, liveChannelRef]);
+  }, [isGuest, userId]);
 
   return { presentUserIds };
 }

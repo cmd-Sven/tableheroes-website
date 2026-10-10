@@ -25,16 +25,19 @@ export function DungeonMasterCamWebRtcSync({ userId }: Props) {
     const key = dmStreamKey(userId);
     if (phase === "active") {
       const stream = getStream();
-      if (stream) {
-        publishStreamRef.current?.(key, stream);
-      }
-    } else {
-      unpublishStreamRef.current?.(key);
+      if (stream) publishStreamRef.current?.(key, stream);
+      return;
     }
+    unpublishStreamRef.current?.(key);
+  }, [getStream, phase, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const key = dmStreamKey(userId);
     return () => {
       unpublishStreamRef.current?.(key);
     };
-  }, [getStream, phase, userId]);
+  }, [userId]);
 
   return null;
 }

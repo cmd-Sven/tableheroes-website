@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useCallback, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -39,6 +39,7 @@ import { BattlemapTrapOverlayLayer } from "./BattlemapTrapOverlayLayer";
 import { BattlemapContainerOverlayLayer } from "./BattlemapContainerOverlayLayer";
 import { BattlemapTokenDragOverlay } from "./BattlemapTokenDragOverlay";
 import { canUserDragBattlemapToken, isMarkerPlaceKind } from "./battlemap-stage-utils";
+import { emitBattlemapTokenDragSync } from "@/src/lib/session/battlemap-realtime-map";
 import { buildBattlemapLayerSelectHandlers } from "./battlemap-stage-map-selection";
 import type { EffectDraft, FogDraft } from "./useBattlemapShapeDrawing";
 
@@ -309,6 +310,37 @@ export function BattlemapStageMap({
     [isGm, ownCharacterId, placementActive, shapeSelectActive],
   );
 
+  const dragLiveRef = useRef<{
+    timer: number | null;
+    pending: { token: SessionBattlemapToken; gridX: number; gridY: number } | null;
+    lastKey: string;
+  }>({ timer: null, pending: null, lastKey: "" });
+
+  const flushDragLive = useCallback(
+    (next?: { token: SessionBattlemapToken; gridX: number; gridY: number }) => {
+      const slot = dragLiveRef.current;
+      if (slot.timer != null) {
+        window.clearTimeout(slot.timer);
+        slot.timer = null;
+      }
+      const payload = next ?? slot.pending;
+      slot.pending = null;
+      if (!payload) return;
+      const key = `${payload.token.id}:${payload.gridX}:${payload.gridY}`;
+      if (key === slot.lastKey) return;
+      slot.lastKey = key;
+      emitBattlemapTokenDragSync(payload.token, payload.gridX, payload.gridY);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const slot = dragLiveRef.current;
+    return () => {
+      if (slot.timer != null) window.clearTimeout(slot.timer);
+    };
+  }, []);
+
   const handleTokenDragPreview = useCallback(
     (token: SessionBattlemapToken, clientX: number, clientY: number) => {
       const el = mapRef.current;
@@ -332,6 +364,19 @@ export function BattlemapStageMap({
           targetGridY: cell.gridY,
         };
       });
+      const slot = dragLiveRef.current;
+      slot.pending = { token: sourceToken, gridX: cell.gridX, gridY: cell.gridY };
+      if (slot.timer != null) return;
+      slot.timer = window.setTimeout(() => {
+        slot.timer = null;
+        const pending = slot.pending;
+        slot.pending = null;
+        if (!pending) return;
+        const key = `${pending.token.id}:${pending.gridX}:${pending.gridY}`;
+        if (key === slot.lastKey) return;
+        slot.lastKey = key;
+        emitBattlemapTokenDragSync(pending.token, pending.gridX, pending.gridY);
+      }, 120);
     },
     [mapRef, cellFromClient, tokens, setTokenDragPreview],
   );
@@ -342,22 +387,42 @@ export function BattlemapStageMap({
       const preview =
         tokenDragPreview?.tokenId === token.id ? tokenDragPreview : null;
       setTokenDragPreview(null);
-      if (!el || !onTokenMove) return;
+      const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
+      const revertLive = () => {
+        if (!preview) {
+          dragLiveRef.current.pending = null;
+          if (dragLiveRef.current.timer != null) {
+            window.clearTimeout(dragLiveRef.current.timer);
+            dragLiveRef.current.timer = null;
+          }
+          return;
+        }
+        flushDragLive({
+          token: sourceToken,
+          gridX: preview.originGridX,
+          gridY: preview.originGridY,
+        });
+      };
+      if (!el || !onTokenMove) {
+        revertLive();
+        return;
+      }
 
       const pointerCell = cellFromClient(clientX, clientY, el);
       const cell = preview
         ? { gridX: preview.targetGridX, gridY: preview.targetGridY }
         : pointerCell;
       if (!cell) {
+        revertLive();
         toast.error("Token konnte nicht platziert werden — Ziel liegt außerhalb der Karte.");
         return;
       }
 
-      const sourceToken = tokens.find((t) => t.id === token.id) ?? token;
       if (
         sourceToken.grid_x === cell.gridX &&
         sourceToken.grid_y === cell.gridY
       ) {
+        revertLive();
         return;
       }
 
@@ -369,16 +434,24 @@ export function BattlemapStageMap({
           sourceToken.id,
         )
       ) {
+        revertLive();
         toast.error("Diese Zelle ist nicht erreichbar.");
         return;
       }
 
+      dragLiveRef.current.pending = null;
+      dragLiveRef.current.lastKey = "";
+      if (dragLiveRef.current.timer != null) {
+        window.clearTimeout(dragLiveRef.current.timer);
+        dragLiveRef.current.timer = null;
+      }
       onTokenMove(sourceToken, cell.gridX, cell.gridY);
     },
     [
       mapRef,
       tokenDragPreview,
       setTokenDragPreview,
+      flushDragLive,
       onTokenMove,
       cellFromClient,
       tokens,
@@ -387,8 +460,25 @@ export function BattlemapStageMap({
   );
 
   const handleTokenDragCancel = useCallback(() => {
+    const preview = tokenDragPreview;
     setTokenDragPreview(null);
-  }, [setTokenDragPreview]);
+    if (preview) {
+      const token = tokens.find((t) => t.id === preview.tokenId);
+      if (token) {
+        flushDragLive({
+          token,
+          gridX: preview.originGridX,
+          gridY: preview.originGridY,
+        });
+      }
+    } else {
+      dragLiveRef.current.pending = null;
+      if (dragLiveRef.current.timer != null) {
+        window.clearTimeout(dragLiveRef.current.timer);
+        dragLiveRef.current.timer = null;
+      }
+    }
+  }, [flushDragLive, setTokenDragPreview, tokenDragPreview, tokens]);
 
   return (
     <TransformWrapper

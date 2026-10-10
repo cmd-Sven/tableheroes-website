@@ -43,6 +43,7 @@ export function usePlayerAvatarCam({
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startInFlightRef = useRef(false);
+  const cameraGenRef = useRef(0);
   const publishStreamRef = useRef(webrtc?.publishStream);
   const unpublishStreamRef = useRef(webrtc?.unpublishStream);
   publishStreamRef.current = webrtc?.publishStream;
@@ -83,6 +84,7 @@ export function usePlayerAvatarCam({
       return;
     }
 
+    const gen = ++cameraGenRef.current;
     startInFlightRef.current = true;
     setPhase("starting");
     setErrorHint(null);
@@ -93,9 +95,9 @@ export function usePlayerAvatarCam({
         audio: false,
       });
 
-      if (!isCameraOwner) {
+      if (gen !== cameraGenRef.current || !isCameraOwner) {
         stream.getTracks().forEach((t) => t.stop());
-        setPhase("idle");
+        if (gen === cameraGenRef.current) setPhase("idle");
         return;
       }
 
@@ -103,6 +105,7 @@ export function usePlayerAvatarCam({
       attachVideo(videoRef.current);
       setPhase("active");
     } catch (e: unknown) {
+      if (gen !== cameraGenRef.current) return;
       stopStream();
       const name =
         e && typeof e === "object" && "name" in e
@@ -125,11 +128,13 @@ export function usePlayerAvatarCam({
         );
       }
     } finally {
-      startInFlightRef.current = false;
+      if (gen === cameraGenRef.current) startInFlightRef.current = false;
     }
   }, [attachVideo, isCameraOwner, stopStream]);
 
   const stopCamera = useCallback(() => {
+    cameraGenRef.current += 1;
+    startInFlightRef.current = false;
     stopStream();
     setPhase("idle");
     setErrorHint(null);
@@ -176,13 +181,17 @@ export function usePlayerAvatarCam({
     const key = streamKey;
     if (displayMode === "webcam" && phase === "active" && streamRef.current) {
       publishStreamRef.current?.(key, streamRef.current);
-    } else {
-      unpublishStreamRef.current?.(key);
+      return;
     }
+    unpublishStreamRef.current?.(key);
+  }, [displayMode, isCameraOwner, phase, streamKey]);
+
+  useEffect(() => {
+    const key = streamKey;
     return () => {
       unpublishStreamRef.current?.(key);
     };
-  }, [displayMode, isCameraOwner, phase, streamKey]);
+  }, [streamKey]);
 
   useEffect(() => {
     return () => {
