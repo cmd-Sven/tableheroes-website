@@ -1668,6 +1668,269 @@ export type Database = {
           },
         ]
       }
+      city_map_district_polygons: {
+        Row: {
+          color: string
+          district_id: string
+          hover_opacity: number
+          points: Json
+          world_id: string
+        }
+        Insert: {
+          color: string
+          district_id: string
+          hover_opacity: number
+          points: Json
+          world_id: string
+        }
+        Update: {
+          color?: string
+          district_id?: string
+          hover_opacity?: number
+          points?: Json
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_district_polygons_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_map_district_sectors: {
+        Row: {
+          district_id: string
+          sectors: Json
+          world_id: string
+        }
+        Insert: {
+          district_id: string
+          sectors: Json
+          world_id: string
+        }
+        Update: {
+          district_id?: string
+          sectors?: Json
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_district_sectors_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_map_placements: {
+        Row: {
+          building_key: string
+          building_type: string | null
+          district_id: string | null
+          location_id: string
+          marker_name: string | null
+          rotation: number | null
+          scale: number | null
+          street_id: string | null
+          u: number | null
+          v: number | null
+          world_id: string
+        }
+        Insert: {
+          building_key: string
+          building_type?: string | null
+          district_id?: string | null
+          location_id: string
+          marker_name?: string | null
+          rotation?: number | null
+          scale?: number | null
+          street_id?: string | null
+          u?: number | null
+          v?: number | null
+          world_id: string
+        }
+        Update: {
+          building_key?: string
+          building_type?: string | null
+          district_id?: string | null
+          location_id?: string
+          marker_name?: string | null
+          rotation?: number | null
+          scale?: number | null
+          street_id?: string | null
+          u?: number | null
+          v?: number | null
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_placements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "city_map_placements_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_map_streets: {
+        Row: {
+          category: string
+          condition: number
+          connects_to: Json
+          crime: number
+          description: string
+          district_ids: Json
+          name: string
+          points: Json
+          security: number
+          street_id: string
+          traffic: number
+          width: number
+          works: Json
+          world_id: string
+        }
+        Insert: {
+          category: string
+          condition: number
+          connects_to?: Json
+          crime: number
+          description?: string
+          district_ids?: Json
+          name: string
+          points: Json
+          security: number
+          street_id: string
+          traffic: number
+          width: number
+          works: Json
+          world_id: string
+        }
+        Update: {
+          category?: string
+          condition?: number
+          connects_to?: Json
+          crime?: number
+          description?: string
+          district_ids?: Json
+          name?: string
+          points?: Json
+          security?: number
+          street_id?: string
+          traffic?: number
+          width?: number
+          works?: Json
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_streets_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_map_viewer_prefs: {
+        Row: {
+          streets_visible: boolean
+          user_id: string
+          weather_enabled: boolean
+          weather_mode: string
+          world_id: string
+        }
+        Insert: {
+          streets_visible?: boolean
+          user_id: string
+          weather_enabled?: boolean
+          weather_mode?: string
+          world_id: string
+        }
+        Update: {
+          streets_visible?: boolean
+          user_id?: string
+          weather_enabled?: boolean
+          weather_mode?: string
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_viewer_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "city_map_viewer_prefs_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_map_walls: {
+        Row: {
+          brightness: number
+          curve: number
+          height: number
+          merlon_count: number
+          merlon_size: number
+          name: string
+          points: Json
+          texture_scale: number
+          thickness: number
+          wall_id: string
+          world_id: string
+        }
+        Insert: {
+          brightness: number
+          curve: number
+          height: number
+          merlon_count: number
+          merlon_size: number
+          name: string
+          points: Json
+          texture_scale: number
+          thickness: number
+          wall_id: string
+          world_id: string
+        }
+        Update: {
+          brightness?: number
+          curve?: number
+          height?: number
+          merlon_count?: number
+          merlon_size?: number
+          name?: string
+          points?: Json
+          texture_scale?: number
+          thickness?: number
+          wall_id?: string
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_walls_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           additional_images: Json | null
@@ -1679,6 +1942,7 @@ export type Database = {
           gm_notes: string | null
           id: string
           image_url: string | null
+          map_building_id: string | null
           map_district_id: string | null
           map_u: number | null
           map_v: number | null
@@ -1698,6 +1962,7 @@ export type Database = {
           gm_notes?: string | null
           id?: string
           image_url?: string | null
+          map_building_id?: string | null
           map_district_id?: string | null
           map_u?: number | null
           map_v?: number | null
@@ -1717,6 +1982,7 @@ export type Database = {
           gm_notes?: string | null
           id?: string
           image_url?: string | null
+          map_building_id?: string | null
           map_district_id?: string | null
           map_u?: number | null
           map_v?: number | null

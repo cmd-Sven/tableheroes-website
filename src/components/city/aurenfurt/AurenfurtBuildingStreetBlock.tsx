@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Route } from "lucide-react";
-import {
-  STREETS_STORAGE_KEY,
-  parseStoredStreets,
-  type AurenfurtStreet,
-} from "@/src/components/city/aurenfurt/aurenfurt-streets";
+import { loadCityMapStreets } from "@/src/components/city/aurenfurt/aurenfurt-city-map-db";
+import type { AurenfurtStreet } from "@/src/components/city/aurenfurt/aurenfurt-streets";
 import { nearbyStreetsForBuilding } from "@/src/components/city/aurenfurt/aurenfurt-map-buildings";
 import type { CityDistrictId } from "@/src/components/city/aurenfurt/aurenfurt-districts";
 import { updateAurenfurtBuildingStreet } from "@/src/components/city/aurenfurt/aurenfurt-map-building-actions";
@@ -21,11 +18,6 @@ type Props = {
   fromEditor: boolean;
   isGm: boolean;
 };
-
-function readStreetsFromStorage(): AurenfurtStreet[] {
-  if (typeof window === "undefined") return [];
-  return parseStoredStreets(window.localStorage.getItem(STREETS_STORAGE_KEY)) ?? [];
-}
 
 export function AurenfurtBuildingStreetBlock({
   locationId,
@@ -43,8 +35,20 @@ export function AurenfurtBuildingStreetBlock({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    setStreets(readStreetsFromStorage());
-  }, []);
+    let active = true;
+    loadCityMapStreets(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setStreets(result.data);
+        if (result.error) setError(result.error);
+      })
+      .catch(() => {
+        if (active) setError("Straßen konnten nicht aus der Datenbank geladen werden.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
   useEffect(() => {
     setSelectedStreetId(streetId ?? "");

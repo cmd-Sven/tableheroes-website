@@ -111,13 +111,24 @@ type Props = {
 };
 
 export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm = false }: Props) {
+  const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
   const [editorBuildings, setEditorBuildings] = useState<CityBuilding[]>([]);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, BuildingCategory>>({});
   const [pois, setPois] = useState<AurenfurtMapPoi[]>([]);
-  const buildings = useMemo(
-    () => mergeCityBuildings(editorBuildings, categoryOverrides),
-    [editorBuildings, categoryOverrides],
-  );
+  const weatherFx = useWeatherFxControl(resolvedWorldId, isGm);
+  const polygons = useDistrictPolygons(resolvedWorldId, isGm);
+  const sectorsApi = useDistrictSectors(resolvedWorldId, isGm);
+  const buildingPositions = useBuildingPositions(resolvedWorldId, isGm);
+  const landmarkScales = useLandmarkScales(resolvedWorldId, isGm);
+  const landmarkRotations = useLandmarkRotations(resolvedWorldId, isGm);
+  const streetsApi = useAurenfurtStreets(polygons.polygons, resolvedWorldId, isGm);
+  const wallsApi = useAurenfurtWalls(resolvedWorldId, isGm);
+  const buildings = useMemo(() => {
+    const extras = buildingPositions.markerBuildings.filter(
+      (marker) => !editorBuildings.some((building) => building.id === marker.id),
+    );
+    return mergeCityBuildings([...editorBuildings, ...extras], categoryOverrides);
+  }, [buildingPositions.markerBuildings, categoryOverrides, editorBuildings]);
 
   const view = useHoloCityView(buildings, pois);
   const calendar = useAurenfurtDay();
@@ -137,19 +148,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     calendar.day,
   );
   const climate = useAurenfurtWeather(calendar.day);
-  const weatherFx = useWeatherFxControl();
   const shownWeather = resolveWeatherFx(
     weatherFx.preference,
     climate.current.kind,
     climate.current.intensity,
   );
-  const polygons = useDistrictPolygons();
-  const sectorsApi = useDistrictSectors();
-  const buildingPositions = useBuildingPositions();
-  const landmarkScales = useLandmarkScales();
-  const landmarkRotations = useLandmarkRotations();
-  const streetsApi = useAurenfurtStreets(polygons.polygons);
-  const wallsApi = useAurenfurtWalls();
 
   useEffect(() => {
     setCitySimLive({
@@ -183,7 +186,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     sectorsApi.sectorsByDistrict,
     polygons.polygons,
   ]);
-  const { streetsVisible, toggleStreetsVisible } = useStreetsVisibility(isGm);
+  const {
+    streetsVisible,
+    toggleStreetsVisible,
+    saveError: streetsVisibilityError,
+  } = useStreetsVisibility(resolvedWorldId, isGm);
   const [citySurface, setCitySurface] = useState<CitySurface>("map");
   const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
   const [places, setPlaces] = useState<AurenfurtPlaceLore[]>([]);
@@ -232,7 +239,17 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
 
   const editorActive = isGm && activeTool !== null;
   const streetsLayerVisible = editorActive || streetsVisible;
-  const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
+  const layoutError =
+    wallsApi.saveError ||
+    polygons.saveError ||
+    sectorsApi.saveError ||
+    buildingPositions.saveError ||
+    landmarkScales.saveError ||
+    landmarkRotations.saveError ||
+    streetsApi.saveError ||
+    weatherFx.saveError ||
+    streetsVisibilityError ||
+    null;
   const selectedPoi =
     view.subject?.type === "poi" ? findPoi(pois, view.subject.id) : null;
   const districtPoiInfluences = useMemo(() => {
@@ -596,10 +613,19 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         ...current.filter((b) => b.id !== result.building.id),
         result.building,
       ]);
-      buildingPositions.placeAndCommit(result.building.id, {
-        u: result.building.u,
-        v: result.building.v,
-      });
+      buildingPositions.placeAndCommit(
+        result.building.id,
+        {
+          u: result.building.u,
+          v: result.building.v,
+        },
+        {
+          name: result.building.name,
+          districtId: result.building.districtId,
+          buildingType: result.building.category,
+          streetId: result.building.streetId,
+        },
+      );
       setBuildingDraftUv(null);
       setPlacingBuilding(false);
       setBuildingFormKey((key) => key + 1);
@@ -740,7 +766,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             {wallsTool ? (
               <WallEditorPanel
                 walls={wallsApi.walls}
-                savedLocally={wallsApi.savedLocally}
+                saved={wallsApi.saved}
+                ready={wallsApi.ready}
+                saveError={wallsApi.saveError}
                 editingWallId={editingWallId}
                 drawing={drawingWall}
                 draftReady={wallDraftReady}
@@ -824,14 +852,23 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
                 poiFormKey={poiFormKey}
                 dayWeather={climate.current}
                 viewedDay={calendar.day}
-                savedLocally={
-                  polygons.savedLocally ||
-                  buildingPositions.savedLocally ||
-                  landmarkScales.savedLocally ||
-                  landmarkRotations.savedLocally ||
-                  streetsApi.savedLocally ||
-                  sectorsApi.savedLocally
+                saved={
+                  polygons.saved ||
+                  buildingPositions.saved ||
+                  landmarkScales.saved ||
+                  landmarkRotations.saved ||
+                  streetsApi.saved ||
+                  sectorsApi.saved
                 }
+                ready={
+                  polygons.ready &&
+                  buildingPositions.ready &&
+                  landmarkScales.ready &&
+                  landmarkRotations.ready &&
+                  streetsApi.ready &&
+                  sectorsApi.ready
+                }
+                saveError={layoutError}
                 onSelectDistrict={selectDistrict}
                 onSelectBuilding={selectBuilding}
                 onSelectPoi={selectPoi}
@@ -1068,6 +1105,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
                   <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
                   Stadtereignis
                 </button>
+              ) : null}
+              {layoutError ? (
+                <p className="mt-2 font-libre text-xs leading-relaxed text-red-300" role="alert">
+                  {layoutError}
+                </p>
               ) : null}
               <p className="mt-1 font-libre text-sm leading-relaxed text-gray-200">
                 {eventWizardOpen && eventPlaceStep

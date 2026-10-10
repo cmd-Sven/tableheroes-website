@@ -1,52 +1,59 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  STREETS_VISIBLE_GM_KEY,
-  STREETS_VISIBLE_PLAYER_KEY,
-} from "../aurenfurt-streets";
+import { loadCityMapViewerPrefs, saveCityMapStreetsVisible } from "../aurenfurt-city-map-db";
 
-function storageKey(isGm: boolean) {
-  return isGm ? STREETS_VISIBLE_GM_KEY : STREETS_VISIBLE_PLAYER_KEY;
-}
-
-/** Default: sichtbar — gespeicherte Straßen sollen nicht plötzlich verschwinden. */
-function readVisible(isGm: boolean): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = window.localStorage.getItem(storageKey(isGm));
-    if (raw === null) return true;
-    return raw !== "0" && raw !== "false";
-  } catch {
-    return true;
-  }
-}
-
-export function useStreetsVisibility(isGm: boolean) {
+export function useStreetsVisibility(worldId: string, isGm: boolean) {
   const [streetsVisible, setStreetsVisibleState] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    setStreetsVisibleState(readVisible(isGm));
-  }, [isGm]);
+    let active = true;
+    setReady(false);
+    loadCityMapViewerPrefs(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setStreetsVisibleState(result.data.streetsVisible);
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Die Straßensichtbarkeit konnte nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
   const setStreetsVisible = useCallback(
     (next: boolean | ((prev: boolean) => boolean)) => {
       setStreetsVisibleState((prev) => {
         const value = typeof next === "function" ? next(prev) : next;
-        try {
-          window.localStorage.setItem(storageKey(isGm), value ? "1" : "0");
-        } catch {
-          // private mode / quota — Preference nur im Session-State halten
-        }
+        void saveCityMapStreetsVisible(worldId, value).then((error) => {
+          if (error) {
+            setStreetsVisibleState(prev);
+            setSaveError(error);
+            setSaved(false);
+            return;
+          }
+          setSaveError(null);
+          setSaved(true);
+        });
         return value;
       });
     },
-    [isGm],
+    [worldId],
   );
 
   const toggleStreetsVisible = useCallback(() => {
     setStreetsVisible((prev) => !prev);
   }, [setStreetsVisible]);
 
-  return { streetsVisible, setStreetsVisible, toggleStreetsVisible };
+  return { streetsVisible, setStreetsVisible, toggleStreetsVisible, saved, ready, saveError };
 }

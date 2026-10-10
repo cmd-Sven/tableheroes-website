@@ -33,7 +33,9 @@ type Draft = {
 
 type Props = {
   walls: AurenfurtWall[];
-  savedLocally: boolean;
+  saved: boolean;
+  ready: boolean;
+  saveError: string | null;
   editingWallId: string | null;
   drawing: boolean;
   draftReady: boolean;
@@ -140,7 +142,9 @@ function AppearanceSliders({
 
 export function WallEditorPanel({
   walls,
-  savedLocally,
+  saved,
+  ready,
+  saveError,
   editingWallId,
   drawing,
   draftReady,
@@ -171,8 +175,15 @@ export function WallEditorPanel({
       <div className="mb-3 flex items-start justify-between gap-2 border-b border-hero-border pb-2">
         <div>
           <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">Stadtmauern</p>
-          <p className="font-libre text-xs text-gray-400">
-            {savedLocally ? "Lokal gespeichert." : "Noch nicht lokal gespeichert."} Nur optisch auf der Karte.
+          <p className={`font-libre text-xs ${saveError ? "text-red-300" : "text-gray-400"}`}>
+            {saveError
+              ? saveError
+              : !ready
+                ? "Wird aus der Datenbank geladen."
+                : saved
+                  ? "In der Datenbank gespeichert."
+                  : "Noch nicht in der Datenbank."}{" "}
+            Nur optisch auf der Karte.
           </p>
         </div>
         <button

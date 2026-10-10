@@ -2,47 +2,56 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CityDistrictId } from "../aurenfurt-districts";
+import { loadCityMapPolygons, saveCityMapPolygons } from "../aurenfurt-city-map-db";
 import {
-  DISTRICT_POLYGONS_LEGACY_STORAGE_KEY,
-  DISTRICT_POLYGONS_STORAGE_KEY,
   clampUvPoint,
   defaultDistrictPolygons,
-  mergeDistrictPolygonsWithDefaults,
-  parseStoredDistrictPolygons,
-  serializeDistrictPolygons,
   type DistrictPolygons,
   type UvPoint,
 } from "../aurenfurt-district-polygons";
 
-export function useDistrictPolygons() {
+export function useDistrictPolygons(worldId: string, isGm: boolean) {
   const [polygons, setPolygons] = useState<DistrictPolygons>(() => defaultDistrictPolygons());
-  const [savedLocally, setSavedLocally] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const current = window.localStorage.getItem(DISTRICT_POLYGONS_STORAGE_KEY);
-    const legacy = window.localStorage.getItem(DISTRICT_POLYGONS_LEGACY_STORAGE_KEY);
-    const stored = parseStoredDistrictPolygons(current) ?? parseStoredDistrictPolygons(legacy);
-    if (stored) {
-      // Fehlende Viertel-Ids (z. B. Akademieviertel) aus Defaults ergänzen, gespeicherte nicht verwerfen.
-      const merged = mergeDistrictPolygonsWithDefaults(stored);
-      setPolygons(merged);
-      setSavedLocally(true);
-      try {
-        window.localStorage.setItem(DISTRICT_POLYGONS_STORAGE_KEY, serializeDistrictPolygons(merged));
-      } catch {
-        // Quota / private mode
-      }
-    }
-  }, []);
+    let active = true;
+    setReady(false);
+    loadCityMapPolygons(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setPolygons(result.data);
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Viertel-Polygone konnten nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
-  const persist = useCallback((next: DistrictPolygons) => {
-    try {
-      window.localStorage.setItem(DISTRICT_POLYGONS_STORAGE_KEY, serializeDistrictPolygons(next));
-      setSavedLocally(true);
-    } catch {
-      // Quota / private mode – State bleibt die Quelle für Mesh und Hits.
-    }
-  }, []);
+  const persist = useCallback(
+    (next: DistrictPolygons) => {
+      if (!isGm) {
+        setSaveError("Nur der Spielleiter kann Viertel speichern.");
+        setSaved(false);
+        return;
+      }
+      void saveCityMapPolygons(worldId, next).then((error) => {
+        setSaveError(error);
+        setSaved(error == null);
+      });
+    },
+    [isGm, worldId],
+  );
 
   const moveVertex = useCallback((districtId: CityDistrictId, index: number, point: UvPoint) => {
     setPolygons((current) => {
@@ -54,26 +63,32 @@ export function useDistrictPolygons() {
     });
   }, []);
 
-  const setDistrictColor = useCallback((districtId: CityDistrictId, color: string) => {
-    setPolygons((current) => {
-      const entry = current[districtId];
-      if (!entry) return current;
-      const next = { ...current, [districtId]: { ...entry, color } };
-      persist(next);
-      return next;
-    });
-  }, [persist]);
+  const setDistrictColor = useCallback(
+    (districtId: CityDistrictId, color: string) => {
+      setPolygons((current) => {
+        const entry = current[districtId];
+        if (!entry) return current;
+        const next = { ...current, [districtId]: { ...entry, color } };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
 
-  const setDistrictHoverOpacity = useCallback((districtId: CityDistrictId, hoverOpacity: number) => {
-    const clamped = Math.min(1, Math.max(0, hoverOpacity));
-    setPolygons((current) => {
-      const entry = current[districtId];
-      if (!entry) return current;
-      const next = { ...current, [districtId]: { ...entry, hoverOpacity: clamped } };
-      persist(next);
-      return next;
-    });
-  }, [persist]);
+  const setDistrictHoverOpacity = useCallback(
+    (districtId: CityDistrictId, hoverOpacity: number) => {
+      const clamped = Math.min(1, Math.max(0, hoverOpacity));
+      setPolygons((current) => {
+        const entry = current[districtId];
+        if (!entry) return current;
+        const next = { ...current, [districtId]: { ...entry, hoverOpacity: clamped } };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
 
   const commit = useCallback(() => {
     setPolygons((current) => {
@@ -88,6 +103,8 @@ export function useDistrictPolygons() {
     setDistrictColor,
     setDistrictHoverOpacity,
     commit,
-    savedLocally,
+    saved,
+    ready,
+    saveError,
   };
 }

@@ -1,35 +1,52 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  WALLS_STORAGE_KEY,
-  defaultWall,
-  parseStoredWalls,
-  serializeWalls,
-  type AurenfurtWall,
-} from "../aurenfurt-walls";
+import { loadCityMapWalls, saveCityMapWalls } from "../aurenfurt-city-map-db";
+import { defaultWall, type AurenfurtWall } from "../aurenfurt-walls";
 import { clampUvPoint, type UvPoint } from "../aurenfurt-district-polygons";
 
-export function useAurenfurtWalls() {
+export function useAurenfurtWalls(worldId: string, isGm: boolean) {
   const [walls, setWalls] = useState<AurenfurtWall[]>([]);
-  const [savedLocally, setSavedLocally] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = parseStoredWalls(window.localStorage.getItem(WALLS_STORAGE_KEY));
-    if (stored) {
-      setWalls(stored);
-      setSavedLocally(true);
-    }
-  }, []);
+    let active = true;
+    setReady(false);
+    loadCityMapWalls(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setWalls(result.data);
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Die Mauern konnten nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
-  const persist = useCallback((next: AurenfurtWall[]) => {
-    try {
-      window.localStorage.setItem(WALLS_STORAGE_KEY, serializeWalls(next));
-      setSavedLocally(true);
-    } catch {
-      // Quota / privater Modus
-    }
-  }, []);
+  const persist = useCallback(
+    (next: AurenfurtWall[]) => {
+      if (!isGm) {
+        setSaveError("Nur der Spielleiter kann die Mauer speichern.");
+        setSaved(false);
+        return;
+      }
+      void saveCityMapWalls(worldId, next).then((error) => {
+        setSaveError(error);
+        setSaved(error == null);
+      });
+    },
+    [isGm, worldId],
+  );
 
   const addWall = useCallback(
     (input: Omit<AurenfurtWall, "id"> & { id?: string }) => {
@@ -93,5 +110,5 @@ export function useAurenfurtWalls() {
     [persist],
   );
 
-  return { walls, savedLocally, addWall, updateWall, movePoint, removeWall };
+  return { walls, saved, ready, saveError, addWall, updateWall, movePoint, removeWall };
 }

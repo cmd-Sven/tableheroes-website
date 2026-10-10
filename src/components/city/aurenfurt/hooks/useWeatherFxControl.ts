@@ -1,45 +1,71 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { loadCityMapViewerPrefs, saveCityMapWeather } from "../aurenfurt-city-map-db";
 import {
-  WEATHER_FX_STORAGE_KEY,
   defaultWeatherFxPreference,
-  parseStoredWeatherFx,
-  serializeWeatherFx,
   type WeatherFxMode,
   type WeatherFxPreference,
 } from "../aurenfurt-weather-fx";
 
-export function useWeatherFxControl() {
+export function useWeatherFxControl(worldId: string, isGm: boolean) {
   const [preference, setPreference] = useState<WeatherFxPreference>(() => defaultWeatherFxPreference());
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = parseStoredWeatherFx(window.localStorage.getItem(WEATHER_FX_STORAGE_KEY));
-    if (stored) setPreference(stored);
-  }, []);
+    let active = true;
+    setReady(false);
+    loadCityMapViewerPrefs(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setPreference(result.data.weather);
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Der Wettereffekt konnte nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
-  const persist = useCallback((next: WeatherFxPreference) => {
-    setPreference(next);
-    try {
-      window.localStorage.setItem(WEATHER_FX_STORAGE_KEY, serializeWeatherFx(next));
-    } catch {
-      // Quota oder privates Fenster: die Sitzung behält die Wahl.
-    }
-  }, []);
+  const persist = useCallback(
+    (next: WeatherFxPreference, previous: WeatherFxPreference) => {
+      setPreference(next);
+      void saveCityMapWeather(worldId, next).then((error) => {
+        if (error) {
+          setPreference(previous);
+          setSaveError(error);
+          setSaved(false);
+          return;
+        }
+        setSaveError(null);
+        setSaved(true);
+      });
+    },
+    [worldId],
+  );
 
   const setEnabled = useCallback(
     (enabled: boolean) => {
-      persist({ ...preference, enabled });
+      persist({ ...preference, enabled }, preference);
     },
     [persist, preference],
   );
 
   const setMode = useCallback(
     (mode: WeatherFxMode) => {
-      persist({ enabled: true, mode });
+      persist({ enabled: true, mode }, preference);
     },
-    [persist],
+    [persist, preference],
   );
 
-  return { preference, setEnabled, setMode };
+  return { preference, setEnabled, setMode, saved, ready, saveError };
 }

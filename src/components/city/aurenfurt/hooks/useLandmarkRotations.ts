@@ -1,52 +1,56 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  LANDMARK_ROTATIONS_STORAGE_KEY,
-  clampLandmarkRotation,
-  parseStoredLandmarkRotations,
-  serializeLandmarkRotations,
-  type LandmarkRotations,
-} from "../aurenfurt-landmark-rotations";
+import { loadCityMapPlacements, placementsToRotations, saveCityMapRotation } from "../aurenfurt-city-map-db";
+import { clampLandmarkRotation, type LandmarkRotations } from "../aurenfurt-landmark-rotations";
 
-export function useLandmarkRotations() {
+export function useLandmarkRotations(worldId: string, isGm: boolean) {
   const [rotations, setRotations] = useState<LandmarkRotations>({});
-  const [savedLocally, setSavedLocally] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = parseStoredLandmarkRotations(window.localStorage.getItem(LANDMARK_ROTATIONS_STORAGE_KEY));
-    if (stored) {
-      setRotations(stored);
-      setSavedLocally(true);
-    }
-  }, []);
-
-  const persist = useCallback((next: LandmarkRotations) => {
-    try {
-      window.localStorage.setItem(LANDMARK_ROTATIONS_STORAGE_KEY, serializeLandmarkRotations(next));
-      setSavedLocally(true);
-    } catch {
-      // Quota / privater Modus
-    }
-  }, []);
+    let active = true;
+    setReady(false);
+    loadCityMapPlacements(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setRotations(placementsToRotations(result.data));
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Drehungen konnten nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
   const setRotation = useCallback(
     (buildingId: string, degrees: number) => {
-      setRotations((current) => {
-        const next = {
-          ...current,
-          [buildingId]: clampLandmarkRotation(degrees),
-        };
-        persist(next);
-        return next;
+      const nextRotation = clampLandmarkRotation(degrees);
+      setRotations((current) => ({
+        ...current,
+        [buildingId]: nextRotation,
+      }));
+      if (!isGm) {
+        setSaveError("Nur der Spielleiter kann die Drehung speichern.");
+        setSaved(false);
+        return;
+      }
+      void saveCityMapRotation(worldId, buildingId, nextRotation).then((error) => {
+        setSaveError(error);
+        setSaved(error == null);
       });
     },
-    [persist],
+    [isGm, worldId],
   );
 
-  return {
-    rotations,
-    setRotation,
-    savedLocally,
-  };
+  return { rotations, setRotation, saved, ready, saveError };
 }

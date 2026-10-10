@@ -3,31 +3,44 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DistrictPolygons, UvPoint } from "../aurenfurt-district-polygons";
 import { clampUvPoint } from "../aurenfurt-district-polygons";
+import { loadCityMapStreets, saveCityMapStreets } from "../aurenfurt-city-map-db";
 import {
-  STREETS_STORAGE_KEY,
   defaultStreet,
-  parseStoredStreets,
-  serializeStreets,
   syncStreetDistricts,
   type AurenfurtStreet,
   type StreetWorks,
 } from "../aurenfurt-streets";
 
-export function useAurenfurtStreets(polygons: DistrictPolygons) {
+export function useAurenfurtStreets(polygons: DistrictPolygons, worldId: string, isGm: boolean) {
   const [streets, setStreets] = useState<AurenfurtStreet[]>([]);
-  const [savedLocally, setSavedLocally] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = parseStoredStreets(window.localStorage.getItem(STREETS_STORAGE_KEY));
-    if (stored) {
-      setStreets(stored.map((street) => syncStreetDistricts(street, polygons)));
-      setSavedLocally(true);
-    }
-    // Nur beim Mount aus localStorage lesen; Polygon-Sync unten / über move/commit.
+    let active = true;
+    setReady(false);
+    loadCityMapStreets(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setStreets(result.data.map((street) => syncStreetDistricts(street, polygons)));
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Straßen konnten nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+    // Polygone beim ersten Laden; spätere Änderungen zieht der Effekt darunter nach.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isGm, worldId]);
 
-  // Wenn Viertel-Polygone nachgeladen oder verändert werden, districtIds nachziehen.
   useEffect(() => {
     setStreets((current) => {
       if (current.length === 0) return current;
@@ -46,14 +59,20 @@ export function useAurenfurtStreets(polygons: DistrictPolygons) {
     });
   }, [polygons]);
 
-  const persist = useCallback((next: AurenfurtStreet[]) => {
-    try {
-      window.localStorage.setItem(STREETS_STORAGE_KEY, serializeStreets(next));
-      setSavedLocally(true);
-    } catch {
-      // Quota / private mode
-    }
-  }, []);
+  const persist = useCallback(
+    (next: AurenfurtStreet[]) => {
+      if (!isGm) {
+        setSaveError("Nur der Spielleiter kann Straßen speichern.");
+        setSaved(false);
+        return;
+      }
+      void saveCityMapStreets(worldId, next).then((error) => {
+        setSaveError(error);
+        setSaved(error == null);
+      });
+    },
+    [isGm, worldId],
+  );
 
   const commit = useCallback(() => {
     setStreets((current) => {
@@ -168,7 +187,9 @@ export function useAurenfurtStreets(polygons: DistrictPolygons) {
 
   return {
     streets,
-    savedLocally,
+    saved,
+    ready,
+    saveError,
     addStreet,
     removeStreet,
     updateStreet,

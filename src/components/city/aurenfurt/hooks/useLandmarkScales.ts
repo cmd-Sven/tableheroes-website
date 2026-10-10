@@ -1,53 +1,56 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  LANDMARK_SCALES_STORAGE_KEY,
-  clampLandmarkScale,
-  defaultLandmarkScales,
-  parseStoredLandmarkScales,
-  serializeLandmarkScales,
-  type LandmarkScales,
-} from "../aurenfurt-landmark-scales";
+import { loadCityMapPlacements, placementsToScales, saveCityMapScale } from "../aurenfurt-city-map-db";
+import { clampLandmarkScale, defaultLandmarkScales, type LandmarkScales } from "../aurenfurt-landmark-scales";
 
-export function useLandmarkScales() {
+export function useLandmarkScales(worldId: string, isGm: boolean) {
   const [scales, setScales] = useState<LandmarkScales>(() => defaultLandmarkScales());
-  const [savedLocally, setSavedLocally] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = parseStoredLandmarkScales(window.localStorage.getItem(LANDMARK_SCALES_STORAGE_KEY));
-    if (stored) {
-      setScales(stored);
-      setSavedLocally(true);
-    }
-  }, []);
-
-  const persist = useCallback((next: LandmarkScales) => {
-    try {
-      window.localStorage.setItem(LANDMARK_SCALES_STORAGE_KEY, serializeLandmarkScales(next));
-      setSavedLocally(true);
-    } catch {
-      // Quota / private mode – State bleibt die Quelle für die Karte.
-    }
-  }, []);
+    let active = true;
+    setReady(false);
+    loadCityMapPlacements(worldId, isGm)
+      .then((result) => {
+        if (!active) return;
+        setScales(placementsToScales(result.data));
+        setSaved(result.saved);
+        setSaveError(result.error);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSaveError("Maßstäbe konnten nicht aus der Datenbank geladen werden.");
+        setSaved(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isGm, worldId]);
 
   const setScale = useCallback(
     (buildingId: string, scale: number) => {
-      setScales((current) => {
-        const next = {
-          ...current,
-          [buildingId]: clampLandmarkScale(scale),
-        };
-        persist(next);
-        return next;
+      const nextScale = clampLandmarkScale(scale);
+      setScales((current) => ({
+        ...current,
+        [buildingId]: nextScale,
+      }));
+      if (!isGm) {
+        setSaveError("Nur der Spielleiter kann den Maßstab speichern.");
+        setSaved(false);
+        return;
+      }
+      void saveCityMapScale(worldId, buildingId, nextScale).then((error) => {
+        setSaveError(error);
+        setSaved(error == null);
       });
     },
-    [persist],
+    [isGm, worldId],
   );
 
-  return {
-    scales,
-    setScale,
-    savedLocally,
-  };
+  return { scales, setScale, saved, ready, saveError };
 }

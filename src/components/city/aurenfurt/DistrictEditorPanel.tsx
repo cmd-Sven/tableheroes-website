@@ -104,7 +104,9 @@ type Props = {
   poiFormKey: number;
   dayWeather: DayWeather;
   viewedDay: string;
-  savedLocally: boolean;
+  saved: boolean;
+  ready: boolean;
+  saveError: string | null;
   sectorCount: number;
   sectorsByDistrict: DistrictSectorsByDistrict;
   onSelectDistrict: (id: CityDistrictId | null) => void;
@@ -207,7 +209,9 @@ export function DistrictEditorPanel({
   poiFormKey,
   dayWeather,
   viewedDay,
-  savedLocally,
+  saved,
+  ready,
+  saveError,
   sectorCount,
   sectorsByDistrict,
   onSelectDistrict,
@@ -540,8 +544,14 @@ export function DistrictEditorPanel({
           <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
             {TOOL_TITLES[tool]}
           </p>
-          <p className="font-libre text-xs text-gray-400">
-            {savedLocally ? "Lokal gespeichert." : "Noch nicht lokal gespeichert."}
+          <p className={`font-libre text-xs ${saveError ? "text-red-300" : "text-gray-400"}`}>
+            {saveError
+              ? saveError
+              : !ready
+                ? "Wird aus der Datenbank geladen."
+                : saved
+                  ? "In der Datenbank gespeichert."
+                  : "Noch nicht in der Datenbank."}
           </p>
         </div>
         <button

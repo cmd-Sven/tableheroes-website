@@ -501,7 +501,7 @@ function parseStreet(raw: unknown): AurenfurtStreet | null {
   return {
     id: row.id,
     name: row.name.trim() || "Straße",
-    // Migration beim Lesen: fehlendes Feld → "" (ohne stilles Überschreiben von localStorage).
+    // Fehlendes Feld beim Lesen → "".
     description: typeof row.description === "string" ? row.description : "",
     points: row.points.map((p) => clampUvPoint(p)),
     districtIds,
