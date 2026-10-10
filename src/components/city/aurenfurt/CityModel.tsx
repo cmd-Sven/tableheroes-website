@@ -30,6 +30,8 @@ import type { AurenfurtMapPoi } from "./aurenfurt-map-pois";
 import type { DistrictSector } from "./aurenfurt-sectors";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
+import { HoloDecorationSlot } from "./scene/HoloDecorationLayer";
+import { useAurenfurtDeco } from "./AurenfurtDecoProvider";
 
 type Props = {
   selection: HoloSelection | null;
@@ -54,6 +56,9 @@ type Props = {
   weatherFxIntensity?: number;
   viewedDay: string;
   streetsLayerVisible?: boolean;
+  buildingsVisible?: boolean;
+  poisVisible?: boolean;
+  wallsVisible?: boolean;
   polygons: DistrictPolygons;
   /** Sektoren nur des gewählten Viertels (Editor). */
   editingSectors?: DistrictSector[];
@@ -114,6 +119,9 @@ export function CityModel({
   weatherFxIntensity = 55,
   viewedDay,
   streetsLayerVisible = true,
+  buildingsVisible = true,
+  poisVisible = true,
+  wallsVisible = true,
   polygons,
   editingSectors = [],
   editingSectorsPreview = false,
@@ -148,11 +156,12 @@ export function CityModel({
   onDragActive,
 }: Props) {
   const floating = useRef<Group>(null);
+  const deco = useAurenfurtDeco();
   const editMode = editorTool !== null;
   useHoloFloat(floating, editMode ? 0 : 0.055);
 
   const placingSomething = placingBuilding || placingPoi;
-  const mapLocked = drawingStreet || drawingWall || placingSomething;
+  const mapLocked = drawingStreet || drawingWall || placingSomething || deco.placingKey !== null;
   const showDistrictHandles = Boolean(
     editorTool === "districts" && editingDistrictId && !placingSomething,
   );
@@ -207,6 +216,7 @@ export function CityModel({
         ) : editorTool === "districts" && editingDistrictId && editingSectors.length > 0 ? (
           <DistrictSectorOverlay sectors={editingSectors} preview={editingSectorsPreview} />
         ) : null}
+        <group visible={buildingsVisible}>
         {buildings.map((building) => {
           const uv = resolveBuildingUv(building, buildingPositions);
           const polygon = polygons[building.districtId]?.points ?? [];
@@ -233,6 +243,8 @@ export function CityModel({
             />
           );
         })}
+        </group>
+        <group visible={poisVisible}>
         {pois.map((poi) => (
           <HoloPoiMarker
             key={poi.id}
@@ -243,6 +255,7 @@ export function CityModel({
             onHover={(id) => onHover(id ? { type: "poi", id } : null)}
           />
         ))}
+        </group>
         <HoloStreetLayer
           streets={streets}
           dayWeather={dayWeather}
@@ -277,7 +290,9 @@ export function CityModel({
           onSelectWall={onSelectWall}
           onOrbitLock={onOrbitLock}
           onDragActive={onDragActive}
+          layerVisible={wallsVisible}
         />
+        <HoloDecorationSlot onOrbitLock={onOrbitLock} onDragActive={onDragActive} />
         {weatherFx ? <HoloWeatherFx effect={weatherFx} intensity={weatherFxIntensity} /> : null}
       </group>
     </>

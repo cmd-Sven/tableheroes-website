@@ -29,6 +29,7 @@ type Props = {
   onSelectWall: (wallId: string | null) => void;
   onOrbitLock: (locked: boolean) => void;
   onDragActive: (active: boolean) => void;
+  layerVisible?: boolean;
 };
 
 const DRAFT = "#23c763";
@@ -445,6 +446,7 @@ export function HoloWallLayer({
   onSelectWall,
   onOrbitLock,
   onDragActive,
+  layerVisible = true,
 }: Props) {
   const texture = useTexture(WALL_TEXTURE_URL);
   const gl = useThree((state) => state.gl);
@@ -457,7 +459,7 @@ export function HoloWallLayer({
   }, [gl, texture]);
 
   return (
-    <group>
+    <group visible={layerVisible}>
       {walls.map((wall) => (
         <WallMesh
           key={wall.id}

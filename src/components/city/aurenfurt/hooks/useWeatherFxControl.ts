@@ -62,7 +62,7 @@ export function useWeatherFxControl(worldId: string, isGm: boolean) {
 
   const setMode = useCallback(
     (mode: WeatherFxMode) => {
-      persist({ enabled: true, mode }, preference);
+      persist({ enabled: preference.enabled, mode }, preference);
     },
     [persist, preference],
   );

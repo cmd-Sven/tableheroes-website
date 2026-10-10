@@ -12,6 +12,9 @@ import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
+import { MapLayerVisibilityBar } from "./MapLayerVisibilityBar";
+import { AurenfurtDecoProvider } from "./AurenfurtDecoProvider";
+import { DekoElementeButton } from "./DekoElementeButton";
 import { CityHudFrame } from "./CityHudFrame";
 import { CityEventWizard } from "./CityEventWizard";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
@@ -43,7 +46,7 @@ import { useDistrictPolygons } from "./hooks/useDistrictPolygons";
 import { useDistrictSectors } from "./hooks/useDistrictSectors";
 import { useHoloCityView } from "./hooks/useHoloCityView";
 import { useKeyLocations } from "./hooks/useKeyLocations";
-import { useStreetsVisibility } from "./hooks/useStreetsVisibility";
+import { useMapLayerVisibility } from "./hooks/useMapLayerVisibility";
 import type { DistrictSector } from "./aurenfurt-sectors";
 import {
   WALL_BRIGHTNESS_DEFAULT,
@@ -187,10 +190,10 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     polygons.polygons,
   ]);
   const {
-    streetsVisible,
-    toggleStreetsVisible,
-    saveError: streetsVisibilityError,
-  } = useStreetsVisibility(resolvedWorldId, isGm);
+    layers,
+    toggleLayer,
+    saveError: layerVisibilityError,
+  } = useMapLayerVisibility(resolvedWorldId, isGm);
   const [citySurface, setCitySurface] = useState<CitySurface>("map");
   const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
   const [places, setPlaces] = useState<AurenfurtPlaceLore[]>([]);
@@ -237,8 +240,6 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   const [eventSectorIds, setEventSectorIds] = useState<string[]>([]);
   const [eventWholeCity, setEventWholeCity] = useState(false);
 
-  const editorActive = isGm && activeTool !== null;
-  const streetsLayerVisible = editorActive || streetsVisible;
   const layoutError =
     wallsApi.saveError ||
     polygons.saveError ||
@@ -248,7 +249,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     landmarkRotations.saveError ||
     streetsApi.saveError ||
     weatherFx.saveError ||
-    streetsVisibilityError ||
+    layerVisibilityError ||
     null;
   const selectedPoi =
     view.subject?.type === "poi" ? findPoi(pois, view.subject.id) : null;
@@ -969,6 +970,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   };
 
   return (
+    <AurenfurtDecoProvider worldId={resolvedWorldId} isGm={isGm}>
     <div className="fixed inset-0 z-[80] flex bg-[#02080c]">
       <HoloCityRail
         selection={view.selection}
@@ -1040,7 +1042,10 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           weatherFx={shownWeather.effect}
           weatherFxIntensity={shownWeather.intensity}
           viewedDay={calendar.day}
-          streetsLayerVisible={streetsLayerVisible}
+          streetsLayerVisible={layers.streets}
+          buildingsVisible={layers.buildings}
+          poisVisible={layers.pois}
+          wallsVisible={layers.walls}
           polygons={polygons.polygons}
           editingSectors={
             isGm && districtsTool && editingDistrictId
@@ -1089,6 +1094,15 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onSelectStreet={selectStreet}
         />
         <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-sm flex-col items-start gap-2">
+          <MapLayerVisibilityBar
+            buildingsVisible={layers.buildings}
+            poisVisible={layers.pois}
+            streetsVisible={layers.streets}
+            wallsVisible={layers.walls}
+            weatherVisible={weatherFx.preference.enabled}
+            onToggleLayer={toggleLayer}
+            onToggleWeather={() => weatherFx.setEnabled(!weatherFx.preference.enabled)}
+          />
           <CityHudFrame density="card" tone="dark" className="pointer-events-auto w-full shadow-lg">
             <div className="px-4 pb-10 pt-12">
               <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
@@ -1136,28 +1150,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             onStepYear={calendar.stepYear}
             onGoToday={calendar.goToday}
           />
-          {!editorActive ? (
-            <button
-              type="button"
-              aria-label="Straßen ein- oder ausblenden"
-              aria-pressed={streetsVisible}
-              onClick={toggleStreetsVisible}
-              className={`pointer-events-auto inline-flex items-center rounded border px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-md transition-colors ${
-                streetsVisible
-                  ? "border-accent-gold/70 bg-hero-dark/95 text-accent-gold"
-                  : "border-hero-dark bg-background-dark/90 text-gray-400 hover:border-accent-gold/40 hover:text-accent-gold/80"
-              }`}
-            >
-              Straßen
-            </button>
-          ) : null}
           <HoloWeatherControl
             enabled={weatherFx.preference.enabled}
             mode={weatherFx.preference.mode}
             autoEffect={shownWeather.autoEffect}
-            onEnabledChange={weatherFx.setEnabled}
             onModeChange={weatherFx.setMode}
           />
+          <DekoElementeButton />
         </div>
         {isGm && eventWizardOpen ? (
           <CityEventWizard
@@ -1193,5 +1192,6 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
 
       {editorControls}
     </div>
+    </AurenfurtDecoProvider>
   );
 }

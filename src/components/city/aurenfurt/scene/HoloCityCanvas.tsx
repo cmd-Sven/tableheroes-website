@@ -41,6 +41,9 @@ type Props = {
   weatherFxIntensity?: number;
   viewedDay: string;
   streetsLayerVisible?: boolean;
+  buildingsVisible?: boolean;
+  poisVisible?: boolean;
+  wallsVisible?: boolean;
   polygons: DistrictPolygons;
   editingSectors?: DistrictSector[];
   /** true = Vorschau vor dem Speichern (dezente Linien). */
@@ -130,6 +133,9 @@ export default function HoloCityCanvas({
   weatherFxIntensity = 55,
   viewedDay,
   streetsLayerVisible = true,
+  buildingsVisible = true,
+  poisVisible = true,
+  wallsVisible = true,
   polygons,
   editingSectors = [],
   editingSectorsPreview = false,
@@ -244,6 +250,9 @@ export default function HoloCityCanvas({
               weatherFxIntensity={weatherFxIntensity}
               viewedDay={viewedDay}
               streetsLayerVisible={streetsLayerVisible}
+              buildingsVisible={buildingsVisible}
+              poisVisible={poisVisible}
+              wallsVisible={wallsVisible}
               polygons={polygons}
               editingSectors={editingSectors}
               editingSectorsPreview={editingSectorsPreview}

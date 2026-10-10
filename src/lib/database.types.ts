@@ -1668,6 +1668,50 @@ export type Database = {
           },
         ]
       }
+      city_map_decorations: {
+        Row: {
+          created_at: string
+          decoration_id: string
+          model_key: string
+          name: string | null
+          rotation: number
+          scale: number
+          u: number
+          v: number
+          world_id: string
+        }
+        Insert: {
+          created_at?: string
+          decoration_id?: string
+          model_key: string
+          name?: string | null
+          rotation?: number
+          scale?: number
+          u: number
+          v: number
+          world_id: string
+        }
+        Update: {
+          created_at?: string
+          decoration_id?: string
+          model_key?: string
+          name?: string | null
+          rotation?: number
+          scale?: number
+          u?: number
+          v?: number
+          world_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_map_decorations_world_id_fkey"
+            columns: ["world_id"]
+            isOneToOne: false
+            referencedRelation: "worlds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       city_map_district_polygons: {
         Row: {
           color: string
@@ -1844,22 +1888,31 @@ export type Database = {
       }
       city_map_viewer_prefs: {
         Row: {
+          buildings_visible: boolean
+          pois_visible: boolean
           streets_visible: boolean
           user_id: string
+          walls_visible: boolean
           weather_enabled: boolean
           weather_mode: string
           world_id: string
         }
         Insert: {
+          buildings_visible?: boolean
+          pois_visible?: boolean
           streets_visible?: boolean
           user_id: string
+          walls_visible?: boolean
           weather_enabled?: boolean
           weather_mode?: string
           world_id: string
         }
         Update: {
+          buildings_visible?: boolean
+          pois_visible?: boolean
           streets_visible?: boolean
           user_id?: string
+          walls_visible?: boolean
           weather_enabled?: boolean
           weather_mode?: string
           world_id?: string

@@ -22,17 +22,16 @@ type Props = {
   enabled: boolean;
   mode: WeatherFxMode;
   autoEffect: WeatherFxId;
-  onEnabledChange: (enabled: boolean) => void;
   onModeChange: (mode: WeatherFxMode) => void;
 };
 
-export function HoloWeatherControl({ enabled, mode, autoEffect, onEnabledChange, onModeChange }: Props) {
+export function HoloWeatherControl({ enabled, mode, autoEffect, onModeChange }: Props) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const labelId = useId();
   const shown = mode === "auto" ? autoEffect : mode;
   const Icon = ICONS[shown];
-  const buttonLabel = enabled ? weatherFxLabel(shown) : "Wetter aus";
+  const buttonLabel = weatherFxLabel(shown);
 
   useEffect(() => {
     if (!open) return;
@@ -76,21 +75,9 @@ export function HoloWeatherControl({ enabled, mode, autoEffect, onEnabledChange,
             </p>
             <button
               type="button"
-              aria-pressed={enabled}
-              onClick={() => onEnabledChange(!enabled)}
-              className={`mt-2 w-full rounded border px-2 py-1 text-left font-barlow text-[10px] font-bold uppercase tracking-wide ${
-                enabled
-                  ? "border-hero-vibrant text-hero-vibrant"
-                  : "border-hero-dark text-gray-400"
-              }`}
-            >
-              {enabled ? "Effekte an" : "Effekte aus"}
-            </button>
-            <button
-              type="button"
               aria-pressed={mode === "auto"}
               onClick={() => onModeChange("auto")}
-              className={`mt-1 w-full rounded px-2 py-1 text-left font-barlow text-[10px] font-bold uppercase tracking-wide ${
+              className={`mt-2 w-full rounded px-2 py-1 text-left font-barlow text-[10px] font-bold uppercase tracking-wide ${
                 mode === "auto" ? "bg-white/10 text-accent-gold" : "text-gray-200 hover:bg-white/5"
               }`}
             >
