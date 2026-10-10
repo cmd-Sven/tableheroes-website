@@ -1,5 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { absoluteUrl } from "@/src/lib/site-url";
+
+export const metadata: Metadata = {
+  title: "Impressum | Table-Heroes",
+  description:
+    "Impressum von Table-Heroes, der Pen-and-Paper-Community in Osnabrück.",
+  alternates: { canonical: "/impressum" },
+  openGraph: {
+    title: "Impressum | Table-Heroes",
+    description:
+      "Impressum von Table-Heroes, der Pen-and-Paper-Community in Osnabrück.",
+    url: absoluteUrl("/impressum"),
+    type: "website",
+  },
+};
 
 export default function ImpressumPage() {
   return (
@@ -27,7 +43,7 @@ export default function ImpressumPage() {
                 Angaben gemäß § 5 TMG
               </h2>
               <p>
-                <strong>TableHeroes</strong><br />
+                <strong>Table-Heroes</strong><br />
                 Sven Sieber<br />
                 Ostlandweg 16<br />
                 49009 Osnabrück

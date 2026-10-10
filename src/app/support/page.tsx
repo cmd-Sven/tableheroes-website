@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -5,6 +6,21 @@ import {
   Trophy,
   Sparkles,
 } from "lucide-react";
+import { absoluteUrl } from "@/src/lib/site-url";
+
+export const metadata: Metadata = {
+  title: "Unterstützer | Table-Heroes",
+  description:
+    "Unterstütze Table-Heroes, die Pen-and-Paper-Community in Osnabrück, und hinterlasse einen Gruß.",
+  alternates: { canonical: "/support" },
+  openGraph: {
+    title: "Unterstützer | Table-Heroes",
+    description:
+      "Unterstütze Table-Heroes, die Pen-and-Paper-Community in Osnabrück, und hinterlasse einen Gruß.",
+    url: absoluteUrl("/support"),
+    type: "website",
+  },
+};
 import { createClient } from "@/src/lib/supabase/server";
 import { getGuestbookEntries, getBackers } from "@/src/lib/actions/support-actions";
 import { GuestbookForm } from "@/src/components/support/GuestbookForm";
@@ -61,10 +77,10 @@ export default async function SupportPage() {
                   "linear-gradient(135deg, #cab926 0%, #f5e6a3 40%, #cab926 60%, #a89320 100%)",
               }}
             >
-              Unterstütze Table Heroes
+              Unterstütze Table-Heroes
             </h1>
             <p className="font-libre text-gray-300 text-lg max-w-2xl mx-auto leading-relaxed">
-              Table Heroes ist und bleibt <strong className="text-white">komplett kostenlos</strong>.
+              Table-Heroes ist und bleibt <strong className="text-white">komplett kostenlos</strong>.
               Kein Abo, kein Pay-to-Win, keine versteckten Gebühren. Jeder Spieler hat
               die gleichen Möglichkeiten.
             </p>
@@ -153,7 +169,7 @@ export default async function SupportPage() {
             </h2>
             <div className="font-libre text-gray-300 leading-relaxed space-y-4">
               <p>
-                Hinter Table Heroes steckt <strong className="text-white">eine einzige Person</strong> –
+                Hinter Table-Heroes steckt <strong className="text-white">eine einzige Person</strong> –
                 ein Spielleiter, der seine Leidenschaft für Pen &amp; Paper in eine Plattform verwandelt hat.
                 Jede Karte, jede Funktion, jeder NPC-Dialog wurde in unzähligen Abendstunden erschaffen.
               </p>
@@ -181,7 +197,7 @@ export default async function SupportPage() {
                 Ehrenhalle der Helden
               </h2>
               <p className="font-libre text-gray-400 max-w-xl mx-auto leading-relaxed">
-                Diese tapferen Seelen halten die Reiche von Table Heroes am Leben.
+                Diese tapferen Seelen halten die Reiche von Table-Heroes am Leben.
                 Wir danken euch für eure Treue!
               </p>
             </div>

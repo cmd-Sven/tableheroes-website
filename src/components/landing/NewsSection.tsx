@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 import { NewsMarkdownBody } from "@/src/components/ui/NewsMarkdownBody";
 import type { NewsPost } from "@/src/lib/constants/news";
@@ -20,31 +20,10 @@ function resolveNewsImageUrl(url: string | null | undefined): string {
   return `/images/news/${trimmed}`;
 }
 
-export function NewsSection() {
-  const [posts, setPosts] = useState<NewsPost[] | null>(null);
+export function NewsSection({ posts }: { posts: NewsPost[] }) {
   const [selectedPost, setSelectedPost] = useState<NewsPost | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch("/api/news/landing");
-        if (!res.ok) throw new Error("failed");
-        const data = await res.json();
-        if (!cancelled) {
-          setPosts(Array.isArray(data.posts) ? data.posts : []);
-        }
-      } catch {
-        if (!cancelled) setPosts([]);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!posts || posts.length === 0) return null;
+  if (posts.length === 0) return null;
 
   return (
     <section id="news" className="relative py-12 md:py-16 overflow-hidden">
@@ -143,6 +122,7 @@ export function NewsSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {posts.map((post) => {
             const imgSrc = resolveNewsImageUrl(post.image_url);
+            const hasOwnImage = Boolean(post.image_url?.trim());
             const created =
               post.created_at &&
               new Date(post.created_at).toLocaleDateString("de-DE", {
@@ -177,7 +157,7 @@ export function NewsSection() {
                 <div className="w-full aspect-square overflow-hidden border-b border-hero-border/60 bg-hero-dark/40 flex items-center justify-center">
                   <img
                     src={imgSrc}
-                    alt=""
+                    alt={hasOwnImage ? post.title : ""}
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
@@ -199,7 +179,7 @@ export function NewsSection() {
                     {post.title}
                   </h3>
                   <p className="mt-1 font-libre text-sm text-gray-200/90 leading-relaxed line-clamp-3">
-                    {teaser || "Neuigkeiten aus den Welten von TableHeroes."}
+                    {teaser || "Neuigkeiten aus den Welten von Table-Heroes."}
                   </p>
                 </div>
               </article>
@@ -236,7 +216,7 @@ export function NewsSection() {
             <div className="w-full aspect-square max-h-[min(90vw,22rem)] shrink-0 overflow-hidden border-b border-hero-border/50 bg-hero-dark/40 flex items-center justify-center mx-auto">
               <img
                 src={resolveNewsImageUrl(selectedPost.image_url)}
-                alt=""
+                alt={selectedPost.image_url?.trim() ? selectedPost.title : ""}
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;

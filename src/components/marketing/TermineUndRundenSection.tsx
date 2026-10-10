@@ -124,7 +124,11 @@ function SessionCard({ ticket }: { ticket: SessionTicket }) {
               {ticket.gmAvatarUrl ? (
                 <Image
                   src={ticket.gmAvatarUrl}
-                  alt="GM"
+                  alt={
+                    ticket.gmUsername
+                      ? `Spielleiter ${ticket.gmUsername}`
+                      : "Spielleiter"
+                  }
                   fill
                   sizes="36px"
                   className="object-cover"
@@ -201,7 +205,7 @@ function EventCard({
         >
           <Image
             src={coverUrl}
-            alt=""
+            alt={event.title}
             fill
             sizes="(max-width: 640px) 88vw, 22rem"
             className="object-cover"
@@ -325,11 +329,10 @@ function CommunityEventDetailModal({
           <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden border-b border-hero-border/50 bg-black/50">
             <Image
               src={coverUrl}
-              alt=""
+              alt={event.title}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 42rem"
-              priority
             />
           </div>
         ) : null}

@@ -85,7 +85,7 @@ export function GuestbookForm() {
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           maxLength={500}
-          placeholder="Was gefällt dir an Table Heroes? Was können wir verbessern?"
+          placeholder="Was gefällt dir an Table-Heroes? Was können wir verbessern?"
           className="w-full rounded border border-hero-dark bg-slate-900 p-2.5 font-libre text-sm text-white placeholder-gray-600 outline-none resize-none transition-colors focus:border-accent-gold"
         />
         <p className="mt-1 text-right font-barlow text-[10px] text-gray-600">

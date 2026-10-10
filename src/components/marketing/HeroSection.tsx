@@ -288,7 +288,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.25 }}
           className="flex flex-col md:grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-center"
           style={{ willChange: "transform, opacity" }}
         >
@@ -306,7 +306,7 @@ export function HeroSection() {
             >
               <Image
                 src="/images/tableHeroes-logo.png"
-                alt="TableHeroes Logo"
+                alt="Table-Heroes Logo"
                 width={520}
                 height={160}
                 priority
@@ -318,7 +318,7 @@ export function HeroSection() {
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1, duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
               className="mt-3 font-barlow font-extrabold text-2xl md:text-3xl tracking-wide text-hero-vibrant"
               style={{ willChange: "transform, opacity" }}
             >

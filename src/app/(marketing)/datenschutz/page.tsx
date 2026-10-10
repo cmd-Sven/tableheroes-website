@@ -1,5 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { absoluteUrl } from "@/src/lib/site-url";
+
+export const metadata: Metadata = {
+  title: "Datenschutz | Table-Heroes",
+  description:
+    "Datenschutzerklärung der Table-Heroes-Website (table-heroes.de).",
+  alternates: { canonical: "/datenschutz" },
+  openGraph: {
+    title: "Datenschutz | Table-Heroes",
+    description:
+      "Datenschutzerklärung der Table-Heroes-Website (table-heroes.de).",
+    url: absoluteUrl("/datenschutz"),
+    type: "website",
+  },
+};
 
 export default function DatenschutzPage() {
   return (
@@ -56,7 +72,7 @@ export default function DatenschutzPage() {
                 Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:
               </p>
               <p className="mt-4">
-                <strong>TableHeroes</strong><br />
+                <strong>Table-Heroes</strong><br />
                 Sven Sieber<br />
                 Ostlandweg 16<br />
                 49009 Osnabrück<br />
@@ -91,7 +107,7 @@ export default function DatenschutzPage() {
                 Registrierung und Login
               </h3>
               <p>
-                Wenn Sie sich bei TableHeroes registrieren, erheben wir folgende Daten:
+                Wenn Sie sich bei Table-Heroes registrieren, erheben wir folgende Daten:
               </p>
               <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
                 <li>E-Mail-Adresse</li>
@@ -185,12 +201,12 @@ export default function DatenschutzPage() {
               <p className="mt-4">
                 <strong>Wer hat Zugriff?</strong> Audiodaten, Transkripte und Chroniken
                 sind für den GM sowie für freigeschaltete Teilnehmende der jeweiligen
-                Kampagne in TableHeroes einsehbar. Eine Veröffentlichung außerhalb der
+                Kampagne in Table-Heroes einsehbar. Eine Veröffentlichung außerhalb der
                 Plattform erfolgt nicht ohne gesonderte Zustimmung.
               </p>
               <p className="mt-4">
                 <strong>Speicherdauer:</strong> Die Daten verbleiben, solange die
-                zugehörige Kampagne bzw. Session auf TableHeroes besteht, sofern sie nicht
+                zugehörige Kampagne bzw. Session auf Table-Heroes besteht, sofern sie nicht
                 früher gelöscht werden (z. B. auf Anfrage oder bei Löschung der Session).
               </p>
             </section>
@@ -359,7 +375,7 @@ export default function DatenschutzPage() {
                   meet.osna.social/tableheroes
                 </a>{" "}
                 genutzt werden. Beim Aufruf dieser externen Konferenz gelten die
-                Datenschutzbestimmungen des jeweiligen Betreibers. TableHeroes speichert
+                Datenschutzbestimmungen des jeweiligen Betreibers. Table-Heroes speichert
                 in diesem Modus die Audio-Aufzeichnung über den Session-Chronist in
                 Supabase.
               </p>

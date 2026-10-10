@@ -6,19 +6,19 @@ import { useState } from "react";
 
 const faqs = [
   {
-    q: "Kan man sich nur für Online Runden bewerben?",
+    q: "Kann man sich nur für Online Runden bewerben?",
     a: "Nein, es gibt auch Präsenz Runden die ausschließlich in Osnabrück stattfinden. Diese Runden sind aber limitiert und werden bevorzugt an Mitglieder vergeben die auch Online Runden leiten oder spielen.",
   },
   {
     q: "Für wen ist Table-Heroes gedacht?",
-    a: "Die Table-Heroes Webseite mit Ihrem Dashboard ist für Mitglieder von Table-Heroes gedacht um ihre Runden besser zu organiseren, Spielleiter eine Möglichkeit zu geben sich mit Spielern Online auszutauschen und Spielern zusätzliche Anreize zu schaffen an Runden teilzunehmen.",
+    a: "Die Table-Heroes Webseite mit Ihrem Dashboard ist für Mitglieder von Table-Heroes gedacht um ihre Runden besser zu organisieren, Spielleiter eine Möglichkeit zu geben sich mit Spielern Online auszutauschen und Spielern zusätzliche Anreize zu schaffen an Runden teilzunehmen.",
   },
   {
     q: "Kann ich direkt mich für Runden anmelden?",
-    a: "Es gibt offene Runden die zum kennenlernen gedacht sind. Um an einer festen bestehenden Runde teilzunehmen muss man sich registrieren und bewerben",
+    a: "Es gibt offene Runden die zum Kennenlernen gedacht sind. Um an einer festen bestehenden Runde teilzunehmen muss man sich registrieren und bewerben",
   },
   {
-    q: "Entstehen mir als Mitglied kosten oder muss ich mich irgendwozu verpflichten?",
+    q: "Entstehen mir als Mitglied Kosten oder muss ich mich irgendwozu verpflichten?",
     a: "Es gibt keine weiteren Kosten, du kannst aber gerne jederzeit eine Spende für das Team einreichen. Die einzige Pflicht die Du als Mitglied hast ist eine Teilnahme an zugesagten Terminen",
   },
   {
@@ -26,8 +26,8 @@ const faqs = [
     a: "Die KI ist für Spieler und Spielleiter ein Werkzeug und soll Euch helfen schnell Infos zu finden und Inspirationen zu geben. Die KI gibt Euch wichtige Bausteine und achtet darauf, dass alles sinnvoll miteinander verknüpft ist. Als SL oder Spieler entscheidet ihr wie und was ihr spielt ... niemals die KI!",
   },
   {
-    q: "Kann ich mich auch als Spielleiter registrierenn?",
-    a: "Vorab musst du dich als Mitglied registrieren und kannst dich dann als SL über Discord bewerben. Dann erhälst du eine seperaten Zugang für den SL Dashboard.",
+    q: "Kann ich mich auch als Spielleiter registrieren?",
+    a: "Vorab musst du dich als Mitglied registrieren und kannst dich dann als SL über Discord bewerben. Dann erhältst du eine separaten Zugang für den SL Dashboard.",
   },
 ];
 
@@ -117,7 +117,7 @@ export function FaqSection() {
           </div>
 
           <p className="mt-10 font-libre text-gray-200 leading-relaxed text-sm">
-            Du hast noch Fragen? Schreib uns – wir bauen TableHeroes gemeinsam
+            Du hast noch Fragen? Schreib uns – wir bauen Table-Heroes gemeinsam
             mit der Community.
           </p>
         </div>

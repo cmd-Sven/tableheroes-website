@@ -1,6 +1,22 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { absoluteUrl } from "@/src/lib/site-url";
+
+export const metadata: Metadata = {
+  title: "Kodex | Table-Heroes",
+  description:
+    "Verhaltenskodex der Table-Heroes-Community in Osnabrück: Respekt am Spieltisch und online.",
+  alternates: { canonical: "/kodex" },
+  openGraph: {
+    title: "Kodex | Table-Heroes",
+    description:
+      "Verhaltenskodex der Table-Heroes-Community in Osnabrück: Respekt am Spieltisch und online.",
+    url: absoluteUrl("/kodex"),
+    type: "website",
+  },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Goldener Ornament-Divider zwischen den Sektionen                   */

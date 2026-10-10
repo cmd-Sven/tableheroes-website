@@ -24,7 +24,7 @@ export function AuthLayoutClient({ children }: Props) {
             <div className="flex flex-col items-center justify-center gap-8 py-8">
               <Image
                 src="/images/tableHeroes-logo.png"
-                alt="TableHeroes"
+                alt="Table-Heroes"
                 width={320}
                 height={100}
                 className="h-auto w-full max-w-[320px]"
@@ -57,7 +57,7 @@ export function AuthLayoutClient({ children }: Props) {
             <div className="mb-8 flex flex-col items-center text-center">
               <Image
                 src="/images/tableHeroes-logo.png"
-                alt="TableHeroes"
+                alt="Table-Heroes"
                 width={320}
                 height={100}
                 className="h-auto w-full max-w-[320px]"

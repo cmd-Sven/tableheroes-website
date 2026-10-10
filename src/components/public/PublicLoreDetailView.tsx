@@ -31,7 +31,7 @@ export function PublicLoreDetailView({ entry }: Props) {
           href="/"
           className="inline-flex text-sm text-gray-400 hover:text-accent-gold font-barlow uppercase tracking-wide"
         >
-          ← Table Heroes
+          ← Table-Heroes
         </Link>
         <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wider text-accent-gold/90 font-barlow">
           <Icon className="h-4 w-4" />
@@ -90,7 +90,7 @@ export function PublicLoreDetailView({ entry }: Props) {
       <footer className="mt-12 pt-6 border-t border-hero-border/50 text-sm text-gray-500 font-libre">
         <p>
           Eintrag aus der Lore-Datenbank der Kampagne{" "}
-          <span className="text-gray-400">{entry.campaignName}</span> auf Table Heroes.
+          <span className="text-gray-400">{entry.campaignName}</span> auf Table-Heroes.
           Veröffentlicht mit Zustimmung des Spielleiters.
         </p>
       </footer>

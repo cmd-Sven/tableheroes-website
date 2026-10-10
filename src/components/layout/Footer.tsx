@@ -64,7 +64,7 @@ export function Footer({ showStarrySection = true }: FooterProps) {
                   src="/images/camp-footer-top.webp"
                   alt=""
                   fill
-                  priority
+                  aria-hidden
                   className="w-full object-cover object-center"
                   sizes="100vw"
                 />
@@ -100,7 +100,7 @@ export function Footer({ showStarrySection = true }: FooterProps) {
             <div className="flex items-center mb-4">
               <Image
                 src="/images/tableHeroes-logo.png"
-                alt="TableHeroes Logo"
+                alt="Table-Heroes Logo"
                 width={200}
                 height={62}
                 priority={false}
@@ -221,7 +221,7 @@ export function Footer({ showStarrySection = true }: FooterProps) {
         {/* Copyright */}
         <div className="mt-12 pt-8 text-center">
           <p className="font-libre text-gray-500 text-sm">
-            © <span suppressHydrationWarning>{new Date().getFullYear()}</span> TableHeroes — 
+            © <span suppressHydrationWarning>{new Date().getFullYear()}</span> Table-Heroes — 
             Deine Pen &amp; Paper Community in Osnabrück
           </p>
         </div>

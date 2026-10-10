@@ -236,9 +236,9 @@ export function PublicSeoEntryCard({
             {entitySubtype}
           </p>
         ) : null}
-        <h3 className="font-cinzel text-lg text-hero-vibrant group-hover:text-accent-gold transition-colors">
+        <h4 className="font-cinzel text-lg text-hero-vibrant group-hover:text-accent-gold transition-colors">
           {name}
-        </h3>
+        </h4>
         {excerpt ? <p className="text-sm text-gray-400 font-libre line-clamp-3">{excerpt}</p> : null}
       </div>
     </Link>

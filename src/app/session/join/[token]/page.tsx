@@ -62,7 +62,7 @@ export default async function SessionJoinPage({ params }: Props) {
         registeredSessionUrl={null}
       />
       <p className="mt-8 text-center font-libre text-xs text-gray-600">
-        Table Heroes · {absoluteUrl(`/session/join/${trimmed}`)}
+        Table-Heroes · {absoluteUrl(`/session/join/${trimmed}`)}
       </p>
     </div>
   );

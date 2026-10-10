@@ -66,7 +66,7 @@ export function GamificationSection() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="font-libre text-gray-200 leading-relaxed text-center max-w-3xl mx-auto mb-8"
           >
-            Bei TableHeroes zählt jede Aktion. Werde Teil der Legende und lass
+            Bei Table-Heroes zählt jede Aktion. Werde Teil der Legende und lass
             dich für dein Spiel belohnen.
           </motion.p>
 

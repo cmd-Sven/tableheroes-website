@@ -12,10 +12,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const entry = await getPublicSeoBySlug(slug);
   if (!entry) {
-    return { title: "Eintrag nicht gefunden | Table Heroes" };
+    return { title: "Eintrag nicht gefunden | Table-Heroes" };
   }
 
-  const title = `${entry.name} | Lore-Datenbank | Table Heroes`;
+  const title = `${entry.name} | Lore-Datenbank | Table-Heroes`;
   const description =
     entry.excerpt ||
     `${entry.name} — ${entry.entitySubtype || "Lore"} aus der Kampagne ${entry.campaignName}.`;

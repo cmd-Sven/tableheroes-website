@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Sidebar } from "@/src/components/dashboard/Sidebar";
 import { createClient } from "@/src/lib/supabase/server";
@@ -11,6 +12,10 @@ import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
 import { awardDailyVisitPoints } from "@/src/lib/dashboard/daily-visit-points";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 type DashboardProfile = {
   id: string;

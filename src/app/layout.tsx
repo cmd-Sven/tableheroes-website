@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Barlow_Condensed, Cinzel, Libre_Baskerville } from "next/font/google";
 import { Toaster } from "sonner";
 import { absoluteUrl, getSiteUrl } from "@/src/lib/site-url";
@@ -35,49 +34,35 @@ const libreItalic = Libre_Baskerville({
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title:
-    "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+    "Table-Heroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
   description:
     "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
-  keywords: [
-    "Pen and Paper Osnabrück",
-    "TTRPG Tool Deutschland",
-    "Rollenspiel Community Osnabrück",
-    "Tabletop RPG",
-    "TTRPG",
-    "Community",
-    "Gamification",
-    "Osnabrück",
-    "Rollenspiel",
-    "D&D",
-    "Pathfinder",
-    "Kampagnen Manager",
-  ],
-  authors: [{ name: "TableHeroes" }],
-  alternates: {
-    canonical: "/",
+  authors: [{ name: "Table-Heroes" }],
+  verification: {
+    google: "mzY6Ev9823X7RLOEqJb2k8TutAYQdf6XL9vYk4FK4v4",
   },
   openGraph: {
     title:
-      "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+      "Table-Heroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
     description:
       "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
     url: absoluteUrl("/"),
-    siteName: "Table Heroes",
+    siteName: "Table-Heroes",
     images: [
       {
         url: "/images/tableHeroes-logo.png",
         width: 520,
         height: 160,
-        alt: "Table Heroes Logo",
+        alt: "Table-Heroes Logo",
       },
     ],
     locale: "de_DE",
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title:
-      "TableHeroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
+      "Table-Heroes | Die TTRPG Community für Osnabrück & exklusives Member-Tool",
     description:
       "Die zentrale Anlaufstelle für Pen & Paper Spieler in Osnabrück. Werde Teil der Community und nutze unser exklusives TTRPG-Management-Tool für Mitglieder.",
     images: ["/images/tableHeroes-logo.png"],
@@ -110,14 +95,14 @@ export default function RootLayout({
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Table Heroes",
+    name: "Table-Heroes",
     description:
       "Community-Plattform für TTRPG-Spieler in Osnabrück mit geschlossener Mitglieder-Area und proprietärem Spielleiter-Tool.",
     url: siteUrl,
     areaServed: {
       "@type": "City",
       name: "Osnabrück",
-      containedIn: {
+      containedInPlace: {
         "@type": "Country",
         name: "Germany",
       },
@@ -132,7 +117,7 @@ export default function RootLayout({
   const softwareApplicationSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Table Heroes",
+    name: "Table-Heroes",
     applicationCategory: "GameApplication",
     operatingSystem: "Web-based",
     description:
@@ -140,51 +125,34 @@ export default function RootLayout({
     url: siteUrl,
     publisher: {
       "@type": "Organization",
-      name: "Table Heroes",
+      name: "Table-Heroes",
     },
     areaServed: {
       "@type": "City",
       name: "Osnabrück",
-      containedIn: {
+      containedInPlace: {
         "@type": "Country",
         name: "Germany",
       },
     },
-    offers: {
-      "@type": "Offer",
-      availability: "https://schema.org/MembersOnly",
-      description: "Exklusiv für registrierte Mitglieder",
-    },
-    keywords:
-      "Pen and Paper Osnabrück, TTRPG Tool Deutschland, Rollenspiel Community Osnabrück",
   };
 
   return (
     <html lang="de" suppressHydrationWarning>
-      <head>
-        {/* Google Search Console Verification */}
-        <meta
-          name="google-site-verification"
-          content="mzY6Ev9823X7RLOEqJb2k8TutAYQdf6XL9vYk4FK4v4"
-        />
-      </head>
       <body
         className={`${barlow.variable} ${cinzel.variable} ${libre.variable} ${libreItalic.variable} font-libre bg-background-dark text-gray-100`}
         suppressHydrationWarning={true}
       >
-        {/* JSON-LD nur im body (vermeidet "script outside main document") */}
-        <Script
-          id="json-ld-organization"
+        <script
           type="application/ld+json"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-        />
-        <Script
-          id="json-ld-software"
-          type="application/ld+json"
-          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(softwareApplicationSchema),
+            __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c"),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(softwareApplicationSchema).replace(/</g, "\\u003c"),
           }}
         />
         {children}

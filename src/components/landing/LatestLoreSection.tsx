@@ -1,32 +1,8 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { PublicSeoEntryCard } from "@/src/components/public/PublicSeoPanel";
 import type { HomepageLoreGroup } from "@/src/lib/queries/public-seo-queries";
 
-export function LatestLoreSection() {
-  const [groups, setGroups] = useState<HomepageLoreGroup[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/lore/landing");
-        if (!res.ok) throw new Error("failed");
-        const data = await res.json();
-        if (!cancelled) {
-          setGroups(Array.isArray(data.groups) ? data.groups : []);
-        }
-      } catch {
-        if (!cancelled) setGroups([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!groups || groups.length === 0) return null;
+export function LatestLoreSection({ groups }: { groups: HomepageLoreGroup[] }) {
+  if (groups.length === 0) return null;
 
   return (
     <section

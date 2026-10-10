@@ -130,7 +130,7 @@ export function CommunitySection() {
               transition={{ duration: 0.5 }}
               className="marketing-section-h2"
             >
-              Das Herz von TableHeroes: Unsere Community
+              Das Herz von Table-Heroes: Unsere Community
             </motion.h2>
           </div>
           <motion.p
