@@ -326,7 +326,8 @@ function standingFromSims(blueprint: FactionBlueprint, day: number): StandingCor
     case "bund-silberne-rose": {
       const rose = cellStrength(tempel, "Silberne Rose gegen das Konklave");
       return {
-        power: clamp01(tempel.vattrak * 0.35 + rose * 0.45 + (100 - tempel.malanthir) * 0.1),
+        // Elysia-Präsenz stützt die Rose, ohne die bisherige Vattrak- und Zellenrechnung zu ersetzen.
+        power: clamp01(tempel.vattrak * 0.35 + rose * 0.45 + (100 - tempel.malanthir) * 0.1 + tempel.elysia * 0.06),
         legality: blendLegality(blueprint.baseLegality, [tempel], 0.15, 0.2),
         economicImpact: clamp01(tempel.economy * 0.35 + 14),
         linkFactor: 0.85 + rose / 200,
@@ -335,7 +336,8 @@ function standingFromSims(blueprint: FactionBlueprint, day: number): StandingCor
     case "konklave-ewige-ordnung": {
       const liturgy = cellStrength(tempel, "Goldene Liturgie");
       return {
-        power: clamp01(tempel.malanthir * 0.25 + liturgy * 0.4 + palast.guard * 0.15 + tempel.guard * 0.15),
+        // Chromus-Präsenz im Tempelbezirk, örtlich, nicht als neuer Stadtzähler neben der Liturgie.
+        power: clamp01(tempel.malanthir * 0.25 + liturgy * 0.4 + palast.guard * 0.15 + tempel.guard * 0.15 + tempel.chromus * 0.1),
         legality: blendLegality(blueprint.baseLegality, [tempel, palast], 0.1, 0.25),
         economicImpact: clamp01(tempel.economy * 0.3 + liturgy * 0.15 + 10),
         linkFactor: 0.85 + liturgy / 220,

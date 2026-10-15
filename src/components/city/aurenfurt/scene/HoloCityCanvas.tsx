@@ -15,6 +15,7 @@ import type { AurenfurtWall } from "../aurenfurt-walls";
 import type { DayWeather } from "../aurenfurt-weather";
 import type { WeatherFxId } from "../aurenfurt-weather-fx";
 import type { DistrictSector } from "../aurenfurt-sectors";
+import type { SectorCrimeCell } from "../aurenfurt-crime-heatmap";
 import type { AurenfurtMapEditorTool } from "../aurenfurt-map-editor-tool";
 import { HoloFocusRig } from "./HoloFocusRig";
 
@@ -51,11 +52,15 @@ type Props = {
   eventPickSectors?: DistrictSector[];
   eventSectorIds?: string[];
   onPickEventSector?: (sector: DistrictSector) => void;
+  crimeHeatmapVisible?: boolean;
+  crimeCells?: SectorCrimeCell[];
   /** Kamera bleibt stehen, z. B. während der Ort auf der Karte gewählt wird. */
   holdStill?: boolean;
   highlightDistricts?: boolean;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
+  worldId: string;
+  campaignId?: string | null;
   buildingPositions: BuildingPositions;
   landmarkScales?: LandmarkScales;
   landmarkRotations?: LandmarkRotations;
@@ -142,10 +147,14 @@ export default function HoloCityCanvas({
   eventPickSectors = [],
   eventSectorIds = [],
   onPickEventSector,
+  crimeHeatmapVisible = false,
+  crimeCells = [],
   holdStill = false,
   highlightDistricts = false,
   buildings,
   pois,
+  worldId,
+  campaignId = null,
   buildingPositions,
   landmarkScales,
   landmarkRotations,
@@ -259,9 +268,13 @@ export default function HoloCityCanvas({
               eventPickSectors={eventPickSectors}
               eventSectorIds={eventSectorIds}
               onPickEventSector={onPickEventSector}
+              crimeHeatmapVisible={crimeHeatmapVisible}
+              crimeCells={crimeCells}
               highlightDistricts={highlightDistricts}
               buildings={buildings}
               pois={pois}
+              worldId={worldId}
+              campaignId={campaignId}
               buildingPositions={buildingPositions}
               landmarkScales={landmarkScales}
               landmarkRotations={landmarkRotations}

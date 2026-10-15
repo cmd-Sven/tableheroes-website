@@ -103,7 +103,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Blaue Dächer und Gärten im Norden. Die Häuser halten die Gassen sauber und die Tore zu.",
-    sim: sim(12, 76, 8, 82, 14, 84, 14, [{ name: "Salons der Häuser", strength: 24 }]),
+    sim: sim(12, 76, 8, 82, 14, 84, 14, [{ name: "Salons der Häuser", strength: 24 }], 34, 8),
   },
   {
     id: "tempelbezirk",
@@ -117,7 +117,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     sim: sim(16, 86, 29, 73, 33, 68, 34, [
       { name: "Goldene Liturgie", strength: 36 },
       { name: "Silberne Rose gegen das Konklave", strength: 44 },
-    ]),
+    ], 54, 22),
   },
   {
     id: "akademieviertel",
@@ -132,7 +132,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     sim: sim(22, 80, 30, 72, 12, 70, 18, [
       { name: "Sternenkammer", strength: 36 },
       { name: "Archivversuchung", strength: 28 },
-    ]),
+    ], 24, 10),
   },
   {
     id: "handwerkerviertel",
@@ -143,7 +143,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Essen und Kontore vor der Südostmauer. Die Zünfte wiegen mehr als die Garde.",
-    sim: sim(41, 37, 17, 44, 42, 74, 27, [{ name: "Zunftkeller", strength: 57 }]),
+    sim: sim(41, 37, 17, 44, 42, 74, 27, [{ name: "Zunftkeller", strength: 57 }], 18, 6),
   },
   {
     id: "suedtor",
@@ -154,7 +154,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: RING_INNER,
     outer: RING_OUTER,
     summary: "Löwentor und Prozessionsallee. Hier kommt die Stadt hinein, und nicht alles wird verzollt.",
-    sim: sim(34, 44, 15, 71, 79, 61, 36, [{ name: "Löwentor-Schmuggler", strength: 48 }]),
+    sim: sim(34, 44, 15, 71, 79, 61, 36, [{ name: "Löwentor-Schmuggler", strength: 48 }], 20, 7),
   },
   {
     id: "unterstadt",
@@ -168,7 +168,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     sim: sim(72, 18, 56, 21, 88, 26, 68, [
       { name: "Flüstern der Roten Gassen", strength: 74 },
       { name: "Malanthir-Zellen", strength: 63 },
-    ]),
+    ], 14, 5),
   },
   {
     id: "palast",
@@ -179,7 +179,7 @@ export const AURENFURT_DISTRICTS: CityDistrict[] = [
     inner: 0,
     outer: PALACE_OUTER,
     summary: "Der Festungspalast im Zentrum. Vattrak ist hier am ruhigsten, die Garde am dichtesten.",
-    sim: sim(6, 94, 11, 96, 5, 91, 12, [{ name: "Hofkanzlei", strength: 19 }]),
+    sim: sim(6, 94, 11, 96, 5, 91, 12, [{ name: "Hofkanzlei", strength: 19 }], 70, 12),
   },
 ];
 

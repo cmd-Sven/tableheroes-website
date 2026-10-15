@@ -8,7 +8,9 @@ import {
   CloudRain,
   CloudSnow,
   Coins,
+  Flower2,
   HardHat,
+  Hourglass,
   Moon,
   Shield,
   ShieldAlert,
@@ -30,6 +32,8 @@ export const KPI_COLORS: Record<SimMeterKey, string> = {
   refugees: "#f59e0b",
   economy: "#cab926",
   unemployment: "#d4a574",
+  elysia: "#e7b6c9",
+  chromus: "#7f93c9",
 };
 
 const KPI_ICONS: Record<SimMeterKey, LucideIcon> = {
@@ -40,6 +44,8 @@ const KPI_ICONS: Record<SimMeterKey, LucideIcon> = {
   refugees: Users,
   economy: Coins,
   unemployment: HardHat,
+  elysia: Flower2,
+  chromus: Hourglass,
 };
 
 /** Kurze Bedeutung je Meter — Tooltip darf die Zahl zeigen. */

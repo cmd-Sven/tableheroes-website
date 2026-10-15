@@ -26,7 +26,7 @@ function actor(partial: Partial<CityActor>): CityActor {
   };
 }
 
-const calm = { crime: 10, guard: 70, vattrak: 40, malanthir: 5, economy: 50, unemployment: 20, refugees: 10 };
+const calm = { crime: 10, guard: 70, vattrak: 40, malanthir: 5, economy: 50, unemployment: 20, refugees: 10, elysia: 30, chromus: 8 };
 const rough = { ...calm, crime: 90, guard: 20 };
 
 const ability = newNpcAbility({

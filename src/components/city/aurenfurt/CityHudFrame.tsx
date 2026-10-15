@@ -49,44 +49,52 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
   const { corner, edgeX, edgeY } = SPEC[density];
   const showCorners = corner > 0;
 
+  const rightEdgeOnly = density === "rail";
+
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-[1]">
-      <div
-        className="absolute top-0"
-        style={{
-          left: corner,
-          right: corner,
-          height: edgeX,
-          backgroundImage: `url('${BORDER_X}')`,
-          backgroundRepeat: "repeat-x",
-          backgroundSize: "auto 100%",
-          backgroundPosition: "center",
-        }}
-      />
-      <div
-        className="absolute bottom-0"
-        style={{
-          left: corner,
-          right: corner,
-          height: edgeX,
-          backgroundImage: `url('${BORDER_X}')`,
-          backgroundRepeat: "repeat-x",
-          backgroundSize: "auto 100%",
-          backgroundPosition: "center",
-        }}
-      />
-      <div
-        className="absolute left-0"
-        style={{
-          top: corner,
-          bottom: corner,
-          width: edgeY,
-          backgroundImage: `url('${BORDER_Y}')`,
-          backgroundRepeat: "repeat-y",
-          backgroundSize: "100% auto",
-          backgroundPosition: "center",
-        }}
-      />
+      {rightEdgeOnly ? null : (
+        <div
+          className="absolute top-0"
+          style={{
+            left: corner,
+            right: corner,
+            height: edgeX,
+            backgroundImage: `url('${BORDER_X}')`,
+            backgroundRepeat: "repeat-x",
+            backgroundSize: "auto 100%",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
+      {rightEdgeOnly ? null : (
+        <div
+          className="absolute bottom-0"
+          style={{
+            left: corner,
+            right: corner,
+            height: edgeX,
+            backgroundImage: `url('${BORDER_X}')`,
+            backgroundRepeat: "repeat-x",
+            backgroundSize: "auto 100%",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
+      {rightEdgeOnly ? null : (
+        <div
+          className="absolute left-0"
+          style={{
+            top: corner,
+            bottom: corner,
+            width: edgeY,
+            backgroundImage: `url('${BORDER_Y}')`,
+            backgroundRepeat: "repeat-y",
+            backgroundSize: "100% auto",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
       <div
         className="absolute right-0"
         style={{

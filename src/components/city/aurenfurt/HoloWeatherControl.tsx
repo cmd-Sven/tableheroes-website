@@ -43,19 +43,18 @@ export function HoloWeatherControl({ enabled, mode, autoEffect, onModeChange }: 
   }, [open]);
 
   return (
-    <div ref={panelRef} className="pointer-events-auto relative">
+    <div ref={panelRef} className="relative w-full">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={labelId}
+        aria-label={`Wettereffekt, ${buttonLabel}`}
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-md ${
-          enabled
-            ? "border-accent-gold/70 bg-hero-dark/95 text-accent-gold"
-            : "border-hero-dark bg-background-dark/90 text-gray-400"
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-xs font-bold uppercase tracking-wide hover:bg-background-card ${
+          enabled ? "text-accent-gold" : "text-gray-400"
         }`}
       >
-        <Icon className="h-3.5 w-3.5" aria-hidden />
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
         {buttonLabel}
       </button>
       <AnimatePresence>
@@ -68,7 +67,7 @@ export function HoloWeatherControl({ enabled, mode, autoEffect, onModeChange }: 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2 }}
-            className="absolute left-0 top-full z-20 mt-1 w-52 rounded border border-hero-border bg-background-card p-2 shadow-lg"
+            className="absolute right-0 top-full z-20 mt-1 w-52 rounded border border-hero-border bg-background-card p-2 shadow-lg"
           >
             <p className="font-libre text-[11px] leading-relaxed text-gray-300">
               Nur die Kartenansicht. Die Stadt rechnet weiter mit dem Tageswetter.

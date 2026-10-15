@@ -1529,6 +1529,14 @@ function PoisToolBody({
       {selectedPoi && !poiCreateOpen ? (
         <div className="space-y-2 rounded border border-hero-border/40 bg-slate-900/30 p-2">
           <p className="font-libre text-xs text-gray-300 line-clamp-3">{selectedPoi.description}</p>
+          <a
+            href={`/dashboard/worlds/${AURENFURT_WORLD_ID}/lore/${selectedPoi.id}/edit`}
+            target="_blank"
+            rel="noopener"
+            className="inline-block font-barlow text-[11px] font-bold uppercase tracking-wide text-hero-vibrant hover:text-white"
+          >
+            In Lore bearbeiten
+          </a>
           <button
             type="button"
             onClick={() => {

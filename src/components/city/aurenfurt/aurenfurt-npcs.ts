@@ -17,6 +17,7 @@ import {
   type FactionId,
 } from "./aurenfurt-factions";
 import { bindNpcSnaps } from "./aurenfurt-city-sim";
+import { faithLineOf } from "./aurenfurt-faith";
 import { districtMetricsOn, utcToday } from "./aurenfurt-history";
 import type { KeyLocation } from "./aurenfurt-locations";
 import type {
@@ -1503,6 +1504,7 @@ export function generateNpcs(): AurenfurtNpc[] {
   kaiser.cityAxisGreedyAltruist = -2;
   kaiser.cityAxisPiousSkeptic = -1;
   kaiser.cityAxisSuperstitionReason = 3;
+  kaiser.cityDeity = "Elysia";
   kaiser.cityAgenda = "Gesetze erlassen, Befehle erteilen und den Vattrak-Vorrat nach seinem Rang verteilen.";
   byId.set(kaiser.id, kaiser);
 
@@ -1686,5 +1688,6 @@ bindNpcSnaps(
       tierWeight: NPC_TIER_WEIGHT[npc.cityInfluenceTier] ?? 1,
       tier: npc.cityInfluenceTier,
       locationId: npc.locationId,
+      faith: faithLineOf(npc.cityDeity),
     })),
 );

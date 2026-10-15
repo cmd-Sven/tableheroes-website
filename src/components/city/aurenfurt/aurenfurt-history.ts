@@ -22,7 +22,7 @@ export const HISTORY_ANCHOR = "2026-09-26";
 export const HISTORY_START = "2023-09-26";
 const DAY_MS = 86_400_000;
 
-const METRIC_KEYS = ["crime", "vattrak", "malanthir", "guard", "refugees", "economy", "unemployment"] as const;
+const METRIC_KEYS = ["crime", "vattrak", "malanthir", "guard", "refugees", "economy", "unemployment", "elysia", "chromus"] as const;
 type MetricKey = (typeof METRIC_KEYS)[number];
 
 type CellDelta = { name: string; delta: number };
@@ -218,6 +218,8 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
         malanthir: 12,
         vattrak: -8,
         crime: 4,
+        elysia: -3,
+        chromus: 6,
         cells: [
           { name: "Goldene Liturgie", delta: 12 },
           { name: "Silberne Rose gegen das Konklave", delta: 44 },
@@ -232,7 +234,7 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
           { name: "Archivversuchung", delta: 12 },
         ],
       },
-      palast: { malanthir: 4, vattrak: -3 },
+      palast: { malanthir: 4, vattrak: -3, chromus: 2 },
       adelsviertel: { malanthir: 2, cells: [{ name: "Salons der Häuser", delta: 8 }] },
       unterstadt: { malanthir: 4 },
       suedtor: { crime: 2 },
@@ -342,7 +344,7 @@ function wobble(districtId: string, day: number, key: string) {
   return ((hash >>> 0) / 4294967295 - 0.5) * 2.4;
 }
 
-const HISTORY_SHIFT_KEYS = ["crime", "guard", "refugees", "economy", "unemployment"] as const;
+const HISTORY_SHIFT_KEYS = ["crime", "guard", "refugees", "economy", "unemployment", "elysia", "chromus"] as const;
 
 function historyShift(districtId: CityDistrictId, day: number): HistoryShift {
   const anchor = parseDay(HISTORY_ANCHOR);
@@ -352,6 +354,8 @@ function historyShift(districtId: CityDistrictId, day: number): HistoryShift {
     refugees: 0,
     economy: 0,
     unemployment: 0,
+    elysia: 0,
+    chromus: 0,
     cells: [],
   };
   for (const event of AURENFURT_HISTORY) {
@@ -415,6 +419,8 @@ const EMPTY_PROFILE: SimProfile = {
   refugees: 0,
   economy: 0,
   unemployment: 0,
+  elysia: 0,
+  chromus: 0,
   underground: [],
 };
 
@@ -430,6 +436,8 @@ function rawProfile(districtId: CityDistrictId, day: number): SimProfile | null 
     refugees: clamp(row.refugees + wobble(districtId, day, "refugees")),
     economy: clamp(row.economy + wobble(districtId, day, "economy")),
     unemployment: clamp(row.unemployment + wobble(districtId, day, "unemployment")),
+    elysia: clamp(row.elysia + wobble(districtId, day, "elysia")),
+    chromus: clamp(row.chromus + wobble(districtId, day, "chromus")),
     underground: row.underground.map((cell) => ({
       name: cell.name,
       strength: clamp(cell.strength + wobble(districtId, day, cell.name)),
@@ -459,6 +467,8 @@ function pressureBook() {
         economy: raw.economy,
         unemployment: raw.unemployment,
         refugees: raw.refugees,
+        elysia: raw.elysia,
+        chromus: raw.chromus,
       };
     },
   });
@@ -495,6 +505,8 @@ function profileOn(districtId: CityDistrictId, day: number): SimProfile {
     refugees: clamp(raw.refugees + press.refugees + chronicle.refugees),
     economy: clamp(raw.economy + press.economy + chronicle.economy),
     unemployment: clamp(raw.unemployment + press.unemployment + chronicle.unemployment),
+    elysia: clamp(raw.elysia + press.elysia + chronicle.elysia),
+    chromus: clamp(raw.chromus + press.chromus + chronicle.chromus),
     underground: raw.underground,
     tensionBias: chronicle.tension,
   };
@@ -538,6 +550,8 @@ export function cityMetricsOn(day = utcToday()): SimProfile {
     refugees: avg((profile) => profile.refugees),
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
+    elysia: avg((profile) => profile.elysia),
+    chromus: avg((profile) => profile.chromus),
     underground,
     tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };

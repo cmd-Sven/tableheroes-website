@@ -186,23 +186,96 @@ export type SectorField = {
   guard: number;
 };
 
+export type SectorCrimeShift = {
+  sector: DistrictSector;
+  /** Gedeckelte Abweichung vom Viertelwert, dieselbe Spanne wie in sectorField. */
+  crimeDelta: number;
+};
+
 /**
- * Basiswerte je Sektor, plus lokale Wache und krimineller Einfluss.
- * Der Viertelwert ist danach der Mittelwert der Sektoren.
+ * Dieselbe Sektor-Verschiebung wie sectorField, ohne den Viertelwert zu mitteln.
+ * Kriminalität liegt in der Simulation je Viertel vor; die Sektoren weichen nur
+ * durch Wache und kriminelle Orte in Reichweite ab.
  */
-export function sectorField(
+export function sectorCrimeShifts(
   districtId: CityDistrictId,
-  baseCrime: number,
-  baseGuard: number,
   buildings: ReachBuilding[],
   npcs: ReachNpc[],
   stored: DistrictSectorsByDistrict | null | undefined,
   polygons?: DistrictPolygons | null,
-): { crime: number; guard: number; sectorCount: number } {
+): SectorCrimeShift[] {
+  return sectorShifts(districtId, buildings, npcs, stored, polygons).map((row) => ({
+    sector: row.sector,
+    crimeDelta: row.crimeDelta,
+  }));
+}
+
+export type SectorFaithShift = {
+  sector: DistrictSector;
+  elysiaDelta: number;
+  chromusDelta: number;
+};
+
+type FaithBuilding = ReachBuilding & { elysia: number; chromus: number };
+type FaithNpc = ReachNpc & { faith?: "elysia" | "chromus" | null };
+
+/**
+ * Dieselbe Sektor-Verteilung wie bei der Kriminalität: Gebäude und Gruppen
+ * ziehen die Präsenz auf ihre Sektoren, der Viertelwert bleibt der Mittelwert.
+ */
+export function sectorFaithShifts(
+  districtId: CityDistrictId,
+  buildings: FaithBuilding[],
+  npcs: FaithNpc[],
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+): SectorFaithShift[] {
   const sectors = sectorsForDistrict(districtId, stored, polygons);
-  if (sectors.length === 0) {
-    return { crime: baseCrime, guard: baseGuard, sectorCount: 0 };
+  const delta = new Map<string, { elysia: number; chromus: number }>();
+  for (const sector of sectors) delta.set(sector.id, { elysia: 0, chromus: 0 });
+
+  for (const building of buildings) {
+    if (building.districtId !== districtId) continue;
+    const occupied = sectorsOccupiedByBuilding(building, sectors);
+    const staff = npcs.filter((npc) => npc.locationId === building.id);
+    for (const sector of occupied) {
+      const slot = delta.get(sector.id);
+      if (!slot) continue;
+      slot.elysia += (building.elysia - 35) * 0.12;
+      slot.chromus += (building.chromus - 15) * 0.12;
+    }
+    for (const npc of staff) {
+      if (npc.faith !== "elysia" && npc.faith !== "chromus") continue;
+      const radius = NPC_SECTOR_REACH[npc.tier] ?? 1;
+      const reached = sectorsWithinReach(occupied, radius, sectors);
+      for (const { sector, distance } of reached) {
+        const weight = Math.max(0, Math.min(1, npc.influence / 100)) * falloff(distance, radius);
+        const slot = delta.get(sector.id);
+        if (!slot) continue;
+        if (npc.faith === "elysia") slot.elysia += 8 * weight;
+        else slot.chromus += 8 * weight;
+      }
+    }
   }
+
+  return sectors.map((sector) => {
+    const shift = delta.get(sector.id) ?? { elysia: 0, chromus: 0 };
+    return {
+      sector,
+      elysiaDelta: Math.max(-14, Math.min(18, shift.elysia)),
+      chromusDelta: Math.max(-14, Math.min(18, shift.chromus)),
+    };
+  });
+}
+
+function sectorShifts(
+  districtId: CityDistrictId,
+  buildings: ReachBuilding[],
+  npcs: ReachNpc[],
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+) {
+  const sectors = sectorsForDistrict(districtId, stored, polygons);
   const delta = new Map<string, { crime: number; guard: number }>();
   for (const sector of sectors) delta.set(sector.id, { crime: 0, guard: 0 });
 
@@ -235,16 +308,40 @@ export function sectorField(
     }
   }
 
+  return sectors.map((sector) => {
+    const shift = delta.get(sector.id) ?? { crime: 0, guard: 0 };
+    return {
+      sector,
+      crimeDelta: Math.max(-6, Math.min(10, shift.crime)),
+      guardDelta: Math.max(-4, Math.min(5, shift.guard)),
+    };
+  });
+}
+
+/**
+ * Basiswerte je Sektor, plus lokale Wache und krimineller Einfluss.
+ * Der Viertelwert ist danach der Mittelwert der Sektoren.
+ */
+export function sectorField(
+  districtId: CityDistrictId,
+  baseCrime: number,
+  baseGuard: number,
+  buildings: ReachBuilding[],
+  npcs: ReachNpc[],
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+): { crime: number; guard: number; sectorCount: number } {
+  const rows = sectorShifts(districtId, buildings, npcs, stored, polygons);
+  if (rows.length === 0) {
+    return { crime: baseCrime, guard: baseGuard, sectorCount: 0 };
+  }
   let crimeSum = 0;
   let guardSum = 0;
-  for (const sector of sectors) {
-    const shift = delta.get(sector.id) ?? { crime: 0, guard: 0 };
-    const crimeDelta = Math.max(-6, Math.min(10, shift.crime));
-    const guardDelta = Math.max(-4, Math.min(5, shift.guard));
-    crimeSum += Math.max(0, Math.min(100, baseCrime + crimeDelta));
-    guardSum += Math.max(0, Math.min(100, baseGuard + guardDelta));
+  for (const row of rows) {
+    crimeSum += Math.max(0, Math.min(100, baseCrime + row.crimeDelta));
+    guardSum += Math.max(0, Math.min(100, baseGuard + row.guardDelta));
   }
-  const count = sectors.length;
+  const count = rows.length;
   return {
     crime: crimeSum / count,
     guard: guardSum / count,

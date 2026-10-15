@@ -30,6 +30,8 @@ import type { AurenfurtMapPoi } from "./aurenfurt-map-pois";
 import type { DistrictSector } from "./aurenfurt-sectors";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
+import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
+import type { SectorCrimeCell } from "./aurenfurt-crime-heatmap";
 import { HoloDecorationSlot } from "./scene/HoloDecorationLayer";
 import { useAurenfurtDeco } from "./AurenfurtDecoProvider";
 
@@ -68,9 +70,13 @@ type Props = {
   eventPickSectors?: DistrictSector[];
   eventSectorIds?: string[];
   onPickEventSector?: (sector: DistrictSector) => void;
+  crimeHeatmapVisible?: boolean;
+  crimeCells?: SectorCrimeCell[];
   highlightDistricts?: boolean;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
+  worldId: string;
+  campaignId?: string | null;
   buildingPositions: BuildingPositions;
   landmarkScales?: LandmarkScales;
   landmarkRotations?: LandmarkRotations;
@@ -128,9 +134,13 @@ export function CityModel({
   eventPickSectors = [],
   eventSectorIds = [],
   onPickEventSector,
+  crimeHeatmapVisible = false,
+  crimeCells = [],
   highlightDistricts = false,
   buildings,
   pois,
+  worldId,
+  campaignId = null,
   buildingPositions,
   landmarkScales,
   landmarkRotations,
@@ -216,6 +226,7 @@ export function CityModel({
         ) : editorTool === "districts" && editingDistrictId && editingSectors.length > 0 ? (
           <DistrictSectorOverlay sectors={editingSectors} preview={editingSectorsPreview} />
         ) : null}
+        <CrimeHeatmapLayer cells={crimeCells} visible={crimeHeatmapVisible} />
         <group visible={buildingsVisible}>
         {buildings.map((building) => {
           const uv = resolveBuildingUv(building, buildingPositions);
@@ -244,18 +255,20 @@ export function CityModel({
           );
         })}
         </group>
-        <group visible={poisVisible}>
-        {pois.map((poi) => (
-          <HoloPoiMarker
-            key={poi.id}
-            poi={poi}
-            selected={sameSelection(selection, { type: "poi", id: poi.id })}
-            suppressSelect={suppressSelect || mapLocked}
-            onSelect={(id) => onSelect({ type: "poi", id })}
-            onHover={(id) => onHover(id ? { type: "poi", id } : null)}
-          />
-        ))}
-        </group>
+        {poisVisible
+          ? pois.map((poi) => (
+              <HoloPoiMarker
+                key={poi.id}
+                poi={poi}
+                worldId={worldId}
+                campaignId={campaignId}
+                selected={sameSelection(selection, { type: "poi", id: poi.id })}
+                suppressSelect={suppressSelect || mapLocked}
+                onSelect={(id) => onSelect({ type: "poi", id })}
+                onHover={(id) => onHover(id ? { type: "poi", id } : null)}
+              />
+            ))
+          : null}
         <HoloStreetLayer
           streets={streets}
           dayWeather={dayWeather}

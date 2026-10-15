@@ -13,6 +13,8 @@ const base = {
   refugees: 20,
   economy: 60,
   unemployment: 25,
+  elysia: 40,
+  chromus: 12,
 };
 
 const calmPrior = { ...base, economy: 88, crime: 18, malanthir: 12, vattrak: 80, guard: 70 };
@@ -46,6 +48,8 @@ for (let day = 0; day < 500; day += 1) {
     refugees: aimed.refugees,
     economy: state.economy + 0.08 * (aimed.economy - state.economy),
     unemployment: state.unemployment + 0.05 * (aimed.unemployment - state.unemployment),
+    elysia: aimed.elysia,
+    chromus: aimed.chromus,
   };
 }
 for (const value of [state.crime, state.economy, state.guard, state.malanthir, state.vattrak, state.unemployment]) {

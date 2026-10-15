@@ -34,6 +34,8 @@ export const CITY_METERS = [
   "economy",
   "unemployment",
   "refugees",
+  "elysia",
+  "chromus",
 ] as const;
 
 export type CityMeter = (typeof CITY_METERS)[number];
@@ -46,6 +48,8 @@ export const CITY_METER_LABELS: Record<CityMeter, string> = {
   economy: "Wirtschaft",
   unemployment: "Arbeitslosigkeit",
   refugees: "Flüchtlinge",
+  elysia: "Elysia",
+  chromus: "Chromus",
 };
 
 export const MeterConditionSchema = z.object({

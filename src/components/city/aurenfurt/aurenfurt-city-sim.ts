@@ -22,7 +22,8 @@ import {
   type BuildingCategory,
 } from "./aurenfurt-building-categories";
 import type { DistrictPolygons } from "./aurenfurt-district-polygons";
-import { sectorField } from "./aurenfurt-sector-reach";
+import { sectorCrimeShifts, sectorFaithShifts, sectorField } from "./aurenfurt-sector-reach";
+import { CHROMUS_ROLE, ELYSIA_ROLE, faithPresenceForBuilding } from "./aurenfurt-faith";
 import type { DistrictSectorsByDistrict } from "./aurenfurt-sectors";
 import type { CityBond } from "./aurenfurt-bonds";
 import type { CityActor, CitySimEvent } from "./aurenfurt-pressure";
@@ -59,6 +60,8 @@ const ALPHA = {
   refugees: 0.06,
   economy: 0.08,
   unemployment: 0.05,
+  elysia: 0.05,
+  chromus: 0.07,
 } as const;
 
 const MAL_BASE: Record<CityDistrictId, number> = {
@@ -128,6 +131,8 @@ export type SimBuilding = {
   category: BuildingCategory;
   prosperity: number;
   hotspot: number;
+  elysia: number;
+  chromus: number;
   active: boolean;
   u: number;
   v: number;
@@ -166,6 +171,8 @@ export type NpcSimSnap = {
   tierWeight: number;
   tier: CityInfluenceTier;
   locationId: string | null;
+  /** Linie der Elysia, des Chromus, oder keiner von beiden. */
+  faith: "elysia" | "chromus" | null;
 };
 
 export type HistoryShift = {
@@ -174,6 +181,8 @@ export type HistoryShift = {
   refugees: number;
   economy: number;
   unemployment: number;
+  elysia: number;
+  chromus: number;
   cells: { name: string; delta: number }[];
 };
 
@@ -281,6 +290,7 @@ export function simBuildingFromCity(building: CityBuilding): SimBuilding {
     category,
     prosperity: building.prosperityLevel,
     hotspot: building.isHotspot,
+    ...faithPresenceForBuilding(building),
     active: building.fromEditor ? Boolean(building.streetId) : true,
     u: building.u,
     v: building.v,
@@ -290,6 +300,22 @@ export function simBuildingFromCity(building: CityBuilding): SimBuilding {
 function activeBuildings(): SimBuilding[] {
   const source = live.buildings ?? CITY_BUILDINGS.map(simBuildingFromCity);
   return source.filter((building) => building.active);
+}
+
+/** Sektoren der ganzen Stadt mit der Glaubens-Abweichung aus Gebäuden und Gruppen. */
+export function liveSectorFaithDeltas() {
+  const buildings = activeBuildings();
+  return AURENFURT_DISTRICTS.flatMap((district) =>
+    sectorFaithShifts(district.id, buildings, npcSnaps, live.sectors, live.polygons),
+  );
+}
+
+/** Sektoren der ganzen Stadt mit der Kriminalitäts-Abweichung aus sectorField. */
+export function liveSectorCrimeDeltas() {
+  const buildings = activeBuildings();
+  return AURENFURT_DISTRICTS.flatMap((district) =>
+    sectorCrimeShifts(district.id, buildings, npcSnaps, live.sectors, live.polygons),
+  );
 }
 
 export function buildingWeights(): Record<CityDistrictId, number> {
@@ -419,6 +445,9 @@ function crimeFromBuildings(buildings: SimBuilding[]) {
       if (building.category === "Lager") value += 8;
       if (building.category === "Wache" || building.category === "Tor") value -= 16;
       if (building.category === "Palast" || building.category === "Tempel") value -= 8;
+      // Rose und Konklave liegen auf denselben Tempel-Orten und drücken das Verbrechen nur leicht extra.
+      if (building.category === "Tempel" && building.elysia >= 70) value -= 3;
+      if (building.category === "Tempel" && building.chromus >= 70) value -= 2;
       return Math.max(0, Math.min(100, value));
     }),
     35,
@@ -439,6 +468,26 @@ function crimeFromNpcs(districtId: CityDistrictId) {
     weight += rowWeight;
   }
   return weight > 0 ? acc / weight : null;
+}
+
+function faithFromNpcs(districtId: CityDistrictId) {
+  const rows = npcSnaps.filter((npc) => npc.districtId === districtId);
+  if (rows.length === 0) return null;
+  let weight = 0;
+  let elysia = 0;
+  let chromus = 0;
+  for (const npc of rows) {
+    const rowWeight = npc.tierWeight * Math.max(0.35, npc.influence / 100);
+    weight += rowWeight;
+    if (npc.faith === "elysia") elysia += rowWeight * 78;
+    else if (npc.faith === "chromus") chromus += rowWeight * 78;
+    else {
+      elysia += rowWeight * ELYSIA_ROLE[districtId] * 0.35;
+      chromus += rowWeight * CHROMUS_ROLE[districtId] * 0.35;
+    }
+  }
+  if (weight <= 0) return null;
+  return { elysia: elysia / weight, chromus: chromus / weight };
 }
 
 function streetCrime(districtId: CityDistrictId) {
@@ -500,6 +549,8 @@ type RawMeters = {
   refugees: number;
   economy: number;
   unemployment: number;
+  elysia: number;
+  chromus: number;
 };
 
 function targetsFor(
@@ -548,13 +599,17 @@ function targetsFor(
     const trade = streetEconomy(district.id);
     if (trade != null) economy = economy * 0.82 + trade * 0.18;
 
+    const roseRites = local.filter((building) => building.category === "Tempel" && building.elysia >= 70).length;
+    const conclaveRites = local.filter((building) => building.category === "Tempel" && building.chromus >= 70).length;
     let guard =
       18 +
       GUARD_ROLE[district.id] +
       watches * 8 +
       prosperity * 3 +
       sat.guard * 16 +
-      sat.rite * 6 -
+      sat.rite * 6 +
+      roseRites * 1.5 +
+      conclaveRites * 1.2 -
       Math.max(0, malanthir - 18) * 0.72;
 
     const localField = sectorField(
@@ -578,6 +633,29 @@ function targetsFor(
       sat.craft * 6 -
       sat.luxury * 4;
 
+    const buildingElysia = mean(
+      local.map((building) => building.elysia),
+      ELYSIA_ROLE[district.id],
+    );
+    const buildingChromus = mean(
+      local.map((building) => building.chromus),
+      CHROMUS_ROLE[district.id],
+    );
+    const npcFaith = faithFromNpcs(district.id);
+    let elysia = ELYSIA_ROLE[district.id] * 0.55 + buildingElysia * 0.45;
+    let chromus = CHROMUS_ROLE[district.id] * 0.55 + buildingChromus * 0.45;
+    if (npcFaith) {
+      elysia = elysia * 0.82 + npcFaith.elysia * 0.18;
+      chromus = chromus * 0.82 + npcFaith.chromus * 0.18;
+    }
+    // Elysia stützt die etablierte Ordnung von Hof und Silberner Rose.
+    // Chromus zieht über das Konklave in dieselbe Richtung, erst ab dichter örtlicher Präsenz.
+    const elysiaOrder = Math.max(0, elysia - 48) * 0.035;
+    const chromusOrder = Math.max(0, chromus - 40) * 0.03;
+    crime -= elysiaOrder + chromusOrder;
+    guard += elysiaOrder * 0.85 + chromusOrder * 0.7;
+    economy += elysiaOrder * 0.4 - chromusOrder * 0.25;
+
     const shift = shiftOf(district.id);
     out[district.id] = {
       crime: clampScore(crime + shift.crime + poiShift(district.id, "crime")),
@@ -587,6 +665,8 @@ function targetsFor(
       refugees: clampScore(refugees + shift.refugees + poiShift(district.id, "refugees")),
       economy: clampScore(economy + shift.economy + poiShift(district.id, "economy")),
       unemployment: clampScore(unemployment + shift.unemployment + poiShift(district.id, "unemployment")),
+      elysia: clampScore(elysia + shift.elysia + poiShift(district.id, "elysia")),
+      chromus: clampScore(chromus + shift.chromus + poiShift(district.id, "chromus")),
     };
   }
   return out;
@@ -651,6 +731,8 @@ export function applyDistrictFeedback(base: RawMeters, prior: RawMeters | null):
     vattrak: clampScore(base.vattrak + capDelta(vattrakDelta)),
     unemployment: clampScore(base.unemployment + capDelta(unemploymentDelta)),
     refugees: base.refugees,
+    elysia: base.elysia,
+    chromus: base.chromus,
   };
 }
 
@@ -718,6 +800,8 @@ export function simulateCityRange(context: CitySimContext) {
         refugees: approach(prior?.refugees ?? null, aimed.refugees, ALPHA.refugees),
         economy: approach(prior?.economy ?? null, aimed.economy, ALPHA.economy),
         unemployment: approach(prior?.unemployment ?? null, aimed.unemployment, ALPHA.unemployment),
+        elysia: approach(prior?.elysia ?? null, aimed.elysia, ALPHA.elysia),
+        chromus: approach(prior?.chromus ?? null, aimed.chromus, ALPHA.chromus),
       };
       shown[district.id] = next;
       const shift = context.historyShift(district.id, day);
@@ -729,6 +813,8 @@ export function simulateCityRange(context: CitySimContext) {
         refugees: next.refugees,
         economy: next.economy,
         unemployment: next.unemployment,
+        elysia: next.elysia,
+        chromus: next.chromus,
         underground: cellsFor(district.id, next.malanthir, next.guard, next.vattrak, shift),
       };
     }

@@ -49,5 +49,5 @@ export function useAurenfurtWeather(dayIso: string) {
     return weatherOn(parseDay(dayIso));
   }, [isLiveDay, live, dayIso]);
 
-  return { current, series, liveState };
+  return { current, series, liveState, live };
 }

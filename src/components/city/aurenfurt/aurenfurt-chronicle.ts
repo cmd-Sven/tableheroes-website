@@ -16,6 +16,8 @@ export type ChronicleMeter =
   | "refugees"
   | "economy"
   | "unemployment"
+  | "elysia"
+  | "chromus"
   | "tension";
 
 export type ChronicleShift = Record<Exclude<ChronicleMeter, "tension">, number> & { tension: number };
@@ -59,6 +61,8 @@ const ZERO: ChronicleShift = {
   refugees: 0,
   economy: 0,
   unemployment: 0,
+  elysia: 0,
+  chromus: 0,
   tension: 0,
 };
 
@@ -259,6 +263,33 @@ const CITY_STORIES: Story[] = [
       },
     ],
   },
+  {
+    id: "chromus-einzug",
+    title: "Einzug des Konklave",
+    summary:
+      "Chromus ist seit etwa einem Jahrhundert in der Stadt und noch im Kommen. Elysia bleibt die ältere Präsenz an Hof, Tempelbezirk und Bund der Silbernen Rose.",
+    segments: [
+      {
+        start: "2023-09-26",
+        end: "2027-01-01",
+        effects: [
+          {
+            meter: "chromus",
+            shape: { kind: "slow", delta: 8 },
+            where: {
+              tempelbezirk: 1,
+              palast: 0.35,
+              adelsviertel: 0.2,
+              akademieviertel: 0.25,
+              suedtor: 0.15,
+              handwerkerviertel: 0.12,
+              unterstadt: 0.1,
+            },
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 type Holiday = {
@@ -283,6 +314,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "tension", shape: { kind: "flat", delta: -10 } },
       { meter: "vattrak", shape: { kind: "flat", delta: 10 }, where: { tempelbezirk: 1, palast: 0.25, adelsviertel: 0.2 } },
       { meter: "crime", shape: { kind: "flat", delta: -12 } },
+      { meter: "chromus", shape: { kind: "flat", delta: 6 }, where: { tempelbezirk: 1, palast: 0.35 } },
     ],
   },
   {
@@ -297,6 +329,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "crime", shape: { kind: "flat", delta: -10 } },
       { meter: "economy", shape: { kind: "flat", delta: -5 } },
       { meter: "tension", shape: { kind: "flat", delta: 6 } },
+      { meter: "chromus", shape: { kind: "flat", delta: 8 }, where: { tempelbezirk: 1, palast: 0.4, adelsviertel: 0.2 } },
     ],
   },
   {
@@ -311,6 +344,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "unemployment", shape: { kind: "flat", delta: -10 } },
       { meter: "crime", shape: { kind: "flat", delta: 12 } },
       { meter: "tension", shape: { kind: "flat", delta: 15 } },
+      { meter: "elysia", shape: { kind: "flat", delta: 8 }, where: { tempelbezirk: 1, palast: 0.7, adelsviertel: 0.35 } },
     ],
   },
   {
@@ -324,6 +358,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "unemployment", shape: { kind: "flat", delta: -8 } },
       { meter: "crime", shape: { kind: "flat", delta: -15 } },
       { meter: "vattrak", shape: { kind: "flat", delta: 5 } },
+      { meter: "elysia", shape: { kind: "flat", delta: 6 }, where: { tempelbezirk: 1, unterstadt: 0.45, handwerkerviertel: 0.35, palast: 0.3 } },
     ],
   },
   {
@@ -337,6 +372,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "economy", shape: { kind: "flat", delta: -10 } },
       { meter: "guard", shape: { kind: "flat", delta: 20 } },
       { meter: "malanthir", shape: { kind: "flat", delta: -14 } },
+      { meter: "chromus", shape: { kind: "flat", delta: 5 }, where: { tempelbezirk: 1, palast: 0.45 } },
     ],
   },
   {
@@ -350,6 +386,7 @@ const HOLIDAYS: Holiday[] = [
       { meter: "economy", shape: { kind: "flat", delta: 15 } },
       { meter: "crime", shape: { kind: "flat", delta: 10 } },
       { meter: "tension", shape: { kind: "flat", delta: 12 } },
+      { meter: "elysia", shape: { kind: "flat", delta: 6 }, where: { tempelbezirk: 0.6, suedtor: 0.4, unterstadt: 0.35, handwerkerviertel: 0.3 } },
     ],
   },
   {
@@ -363,9 +400,34 @@ const HOLIDAYS: Holiday[] = [
       { meter: "guard", shape: { kind: "flat", delta: 15 } },
       { meter: "crime", shape: { kind: "flat", delta: -12 } },
       { meter: "economy", shape: { kind: "flat", delta: -10 } },
+      { meter: "chromus", shape: { kind: "flat", delta: 7 }, where: { tempelbezirk: 1, palast: 0.3 } },
     ],
   },
 ];
+
+export type AurenfurtHoliday = {
+  id: string;
+  title: string;
+};
+
+/** Feiertag, der diesen UTC-Tag einschließt. Dieselbe Spanne wie die Chronik. */
+export function holidayOnDay(day: number): AurenfurtHoliday | null {
+  if (!Number.isFinite(day)) return null;
+  const year = new Date(day).getUTCFullYear();
+  for (const holiday of HOLIDAYS) {
+    for (const candidate of [year - 1, year, year + 1]) {
+      const start = Date.UTC(candidate, holiday.month - 1, holiday.day);
+      const end = start + holiday.duration * DAY;
+      if (day < start || day >= end) continue;
+      return { id: `${holiday.id}-${candidate}`, title: holiday.title };
+    }
+  }
+  return null;
+}
+
+export function holidayOnIso(iso: string): AurenfurtHoliday | null {
+  return holidayOnDay(parseDay(iso));
+}
 
 function progress(start: number, end: number, day: number) {
   const last = end - DAY;

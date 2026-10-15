@@ -1,0 +1,231 @@
+"use client";
+
+import { useEffect, useId, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Menu, ScrollText, Trees } from "lucide-react";
+import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
+import { DekoElementeButton } from "./DekoElementeButton";
+import { HoloDayStrip } from "./HoloDayStrip";
+import { HoloWeatherControl } from "./HoloWeatherControl";
+import { MapLayerVisibilityBar } from "./MapLayerVisibilityBar";
+import { useAurenfurtDeco } from "./AurenfurtDecoProvider";
+import type { MapLayerId } from "./hooks/useMapLayerVisibility";
+import type { DayWeather } from "./aurenfurt-weather";
+import type { WeatherFxId, WeatherFxMode } from "./aurenfurt-weather-fx";
+
+type Props = {
+  citySurface: CitySurface;
+  onCitySurface: (mode: CitySurface) => void;
+  day: string;
+  minDay: string;
+  maxDay: string;
+  isToday: boolean;
+  liveWeather: DayWeather | null;
+  onDayChange: (iso: string) => void;
+  onStepDay: (delta: number) => void;
+  onStepYear: (delta: number) => void;
+  onGoToday: () => void;
+  isGm: boolean;
+  eventWizardOpen: boolean;
+  onToggleEventWizard: () => void;
+  statusLine: string;
+  layoutError: string | null;
+  buildingsVisible: boolean;
+  poisVisible: boolean;
+  streetsVisible: boolean;
+  wallsVisible: boolean;
+  weatherVisible: boolean;
+  onToggleLayer: (layer: MapLayerId) => void;
+  onToggleWeather: () => void;
+  weatherEnabled: boolean;
+  weatherMode: WeatherFxMode;
+  autoEffect: WeatherFxId;
+  onWeatherMode: (mode: WeatherFxMode) => void;
+  crimeHeatmap: boolean;
+  onToggleCrimeHeatmap: () => void;
+};
+
+export function CityMapHud({
+  citySurface,
+  onCitySurface,
+  day,
+  minDay,
+  maxDay,
+  isToday,
+  liveWeather,
+  onDayChange,
+  onStepDay,
+  onStepYear,
+  onGoToday,
+  isGm,
+  eventWizardOpen,
+  onToggleEventWizard,
+  statusLine,
+  layoutError,
+  buildingsVisible,
+  poisVisible,
+  streetsVisible,
+  wallsVisible,
+  weatherVisible,
+  onToggleLayer,
+  onToggleWeather,
+  weatherEnabled,
+  weatherMode,
+  autoEffect,
+  onWeatherMode,
+  crimeHeatmap,
+  onToggleCrimeHeatmap,
+}: Props) {
+  const deco = useAurenfurtDeco();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    }
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [menuOpen]);
+
+  const menuItem =
+    "flex w-full items-center gap-2 px-3 py-2 text-left font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold hover:bg-background-card";
+
+  return (
+    <>
+      <header
+        data-city-map-hud="top"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[120px] items-center gap-2 bg-background-dark px-2"
+      >
+        <div className="shrink-0">
+          <CityViewSwitch mode={citySurface} onChange={onCitySurface} />
+        </div>
+        <HoloDayStrip
+          day={day}
+          minDay={minDay}
+          maxDay={maxDay}
+          isToday={isToday}
+          liveWeather={liveWeather}
+          onDayChange={onDayChange}
+          onStepDay={onStepDay}
+          onStepYear={onStepYear}
+          onGoToday={onGoToday}
+        />
+        <div className="flex h-full shrink-0 items-center gap-2">
+          <button
+            type="button"
+            data-crime-heatmap={crimeHeatmap ? "on" : "off"}
+            aria-pressed={crimeHeatmap}
+            aria-label={crimeHeatmap ? "Kriminalität, eingeblendet" : "Kriminalität, ausgeblendet"}
+            onClick={onToggleCrimeHeatmap}
+            className={`inline-flex shrink-0 items-center gap-2 border px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide ${
+              crimeHeatmap
+                ? "border-accent-blood bg-accent-blood text-white"
+                : "border-hero-dark bg-hero-dark text-accent-gold hover:bg-background-card"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-2.5 w-2.5 rounded-full ${crimeHeatmap ? "bg-orange-300" : "bg-gray-500"}`}
+            />
+            Kriminalität
+          </button>
+        </div>
+        <div data-cal-hint="" className="ml-auto flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+          <p className="truncate font-cinzel text-xs font-bold text-accent-gold">Aurenfurt</p>
+          {layoutError ? (
+            <p className="truncate font-libre text-[11px] leading-snug text-red-300" role="alert">
+              {layoutError}
+            </p>
+          ) : null}
+          <p className="truncate font-libre text-[11px] leading-snug text-gray-200" title={statusLine}>
+            {statusLine}
+          </p>
+        </div>
+        <div ref={menuRef} className="relative z-40 flex h-full shrink-0 items-center">
+          <button
+            type="button"
+            data-city-burger=""
+            aria-label="Menü"
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
+            onClick={() => setMenuOpen((open) => !open)}
+            className="inline-flex items-center justify-center border border-hero-dark bg-hero-dark p-2 text-accent-gold hover:bg-background-card"
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
+          <AnimatePresence>
+            {menuOpen ? (
+              <motion.div
+                id={menuId}
+                role="menu"
+                aria-label="Kartenmenü"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute right-0 top-full z-40 mt-1 w-56 border border-hero-dark bg-background-dark py-1 shadow-lg"
+              >
+                {isGm ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    aria-pressed={eventWizardOpen}
+                    onClick={() => {
+                      onToggleEventWizard();
+                      setMenuOpen(false);
+                    }}
+                    className={`${menuItem} ${eventWizardOpen ? "text-hero-vibrant" : ""}`}
+                  >
+                    <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
+                    Stadtereignis
+                  </button>
+                ) : null}
+                {deco.isGm ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    aria-pressed={deco.panelOpen}
+                    onClick={() => {
+                      deco.togglePanel();
+                      setMenuOpen(false);
+                    }}
+                    className={`${menuItem} ${deco.panelOpen ? "text-hero-vibrant" : ""}`}
+                  >
+                    <Trees className="h-4 w-4 shrink-0" aria-hidden />
+                    Deko Elemente
+                  </button>
+                ) : null}
+                <div className="border-t border-hero-dark">
+                  <HoloWeatherControl
+                    enabled={weatherEnabled}
+                    mode={weatherMode}
+                    autoEffect={autoEffect}
+                    onModeChange={onWeatherMode}
+                  />
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+          <DekoElementeButton />
+        </div>
+      </header>
+      <div
+        data-city-map-hud="layers"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center"
+      >
+        <MapLayerVisibilityBar
+          buildingsVisible={buildingsVisible}
+          poisVisible={poisVisible}
+          streetsVisible={streetsVisible}
+          wallsVisible={wallsVisible}
+          weatherVisible={weatherVisible}
+          onToggleLayer={onToggleLayer}
+          onToggleWeather={onToggleWeather}
+        />
+      </div>
+    </>
+  );
+}

@@ -160,7 +160,7 @@ export default function CityDashboard({
           {report.liveWeatherNote ? ` ${report.liveWeatherNote}` : ""}
         </p>
 
-        <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+        <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {SIM_METERS.map((meter) => {
             const delta = report.deltas[meter.key];
             return (
@@ -342,6 +342,8 @@ export default function CityDashboard({
                 <th className="px-3 py-2">Arbeit</th>
                 <th className="px-3 py-2">Vattrak</th>
                 <th className="px-3 py-2">Malanthir</th>
+                <th className="px-3 py-2">Elysia</th>
+                <th className="px-3 py-2">Chromus</th>
                 <th className="px-3 py-2">Spannung</th>
               </tr>
             </thead>
@@ -370,6 +372,8 @@ export default function CityDashboard({
                     <td className="px-3 py-2 tabular-nums">{district.average.unemployment}</td>
                     <td className="px-3 py-2 tabular-nums">{district.average.vattrak}</td>
                     <td className="px-3 py-2 tabular-nums">{district.average.malanthir}</td>
+                    <td className="px-3 py-2 tabular-nums">{district.average.elysia}</td>
+                    <td className="px-3 py-2 tabular-nums">{district.average.chromus}</td>
                     <td className="px-3 py-2 tabular-nums">{district.tension}</td>
                   </tr>
                 ))}

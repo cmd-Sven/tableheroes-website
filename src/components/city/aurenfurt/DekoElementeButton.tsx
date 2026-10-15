@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Trash2, Trees } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   DECO_CATALOG,
   DECO_ROTATION_MAX,
@@ -24,23 +24,9 @@ export function DekoElementeButton() {
   const placingModel = deco.placingKey ? decoModelByKey(deco.placingKey) : null;
 
   return (
-    <div className="pointer-events-auto flex w-full max-w-sm flex-col items-start gap-2">
-      <button
-        type="button"
-        aria-expanded={deco.panelOpen}
-        aria-pressed={deco.panelOpen}
-        onClick={deco.togglePanel}
-        className={`inline-flex items-center gap-2 border px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide shadow-lg ${
-          deco.panelOpen
-            ? "border-accent-gold bg-hero-dark text-hero-vibrant"
-            : "border-hero-dark bg-hero-dark/95 text-accent-gold hover:bg-background-card"
-        }`}
-      >
-        <Trees className="h-4 w-4 shrink-0" aria-hidden />
-        Deko Elemente
-      </button>
+    <>
       {deco.saveError || deco.modelError ? (
-        <p className="font-libre text-xs leading-relaxed text-red-300" role="alert">
+        <p className="pointer-events-auto absolute right-0 top-full z-30 mt-1 w-64 font-libre text-xs leading-relaxed text-red-300" role="alert">
           {deco.saveError ?? deco.modelError}
         </p>
       ) : null}
@@ -49,7 +35,7 @@ export function DekoElementeButton() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="w-full rounded-md border border-hero-dark bg-background-card p-4 shadow-lg"
+          className="pointer-events-auto absolute right-0 top-full z-30 mt-1 max-h-[min(70vh,32rem)] w-72 overflow-y-auto rounded-md border border-hero-dark bg-background-card p-4 shadow-lg"
         >
           <h3 className="font-cinzel text-base font-bold text-accent-gold">Deko Elemente</h3>
           <p className="mt-1 font-libre text-xs leading-relaxed text-gray-200">
@@ -148,6 +134,6 @@ export function DekoElementeButton() {
           ) : null}
         </motion.div>
       ) : null}
-    </div>
+    </>
   );
 }

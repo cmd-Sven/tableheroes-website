@@ -2,6 +2,7 @@ import {
   AURENFURT_DISTRICTS,
   type CityDistrictId,
 } from "./aurenfurt-districts";
+import { LORE_PLACEHOLDER_IMAGE } from "./aurenfurt-district-lore-ids";
 import {
   clampUvPoint,
   pointInPolygon,
@@ -34,6 +35,8 @@ export const POI_INFLUENCE_ASPECTS = [
   { key: "refugees", label: "Flüchtlinge" },
   { key: "economy", label: "Wirtschaft" },
   { key: "unemployment", label: "Arbeitslosigkeit" },
+  { key: "elysia", label: "Elysia" },
+  { key: "chromus", label: "Chromus" },
   { key: "religion", label: "Religion" },
   { key: "knowledge", label: "Wissen" },
   { key: "prestige", label: "Ansehen" },
@@ -143,16 +146,40 @@ export function districtIdAtUv(
   return null;
 }
 
+function finiteCoordinate(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+/** Bild für den Karten-Tooltip. Platzhalter und leere URLs bleiben unsichtbar. */
+export function poiTooltipImage(url: string | null | undefined): string | null {
+  const value = (url ?? "").trim();
+  if (!value || value === LORE_PLACEHOLDER_IMAGE || value.endsWith("/ort-platzhalter.png")) {
+    return null;
+  }
+  return value;
+}
+
+/** Lore-Seite des Orts. In der Kampagne die Spieler-Seite, sonst die Welt-Lore. */
+export function poiLoreHref(worldId: string, poiId: string, campaignId?: string | null) {
+  if (campaignId) return `/dashboard/campaigns/${campaignId}/lore/${poiId}`;
+  return `/dashboard/worlds/${worldId}/lore/${poiId}`;
+}
+
 export function mapEditorRowToPoi(row: MapEditorPoiRow): AurenfurtMapPoi | null {
   if (!row.map_poi_kind || !isPoiKind(row.map_poi_kind)) return null;
   const districtId = row.map_district_id as CityDistrictId | null;
   if (!districtId || !DISTRICT_IDS.has(districtId)) return null;
-  if (typeof row.map_u !== "number" || !Number.isFinite(row.map_u)) return null;
-  if (typeof row.map_v !== "number" || !Number.isFinite(row.map_v)) return null;
+  const mapU = finiteCoordinate(row.map_u);
+  const mapV = finiteCoordinate(row.map_v);
+  if (mapU == null || mapV == null) return null;
 
-  const uv = clampUvPoint({ u: row.map_u, v: row.map_v });
-  const imageUrl =
-    (row.image_url ?? "").trim() || "/images/lore/ort-platzhalter.png";
+  const uv = clampUvPoint({ u: mapU, v: mapV });
+  const imageUrl = (row.image_url ?? "").trim() || LORE_PLACEHOLDER_IMAGE;
 
   return {
     id: row.id,

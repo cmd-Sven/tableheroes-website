@@ -2,7 +2,7 @@
  * Run: npx tsx src/components/city/aurenfurt/aurenfurt-chronicle.selftest.ts
  */
 import assert from "node:assert/strict";
-import { chronicleInWindow, chronicleShift } from "./aurenfurt-chronicle";
+import { chronicleInWindow, chronicleShift, holidayOnIso } from "./aurenfurt-chronicle";
 import { parseDay } from "./aurenfurt-time";
 
 function on(iso: string, district: "unterstadt" | "suedtor" | "palast" | "tempelbezirk" | "akademieviertel" = "unterstadt") {
@@ -70,5 +70,12 @@ assert.equal(on("2025-02-02", "unterstadt").vattrak, 0);
 const marks = chronicleInWindow([parseDay("2026-01-12"), parseDay("2026-01-20")], null);
 assert.equal(marks.some((mark) => mark.title === "Die große Frostwelle"), true);
 assert.equal(chronicleInWindow([parseDay("2026-01-12")], "adelsviertel").length > 0, true);
+
+assert.equal(holidayOnIso("2026-10-11"), null);
+assert.equal(holidayOnIso("2026-10-30")?.title, "Nacht des langen Blickes");
+assert.equal(holidayOnIso("2026-11-01")?.title, "Nacht des langen Blickes");
+assert.equal(holidayOnIso("2026-11-02"), null);
+assert.equal(holidayOnIso("2026-02-08")?.title, "Echo der verlorenen Zeit");
+assert.equal(holidayOnIso("2026-02-09"), null);
 
 console.log("aurenfurt-chronicle selftest ok");

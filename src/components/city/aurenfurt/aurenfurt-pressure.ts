@@ -113,6 +113,8 @@ const ZERO: MeterSnapshot = {
   economy: 0,
   unemployment: 0,
   refugees: 0,
+  elysia: 0,
+  chromus: 0,
 };
 
 export function neighborDistricts(id: CityDistrictId): CityDistrictId[] {

@@ -61,6 +61,8 @@ export type AnalyticsPoint = {
   refugees: number;
   economy: number;
   unemployment: number;
+  elysia: number;
+  chromus: number;
   tension: number;
 };
 
@@ -182,6 +184,8 @@ function weightedCity(bundle: DayBundle): SimProfile {
     refugees: avg((profile) => profile.refugees),
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
+    elysia: avg((profile) => profile.elysia),
+    chromus: avg((profile) => profile.chromus),
     underground,
     tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };
@@ -214,6 +218,8 @@ function averageProfiles(profiles: SimProfile[]): SimProfile {
     refugees: avg((profile) => profile.refugees),
     economy: avg((profile) => profile.economy),
     unemployment: avg((profile) => profile.unemployment),
+    elysia: avg((profile) => profile.elysia),
+    chromus: avg((profile) => profile.chromus),
     underground,
     tensionBias: avg((profile) => profile.tensionBias ?? 0),
   };
@@ -310,6 +316,8 @@ function pointFrom(label: string, profile: SimProfile): AnalyticsPoint {
     refugees: profile.refugees,
     economy: profile.economy,
     unemployment: profile.unemployment,
+    elysia: profile.elysia,
+    chromus: profile.chromus,
     tension: tensionOf(profile),
   };
 }

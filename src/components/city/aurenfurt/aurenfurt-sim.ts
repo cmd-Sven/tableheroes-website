@@ -12,6 +12,10 @@ export type SimProfile = {
   refugees: number;
   economy: number;
   unemployment: number;
+  /** Präsenz der Elysia, 0–100, dieselbe Spanne wie die übrigen Zähler. */
+  elysia: number;
+  /** Präsenz des Chromus, 0–100. */
+  chromus: number;
   underground: UndergroundCell[];
   /** Zusätzliche Spannung aus datierten Stadtgeschichten, oben auf die Formel. */
   tensionBias?: number;
@@ -29,6 +33,9 @@ export function meanSim(profiles: SimProfile[]): SimProfile {
     avg((profile) => profile.refugees),
     avg((profile) => profile.economy),
     avg((profile) => profile.unemployment),
+    [],
+    avg((profile) => profile.elysia),
+    avg((profile) => profile.chromus),
   );
 }
 
@@ -41,8 +48,10 @@ export function sim(
   economy: number,
   unemployment: number,
   underground: UndergroundCell[] = [],
+  elysia = 0,
+  chromus = 0,
 ): SimProfile {
-  return { crime, vattrak, malanthir, guard, refugees, economy, unemployment, underground };
+  return { crime, vattrak, malanthir, guard, refugees, economy, unemployment, elysia, chromus, underground };
 }
 
 export const SIM_METERS = [
@@ -53,6 +62,8 @@ export const SIM_METERS = [
   { key: "refugees", label: "Flüchtlingsstrom", tone: "bg-amber-500", stroke: "#f59e0b" },
   { key: "economy", label: "Wirtschaftsindex", tone: "bg-[#cab926]", stroke: "#cab926" },
   { key: "unemployment", label: "Arbeitslosigkeit", tone: "bg-[#d4a574]", stroke: "#d4a574" },
+  { key: "elysia", label: "Elysia-Präsenz", tone: "bg-[#e7b6c9]", stroke: "#e7b6c9" },
+  { key: "chromus", label: "Chromus-Präsenz", tone: "bg-[#7f93c9]", stroke: "#7f93c9" },
 ] as const satisfies ReadonlyArray<{ key: keyof SimProfile; label: string; tone: string; stroke: string }>;
 
 export type SimMeterKey = (typeof SIM_METERS)[number]["key"];

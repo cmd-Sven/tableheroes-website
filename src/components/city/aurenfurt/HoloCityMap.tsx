@@ -1,21 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { ScrollText } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { HoloCityRail } from "./HoloCityRail";
-import { HoloDayCalendar } from "./HoloDayCalendar";
 import { HoloOverlay } from "./HoloOverlay";
-import { HoloWeatherControl } from "./HoloWeatherControl";
-import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
+import type { CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
-import { MapLayerVisibilityBar } from "./MapLayerVisibilityBar";
 import { AurenfurtDecoProvider } from "./AurenfurtDecoProvider";
-import { DekoElementeButton } from "./DekoElementeButton";
-import { CityHudFrame } from "./CityHudFrame";
+import { CityMapHud } from "./CityMapHud";
 import { CityEventWizard } from "./CityEventWizard";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import {
@@ -36,7 +31,7 @@ import { useWeatherFxControl } from "./hooks/useWeatherFxControl";
 import { resolveWeatherFx } from "./aurenfurt-weather-fx";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
-import { bindCityBonds, bindCityPressure, setCitySimLive, simBuildingFromCity } from "./aurenfurt-city-sim";
+import { bindCityBonds, bindCityPressure, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
 import { resolveBuildingUv } from "./aurenfurt-building-positions";
 import { useDistrictNpcs } from "./hooks/useDistrictNpcs";
 import { useBuildingPositions } from "./hooks/useBuildingPositions";
@@ -48,6 +43,8 @@ import { useHoloCityView } from "./hooks/useHoloCityView";
 import { useKeyLocations } from "./hooks/useKeyLocations";
 import { useMapLayerVisibility } from "./hooks/useMapLayerVisibility";
 import type { DistrictSector } from "./aurenfurt-sectors";
+import { citySectorCrime } from "./aurenfurt-crime-heatmap";
+import { parseDay } from "./aurenfurt-time";
 import {
   WALL_BRIGHTNESS_DEFAULT,
   WALL_CURVE_DEFAULT,
@@ -239,6 +236,12 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   const [eventDistrictId, setEventDistrictId] = useState<CityDistrictId | null>(null);
   const [eventSectorIds, setEventSectorIds] = useState<string[]>([]);
   const [eventWholeCity, setEventWholeCity] = useState(false);
+  const [crimeHeatmap, setCrimeHeatmap] = useState(false);
+  const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
+  const crimeCells = useMemo(
+    () => (crimeHeatmap ? citySectorCrime(parseDay(calendar.day)) : []),
+    [calendar.day, crimeHeatmap, simVersion],
+  );
 
   const layoutError =
     wallsApi.saveError ||
@@ -1042,8 +1045,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           weatherFx={shownWeather.effect}
           weatherFxIntensity={shownWeather.intensity}
           viewedDay={calendar.day}
-          streetsLayerVisible={layers.streets}
-          buildingsVisible={layers.buildings}
+          streetsLayerVisible={crimeHeatmap ? false : layers.streets}
+          buildingsVisible={crimeHeatmap ? false : layers.buildings}
           poisVisible={layers.pois}
           wallsVisible={layers.walls}
           polygons={polygons.polygons}
@@ -1064,10 +1067,14 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           eventPickSectors={eventPickSectors}
           eventSectorIds={eventSectorIds}
           onPickEventSector={onPickEventSector}
+          crimeHeatmapVisible={crimeHeatmap}
+          crimeCells={crimeCells}
           holdStill={eventPlaceStep}
           highlightDistricts={eventPlaceStep}
           buildings={buildings.length > 0 ? buildings : CITY_BUILDINGS}
           pois={pois}
+          worldId={resolvedWorldId}
+          campaignId={campaignId}
           buildingPositions={buildingPositions.positions}
           landmarkScales={landmarkScales.scales}
           landmarkRotations={landmarkRotations.rotations}
@@ -1093,71 +1100,49 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onPlacePoiPoint={placePoiPoint}
           onSelectStreet={selectStreet}
         />
-        <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-sm flex-col items-start gap-2">
-          <MapLayerVisibilityBar
-            buildingsVisible={layers.buildings}
-            poisVisible={layers.pois}
-            streetsVisible={layers.streets}
-            wallsVisible={layers.walls}
-            weatherVisible={weatherFx.preference.enabled}
-            onToggleLayer={toggleLayer}
-            onToggleWeather={() => weatherFx.setEnabled(!weatherFx.preference.enabled)}
-          />
-          <CityHudFrame density="card" tone="dark" className="pointer-events-auto w-full shadow-lg">
-            <div className="px-4 pb-10 pt-12">
-              <CityViewSwitch mode={citySurface} onChange={setCitySurface} />
-              <p className="mt-2 font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
-              {isGm ? (
-                <button
-                  type="button"
-                  aria-pressed={eventWizardOpen}
-                  onClick={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
-                  className={`mt-2 inline-flex items-center gap-2 bg-hero-dark px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold hover:bg-background-card ${
-                    eventWizardOpen ? "text-hero-vibrant" : ""
-                  }`}
-                >
-                  <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
-                  Stadtereignis
-                </button>
-              ) : null}
-              {layoutError ? (
-                <p className="mt-2 font-libre text-xs leading-relaxed text-red-300" role="alert">
-                  {layoutError}
-                </p>
-              ) : null}
-              <p className="mt-1 font-libre text-sm leading-relaxed text-gray-200">
-                {eventWizardOpen && eventPlaceStep
-                  ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
-                  : wallDrawActive
-                  ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
-                  : placingBuildingActive
+        <CityMapHud
+          citySurface={citySurface}
+          onCitySurface={setCitySurface}
+          day={calendar.day}
+          minDay={calendar.minDay}
+          maxDay={calendar.maxDay}
+          isToday={calendar.isToday}
+          liveWeather={climate.live}
+          onDayChange={calendar.setDay}
+          onStepDay={calendar.stepDay}
+          onStepYear={calendar.stepYear}
+          onGoToday={calendar.goToday}
+          isGm={isGm}
+          eventWizardOpen={eventWizardOpen}
+          onToggleEventWizard={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
+          statusLine={
+            eventWizardOpen && eventPlaceStep
+              ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
+              : wallDrawActive
+                ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
+                : placingBuildingActive
                   ? "Klicke im Viertel, um das Gebäude zu setzen."
                   : placingPoiActive
                     ? repositioningPoi
                       ? "Klicke auf die Karte, um den Ort neu zu setzen."
                       : "Klicke auf die Karte, um den besonderen Ort zu setzen."
-                    : (hint ?? view.subject?.name ?? "Viertel links wählen.")}
-              </p>
-            </div>
-          </CityHudFrame>
-          <HoloDayCalendar
-            day={calendar.day}
-            minDay={calendar.minDay}
-            maxDay={calendar.maxDay}
-            isToday={calendar.isToday}
-            onDayChange={calendar.setDay}
-            onStepDay={calendar.stepDay}
-            onStepYear={calendar.stepYear}
-            onGoToday={calendar.goToday}
-          />
-          <HoloWeatherControl
-            enabled={weatherFx.preference.enabled}
-            mode={weatherFx.preference.mode}
-            autoEffect={shownWeather.autoEffect}
-            onModeChange={weatherFx.setMode}
-          />
-          <DekoElementeButton />
-        </div>
+                    : (hint ?? view.subject?.name ?? "Viertel links wählen.")
+          }
+          layoutError={layoutError}
+          buildingsVisible={layers.buildings}
+          poisVisible={layers.pois}
+          streetsVisible={layers.streets}
+          wallsVisible={layers.walls}
+          weatherVisible={weatherFx.preference.enabled}
+          onToggleLayer={toggleLayer}
+          onToggleWeather={() => weatherFx.setEnabled(!weatherFx.preference.enabled)}
+          weatherEnabled={weatherFx.preference.enabled}
+          weatherMode={weatherFx.preference.mode}
+          autoEffect={shownWeather.autoEffect}
+          onWeatherMode={weatherFx.setMode}
+          crimeHeatmap={crimeHeatmap}
+          onToggleCrimeHeatmap={() => setCrimeHeatmap((current) => !current)}
+        />
         {isGm && eventWizardOpen ? (
           <CityEventWizard
             day={calendar.day}
