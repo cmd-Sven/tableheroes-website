@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Trash2, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Trash2, Loader2, Monitor } from "lucide-react";
 import { deleteCampaign } from "@/src/app/dashboard/campaigns/[id]/actions";
 import { useRouter } from "next/navigation";
 import { HeroButton } from "@/src/components/ui/HeroButton";
@@ -51,14 +52,23 @@ export function CampaignCard({ campaign }: Props) {
         {campaign.system || "System offen"} • {campaign.max_players || "?"} Plätze
       </p>
       <div className="flex gap-2 mt-4 items-center justify-between">
-        <HeroButton
-          href={`/dashboard/campaigns/${campaign.id}`}
-          size="sm"
-          ariaLabel="Kampagne verwalten"
-          className="button-glint"
-        >
-          Kampagne öffnen
-        </HeroButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <HeroButton
+            href={`/dashboard/campaigns/${campaign.id}`}
+            size="sm"
+            ariaLabel="Kampagne verwalten"
+            className="button-glint"
+          >
+            Kampagne öffnen
+          </HeroButton>
+          <Link
+            href={`/dashboard/campaigns/${campaign.id}/live-lite`}
+            className="inline-flex items-center gap-1 rounded-md border border-accent-gold/70 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-accent-gold"
+          >
+            <Monitor className="h-3.5 w-3.5" />
+            Lite-Bühne
+          </Link>
+        </div>
         <button
           onClick={handleDelete}
           disabled={isPending}

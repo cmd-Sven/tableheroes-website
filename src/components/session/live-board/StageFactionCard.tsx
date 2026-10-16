@@ -27,6 +27,7 @@ export function StageFactionCard({
   campaignId,
   onPortrait,
   onRemove,
+  suppressPlayerNotes = false,
 }: {
   faction: CampaignFaction;
   isSingle: boolean;
@@ -35,6 +36,8 @@ export function StageFactionCard({
   campaignId: string;
   onPortrait: (portrait: StagePortraitModal) => void;
   onRemove: (factionId: string) => void;
+  /** Lite-Spielerfläche: keine Notiz-Editoren. Volle Session lässt den Default. */
+  suppressPlayerNotes?: boolean;
 }) {
   const showGlow = useTemporaryStageGlow();
   const cardTitle = [faction.name, faction.type].filter(Boolean).join(" — ");
@@ -142,7 +145,7 @@ export function StageFactionCard({
           <span className="font-barlow text-[9px] font-bold uppercase">{statusVisual.label}</span>
         </span>
       ) : null}
-      {!isGM ? (
+      {!isGM && !suppressPlayerNotes ? (
         <StageFactionPlayerNotesButton
           campaignId={campaignId}
           factionId={String(faction.id)}

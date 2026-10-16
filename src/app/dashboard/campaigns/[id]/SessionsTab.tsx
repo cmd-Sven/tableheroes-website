@@ -610,6 +610,13 @@ export function SessionsTab({
           </h2>
           {isGM && (
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/dashboard/campaigns/${campaignId}/live-lite`}
+                className="flex items-center gap-1 rounded border border-accent-gold/70 bg-background-dark px-3 py-1.5 font-barlow font-bold uppercase text-xs text-accent-gold hover:border-accent-gold transition-colors"
+              >
+                <Radio className="h-4 w-4" />
+                Lite-Bühne
+              </Link>
               <button
                 type="button"
                 onClick={() => setIsEventModalOpen(true)}

@@ -43,6 +43,7 @@ import {
   Scale,
   Globe2,
   Eye,
+  Monitor,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -394,6 +395,16 @@ export function Sidebar({
           icon: Calendar,
           tab: "sessions",
         },
+        ...(role === "GameMaster" || role === "Admin"
+          ? [
+              {
+                href: `/dashboard/campaigns/${campaignId}/live-lite`,
+                label: "Lite-Bühne",
+                icon: Monitor,
+                tab: undefined as string | undefined,
+              },
+            ]
+          : []),
         {
           href: `/dashboard/campaigns/${campaignId}/lore`,
           label: "Welt & Lore",
