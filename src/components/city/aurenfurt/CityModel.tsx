@@ -8,6 +8,7 @@ import {
   type CityBuilding,
   type CityDistrictId,
   type HoloSelection,
+  type LandmarkModel,
 } from "./aurenfurt-districts";
 import { resolveBuildingUv, type BuildingPositions } from "./aurenfurt-building-positions";
 import { resolveLandmarkScale, type LandmarkScales } from "./aurenfurt-landmark-scales";
@@ -32,8 +33,7 @@ import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
 import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
 import type { SectorCrimeCell } from "./aurenfurt-crime-heatmap";
-import { HoloDecorationSlot } from "./scene/HoloDecorationLayer";
-import { useAurenfurtDeco } from "./AurenfurtDecoProvider";
+import { HoloLandmarkInstances, type LandmarkInstanceItem } from "./scene/HoloLandmarkInstances";
 
 type Props = {
   selection: HoloSelection | null;
@@ -166,17 +166,34 @@ export function CityModel({
   onDragActive,
 }: Props) {
   const floating = useRef<Group>(null);
-  const deco = useAurenfurtDeco();
   const editMode = editorTool !== null;
   useHoloFloat(floating, editMode ? 0 : 0.055);
 
   const placingSomething = placingBuilding || placingPoi;
-  const mapLocked = drawingStreet || drawingWall || placingSomething || deco.placingKey !== null;
+  const mapLocked = drawingStreet || drawingWall || placingSomething;
   const showDistrictHandles = Boolean(
     editorTool === "districts" && editingDistrictId && !placingSomething,
   );
   const buildingsEditable = editorTool === "buildings" && !placingSomething;
   const streetsEditMode = editorTool === "streets";
+  const landmarkBuckets = new Map<LandmarkModel, LandmarkInstanceItem[]>();
+  for (const building of buildings) {
+    if (!building.landmark) continue;
+    const uv = resolveBuildingUv(building, buildingPositions);
+    const item: LandmarkInstanceItem = {
+      id: building.id,
+      u: uv.u,
+      v: uv.v,
+      scaleMultiplier: resolveLandmarkScale(building.id, landmarkScales),
+      rotationDegrees: resolveLandmarkRotation(building.id, landmarkRotations),
+      selected: sameSelection(selection, { type: "building", id: building.id }),
+    };
+    const bucket = landmarkBuckets.get(building.landmark);
+    if (bucket) bucket.push(item);
+    else landmarkBuckets.set(building.landmark, [item]);
+  }
+  const instancedLandmarks = [...landmarkBuckets.entries()].filter(([, items]) => items.length >= 2);
+  const instancedModels = new Set(instancedLandmarks.map(([model]) => model));
 
   return (
     <>
@@ -228,6 +245,17 @@ export function CityModel({
         ) : null}
         <CrimeHeatmapLayer cells={crimeCells} visible={crimeHeatmapVisible} />
         <group visible={buildingsVisible}>
+        {instancedLandmarks.map(([model, items]) => (
+          <HoloLandmarkInstances
+            key={model}
+            model={model}
+            items={items}
+            suppressSelect={suppressSelect || mapLocked}
+            editable={buildingsEditable}
+            onSelect={(id) => onSelect({ type: "building", id })}
+            onHover={(id) => onHover(id ? { type: "building", id } : null)}
+          />
+        ))}
         {buildings.map((building) => {
           const uv = resolveBuildingUv(building, buildingPositions);
           const polygon = polygons[building.districtId]?.points ?? [];
@@ -243,6 +271,7 @@ export function CityModel({
               suppressSelect={suppressSelect || mapLocked}
               editable={editable}
               outside={outside}
+              showLandmark={!building.landmark || !instancedModels.has(building.landmark)}
               landmarkScale={resolveLandmarkScale(building.id, landmarkScales)}
               landmarkRotation={resolveLandmarkRotation(building.id, landmarkRotations)}
               onSelect={(id) => onSelect({ type: "building", id })}
@@ -305,7 +334,6 @@ export function CityModel({
           onDragActive={onDragActive}
           layerVisible={wallsVisible}
         />
-        <HoloDecorationSlot onOrbitLock={onOrbitLock} onDragActive={onDragActive} />
         {weatherFx ? <HoloWeatherFx effect={weatherFx} intensity={weatherFxIntensity} /> : null}
       </group>
     </>

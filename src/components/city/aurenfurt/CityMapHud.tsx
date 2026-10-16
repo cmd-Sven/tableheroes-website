@@ -2,13 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, ScrollText, Trees } from "lucide-react";
+import { Menu, ScrollText } from "lucide-react";
 import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
-import { DekoElementeButton } from "./DekoElementeButton";
 import { HoloDayStrip } from "./HoloDayStrip";
 import { HoloWeatherControl } from "./HoloWeatherControl";
 import { MapLayerVisibilityBar } from "./MapLayerVisibilityBar";
-import { useAurenfurtDeco } from "./AurenfurtDecoProvider";
 import type { MapLayerId } from "./hooks/useMapLayerVisibility";
 import type { DayWeather } from "./aurenfurt-weather";
 import type { WeatherFxId, WeatherFxMode } from "./aurenfurt-weather-fx";
@@ -76,7 +74,6 @@ export function CityMapHud({
   crimeHeatmap,
   onToggleCrimeHeatmap,
 }: Props) {
-  const deco = useAurenfurtDeco();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,21 +180,6 @@ export function CityMapHud({
                     Stadtereignis
                   </button>
                 ) : null}
-                {deco.isGm ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    aria-pressed={deco.panelOpen}
-                    onClick={() => {
-                      deco.togglePanel();
-                      setMenuOpen(false);
-                    }}
-                    className={`${menuItem} ${deco.panelOpen ? "text-hero-vibrant" : ""}`}
-                  >
-                    <Trees className="h-4 w-4 shrink-0" aria-hidden />
-                    Deko Elemente
-                  </button>
-                ) : null}
                 <div className="border-t border-hero-dark">
                   <HoloWeatherControl
                     enabled={weatherEnabled}
@@ -209,7 +191,6 @@ export function CityMapHud({
               </motion.div>
             ) : null}
           </AnimatePresence>
-          <DekoElementeButton />
         </div>
       </header>
       <div

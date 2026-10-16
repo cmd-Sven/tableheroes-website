@@ -9,7 +9,6 @@ import type { CitySurface } from "./CityViewSwitch";
 import { DistrictEditorPanel } from "./DistrictEditorPanel";
 import { WallEditorPanel } from "./WallEditorPanel";
 import { MapEditorToolbar } from "./MapEditorToolbar";
-import { AurenfurtDecoProvider } from "./AurenfurtDecoProvider";
 import { CityMapHud } from "./CityMapHud";
 import { CityEventWizard } from "./CityEventWizard";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
@@ -973,7 +972,6 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   };
 
   return (
-    <AurenfurtDecoProvider worldId={resolvedWorldId} isGm={isGm}>
     <div className="fixed inset-0 z-[80] flex bg-[#02080c]">
       <HoloCityRail
         selection={view.selection}
@@ -1177,6 +1175,5 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
 
       {editorControls}
     </div>
-    </AurenfurtDecoProvider>
   );
 }

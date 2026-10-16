@@ -221,8 +221,16 @@ export default function HoloCityCanvas({
       >
         <Canvas
           camera={{ position: [0.2, 3.5, 5.25], fov: 34, near: 0.1, far: 40 }}
-          dpr={[1, 1.5]}
-          gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+          // Schweben, Autorotation, Wetter und der Heatmap-Fade hängen an useFrame.
+          frameloop="always"
+          shadows={false}
+          dpr={[1, 1.25]}
+          gl={{
+            antialias: false,
+            alpha: false,
+            stencil: false,
+            powerPreference: "high-performance",
+          }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
           onPointerMissed={() => {
             if (dragActiveRef.current || drawingStreet || drawingWall || placingSomething) return;

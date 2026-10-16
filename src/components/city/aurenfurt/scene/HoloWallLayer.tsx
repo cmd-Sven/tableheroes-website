@@ -449,14 +449,13 @@ export function HoloWallLayer({
   layerVisible = true,
 }: Props) {
   const texture = useTexture(WALL_TEXTURE_URL);
-  const gl = useThree((state) => state.gl);
   useLayoutEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.anisotropy = gl.capabilities.getMaxAnisotropy();
+    texture.anisotropy = 4;
     texture.needsUpdate = true;
-  }, [gl, texture]);
+  }, [texture]);
 
   return (
     <group visible={layerVisible}>

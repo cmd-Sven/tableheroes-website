@@ -5,6 +5,8 @@ import { useGLTF } from "@react-three/drei";
 import { Box3, Matrix4, Vector3, type Mesh, type Object3D } from "three";
 import type { LandmarkModel } from "../aurenfurt-districts";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
+import { disposeCloneKeepSource } from "./dispose-cloned-gltf";
+import { HeavyGlbSlot } from "./HeavyGlbSlot";
 
 export const LANDMARK_URL: Record<LandmarkModel, string> = {
   wirtshaus: "/models/aurenfurt/wirtshaus.glb",
@@ -20,6 +22,13 @@ export const LANDMARK_URL: Record<LandmarkModel, string> = {
 
 /** Fußabdruck auf der Tafel, in Welteinheiten. Die Stadt selbst ist etwa vier Einheiten breit. */
 export const LANDMARK_WIDTH = 0.3;
+
+export type LandmarkBounds = {
+  span: number;
+  centerX: number;
+  minY: number;
+  centerZ: number;
+};
 
 /** Hüllbox im lokalen Raum des Modells, ohne Kartenposition und ohne Drehgruppe. */
 function boundsInObjectSpace(root: Object3D): Box3 {
@@ -47,6 +56,19 @@ function boundsInObjectSpace(root: Object3D): Box3 {
   return box;
 }
 
+export function measureLandmarkBounds(root: Object3D): LandmarkBounds | null {
+  const box = boundsInObjectSpace(root);
+  if (box.isEmpty()) return null;
+  const size = box.getSize(new Vector3());
+  const center = box.getCenter(new Vector3());
+  return {
+    span: Math.max(size.x, size.z, 0.001),
+    centerX: center.x,
+    minY: box.min.y,
+    centerZ: center.z,
+  };
+}
+
 type Props = {
   model: LandmarkModel;
   /** Multiplikator auf LANDMARK_WIDTH (Default 1). */
@@ -61,6 +83,26 @@ export function HoloLandmarkMesh({
   rotationDegrees = 0,
 }: Props) {
   const url = LANDMARK_URL[model];
+  return (
+    <HeavyGlbSlot url={url}>
+      <HoloLandmarkBody
+        url={url}
+        scaleMultiplier={scaleMultiplier}
+        rotationDegrees={rotationDegrees}
+      />
+    </HeavyGlbSlot>
+  );
+}
+
+function HoloLandmarkBody({
+  url,
+  scaleMultiplier,
+  rotationDegrees,
+}: {
+  url: string;
+  scaleMultiplier: number;
+  rotationDegrees: number;
+}) {
   const { scene } = useGLTF(url);
   const object = useMemo(() => scene.clone(true), [scene]);
 
@@ -68,15 +110,14 @@ export function HoloLandmarkMesh({
     object.rotation.set(0, 0, 0);
     object.scale.set(1, 1, 1);
     object.position.set(0, 0, 0);
-    const box = boundsInObjectSpace(object);
-    if (box.isEmpty()) return;
-    const size = box.getSize(new Vector3());
-    const center = box.getCenter(new Vector3());
-    const span = Math.max(size.x, size.z, 0.001);
-    const scale = (LANDMARK_WIDTH * scaleMultiplier) / span;
+    const bounds = measureLandmarkBounds(object);
+    if (!bounds) return;
+    const scale = (LANDMARK_WIDTH * scaleMultiplier) / bounds.span;
     object.scale.setScalar(scale);
-    object.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+    object.position.set(-bounds.centerX * scale, -bounds.minY * scale, -bounds.centerZ * scale);
   }, [object, scaleMultiplier]);
+
+  useLayoutEffect(() => () => disposeCloneKeepSource(object, scene), [object, scene]);
 
   return (
     <group rotation={[0, (rotationDegrees * Math.PI) / 180, 0]}>
@@ -84,13 +125,3 @@ export function HoloLandmarkMesh({
     </group>
   );
 }
-
-useGLTF.preload(LANDMARK_URL.wirtshaus);
-useGLTF.preload(LANDMARK_URL.kraemer);
-useGLTF.preload(LANDMARK_URL.nordtor);
-useGLTF.preload(LANDMARK_URL.suedtor);
-useGLTF.preload(LANDMARK_URL.wachturm);
-useGLTF.preload(LANDMARK_URL.palais);
-useGLTF.preload(LANDMARK_URL.kapelle);
-useGLTF.preload(LANDMARK_URL.hofkanzlei);
-useGLTF.preload(LANDMARK_URL.observatorium);

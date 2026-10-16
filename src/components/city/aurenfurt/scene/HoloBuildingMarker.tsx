@@ -10,6 +10,9 @@ import { DIORAMA_DEPTH, DIORAMA_WIDTH, surfacePoint } from "./diorama-geometry";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
 import { HoloLandmarkMesh } from "./HoloLandmarkMesh";
 
+/** Auswahl vergrößert Ring und Modell um denselben Faktor. */
+export const BUILDING_SELECTED_SCALE = 1.18;
+
 type Props = {
   building: CityBuilding;
   /** Effektive UV (Code-Default oder Override). */
@@ -21,6 +24,8 @@ type Props = {
   editable: boolean;
   /** Liegt außerhalb des aktuellen Viertel-Polygons. */
   outside: boolean;
+  /** false, wenn das Modell als Instanz außerhalb dieser Gruppe steht. */
+  showLandmark?: boolean;
   /** Multiplikator für 3D-Landmark auf der Karte. */
   landmarkScale?: number;
   /** Drehung der 3D-Landmark um die Hochachse, in Grad. */
@@ -41,6 +46,7 @@ export function HoloBuildingMarker({
   suppressSelect,
   editable,
   outside,
+  showLandmark = true,
   landmarkScale = LANDMARK_SCALE_DEFAULT,
   landmarkRotation = 0,
   onSelect,
@@ -75,7 +81,7 @@ export function HoloBuildingMarker({
   return (
     <group
       position={position}
-      scale={selected ? 1.18 : 1}
+      scale={selected ? BUILDING_SELECTED_SCALE : 1}
       onClick={suppressSelect ? undefined : select}
       onPointerOver={suppressSelect ? undefined : over}
       onPointerOut={suppressSelect ? undefined : out}
@@ -89,13 +95,13 @@ export function HoloBuildingMarker({
           side={DoubleSide}
         />
       </mesh>
-      {building.landmark ? (
+      {building.landmark && showLandmark ? (
         <HoloLandmarkMesh
           model={building.landmark}
           scaleMultiplier={landmarkScale}
           rotationDegrees={landmarkRotation}
         />
-      ) : (
+      ) : building.landmark ? null : (
         <>
           <BuildingShape kind={building.kind} selected={selected} />
           <mesh position={[0, 0.36, 0]}>

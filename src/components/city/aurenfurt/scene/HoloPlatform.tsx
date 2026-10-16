@@ -2,7 +2,6 @@
 
 import { useLayoutEffect, useMemo } from "react";
 import { useTexture } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   DIORAMA_DEPTH,
@@ -20,13 +19,12 @@ type Props = {
 export function HoloPlatform({ onClear, interactive = true }: Props) {
   const geometry = useMemo(() => createDomedCityGeometry(), []);
   const texture = useTexture("/images/cities/aurenfurt.jpg?v=detail-20261001");
-  const gl = useThree((state) => state.gl);
 
   useLayoutEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = gl.capabilities.getMaxAnisotropy();
+    texture.anisotropy = 4;
     texture.needsUpdate = true;
-  }, [gl, texture]);
+  }, [texture]);
 
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
 
