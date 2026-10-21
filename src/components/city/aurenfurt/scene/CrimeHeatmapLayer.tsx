@@ -39,6 +39,10 @@ function buildHeatGeometry(cells: SectorCrimeCell[]) {
     piece.dispose();
   }
 
+  if (positions.length < 9 || indices.length < 3) {
+    return new THREE.BufferGeometry();
+  }
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("tint", new THREE.Float32BufferAttribute(tints, 3));
@@ -91,7 +95,13 @@ export function CrimeHeatmapLayer({ cells, visible }: Props) {
     hideOnce.current = false;
   });
 
-  if (!present || drawn.length === 0) return null;
+  const hasMesh =
+    Boolean(geometry.getAttribute("position")) &&
+    (geometry.getAttribute("position")?.count ?? 0) >= 3 &&
+    Boolean(geometry.getIndex()) &&
+    (geometry.getIndex()?.count ?? 0) >= 3;
+
+  if (!present || drawn.length === 0 || !hasMesh) return null;
 
   return (
     <mesh geometry={geometry} position={[0, 0.02, 0]} renderOrder={3} raycast={() => undefined}>

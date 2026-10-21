@@ -63,15 +63,27 @@ export function DistrictSectorOverlay({
     const positions: number[] = [];
     for (const sector of sectors) {
       const pts = sector.polygon;
-      if (pts.length < 2) continue;
+      if (!Array.isArray(pts) || pts.length < 2) continue;
       for (let i = 0; i < pts.length; i += 1) {
         const a = pts[i];
         const b = pts[(i + 1) % pts.length];
+        if (
+          !a ||
+          !b ||
+          !Number.isFinite(a.u) ||
+          !Number.isFinite(a.v) ||
+          !Number.isFinite(b.u) ||
+          !Number.isFinite(b.v)
+        ) {
+          continue;
+        }
         const wa = surfacePoint(a.u, a.v);
         const wb = surfacePoint(b.u, b.v);
         positions.push(wa.x, wa.y + 0.055, wa.z, wb.x, wb.y + 0.055, wb.z);
       }
     }
+
+    if (positions.length < 6) return null;
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -89,6 +101,7 @@ export function DistrictSectorOverlay({
 
   useEffect(
     () => () => {
+      if (!lineObject) return;
       lineObject.geometry.dispose();
       if (Array.isArray(lineObject.material)) {
         lineObject.material.forEach((m) => m.dispose());
@@ -104,19 +117,29 @@ export function DistrictSectorOverlay({
   return (
     <group>
       {pickable && onPick
-        ? sectors.map((sector) => (
-            <SectorHit
-              key={sector.id}
-              sector={sector}
-              selected={selectedIds.includes(sector.id)}
-              onPick={onPick}
-            />
-          ))
+        ? sectors.map((sector) =>
+            Array.isArray(sector.polygon) && sector.polygon.length >= 3 ? (
+              <SectorHit
+                key={sector.id}
+                sector={sector}
+                selected={selectedIds.includes(sector.id)}
+                onPick={onPick}
+              />
+            ) : null,
+          )
         : null}
-      <primitive object={lineObject} />
+      {lineObject ? <primitive object={lineObject} /> : null}
       {!preview
         ? sectors.map((sector) => {
-            const world = surfacePoint(sector.centroid.u, sector.centroid.v);
+            const centroid = sector.centroid;
+            if (
+              !centroid ||
+              !Number.isFinite(centroid.u) ||
+              !Number.isFinite(centroid.v)
+            ) {
+              return null;
+            }
+            const world = surfacePoint(centroid.u, centroid.v);
             return (
               <Html
                 key={sector.id}

@@ -95,21 +95,33 @@ export function createPolygonDistrictGeometry(points: UvPoint[]) {
   const lift = 0.045;
   const positions: number[] = [];
   for (const point of points) {
+    if (!Number.isFinite(point.u) || !Number.isFinite(point.v)) {
+      return new THREE.BufferGeometry();
+    }
     pushSurface(positions, point.u, point.v, lift);
   }
 
-  const contour = points.map((point) => new THREE.Vector2(point.u, point.v));
-  const faces = THREE.ShapeUtils.triangulateShape(contour, []);
-  const indices: number[] = [];
-  for (const face of faces) {
-    indices.push(face[0], face[1], face[2]);
-  }
+  try {
+    const contour = points.map((point) => new THREE.Vector2(point.u, point.v));
+    const faces = THREE.ShapeUtils.triangulateShape(contour, []);
+    const indices: number[] = [];
+    for (const face of faces) {
+      if (!face || face.length < 3) continue;
+      indices.push(face[0], face[1], face[2]);
+    }
+    if (indices.length === 0) {
+      return new THREE.BufferGeometry();
+    }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  } catch (error) {
+    console.warn("[HoloCity] Polygon konnte nicht trianguliert werden:", error);
+    return new THREE.BufferGeometry();
+  }
 }
 
 export function polygonAnchor(points: UvPoint[]) {

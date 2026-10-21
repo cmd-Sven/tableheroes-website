@@ -83,21 +83,53 @@ type Props = {
   onSelectStreet: (streetId: string | null) => void;
 };
 
-type BoundaryProps = { children: ReactNode };
-type BoundaryState = { failed: boolean };
+type BoundaryProps = { children: ReactNode; onRetry?: () => void };
+type BoundaryState = { failed: boolean; message: string | null; webglLikely: boolean };
+
+function isLikelyWebGlFailure(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error ?? "");
+  return /webgl|WebGL|WEBGL|getContext|GPU|graphics context/i.test(text);
+}
 
 class HoloCityErrorBoundary extends Component<BoundaryProps, BoundaryState> {
-  state: BoundaryState = { failed: false };
+  state: BoundaryState = { failed: false, message: null, webglLikely: false };
 
-  static getDerivedStateFromError(): BoundaryState {
-    return { failed: true };
+  static getDerivedStateFromError(error: unknown): BoundaryState {
+    const message = error instanceof Error ? error.message : String(error ?? "Unbekannter Fehler");
+    return {
+      failed: true,
+      message,
+      webglLikely: isLikelyWebGlFailure(error),
+    };
+  }
+
+  componentDidCatch(error: unknown, info: { componentStack?: string | null }) {
+    console.error("[HoloCity] Diorama-Renderfehler:", error, info?.componentStack);
   }
 
   render() {
     if (this.state.failed) {
       return (
-        <div className="flex h-full items-center justify-center px-6 text-center font-libre text-sm text-gray-300">
-          Das Diorama konnte nicht geladen werden. WebGL ist in diesem Browser nicht verfügbar.
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="font-libre text-sm text-gray-300">
+            {this.state.webglLikely
+              ? "Das Diorama konnte nicht geladen werden. WebGL ist in diesem Browser nicht verfügbar oder wurde blockiert."
+              : "Das Diorama konnte nicht geladen werden. Der 3D-Aufbau ist fehlgeschlagen."}
+          </p>
+          {this.state.message ? (
+            <p className="max-w-md font-libre text-xs text-gray-500 break-words">
+              {this.state.message}
+            </p>
+          ) : null}
+          {this.props.onRetry ? (
+            <button
+              type="button"
+              onClick={this.props.onRetry}
+              className="rounded border border-hero-border/60 bg-background-dark/80 px-3 py-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold hover:border-accent-gold"
+            >
+              Erneut versuchen
+            </button>
+          ) : null}
         </div>
       );
     }
@@ -178,6 +210,7 @@ export default function HoloCityCanvas({
 }: Props) {
   const [orbitLocked, setOrbitLocked] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [canvasKey, setCanvasKey] = useState(0);
   const dragActiveRef = useRef(false);
   const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placingSomething = placingBuilding || placingPoi;
@@ -211,7 +244,7 @@ export default function HoloCityCanvas({
   }
 
   return (
-    <HoloCityErrorBoundary>
+    <HoloCityErrorBoundary key={canvasKey} onRetry={() => setCanvasKey((value) => value + 1)}>
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center font-barlow text-xs font-bold uppercase tracking-wide text-cyan-100/80">
@@ -230,6 +263,7 @@ export default function HoloCityCanvas({
             alpha: false,
             stencil: false,
             powerPreference: "high-performance",
+            failIfMajorPerformanceCaveat: false,
           }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
           onPointerMissed={() => {
