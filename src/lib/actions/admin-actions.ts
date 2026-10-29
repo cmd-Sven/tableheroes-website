@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient, createAdminClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getMaintenanceStatus } from "@/src/lib/queries/admin-queries";
+import { notifyProfileMessageEmail } from "@/src/lib/email/dispatch";
 
 const SITE_SETTINGS_KEY_MAINTENANCE = "maintenance_mode";
 
@@ -338,5 +340,89 @@ export async function deleteUser(userId: string): Promise<{
 
   revalidatePath("/dashboard/admin/users");
   revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
+
+export type SendAdminMessageInput = {
+  recipientUserId: string;
+  subject: string;
+  content: string;
+  priority?: "normal" | "high";
+};
+
+/**
+ * Admin → einzelnes Mitglied: Direktnachricht in `messages` + E-Mail-Hinweis.
+ * Erscheint im Dashboard-Widget „Nachrichten“.
+ */
+export async function sendAdminMessageToUser(
+  input: SendAdminMessageInput,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Nicht angemeldet." };
+
+  const { data: profile } = await (supabase.from("users") as any)
+    .select("primary_role")
+    .eq("id", user.id)
+    .single();
+  if ((profile as { primary_role?: string } | null)?.primary_role !== "Admin") {
+    return { success: false, error: "Nur Admins können Plattform-Nachrichten senden." };
+  }
+
+  const subject = input.subject?.trim() ?? "";
+  const content = input.content?.trim() ?? "";
+  if (!subject) return { success: false, error: "Bitte gib einen Betreff ein." };
+  if (!content) return { success: false, error: "Bitte gib eine Nachricht ein." };
+  if (!input.recipientUserId?.trim()) {
+    return { success: false, error: "Kein Empfänger angegeben." };
+  }
+
+  const admin = createAdminClient();
+  const { data: recipient } = await (admin.from("users") as any)
+    .select("id, status")
+    .eq("id", input.recipientUserId)
+    .maybeSingle();
+  if (!recipient) return { success: false, error: "Empfänger nicht gefunden." };
+
+  const priority = input.priority === "high" ? "high" : "normal";
+  const { data: inserted, error } = await (admin.from("messages") as any)
+    .insert({
+      sender_id: user.id,
+      recipient_id: input.recipientUserId,
+      campaign_id: null,
+      subject,
+      content,
+      type: "direct",
+      priority,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[sendAdminMessageToUser]", error);
+    return {
+      success: false,
+      error: error.message ?? "Nachricht konnte nicht gesendet werden.",
+    };
+  }
+
+  const messageId = String((inserted as { id?: string } | null)?.id ?? "");
+  if (messageId) {
+    after(async () => {
+      await notifyProfileMessageEmail({
+        supabase: createAdminClient(),
+        recipientUserId: input.recipientUserId,
+        messageId,
+        subject,
+        source: "admin",
+      });
+    });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/messages");
+  revalidatePath("/dashboard/admin/users");
   return { success: true };
 }

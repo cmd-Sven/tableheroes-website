@@ -7,6 +7,7 @@ import {
   rejectUser,
   deleteUser,
   setUserPending,
+  sendAdminMessageToUser,
 } from "@/src/lib/actions/admin-actions";
 import {
   Check,
@@ -19,6 +20,7 @@ import {
   Swords,
   Star,
   Medal,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -181,10 +183,145 @@ function OnboardingDetailModal({
   );
 }
 
+function AdminMessageModal({
+  user,
+  onClose,
+  onSent,
+}: {
+  user: UserRow;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [subject, setSubject] = React.useState("");
+  const [content, setContent] = React.useState("");
+  const [priority, setPriority] = React.useState<"normal" | "high">("normal");
+  const [sending, setSending] = React.useState(false);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    const res = await sendAdminMessageToUser({
+      recipientUserId: user.id,
+      subject,
+      content,
+      priority,
+    });
+    setSending(false);
+    if (res.success) {
+      toast.success("Nachricht gesendet. Der Nutzer sieht sie im Dashboard.");
+      onSent();
+      onClose();
+    } else {
+      toast.error(res.error ?? "Senden fehlgeschlagen.");
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg border border-hero-border bg-background-card p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="font-barlow text-xl font-bold uppercase text-white">
+            Nachricht an {user.username || user.email || "Mitglied"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-hero-dark hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-4 font-libre text-sm text-gray-400">
+          Die Nachricht erscheint im Dashboard-Widget „Nachrichten“. Zusätzlich geht eine
+          E-Mail-Benachrichtigung an {user.email || "die hinterlegte Adresse"}.
+        </p>
+        <form onSubmit={handleSend} className="space-y-4">
+          <div>
+            <label
+              htmlFor="admin-msg-subject"
+              className="mb-1 block font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold"
+            >
+              Betreff
+            </label>
+            <input
+              id="admin-msg-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              required
+              maxLength={120}
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+              placeholder="Kurzer Betreff"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="admin-msg-content"
+              className="mb-1 block font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold"
+            >
+              Nachricht
+            </label>
+            <textarea
+              id="admin-msg-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              required
+              rows={6}
+              maxLength={4000}
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 font-libre text-sm text-white outline-none focus:border-hero-vibrant"
+              placeholder="Deine Nachricht an das Mitglied…"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="admin-msg-priority"
+              className="mb-1 block font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold"
+            >
+              Priorität
+            </label>
+            <select
+              id="admin-msg-priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value === "high" ? "high" : "normal")}
+              className="w-full rounded border border-hero-dark bg-slate-900 p-2 text-white outline-none focus:border-hero-vibrant"
+            >
+              <option value="normal">Normal</option>
+              <option value="high">Hoch</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded border border-hero-border bg-background-dark px-4 py-2 font-barlow text-sm font-bold uppercase text-gray-300 hover:bg-hero-dark"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={sending}
+              className="inline-flex items-center gap-2 rounded border border-hero-vibrant bg-hero-vibrant/20 px-4 py-2 font-barlow text-sm font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/30 disabled:opacity-50"
+            >
+              <Mail className="h-4 w-4" />
+              {sending ? "Wird gesendet…" : "Senden"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
   const router = useRouter();
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
   const [detailUser, setDetailUser] = React.useState<UserRow | null>(null);
+  const [messageUser, setMessageUser] = React.useState<UserRow | null>(null);
 
   async function handleApprove(id: string) {
     setLoadingId(id);
@@ -446,7 +583,15 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMessageUser(u)}
+                          className="inline-flex items-center gap-1 rounded border border-hero-vibrant bg-hero-vibrant/15 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-hero-vibrant hover:bg-hero-vibrant/25"
+                        >
+                          <Mail className="h-4 w-4" />
+                          Nachricht
+                        </button>
                         <button
                           type="button"
                           onClick={async () => {
@@ -461,7 +606,7 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                             }
                           }}
                           disabled={loadingId === u.id}
-                          className="inline-flex items-center gap-1 rounded border border-amber-500 bg-amber-900/30 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-amber-300 hover:bg-amber-900/50 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded border border-amber-500 bg-amber-900/30 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-amber-300 hover:bg-amber-900/50 disabled:opacity-50"
                         >
                           <X className="h-4 w-4" />
                           Sperren
@@ -469,7 +614,7 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
                         <button
                           type="button"
                           onClick={() => handleDelete(u.id)}
-                          className="inline-flex items-center gap-1 rounded border border-red-800 bg-red-950/30 px-3 py-1.5 font-barlow font-bold text-xs uppercase text-red-400 hover:bg-red-950/50"
+                          className="inline-flex items-center gap-1 rounded border border-red-800 bg-red-950/30 px-3 py-1.5 font-barlow text-xs font-bold uppercase text-red-400 hover:bg-red-950/50"
                         >
                           <Trash2 className="h-4 w-4" />
                           Löschen
@@ -491,6 +636,14 @@ export function AdminUsersClient({ pendingUsers, approvedUsers }: Props) {
           onClose={() => setDetailUser(null)}
         />
       )}
+
+      {messageUser ? (
+        <AdminMessageModal
+          user={messageUser}
+          onClose={() => setMessageUser(null)}
+          onSent={() => router.refresh()}
+        />
+      ) : null}
     </div>
   );
 }

@@ -97,18 +97,24 @@ export async function notifyProfileMessageEmail(args: {
   recipientUserId: string;
   messageId: string;
   subject: string;
+  /** Admin-Nachrichten nutzen Dashboard-Formulierung statt SL-Text. */
+  source?: "gm" | "admin";
 }): Promise<void> {
+  const fromAdmin = args.source === "admin";
   const result = await sendIfAllowed({
     supabase: args.supabase,
     userId: args.recipientUserId,
     kind: "profile_messages",
     referenceKey: `message:${args.messageId}`,
-    subject: `Neue Nachricht: ${args.subject}`,
-    title: "Neue Nachricht in deinem Profil",
-    intro:
-      "Dein Spielleiter hat dir eine neue Nachricht hinterlassen. Schau in deinem Posteingang nach, was es Neues gibt.",
-    ctaLabel: "Nachrichten öffnen",
-    ctaUrl: `${SITE_URL()}/dashboard/messages`,
+    subject: fromAdmin
+      ? "Du hast eine neue Nachricht auf deinem Dashboard"
+      : `Neue Nachricht: ${args.subject}`,
+    title: fromAdmin ? "Neue Nachricht auf deinem Dashboard" : "Neue Nachricht in deinem Profil",
+    intro: fromAdmin
+      ? "Du hast eine neue Nachricht auf deinem Dashboard. Öffne den Posteingang, um sie zu lesen."
+      : "Dein Spielleiter hat dir eine neue Nachricht hinterlassen. Schau in deinem Posteingang nach, was es Neues gibt.",
+    ctaLabel: fromAdmin ? "Zum Dashboard" : "Nachrichten öffnen",
+    ctaUrl: fromAdmin ? `${SITE_URL()}/dashboard` : `${SITE_URL()}/dashboard/messages`,
   });
 
   if (result.error) {
