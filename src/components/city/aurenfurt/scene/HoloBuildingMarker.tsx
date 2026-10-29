@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
-import { DoubleSide } from "three";
 import type { BuildingKind, CityBuilding } from "../aurenfurt-districts";
 import { worldXZToUv, type UvPoint } from "../aurenfurt-district-polygons";
 import { DIORAMA_DEPTH, DIORAMA_WIDTH, surfacePoint } from "./diorama-geometry";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
 import { HoloLandmarkMesh } from "./HoloLandmarkMesh";
 
-/** Auswahl vergrößert Ring und Modell um denselben Faktor. */
+/** Auswahl vergrößert das Modell leicht. */
 export const BUILDING_SELECTED_SCALE = 1.18;
 
 type Props = {
@@ -58,6 +57,8 @@ export function HoloBuildingMarker({
 }: Props) {
   const suppressRef = useRef(suppressSelect);
   suppressRef.current = suppressSelect;
+  const [hot, setHot] = useState(false);
+  const lit = selected || hot;
 
   const position = useMemo(() => surfacePoint(u, v), [u, v]);
 
@@ -70,53 +71,37 @@ export function HoloBuildingMarker({
   function over(event: ThreeEvent<PointerEvent>) {
     event.stopPropagation();
     document.body.style.cursor = editable ? "default" : "pointer";
+    setHot(true);
     onHover(building.id);
   }
 
   function out() {
     document.body.style.cursor = "";
+    setHot(false);
     onHover(null);
   }
+
+  // Landmark als Instanz: Treffer laufen über HoloLandmarkInstances — keine Extra-Hitbox hier.
+  const localVisual = Boolean(building.landmark ? showLandmark : true);
+  const needsHitProxy = localVisual && !building.landmark;
 
   return (
     <group
       position={position}
       scale={selected ? BUILDING_SELECTED_SCALE : 1}
-      onClick={suppressSelect ? undefined : select}
-      onPointerOver={suppressSelect ? undefined : over}
-      onPointerOut={suppressSelect ? undefined : out}
+      onClick={suppressSelect || !localVisual ? undefined : select}
+      onPointerOver={suppressSelect || !localVisual ? undefined : over}
+      onPointerOut={suppressSelect || !localVisual ? undefined : out}
     >
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <ringGeometry args={building.landmark ? [0.18, 0.24] : [0.07, 0.11]} />
-        <meshBasicMaterial
-          color={selected ? "#ffe7a3" : outside ? "#ef4444" : "#9af6ff"}
-          transparent
-          opacity={0.9}
-          side={DoubleSide}
-        />
-      </mesh>
       {building.landmark && showLandmark ? (
         <HoloLandmarkMesh
           model={building.landmark}
           scaleMultiplier={landmarkScale}
           rotationDegrees={landmarkRotation}
+          lit={lit}
         />
       ) : building.landmark ? null : (
-        <>
-          <BuildingShape kind={building.kind} selected={selected} />
-          <mesh position={[0, 0.36, 0]}>
-            <cylinderGeometry args={[0.012, 0.012, selected ? 0.58 : 0.4, 6]} />
-            <meshBasicMaterial
-              color={selected ? "#ffe7a3" : outside ? "#ef4444" : "#9af6ff"}
-              transparent
-              opacity={0.92}
-            />
-          </mesh>
-          <mesh position={[0, selected ? 0.66 : 0.56, 0]}>
-            <sphereGeometry args={[0.034, 10, 10]} />
-            <meshBasicMaterial color={selected ? "#fff4c8" : outside ? "#fecaca" : "#e9fdff"} />
-          </mesh>
-        </>
+        <BuildingShape kind={building.kind} lit={lit} outside={outside} />
       )}
       {outside ? (
         <group position={[0, building.landmark ? 0.55 : 0.82, 0]} renderOrder={6}>
@@ -140,10 +125,12 @@ export function HoloBuildingMarker({
           onDragActive={onDragActive}
         />
       ) : null}
-      <mesh visible={false} position={[0, 0.32, 0]}>
-        <sphereGeometry args={[0.36, 10, 10]} />
-        <meshBasicMaterial />
-      </mesh>
+      {needsHitProxy ? (
+        <mesh visible={false} position={[0, 0.08, 0]}>
+          <sphereGeometry args={[0.12, 10, 10]} />
+          <meshBasicMaterial />
+        </mesh>
+      ) : null}
     </group>
   );
 }
@@ -251,11 +238,11 @@ function BuildingDragHandle({
 
 function Solid({
   color,
-  selected,
+  lit,
   metalness = 0.25,
 }: {
   color: string;
-  selected: boolean;
+  lit: boolean;
   metalness?: number;
 }) {
   return (
@@ -263,23 +250,30 @@ function Solid({
       color={color}
       roughness={0.4}
       metalness={metalness}
-      emissive={selected ? "#ffe7a0" : color}
-      emissiveIntensity={selected ? 0.4 : 0.12}
+      emissive={lit ? "#fff4c8" : color}
+      emissiveIntensity={lit ? 0.45 : 0.08}
     />
   );
 }
 
-function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boolean }) {
+function BuildingShape({
+  kind,
+  lit,
+}: {
+  kind: BuildingKind;
+  lit: boolean;
+  outside?: boolean;
+}) {
   if (kind === "palace") {
     return (
       <group>
         <mesh position={[0, 0.05, 0]}>
           <cylinderGeometry args={[0.13, 0.15, 0.08, 8]} />
-          <Solid color="#d9d3c4" selected={selected} />
+          <Solid color="#d9d3c4" lit={lit} />
         </mesh>
         <mesh position={[0, 0.14, 0]}>
           <sphereGeometry args={[0.11, 18, 14]} />
-          <Solid color="#f0d15a" selected={selected} metalness={0.7} />
+          <Solid color="#f0d15a" lit={lit} metalness={0.7} />
         </mesh>
       </group>
     );
@@ -290,11 +284,11 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
       <group>
         <mesh position={[0, 0.04, 0]}>
           <cylinderGeometry args={[0.09, 0.1, 0.06, 8]} />
-          <Solid color="#efe6cf" selected={selected} />
+          <Solid color="#efe6cf" lit={lit} />
         </mesh>
         <mesh position={[0, 0.11, 0]}>
           <sphereGeometry args={[0.075, 16, 12]} />
-          <Solid color="#e6c14a" selected={selected} metalness={0.65} />
+          <Solid color="#e6c14a" lit={lit} metalness={0.65} />
         </mesh>
       </group>
     );
@@ -305,15 +299,15 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
       <group>
         <mesh position={[-0.07, 0.08, 0]}>
           <boxGeometry args={[0.045, 0.16, 0.05]} />
-          <Solid color="#d5dbe3" selected={selected} metalness={0.15} />
+          <Solid color="#d5dbe3" lit={lit} metalness={0.15} />
         </mesh>
         <mesh position={[0.07, 0.08, 0]}>
           <boxGeometry args={[0.045, 0.16, 0.05]} />
-          <Solid color="#d5dbe3" selected={selected} metalness={0.15} />
+          <Solid color="#d5dbe3" lit={lit} metalness={0.15} />
         </mesh>
         <mesh position={[0, 0.17, 0]}>
           <boxGeometry args={[0.2, 0.04, 0.06]} />
-          <Solid color="#d5dbe3" selected={selected} metalness={0.15} />
+          <Solid color="#d5dbe3" lit={lit} metalness={0.15} />
         </mesh>
       </group>
     );
@@ -324,7 +318,7 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
       <group>
         <mesh position={[0, 0.06, 0]}>
           <boxGeometry args={[0.16, 0.12, 0.12]} />
-          <Solid color="#8d5a3c" selected={selected} />
+          <Solid color="#8d5a3c" lit={lit} />
         </mesh>
         <mesh position={[0.05, 0.16, 0]}>
           <cylinderGeometry args={[0.025, 0.03, 0.12, 8]} />
@@ -339,11 +333,11 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
       <group>
         <mesh position={[0, 0.05, 0]}>
           <boxGeometry args={[0.14, 0.1, 0.12]} />
-          <Solid color="#e7d3b0" selected={selected} />
+          <Solid color="#e7d3b0" lit={lit} />
         </mesh>
         <mesh position={[0, 0.13, 0]} rotation={[0, Math.PI / 4, 0]}>
           <coneGeometry args={[0.12, 0.09, 4]} />
-          <Solid color="#8c3a32" selected={selected} metalness={0.1} />
+          <Solid color="#8c3a32" lit={lit} metalness={0.1} />
         </mesh>
       </group>
     );
@@ -355,7 +349,7 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
         {[-0.06, 0, 0.06].map((x, index) => (
           <mesh key={x} position={[x, 0.05, 0]}>
             <coneGeometry args={[0.045, 0.08, 4]} />
-            <Solid color={index === 1 ? "#d98a4a" : "#c4553a"} selected={selected} metalness={0.05} />
+            <Solid color={index === 1 ? "#d98a4a" : "#c4553a"} lit={lit} metalness={0.05} />
           </mesh>
         ))}
       </group>
@@ -366,7 +360,7 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
     return (
       <mesh position={[0, 0.04, 0]} scale={[1, 0.45, 1]}>
         <sphereGeometry args={[0.09, 14, 10]} />
-        <Solid color="#7dbe6a" selected={selected} metalness={0.05} />
+        <Solid color="#7dbe6a" lit={lit} metalness={0.05} />
       </mesh>
     );
   }
@@ -375,11 +369,11 @@ function BuildingShape({ kind, selected }: { kind: BuildingKind; selected: boole
     <group>
       <mesh position={[0, 0.07, 0]}>
         <boxGeometry args={[0.12, 0.14, 0.1]} />
-        <Solid color="#8eb4e8" selected={selected} />
+        <Solid color="#8eb4e8" lit={lit} />
       </mesh>
       <mesh position={[0, 0.16, 0]}>
         <coneGeometry args={[0.09, 0.07, 4]} />
-        <Solid color="#4d6e99" selected={selected} />
+        <Solid color="#4d6e99" lit={lit} />
       </mesh>
     </group>
   );

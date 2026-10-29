@@ -25,6 +25,9 @@ import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
+import { anyLocationInCitySimulation } from "@/src/components/city/aurenfurt/location-in-city-sim";
+import { citySimulationFromDb, refineCitySimulationPayload } from "@/src/lib/npcs/city-simulation";
+import { normalizeFactionIds, syncNpcFactionLinks } from "@/src/lib/npcs/npc-faction-links";
 
 export async function createNPC(formData: {
   campaign_id?: string;
@@ -34,6 +37,8 @@ export async function createNPC(formData: {
   description?: string;
   gm_notes?: string;
   faction_id?: string | null;
+  /** Volle Welt-Fraktionsliste. Erste ID wird zur primären faction_id. */
+  faction_ids?: string[] | null;
   current_location_id?: string | null;
   home_location_id?: string | null;
   race?: string;
@@ -125,6 +130,10 @@ export async function createNPC(formData: {
   const normalizedFactionId = formData.faction_id && formData.faction_id.trim() !== "" 
     ? formData.faction_id.trim() 
     : null;
+  const factionIdsForLinks = Array.isArray(formData.faction_ids)
+    ? normalizeFactionIds(formData.faction_ids)
+    : normalizeFactionIds([normalizedFactionId]);
+  const primaryFactionId = factionIdsForLinks[0] ?? null;
   const normalizedCurrentLocationId = formData.current_location_id && formData.current_location_id.trim() !== "" 
     ? formData.current_location_id.trim() 
     : null;
@@ -133,7 +142,7 @@ export async function createNPC(formData: {
     : null;
 
   console.log("🔍 [createNPC] Normalized IDs:", {
-    faction_id: normalizedFactionId,
+    faction_id: primaryFactionId,
     current_location_id: normalizedCurrentLocationId,
     home_location_id: normalizedHomeLocationId,
   });
@@ -246,6 +255,35 @@ export async function createNPC(formData: {
   const validatedCurrentLocationId = await validateLocation(normalizedCurrentLocationId, "current_location_id");
   const validatedHomeLocationId = await validateLocation(normalizedHomeLocationId, "home_location_id");
 
+  const placedInCitySimulation = await anyLocationInCitySimulation(supabase, [
+    validatedCurrentLocationId,
+    validatedHomeLocationId,
+  ]);
+  if (placedInCitySimulation) {
+    if (!formData.for_city_simulation) {
+      throw new Error(
+        "Dieser Ort gehört zur Stadtsimulation. Der NPC muss mit „für die Stadtsimulation“ angelegt werden.",
+      );
+    }
+    const citySimCheck = refineCitySimulationPayload(
+      citySimulationFromDb({
+        for_city_simulation: true,
+        city_influence_tier: formData.city_influence_tier ?? null,
+        city_axis_loyal_criminal: formData.city_axis_loyal_criminal ?? null,
+        city_axis_greedy_altruist: formData.city_axis_greedy_altruist ?? null,
+        city_axis_pious_skeptic: formData.city_axis_pious_skeptic ?? null,
+        city_axis_superstition_reason: formData.city_axis_superstition_reason ?? null,
+        city_deity: formData.city_deity ?? null,
+        city_faction_id: formData.city_faction_id ?? null,
+        city_agenda: formData.city_agenda ?? null,
+        city_event_deck: Array.isArray(formData.city_event_deck) ? formData.city_event_deck : [],
+        city_abilities: Array.isArray(formData.city_abilities) ? formData.city_abilities : [],
+        city_card_plays: Array.isArray(formData.city_card_plays) ? formData.city_card_plays : [],
+      } as Parameters<typeof citySimulationFromDb>[0]),
+    );
+    if (!citySimCheck.ok) throw new Error(citySimCheck.error);
+  }
+
   const imageUrl = (formData.image_url || "").trim();
   const portraitMeta = resolveNpcPortraitMetaForServer(user.id, {
     imageUrl,
@@ -270,7 +308,7 @@ export async function createNPC(formData: {
     title: formData.title || null,
     description: formData.description || null,
     gm_notes: formData.gm_notes || null,
-    faction_id: normalizedFactionId,
+    faction_id: primaryFactionId,
     current_location_id: validatedCurrentLocationId, // WICHTIG: Verwende die validierte ID
     home_location_id: validatedHomeLocationId, // WICHTIG: Verwende die validierte ID
     race: formData.race || null,
@@ -342,6 +380,8 @@ export async function createNPC(formData: {
     console.error("Create NPC Error:", error);
     throw new Error(error.message);
   }
+
+  await syncNpcFactionLinks(supabase, npc.id, factionIdsForLinks);
 
   // 7. Automatisches Secret erstellen, wenn is_secret_antagonist true ist oder secret_entry vorhanden ist
   if ((formData.is_secret_antagonist || formData.secret_entry) && npc.id) {

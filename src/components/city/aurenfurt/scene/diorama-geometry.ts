@@ -9,6 +9,9 @@ export const DIORAMA_WIDTH = 8.8;
 export const DIORAMA_DEPTH = DIORAMA_WIDTH * IMAGE_ASPECT;
 export const DOME_HEIGHT = 0.48;
 export const PLINTH_HEIGHT = 0.36;
+/** Viertel-/Sektor-Flächen über der gewölbten Kartenoptik (ca. +5px Sicht). */
+export const DISTRICT_SURFACE_LIFT = 0.08;
+export const DISTRICT_OUTLINE_LIFT = 0.105;
 
 /** Bildkoordinate (Ursprung oben links) auf die gewölbte Tafelfläche. */
 export function surfacePoint(u: number, v: number) {
@@ -47,7 +50,7 @@ export function createDistrictGeometry(start: number, end: number, inner: number
   const steps = Math.max(10, Math.round(span / 7));
   const positions: number[] = [];
   const indices: number[] = [];
-  const lift = 0.045;
+  const lift = DISTRICT_SURFACE_LIFT;
 
   if (inner <= 0.001) {
     const center = polarToImage(0, 0);
@@ -92,7 +95,7 @@ export function createPolygonDistrictGeometry(points: UvPoint[]) {
     return new THREE.BufferGeometry();
   }
 
-  const lift = 0.045;
+  const lift = DISTRICT_SURFACE_LIFT;
   const positions: number[] = [];
   for (const point of points) {
     if (!Number.isFinite(point.u) || !Number.isFinite(point.v)) {

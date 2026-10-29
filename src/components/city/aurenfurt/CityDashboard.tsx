@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { motion } from "framer-motion";
+import { Undo2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -8,6 +10,7 @@ import {
   Cell,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,6 +22,8 @@ import {
   RANGE_LABEL,
   buildCityAnalytics,
   deltaTone,
+  type AnalyticsEvent,
+  type AnalyticsPoint,
   type AnalyticsRange,
   type CityAnalytics,
   type DistrictRank,
@@ -40,8 +45,8 @@ const WEATHER_COLOR: Record<WeatherKind, string> = {
   heat: "#fb7185",
 };
 
-type ChartMetric = SimMeterKey | "tension";
-type LineKey = SimMeterKey | "tension";
+export type ChartMetric = SimMeterKey | "tension";
+export type LineKey = SimMeterKey | "tension";
 
 const LINE_OPTIONS: { key: LineKey; label: string; stroke: string }[] = [
   ...SIM_METERS.map((meter) => ({ key: meter.key, label: meter.label, stroke: meter.stroke })),
@@ -63,6 +68,13 @@ type Props = {
   onStepYear: (delta: number) => void;
   onGoToday: () => void;
   onShowMap: () => void;
+  onLeave: () => void;
+  range: AnalyticsRange;
+  setRange: Dispatch<SetStateAction<AnalyticsRange>>;
+  chartMetric: ChartMetric;
+  setChartMetric: Dispatch<SetStateAction<ChartMetric>>;
+  lines: LineKey[];
+  setLines: Dispatch<SetStateAction<LineKey[]>>;
 };
 
 export default function CityDashboard({
@@ -78,10 +90,14 @@ export default function CityDashboard({
   onStepYear,
   onGoToday,
   onShowMap,
+  onLeave,
+  range,
+  setRange,
+  chartMetric,
+  setChartMetric,
+  lines,
+  setLines,
 }: Props) {
-  const [range, setRange] = useState<AnalyticsRange>("month");
-  const [chartMetric, setChartMetric] = useState<ChartMetric>("economy");
-  const [lines, setLines] = useState<LineKey[]>(["economy", "crime", "guard", "tension"]);
   const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
 
   const report = useMemo(
@@ -98,17 +114,33 @@ export default function CityDashboard({
   );
 
   const valueKey = range === "day" ? "current" : "average";
+  const eventBands = useMemo(() => bandsFor(report.series, report.events), [report.series, report.events]);
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-background-dark text-gray-200">
       <CityHudChrome density="panel" />
-      <header className="relative z-10 flex flex-wrap items-center gap-3 border-b border-hero-dark/50 px-5 pb-3 pt-14">
-        <div className="min-w-0">
+      <header className="relative z-10 flex flex-wrap items-end gap-3 border-b border-hero-dark/50 px-5 pb-3 pt-4">
+        <CityViewSwitch
+          mode="dashboard"
+          onChange={(mode) => {
+            if (mode === "map") onShowMap();
+          }}
+        />
+        <div className="min-w-0 pb-2">
           <p className="font-cinzel text-sm font-bold text-accent-gold">Aurenfurt</p>
-          <h2 className="font-barlow text-xl font-extrabold uppercase tracking-wide text-hero-vibrant">Stadt-Dashboard</h2>
+          <h2 className="font-barlow text-xl font-extrabold uppercase tracking-wide text-hero-vibrant">
+            Stadt-Dashboard
+          </h2>
         </div>
-        <CityViewSwitch mode="dashboard" onChange={(mode) => (mode === "map" ? onShowMap() : undefined)} />
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 pb-2">
+          <button
+            type="button"
+            onClick={onLeave}
+            className="inline-flex items-center gap-1.5 border border-hero-dark bg-hero-dark px-3 py-2 font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold hover:bg-background-card"
+          >
+            <Undo2 className="h-4 w-4" aria-hidden />
+            Zurück zur Lore
+          </button>
           <div role="tablist" aria-label="Zeitraum" className="inline-flex rounded-md border border-hero-dark bg-background-dark p-0.5">
             {ANALYTICS_RANGES.map((id) => (
               <button
@@ -225,7 +257,19 @@ export default function CityDashboard({
                   <CartesianGrid stroke="#217d4233" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#d1d5db", fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 100]} tick={{ fill: "#d1d5db", fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
-                  <Tooltip content={<LineTooltip />} />
+                  {eventBands.map((band) => (
+                    <ReferenceArea
+                      key={`${band.x1}|${band.x2}`}
+                      x1={band.x1}
+                      x2={band.x2}
+                      fill="#217d42"
+                      fillOpacity={0.12}
+                      stroke="#cab926"
+                      strokeOpacity={0.2}
+                      ifOverflow="hidden"
+                    />
+                  ))}
+                  <Tooltip content={<LineTooltip />} isAnimationActive={false} />
                   {LINE_OPTIONS.filter((meter) => lines.includes(meter.key)).map((meter) => (
                     <Line
                       key={meter.key}
@@ -561,17 +605,83 @@ function districtBars(report: CityAnalytics, metric: ChartMetric) {
     }));
 }
 
-function LineTooltip({ active, payload, label }: { active?: boolean; payload?: TipRow[]; label?: string }) {
+const TIP_MONTHS = [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
+] as const;
+
+function germanDate(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day) return iso;
+  return `${day}. ${TIP_MONTHS[month - 1]} ${year}`;
+}
+
+function tipDate(point: AnalyticsPoint | undefined, label?: string) {
+  if (!point?.day) return label ?? "";
+  if (point.day === point.until) return germanDate(point.day);
+  return `${germanDate(point.day)} – ${germanDate(point.until)}`;
+}
+
+function bandsFor(series: AnalyticsPoint[], events: AnalyticsEvent[]) {
+  const bands = new Map<string, { x1: string; x2: string }>();
+  for (const event of events) {
+    if (!event.start || !event.end) continue;
+    const covered = series.filter((point) => point.day <= event.end! && point.until >= event.start!);
+    if (covered.length === 0) continue;
+    const x1 = covered[0].label;
+    const x2 = covered[covered.length - 1].label;
+    const key = `${x1}|${x2}`;
+    if (!bands.has(key)) bands.set(key, { x1, x2 });
+  }
+  return [...bands.values()];
+}
+
+function LineTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<TipRow & { payload?: AnalyticsPoint }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
+  const events = point?.events ?? [];
   return (
-    <div className="rounded-md border border-hero-dark bg-background-card px-3 py-2 shadow-lg">
-      <p className="font-barlow text-[11px] font-bold uppercase text-accent-gold">{label}</p>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="max-w-xs rounded-md border border-hero-dark bg-background-dark px-3 py-2 shadow-lg"
+    >
+      <p className="font-barlow text-[11px] font-bold uppercase text-accent-gold">{tipDate(point, label)}</p>
       {payload.map((row) => (
         <p key={String(row.dataKey)} className="font-libre text-xs text-gray-100">
           <span style={{ color: row.color }}>{row.name}</span> {row.value}
         </p>
       ))}
-    </div>
+      {events.length > 0 ? (
+        <div className="mt-2 border-t border-hero-dark/70 pt-1.5">
+          <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">Aktive Ereignisse</p>
+          {events.map((name) => (
+            <p key={name} className="font-libre text-xs leading-relaxed text-gray-200">
+              {name}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </motion.div>
   );
 }
 

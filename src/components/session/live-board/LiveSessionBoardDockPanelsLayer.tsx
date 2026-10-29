@@ -21,6 +21,8 @@ export function LiveSessionBoardDockPanelsLayer() {
       forcePlayerView,
       userId,
       partyCharacters,
+      sessionRsvpRoster,
+      setSessionRsvpRoster,
       allCampaignNpcs,
       allCampaignCreatures,
       stageDeckNpcIds,
@@ -350,6 +352,8 @@ export function LiveSessionBoardDockPanelsLayer() {
         userId={userId}
         isPrepMode={isPrepMode}
         partyCharacters={partyCharacters}
+        sessionRsvpRoster={sessionRsvpRoster}
+        setSessionRsvpRoster={setSessionRsvpRoster}
         currentPlayerCharacter={currentPlayerCharacter}
         prepTestCharacterId={prepTestCharacterId}
         setPrepTestCharacterId={setPrepTestCharacterId}

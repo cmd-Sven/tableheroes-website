@@ -4,7 +4,7 @@
  */
 export function isPlayerReadyForSessionStart(
   row:
-    | { rsvp_status: string | null | undefined; gm_confirmed?: boolean | null }
+    | { rsvp_status?: string | null; gm_confirmed?: boolean | null }
     | undefined
     | null,
 ): boolean {
@@ -28,6 +28,101 @@ export function hasPlayerRsvpResponse(
  * Der SL selbst ist normalerweise kein Teilnehmer — außer er hat einen
  * Kampagnen-Charakter (GM-PC), sonst fehlt die Figur in der Terminliste.
  */
+export const SESSION_RSVP_CHANGED_BROADCAST = "session_rsvp_changed";
+
+export type SessionRsvpRosterPlayer = {
+  userId: string;
+  username: string;
+  characterName: string | null;
+  status: "zusage" | "via_online" | "absage" | "offen" | "gm_override";
+  label: string;
+  canGmManuallyConfirm: boolean;
+  canGmManuallyDecline: boolean;
+};
+
+/** Eine Zeile der GM-Liste: dabei, abgesagt oder noch offen. */
+export function buildSessionRsvpRosterPlayer(input: {
+  userId: string;
+  username: string;
+  characterName: string | null;
+  row:
+    | { rsvp_status?: string | null; gm_confirmed?: boolean | null }
+    | null
+    | undefined;
+  allowGmActions: boolean;
+}): SessionRsvpRosterPlayer {
+  const { userId, username, characterName, row, allowGmActions } = input;
+  const ready = isPlayerReadyForSessionStart(row);
+  const st = row?.rsvp_status != null ? String(row.rsvp_status) : "";
+
+  if (ready) {
+    if (st === "Zusage") {
+      return {
+        userId,
+        username,
+        characterName,
+        status: "zusage",
+        label: "Termin angenommen",
+        canGmManuallyConfirm: false,
+        canGmManuallyDecline: allowGmActions,
+      };
+    }
+    if (st === "Via Online") {
+      return {
+        userId,
+        username,
+        characterName,
+        status: "via_online",
+        label: "Online dabei",
+        canGmManuallyConfirm: false,
+        canGmManuallyDecline: allowGmActions,
+      };
+    }
+    if (st === "Absage" && row?.gm_confirmed) {
+      return {
+        userId,
+        username,
+        characterName,
+        status: "gm_override",
+        label: "Abgesagt · vom GM für den Tisch freigegeben",
+        canGmManuallyConfirm: false,
+        canGmManuallyDecline: allowGmActions,
+      };
+    }
+    return {
+      userId,
+      username,
+      characterName,
+      status: "zusage",
+      label: "Vom GM als dabei markiert",
+      canGmManuallyConfirm: false,
+      canGmManuallyDecline: allowGmActions,
+    };
+  }
+
+  if (st === "Absage") {
+    return {
+      userId,
+      username,
+      characterName,
+      status: "absage",
+      label: "Abgesagt",
+      canGmManuallyConfirm: allowGmActions,
+      canGmManuallyDecline: false,
+    };
+  }
+
+  return {
+    userId,
+    username,
+    characterName,
+    status: "offen",
+    label: "Noch keine Rückmeldung",
+    canGmManuallyConfirm: allowGmActions,
+    canGmManuallyDecline: allowGmActions,
+  };
+}
+
 export function isOnSessionRsvpRoster(input: {
   memberUserId: string | null | undefined;
   gmUserId: string;

@@ -213,6 +213,7 @@ export type LiveSessionBoardProps = {
   userId: string;
   initialLiveState: LiveState | null;
   partyCharacters: PartyCharacter[];
+  sessionRsvpRoster?: import("@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness").SessionRsvpRosterPlayer[];
   allCampaignNpcs: CampaignNpc[];
   allCampaignCreatures?: CampaignCreature[];
   allCampaignFactions: CampaignFaction[];

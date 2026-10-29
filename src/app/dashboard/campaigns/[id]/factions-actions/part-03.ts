@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { resolveFactionImageMeta } from "@/src/lib/faction-image-meta";
 import { setCampaignVisibility } from "../campaign-visibility-actions";
+import { loadLinkedNpcsForFaction, mergeFactionMembers } from "@/src/lib/npcs/npc-faction-links";
 
 /**
  * Server Actions für Fraktionen (welt-zentrisch).
@@ -42,7 +43,7 @@ export async function getFactionById(factionId: string) {
         gm_notes,
         is_revealed
       ),
-      npcs!left (
+      npcs!npcs_faction_id_fkey!left (
         id,
         name,
         title,
@@ -73,6 +74,16 @@ export async function getFactionById(factionId: string) {
     // damit die UI 'Not Found' anzeigen kann, statt zu crashen.
     return null;
   }
+
+  if (!faction) return null;
+
+  const linkedNpcs = await loadLinkedNpcsForFaction(supabase, factionId);
+  const primaryNpcs = Array.isArray(faction?.npcs)
+    ? faction.npcs
+    : faction?.npcs
+      ? [faction.npcs]
+      : [];
+  faction.npcs = mergeFactionMembers(primaryNpcs, linkedNpcs);
 
   console.log("✅ [getFactionById] Faction loaded successfully:", {
     id: faction?.id,

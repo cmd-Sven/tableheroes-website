@@ -8,6 +8,7 @@ import { NarrativeNPCWizard } from "@/src/components/worlds/NarrativeNPCWizard";
 import { parseChronicleImportFromSearchParams } from "@/src/lib/session-chronicle/inbox-import-urls";
 import type { WorldBlueprint } from "@/src/types/world";
 import type { ChronicleImportRef } from "@/src/lib/session-chronicle/chronicle-import-types";
+import { anyLocationInCitySimulation } from "@/src/components/city/aurenfurt/location-in-city-sim";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -83,6 +84,9 @@ export default async function WorldNPCCreatePage({ params, searchParams }: Props
 
   const prefillName = sp.prefillName ?? sp.prefill_name ?? undefined;
   const chronicleImport = toChronicleImportRef(parseChronicleImportFromSearchParams(sp));
+  const requireCitySimulation = sp.locationId
+    ? await anyLocationInCitySimulation(supabase, [sp.locationId])
+    : false;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -101,6 +105,7 @@ export default async function WorldNPCCreatePage({ params, searchParams }: Props
         factions={factionList}
         locations={locationList}
         initialLocationId={sp.locationId ?? undefined}
+        requireCitySimulation={requireCitySimulation}
         initialPrefillName={prefillName}
         initialBriefing={sp.prefill_description ?? undefined}
         linkFactionId={sp.factionId ?? undefined}

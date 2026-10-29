@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
+import * as THREE from "three";
 import { DoubleSide } from "three";
 import type { CityDistrict, CityDistrictId, HoloSelection } from "./aurenfurt-districts";
 import type { UvPoint } from "./aurenfurt-district-polygons";
 import { DistrictPolygonOverlay } from "./scene/DistrictPolygonOverlay";
-import { createPolygonDistrictGeometry } from "./scene/diorama-geometry";
+import {
+  createPolygonDistrictGeometry,
+  DISTRICT_OUTLINE_LIFT,
+  surfacePoint,
+} from "./scene/diorama-geometry";
 
 type Props = {
   district: CityDistrict;
@@ -64,10 +69,65 @@ export function DistrictNode({
         ? 0.42
         : 0.24
     : selected
-      ? 0.2
+      ? 0.42
       : hovered
         ? Math.max(0.08, Math.min(0.18, hoverOpacity * 0.55))
         : 0.03;
+
+  const selectionOutline = useMemo(() => {
+    if (!selected || showHandles || points.length < 2) return null;
+    const positions: number[] = [];
+    for (let i = 0; i < points.length; i += 1) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      if (
+        !a ||
+        !b ||
+        !Number.isFinite(a.u) ||
+        !Number.isFinite(a.v) ||
+        !Number.isFinite(b.u) ||
+        !Number.isFinite(b.v)
+      ) {
+        continue;
+      }
+      const wa = surfacePoint(a.u, a.v);
+      const wb = surfacePoint(b.u, b.v);
+      positions.push(
+        wa.x,
+        wa.y + DISTRICT_OUTLINE_LIFT,
+        wa.z,
+        wb.x,
+        wb.y + DISTRICT_OUTLINE_LIFT,
+        wb.z,
+      );
+    }
+    if (positions.length < 6) return null;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const material = new THREE.LineBasicMaterial({
+      color: "#cab926",
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.renderOrder = 6;
+    lines.raycast = () => undefined;
+    return lines;
+  }, [points, selected, showHandles]);
+
+  useEffect(
+    () => () => {
+      if (!selectionOutline) return;
+      selectionOutline.geometry.dispose();
+      if (Array.isArray(selectionOutline.material)) {
+        selectionOutline.material.forEach((material) => material.dispose());
+      } else {
+        selectionOutline.material.dispose();
+      }
+    },
+    [selectionOutline],
+  );
 
   function select(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
@@ -97,13 +157,14 @@ export function DistrictNode({
         onPointerOut={suppressSelect ? undefined : out}
       >
         <meshBasicMaterial
-          color={color}
+          color={selected && !editingActive ? "#cab926" : color}
           transparent
           opacity={opacity}
           depthWrite={false}
           side={DoubleSide}
         />
       </mesh>
+      {selectionOutline ? <primitive object={selectionOutline} /> : null}
       {showHandles ? (
         <DistrictPolygonOverlay
           districtId={district.id}

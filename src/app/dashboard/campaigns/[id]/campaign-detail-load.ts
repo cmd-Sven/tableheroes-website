@@ -586,7 +586,8 @@ export async function loadCampaignDetailPageData(
     if (featured) {
       const rows = gmSessionRsvpRows.filter((r) => r.session_id === featured.id);
       const byUser = new Map(rows.map((r) => [r.user_id, r]));
-      const allowGmConfirm = isSessionStatusScheduled(featured.status);
+      const allowGmConfirm =
+        isSessionStatusScheduled(featured.status) || isSessionStatusLive(featured.status);
 
       const players: GmTerminePayload["players"] = acceptedMembers
         .filter((m: any) =>
@@ -614,6 +615,7 @@ export async function loadCampaignDetailPageData(
                 status: "zusage" as const,
                 label: "Termin angenommen",
                 canGmManuallyConfirm: false,
+                canGmManuallyDecline: allowGmConfirm,
               };
             }
             if (st === "Via Online") {
@@ -624,6 +626,7 @@ export async function loadCampaignDetailPageData(
                 status: "via_online" as const,
                 label: "Online dabei",
                 canGmManuallyConfirm: false,
+                canGmManuallyDecline: allowGmConfirm,
               };
             }
             if (st === "Absage" && row?.gm_confirmed) {
@@ -634,6 +637,7 @@ export async function loadCampaignDetailPageData(
                 status: "gm_override" as const,
                 label: "Abgesagt · vom GM für Start freigegeben",
                 canGmManuallyConfirm: false,
+                canGmManuallyDecline: allowGmConfirm,
               };
             }
             return {
@@ -643,6 +647,7 @@ export async function loadCampaignDetailPageData(
               status: "zusage" as const,
               label: "Vom GM als dabei markiert",
               canGmManuallyConfirm: false,
+              canGmManuallyDecline: allowGmConfirm,
             };
           }
 
@@ -654,6 +659,7 @@ export async function loadCampaignDetailPageData(
               status: "absage" as const,
               label: "Abgesagt",
               canGmManuallyConfirm: allowGmConfirm,
+              canGmManuallyDecline: false,
             };
           }
           return {
@@ -663,6 +669,7 @@ export async function loadCampaignDetailPageData(
             status: "offen" as const,
             label: "Noch keine Rückmeldung",
             canGmManuallyConfirm: allowGmConfirm,
+            canGmManuallyDecline: allowGmConfirm,
           };
         });
 

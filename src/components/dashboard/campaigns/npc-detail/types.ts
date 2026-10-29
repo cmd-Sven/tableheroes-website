@@ -33,6 +33,12 @@ export type NPC = {
   is_favorite?: boolean;
   all_quests?: Quest[];
   faction_id?: string | null;
+  city_faction_id?: string | null;
+  world_factions?: Array<{
+    id: string;
+    name: string;
+    type?: string | null;
+  }>;
   current_location_id?: string | null;
   home_location_id?: string | null;
   factions?: {

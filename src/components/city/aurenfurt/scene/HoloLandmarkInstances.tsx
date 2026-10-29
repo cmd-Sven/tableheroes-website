@@ -1,24 +1,29 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
+  Color,
   Matrix4,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
   type Mesh,
+  type MeshStandardMaterial,
   type Object3D,
 } from "three";
 import type { LandmarkModel } from "../aurenfurt-districts";
 import { BUILDING_SELECTED_SCALE } from "./HoloBuildingMarker";
 import {
+  applyLandmarkLit,
   LANDMARK_URL,
   LANDMARK_WIDTH,
   measureLandmarkBounds,
   type LandmarkBounds,
 } from "./HoloLandmarkMesh";
+
+const LIT_EMISSIVE = new Color("#fff4c8");
 import { disposeCloneKeepSource } from "./dispose-cloned-gltf";
 import { HeavyGlbSlot } from "./HeavyGlbSlot";
 import { surfacePoint } from "./diorama-geometry";
@@ -113,6 +118,7 @@ function InstancePart({
   const ref = useRef<InstancedMesh>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const [hotId, setHotId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -127,6 +133,24 @@ function InstancePart({
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
   }, [bounds, items, local]);
+
+  useLayoutEffect(() => {
+    const standard = material as MeshStandardMaterial;
+    if (!standard || typeof standard.emissiveIntensity !== "number") return;
+    if (!standard.userData.holoBaseEmissiveIntensity) {
+      standard.userData.holoBaseEmissiveIntensity = standard.emissiveIntensity;
+      standard.userData.holoBaseEmissive = standard.emissive?.clone?.() ?? new Color(0x000000);
+    }
+    const lit = Boolean(hotId) || items.some((item) => item.selected);
+    if (lit) {
+      standard.emissive.copy(LIT_EMISSIVE);
+      standard.emissiveIntensity = Math.max(0.35, standard.userData.holoBaseEmissiveIntensity + 0.28);
+    } else {
+      standard.emissive.copy(standard.userData.holoBaseEmissive);
+      standard.emissiveIntensity = standard.userData.holoBaseEmissiveIntensity;
+    }
+    standard.needsUpdate = true;
+  }, [hotId, items, material]);
 
   function idAt(instanceId: number | undefined): string | null {
     if (instanceId == null || instanceId < 0) return null;
@@ -145,11 +169,13 @@ function InstancePart({
     const id = idAt(event.instanceId);
     if (!id) return;
     document.body.style.cursor = editable ? "default" : "pointer";
+    setHotId(id);
     onHover(id);
   }
 
   function out() {
     document.body.style.cursor = "";
+    setHotId(null);
     onHover(null);
   }
 
@@ -184,6 +210,8 @@ function ClonedLandmark({
 }) {
   const object = useMemo(() => scene.clone(true), [scene]);
   const position = useMemo(() => surfacePoint(item.u, item.v), [item.u, item.v]);
+  const [hot, setHot] = useState(false);
+  const lit = item.selected || hot;
 
   useLayoutEffect(() => {
     object.rotation.set(0, 0, 0);
@@ -196,6 +224,10 @@ function ClonedLandmark({
     object.position.set(-bounds.centerX * scale, -bounds.minY * scale, -bounds.centerZ * scale);
   }, [item.scaleMultiplier, object]);
 
+  useLayoutEffect(() => {
+    applyLandmarkLit(object, lit);
+  }, [lit, object]);
+
   useLayoutEffect(() => () => disposeCloneKeepSource(object, scene), [object, scene]);
 
   function select(event: ThreeEvent<MouseEvent>) {
@@ -206,11 +238,13 @@ function ClonedLandmark({
   function over(event: ThreeEvent<PointerEvent>) {
     event.stopPropagation();
     document.body.style.cursor = editable ? "default" : "pointer";
+    setHot(true);
     onHover(item.id);
   }
 
   function out() {
     document.body.style.cursor = "";
+    setHot(false);
     onHover(null);
   }
 

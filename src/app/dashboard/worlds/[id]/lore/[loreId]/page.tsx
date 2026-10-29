@@ -8,6 +8,7 @@ import {
   buildingMetaFromLocationRow,
   poiExtrasFromLocationRow,
 } from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
+import { loreLocationInCitySimulation } from "@/src/components/city/aurenfurt/location-in-city-sim";
 
 type Props = {
   params: Promise<{ id: string; loreId: string }>;
@@ -254,15 +255,26 @@ export default async function WorldLoreDetailPage({ params }: Props) {
     mapV: number | null;
   } | null = null;
   let aurenfurtPoi: ReturnType<typeof poiExtrasFromLocationRow> = null;
+  let citySimulationLocation = false;
   if (isLocation) {
     const { data: locMeta } = await (supabase.from("locations") as any)
       .select(
-        "aurenfurt_street_id, created_via_map_editor, map_district_id, map_u, map_v, map_poi_kind, map_poi_influences",
+        "aurenfurt_street_id, created_via_map_editor, map_district_id, map_u, map_v, map_poi_kind, map_poi_influences, parent_location_id",
       )
       .eq("id", loreId)
       .maybeSingle();
     aurenfurtPoi = poiExtrasFromLocationRow(locMeta);
     aurenfurtBuilding = buildingMetaFromLocationRow(locMeta);
+    citySimulationLocation = loreLocationInCitySimulation({
+      worldId,
+      locationId: loreId,
+      name: lore.name,
+      type: lore.type,
+      description: lore.description,
+      imageUrl: lore.image_url,
+      parentId: lore.parent_id,
+      locMeta,
+    });
   }
 
   const displayType = aurenfurtPoi?.kind ?? lore.type;
@@ -299,6 +311,7 @@ export default async function WorldLoreDetailPage({ params }: Props) {
         loreMetadata={loreMetadata}
         aurenfurtBuilding={aurenfurtBuilding}
         aurenfurtPoi={aurenfurtPoi}
+        citySimulationLocation={citySimulationLocation}
       />
     </div>
   );

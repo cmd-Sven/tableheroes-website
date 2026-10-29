@@ -23,6 +23,8 @@ import { uploadNpcPortrait } from "@/src/lib/profile-media";
 import { buildNpcPortraitMeta } from "@/src/lib/npc-portrait-meta";
 import { NpcPortraitUploadField } from "./NpcPortraitUploadField";
 import { NpcCitySimulationFields } from "@/src/components/worlds/npc-wizard/NpcCitySimulationFields";
+import { WorldFactionCheckboxList } from "./WorldFactionCheckboxList";
+import { resolveWorldFactionIds } from "@/src/lib/npcs/npc-faction-links";
 import {
   EMPTY_CITY_SIMULATION,
   citySimulationFromDb,
@@ -45,6 +47,8 @@ type NPC = {
   gm_notes: string | null;
   image_url: string | null;
   faction_id: string | null;
+  faction_ids?: string[] | null;
+  world_factions?: Array<{ id: string; name: string }> | null;
   current_location_id: string | null;
   home_location_id: string | null;
   is_merchant?: boolean | null;
@@ -107,6 +111,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
   const [showWizard, setShowWizard] = useState(false);
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
   const isEditMode = !!(initialData?.id && initialData.id.trim() !== "");
+  const startingFactionIds = resolveWorldFactionIds(initialData, defaultFactionId);
   const showAdvancedSections = isEditMode || !!hookContext || !!initialData;
   const [citySim, setCitySim] = useState<CitySimulationFields>(() =>
     citySimulationFromDb(initialData as any),
@@ -147,6 +152,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
     gm_notes: string;
     image_url: string;
     faction_id: string;
+    faction_ids: string[];
     current_location_id: string;
     home_location_id: string;
     is_merchant: boolean;
@@ -176,7 +182,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
     personality_traits: "",
     gm_notes: "",
     image_url: "",
-    faction_id: defaultFactionId ?? "",
+    faction_id: startingFactionIds[0] ?? "",
+    faction_ids: startingFactionIds,
     current_location_id: defaultLocationId ?? "",
     home_location_id: defaultLocationId ?? "",
     is_merchant: false,
@@ -238,7 +245,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         personality_traits: initialData.personality_traits || "",
         gm_notes: initialData.gm_notes || "",
         image_url: initialData.image_url || "",
-        faction_id: initialData.faction_id || "",
+        faction_ids: resolveWorldFactionIds(initialData, defaultFactionId),
+        faction_id: resolveWorldFactionIds(initialData, defaultFactionId)[0] ?? "",
         current_location_id: initialData.current_location_id || "",
         home_location_id: initialData.home_location_id || "",
         is_merchant: Boolean(initialData.is_merchant),
@@ -276,7 +284,8 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
         personality_traits: "",
         gm_notes: "",
         image_url: "",
-        faction_id: "",
+        faction_ids: resolveWorldFactionIds(null, defaultFactionId),
+        faction_id: resolveWorldFactionIds(null, defaultFactionId)[0] ?? "",
         current_location_id: "",
         home_location_id: "",
         is_merchant: false,
@@ -386,9 +395,10 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
       try {
         // Normalize empty strings to null for foreign keys
         // WICHTIG: Trim whitespace und konvertiere leere Strings zu null
-        const normalizedFactionId = formData.faction_id && String(formData.faction_id).trim() !== "" 
-          ? String(formData.faction_id).trim() 
-          : null;
+        const normalizedFactionIds = formData.faction_ids
+          .map((id) => String(id).trim())
+          .filter((id) => id !== "");
+        const normalizedFactionId = normalizedFactionIds[0] ?? null;
         const normalizedCurrentLocationId = formData.current_location_id && String(formData.current_location_id).trim() !== "" 
           ? String(formData.current_location_id).trim() 
           : null;
@@ -488,6 +498,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
             ? normalizeImageDisplay(imageDisplay)
             : null,
           ...portraitMetaFields,
+          faction_ids: normalizedFactionIds,
           faction_id: normalizedFactionId,
           current_location_id: normalizedCurrentLocationId,
           home_location_id: normalizedHomeLocationId,
@@ -562,7 +573,13 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6"
+        autoComplete="off"
+        data-form-type="other"
+        data-dashlane-ignore="true"
+      >
         {/* Header */}
         <div className="mb-6">
           <h1 className="font-cinzel font-bold text-3xl text-hero-vibrant mb-6">
@@ -696,24 +713,17 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           </div>
         </div>
 
-        {/* Faction */}
-        <div>
-          <label className="mb-2 block font-barlow font-bold text-sm uppercase text-gray-300">
-            Zugehörigkeit / Fraktion
-          </label>
-          <select
-            value={formData.faction_id}
-            onChange={(e) => setFormData({ ...formData, faction_id: e.target.value })}
-            className="w-full rounded border border-hero-dark bg-slate-900/80 p-3 font-libre text-white outline-none transition-all focus:border-accent-gold"
-          >
-            <option value="">-- Keine Fraktion --</option>
-            {factions.map((faction) => (
-              <option key={faction.id} value={faction.id}>
-                {faction.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <WorldFactionCheckboxList
+          factions={factions}
+          selectedIds={formData.faction_ids}
+          onChange={(next) =>
+            setFormData({
+              ...formData,
+              faction_ids: next,
+              faction_id: next[0] ?? "",
+            })
+          }
+        />
 
         {/* Aktueller Aufenthaltsort (nur im Create-Modus, im Edit-Modus beide Orte zeigen) */}
         {isEditMode ? (

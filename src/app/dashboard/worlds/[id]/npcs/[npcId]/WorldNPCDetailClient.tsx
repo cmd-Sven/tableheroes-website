@@ -28,6 +28,7 @@ import { NpcPortraitAttribution } from "@/src/components/dashboard/campaigns/npc
 import { SmartText } from "@/src/components/ui/SmartText";
 import { NpcCitySimulationSheet } from "@/src/components/dashboard/campaigns/npc-detail/NpcCitySimulationSheet";
 import { citySimulationFromDb } from "@/src/lib/npcs/city-simulation";
+import { factionName, isCityFactionId } from "@/src/components/city/aurenfurt/aurenfurt-factions";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
 import type { RelationshipWithNames } from "@/src/app/dashboard/worlds/relationship-actions";
 import type { WorldBlueprint } from "@/src/types/world";
@@ -78,6 +79,15 @@ export function WorldNPCDetailClient({
   const [playerView, setPlayerView] = useState(false);
   const { entities } = useWorldEntities(worldId);
   const citySim = citySimulationFromDb(npc);
+  const worldFactions: Array<{ id: string; name: string }> = Array.isArray(npc.world_factions)
+    ? npc.world_factions.filter((faction: { id?: string; name?: string }) => faction?.id && faction?.name)
+    : npc.factions?.id
+      ? [{ id: npc.factions.id, name: npc.factions.name }]
+      : [];
+  const cityFactionLabel =
+    typeof npc.city_faction_id === "string" && isCityFactionId(npc.city_faction_id)
+      ? factionName(npc.city_faction_id)
+      : null;
   const inCitySim = citySim.forCitySimulation;
   const showCityTab = inCitySim && !(isGM && playerView);
   const [sheetTab, setSheetTab] = useState<"profil" | "stadt">("profil");
@@ -349,15 +359,44 @@ export function WorldNPCDetailClient({
               <p className="font-libre text-gray-200">{npc.current_location.name}</p>
             </section>
           )}
-          {npc.factions?.name && (
+          {(worldFactions.length > 0 || cityFactionLabel) && (
             <section>
               <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Fraktion
+                Fraktionen
               </h2>
-              <p className="font-libre text-gray-200">
-                {npc.factions.name}
-              </p>
+              {worldFactions.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="font-barlow text-xs font-bold uppercase tracking-wide text-gray-400">
+                    Welt-Fraktionen
+                  </p>
+                  <ul className="space-y-1">
+                    {worldFactions.map((faction) => (
+                      <li key={faction.id} className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/worlds/${worldId}/factions/${faction.id}`}
+                          className="font-libre text-accent-gold hover:underline"
+                        >
+                          {faction.name}
+                        </Link>
+                        {faction.id === npc.faction_id ? (
+                          <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
+                            Primär
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {cityFactionLabel ? (
+                <div className={worldFactions.length > 0 ? "mt-3" : undefined}>
+                  <p className="font-barlow text-xs font-bold uppercase tracking-wide text-accent-gold">
+                    Stadtsimulation (Aurenfurt)
+                  </p>
+                  <p className="font-libre text-gray-200">{cityFactionLabel}</p>
+                </div>
+              ) : null}
             </section>
           )}
 
@@ -507,7 +546,7 @@ export function WorldNPCDetailClient({
                 <FileText className="h-4 w-4" />
                 Welt-Geheimnisse & GM-Notizen
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-4" data-form-type="other" suppressHydrationWarning>
                 <div>
                   <label className="block mb-1 font-barlow font-semibold text-xs uppercase text-gray-400">
                     GM-Notizen (weltweit)
@@ -516,6 +555,10 @@ export function WorldNPCDetailClient({
                     value={gmNotes}
                     onChange={(e) => setGmNotes(e.target.value)}
                     rows={3}
+                    autoComplete="off"
+                    data-form-type="other"
+                    data-dashlane-ignore="true"
+                    suppressHydrationWarning
                     className="w-full rounded border border-hero-dark bg-slate-900/80 p-2 font-libre text-sm text-gray-100 outline-none focus:border-accent-gold resize-none"
                     placeholder="Interne Notizen zu diesem NPC, unabhängig von Kampagnen."
                   />
@@ -528,6 +571,10 @@ export function WorldNPCDetailClient({
                     value={hiddenAgenda}
                     onChange={(e) => setHiddenAgenda(e.target.value)}
                     rows={3}
+                    autoComplete="off"
+                    data-form-type="other"
+                    data-dashlane-ignore="true"
+                    suppressHydrationWarning
                     className="w-full rounded border border-accent-blood/60 bg-slate-900/80 p-2 font-libre text-sm text-gray-100 outline-none focus:border-accent-blood resize-none"
                     placeholder="Was will dieser NPC wirklich? Diese Info ist nur für dich als Spielleiter sichtbar."
                   />
@@ -540,6 +587,10 @@ export function WorldNPCDetailClient({
                     value={trueNature}
                     onChange={(e) => setTrueNature(e.target.value)}
                     rows={3}
+                    autoComplete="off"
+                    data-form-type="other"
+                    data-dashlane-ignore="true"
+                    suppressHydrationWarning
                     className="w-full rounded border border-accent-blood/60 bg-slate-900/80 p-2 font-libre text-sm text-gray-100 outline-none focus:border-accent-blood resize-none"
                     placeholder="Wie ist die wahre, interne Persönlichkeit dieses NPCs?"
                   />

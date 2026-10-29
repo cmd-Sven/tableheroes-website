@@ -81,7 +81,8 @@ export function HoloCityRail({ selection, subject, onSelect, onLeave }: Props) {
       aria-label="Aurenfurt steuern"
     >
       <CityHudChrome density="rail" />
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible pt-2">
+      {/* Unter der HUD (Stadtansicht), damit das erste Wappen nicht überlappt. */}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible pt-[148px]">
         <div className="flex min-h-0 flex-1 flex-col overflow-visible">
           {AURENFURT_DISTRICTS.map((district) => {
             const crest = DISTRICT_CREST[district.id];

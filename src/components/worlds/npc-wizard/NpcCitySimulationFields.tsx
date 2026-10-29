@@ -18,6 +18,8 @@ type Props = {
   deities?: Array<{ id: string; name: string }>;
   /** Wenn true: Frage + Felder; wenn false und hideWhenNo: nur Frage. */
   className?: string;
+  /** Ort der Stadtsimulation: „Nein“ ist keine Option. */
+  locked?: boolean;
 };
 
 function BipolarSlider({
@@ -70,11 +72,12 @@ export function NpcCitySimulationFields({
   onChange,
   deities = [],
   className,
+  locked = false,
 }: Props) {
   const patch = (partial: Partial<CitySimulationFields>) =>
     onChange({ ...value, ...partial });
 
-  const showDetails = value.forCitySimulation;
+  const showDetails = locked || value.forCitySimulation;
   const deityRequired = requiresCityDeity(value.cityAxisPiousSkeptic);
 
   return (
@@ -84,9 +87,11 @@ export function NpcCitySimulationFields({
           Ist dieser NPC für eine Stadtsimulation wichtig?
         </p>
         <p className="mb-3 font-libre text-xs text-gray-400 leading-relaxed">
-          Nur bei „Ja“ werden Kategorie, Wesensachsen, Fraktion und Zielvorgabe für die Stadt-Simulation
-          erfasst. Du kannst das später jederzeit nachziehen.
+          {locked
+            ? "Dieser Ort gehört zur Stadtsimulation. Die neue Figur wird dafür angelegt. Kategorie, Wesensachsen und Zielvorgabe sind Pflicht."
+            : "Nur bei „Ja“ werden Kategorie, Wesensachsen, Fraktion und Zielvorgabe für die Stadt-Simulation erfasst. Du kannst das später jederzeit nachziehen."}
         </p>
+        {locked ? null : (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -124,6 +129,7 @@ export function NpcCitySimulationFields({
             Ja
           </button>
         </div>
+        )}
       </div>
 
       {showDetails && (

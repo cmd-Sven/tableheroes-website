@@ -121,6 +121,22 @@ export function formatInfluenceDelta(influence: PoiInfluence): string {
   return `${aspectLabel(influence.aspect)} ${sign}${influence.delta}`;
 }
 
+/** Farben der Einfluss-Aspekte für kompakte KPI-Chips im Kartenfenster. */
+export const POI_INFLUENCE_COLORS: Record<PoiInfluenceAspect, string> = {
+  crime: "#ef4444",
+  vattrak: "#379806",
+  malanthir: "#a78bfa",
+  guard: "#38bdf8",
+  refugees: "#f59e0b",
+  economy: "#cab926",
+  unemployment: "#d4a574",
+  elysia: "#e7b6c9",
+  chromus: "#7f93c9",
+  religion: "#cab926",
+  knowledge: "#67e8f9",
+  prestige: "#f0d060",
+};
+
 /** Summe gleicher Aspekte über mehrere POIs (SL Clean View). */
 export function sumPoiInfluences(pois: AurenfurtMapPoi[]): PoiInfluence[] {
   const totals = new Map<PoiInfluenceAspect, number>();

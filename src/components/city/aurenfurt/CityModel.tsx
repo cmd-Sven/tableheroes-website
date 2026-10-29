@@ -25,6 +25,7 @@ import { HoloPoiMarker } from "./scene/HoloPoiMarker";
 import { HoloStreetLayer } from "./scene/HoloStreetLayer";
 import { HoloWallLayer } from "./scene/HoloWallLayer";
 import { HoloWeatherFx } from "./scene/HoloWeatherFx";
+import { FreeMapPlaceSurface } from "./scene/FreeMapPlaceSurface";
 import type { WeatherFxId } from "./aurenfurt-weather-fx";
 import type { AurenfurtWall } from "./aurenfurt-walls";
 import type { AurenfurtMapPoi } from "./aurenfurt-map-pois";
@@ -32,7 +33,9 @@ import type { DistrictSector } from "./aurenfurt-sectors";
 import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
 import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
+import { PoiReachOverlay } from "./scene/PoiReachOverlay";
 import type { SectorCrimeCell } from "./aurenfurt-crime-heatmap";
+import type { PoiReachCell } from "./aurenfurt-sector-reach";
 import { HoloLandmarkInstances, type LandmarkInstanceItem } from "./scene/HoloLandmarkInstances";
 
 type Props = {
@@ -72,6 +75,9 @@ type Props = {
   onPickEventSector?: (sector: DistrictSector) => void;
   crimeHeatmapVisible?: boolean;
   crimeCells?: SectorCrimeCell[];
+  /** Sektoren im Einflussbereich des gewählten besonderen Orts. */
+  poiReachCells?: PoiReachCell[];
+  poiReachVisible?: boolean;
   highlightDistricts?: boolean;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
@@ -97,6 +103,8 @@ type Props = {
   onSelectWall: (wallId: string | null) => void;
   onPlaceBuildingPoint: (point: UvPoint) => void;
   onPlacePoiPoint: (point: UvPoint) => void;
+  onMovePoi?: (poiId: string, point: UvPoint) => void;
+  onCommitPoi?: (poiId: string) => void;
   onSelectStreet: (streetId: string | null) => void;
   onOrbitLock: (locked: boolean) => void;
   onDragActive: (active: boolean) => void;
@@ -136,6 +144,8 @@ export function CityModel({
   onPickEventSector,
   crimeHeatmapVisible = false,
   crimeCells = [],
+  poiReachCells = [],
+  poiReachVisible = false,
   highlightDistricts = false,
   buildings,
   pois,
@@ -161,6 +171,8 @@ export function CityModel({
   onSelectWall,
   onPlaceBuildingPoint,
   onPlacePoiPoint,
+  onMovePoi,
+  onCommitPoi,
   onSelectStreet,
   onOrbitLock,
   onDragActive,
@@ -175,7 +187,12 @@ export function CityModel({
     editorTool === "districts" && editingDistrictId && !placingSomething,
   );
   const buildingsEditable = editorTool === "buildings" && !placingSomething;
+  const poisEditable = editorTool === "pois" && !placingSomething;
   const streetsEditMode = editorTool === "streets";
+  /** Ansicht: Klick öffnet das Gebäude-Infofenster. Editor: Auswahl zum Verschieben. */
+  const selectBuildingOrDistrict = (buildingId: string) => {
+    onSelect({ type: "building", id: buildingId });
+  };
   const landmarkBuckets = new Map<LandmarkModel, LandmarkInstanceItem[]>();
   for (const building of buildings) {
     if (!building.landmark) continue;
@@ -186,7 +203,9 @@ export function CityModel({
       v: uv.v,
       scaleMultiplier: resolveLandmarkScale(building.id, landmarkScales),
       rotationDegrees: resolveLandmarkRotation(building.id, landmarkRotations),
-      selected: sameSelection(selection, { type: "building", id: building.id }),
+      selected:
+        buildingsEditable &&
+        sameSelection(selection, { type: "building", id: building.id }),
     };
     const bucket = landmarkBuckets.get(building.landmark);
     if (bucket) bucket.push(item);
@@ -244,6 +263,7 @@ export function CityModel({
           <DistrictSectorOverlay sectors={editingSectors} preview={editingSectorsPreview} />
         ) : null}
         <CrimeHeatmapLayer cells={crimeCells} visible={crimeHeatmapVisible} />
+        <PoiReachOverlay cells={poiReachCells} visible={poiReachVisible} />
         <group visible={buildingsVisible}>
         {instancedLandmarks.map(([model, items]) => (
           <HoloLandmarkInstances
@@ -252,8 +272,19 @@ export function CityModel({
             items={items}
             suppressSelect={suppressSelect || mapLocked}
             editable={buildingsEditable}
-            onSelect={(id) => onSelect({ type: "building", id })}
-            onHover={(id) => onHover(id ? { type: "building", id } : null)}
+            onSelect={selectBuildingOrDistrict}
+            onHover={(id) => {
+              if (!id) {
+                onHover(null);
+                return;
+              }
+              if (buildingsEditable) {
+                onHover({ type: "building", id });
+                return;
+              }
+              const districtId = buildings.find((entry) => entry.id === id)?.districtId;
+              onHover(districtId ? { type: "district", id: districtId } : null);
+            }}
           />
         ))}
         {buildings.map((building) => {
@@ -267,15 +298,26 @@ export function CityModel({
               building={building}
               u={uv.u}
               v={uv.v}
-              selected={sameSelection(selection, { type: "building", id: building.id })}
+              selected={
+                buildingsEditable &&
+                sameSelection(selection, { type: "building", id: building.id })
+              }
               suppressSelect={suppressSelect || mapLocked}
               editable={editable}
               outside={outside}
               showLandmark={!building.landmark || !instancedModels.has(building.landmark)}
               landmarkScale={resolveLandmarkScale(building.id, landmarkScales)}
               landmarkRotation={resolveLandmarkRotation(building.id, landmarkRotations)}
-              onSelect={(id) => onSelect({ type: "building", id })}
-              onHover={(id) => onHover(id ? { type: "building", id } : null)}
+              onSelect={selectBuildingOrDistrict}
+              onHover={(id) =>
+                onHover(
+                  id
+                    ? buildingsEditable
+                      ? { type: "building", id }
+                      : { type: "district", id: building.districtId }
+                    : null,
+                )
+              }
               onMove={onMoveBuilding}
               onCommit={onCommitBuildings}
               onOrbitLock={onOrbitLock}
@@ -293,8 +335,13 @@ export function CityModel({
                 campaignId={campaignId}
                 selected={sameSelection(selection, { type: "poi", id: poi.id })}
                 suppressSelect={suppressSelect || mapLocked}
+                editable={poisEditable}
                 onSelect={(id) => onSelect({ type: "poi", id })}
                 onHover={(id) => onHover(id ? { type: "poi", id } : null)}
+                onMove={onMovePoi}
+                onCommit={onCommitPoi}
+                onOrbitLock={onOrbitLock}
+                onDragActive={onDragActive}
               />
             ))
           : null}
@@ -304,18 +351,21 @@ export function CityModel({
           viewedDay={viewedDay}
           editMode={streetsEditMode}
           editingStreetId={editingStreetId}
-          drawing={drawingStreet || placingSomething}
+          drawing={drawingStreet}
           draftPoints={drawingStreet ? draftStreetPoints : []}
           layerVisible={streetsLayerVisible}
           onMoveStreetPoint={onMoveStreetPoint}
           onCommitStreets={onCommitStreets}
-          onAddDrawPoint={
-            placingPoi ? onPlacePoiPoint : placingBuilding ? onPlaceBuildingPoint : onAddDrawPoint
-          }
+          onAddDrawPoint={onAddDrawPoint}
           onFinishDraw={onFinishDrawStreet}
           onSelectStreet={onSelectStreet}
           onOrbitLock={onOrbitLock}
           onDragActive={onDragActive}
+        />
+        <FreeMapPlaceSurface
+          active={placingSomething}
+          onPlace={placingPoi ? onPlacePoiPoint : onPlaceBuildingPoint}
+          onOrbitLock={onOrbitLock}
         />
         <HoloWallLayer
           walls={walls}

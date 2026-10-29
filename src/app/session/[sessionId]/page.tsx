@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { LiveSessionBoard } from "./LiveSessionBoard";
+import { getGmSessionRsvpRoster } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import { getNPCs } from "@/src/app/dashboard/campaigns/[id]/npc-queries";
 import { getFactionsWithMembers } from "@/src/app/dashboard/campaigns/[id]/factions-queries";
 import { ensureSessionPrepLiveState } from "@/src/app/dashboard/campaigns/[id]/session-actions";
@@ -582,6 +583,9 @@ export default async function SessionPage({ params, searchParams }: Props) {
           : null
       }
       partyCharacters={serializeForClient(partyCharacters)}
+      sessionRsvpRoster={
+        viewAsGM ? serializeForClient(await getGmSessionRsvpRoster(sessionId)) : []
+      }
       allCampaignNpcs={serializeForClient(allCampaignNpcs || [])}
       allCampaignCreatures={serializeForClient(allCampaignCreatures)}
       allCampaignFactions={serializeForClient(allCampaignFactions)}

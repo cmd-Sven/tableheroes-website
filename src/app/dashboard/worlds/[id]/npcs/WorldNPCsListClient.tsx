@@ -151,13 +151,17 @@ export function WorldNPCsListClient({
       </p>
 
       {/* Text-Suche: Name, Volk, Rolle */}
-      <div className="relative">
+      <div className="relative" data-form-type="other" suppressHydrationWarning>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Suchen nach Name, Volk oder Rolle …"
+          autoComplete="off"
+          data-form-type="other"
+          data-dashlane-ignore="true"
+          suppressHydrationWarning
           className="w-full rounded bg-slate-900 border border-hero-dark pl-10 pr-4 py-2 text-white font-libre text-sm focus:border-hero-vibrant outline-none"
         />
       </div>

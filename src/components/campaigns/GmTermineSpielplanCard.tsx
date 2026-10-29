@@ -27,9 +27,13 @@ import {
   setPlanningDummyPlayerCount,
 } from "@/src/app/dashboard/campaigns/[id]/session-actions";
 import { StartSessionBackgroundModal } from "@/src/components/dashboard/StartSessionBackgroundModal";
-import { setGmConfirmed } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import {
+  setGmConfirmed,
+  setGmMarkedAbsent,
+} from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
 import {
   applyGmConfirmToTerminePlayer,
+  applyGmDeclineToTerminePlayer,
   countTerminePendingPlayers,
 } from "@/src/lib/session-rsvp/gm-confirm-optimistic";
 import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
@@ -43,6 +47,8 @@ export type GmTerminePlayerRsvp = {
   label: string;
   /** GM kann Spieler ohne Zusage (oder nach Absage) für den Start freigeben */
   canGmManuallyConfirm?: boolean;
+  /** GM kann eine mündliche Absage als „nicht dabei“ festhalten */
+  canGmManuallyDecline?: boolean;
 };
 
 export type GmTermineNextSession = {
@@ -118,6 +124,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
   const [startBgSessionId, setStartBgSessionId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
+  const [confirmingKind, setConfirmingKind] = useState<"dabei" | "abwesend" | null>(null);
   const [playersLocal, setPlayersLocal] = useState(players);
   const [nextSessionLocal, setNextSessionLocal] = useState(nextSession);
   const [dummyLocal, setDummyLocal] = useState(nextSession?.planningDummySlotCount ?? 0);
@@ -182,6 +189,7 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
     });
 
     setConfirmingUserId(playerUserId);
+    setConfirmingKind("dabei");
     void (async () => {
       try {
         const res = await setGmConfirmed(sessionId, playerUserId, true);
@@ -197,6 +205,52 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
         );
       } finally {
         setConfirmingUserId(null);
+        setConfirmingKind(null);
+      }
+    })();
+  };
+
+  const handleGmDeclinePlayer = (sessionId: string, playerUserId: string) => {
+    if (confirmingUserId) return;
+
+    const rollbackPlayers = playersLocal;
+    const rollbackSession = nextSessionLocal;
+
+    setPlayersLocal((prev) => {
+      const nextPlayers = prev.map((p) =>
+        p.userId === playerUserId ? applyGmDeclineToTerminePlayer(p) : p,
+      );
+      const pending = nextPlayers.filter((p) => p.status === "offen").length;
+      setNextSessionLocal((current) =>
+        current
+          ? {
+              ...current,
+              pendingCount: pending,
+              canStart: pending === 0 && current.gmPrepComplete,
+            }
+          : current,
+      );
+      return nextPlayers;
+    });
+
+    setConfirmingUserId(playerUserId);
+    setConfirmingKind("abwesend");
+    void (async () => {
+      try {
+        const res = await setGmMarkedAbsent(sessionId, playerUserId);
+        if (!res.success) {
+          throw new Error(res.error ?? "Absage fehlgeschlagen.");
+        }
+        toast.success("Spieler als nicht dabei markiert.");
+      } catch (err: unknown) {
+        setPlayersLocal(rollbackPlayers);
+        setNextSessionLocal(rollbackSession);
+        toast.error(
+          err instanceof Error ? err.message : "Absage fehlgeschlagen.",
+        );
+      } finally {
+        setConfirmingUserId(null);
+        setConfirmingKind(null);
       }
     })();
   };
@@ -473,10 +527,10 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
 
           {liveNs ? (
             <p className="font-libre text-sm text-gray-500">
-              Diese Sitzung läuft bereits. Rückmeldungen bezogen sich auf den Start des
-              Termins; zur Nachbereitung nutze die Session-Ansicht.
+              Diese Sitzung läuft. Spieler kannst du hier und am Live-Tisch an- und abmelden.
             </p>
-          ) : playersLocal.length > 0 ? (
+          ) : null}
+          {playersLocal.length > 0 ? (
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <h3 className="font-barlow font-bold text-xs uppercase text-gray-500">
@@ -508,22 +562,43 @@ export function GmTermineSpielplanCard({ campaignId, nextSession, players }: Pro
                     >
                       {p.label}
                     </span>
-                    {p.canGmManuallyConfirm && sched && nextSessionLocal?.id ? (
-                      <button
-                        type="button"
-                        onClick={() => handleGmConfirmPlayer(nextSessionLocal.id, p.userId)}
-                        disabled={confirmingUserId === p.userId}
-                        className="ml-auto inline-flex min-w-[7.5rem] items-center justify-center gap-1 shrink-0 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
-                      >
-                        {confirmingUserId === p.userId ? (
-                          <>
-                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                            Speichern…
-                          </>
-                        ) : (
-                          "Als dabei markieren"
-                        )}
-                      </button>
+                    {(sched || liveNs) && nextSessionLocal?.id && (p.canGmManuallyConfirm || p.canGmManuallyDecline) ? (
+                      <span className="ml-auto inline-flex flex-wrap justify-end gap-1">
+                        {p.canGmManuallyConfirm ? (
+                          <button
+                            type="button"
+                            onClick={() => handleGmConfirmPlayer(nextSessionLocal.id, p.userId)}
+                            disabled={confirmingUserId === p.userId}
+                            className="inline-flex min-w-[7.5rem] items-center justify-center gap-1 shrink-0 rounded border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+                          >
+                            {confirmingUserId === p.userId && confirmingKind === "dabei" ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                                Speichern…
+                              </>
+                            ) : (
+                              "Als dabei markieren"
+                            )}
+                          </button>
+                        ) : null}
+                        {p.canGmManuallyDecline ? (
+                          <button
+                            type="button"
+                            onClick={() => handleGmDeclinePlayer(nextSessionLocal.id, p.userId)}
+                            disabled={confirmingUserId === p.userId}
+                            className="inline-flex min-w-[7.5rem] items-center justify-center gap-1 shrink-0 rounded border border-red-800/50 bg-red-950/30 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-red-200 hover:bg-red-950/50 disabled:opacity-50"
+                          >
+                            {confirmingUserId === p.userId && confirmingKind === "abwesend" ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                                Speichern…
+                              </>
+                            ) : (
+                              "Als nicht dabei markieren"
+                            )}
+                          </button>
+                        ) : null}
+                      </span>
                     ) : null}
                   </li>
                 ))}

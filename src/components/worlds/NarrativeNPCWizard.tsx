@@ -45,8 +45,10 @@ import {
 } from "@/src/lib/npcs/npc-sheet-types";
 import { generateNpcCombatSheet } from "@/src/app/dashboard/worlds/world-npc-actions";
 import { NpcCitySimulationFields } from "@/src/components/worlds/npc-wizard/NpcCitySimulationFields";
+import { WorldFactionCheckboxList } from "@/src/components/dashboard/campaigns/npcs/WorldFactionCheckboxList";
 import {
   EMPTY_CITY_SIMULATION,
+  activateCitySimulation,
   citySimulationToDb,
   refineCitySimulationPayload,
   type CitySimulationFields,
@@ -82,6 +84,11 @@ type Props = {
   /** Optional: Sprachen aus Welt-Lore (Type = \"Sprache\"). */
   languages?: Array<{ id: string; name: string }>;
   chronicleImport?: ChronicleImportRef;
+  /**
+   * Ort gehört zur Stadtsimulation. Der Wizard lässt „Nein“ nicht zu und
+   * speichert for_city_simulation.
+   */
+  requireCitySimulation?: boolean;
   onSuccess?: (npcId: string) => void;
   onError?: (message: string) => void;
 };
@@ -104,6 +111,7 @@ export function NarrativeNPCWizard({
   deities = [],
   languages = [],
   chronicleImport,
+  requireCitySimulation = false,
   onSuccess,
   onError,
 }: Props) {
@@ -142,12 +150,16 @@ export function NarrativeNPCWizard({
   const [combatSheet, setCombatSheet] = useState<NpcSheetData | null>(null);
   const [portraitObjectUrl, setPortraitObjectUrl] = useState<string | null>(null);
   const [rerollSection, setRerollSection] = useState<RerollSection | null>(null);
-  const [selectedFactionId, setSelectedFactionId] = useState<string | null>(linkFactionId ?? null);
+  const [selectedFactionIds, setSelectedFactionIds] = useState<string[]>(
+    linkFactionId ? [linkFactionId] : [],
+  );
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(initialLocationId ?? null);
   const [linkedNpcId, setLinkedNpcId] = useState<string | null>(null);
   const [linkedNpcRelationType, setLinkedNpcRelationType] = useState<string>("Andere");
   const [worldNPCs, setWorldNPCs] = useState<Array<{ id: string; name: string }>>([]);
-  const [citySim, setCitySim] = useState<CitySimulationFields>({ ...EMPTY_CITY_SIMULATION });
+  const [citySim, setCitySim] = useState<CitySimulationFields>(() =>
+    requireCitySimulation ? activateCitySimulation() : { ...EMPTY_CITY_SIMULATION },
+  );
 
   useEffect(() => {
     if (!portraitFile) {
@@ -333,7 +345,8 @@ export function NarrativeNPCWizard({
           ? mergeNpcSheetWithDefaults(combatSheet)
           : null;
 
-        const citySimCheck = refineCitySimulationPayload(citySim);
+        const citySimFields = requireCitySimulation ? activateCitySimulation(citySim) : citySim;
+        const citySimCheck = refineCitySimulationPayload(citySimFields);
         if (!citySimCheck.ok) {
           throw new Error(citySimCheck.error);
         }
@@ -360,7 +373,8 @@ export function NarrativeNPCWizard({
           image_upload_rights_confirmed: imageUploadRightsConfirmed ?? undefined,
           narrative_hooks: (persona.narrative_hooks ?? undefined)?.map((h) => ({ ...h, name: h.name ?? undefined })) ?? undefined,
           check_results: (persona.check_results ?? undefined) as any,
-          faction_id: selectedFactionId ?? undefined,
+          faction_ids: selectedFactionIds,
+          faction_id: selectedFactionIds[0] ?? undefined,
           current_location_id: selectedLocationId ?? undefined,
           home_location_id: homeLocationId ?? undefined,
           token_url: tokenUrl,
@@ -536,19 +550,12 @@ export function NarrativeNPCWizard({
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Fraktion (optional)</label>
-                  <select
-                    value={selectedFactionId ?? ""}
-                    onChange={(e) => setSelectedFactionId(e.target.value || null)}
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                  >
-                    <option value="">— Keine —</option>
-                    {factions.map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <WorldFactionCheckboxList
+                  compact
+                  factions={factions}
+                  selectedIds={selectedFactionIds}
+                  onChange={setSelectedFactionIds}
+                />
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Religion(en)</label>
                   {religions.length > 0 ? (
@@ -640,8 +647,12 @@ export function NarrativeNPCWizard({
 
             <NpcCitySimulationFields
               value={citySim}
-              onChange={setCitySim}
+              onChange={(next) => {
+                if (requireCitySimulation && !next.forCitySimulation) return;
+                setCitySim(requireCitySimulation ? activateCitySimulation(next) : next);
+              }}
               deities={deities}
+              locked={requireCitySimulation}
             />
 
             {/* Existierenden NPC verbinden */}
@@ -968,19 +979,12 @@ export function NarrativeNPCWizard({
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Fraktion (optional)</label>
-                    <select
-                      value={selectedFactionId ?? ""}
-                      onChange={(e) => setSelectedFactionId(e.target.value || null)}
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                    >
-                      <option value="">Keine</option>
-                      {factions.map((f) => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <WorldFactionCheckboxList
+                    compact
+                    factions={factions}
+                    selectedIds={selectedFactionIds}
+                    onChange={setSelectedFactionIds}
+                  />
                   <div>
                     <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Aufenthaltsort (optional)</label>
                     <select

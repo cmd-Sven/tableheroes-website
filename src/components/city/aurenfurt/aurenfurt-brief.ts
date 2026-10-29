@@ -319,11 +319,16 @@ export function deriveConcerns(input: PlaceBriefInput): string[] {
     lines.push("Hofnahe Ordnung greift hier kaum; Kerzen und Segen halten nicht stand.");
   }
 
-  for (const influence of influences) {
-    if (lines.length >= 3) break;
-    if (/konfession|tempel|glaube|kirche|streit/i.test(`${influence.title} ${influence.summary}`)) {
-      lines.push("Konfessionsstreit ist spürbar und spaltet Blicke und Gebete.");
-    }
+  const confessionLine =
+    "Konfessionsstreit ist spürbar und spaltet Blicke und Gebete.";
+  if (
+    lines.length < 3 &&
+    !lines.includes(confessionLine) &&
+    influences.some((influence) =>
+      /konfession|tempel|glaube|kirche|streit/i.test(`${influence.title} ${influence.summary}`),
+    )
+  ) {
+    lines.push(confessionLine);
   }
 
   return lines.slice(0, 3);

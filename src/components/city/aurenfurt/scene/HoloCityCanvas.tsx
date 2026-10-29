@@ -16,6 +16,7 @@ import type { DayWeather } from "../aurenfurt-weather";
 import type { WeatherFxId } from "../aurenfurt-weather-fx";
 import type { DistrictSector } from "../aurenfurt-sectors";
 import type { SectorCrimeCell } from "../aurenfurt-crime-heatmap";
+import type { PoiReachCell } from "../aurenfurt-sector-reach";
 import type { AurenfurtMapEditorTool } from "../aurenfurt-map-editor-tool";
 import { HoloFocusRig } from "./HoloFocusRig";
 
@@ -54,6 +55,8 @@ type Props = {
   onPickEventSector?: (sector: DistrictSector) => void;
   crimeHeatmapVisible?: boolean;
   crimeCells?: SectorCrimeCell[];
+  poiReachCells?: PoiReachCell[];
+  poiReachVisible?: boolean;
   /** Kamera bleibt stehen, z. B. während der Ort auf der Karte gewählt wird. */
   holdStill?: boolean;
   highlightDistricts?: boolean;
@@ -80,7 +83,11 @@ type Props = {
   onSelectWall: (wallId: string | null) => void;
   onPlaceBuildingPoint: (point: UvPoint) => void;
   onPlacePoiPoint: (point: UvPoint) => void;
+  onMovePoi?: (poiId: string, point: UvPoint) => void;
+  onCommitPoi?: (poiId: string) => void;
   onSelectStreet: (streetId: string | null) => void;
+  /** WebGL-Kontext steht — Lade-Overlay kann auf Assets warten. */
+  onSceneBoot?: () => void;
 };
 
 type BoundaryProps = { children: ReactNode; onRetry?: () => void };
@@ -181,6 +188,8 @@ export default function HoloCityCanvas({
   onPickEventSector,
   crimeHeatmapVisible = false,
   crimeCells = [],
+  poiReachCells = [],
+  poiReachVisible = false,
   holdStill = false,
   highlightDistricts = false,
   buildings,
@@ -206,7 +215,10 @@ export default function HoloCityCanvas({
   onSelectWall,
   onPlaceBuildingPoint,
   onPlacePoiPoint,
+  onMovePoi,
+  onCommitPoi,
   onSelectStreet,
+  onSceneBoot,
 }: Props) {
   const [orbitLocked, setOrbitLocked] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -245,13 +257,7 @@ export default function HoloCityCanvas({
 
   return (
     <HoloCityErrorBoundary key={canvasKey} onRetry={() => setCanvasKey((value) => value + 1)}>
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center font-barlow text-xs font-bold uppercase tracking-wide text-cyan-100/80">
-            Diorama wird gehoben…
-          </div>
-        }
-      >
+      <Suspense fallback={<div className="h-full w-full bg-[#02080c]" aria-hidden />}>
         <Canvas
           camera={{ position: [0.2, 3.5, 5.25], fov: 34, near: 0.1, far: 40 }}
           // Schweben, Autorotation, Wetter und der Heatmap-Fade hängen an useFrame.
@@ -266,6 +272,7 @@ export default function HoloCityCanvas({
             failIfMajorPerformanceCaveat: false,
           }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
+          onCreated={() => onSceneBoot?.()}
           onPointerMissed={() => {
             if (dragActiveRef.current || drawingStreet || drawingWall || placingSomething) return;
             onSelect(null);
@@ -312,6 +319,8 @@ export default function HoloCityCanvas({
               onPickEventSector={onPickEventSector}
               crimeHeatmapVisible={crimeHeatmapVisible}
               crimeCells={crimeCells}
+              poiReachCells={poiReachCells}
+              poiReachVisible={poiReachVisible}
               highlightDistricts={highlightDistricts}
               buildings={buildings}
               pois={pois}
@@ -337,6 +346,8 @@ export default function HoloCityCanvas({
               onSelectWall={onSelectWall}
               onPlaceBuildingPoint={onPlaceBuildingPoint}
               onPlacePoiPoint={onPlacePoiPoint}
+              onMovePoi={onMovePoi}
+              onCommitPoi={onCommitPoi}
               onSelectStreet={onSelectStreet}
               onOrbitLock={setOrbitLocked}
               onDragActive={onDragActive}

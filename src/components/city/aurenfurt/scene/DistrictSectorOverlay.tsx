@@ -5,7 +5,11 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { DistrictSector } from "../aurenfurt-sectors";
-import { createPolygonDistrictGeometry, surfacePoint } from "./diorama-geometry";
+import {
+  createPolygonDistrictGeometry,
+  DISTRICT_OUTLINE_LIFT,
+  surfacePoint,
+} from "./diorama-geometry";
 
 type Props = {
   sectors: DistrictSector[];
@@ -36,7 +40,7 @@ function SectorHit({
   }
 
   return (
-    <mesh geometry={geometry} position={[0, 0.035, 0]} renderOrder={5} onClick={pick}>
+    <mesh geometry={geometry} renderOrder={5} onClick={pick}>
       <meshBasicMaterial
         color={selected ? "#cab926" : "#379806"}
         transparent
@@ -79,7 +83,14 @@ export function DistrictSectorOverlay({
         }
         const wa = surfacePoint(a.u, a.v);
         const wb = surfacePoint(b.u, b.v);
-        positions.push(wa.x, wa.y + 0.055, wa.z, wb.x, wb.y + 0.055, wb.z);
+        positions.push(
+          wa.x,
+          wa.y + DISTRICT_OUTLINE_LIFT,
+          wa.z,
+          wb.x,
+          wb.y + DISTRICT_OUTLINE_LIFT,
+          wb.z,
+        );
       }
     }
 
@@ -143,7 +154,7 @@ export function DistrictSectorOverlay({
             return (
               <Html
                 key={sector.id}
-                position={[world.x, world.y + 0.08, world.z]}
+                position={[world.x, world.y + DISTRICT_OUTLINE_LIFT + 0.02, world.z]}
                 center
                 distanceFactor={7.5}
                 style={{ pointerEvents: "none", userSelect: "none" }}

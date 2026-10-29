@@ -25,6 +25,7 @@ import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
+import { loadWorldFactionsForNpc } from "@/src/lib/npcs/npc-faction-links";
 
 
 // ============================================================================
@@ -56,8 +57,28 @@ export async function getNPCsByFactionForOnboarding(campaignId: string, factionI
     return [];
   }
 
+  const { data: linkRows, error: linkError } = await (supabase.from("npc_faction_links") as any)
+    .select("npcs:npc_id (id, name, title, role, allow_pc_onboarding, world_id)")
+    .eq("faction_id", factionId);
+  if (linkError) {
+    throw new Error(`Fraktionsmitglieder konnten nicht geladen werden: ${linkError.message}`);
+  }
+
+  const byId = new Map<string, any>();
+  for (const npc of npcsRaw || []) {
+    if (npc?.id) byId.set(npc.id, npc);
+  }
+  for (const row of linkRows || []) {
+    const linked = row?.npcs;
+    if (!linked?.id || linked.world_id !== campaign.world_id || byId.has(linked.id)) continue;
+    byId.set(linked.id, linked);
+  }
+  const mergedNpcs = [...byId.values()].sort((a, b) =>
+    String(a.name ?? "").localeCompare(String(b.name ?? ""), "de"),
+  );
+
   const visibility = await getVisibilityForCampaign(campaignId, "npc");
-  const npcs = (npcsRaw || []).filter(
+  const npcs = mergedNpcs.filter(
     (npc: any) => visibility[npc.id] === true && npc.allow_pc_onboarding === true,
   );
   return npcs.map((n: any) => ({ id: n.id, name: n.name, title: n.title, role: n.role })) as { id: string; name: string; title: string | null; role: string | null }[];
@@ -117,7 +138,7 @@ export async function getNPCsByWorld(worldId: string) {
   const { data: npcsRaw, error } = await (supabase.from("npcs") as any)
     .select(`
       *,
-      factions ( id, name, type )
+      factions!npcs_faction_id_fkey ( id, name, type )
     `)
     .eq("world_id", worldId)
     .order("created_at", { ascending: false });
@@ -235,6 +256,15 @@ export async function getNPCById(npcId: string) {
     locationName: (npc as any)?.locations?.name || "Keine Location",
   });
 
+  const primaryFaction = (npc as any).factions?.id
+    ? {
+        id: String((npc as any).factions.id),
+        name: String((npc as any).factions.name ?? ""),
+        type: (npc as any).factions.type ?? null,
+      }
+    : null;
+  const worldFactions = await loadWorldFactionsForNpc(supabase, npcId, primaryFaction);
+
   // 5. Map locations for backward compatibility
   const result = {
     ...npc,
@@ -242,6 +272,8 @@ export async function getNPCById(npcId: string) {
     home_location: (npc as any).home_location || null,
     // Backward compatibility: locations -> current_location
     locations: (npc as any).current_location || null,
+    world_factions: worldFactions,
+    faction_ids: worldFactions.map((faction) => faction.id),
     is_favorite: !!favorite,
     all_quests: [...questsAsGiver, ...questsAsParticipant],
   };

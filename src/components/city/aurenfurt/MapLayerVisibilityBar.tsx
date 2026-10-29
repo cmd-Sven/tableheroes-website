@@ -49,7 +49,7 @@ export function MapLayerVisibilityBar({
 
   return (
     <div
-      className="pointer-events-auto flex items-center"
+      className="pointer-events-auto mb-3 flex items-center gap-0.5 rounded-md border border-hero-border/70 bg-background-dark/95 px-1.5 py-1 shadow-[0_4px_18px_rgba(0,0,0,0.65)] backdrop-blur-sm"
       role="toolbar"
       aria-label="Kartenebenen"
     >
@@ -64,11 +64,18 @@ export function MapLayerVisibilityBar({
             title={name}
             aria-pressed={visible}
             onClick={() => (id === "weather" ? onToggleWeather() : onToggleLayer(id))}
-            className={`grid h-11 w-11 shrink-0 place-items-center bg-transparent p-0 transition-opacity focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-1px] focus-visible:outline-accent-gold ${
-              visible ? "opacity-100" : "opacity-30"
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded transition-[opacity,background-color] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-1px] focus-visible:outline-accent-gold ${
+              visible
+                ? "bg-background-card/80 opacity-100"
+                : "opacity-55 hover:opacity-80"
             }`}
           >
-            <Icon className="h-5 w-5" style={{ color }} aria-hidden />
+            <Icon
+              className="h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]"
+              strokeWidth={2.25}
+              style={{ color }}
+              aria-hidden
+            />
           </button>
         );
       })}

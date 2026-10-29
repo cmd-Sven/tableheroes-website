@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { isCampaignGm } from "@/src/lib/campaign-gm";
 import { resolveFactionImageMeta } from "@/src/lib/faction-image-meta";
 import { setCampaignVisibility } from "../campaign-visibility-actions";
+import { attachNpcFactionMembership } from "@/src/lib/npcs/npc-faction-links";
 
 /**
  * Server Actions für Fraktionen (welt-zentrisch).
@@ -208,6 +209,8 @@ export async function updateFactionPlannedMemberNpcId(
     throw new Error(error.message);
   }
 
+  await attachNpcFactionMembership(supabase, npcId, factionId);
+
   revalidatePath(`/dashboard/worlds/${faction.world_id}`);
 }
 
@@ -262,6 +265,8 @@ export async function linkPlannedMemberByNameToNpc(
     console.error("linkPlannedMemberByNameToNpc Error:", error);
     throw new Error(error.message);
   }
+
+  await attachNpcFactionMembership(supabase, npcId, factionId);
 
   revalidatePath(`/dashboard/worlds/${faction.world_id}`);
 }

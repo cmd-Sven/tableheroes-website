@@ -3,12 +3,32 @@
  */
 "use client";
 
-import type { MutableRefObject } from "react";
-import { UserRound } from "lucide-react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import {
+  setGmConfirmed,
+  setGmMarkedAbsent,
+} from "@/src/app/dashboard/campaigns/[id]/session-rsvp-actions";
+import {
+  SESSION_RSVP_CHANGED_BROADCAST,
+  type SessionRsvpRosterPlayer,
+} from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
+import {
+  applyGmConfirmToTerminePlayer,
+  applyGmDeclineToTerminePlayer,
+} from "@/src/lib/session-rsvp/gm-confirm-optimistic";
+import { sendSessionBroadcast } from "@/src/lib/session/realtime-outbox";
 import { normalizePhysicallyPresentUserIds } from "../live-session-normalize";
 import type { LiveState, PartyCharacter } from "../live-session-types";
 
 type Props = {
+  sessionId: string;
+  userId: string;
+  sessionRsvpRoster: SessionRsvpRosterPlayer[];
+  setSessionRsvpRoster?: Dispatch<SetStateAction<SessionRsvpRosterPlayer[]>>;
   partyCharacters: PartyCharacter[];
   physicallyPresentIdSet: Set<string>;
   liveStateRef: MutableRefObject<LiveState | null>;
@@ -18,6 +38,10 @@ type Props = {
 };
 
 export function LiveSessionLeftDockTableSlot({
+  sessionId,
+  userId,
+  sessionRsvpRoster,
+  setSessionRsvpRoster,
   partyCharacters,
   physicallyPresentIdSet,
   liveStateRef,
@@ -25,8 +49,126 @@ export function LiveSessionLeftDockTableSlot({
   dummyPlayerCountLive,
   isUpdating,
 }: Props) {
+  const router = useRouter();
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingKind, setPendingKind] = useState<"dabei" | "abwesend" | null>(null);
+
+  const markPlayer = (player: SessionRsvpRosterPlayer, kind: "dabei" | "abwesend") => {
+    if (pendingUserId || !setSessionRsvpRoster) return;
+    const previous = sessionRsvpRoster;
+    setSessionRsvpRoster((current) =>
+      current.map((row) => {
+        if (row.userId !== player.userId) return row;
+        const next =
+          kind === "dabei"
+            ? applyGmConfirmToTerminePlayer(row)
+            : applyGmDeclineToTerminePlayer(row);
+        return {
+          ...row,
+          ...next,
+          characterName: row.characterName,
+          canGmManuallyConfirm: !!next.canGmManuallyConfirm,
+          canGmManuallyDecline: !!next.canGmManuallyDecline,
+        };
+      }),
+    );
+    setPendingUserId(player.userId);
+    setPendingKind(kind);
+    void (async () => {
+      try {
+        const res =
+          kind === "dabei"
+            ? await setGmConfirmed(sessionId, player.userId, true)
+            : await setGmMarkedAbsent(sessionId, player.userId);
+        if (!res.success) {
+          throw new Error(res.error ?? "Speichern fehlgeschlagen.");
+        }
+        sendSessionBroadcast(SESSION_RSVP_CHANGED_BROADCAST, {
+          sessionId,
+          senderId: userId,
+        });
+        toast.success(
+          kind === "dabei"
+            ? "Spieler als dabei markiert."
+            : "Spieler als nicht dabei markiert.",
+        );
+        router.refresh();
+      } catch (err: unknown) {
+        setSessionRsvpRoster(previous);
+        toast.error(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+      } finally {
+        setPendingUserId(null);
+        setPendingKind(null);
+      }
+    })();
+  };
+
   return (
     <div className="space-y-4">
+      {sessionRsvpRoster.length > 0 ? (
+        <div className="space-y-2">
+          <p className="font-barlow text-[10px] font-extrabold uppercase text-accent-gold">
+            Sitzungsteilnahme
+          </p>
+          <p className="font-libre text-xs leading-relaxed text-gray-300">
+            Mündliche Zu- und Absagen hältst du hier fest. Abgemeldete Helden verlassen den Tisch.
+          </p>
+          <ul className="max-h-56 space-y-2 overflow-y-auto">
+            {sessionRsvpRoster.map((player) => {
+              const busy = pendingUserId === player.userId;
+              return (
+                <li
+                  key={player.userId}
+                  className="space-y-2 rounded-lg border border-white/10 bg-background-dark/60 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-barlow text-sm font-bold text-gray-200">
+                      {player.characterName?.trim() || player.username}
+                    </span>
+                    <span
+                      className={`shrink-0 font-libre text-[10px] ${
+                        player.status === "offen" ? "text-amber-300" : "text-gray-400"
+                      }`}
+                    >
+                      {player.label}
+                    </span>
+                  </div>
+                  {player.canGmManuallyConfirm || player.canGmManuallyDecline ? (
+                    <div className="flex flex-wrap gap-1">
+                      {player.canGmManuallyConfirm ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => markPlayer(player, "dabei")}
+                          className="inline-flex items-center gap-1 rounded-md border border-accent-gold/40 bg-accent-gold/10 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-accent-gold hover:bg-accent-gold/20 disabled:opacity-50"
+                        >
+                          {busy && pendingKind === "dabei" ? (
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                          ) : null}
+                          Als dabei markieren
+                        </button>
+                      ) : null}
+                      {player.canGmManuallyDecline ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => markPlayer(player, "abwesend")}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-800/50 bg-red-950/30 px-2 py-1 font-barlow text-[10px] font-bold uppercase text-red-200 hover:bg-red-950/50 disabled:opacity-50"
+                        >
+                          {busy && pendingKind === "abwesend" ? (
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                          ) : null}
+                          Als nicht dabei markieren
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
       <p className="font-libre text-xs leading-relaxed text-gray-300">
         Bei Hybridrunden: Wenn jemand physisch am Tisch sitzt, aber keinen Browser offen hat,
         markiere den Charakter hier — das Portrait wird dann nicht mehr ausgegraut.

@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useMemo, useRef, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient as createBrowserSupabase } from "@/src/lib/supabase/client";
@@ -20,6 +20,9 @@ import { useLiveSessionBoardUiState } from "./useLiveSessionBoardUiState";
 import { useLiveSessionChronicleUi } from "./useLiveSessionChronicleUi";
 import { useLiveSessionLiveStateMutations } from "./useLiveSessionLiveStateMutations";
 import { useLiveSessionPreload } from "./useLiveSessionPreload";
+import type { SessionRsvpRosterPlayer } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
+
+const EMPTY_RSVP_ROSTER: SessionRsvpRosterPlayer[] = [];
 
 export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
   const {
@@ -35,6 +38,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     userId,
     initialLiveState,
     partyCharacters,
+    sessionRsvpRoster: initialSessionRsvpRoster = EMPTY_RSVP_ROSTER,
     allCampaignNpcs,
     allCampaignCreatures = [],
     allCampaignFactions,
@@ -150,9 +154,29 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     isGuest,
   });
 
+  const [sessionRsvpRoster, setSessionRsvpRoster] = useState(initialSessionRsvpRoster);
+  const rosterKey = initialSessionRsvpRoster
+    .map((player) => `${player.userId}:${player.status}:${player.label}`)
+    .join("|");
+  useEffect(() => {
+    setSessionRsvpRoster(initialSessionRsvpRoster);
+  }, [rosterKey, initialSessionRsvpRoster]);
+
+  const seatedPartyCharacters = useMemo(() => {
+    const absentIds = new Set(
+      sessionRsvpRoster
+        .filter((player) => player.status === "absage")
+        .map((player) => player.userId),
+    );
+    if (absentIds.size === 0) return partyCharacters;
+    return partyCharacters.filter(
+      (pc) => !pc.playerUserId || !absentIds.has(String(pc.playerUserId)),
+    );
+  }, [partyCharacters, sessionRsvpRoster]);
+
   const derived = useLiveSessionDerivedState({
     liveState,
-    partyCharacters,
+    partyCharacters: seatedPartyCharacters,
     userId,
     isGM,
     forcePlayerView,
@@ -272,7 +296,9 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
       guestSlotIndex,
       forcePlayerView,
       userId,
-      partyCharacters,
+      partyCharacters: seatedPartyCharacters,
+      sessionRsvpRoster,
+      setSessionRsvpRoster,
       allCampaignNpcs,
       allCampaignCreatures,
       allCampaignFactions,

@@ -1,6 +1,12 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { isSessionStatusLive, isSessionStatusScheduled } from "@/src/lib/session-status";
+import {
+  buildSessionRsvpRosterPlayer,
+  isOnSessionRsvpRoster,
+  type SessionRsvpRosterPlayer,
+} from "./session-rsvp-readiness";
 import { revalidatePath } from "next/cache";
 import { sessionRequiresCharacter } from "@/src/lib/session-type";
 
@@ -210,7 +216,172 @@ export async function setGmConfirmed(
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}`, "page");
+  revalidatePath(`/session/${sessionId}`);
   return { success: true };
+}
+
+/**
+ * GM hält eine mündliche Absage fest: der Spieler ist nicht dabei.
+ * Das zählt als Rückmeldung und gibt ihn nicht für den Start frei.
+ */
+export async function setGmMarkedAbsent(
+  sessionId: string,
+  userId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Nicht authentifiziert." };
+
+  const { data: session, error: sessionError } = await (supabase.from("sessions") as any)
+    .select("id, campaign_id, campaigns!inner(gm_id)")
+    .eq("id", sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    return { success: false, error: "Session nicht gefunden." };
+  }
+
+  const campaignGmId = String(
+    (session as { campaigns?: { gm_id?: string } }).campaigns?.gm_id ?? "",
+  );
+  if (campaignGmId !== user.id) {
+    return { success: false, error: "Nur der GM kann absagen." };
+  }
+
+  const campaignId = String((session as { campaign_id: string }).campaign_id);
+  const nowIso = new Date().toISOString();
+
+  const { data: existing } = await (supabase.from("session_rsvps") as any)
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await (supabase.from("session_rsvps") as any)
+      .update({
+        rsvp_status: "Absage",
+        gm_confirmed: false,
+        updated_at: nowIso,
+      })
+      .eq("id", existing.id);
+    if (error) return { success: false, error: error.message };
+  } else {
+    const { error } = await (supabase.from("session_rsvps") as any).insert({
+      session_id: sessionId,
+      user_id: userId,
+      rsvp_status: "Absage",
+      gm_confirmed: false,
+      updated_at: nowIso,
+    });
+    if (error) return { success: false, error: error.message };
+  }
+
+  revalidatePath(`/dashboard/campaigns/${campaignId}`, "page");
+  revalidatePath(`/session/${sessionId}`);
+  return { success: true };
+}
+
+/** Spielerliste für die Live-Session: der SL kann dabei und nicht dabei setzen. */
+export async function getGmSessionRsvpRoster(
+  sessionId: string,
+): Promise<SessionRsvpRosterPlayer[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: session } = await (supabase.from("sessions") as any)
+    .select("id, status, campaign_id, campaigns!inner(gm_id)")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!session) return [];
+
+  const campaignGmId = String(
+    (session as { campaigns?: { gm_id?: string } }).campaigns?.gm_id ?? "",
+  );
+  if (campaignGmId !== user.id) return [];
+
+  const status = String((session as { status?: string }).status ?? "");
+  const allowGmActions =
+    isSessionStatusScheduled(status) || isSessionStatusLive(status);
+  const campaignId = String((session as { campaign_id: string }).campaign_id);
+
+  const [{ data: members }, { data: rsvps }] = await Promise.all([
+    (supabase.from("campaign_members") as any)
+      .select("user_id, character_id, users(username)")
+      .eq("campaign_id", campaignId)
+      .in("status", ["Accepted", "Approved", "Active", "Drafting", "In_Review"]),
+    (supabase.from("session_rsvps") as any)
+      .select("user_id, rsvp_status, gm_confirmed")
+      .eq("session_id", sessionId),
+  ]);
+
+  const memberRows = (members as Array<{
+    user_id?: string;
+    character_id?: string | null;
+    users?: { username?: string | null } | { username?: string | null }[] | null;
+  }> | null) ?? [];
+  const characterIds = [
+    ...new Set(
+      memberRows
+        .map((member) => (member.character_id ? String(member.character_id) : ""))
+        .filter((id) => id !== ""),
+    ),
+  ];
+  const characterNameById = new Map<string, string>();
+  if (characterIds.length > 0) {
+    const { data: characters } = await (supabase.from("characters") as any)
+      .select("id, name")
+      .in("id", characterIds);
+    for (const character of (characters as Array<{ id?: string; name?: string | null }> | null) ?? []) {
+      if (!character.id) continue;
+      characterNameById.set(String(character.id), String(character.name ?? ""));
+    }
+  }
+
+  const byUser = new Map<string, { rsvp_status: string; gm_confirmed: boolean }>();
+  for (const row of (rsvps as Array<{ user_id?: string; rsvp_status?: string; gm_confirmed?: boolean }> | null) ?? []) {
+    if (!row.user_id) continue;
+    byUser.set(String(row.user_id), {
+      rsvp_status: String(row.rsvp_status ?? ""),
+      gm_confirmed: !!row.gm_confirmed,
+    });
+  }
+
+  const players: SessionRsvpRosterPlayer[] = [];
+  for (const member of memberRows) {
+    const userId = String(member.user_id ?? "");
+    const characterId = member.character_id ? String(member.character_id) : "";
+    if (
+      !isOnSessionRsvpRoster({
+        memberUserId: userId,
+        gmUserId: campaignGmId,
+        hasCharacter: Boolean(characterId),
+      })
+    ) {
+      continue;
+    }
+    const userRow = Array.isArray(member.users) ? member.users[0] : member.users;
+    const characterName = characterId ? characterNameById.get(characterId) ?? null : null;
+    players.push(
+      buildSessionRsvpRosterPlayer({
+        userId,
+        username: String(userRow?.username ?? "Spieler"),
+        characterName: characterName && characterName.trim() !== "" ? characterName : null,
+        row: byUser.get(userId),
+        allowGmActions,
+      }),
+    );
+  }
+
+  players.sort((a, b) =>
+    (a.characterName || a.username).localeCompare(b.characterName || b.username, "de"),
+  );
+  return players;
 }
 
 /**

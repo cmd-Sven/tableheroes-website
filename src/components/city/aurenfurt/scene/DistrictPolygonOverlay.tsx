@@ -6,7 +6,12 @@ import * as THREE from "three";
 import type { CityDistrictId } from "../aurenfurt-districts";
 import type { UvPoint } from "../aurenfurt-district-polygons";
 import { worldXZToUv } from "../aurenfurt-district-polygons";
-import { DIORAMA_DEPTH, DIORAMA_WIDTH, surfacePoint } from "./diorama-geometry";
+import {
+  DIORAMA_DEPTH,
+  DIORAMA_WIDTH,
+  DISTRICT_OUTLINE_LIFT,
+  surfacePoint,
+} from "./diorama-geometry";
 
 type Props = {
   districtId: CityDistrictId;
@@ -32,13 +37,13 @@ export function DistrictPolygonOverlay({
     for (let i = 0; i < points.length; i += 1) {
       const point = surfacePoint(points[i].u, points[i].v);
       positions[i * 3] = point.x;
-      positions[i * 3 + 1] = point.y + 0.06;
+      positions[i * 3 + 1] = point.y + DISTRICT_OUTLINE_LIFT;
       positions[i * 3 + 2] = point.z;
     }
     const first = surfacePoint(points[0].u, points[0].v);
     const last = points.length * 3;
     positions[last] = first.x;
-    positions[last + 1] = first.y + 0.06;
+    positions[last + 1] = first.y + DISTRICT_OUTLINE_LIFT;
     positions[last + 2] = first.z;
 
     const geometry = new THREE.BufferGeometry();

@@ -18,6 +18,7 @@ import { InlineEditField } from "./InlineEditField";
 import { TravelQuickAction } from "./TravelQuickAction";
 import { ALIGNMENTS, NPC_STATUSES } from "./types";
 import { getAlignmentColor } from "./getAlignmentColor";
+import { factionName, isCityFactionId } from "@/src/components/city/aurenfurt/aurenfurt-factions";
 import type { NPCDetailController } from "./useNPCDetailPage";
 
 export function NPCDetailIdentityCard({ c }: { c: NPCDetailController }) {
@@ -49,6 +50,17 @@ export function NPCDetailIdentityCard({ c }: { c: NPCDetailController }) {
     handleCancelEdit,
     router,
   } = c;
+
+  const worldFactions =
+    npc.world_factions && npc.world_factions.length > 0
+      ? npc.world_factions
+      : npc.factions?.id
+        ? [npc.factions]
+        : [];
+  const cityFactionLabel =
+    npc.city_faction_id && isCityFactionId(npc.city_faction_id)
+      ? factionName(npc.city_faction_id)
+      : null;
 
   return (
     <>
@@ -356,25 +368,47 @@ export function NPCDetailIdentityCard({ c }: { c: NPCDetailController }) {
                 </select>
               }
             >
-              {npc.factions ? (
-                <div className="flex items-center gap-2">
-                  <span className="font-libre text-gray-400">Fraktion:</span>
-                  <span className="font-libre text-accent-gold font-semibold">
-                    {npc.factions.name}
-                  </span>
+              {worldFactions.length > 0 ? (
+                <div className="space-y-1">
+                  <span className="font-libre text-gray-400">Welt-Fraktionen:</span>
+                  <ul className="space-y-1">
+                    {worldFactions.map((faction) => (
+                      <li key={faction.id} className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/campaigns/${campaignId}/factions/${faction.id}`}
+                          className="font-libre font-semibold text-accent-gold hover:underline"
+                        >
+                          {faction.name}
+                        </Link>
+                        {faction.id === npc.faction_id ? (
+                          <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
+                            Primär
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : canEdit ? (
                 <button
                   onClick={() => handleStartEdit("faction_id", null)}
                   className="text-gray-500 hover:text-accent-gold text-sm font-libre"
                 >
-                  + Fraktion hinzufügen
+                  + Welt-Fraktion hinzufügen
                 </button>
               ) : (
                 <p className="font-libre text-gray-500 text-sm">
-                  Keine Fraktion
+                  Keine Welt-Fraktion
                 </p>
               )}
+              {cityFactionLabel ? (
+                <p className="mt-2 font-libre text-sm text-gray-200">
+                  <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                    Stadtsimulation (Aurenfurt):{" "}
+                  </span>
+                  {cityFactionLabel}
+                </p>
+              ) : null}
             </InlineEditField>
 
             {/* Location */}

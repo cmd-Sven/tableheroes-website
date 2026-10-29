@@ -414,6 +414,239 @@ export type UpdateAurenfurtMapPoiPositionResult =
   | { ok: true; poi: AurenfurtMapPoi }
   | { ok: false; error: string };
 
+export type MapLocationLeadNpc = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  role: string | null;
+};
+
+/**
+ * Führender NPC eines Orts: zuerst Ansässige (home), sonst Gäste (current).
+ * Nur mit Portrait, damit das Kartenfenster einen Kreis zeigen kann.
+ */
+export async function loadLeadingNpcForMapLocation(
+  worldId: string,
+  locationId: string,
+  options?: { fallbackCatalogId?: string | null },
+): Promise<MapLocationLeadNpc | null> {
+  if (!worldId || !locationId) return null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const canRead =
+      (await rpcFlag(supabase, "user_can_access_world_maps")) ||
+      (await rpcFlag(supabase, "user_is_world_gm"));
+    if (!canRead) {
+      const { data: profile } = await (supabase.from("users") as any)
+        .select("is_admin, primary_role")
+        .eq("id", user.id)
+        .maybeSingle();
+      const admin =
+        Boolean((profile as { is_admin?: boolean } | null)?.is_admin) ||
+        (profile as { primary_role?: string } | null)?.primary_role === "Admin";
+      if (!admin) return null;
+    }
+
+    const pick = (
+      rows: Array<{ id: string; name: string | null; image_url: string | null; role: string | null }>,
+    ) => {
+      for (const row of rows) {
+        const imageUrl = (row.image_url ?? "").trim();
+        if (!imageUrl) continue;
+        const name = (row.name ?? "").trim();
+        if (!name) continue;
+        return {
+          id: row.id,
+          name,
+          imageUrl,
+          role: (row.role ?? "").trim() || null,
+        } satisfies MapLocationLeadNpc;
+      }
+      return null;
+    };
+
+    const { data: residents } = await (supabase.from("npcs") as any)
+      .select("id, name, image_url, role")
+      .eq("world_id", worldId)
+      .eq("home_location_id", locationId)
+      .order("name", { ascending: true })
+      .limit(8);
+
+    const resident = pick(
+      (residents ?? []) as Array<{
+        id: string;
+        name: string | null;
+        image_url: string | null;
+        role: string | null;
+      }>,
+    );
+    if (resident) return resident;
+
+    const { data: guests } = await (supabase.from("npcs") as any)
+      .select("id, name, image_url, role")
+      .eq("world_id", worldId)
+      .eq("current_location_id", locationId)
+      .order("name", { ascending: true })
+      .limit(8);
+
+    const guest = pick(
+      (guests ?? []) as Array<{
+        id: string;
+        name: string | null;
+        image_url: string | null;
+        role: string | null;
+      }>,
+    );
+    if (guest) return guest;
+
+    const fallbackCatalogId = options?.fallbackCatalogId?.trim();
+    if (!fallbackCatalogId) return null;
+
+    const { data: catalogNpc } = await (supabase.from("npcs") as any)
+      .select("id, name, image_url, role")
+      .eq("world_id", worldId)
+      .eq("aurenfurt_catalog_id", fallbackCatalogId)
+      .maybeSingle();
+
+    return catalogNpc
+      ? pick([
+          catalogNpc as {
+            id: string;
+            name: string | null;
+            image_url: string | null;
+            role: string | null;
+          },
+        ])
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export type MapNpcOverlayDetail = {
+  id: string;
+  name: string;
+  title: string | null;
+  role: string | null;
+  race: string | null;
+  status: string | null;
+  alignment: string | null;
+  imageUrl: string;
+  description: string | null;
+  forCitySimulation: boolean;
+  cityInfluenceTier: string | null;
+  cityFactionId: string | null;
+  cityDeity: string | null;
+  cityAgenda: string | null;
+  cityAxisLoyalCriminal: number | null;
+  cityAxisGreedyAltruist: number | null;
+  cityAxisPiousSkeptic: number | null;
+  cityAxisSuperstitionReason: number | null;
+  /** Nur für den Spielleiter befüllt. */
+  eventCards: Array<{
+    id: string;
+    title: string;
+    text: string;
+    trigger: string | null;
+    sortOrder: number;
+    durationDays?: number;
+    range?: "district" | "adjacent" | "sector" | "city";
+    sectorLabel?: string | null;
+    effects?: Array<{ meter: string; delta: number }>;
+  }>;
+  cardPlays: Array<{ cardId: string; startedOn: string }>;
+  isGm: boolean;
+};
+
+/**
+ * Volle Karten-Overlay-Daten zu einem NPC (Portrait-Klick).
+ * Ereigniskarten nur für den Spielleiter der Welt.
+ */
+export async function loadMapNpcOverlayDetail(
+  worldId: string,
+  npcId: string,
+): Promise<MapNpcOverlayDetail | null> {
+  if (!worldId || !npcId) return null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const [mapViewer, worldGm] = await Promise.all([
+      rpcFlag(supabase, "user_can_access_world_maps"),
+      rpcFlag(supabase, "user_is_world_gm"),
+    ]);
+    const { data: profile } = await (supabase.from("users") as any)
+      .select("is_admin, primary_role")
+      .eq("id", user.id)
+      .maybeSingle();
+    const staff =
+      Boolean((profile as { is_admin?: boolean } | null)?.is_admin) ||
+      (profile as { primary_role?: string } | null)?.primary_role === "Admin";
+    if (!mapViewer && !worldGm && !staff) return null;
+
+    const { data: row } = await (supabase.from("npcs") as any)
+      .select(
+        "id, name, title, role, race, status, alignment, image_url, description, world_id, for_city_simulation, city_influence_tier, city_faction_id, city_deity, city_agenda, city_axis_loyal_criminal, city_axis_greedy_altruist, city_axis_pious_skeptic, city_axis_superstition_reason, city_event_deck, city_card_plays",
+      )
+      .eq("id", npcId)
+      .eq("world_id", worldId)
+      .maybeSingle();
+    if (!row) return null;
+
+    const { citySimulationFromDb } = await import("@/src/lib/npcs/city-simulation");
+    const city = citySimulationFromDb(row as Parameters<typeof citySimulationFromDb>[0]);
+    const isGm = worldGm || staff;
+    const imageUrl = ((row as { image_url?: string | null }).image_url ?? "").trim();
+    if (!imageUrl) return null;
+
+    return {
+      id: String((row as { id: string }).id),
+      name: String((row as { name?: string | null }).name ?? "").trim() || "Unbekannt",
+      title: ((row as { title?: string | null }).title ?? "").trim() || null,
+      role: ((row as { role?: string | null }).role ?? "").trim() || null,
+      race: ((row as { race?: string | null }).race ?? "").trim() || null,
+      status: ((row as { status?: string | null }).status ?? "").trim() || null,
+      alignment: ((row as { alignment?: string | null }).alignment ?? "").trim() || null,
+      imageUrl,
+      description: ((row as { description?: string | null }).description ?? "").trim() || null,
+      forCitySimulation: city.forCitySimulation,
+      cityInfluenceTier: city.cityInfluenceTier,
+      cityFactionId: city.cityFactionId,
+      cityDeity: city.cityDeity,
+      cityAgenda: city.cityAgenda,
+      cityAxisLoyalCriminal: city.cityAxisLoyalCriminal,
+      cityAxisGreedyAltruist: city.cityAxisGreedyAltruist,
+      cityAxisPiousSkeptic: city.cityAxisPiousSkeptic,
+      cityAxisSuperstitionReason: city.cityAxisSuperstitionReason,
+      eventCards: isGm
+        ? city.cityEventDeck.map((card) => ({
+            id: card.id,
+            title: card.title,
+            text: card.text,
+            trigger: card.trigger ?? null,
+            sortOrder: card.sortOrder,
+            durationDays: card.durationDays,
+            range: card.range,
+            sectorLabel: card.sectorLabel ?? null,
+            effects: card.effects,
+          }))
+        : [],
+      cardPlays: isGm ? city.cityCardPlays.map((play) => ({ ...play })) : [],
+      isGm,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Bestehende DB-Felder map_u / map_v / map_district_id — kein neuer Speicherpfad. */
 export async function updateAurenfurtMapPoiPosition(
   input: UpdateAurenfurtMapPoiPositionInput,

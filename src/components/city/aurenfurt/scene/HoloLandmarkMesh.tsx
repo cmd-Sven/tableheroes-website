@@ -2,11 +2,46 @@
 
 import { useLayoutEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
-import { Box3, Matrix4, Vector3, type Mesh, type Object3D } from "three";
+import {
+  Box3,
+  Color,
+  Matrix4,
+  Vector3,
+  type Material,
+  type Mesh,
+  type MeshStandardMaterial,
+  type Object3D,
+} from "three";
 import type { LandmarkModel } from "../aurenfurt-districts";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
 import { disposeCloneKeepSource } from "./dispose-cloned-gltf";
 import { HeavyGlbSlot } from "./HeavyGlbSlot";
+
+const LIT_EMISSIVE = new Color("#fff4c8");
+
+export function applyLandmarkLit(root: Object3D, lit: boolean) {
+  root.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    const materials: Material[] = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      const standard = material as MeshStandardMaterial;
+      if (!standard || typeof standard.emissiveIntensity !== "number") continue;
+      if (!standard.userData.holoBaseEmissiveIntensity) {
+        standard.userData.holoBaseEmissiveIntensity = standard.emissiveIntensity;
+        standard.userData.holoBaseEmissive = standard.emissive?.clone?.() ?? new Color(0x000000);
+      }
+      if (lit) {
+        standard.emissive.copy(LIT_EMISSIVE);
+        standard.emissiveIntensity = Math.max(0.35, standard.userData.holoBaseEmissiveIntensity + 0.28);
+      } else {
+        standard.emissive.copy(standard.userData.holoBaseEmissive);
+        standard.emissiveIntensity = standard.userData.holoBaseEmissiveIntensity;
+      }
+      standard.needsUpdate = true;
+    }
+  });
+}
 
 export const LANDMARK_URL: Record<LandmarkModel, string> = {
   wirtshaus: "/models/aurenfurt/wirtshaus.glb",
@@ -75,12 +110,15 @@ type Props = {
   scaleMultiplier?: number;
   /** Drehung um die Hochachse, in Grad. Das Gebäude bleibt auf dem Pin. */
   rotationDegrees?: number;
+  /** Auswahl oder Hover: Modell etwas heller. */
+  lit?: boolean;
 };
 
 export function HoloLandmarkMesh({
   model,
   scaleMultiplier = LANDMARK_SCALE_DEFAULT,
   rotationDegrees = 0,
+  lit = false,
 }: Props) {
   const url = LANDMARK_URL[model];
   return (
@@ -89,6 +127,7 @@ export function HoloLandmarkMesh({
         url={url}
         scaleMultiplier={scaleMultiplier}
         rotationDegrees={rotationDegrees}
+        lit={lit}
       />
     </HeavyGlbSlot>
   );
@@ -98,10 +137,12 @@ function HoloLandmarkBody({
   url,
   scaleMultiplier,
   rotationDegrees,
+  lit,
 }: {
   url: string;
   scaleMultiplier: number;
   rotationDegrees: number;
+  lit: boolean;
 }) {
   const { scene } = useGLTF(url);
   const object = useMemo(() => scene.clone(true), [scene]);
@@ -116,6 +157,10 @@ function HoloLandmarkBody({
     object.scale.setScalar(scale);
     object.position.set(-bounds.centerX * scale, -bounds.minY * scale, -bounds.centerZ * scale);
   }, [object, scaleMultiplier]);
+
+  useLayoutEffect(() => {
+    applyLandmarkLit(object, lit);
+  }, [lit, object]);
 
   useLayoutEffect(() => () => disposeCloneKeepSource(object, scene), [object, scene]);
 

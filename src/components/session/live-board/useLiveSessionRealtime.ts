@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { registerSessionOnlinePresence } from "@/src/lib/actions/session-presence-actions";
@@ -71,6 +72,7 @@ import {
   type SessionLivePatchDetail,
 } from "@/src/lib/session/live-state-patch";
 import { markSessionBroadcastReady, sendSessionBroadcast } from "@/src/lib/session/realtime-outbox";
+import { SESSION_RSVP_CHANGED_BROADCAST } from "@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness";
 import {
   SESSION_ACTIVITY_POSTED_BROADCAST,
   SESSION_ACTIVITY_POSTED_EVENT,
@@ -113,6 +115,7 @@ export function useLiveSessionRealtime({
   liveChannelRef,
   bm,
 }: Params) {
+  const router = useRouter();
   const [presentUserIds, setPresentUserIds] = useState<Set<string>>(() => new Set());
 
   const {
@@ -523,6 +526,11 @@ export function useLiveSessionRealtime({
           }),
         );
       })
+      .on("broadcast", { event: SESSION_RSVP_CHANGED_BROADCAST }, (payload) => {
+        const raw = (payload.payload ?? {}) as { senderId?: unknown };
+        if (raw.senderId != null && String(raw.senderId) === userId) return;
+        router.refresh();
+      })
       .on("broadcast", { event: SESSION_ACTIVITY_POSTED_BROADCAST }, (payload) => {
         const raw = (payload.payload ?? {}) as {
           entry?: unknown;
@@ -562,7 +570,7 @@ export function useLiveSessionRealtime({
       }
       supabase.removeChannel(channel);
     };
-  }, [sessionId, showNpcReaction, supabase, userId, isGM, isGuest]);
+  }, [sessionId, showNpcReaction, supabase, userId, isGM, isGuest, router]);
 
   useEffect(() => {
     if (isGuest) return;

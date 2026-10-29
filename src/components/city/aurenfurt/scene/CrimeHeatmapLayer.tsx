@@ -104,7 +104,7 @@ export function CrimeHeatmapLayer({ cells, visible }: Props) {
   if (!present || drawn.length === 0 || !hasMesh) return null;
 
   return (
-    <mesh geometry={geometry} position={[0, 0.02, 0]} renderOrder={3} raycast={() => undefined}>
+    <mesh geometry={geometry} position={[0, 0.01, 0]} renderOrder={3} raycast={() => undefined}>
       <shaderMaterial
         ref={materialRef}
         transparent

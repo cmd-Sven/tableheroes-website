@@ -8,7 +8,7 @@
 import { AURENFURT_DISTRICTS, type CityDistrictId } from "./aurenfurt-districts";
 import { buildingWeights, citySimVersion } from "./aurenfurt-city-sim";
 import { allFactionStandings } from "./aurenfurt-factions";
-import { chronicleInWindow } from "./aurenfurt-chronicle";
+import { chronicleInWindow, chronicleMarksOn } from "./aurenfurt-chronicle";
 import {
   AURENFURT_HISTORY,
   HISTORY_START,
@@ -16,6 +16,7 @@ import {
   eventWeight,
   formatDay,
   parseDay,
+  pressureNotesOn,
   utcToday,
 } from "./aurenfurt-history";
 import { SIM_METERS, type SimMeterKey, type SimProfile } from "./aurenfurt-sim";
@@ -64,6 +65,12 @@ export type AnalyticsPoint = {
   elysia: number;
   chromus: number;
   tension: number;
+  /** Namen, die an den Tagen dieses Punktes aktiv sind. */
+  events: string[];
+  /** Erster ISO-Tag, den der Punkt bündelt. */
+  day: string;
+  /** Letzter ISO-Tag, den der Punkt bündelt. */
+  until: string;
 };
 
 export type DistrictRank = {
@@ -85,6 +92,10 @@ export type AnalyticsEvent = {
   title: string;
   summary: string;
   weight: number;
+  /** ISO-Anfang, wenn die Quelle einen hat. */
+  start: string | null;
+  /** ISO-Ende, wenn die Quelle eines hat. Offen oder fehlend: keine Fläche. */
+  end: string | null;
 };
 
 export type AnalyticsFaction = {
@@ -306,7 +317,13 @@ function comparePhrase(range: AnalyticsRange, to: number, hasPrevious: boolean) 
   if (end.getUTCDate() < last) return "gegen dieselben Tage im Vormonat";
   return "gegen den Vormonat";
 }
-function pointFrom(label: string, profile: SimProfile): AnalyticsPoint {
+function pointFrom(
+  label: string,
+  profile: SimProfile,
+  events: string[],
+  day: string,
+  until: string,
+): AnalyticsPoint {
   return {
     label,
     crime: profile.crime,
@@ -319,7 +336,41 @@ function pointFrom(label: string, profile: SimProfile): AnalyticsPoint {
     elysia: profile.elysia,
     chromus: profile.chromus,
     tension: tensionOf(profile),
+    events,
+    day,
+    until,
   };
+}
+
+function activeNames(day: number, scopeId: CityDistrictId | null): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const add = (name: string) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    names.push(name);
+  };
+  for (const event of AURENFURT_HISTORY) {
+    if (eventWeight(event, day) < 0.2) continue;
+    if (scopeId && !event.impact[scopeId]) continue;
+    add(event.title);
+  }
+  for (const mark of chronicleMarksOn(day, scopeId)) add(mark.title);
+  for (const note of pressureNotesOn(day)) add(note.title);
+  return names;
+}
+
+function namesOnDays(days: number[], scopeId: CityDistrictId | null) {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const day of days) {
+    for (const name of activeNames(day, scopeId)) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      names.push(name);
+    }
+  }
+  return names;
 }
 
 function previousWindow(range: AnalyticsRange, from: number, to: number) {
@@ -349,22 +400,32 @@ function chartSeries(
   scopeId: CityDistrictId | null,
 ) {
   if (range === "year") {
-    const buckets = new Map<string, SimProfile[]>();
+    const buckets = new Map<string, { profiles: SimProfile[]; days: number[] }>();
     for (const day of windowDays) {
       const date = new Date(day);
       const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
-      const list = buckets.get(key) ?? [];
-      list.push(scopeProfile(rememberBundle(day), scopeId));
-      buckets.set(key, list);
+      const bucket = buckets.get(key) ?? { profiles: [], days: [] };
+      bucket.profiles.push(scopeProfile(rememberBundle(day), scopeId));
+      bucket.days.push(day);
+      buckets.set(key, bucket);
     }
-    return [...buckets.entries()].map(([key, profiles]) => {
+    return [...buckets.entries()].map(([key, bucket]) => {
       const month = Number(key.split("-")[1]);
-      return pointFrom(MONTHS_SHORT[month] ?? key, averageProfiles(profiles));
+      return pointFrom(
+        MONTHS_SHORT[month] ?? key,
+        averageProfiles(bucket.profiles),
+        namesOnDays(bucket.days, scopeId),
+        formatDay(bucket.days[0]),
+        formatDay(bucket.days[bucket.days.length - 1]),
+      );
     });
   }
 
   const plotted = range === "day" ? eachDay(anchor - 13 * DAY_MS, anchor) : windowDays;
-  return plotted.map((day) => pointFrom(shortDay(day), scopeProfile(rememberBundle(day), scopeId)));
+  return plotted.map((day) => {
+    const iso = formatDay(day);
+    return pointFrom(shortDay(day), scopeProfile(rememberBundle(day), scopeId), activeNames(day, scopeId), iso, iso);
+  });
 }
 
 function weatherShares(
@@ -410,15 +471,48 @@ function eventsIn(days: number[], scopeId: CityDistrictId | null): AnalyticsEven
     for (const day of days) peak = Math.max(peak, eventWeight(event, day));
     if (peak < 0.2) return [];
     if (scopeId && !event.impact[scopeId]) return [];
-    return [{ id: event.id, title: event.title, summary: event.summary, weight: peak }];
+    return [
+      {
+        id: event.id,
+        title: event.title,
+        summary: event.summary,
+        weight: peak,
+        start: event.start,
+        end: event.end,
+      },
+    ];
   });
   const chronicle = chronicleInWindow(days, scopeId).map((mark) => ({
     id: mark.id,
     title: mark.title,
     summary: mark.summary,
     weight: 1,
+    start: null,
+    end: null,
   }));
-  return [...history, ...chronicle].sort((a, b) => b.weight - a.weight);
+  const ranked = [...history, ...chronicle].sort((a, b) => b.weight - a.weight);
+  const taken = new Set(ranked.map((event) => event.title));
+  const seenIds = new Set<string>();
+  const pressure: AnalyticsEvent[] = [];
+  for (const day of days) {
+    const dayNames = new Set<string>();
+    for (const note of pressureNotesOn(day)) {
+      if (dayNames.has(note.title)) continue;
+      dayNames.add(note.title);
+      if (taken.has(note.title) || seenIds.has(note.id)) continue;
+      seenIds.add(note.id);
+      taken.add(note.title);
+      pressure.push({
+        id: note.id,
+        title: note.title,
+        summary: note.detail,
+        weight: 0,
+        start: null,
+        end: null,
+      });
+    }
+  }
+  return [...ranked, ...pressure];
 }
 
 function signed(value: number) {

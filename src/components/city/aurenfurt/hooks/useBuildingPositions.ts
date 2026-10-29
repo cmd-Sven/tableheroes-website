@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   loadCityMapPlacements,
   markerBuildingsFromPlacements,
+  placementsToLocationIds,
   placementsToPositions,
   saveCityMapPosition,
   saveCityMapPositions,
@@ -15,6 +16,7 @@ import type { EditorCityBuilding } from "../aurenfurt-map-buildings";
 
 export function useBuildingPositions(worldId: string, isGm: boolean) {
   const [positions, setPositions] = useState<BuildingPositions>(() => defaultBuildingPositions());
+  const [locationIds, setLocationIds] = useState<Record<string, string>>({});
   const [markerBuildings, setMarkerBuildings] = useState<EditorCityBuilding[]>([]);
   const [saved, setSaved] = useState(false);
   const [ready, setReady] = useState(false);
@@ -27,6 +29,7 @@ export function useBuildingPositions(worldId: string, isGm: boolean) {
       .then((result) => {
         if (!active) return;
         setPositions(placementsToPositions(result.data));
+        setLocationIds(placementsToLocationIds(result.data));
         setMarkerBuildings(markerBuildingsFromPlacements(result.data));
         setSaved(result.saved);
         setSaveError(result.error);
@@ -87,6 +90,7 @@ export function useBuildingPositions(worldId: string, isGm: boolean) {
 
   return {
     positions,
+    locationIds,
     markerBuildings,
     moveBuilding,
     placeAndCommit,

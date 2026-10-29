@@ -55,6 +55,12 @@ export type LiveSessionLeftDockSessionProps = {
   userId: string;
   isPrepMode: boolean;
   partyCharacters: PartyCharacter[];
+  sessionRsvpRoster?: import("@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness").SessionRsvpRosterPlayer[];
+  setSessionRsvpRoster?: import("react").Dispatch<
+    import("react").SetStateAction<
+      import("@/src/app/dashboard/campaigns/[id]/session-rsvp-readiness").SessionRsvpRosterPlayer[]
+    >
+  >;
   currentPlayerCharacter: PartyCharacter | null | undefined;
   prepTestCharacterId: string | null;
   setPrepTestCharacterId: Dispatch<SetStateAction<string | null>>;
@@ -179,6 +185,8 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
     userId,
     isPrepMode,
     partyCharacters,
+    sessionRsvpRoster = [],
+    setSessionRsvpRoster,
     currentPlayerCharacter,
     prepTestCharacterId,
     setPrepTestCharacterId,
@@ -672,6 +680,10 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
         }
         tableContent={
           <LiveSessionLeftDockTableSlot
+            sessionId={sessionId}
+            userId={userId}
+            sessionRsvpRoster={sessionRsvpRoster}
+            setSessionRsvpRoster={setSessionRsvpRoster}
             partyCharacters={partyCharacters}
             physicallyPresentIdSet={physicallyPresentIdSet}
             liveStateRef={liveStateRef}

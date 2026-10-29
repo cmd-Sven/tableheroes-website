@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
-import { motion } from "framer-motion";
-import { Droplets, Landmark, MapPin, Square, Trees, type LucideIcon } from "lucide-react";
-import Image from "next/image";
-import {
-  poiLoreHref,
-  poiTooltipImage,
-  type AurenfurtMapPoi,
-  type PoiKind,
-} from "../aurenfurt-map-pois";
-import { surfacePoint } from "./diorama-geometry";
+import { useThree, type ThreeEvent } from "@react-three/fiber";
+import * as THREE from "three";
+import { DoubleSide } from "three";
+import type { AurenfurtMapPoi } from "../aurenfurt-map-pois";
+import { worldXZToUv, type UvPoint } from "../aurenfurt-district-polygons";
+import { DIORAMA_DEPTH, DIORAMA_WIDTH, DISTRICT_SURFACE_LIFT, surfacePoint } from "./diorama-geometry";
 
 type Props = {
   poi: AurenfurtMapPoi;
@@ -20,161 +15,199 @@ type Props = {
   campaignId?: string | null;
   selected: boolean;
   suppressSelect: boolean;
+  /** Im Orte-Editor: Token frei ziehen, ohne Sektor-Raster. */
+  editable?: boolean;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
+  onMove?: (poiId: string, point: UvPoint) => void;
+  onCommit?: (poiId: string) => void;
+  onOrbitLock?: (locked: boolean) => void;
+  onDragActive?: (active: boolean) => void;
 };
 
-const KIND_ICON: Record<PoiKind, LucideIcon> = {
-  Brunnen: Droplets,
-  Statue: Landmark,
-  Parkanlage: Trees,
-  Denkmal: Landmark,
-  Platz: Square,
-  "sonstiger Ort": MapPin,
-};
+const TOKEN_R = 0.085;
+const GOLD = "#cab926";
+const DARK = "#0a1f10";
+const LIT = "#1a4a28";
 
-/**
- * Der frühere Gold-Pin lag fast in der angehobenen Stadtfläche (Plattform +0.012,
- * Ring nur +0.015) und verschwand im Kartenfoto. Der Token ist dasselbe Objekt,
- * als flaches DOM-Element über der gespeicherten UV-Position.
- */
+/** Flacher Token: Hover zeigt nur den Namen, Klick öffnet das Seitenfenster. */
 export function HoloPoiMarker({
   poi,
-  worldId,
-  campaignId = null,
   selected,
   suppressSelect,
+  editable = false,
   onSelect,
   onHover,
+  onMove,
+  onCommit,
+  onOrbitLock,
+  onDragActive,
 }: Props) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const tipRef = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
-  const [imageBroken, setImageBroken] = useState(false);
-  const position = surfacePoint(poi.u, poi.v);
-  const Icon = KIND_ICON[poi.kind] ?? MapPin;
-  const imageSrc = imageBroken ? null : poiTooltipImage(poi.imageUrl);
-  const loreHref = poiLoreHref(worldId, poi.id, campaignId);
+  const { camera, gl } = useThree();
+  const [hot, setHot] = useState(false);
+  const draggingRef = useRef(false);
+  const listenersRef = useRef<{ move: (ev: PointerEvent) => void; up: () => void } | null>(null);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+  const hit = useMemo(() => new THREE.Vector3(), []);
+  const ndc = useMemo(() => new THREE.Vector2(), []);
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const position = useMemo(() => surfacePoint(poi.u, poi.v), [poi.u, poi.v]);
+  const lift = DISTRICT_SURFACE_LIFT + 0.02;
+  const lit = selected || hot || draggingRef.current;
+
+  const fillMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: lit ? LIT : DARK,
+        transparent: true,
+        opacity: 0.97,
+        depthWrite: false,
+        side: DoubleSide,
+      }),
+    [lit],
+  );
+  const ringMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: GOLD,
+        transparent: true,
+        opacity: lit ? 1 : 0.92,
+        depthWrite: false,
+        side: DoubleSide,
+      }),
+    [lit],
+  );
 
   useEffect(
     () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
+      fillMat.dispose();
+      ringMat.dispose();
+    },
+    [fillMat, ringMat],
+  );
+
+  useEffect(
+    () => () => {
+      const listeners = listenersRef.current;
+      if (!listeners) return;
+      window.removeEventListener("pointermove", listeners.move);
+      window.removeEventListener("pointerup", listeners.up);
+      listenersRef.current = null;
     },
     [],
   );
 
-  useEffect(() => {
-    setImageBroken(false);
-  }, [poi.imageUrl]);
-
-  function readAnchor() {
-    const rect = anchorRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    return { x: rect.left + rect.width / 2, y: rect.top };
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    let frame = 0;
-    const tick = () => {
-      const next = readAnchor();
-      const tip = tipRef.current;
-      if (next && tip) {
-        tip.style.left = `${next.x}px`;
-        tip.style.top = `${next.y}px`;
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
-
-  function holdOpen() {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-    const next = readAnchor();
-    if (next) setAnchor(next);
-    setOpen(true);
+  function over(event: ThreeEvent<PointerEvent>) {
+    if (suppressSelect && !editable) return;
+    event.stopPropagation();
+    document.body.style.cursor = editable ? "grab" : "pointer";
+    setHot(true);
     onHover(poi.id);
   }
 
-  function scheduleClose() {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => {
-      setOpen(false);
-      onHover(null);
-    }, 140);
+  function out() {
+    if (draggingRef.current) return;
+    if (suppressSelect && !editable) return;
+    document.body.style.cursor = "";
+    setHot(false);
+    onHover(null);
+  }
+
+  function select(event: ThreeEvent<MouseEvent>) {
+    event.stopPropagation();
+    if (draggingRef.current) return;
+    if (suppressSelect && !editable) return;
+    onSelect(poi.id);
+  }
+
+  function onPointerDown(event: ThreeEvent<PointerEvent>) {
+    if (!editable || !onMove || !onCommit) {
+      return;
+    }
+    event.stopPropagation();
+    onSelect(poi.id);
+    draggingRef.current = true;
+    onOrbitLock?.(true);
+    onDragActive?.(true);
+    document.body.style.cursor = "grabbing";
+
+    const move = (ev: PointerEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      ndc.set(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -(((ev.clientY - rect.top) / rect.height) * 2) + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      plane.set(new THREE.Vector3(0, 1, 0), -(position.y + lift));
+      if (!raycaster.ray.intersectPlane(plane, hit)) return;
+      onMove(poi.id, worldXZToUv(hit.x, hit.z, DIORAMA_WIDTH, DIORAMA_DEPTH));
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      listenersRef.current = null;
+      draggingRef.current = false;
+      onOrbitLock?.(false);
+      onDragActive?.(false);
+      document.body.style.cursor = "";
+      onCommit(poi.id);
+    };
+
+    listenersRef.current = { move, up };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   return (
-    <group position={[position.x, position.y + 0.08, position.z]}>
-      <Html
-        center
-        distanceFactor={10}
-        zIndexRange={[40, 0]}
-        style={{ pointerEvents: suppressSelect ? "none" : "auto" }}
+    <group position={[position.x, position.y + lift, position.z]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={5} material={fillMat} raycast={() => undefined}>
+        <circleGeometry args={[TOKEN_R, 32]} />
+      </mesh>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.0015, 0]}
+        renderOrder={6}
+        material={ringMat}
+        raycast={() => undefined}
       >
-        <button
-          ref={anchorRef}
-          type="button"
-          aria-label={poi.name}
-          className={`grid h-8 w-8 place-items-center rounded-full border-2 border-accent-gold bg-background-card shadow-lg ${
-            selected ? "scale-110" : "scale-100"
-          }`}
-          onPointerEnter={suppressSelect ? undefined : holdOpen}
-          onPointerLeave={suppressSelect ? undefined : scheduleClose}
-          onClick={(event) => {
-            event.stopPropagation();
-            if (suppressSelect) return;
-            onSelect(poi.id);
-          }}
-        >
-          <Icon className="h-4 w-4 text-accent-gold" aria-hidden />
-        </button>
-      </Html>
-      {open && anchor
-        ? createPortal(
-            <motion.div
-              ref={tipRef}
-              initial={{ opacity: 0, x: "-50%", y: "calc(-100% - 4px)" }}
-              animate={{ opacity: 1, x: "-50%", y: "calc(-100% - 12px)" }}
-              transition={{ duration: 0.18 }}
-              style={{ position: "fixed", left: anchor.x, top: anchor.y, zIndex: 120 }}
-              className="pointer-events-auto w-72 overflow-hidden rounded-[10px] border border-hero-border/40 bg-background-card shadow-lg"
-              onPointerEnter={holdOpen}
-              onPointerLeave={scheduleClose}
-            >
-              {imageSrc ? (
-                <div className="relative h-40 w-full">
-                  <Image
-                    src={imageSrc}
-                    alt=""
-                    fill
-                    sizes="288px"
-                    className="object-cover"
-                    onError={() => setImageBroken(true)}
-                  />
-                </div>
-              ) : null}
-              <div className="space-y-2 px-3 py-3">
-                <p className="font-cinzel text-lg font-bold leading-snug text-accent-gold">{poi.name}</p>
-                <a
-                  href={loreHref}
-                  target="_blank"
-                  rel="noopener"
-                  className="inline-block font-barlow text-sm font-bold uppercase tracking-wide text-hero-vibrant hover:text-white"
-                >
-                  Mehr
-                </a>
-              </div>
-            </motion.div>,
-            document.body,
-          )
-        : null}
+        <ringGeometry args={[TOKEN_R * 0.72, TOKEN_R, 32]} />
+      </mesh>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.002, 0]}
+        renderOrder={6}
+        raycast={() => undefined}
+      >
+        <circleGeometry args={[TOKEN_R * 0.22, 20]} />
+        <meshBasicMaterial
+          color={GOLD}
+          transparent
+          opacity={lit ? 1 : 0.85}
+          depthWrite={false}
+          side={DoubleSide}
+        />
+      </mesh>
+
+      <mesh
+        position={[0, 0.14, 0]}
+        visible={false}
+        onClick={suppressSelect && !editable ? undefined : select}
+        onPointerDown={editable ? onPointerDown : undefined}
+        onPointerOver={suppressSelect && !editable ? undefined : over}
+        onPointerOut={suppressSelect && !editable ? undefined : out}
+      >
+        <cylinderGeometry args={[TOKEN_R * 1.35, TOKEN_R * 1.35, 0.32, 16]} />
+        <meshBasicMaterial />
+      </mesh>
+
+      {hot && !selected && !editable ? (
+        <Html center position={[0, 0.22, 0]} zIndexRange={[100, 0]} style={{ pointerEvents: "none" }}>
+          <div className="-translate-y-full whitespace-nowrap rounded border border-accent-gold/40 bg-background-card/95 px-2 py-1 shadow-lg">
+            <p className="font-cinzel text-xs font-bold text-accent-gold">{poi.name}</p>
+          </div>
+        </Html>
+      ) : null}
     </group>
   );
 }

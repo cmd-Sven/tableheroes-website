@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, ScrollText } from "lucide-react";
+import { ChevronRight, Filter, Menu, ScrollText, Shield } from "lucide-react";
 import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { HoloDayStrip } from "./HoloDayStrip";
 import { HoloWeatherControl } from "./HoloWeatherControl";
@@ -24,6 +24,8 @@ type Props = {
   onStepYear: (delta: number) => void;
   onGoToday: () => void;
   isGm: boolean;
+  mapAdminMode: boolean;
+  onToggleMapAdminMode: () => void;
   eventWizardOpen: boolean;
   onToggleEventWizard: () => void;
   statusLine: string;
@@ -56,6 +58,8 @@ export function CityMapHud({
   onStepYear,
   onGoToday,
   isGm,
+  mapAdminMode,
+  onToggleMapAdminMode,
   eventWizardOpen,
   onToggleEventWizard,
   statusLine,
@@ -77,9 +81,13 @@ export function CityMapHud({
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen) {
+      setFilterOpen(false);
+      return;
+    }
     function onPointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
     }
@@ -94,9 +102,9 @@ export function CityMapHud({
     <>
       <header
         data-city-map-hud="top"
-        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[120px] items-center gap-2 bg-background-dark px-2"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[140px] items-end gap-2.5 bg-background-dark px-2 pb-3"
       >
-        <div className="shrink-0">
+        <div className="shrink-0" style={{ marginRight: 50 }}>
           <CityViewSwitch mode={citySurface} onChange={onCitySurface} />
         </div>
         <HoloDayStrip
@@ -110,26 +118,6 @@ export function CityMapHud({
           onStepYear={onStepYear}
           onGoToday={onGoToday}
         />
-        <div className="flex h-full shrink-0 items-center gap-2">
-          <button
-            type="button"
-            data-crime-heatmap={crimeHeatmap ? "on" : "off"}
-            aria-pressed={crimeHeatmap}
-            aria-label={crimeHeatmap ? "Kriminalität, eingeblendet" : "Kriminalität, ausgeblendet"}
-            onClick={onToggleCrimeHeatmap}
-            className={`inline-flex shrink-0 items-center gap-2 border px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide ${
-              crimeHeatmap
-                ? "border-accent-blood bg-accent-blood text-white"
-                : "border-hero-dark bg-hero-dark text-accent-gold hover:bg-background-card"
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`h-2.5 w-2.5 rounded-full ${crimeHeatmap ? "bg-orange-300" : "bg-gray-500"}`}
-            />
-            Kriminalität
-          </button>
-        </div>
         <div data-cal-hint="" className="ml-auto flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
           <p className="truncate font-cinzel text-xs font-bold text-accent-gold">Aurenfurt</p>
           {layoutError ? (
@@ -163,23 +151,77 @@ export function CityMapHud({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="absolute right-0 top-full z-40 mt-1 w-56 border border-hero-dark bg-background-dark py-1 shadow-lg"
+                className="absolute right-0 top-full z-40 mt-1 w-60 border border-hero-dark bg-background-dark py-1 shadow-lg"
               >
-                {isGm ? (
+                <div className="border-b border-hero-dark">
                   <button
                     type="button"
                     role="menuitem"
-                    aria-pressed={eventWizardOpen}
-                    onClick={() => {
-                      onToggleEventWizard();
-                      setMenuOpen(false);
-                    }}
-                    className={`${menuItem} ${eventWizardOpen ? "text-hero-vibrant" : ""}`}
+                    aria-expanded={filterOpen}
+                    onClick={() => setFilterOpen((open) => !open)}
+                    className={menuItem}
                   >
-                    <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
-                    Stadtereignis
+                    <Filter className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="flex-1">Filter</span>
+                    <ChevronRight
+                      className={`h-3.5 w-3.5 shrink-0 transition-transform ${filterOpen ? "rotate-90" : ""}`}
+                      aria-hidden
+                    />
                   </button>
+                  {filterOpen ? (
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={crimeHeatmap}
+                      data-crime-heatmap={crimeHeatmap ? "on" : "off"}
+                      onClick={onToggleCrimeHeatmap}
+                      className={`${menuItem} pl-9 ${crimeHeatmap ? "text-hero-vibrant" : ""}`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                          crimeHeatmap ? "bg-orange-300" : "bg-gray-500"
+                        }`}
+                      />
+                      Kriminalität
+                      <span className="ml-auto font-libre text-[10px] normal-case tracking-normal text-gray-400">
+                        {crimeHeatmap ? "an" : "aus"}
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
+
+                {isGm ? (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      aria-pressed={eventWizardOpen}
+                      onClick={() => {
+                        onToggleEventWizard();
+                        setMenuOpen(false);
+                      }}
+                      className={`${menuItem} ${eventWizardOpen ? "text-hero-vibrant" : ""}`}
+                    >
+                      <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
+                      Stadtereignis
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      aria-pressed={mapAdminMode}
+                      onClick={() => {
+                        onToggleMapAdminMode();
+                        setMenuOpen(false);
+                      }}
+                      className={`${menuItem} ${mapAdminMode ? "text-hero-vibrant" : ""}`}
+                    >
+                      <Shield className="h-4 w-4 shrink-0" aria-hidden />
+                      {mapAdminMode ? "Admin beenden" : "Admin"}
+                    </button>
+                  </>
                 ) : null}
+
                 <div className="border-t border-hero-dark">
                   <HoloWeatherControl
                     enabled={weatherEnabled}

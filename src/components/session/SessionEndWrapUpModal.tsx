@@ -99,7 +99,7 @@ export function SessionEndWrapUpModal({
     void getSessionWrapUpPreview(sessionId)
       .then((data) => {
         if (!data) {
-          setLoadError("Ãœbersicht konnte nicht geladen werden.");
+          setLoadError("Übersicht konnte nicht geladen werden.");
           return;
         }
         setPreview(data);
@@ -121,7 +121,7 @@ export function SessionEndWrapUpModal({
         ]);
       })
       .catch(() => {
-        setLoadError("Ãœbersicht konnte nicht geladen werden.");
+        setLoadError("Übersicht konnte nicht geladen werden.");
       });
   }, [open, sessionId]);
 
@@ -169,7 +169,7 @@ export function SessionEndWrapUpModal({
               const points = Number(row?.points ?? 0);
               if (!Number.isFinite(points) || points === 0) continue;
               if (!row?.reason?.trim() || row.reason.trim().length < 3) {
-                throw new Error("Bitte fÃ¼r Extrapunkte einen Grund angeben (mind. 3 Zeichen).");
+                throw new Error("Bitte für Extrapunkte einen Grund angeben (mind. 3 Zeichen).");
               }
               extras.push({
                 userId,
@@ -204,7 +204,7 @@ export function SessionEndWrapUpModal({
         }
         if (pointsSkippedDueToConfig) {
           window.alert(
-            "Session wurde archiviert. Teilnahme-Punkte konnten wegen fehlender Server-Konfiguration (SUPABASE_SERVICE_ROLE_KEY) nicht vergeben werden â€” bitte in Vercel nachziehen.",
+            "Session wurde archiviert. Teilnahme-Punkte konnten wegen fehlender Server-Konfiguration (SUPABASE_SERVICE_ROLE_KEY) nicht vergeben werden — bitte in Vercel nachziehen.",
           );
         }
       } catch (e: unknown) {
@@ -229,12 +229,12 @@ export function SessionEndWrapUpModal({
             >
               {phase === "chronist-processing"
                 ? "Chronist-Verarbeitung"
-                : "Session abschlieÃŸen"}
+                : "Session abschließen"}
             </h2>
             <p className="mt-1 font-libre text-sm text-gray-400">
               {phase === "chronist-processing"
-                ? "Session archiviert â€” der Chronist arbeitet die Aufnahme auf"
-                : `${preview?.sessionTitle?.trim() || "Live-Session"} â€” Ãœbersicht vor dem Archivieren`}
+                ? "Session archiviert — der Chronist arbeitet die Aufnahme auf"
+                : `${preview?.sessionTitle?.trim() || "Live-Session"} — Übersicht vor dem Archivieren`}
             </p>
           </div>
           <button
@@ -242,7 +242,7 @@ export function SessionEndWrapUpModal({
             onClick={onClose}
             disabled={isPending || phase === "chronist-processing"}
             className="rounded border border-hero-border/50 p-2 text-gray-400 hover:text-white disabled:opacity-50"
-            aria-label="SchlieÃŸen"
+            aria-label="Schließen"
           >
             <X className="h-4 w-4" />
           </button>
@@ -294,7 +294,7 @@ export function SessionEndWrapUpModal({
                 }
                 className="rounded border border-hero-border px-4 py-2 font-barlow text-xs font-bold uppercase text-gray-400 hover:text-white"
               >
-                SpÃ¤ter im Dashboard
+                Später im Dashboard
               </button>
               <Link
                 href={chronistHref}
@@ -308,12 +308,12 @@ export function SessionEndWrapUpModal({
                 {chronistReady ? (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Ergebnis im Chronist Ã¶ffnen
+                    Ergebnis im Chronist öffnen
                   </>
                 ) : (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Chronist Ã¶ffnen
+                    Chronist öffnen
                   </>
                 )}
               </Link>

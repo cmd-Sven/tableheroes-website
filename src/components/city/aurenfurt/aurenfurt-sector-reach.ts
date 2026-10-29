@@ -349,6 +349,67 @@ export function sectorField(
   };
 }
 
+export type PoiReachPoint = {
+  u: number;
+  v: number;
+  districtId: CityDistrictId;
+  influences: { delta: number }[];
+};
+
+export type PoiReachCell = {
+  sector: DistrictSector;
+  distance: number;
+};
+
+/**
+ * Reichweite in Sektor-Schritten aus der Stärke der Einflussfaktoren.
+ * Ohne Faktoren nur der eigene Sektor; starke Orte bis zwei Schritte.
+ */
+export function poiInfluenceRadius(influences: { delta: number }[]): number {
+  if (!influences.length) return 0;
+  const peak = Math.max(...influences.map((entry) => Math.abs(entry.delta)));
+  if (peak >= 5) return 2;
+  if (peak >= 2) return 1;
+  return 0;
+}
+
+/** Sektoren im optischen Einflussbereich eines besonderen Orts. */
+export function sectorsInPoiInfluence(
+  poi: PoiReachPoint,
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+): PoiReachCell[] {
+  const sectors = sectorsForDistrict(poi.districtId, stored, polygons);
+  if (sectors.length === 0) return [];
+  const occupied = sectorsOccupiedByBuilding(poi, sectors);
+  if (occupied.length === 0) return [];
+  const radius = poiInfluenceRadius(poi.influences);
+  const reached = sectorsWithinReach(occupied, radius, sectors);
+  if (reached.length > 0) return reached;
+  return occupied.map((sector) => ({ sector, distance: 0 }));
+}
+
+/** Sektoren im optischen Einflussbereich eines Gebäudes (NPCs + Standort). */
+export function sectorsInBuildingInfluence(
+  building: ReachBuilding,
+  npcs: ReachNpc[],
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+): PoiReachCell[] {
+  const sectors = sectorsForDistrict(building.districtId, stored, polygons);
+  if (sectors.length === 0) return [];
+  const occupied = sectorsOccupiedByBuilding(building, sectors);
+  if (occupied.length === 0) return [];
+  const staff = npcs.filter((npc) => npc.locationId === building.id);
+  const radius = staff.reduce(
+    (max, npc) => Math.max(max, NPC_SECTOR_REACH[npc.tier] ?? 1),
+    0,
+  );
+  const reached = sectorsWithinReach(occupied, radius, sectors);
+  if (reached.length > 0) return reached;
+  return occupied.map((sector) => ({ sector, distance: 0 }));
+}
+
 export type BuildingReachReport = {
   id: string;
   name: string;

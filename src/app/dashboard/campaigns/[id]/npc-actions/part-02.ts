@@ -25,6 +25,11 @@ import { resolveNpcPortraitMetaForServer } from "@/src/lib/npc-portrait-meta";
 // ============================================================================
 import { NarrativeHook } from "@/src/types/npc";
 import { imageDisplayToJson, normalizeImageDisplay } from "@/src/lib/image-display";
+import {
+  ensureNpcFactionLink,
+  normalizeFactionIds,
+  syncNpcFactionLinks,
+} from "@/src/lib/npcs/npc-faction-links";
 
 
 // ============================================================================
@@ -160,6 +165,8 @@ export async function updateNPC(
     description?: string;
     gm_notes?: string;
     faction_id?: string | null;
+    /** Volle Welt-Fraktionsliste. Ersetzt die Link-Zeilen und setzt faction_id auf die erste ID. */
+    faction_ids?: string[] | null;
     current_location_id?: string | null;
     home_location_id?: string | null;
     is_dead?: boolean; // Globaler Status: gilt für alle Kampagnen dieser Welt
@@ -236,11 +243,20 @@ export async function updateNPC(
         ? updates.check_results
         : null;
   }
-  if (updates.faction_id !== undefined) {
-    normalizedUpdates.faction_id = updates.faction_id && String(updates.faction_id).trim() !== "" 
-      ? String(updates.faction_id).trim() 
-      : null;
+  let factionIdsToSync: string[] | null = null;
+  let factionIdToEnsure: string | null = null;
+  if (updates.faction_ids !== undefined) {
+    factionIdsToSync = normalizeFactionIds(updates.faction_ids ?? []);
+    normalizedUpdates.faction_id = factionIdsToSync[0] ?? null;
+  } else if (updates.faction_id !== undefined) {
+    const primary =
+      updates.faction_id && String(updates.faction_id).trim() !== ""
+        ? String(updates.faction_id).trim()
+        : null;
+    normalizedUpdates.faction_id = primary;
+    factionIdToEnsure = primary;
   }
+  delete normalizedUpdates.faction_ids;
   if (updates.current_location_id !== undefined) {
     const originalLocationId = updates.current_location_id;
     normalizedUpdates.current_location_id = updates.current_location_id && String(updates.current_location_id).trim() !== "" 
@@ -372,6 +388,12 @@ export async function updateNPC(
   if (error) {
     console.error("Update NPC Error:", error);
     throw new Error(error.message);
+  }
+
+  if (factionIdsToSync) {
+    await syncNpcFactionLinks(supabase, npcId, factionIdsToSync);
+  } else if (factionIdToEnsure) {
+    await ensureNpcFactionLink(supabase, npcId, factionIdToEnsure);
   }
 
   revalidatePath("/dashboard");

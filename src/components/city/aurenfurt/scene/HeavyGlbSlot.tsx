@@ -20,6 +20,61 @@ type Job = {
 const jobs = new Map<string, Job>();
 let tail: Promise<void> = Promise.resolve();
 
+/** Offene Heavy-Slots (Warteschlange + Decode) — für den Stadt-Ladebildschirm. */
+let heavyPending = 0;
+/** Erfolgreich fertig geladene Heavy-Slots in dieser Session. */
+let heavyCompleted = 0;
+/** URL des gerade decodierten Heavy-GLB (oder null). */
+let heavyCurrentUrl: string | null = null;
+const heavyListeners = new Set<() => void>();
+
+function notifyHeavyListeners() {
+  for (const listener of heavyListeners) listener();
+}
+
+function bumpHeavyPending(delta: number) {
+  heavyPending = Math.max(0, heavyPending + delta);
+  notifyHeavyListeners();
+}
+
+function markHeavyCompleted() {
+  heavyCompleted += 1;
+  notifyHeavyListeners();
+}
+
+function setHeavyCurrentUrl(url: string | null) {
+  if (heavyCurrentUrl === url) return;
+  heavyCurrentUrl = url;
+  notifyHeavyListeners();
+}
+
+export function subscribeHeavyGlbLoads(onStoreChange: () => void) {
+  heavyListeners.add(onStoreChange);
+  return () => {
+    heavyListeners.delete(onStoreChange);
+  };
+}
+
+export function getHeavyGlbPending() {
+  return heavyPending;
+}
+
+export function getHeavyGlbCompleted() {
+  return heavyCompleted;
+}
+
+export function getHeavyGlbCurrentUrl() {
+  return heavyCurrentUrl;
+}
+
+/** Für einen frischen Karten-Besuch: Zähler zurücksetzen. */
+export function resetHeavyGlbLoadStats() {
+  heavyPending = 0;
+  heavyCompleted = 0;
+  heavyCurrentUrl = null;
+  notifyHeavyListeners();
+}
+
 /**
  * Gleiche URL teilt sich einen Slot (ein Decode, viele Klone).
  * Die nächste URL startet erst, wenn alle Instanzen der vorigen fertig oder weg sind.
@@ -92,13 +147,23 @@ export function HeavyGlbSlot({ url, children }: { url: string; children: ReactNo
   const [go, setGo] = useState(false);
   const releaseRef = useRef<(() => void) | null>(null);
   const finishedRef = useRef(false);
+  const countedRef = useRef(false);
   const done = useRef<(() => void) | null>(null);
+
+  function releasePending() {
+    if (!countedRef.current) return;
+    countedRef.current = false;
+    bumpHeavyPending(-1);
+  }
 
   function finish() {
     if (finishedRef.current) return;
     finishedRef.current = true;
     releaseRef.current?.();
     releaseRef.current = null;
+    setHeavyCurrentUrl(null);
+    markHeavyCompleted();
+    releasePending();
   }
 
   done.current = finish;
@@ -107,12 +172,15 @@ export function HeavyGlbSlot({ url, children }: { url: string; children: ReactNo
     const { ready, release } = retainHeavy(url);
     let cancel = false;
     finishedRef.current = false;
+    countedRef.current = true;
+    bumpHeavyPending(1);
     void ready.then(() => {
       if (cancel) {
         release();
         return;
       }
       releaseRef.current = release;
+      setHeavyCurrentUrl(url);
       setGo(true);
     });
     return () => {
@@ -122,6 +190,8 @@ export function HeavyGlbSlot({ url, children }: { url: string; children: ReactNo
         releaseRef.current();
         releaseRef.current = null;
       }
+      setHeavyCurrentUrl(null);
+      releasePending();
     };
   }, [url]);
 

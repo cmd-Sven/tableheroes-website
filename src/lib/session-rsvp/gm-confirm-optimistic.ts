@@ -12,6 +12,7 @@ export function applyGmConfirmToTerminePlayer(
       status: "gm_override",
       label: "Abgesagt · vom GM für Start freigegeben",
       canGmManuallyConfirm: false,
+      canGmManuallyDecline: true,
     };
   }
   return {
@@ -19,6 +20,21 @@ export function applyGmConfirmToTerminePlayer(
     status: "zusage",
     label: "Vom GM als dabei markiert",
     canGmManuallyConfirm: false,
+    canGmManuallyDecline: true,
+  };
+}
+
+/** Lokales UI-Update, nachdem der GM eine mündliche Absage festgehalten hat. */
+export function applyGmDeclineToTerminePlayer(
+  player: GmTerminePlayerRsvp,
+): GmTerminePlayerRsvp {
+  if (!player.canGmManuallyDecline) return player;
+  return {
+    ...player,
+    status: "absage",
+    label: "Vom GM als nicht dabei markiert",
+    canGmManuallyConfirm: true,
+    canGmManuallyDecline: false,
   };
 }
 

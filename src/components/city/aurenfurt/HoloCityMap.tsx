@@ -1,27 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { HoloCityRail } from "./HoloCityRail";
 import { HoloOverlay } from "./HoloOverlay";
 import type { CitySurface } from "./CityViewSwitch";
-import { DistrictEditorPanel } from "./DistrictEditorPanel";
-import { WallEditorPanel } from "./WallEditorPanel";
-import { MapEditorToolbar } from "./MapEditorToolbar";
+import type { ChartMetric, LineKey } from "./CityDashboard";
+import type { AnalyticsRange } from "./aurenfurt-analytics";
+import { MapEditorPortals } from "./MapEditorPortals";
 import { CityMapHud } from "./CityMapHud";
 import { CityEventWizard } from "./CityEventWizard";
-import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import {
   CITY_BUILDINGS,
   findBuilding,
   findDistrict,
-  type CityBuilding,
   type CityDistrictId,
   type HoloSelection,
 } from "./aurenfurt-districts";
-import { findPlaceLore, type AurenfurtPlaceLore } from "./aurenfurt-lore";
-import { pointInPolygon, type UvPoint } from "./aurenfurt-district-polygons";
+import { findPlaceLore } from "./aurenfurt-lore";
 import { useAurenfurtDay } from "./hooks/useAurenfurtDay";
 import { useAurenfurtStreets } from "./hooks/useAurenfurtStreets";
 import { useAurenfurtWalls } from "./hooks/useAurenfurtWalls";
@@ -30,7 +26,7 @@ import { useWeatherFxControl } from "./hooks/useWeatherFxControl";
 import { resolveWeatherFx } from "./aurenfurt-weather-fx";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
-import { bindCityBonds, bindCityPressure, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
+import { bindCityPressure, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
 import { resolveBuildingUv } from "./aurenfurt-building-positions";
 import { useDistrictNpcs } from "./hooks/useDistrictNpcs";
 import { useBuildingPositions } from "./hooks/useBuildingPositions";
@@ -41,56 +37,22 @@ import { useDistrictSectors } from "./hooks/useDistrictSectors";
 import { useHoloCityView } from "./hooks/useHoloCityView";
 import { useKeyLocations } from "./hooks/useKeyLocations";
 import { useMapLayerVisibility } from "./hooks/useMapLayerVisibility";
+import { useAurenfurtMapBootstrap } from "./hooks/useAurenfurtMapBootstrap";
+import { useMapSelectionReach } from "./hooks/useMapSelectionReach";
+import { useMapEditorSession } from "./hooks/useMapEditorSession";
+import { useMapEditorMutations } from "./hooks/useMapEditorMutations";
 import type { DistrictSector } from "./aurenfurt-sectors";
 import { citySectorCrime } from "./aurenfurt-crime-heatmap";
 import { parseDay } from "./aurenfurt-time";
-import {
-  WALL_BRIGHTNESS_DEFAULT,
-  WALL_CURVE_DEFAULT,
-  WALL_HEIGHT_DEFAULT,
-  WALL_MERLON_COUNT_DEFAULT,
-  WALL_MERLON_SIZE_DEFAULT,
-  WALL_TEXTURE_SCALE_DEFAULT,
-  WALL_THICKNESS_DEFAULT,
-  defaultWall,
-} from "./aurenfurt-walls";
-import { loadAurenfurtCityBonds, loadAurenfurtCityPressure, loadAurenfurtFactionRecordIds, loadAurenfurtNpcRecordIds } from "./load-aurenfurt-npc-records";
-import { loadAurenfurtPlaceLore } from "./load-aurenfurt-place-lore";
-import {
-  createAurenfurtMapBuilding,
-  loadAurenfurtCodeBuildingCategories,
-  loadAurenfurtMapEditorBuildings,
-  updateAurenfurtMapBuildingCategory,
-} from "./aurenfurt-map-building-actions";
+import { loadAurenfurtCityPressure } from "./load-aurenfurt-npc-records";
 import { mergeCityBuildings } from "./aurenfurt-map-buildings";
-import {
-  buildingCategoryForId,
-  categoryToBuildingKind,
-  isBuildingCategory,
-  type BuildingCategory,
-} from "./aurenfurt-building-categories";
-import { AURENFURT_WORLD_ID, LORE_PLACEHOLDER_IMAGE } from "./aurenfurt-district-lore-ids";
-import {
-  createAurenfurtMapPoi,
-  loadAurenfurtMapEditorPois,
-  updateAurenfurtMapPoiPosition,
-} from "./aurenfurt-map-poi-actions";
-import {
-  districtIdAtUv,
-  findPoi,
-  poisInDistrict,
-  type AurenfurtMapPoi,
-  type PoiInfluence,
-  type PoiKind,
-} from "./aurenfurt-map-pois";
+import { AURENFURT_WORLD_ID } from "./aurenfurt-district-lore-ids";
+import { findPoi } from "./aurenfurt-map-pois";
+import { HoloCityLoadingOverlay } from "./HoloCityLoadingOverlay";
 
 const HoloCityCanvas = dynamic(() => import("./scene/HoloCityCanvas"), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center font-barlow text-xs font-bold uppercase tracking-wide text-cyan-100/80">
-      Diorama wird gehoben…
-    </div>
-  ),
+  loading: () => <div className="h-full w-full bg-[#02080c]" aria-hidden />,
 });
 
 const CityDashboard = dynamic(() => import("./CityDashboard"), {
@@ -111,9 +73,8 @@ type Props = {
 
 export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm = false }: Props) {
   const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
-  const [editorBuildings, setEditorBuildings] = useState<CityBuilding[]>([]);
-  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, BuildingCategory>>({});
-  const [pois, setPois] = useState<AurenfurtMapPoi[]>([]);
+  const bootstrap = useAurenfurtMapBootstrap();
+  const { editorBuildings, categoryOverrides, pois, places, npcRecordIds, factionRecordIds } = bootstrap;
   const weatherFx = useWeatherFxControl(resolvedWorldId, isGm);
   const polygons = useDistrictPolygons(resolvedWorldId, isGm);
   const sectorsApi = useDistrictSectors(resolvedWorldId, isGm);
@@ -138,8 +99,6 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     view.subject?.type === "building" ? view.subject.id : null,
     buildings,
   );
-  const [npcRecordIds, setNpcRecordIds] = useState<Record<string, string> | null>(null);
-  const [factionRecordIds, setFactionRecordIds] = useState<Record<string, string>>({});
   const districtNpcs = useDistrictNpcs(
     view.subject?.districtId ?? null,
     view.subject?.type === "building" ? view.subject.id : null,
@@ -192,44 +151,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   } = useMapLayerVisibility(resolvedWorldId, isGm);
   const [citySurface, setCitySurface] = useState<CitySurface>("map");
   const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
-  const [places, setPlaces] = useState<AurenfurtPlaceLore[]>([]);
-  const [activeTool, setActiveTool] = useState<AurenfurtMapEditorTool | null>(null);
-  const [editingDistrictId, setEditingDistrictId] = useState<CityDistrictId | null>(null);
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
-  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
-  const [editingStreetId, setEditingStreetId] = useState<string | null>(null);
-  const [drawingStreet, setDrawingStreet] = useState(false);
-  const [draftStreetPoints, setDraftStreetPoints] = useState<UvPoint[]>([]);
-  const [editingWallId, setEditingWallId] = useState<string | null>(null);
-  const [drawingWall, setDrawingWall] = useState(false);
-  const [wallDraftReady, setWallDraftReady] = useState(false);
-  const [draftWallPoints, setDraftWallPoints] = useState<UvPoint[]>([]);
-  const [wallDraft, setWallDraft] = useState({
-    name: "Mauerabschnitt",
-    curve: WALL_CURVE_DEFAULT,
-    height: WALL_HEIGHT_DEFAULT,
-    thickness: WALL_THICKNESS_DEFAULT,
-    textureScale: WALL_TEXTURE_SCALE_DEFAULT,
-    brightness: WALL_BRIGHTNESS_DEFAULT,
-    merlonCount: WALL_MERLON_COUNT_DEFAULT,
-    merlonSize: WALL_MERLON_SIZE_DEFAULT,
-  });
-  const [placingBuilding, setPlacingBuilding] = useState(false);
-  const [buildingDraftUv, setBuildingDraftUv] = useState<UvPoint | null>(null);
-  const [buildingSaveError, setBuildingSaveError] = useState<string | null>(null);
-  const [categorySaveNote, setCategorySaveNote] = useState<string | null>(null);
-  const [buildingFormKey, setBuildingFormKey] = useState(0);
-  const [savingBuilding, startSaveBuilding] = useTransition();
-  const [savingCategory, startSaveCategory] = useTransition();
-  const [placingPoi, setPlacingPoi] = useState(false);
-  const [repositioningPoi, setRepositioningPoi] = useState(false);
-  const [poiDraftUv, setPoiDraftUv] = useState<UvPoint | null>(null);
-  const [poiDraftDistrictId, setPoiDraftDistrictId] = useState<CityDistrictId | null>(null);
-  const [poiSaveError, setPoiSaveError] = useState<string | null>(null);
-  const [poiFormKey, setPoiFormKey] = useState(0);
-  const [savingPoi, startSavePoi] = useTransition();
-  const [portalReady, setPortalReady] = useState(false);
-  const [sectorPreviewSectors, setSectorPreviewSectors] = useState<DistrictSector[]>([]);
+  const [range, setRange] = useState<AnalyticsRange>("month");
+  const [chartMetric, setChartMetric] = useState<ChartMetric>("economy");
+  const [lines, setLines] = useState<LineKey[]>(["economy", "crime", "guard", "tension"]);
   const [eventWizardOpen, setEventWizardOpen] = useState(false);
   const [eventPlaceStep, setEventPlaceStep] = useState(false);
   const [eventDistrictId, setEventDistrictId] = useState<CityDistrictId | null>(null);
@@ -242,6 +166,37 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     [calendar.day, crimeHeatmap, simVersion],
   );
 
+  const session = useMapEditorSession({
+    isGm,
+    buildings,
+    focusSelection: view.focus,
+    addStreet: streetsApi.addStreet,
+  });
+  const mutations = useMapEditorMutations({
+    worldId: resolvedWorldId,
+    session,
+    polygons: polygons.polygons,
+    buildings,
+    categoryOverrides,
+    pois,
+    buildingPositions,
+    setEditorBuildings: bootstrap.setEditorBuildings,
+    setCategoryOverrides: bootstrap.setCategoryOverrides,
+    setPois: bootstrap.setPois,
+    setPlaces: bootstrap.setPlaces,
+  });
+  const reach = useMapSelectionReach({
+    worldId: resolvedWorldId,
+    subject: view.subject,
+    buildings,
+    pois,
+    buildingPositions: buildingPositions.positions,
+    buildingLocationIds: buildingPositions.locationIds,
+    sectorsByDistrict: sectorsApi.sectorsByDistrict,
+    polygons: polygons.polygons,
+  });
+  const { poiReachVisible, setPoiReachVisible, selectedPoi, selectedBuilding } = reach;
+
   const layoutError =
     wallsApi.saveError ||
     polygons.saveError ||
@@ -253,96 +208,6 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     weatherFx.saveError ||
     layerVisibilityError ||
     null;
-  const selectedPoi =
-    view.subject?.type === "poi" ? findPoi(pois, view.subject.id) : null;
-  const districtPoiInfluences = useMemo(() => {
-    if (view.subject?.type !== "district") return [];
-    return poisInDistrict(pois, view.subject.districtId);
-  }, [pois, view.subject]);
-
-  useEffect(() => {
-    let active = true;
-    loadAurenfurtPlaceLore()
-      .then((rows) => {
-        if (active) setPlaces(rows);
-      })
-      .catch(() => {
-        if (active) setPlaces([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    loadAurenfurtNpcRecordIds()
-      .then((rows) => {
-        if (active) setNpcRecordIds(rows);
-      })
-      .catch(() => {
-        if (active) setNpcRecordIds({});
-      });
-    loadAurenfurtFactionRecordIds()
-      .then((rows) => {
-        if (active) setFactionRecordIds(rows);
-      })
-      .catch(() => {
-        if (active) setFactionRecordIds({});
-      });
-    loadAurenfurtCityBonds()
-      .then((bonds) => {
-        if (active) bindCityBonds(bonds);
-      })
-      .catch(() => {
-        if (active) bindCityBonds([]);
-      });
-    loadAurenfurtCityPressure()
-      .then((pressure) => {
-        if (active) bindCityPressure(pressure.actors, pressure.events);
-      })
-      .catch(() => {
-        if (active) bindCityPressure([], []);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    loadAurenfurtMapEditorBuildings()
-      .then((rows) => {
-        if (active) setEditorBuildings(rows);
-      })
-      .catch(() => {
-        if (active) setEditorBuildings([]);
-      });
-    loadAurenfurtCodeBuildingCategories()
-      .then((rows) => {
-        if (active) setCategoryOverrides(rows);
-      })
-      .catch(() => {
-        /* Defaults aus BUILDING_CATEGORY_BY_ID bleiben */
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    loadAurenfurtMapEditorPois()
-      .then((rows) => {
-        if (active) setPois(rows);
-      })
-      .catch(() => {
-        if (active) setPois([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -352,568 +217,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     };
   }, []);
 
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
-
-  function resetPlacementState() {
-    setPlacingBuilding(false);
-    setBuildingDraftUv(null);
-    setBuildingSaveError(null);
-    setPlacingPoi(false);
-    setRepositioningPoi(false);
-    setPoiDraftUv(null);
-    setPoiDraftDistrictId(null);
-    setPoiSaveError(null);
-  }
-
-  function resetEditorModes() {
-    setEditingDistrictId(null);
-    setSelectedBuildingId(null);
-    setSelectedPoiId(null);
-    setEditingStreetId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    setEditingWallId(null);
-    setDrawingWall(false);
-    setWallDraftReady(false);
-    setDraftWallPoints([]);
-    setSectorPreviewSectors([]);
-    resetPlacementState();
-  }
-
-  useEffect(() => {
-    if (!isGm && activeTool) {
-      setActiveTool(null);
-      resetEditorModes();
-    }
-  }, [activeTool, isGm]);
-
-  function closeEditor() {
-    setActiveTool(null);
-    resetEditorModes();
-  }
-
-  function toggleTool(tool: AurenfurtMapEditorTool) {
-    if (activeTool === tool) {
-      closeEditor();
-      return;
-    }
-    resetEditorModes();
-    setActiveTool(tool);
-  }
-
-  function selectDistrict(id: CityDistrictId | null) {
-    setEditingStreetId(null);
-    setSelectedBuildingId(null);
-    setSelectedPoiId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    resetPlacementState();
-    setSectorPreviewSectors([]);
-    setEditingDistrictId(id);
-  }
-
-  function selectBuilding(id: string | null) {
-    setEditingStreetId(null);
-    setSelectedPoiId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    resetPlacementState();
-    setSectorPreviewSectors([]);
-    setSelectedBuildingId(id);
-    setBuildingSaveError(null);
-    setCategorySaveNote(null);
-    if (id) {
-      const building = findBuilding(id, buildings);
-      if (building) {
-        setEditingDistrictId(building.districtId);
-        view.focus({ type: "building", id });
-      }
-    }
-  }
-
-  function selectPoi(id: string | null) {
-    setEditingStreetId(null);
-    setSelectedBuildingId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    resetPlacementState();
-    setSectorPreviewSectors([]);
-    setSelectedPoiId(id);
-    if (id) {
-      view.focus({ type: "poi", id });
-    }
-  }
-
-  function selectStreet(id: string | null) {
-    setEditingDistrictId(null);
-    setSelectedBuildingId(null);
-    setSelectedPoiId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    resetPlacementState();
-    setSectorPreviewSectors([]);
-    setEditingStreetId(id);
-  }
-
-  function startDrawStreet() {
-    setEditingDistrictId(null);
-    setSelectedBuildingId(null);
-    setSelectedPoiId(null);
-    setEditingStreetId(null);
-    resetPlacementState();
-    setDrawingStreet(true);
-    setDraftStreetPoints([]);
-  }
-
-  function cancelDrawStreet() {
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-  }
-
-  function finishDrawStreet() {
-    if (draftStreetPoints.length < 2) return;
-    const id = streetsApi.addStreet(draftStreetPoints);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    if (id) setEditingStreetId(id);
-  }
-
-  function addDrawPoint(point: UvPoint) {
-    setDraftStreetPoints((current) => [...current, point]);
-  }
-
-  function startPlaceBuilding() {
-    setEditingStreetId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    setPlacingPoi(false);
-    setRepositioningPoi(false);
-    setPoiSaveError(null);
-    setBuildingSaveError(null);
-    setPlacingBuilding(true);
-  }
-
-  function cancelPlaceBuilding() {
-    setPlacingBuilding(false);
-  }
-
-  function startPlacePoi() {
-    setEditingStreetId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    setPlacingBuilding(false);
-    setBuildingSaveError(null);
-    setPoiSaveError(null);
-    setRepositioningPoi(false);
-    setPlacingPoi(true);
-  }
-
-  function startRepositionPoi() {
-    if (!selectedPoiId) return;
-    setEditingStreetId(null);
-    setDrawingStreet(false);
-    setDraftStreetPoints([]);
-    setPlacingBuilding(false);
-    setBuildingSaveError(null);
-    setPoiSaveError(null);
-    setPoiDraftUv(null);
-    setPoiDraftDistrictId(null);
-    setRepositioningPoi(true);
-    setPlacingPoi(true);
-  }
-
-  function cancelPlacePoi() {
-    setPlacingPoi(false);
-    setRepositioningPoi(false);
-  }
-
-  const placeBuildingPoint = useCallback(
-    (point: UvPoint) => {
-      if (!editingDistrictId) return;
-      const poly = polygons.polygons[editingDistrictId]?.points ?? [];
-      if (!pointInPolygon(point, poly)) {
-        setBuildingSaveError("Gebäude nur innerhalb des Viertel-Polygons platzieren.");
-        return;
-      }
-      setBuildingSaveError(null);
-      setBuildingDraftUv(point);
-      setPlacingBuilding(false);
-    },
-    [editingDistrictId, polygons.polygons],
-  );
-
-  const placePoiPoint = useCallback(
-    (point: UvPoint) => {
-      const districtId = districtIdAtUv(point, polygons.polygons);
-      if (!districtId) {
-        setPoiSaveError(
-          "Dieser Punkt liegt in keinem Viertel. Bitte innerhalb einer Viertel-Fläche setzen.",
-        );
-        return;
-      }
-      setPoiSaveError(null);
-
-      if (repositioningPoi && selectedPoiId) {
-        setPlacingPoi(false);
-        setRepositioningPoi(false);
-        startSavePoi(async () => {
-          const result = await updateAurenfurtMapPoiPosition({
-            worldId: resolvedWorldId,
-            poiId: selectedPoiId,
-            districtId,
-            u: point.u,
-            v: point.v,
-          });
-          if (!result.ok) {
-            setPoiSaveError(result.error);
-            return;
-          }
-          setPois((current) => [
-            ...current.filter((p) => p.id !== result.poi.id),
-            result.poi,
-          ]);
-        });
-        return;
-      }
-
-      setPoiDraftUv(point);
-      setPoiDraftDistrictId(districtId);
-      setPlacingPoi(false);
-    },
-    [polygons.polygons, repositioningPoi, resolvedWorldId, selectedPoiId],
-  );
-
-  function saveNewBuilding(input: {
-    name: string;
-    summary: string;
-    category: BuildingCategory;
-    streetId: string | null;
-  }) {
-    if (!editingDistrictId || !buildingDraftUv) {
-      setBuildingSaveError("Bitte zuerst eine Position im Viertel setzen.");
-      return;
-    }
-    setBuildingSaveError(null);
-    setCategorySaveNote(null);
-    startSaveBuilding(async () => {
-      const result = await createAurenfurtMapBuilding({
-        worldId: resolvedWorldId,
-        districtId: editingDistrictId,
-        name: input.name,
-        summary: input.summary,
-        category: input.category,
-        u: buildingDraftUv.u,
-        v: buildingDraftUv.v,
-        streetId: input.streetId,
-      });
-      if (!result.ok) {
-        setBuildingSaveError(result.error);
-        return;
-      }
-      setEditorBuildings((current) => [
-        ...current.filter((b) => b.id !== result.building.id),
-        result.building,
-      ]);
-      buildingPositions.placeAndCommit(
-        result.building.id,
-        {
-          u: result.building.u,
-          v: result.building.v,
-        },
-        {
-          name: result.building.name,
-          districtId: result.building.districtId,
-          buildingType: result.building.category,
-          streetId: result.building.streetId,
-        },
-      );
-      setBuildingDraftUv(null);
-      setPlacingBuilding(false);
-      setBuildingFormKey((key) => key + 1);
-      setPlaces((current) => [
-        ...current.filter((p) => p.name !== result.building.name),
-        {
-          name: result.building.name,
-          description: result.building.summary,
-          imageUrl: LORE_PLACEHOLDER_IMAGE,
-        },
-      ]);
-    });
-  }
-
-  function saveBuildingCategory(buildingId: string, category: BuildingCategory) {
-    if (!isBuildingCategory(category)) {
-      setBuildingSaveError("Bitte eine gültige Kategorie wählen.");
-      return;
-    }
-
-    const previous =
-      (isBuildingCategory(categoryOverrides[buildingId])
-        ? categoryOverrides[buildingId]
-        : null) ??
-      buildingCategoryForId(
-        buildingId,
-        findBuilding(buildingId, buildings)?.category ?? null,
-      );
-
-    setBuildingSaveError(null);
-    setCategorySaveNote(null);
-    setCategoryOverrides((current) => ({ ...current, [buildingId]: category }));
-    setEditorBuildings((current) =>
-      current.map((building) =>
-        building.id === buildingId
-          ? { ...building, category, kind: categoryToBuildingKind(category) }
-          : building,
-      ),
-    );
-
-    startSaveCategory(async () => {
-      const result = await updateAurenfurtMapBuildingCategory({
-        locationId: buildingId,
-        category,
-        worldId: resolvedWorldId,
-      });
-      if (!result.ok) {
-        setCategoryOverrides((current) => ({ ...current, [buildingId]: previous }));
-        setEditorBuildings((current) =>
-          current.map((building) =>
-            building.id === buildingId
-              ? { ...building, category: previous, kind: categoryToBuildingKind(previous) }
-              : building,
-          ),
-        );
-        setBuildingSaveError(result.error);
-        return;
-      }
-      if (!result.persisted) {
-        setCategorySaveNote(result.note);
-      }
-    });
-  }
-
-  function saveNewPoi(input: {
-    name: string;
-    description: string;
-    kind: PoiKind;
-    imageUrl: string | null;
-    influences: PoiInfluence[];
-  }) {
-    if (!poiDraftUv || !poiDraftDistrictId) {
-      setPoiSaveError("Bitte zuerst eine Position auf der Karte setzen.");
-      return;
-    }
-    setPoiSaveError(null);
-    startSavePoi(async () => {
-      const result = await createAurenfurtMapPoi({
-        worldId: resolvedWorldId,
-        districtId: poiDraftDistrictId,
-        name: input.name,
-        description: input.description,
-        kind: input.kind,
-        imageUrl: input.imageUrl,
-        influences: input.influences,
-        u: poiDraftUv.u,
-        v: poiDraftUv.v,
-      });
-      if (!result.ok) {
-        setPoiSaveError(result.error);
-        return;
-      }
-      setPois((current) => [...current.filter((p) => p.id !== result.poi.id), result.poi]);
-      setPoiDraftUv(null);
-      setPoiDraftDistrictId(null);
-      setPlacingPoi(false);
-      setRepositioningPoi(false);
-      setPoiFormKey((key) => key + 1);
-      setPlaces((current) => [
-        ...current.filter((p) => p.name !== result.poi.name),
-        {
-          name: result.poi.name,
-          description: result.poi.description,
-          imageUrl: result.poi.imageUrl,
-        },
-      ]);
-    });
-  }
-
   const hint =
     view.hoveredSubject && view.hoveredSubject.id !== view.subject?.id
       ? view.hoveredSubject.name
-      : null;
-
-  const districtsTool = activeTool === "districts";
-  const streetsTool = activeTool === "streets";
-  const buildingsTool = activeTool === "buildings";
-  const poisTool = activeTool === "pois";
-  const wallsTool = activeTool === "walls";
-  const streetDrawActive = streetsTool && drawingStreet;
-  const wallDrawActive = wallsTool && drawingWall;
-  const previewWall = useMemo(() => {
-    if (!wallDraftReady || draftWallPoints.length < 2) return null;
-    return defaultWall({
-      id: "wall-preview",
-      points: draftWallPoints,
-      ...wallDraft,
-    });
-  }, [draftWallPoints, wallDraft, wallDraftReady]);
-  const placingBuildingActive = buildingsTool && placingBuilding;
-  const placingPoiActive = poisTool && placingPoi;
-
-  const editorControls =
-    isGm && portalReady
-      ? createPortal(
-          <>
-            <MapEditorToolbar activeTool={activeTool} onToggle={toggleTool} />
-            {wallsTool ? (
-              <WallEditorPanel
-                walls={wallsApi.walls}
-                saved={wallsApi.saved}
-                ready={wallsApi.ready}
-                saveError={wallsApi.saveError}
-                editingWallId={editingWallId}
-                drawing={drawingWall}
-                draftReady={wallDraftReady}
-                draftPointCount={draftWallPoints.length}
-                draft={wallDraft}
-                onDraftChange={(patch) => setWallDraft((current) => ({ ...current, ...patch }))}
-                onStartDraw={() => {
-                  setEditingWallId(null);
-                  setWallDraftReady(false);
-                  setDraftWallPoints([]);
-                  setDrawingWall(true);
-                }}
-                onCancelDraw={() => {
-                  setDrawingWall(false);
-                  setWallDraftReady(false);
-                  setDraftWallPoints([]);
-                }}
-                onFinishLine={() => {
-                  if (draftWallPoints.length < 2) return;
-                  setDrawingWall(false);
-                  setWallDraftReady(true);
-                }}
-                onConfirmWall={() => {
-                  if (draftWallPoints.length < 2) return;
-                  const wall = wallsApi.addWall({
-                    name: wallDraft.name,
-                    points: draftWallPoints,
-                    curve: wallDraft.curve,
-                    height: wallDraft.height,
-                    thickness: wallDraft.thickness,
-                    textureScale: wallDraft.textureScale,
-                    brightness: wallDraft.brightness,
-                    merlonCount: wallDraft.merlonCount,
-                    merlonSize: wallDraft.merlonSize,
-                  });
-                  setDrawingWall(false);
-                  setWallDraftReady(false);
-                  setDraftWallPoints([]);
-                  setEditingWallId(wall?.id ?? null);
-                }}
-                onSelectWall={setEditingWallId}
-                onUpdateWall={wallsApi.updateWall}
-                onRemoveWall={(id) => {
-                  wallsApi.removeWall(id);
-                  setEditingWallId((current) => (current === id ? null : current));
-                }}
-                onClose={closeEditor}
-              />
-            ) : activeTool ? (
-              <DistrictEditorPanel
-                open
-                tool={activeTool}
-                polygons={polygons.polygons}
-                buildings={buildings}
-                pois={pois}
-                buildingPositions={buildingPositions.positions}
-                landmarkScales={landmarkScales.scales}
-                onLandmarkScaleChange={landmarkScales.setScale}
-                landmarkRotations={landmarkRotations.rotations}
-                onLandmarkRotationChange={landmarkRotations.setRotation}
-                editingDistrictId={editingDistrictId}
-                selectedBuildingId={selectedBuildingId}
-                selectedPoiId={selectedPoiId}
-                streets={streetsApi.streets}
-                editingStreetId={editingStreetId}
-                drawingStreet={drawingStreet}
-                draftPointCount={draftStreetPoints.length}
-                placingBuilding={placingBuilding}
-                buildingDraftUv={buildingDraftUv}
-                buildingSaveError={buildingSaveError}
-                categorySaveNote={categorySaveNote}
-                savingBuilding={savingBuilding}
-                savingCategory={savingCategory}
-                buildingFormKey={buildingFormKey}
-                placingPoi={placingPoi}
-                repositioningPoi={repositioningPoi}
-                poiDraftUv={poiDraftUv}
-                poiDraftDistrictId={poiDraftDistrictId}
-                poiSaveError={poiSaveError}
-                savingPoi={savingPoi}
-                poiFormKey={poiFormKey}
-                dayWeather={climate.current}
-                viewedDay={calendar.day}
-                saved={
-                  polygons.saved ||
-                  buildingPositions.saved ||
-                  landmarkScales.saved ||
-                  landmarkRotations.saved ||
-                  streetsApi.saved ||
-                  sectorsApi.saved
-                }
-                ready={
-                  polygons.ready &&
-                  buildingPositions.ready &&
-                  landmarkScales.ready &&
-                  landmarkRotations.ready &&
-                  streetsApi.ready &&
-                  sectorsApi.ready
-                }
-                saveError={layoutError}
-                onSelectDistrict={selectDistrict}
-                onSelectBuilding={selectBuilding}
-                onSelectPoi={selectPoi}
-                onSelectStreet={selectStreet}
-                onColorChange={polygons.setDistrictColor}
-                onHoverOpacityChange={polygons.setDistrictHoverOpacity}
-                onDivideSectors={(cellSize) => {
-                  if (!editingDistrictId) return null;
-                  const poly = polygons.polygons[editingDistrictId]?.points ?? [];
-                  return sectorsApi.divideDistrict(editingDistrictId, poly, cellSize);
-                }}
-                onSectorPreviewChange={setSectorPreviewSectors}
-                sectorCount={
-                  editingDistrictId
-                    ? (sectorsApi.sectorsByDistrict[editingDistrictId]?.length ?? 0)
-                    : 0
-                }
-                sectorsByDistrict={sectorsApi.sectorsByDistrict}
-                onStartDrawStreet={startDrawStreet}
-                onFinishDrawStreet={finishDrawStreet}
-                onCancelDrawStreet={cancelDrawStreet}
-                onUpdateStreet={streetsApi.updateStreet}
-                onRemoveStreet={streetsApi.removeStreet}
-                onStartPlaceBuilding={startPlaceBuilding}
-                onCancelPlaceBuilding={cancelPlaceBuilding}
-                onClearBuildingDraft={() => setBuildingDraftUv(null)}
-                onSaveBuilding={saveNewBuilding}
-                onUpdateBuildingCategory={saveBuildingCategory}
-                onStartPlacePoi={startPlacePoi}
-                onStartRepositionPoi={startRepositionPoi}
-                onCancelPlacePoi={cancelPlacePoi}
-                onClearPoiDraft={() => {
-                  setPoiDraftUv(null);
-                  setPoiDraftDistrictId(null);
-                }}
-                onSavePoi={saveNewPoi}
-                onClose={closeEditor}
-              />
-            ) : null}
-          </>,
-          document.body,
-        )
       : null;
 
   const eventPickSectors =
@@ -971,73 +277,62 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       .catch(() => bindCityPressure([], []));
   };
 
+  const [sceneBooted, setSceneBooted] = useState(false);
+  const mapBuildings = buildings.length > 0 ? buildings : CITY_BUILDINGS;
+  /** Ein HeavyGlb-Slot pro Landmark-Typ (Instancing oder Einzelmesh). */
+  const expectedHeavyCount = useMemo(() => {
+    const models = new Set<string>();
+    for (const building of mapBuildings) {
+      if (building.landmark) models.add(building.landmark);
+    }
+    return models.size;
+  }, [mapBuildings]);
+
   return (
     <div className="fixed inset-0 z-[80] flex bg-[#02080c]">
-      <HoloCityRail
-        selection={view.selection}
-        subject={view.subject}
-        sim={metrics.sim}
-        scopeLabel={view.subject ? (findDistrict(view.subject.districtId)?.name ?? "Viertel") : "Stadt gesamt"}
-        onSelect={(selection) => {
-          view.focus(selection);
-          if (citySurface === "dashboard" && selection.type === "district") setDashboardScope(selection.id);
-        }}
-        onLeave={onLeave}
-      />
       {citySurface === "map" ? (
-      <HoloOverlay
-        subject={view.subject}
-        lore={view.subject ? findPlaceLore(places, view.subject.name) : null}
-        sim={metrics.sim}
-        series={metrics.series}
-        weather={climate.current}
-        weatherSeries={climate.series}
-        influences={metrics.influences}
-        factions={districtFactions.factions}
-        factionRecordIds={factionRecordIds}
-        locations={keyLocations.locations}
-        selectedLocation={keyLocations.selected}
-        leaders={districtNpcs.leaders}
-        operator={districtNpcs.operator}
-        npcLinkContext={{ worldId, campaignId }}
-        viewDay={calendar.day}
-        isGm={isGm}
-        selectedPoi={selectedPoi}
-        districtPois={districtPoiInfluences}
-        landmark={
-          view.subject?.type === "building"
-            ? (buildings.find((entry) => entry.id === view.subject?.id)?.landmark ?? null)
-            : null
-        }
-        onClose={() => view.focus(null)}
-        onSelect={view.focus}
-      />
+        <HoloCityRail
+          selection={view.selection}
+          subject={view.subject}
+          sim={metrics.sim}
+          scopeLabel={view.subject ? (findDistrict(view.subject.districtId)?.name ?? "Viertel") : "Stadt gesamt"}
+          onSelect={(selection) => {
+            view.focus(selection);
+          }}
+          onLeave={onLeave}
+        />
       ) : null}
       <div className="relative min-w-0 flex-1">
         <div className={citySurface === "dashboard" ? "invisible absolute inset-0" : eventPlaceStep ? "h-full cursor-crosshair" : "h-full"}>
+        <HoloCityLoadingOverlay
+          enabled={citySurface === "map"}
+          sceneBooted={sceneBooted}
+          expectedHeavyCount={expectedHeavyCount}
+        />
         <HoloCityCanvas
+          onSceneBoot={() => setSceneBooted(true)}
           selection={
             eventWizardOpen && eventPlaceStep && eventDistrictId
               ? { type: "district", id: eventDistrictId }
               : view.selection
           }
           hovered={view.hovered}
-          editorTool={isGm ? activeTool : null}
+          editorTool={isGm && session.mapAdminMode ? session.activeTool : null}
           editingDistrictId={
-            isGm && (districtsTool || buildingsTool) ? editingDistrictId : null
+            isGm && (session.districtsTool || session.buildingsTool) ? session.editingDistrictId : null
           }
-          editingStreetId={isGm && streetsTool ? editingStreetId : null}
-          drawingStreet={isGm && streetDrawActive}
-          drawingWall={isGm && wallDrawActive}
-          previewingWall={isGm && wallsTool && (drawingWall || wallDraftReady)}
-          draftWallPoints={draftWallPoints}
-          draftWallCurve={wallDraft.curve}
-          previewWall={isGm && wallsTool ? previewWall : null}
+          editingStreetId={isGm && session.streetsTool ? session.editingStreetId : null}
+          drawingStreet={isGm && session.streetDrawActive}
+          drawingWall={isGm && session.wallDrawActive}
+          previewingWall={isGm && session.wallsTool && (session.drawingWall || session.wallDraftReady)}
+          draftWallPoints={session.draftWallPoints}
+          draftWallCurve={session.wallDraft.curve}
+          previewWall={isGm && session.wallsTool ? session.previewWall : null}
           walls={wallsApi.walls}
-          editingWallId={isGm && wallsTool ? editingWallId : null}
-          placingBuilding={isGm && placingBuildingActive}
-          placingPoi={isGm && placingPoiActive}
-          draftStreetPoints={draftStreetPoints}
+          editingWallId={isGm && session.wallsTool ? session.editingWallId : null}
+          placingBuilding={isGm && session.placingBuildingActive}
+          placingPoi={isGm && session.placingPoiActive}
+          draftStreetPoints={session.draftStreetPoints}
           streets={streetsApi.streets}
           dayWeather={climate.current}
           weatherFx={shownWeather.effect}
@@ -1049,27 +344,29 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           wallsVisible={layers.walls}
           polygons={polygons.polygons}
           editingSectors={
-            isGm && districtsTool && editingDistrictId
-              ? (sectorsApi.sectorsByDistrict[editingDistrictId]?.length ?? 0) > 0
-                ? (sectorsApi.sectorsByDistrict[editingDistrictId] ?? [])
-                : sectorPreviewSectors
+            isGm && session.districtsTool && session.editingDistrictId
+              ? (sectorsApi.sectorsByDistrict[session.editingDistrictId]?.length ?? 0) > 0
+                ? (sectorsApi.sectorsByDistrict[session.editingDistrictId] ?? [])
+                : session.sectorPreviewSectors
               : []
           }
           editingSectorsPreview={Boolean(
             isGm &&
-              districtsTool &&
-              editingDistrictId &&
-              (sectorsApi.sectorsByDistrict[editingDistrictId]?.length ?? 0) === 0 &&
-              sectorPreviewSectors.length > 0,
+              session.districtsTool &&
+              session.editingDistrictId &&
+              (sectorsApi.sectorsByDistrict[session.editingDistrictId]?.length ?? 0) === 0 &&
+              session.sectorPreviewSectors.length > 0,
           )}
           eventPickSectors={eventPickSectors}
           eventSectorIds={eventSectorIds}
           onPickEventSector={onPickEventSector}
           crimeHeatmapVisible={crimeHeatmap}
           crimeCells={crimeCells}
+          poiReachCells={reach.poiReachCells}
+          poiReachVisible={poiReachVisible}
           holdStill={eventPlaceStep}
           highlightDistricts={eventPlaceStep}
-          buildings={buildings.length > 0 ? buildings : CITY_BUILDINGS}
+          buildings={mapBuildings}
           pois={pois}
           worldId={resolvedWorldId}
           campaignId={campaignId}
@@ -1084,19 +381,21 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onCommitPolygons={polygons.commit}
           onCommitBuildings={buildingPositions.commit}
           onCommitStreets={streetsApi.commit}
-          onAddDrawPoint={addDrawPoint}
-          onFinishDrawStreet={finishDrawStreet}
-          onAddWallPoint={(point) => setDraftWallPoints((current) => [...current, point])}
+          onAddDrawPoint={session.addDrawPoint}
+          onFinishDrawStreet={session.finishDrawStreet}
+          onAddWallPoint={(point) => session.setDraftWallPoints((current) => [...current, point])}
           onFinishDrawWall={() => {
-            if (draftWallPoints.length < 2) return;
-            setDrawingWall(false);
-            setWallDraftReady(true);
+            if (session.draftWallPoints.length < 2) return;
+            session.setDrawingWall(false);
+            session.setWallDraftReady(true);
           }}
           onMoveWallPoint={wallsApi.movePoint}
-          onSelectWall={setEditingWallId}
-          onPlaceBuildingPoint={placeBuildingPoint}
-          onPlacePoiPoint={placePoiPoint}
-          onSelectStreet={selectStreet}
+          onSelectWall={session.setEditingWallId}
+          onPlaceBuildingPoint={mutations.placeBuildingPoint}
+          onPlacePoiPoint={mutations.placePoiPoint}
+          onMovePoi={isGm && session.poisTool ? mutations.movePoiPoint : undefined}
+          onCommitPoi={isGm && session.poisTool ? mutations.commitPoiPoint : undefined}
+          onSelectStreet={session.selectStreet}
         />
         <CityMapHud
           citySurface={citySurface}
@@ -1111,17 +410,19 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onStepYear={calendar.stepYear}
           onGoToday={calendar.goToday}
           isGm={isGm}
+          mapAdminMode={session.mapAdminMode}
+          onToggleMapAdminMode={session.toggleMapAdminMode}
           eventWizardOpen={eventWizardOpen}
           onToggleEventWizard={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
           statusLine={
             eventWizardOpen && eventPlaceStep
               ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
-              : wallDrawActive
+              : session.wallDrawActive
                 ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
-                : placingBuildingActive
+                : session.placingBuildingActive
                   ? "Klicke im Viertel, um das Gebäude zu setzen."
-                  : placingPoiActive
-                    ? repositioningPoi
+                  : session.placingPoiActive
+                    ? session.repositioningPoi
                       ? "Klicke auf die Karte, um den Ort neu zu setzen."
                       : "Klicke auf die Karte, um den besonderen Ort zu setzen."
                     : (hint ?? view.subject?.name ?? "Viertel links wählen.")
@@ -1169,11 +470,67 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             onStepYear={calendar.stepYear}
             onGoToday={calendar.goToday}
             onShowMap={() => setCitySurface("map")}
+            onLeave={onLeave}
+            range={range}
+            setRange={setRange}
+            chartMetric={chartMetric}
+            setChartMetric={setChartMetric}
+            lines={lines}
+            setLines={setLines}
           />
+        ) : null}
+        {citySurface === "map" && !session.mapAdminMode && view.subject?.type !== "district" ? (
+          <div className="pointer-events-none absolute inset-0 z-[90]">
+            <HoloOverlay
+              subject={view.subject}
+              lore={view.subject ? findPlaceLore(places, view.subject.name) : null}
+              sim={metrics.sim}
+              series={metrics.series}
+              weather={climate.current}
+              weatherSeries={climate.series}
+              influences={metrics.influences}
+              factions={districtFactions.factions}
+              factionRecordIds={factionRecordIds}
+              locations={keyLocations.locations}
+              selectedLocation={keyLocations.selected}
+              leaders={districtNpcs.leaders}
+              operator={districtNpcs.operator}
+              npcLinkContext={{ worldId: resolvedWorldId, campaignId }}
+              viewDay={calendar.day}
+              isGm={isGm}
+              selectedPoi={selectedPoi}
+              districtPois={reach.districtPoiInfluences}
+              influenceReachOn={poiReachVisible}
+              onToggleInfluenceReach={() => setPoiReachVisible((current) => !current)}
+              leadNpc={reach.poiLeadNpc}
+              selectedBuilding={selectedBuilding}
+              buildingLocationId={reach.selectedBuildingLocationId}
+              buildingReachHint={reach.buildingReachHint}
+              landmark={selectedBuilding?.landmark ?? null}
+              onClose={() => view.focus(null)}
+              onSelect={view.focus}
+            />
+          </div>
         ) : null}
       </div>
 
-      {editorControls}
+      <MapEditorPortals
+        isGm={isGm}
+        session={session}
+        mutations={mutations}
+        buildings={buildings}
+        pois={pois}
+        polygons={polygons}
+        sectorsApi={sectorsApi}
+        buildingPositions={buildingPositions}
+        landmarkScales={landmarkScales}
+        landmarkRotations={landmarkRotations}
+        streetsApi={streetsApi}
+        wallsApi={wallsApi}
+        dayWeather={climate.current}
+        viewedDay={calendar.day}
+        layoutError={layoutError}
+      />
     </div>
   );
 }

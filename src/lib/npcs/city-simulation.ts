@@ -161,6 +161,25 @@ export const CitySimulationFieldsSchema = z.object({
 
 export type CitySimulationFields = z.infer<typeof CitySimulationFieldsSchema>;
 
+/** Dieselben Startwerte wie der Schalter „Ja“ im NPC-Wizard. */
+export function activateCitySimulation(
+  fields: CitySimulationFields = EMPTY_CITY_SIMULATION,
+): CitySimulationFields {
+  return {
+    ...fields,
+    forCitySimulation: true,
+    cityInfluenceTier: fields.cityInfluenceTier ?? "local",
+    cityAxisLoyalCriminal: fields.cityAxisLoyalCriminal ?? 0,
+    cityAxisGreedyAltruist: fields.cityAxisGreedyAltruist ?? 0,
+    cityAxisPiousSkeptic: fields.cityAxisPiousSkeptic ?? 0,
+    cityAxisSuperstitionReason: fields.cityAxisSuperstitionReason ?? 0,
+    cityAgenda: fields.cityAgenda ?? "",
+    cityEventDeck: fields.cityEventDeck ?? [],
+    cityAbilities: fields.cityAbilities ?? [],
+    cityCardPlays: fields.cityCardPlays ?? [],
+  };
+}
+
 export const EMPTY_CITY_SIMULATION: CitySimulationFields = {
   forCitySimulation: false,
   cityInfluenceTier: null,

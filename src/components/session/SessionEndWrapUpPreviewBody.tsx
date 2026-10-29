@@ -111,10 +111,10 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                             : preview.chronist.processedChunks > 0 &&
                                 preview.chronist.processedChunks ===
                                   preview.chronist.chunkCount
-                              ? "VollstÃ¤ndig verarbeitet"
+                              ? "Vollständig verarbeitet"
                               : preview.chronist.transcriptionStatus === "stopped"
                                 ? "Beendet"
-                                : (preview.chronist.transcriptionStatus ?? "â€”")}
+                                : (preview.chronist.transcriptionStatus ?? "—")}
                       </dd>
                     </div>
                   </dl>
@@ -123,8 +123,8 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                   0 ? (
                     <p className="mt-3 font-libre text-xs text-amber-200/90 leading-relaxed">
                       Nach dem Archivieren wartet das Modal, bis alle Chunks
-                      durch sind â€” dann kannst du das Ergebnis direkt im Chronist
-                      Ã¶ffnen.
+                      durch sind — dann kannst du das Ergebnis direkt im Chronist
+                      öffnen.
                     </p>
                   ) : null}
                 </section>
@@ -140,12 +140,12 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                 <div className="mb-3 flex items-center gap-2">
                   <Users className="h-4 w-4 text-accent-gold" />
                   <h3 className="font-barlow text-xs font-bold uppercase text-gray-300">
-                    Aktuelle BÃ¼hne & Szene
+                    Aktuelle Bühne & Szene
                   </h3>
                 </div>
                 <ul className="space-y-2 font-libre text-sm text-gray-300">
                   <li>
-                    <span className="text-gray-500">NSCs auf der BÃ¼hne: </span>
+                    <span className="text-gray-500">NSCs auf der Bühne: </span>
                     {preview.board.stageNpcCount > 0 ? (
                       <span className="text-white">
                         {preview.board.stageNpcNames.join(", ")}
@@ -161,9 +161,9 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                   <li className="flex items-start gap-1.5">
                     <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500" />
                     <span>
-                      {preview.board.weatherLabel} Â· {preview.board.temperatureLabel}
+                      {preview.board.weatherLabel} · {preview.board.temperatureLabel}
                       {preview.board.dayPhaseLabel
-                        ? ` Â· ${preview.board.dayPhaseLabel}`
+                        ? ` · ${preview.board.dayPhaseLabel}`
                         : ""}
                     </span>
                   </li>
@@ -172,7 +172,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                       <span className="text-gray-500">Ingame-Zeit: </span>
                       {[preview.board.inGameDate, preview.board.inGameTime]
                         .filter(Boolean)
-                        .join(" Â· ")}
+                        .join(" · ")}
                     </li>
                   ) : null}
                 </ul>
@@ -187,12 +187,12 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                 </div>
                 {preview.participation.alreadySettled ? (
                   <p className="font-libre text-sm text-gray-400">
-                    Teilnahme-Punkte fÃ¼r diese Session wurden bereits verbucht.
+                    Teilnahme-Punkte für diese Session wurden bereits verbucht.
                   </p>
                 ) : (
                   <div className="space-y-4">
                     <p className="font-libre text-sm text-gray-300 leading-relaxed">
-                      Jeder Spieler mit erfolgreicher Teilnahme erhÃ¤lt{" "}
+                      Jeder Spieler mit erfolgreicher Teilnahme erhält{" "}
                       <strong className="text-white">
                         {preview.participation.basePointsPerPlayer} Punkte
                       </strong>{" "}
@@ -228,7 +228,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                                 {player.characterName ? (
                                   <span className="font-normal text-gray-400">
                                     {" "}
-                                    Â· {player.characterName}
+                                    · {player.characterName}
                                   </span>
                                 ) : null}
                               </p>
@@ -239,7 +239,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                             <span className="font-barlow text-xs font-bold text-hero-vibrant">
                               {player.eligible
                                 ? `+${preview.participation.basePointsPerPlayer} Pkt.`
-                                : "â€”"}
+                                : "—"}
                             </span>
                           </li>
                         );
@@ -255,10 +255,10 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                       />
                       <span className="font-libre text-sm text-gray-300">
                         <span className="font-barlow text-xs font-bold uppercase text-gray-200">
-                          Extrapunkte fÃ¼r besondere Aktionen?
+                          Extrapunkte für besondere Aktionen?
                         </span>
                         <span className="mt-1 block text-xs text-gray-500">
-                          Optional pro ausgewÃ¤hltem Spieler â€” Betrag und kurzer Grund.
+                          Optional pro ausgewähltem Spieler — Betrag und kurzer Grund.
                         </span>
                       </span>
                     </label>
@@ -320,10 +320,10 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                       />
                       <span className="font-libre text-sm text-gray-300">
                         <span className="font-barlow text-xs font-bold uppercase text-accent-gold">
-                          Achievement fÃ¼r besondere Leistung?
+                          Achievement für besondere Leistung?
                         </span>
                         <span className="mt-1 block text-xs text-gray-500">
-                          WÃ¤hle Spieler und Achievement aus der bestehenden Ãœbersicht.
+                          Wähle Spieler und Achievement aus der bestehenden Übersicht.
                         </span>
                       </span>
                     </label>
@@ -349,7 +349,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                               }
                               className="min-w-[8rem] flex-1 rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white"
                             >
-                              <option value="">Spieler wÃ¤hlenâ€¦</option>
+                              <option value="">Spieler wählen…</option>
                               {preview.participation.players
                                 .filter((p) => includedPlayerIds.has(p.userId))
                                 .map((p) => (
@@ -371,7 +371,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                               }
                               className="min-w-[10rem] flex-1 rounded border border-hero-border bg-background-dark px-2 py-1.5 font-libre text-sm text-white"
                             >
-                              <option value="">Achievement wÃ¤hlenâ€¦</option>
+                              <option value="">Achievement wählen…</option>
                               {preview.participation.achievements.map((a) => (
                                 <option key={a.id} value={a.id}>
                                   {a.name}
@@ -512,7 +512,7 @@ export function SessionEndWrapUpPreviewBody(props: SessionEndWrapUpPreviewBodyPr
                             className="mt-1 inline-block font-barlow text-[10px] font-bold uppercase text-hero-vibrant hover:text-white"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            Ã–ffnen
+                            Öffnen
                           </Link>
                         ) : null}
                       </div>

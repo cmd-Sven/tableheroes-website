@@ -2256,6 +2256,39 @@ export type Database = {
           },
         ]
       }
+      npc_faction_links: {
+        Row: {
+          created_at: string
+          faction_id: string
+          npc_id: string
+        }
+        Insert: {
+          created_at?: string
+          faction_id: string
+          npc_id: string
+        }
+        Update: {
+          created_at?: string
+          faction_id?: string
+          npc_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_faction_links_faction_id_fkey"
+            columns: ["faction_id"]
+            isOneToOne: false
+            referencedRelation: "factions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_faction_links_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       npc_favorites: {
         Row: {
           created_at: string | null

@@ -12,7 +12,7 @@ const barlow = Barlow_Condensed({
 });
 
 const cinzel = Cinzel({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["700"], // Bold
   variable: "--font-cinzel",
 });

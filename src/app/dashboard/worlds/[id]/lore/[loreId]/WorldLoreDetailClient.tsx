@@ -19,6 +19,7 @@ import { AurenfurtBuildingStreetBlock } from "@/src/components/city/aurenfurt/Au
 import { PoiInfluencesSection } from "@/src/components/city/aurenfurt/PoiInfluencesSection";
 import type { AurenfurtPoiLoreExtras } from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
 import { POI_LOCATION_TYPES } from "@/src/lib/lore-types";
+import { LocationNpcAssignSearch } from "@/src/components/worlds/LocationNpcAssignSearch";
 import type { PoiInfluence } from "@/src/components/city/aurenfurt/aurenfurt-map-pois";
 
 type LoreData = {
@@ -111,6 +112,8 @@ type Props = {
   } | null;
   /** Besonderer Ort (POI): Art + Einflussfaktoren */
   aurenfurtPoi?: AurenfurtPoiLoreExtras | null;
+  /** Ort wird von der Aurenfurt-Stadtsimulation aufgenommen. */
+  citySimulationLocation?: boolean;
 };
 
 export function WorldLoreDetailClient({
@@ -134,6 +137,7 @@ export function WorldLoreDetailClient({
   loreMetadata = {},
   aurenfurtBuilding = null,
   aurenfurtPoi = null,
+  citySimulationLocation = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -1034,49 +1038,20 @@ export function WorldLoreDetailClient({
                     </ul>
                   </div>
                 )}
-                <Link
-                  href={"/dashboard/worlds/" + worldId + "/npcs/create?locationId=" + loreId}
-                  className={`inline-flex items-center gap-2 text-sm ${
-                    npcCreateAllowed
-                      ? "text-hero-vibrant hover:underline"
-                      : "pointer-events-none text-gray-500 opacity-60"
-                  }`}
-                  aria-disabled={!npcCreateAllowed}
-                  title={
-                    npcCreateAllowed
-                      ? undefined
-                      : "Gebäude inaktiv: zuerst eine Straße im Lore-Eintrag zuordnen."
-                  }
-                  onClick={(e) => {
-                    if (!npcCreateAllowed) e.preventDefault();
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  NPC hier platzieren
-                </Link>
-                {!npcCreateAllowed ? (
-                  <p className="font-libre text-xs text-amber-400/90 mt-1">
-                    Keine NPCs möglich — Gebäude ohne Straßen-Zuordnung ist inaktiv.
-                  </p>
-                ) : null}
               </div>
             ) : (
-              <>
-                <p className="font-libre text-gray-500 italic mb-2">Keine NPCs mit diesem Ort verknüpft.</p>
-                {npcCreateAllowed ? (
-                  <Link
-                    href={"/dashboard/worlds/" + worldId + "/npcs/create?locationId=" + loreId}
-                    className="inline-flex items-center gap-2 text-sm text-hero-vibrant hover:underline"
-                  >
-                    <Plus className="h-4 w-4" />
-                    NPC hinzufügen
-                  </Link>
-                ) : (
-                  <p className="font-libre text-xs text-amber-400/90">
-                    NPC hinzufügen deaktiviert — Gebäude ohne Straßen-Zuordnung ist inaktiv.
-                  </p>
-                )}
-              </>
+              <p className="font-libre text-gray-500 italic">Keine NPCs mit diesem Ort verknüpft.</p>
+            )}
+            {npcCreateAllowed ? (
+              <LocationNpcAssignSearch
+                worldId={worldId}
+                locationId={loreId}
+                citySimulationLocation={citySimulationLocation}
+              />
+            ) : (
+              <p className="font-libre text-xs text-amber-400/90 mt-2">
+                NPC hinzufügen deaktiviert — Gebäude ohne Straßen-Zuordnung ist inaktiv.
+              </p>
             )}
           </div>
 

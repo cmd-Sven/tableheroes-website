@@ -248,7 +248,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
       {cityNpcs.length > 0 ? (
         <section className="rounded-lg border border-hero-border bg-background-card p-6 shadow-lg">
           <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
-            Mitglieder in der Stadt
+            Mitglieder
           </h2>
           <ul className="space-y-2">
             {cityNpcs.map((npc) => (
