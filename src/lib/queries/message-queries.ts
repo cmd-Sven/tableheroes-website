@@ -471,3 +471,84 @@ export async function getUnreadInboxMessages(
   });
   return unread.slice(0, 3);
 }
+
+export type PlayerMessageGmTarget = {
+  campaignId: string;
+  campaignName: string;
+  gmUserId: string;
+  gmUsername: string;
+};
+
+export type PlayerMessageAdminTarget = {
+  userId: string;
+  username: string;
+};
+
+export type PlayerMessageTargets = {
+  campaignGms: PlayerMessageGmTarget[];
+  admins: PlayerMessageAdminTarget[];
+};
+
+/** Ziele für Spieler-Nachrichten: eigene Kampagnen-SLs und Plattform-Admins. */
+export async function getPlayerMessageTargets(
+  userId: string,
+): Promise<PlayerMessageTargets> {
+  const supabase = await createClient();
+
+  const { data: memberRows } = await (supabase.from("campaign_members") as any)
+    .select("campaign_id, campaigns:campaign_id ( id, name, gm_id )")
+    .eq("user_id", userId)
+    .in("status", ["Approved", "Active"]);
+
+  const campaignGms: PlayerMessageGmTarget[] = [];
+  const gmIds = new Set<string>();
+  for (const row of (memberRows as any[]) || []) {
+    const campaign = row.campaigns as
+      | { id?: string; name?: string | null; gm_id?: string | null }
+      | null
+      | undefined;
+    const campaignId = campaign?.id ?? (row.campaign_id as string | undefined);
+    const gmUserId = campaign?.gm_id ? String(campaign.gm_id) : "";
+    if (!campaignId || !gmUserId || gmUserId === userId) continue;
+    if (gmIds.has(`${campaignId}:${gmUserId}`)) continue;
+    gmIds.add(`${campaignId}:${gmUserId}`);
+    campaignGms.push({
+      campaignId,
+      campaignName: (campaign?.name ?? "").trim() || "Kampagne",
+      gmUserId,
+      gmUsername: "Spielleiter",
+    });
+  }
+
+  const uniqueGmIds = [...new Set(campaignGms.map((entry) => entry.gmUserId))];
+  if (uniqueGmIds.length > 0) {
+    const { data: gmUsers } = await (supabase.from("users") as any)
+      .select("id, username")
+      .in("id", uniqueGmIds);
+    const nameById = new Map<string, string>();
+    for (const gm of (gmUsers as any[]) || []) {
+      const name = String(gm.username ?? "").trim();
+      if (name) nameById.set(String(gm.id), name);
+    }
+    for (const entry of campaignGms) {
+      entry.gmUsername = nameById.get(entry.gmUserId) ?? entry.gmUsername;
+    }
+  }
+
+  const { data: adminRows } = await (supabase.from("users") as any)
+    .select("id, username")
+    .eq("primary_role", "Admin")
+    .eq("status", "approved")
+    .neq("id", userId)
+    .order("username", { ascending: true })
+    .limit(20);
+
+  const admins: PlayerMessageAdminTarget[] = ((adminRows as any[]) || [])
+    .map((row) => ({
+      userId: String(row.id),
+      username: String(row.username ?? "").trim() || "Admin",
+    }))
+    .filter((row) => Boolean(row.userId));
+
+  return { campaignGms, admins };
+}

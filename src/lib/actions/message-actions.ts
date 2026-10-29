@@ -10,7 +10,10 @@ export type {
   GMNotification,
   GMRecipientCampaign,
   PlayerMessage,
+  PlayerMessageTargets,
 } from "@/src/lib/queries/message-queries";
+
+export { getPlayerMessageTargets } from "@/src/lib/queries/message-queries";
 
 // ============================================================================
 // 3. Send Message
@@ -199,6 +202,128 @@ export async function sendMessage(
 
   revalidatePath("/dashboard");
   return { success: true, count: 1 };
+}
+
+export type SendPlayerMessageInput = {
+  /** Kampagnen-SL oder Plattform-Admin */
+  target: "gm" | "admin";
+  /** Pflicht bei target=gm */
+  campaignId?: string;
+  /** Pflicht bei target=admin */
+  adminUserId?: string;
+  subject: string;
+  content: string;
+  priority?: "normal" | "high";
+};
+
+/**
+ * Spieler → Spielleiter (eigene Kampagne) oder → Table-Heroes-Admin.
+ * Schreibt eine Direktnachricht und benachrichtigt den Empfänger per E-Mail.
+ */
+export async function sendPlayerMessage(
+  input: SendPlayerMessageInput,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Nicht authentifiziert." };
+
+  const subject = input.subject?.trim() ?? "";
+  const content = input.content?.trim() ?? "";
+  if (!subject) return { success: false, error: "Bitte gib einen Betreff ein." };
+  if (!content) return { success: false, error: "Bitte gib eine Nachricht ein." };
+
+  const priority = input.priority === "high" ? "high" : "normal";
+  let recipientUserId = "";
+  let campaignId: string | null = null;
+
+  if (input.target === "gm") {
+    const campaignKey = input.campaignId?.trim() ?? "";
+    if (!campaignKey) return { success: false, error: "Bitte wähle eine Kampagne." };
+
+    const { data: membership } = await (supabase.from("campaign_members") as any)
+      .select("campaign_id, status")
+      .eq("user_id", user.id)
+      .eq("campaign_id", campaignKey)
+      .in("status", ["Approved", "Active"])
+      .maybeSingle();
+    if (!membership) {
+      return { success: false, error: "Du bist in dieser Kampagne kein bestätigtes Mitglied." };
+    }
+
+    const { data: campaign } = await (supabase.from("campaigns") as any)
+      .select("id, gm_id, name")
+      .eq("id", campaignKey)
+      .maybeSingle();
+    const gmId = campaign?.gm_id ? String(campaign.gm_id) : "";
+    if (!gmId) return { success: false, error: "Spielleiter der Kampagne nicht gefunden." };
+    if (gmId === user.id) {
+      return { success: false, error: "Du kannst dir selbst keine Nachricht schicken." };
+    }
+
+    recipientUserId = gmId;
+    campaignId = campaignKey;
+  } else {
+    const adminId = input.adminUserId?.trim() ?? "";
+    if (!adminId) return { success: false, error: "Bitte wähle einen Admin." };
+    if (adminId === user.id) {
+      return { success: false, error: "Du kannst dir selbst keine Nachricht schicken." };
+    }
+
+    const { data: adminRow } = await (supabase.from("users") as any)
+      .select("id, primary_role, status")
+      .eq("id", adminId)
+      .maybeSingle();
+    if (
+      !adminRow ||
+      String((adminRow as { primary_role?: string }).primary_role ?? "") !== "Admin" ||
+      String((adminRow as { status?: string }).status ?? "") !== "approved"
+    ) {
+      return { success: false, error: "Ungültiger Admin-Empfänger." };
+    }
+    recipientUserId = adminId;
+    campaignId = null;
+  }
+
+  const admin = createAdminClient();
+  const { data: inserted, error } = await (admin.from("messages") as any)
+    .insert({
+      sender_id: user.id,
+      recipient_id: recipientUserId,
+      campaign_id: campaignId,
+      subject,
+      content,
+      type: "direct",
+      priority,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[sendPlayerMessage]", error);
+    return {
+      success: false,
+      error: error.message ?? "Nachricht konnte nicht gesendet werden.",
+    };
+  }
+
+  const messageId = String((inserted as { id?: string } | null)?.id ?? "");
+  if (messageId) {
+    after(async () => {
+      await notifyProfileMessageEmail({
+        supabase: createAdminClient(),
+        recipientUserId,
+        messageId,
+        subject,
+        source: "player",
+      });
+    });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/messages");
+  return { success: true };
 }
 
 // ============================================================================

@@ -97,24 +97,28 @@ export async function notifyProfileMessageEmail(args: {
   recipientUserId: string;
   messageId: string;
   subject: string;
-  /** Admin-Nachrichten nutzen Dashboard-Formulierung statt SL-Text. */
-  source?: "gm" | "admin";
+  /**
+   * gm = SL→Spieler (klassisch)
+   * admin = Admin→Mitglied
+   * player = Spieler→SL/Admin (Dashboard-Hinweis)
+   */
+  source?: "gm" | "admin" | "player";
 }): Promise<void> {
-  const fromAdmin = args.source === "admin";
+  const dashboardTone = args.source === "admin" || args.source === "player";
   const result = await sendIfAllowed({
     supabase: args.supabase,
     userId: args.recipientUserId,
     kind: "profile_messages",
     referenceKey: `message:${args.messageId}`,
-    subject: fromAdmin
+    subject: dashboardTone
       ? "Du hast eine neue Nachricht auf deinem Dashboard"
       : `Neue Nachricht: ${args.subject}`,
-    title: fromAdmin ? "Neue Nachricht auf deinem Dashboard" : "Neue Nachricht in deinem Profil",
-    intro: fromAdmin
+    title: dashboardTone ? "Neue Nachricht auf deinem Dashboard" : "Neue Nachricht in deinem Profil",
+    intro: dashboardTone
       ? "Du hast eine neue Nachricht auf deinem Dashboard. Öffne den Posteingang, um sie zu lesen."
       : "Dein Spielleiter hat dir eine neue Nachricht hinterlassen. Schau in deinem Posteingang nach, was es Neues gibt.",
-    ctaLabel: fromAdmin ? "Zum Dashboard" : "Nachrichten öffnen",
-    ctaUrl: fromAdmin ? `${SITE_URL()}/dashboard` : `${SITE_URL()}/dashboard/messages`,
+    ctaLabel: dashboardTone ? "Zum Dashboard" : "Nachrichten öffnen",
+    ctaUrl: dashboardTone ? `${SITE_URL()}/dashboard` : `${SITE_URL()}/dashboard/messages`,
   });
 
   if (result.error) {

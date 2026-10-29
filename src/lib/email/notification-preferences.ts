@@ -130,8 +130,9 @@ export const EMAIL_NOTIFICATION_LABELS: Record<
     description: "Neue veröffentlichte News und Ankündigungen auf Table Heroes.",
   },
   profile_messages: {
-    title: "Nachrichten vom Spielleiter",
-    description: "E-Mail, wenn dein SL dir eine Nachricht im Posteingang hinterlässt.",
+    title: "Nachrichten im Posteingang",
+    description:
+      "E-Mail, wenn du eine neue Nachricht erhältst (Spielleiter, Admin oder Spieler).",
   },
   npc_revealed: {
     title: "Neuer NPC in der Kampagne",
