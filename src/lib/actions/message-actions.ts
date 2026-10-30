@@ -13,8 +13,6 @@ export type {
   PlayerMessageTargets,
 } from "@/src/lib/queries/message-queries";
 
-export { getPlayerMessageTargets } from "@/src/lib/queries/message-queries";
-
 // ============================================================================
 // 3. Send Message
 // ============================================================================

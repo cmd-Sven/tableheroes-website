@@ -277,7 +277,7 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
                         .map((card, index) => {
                           const duration = card.durationDays ?? defaultCardDuration(tier);
                           const range = card.range ?? defaultCardRange(tier);
-                          const open = detail.cardPlays.some(
+                          const open = (detail?.cardPlays ?? []).some(
                             (play) =>
                               play.cardId === card.id && playIsOpen(play.startedOn, duration),
                           );
