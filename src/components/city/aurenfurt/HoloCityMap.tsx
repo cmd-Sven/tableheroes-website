@@ -47,6 +47,7 @@ import type { DistrictSector } from "./aurenfurt-sectors";
 import { citySectorHeat, type HeatmapAspect } from "./aurenfurt-city-heatmap";
 import { buildDistrictHudKpis } from "./DistrictHudKpis";
 import { cityMetricsOn, districtMetricsOn } from "./aurenfurt-history";
+import { populationOn } from "./aurenfurt-population";
 import { parseDay } from "./aurenfurt-time";
 import { weatherConditionPenalty } from "./aurenfurt-streets";
 import { loadAurenfurtCityPressure } from "./load-aurenfurt-npc-records";
@@ -258,6 +259,15 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       : cityMetricsOn(compareMs);
     return buildDistrictHudKpis(current, compare, { fromPast: !lookingForward });
   }, [calendar.day, calendar.maxDay, calendar.minDay, focusDistrictId, simVersion]);
+
+  /** Ein Tages-Snapshot aus dem Populations-Cache — kein Range-/History-Rebuild. */
+  const populationTotal = useMemo(() => {
+    const snap = populationOn(calendar.day);
+    if (focusDistrictId) {
+      return snap.districts[focusDistrictId]?.population_total ?? 0;
+    }
+    return snap.population_total;
+  }, [calendar.day, focusDistrictId, simVersion]);
 
   const eventPickSectors =
     eventWizardOpen && eventPlaceStep && eventDistrictId
@@ -471,6 +481,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           districtTitle={districtTitle}
           districtId={focusDistrictId}
           districtKpis={districtKpis}
+          population={populationTotal}
           statusLine={
             eventWizardOpen && eventPlaceStep
               ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."

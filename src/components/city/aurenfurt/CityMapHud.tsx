@@ -37,6 +37,8 @@ type Props = {
   districtTitle: string;
   districtId: CityDistrictId | null;
   districtKpis: DistrictHudKpi[];
+  /** Aktuelle Bevölkerung (Stadt gesamt oder ausgewähltes Viertel). */
+  population: number;
   statusLine: string | null;
   layoutError: string | null;
   buildingsVisible: boolean;
@@ -75,6 +77,7 @@ export function CityMapHud({
   districtTitle,
   districtId,
   districtKpis,
+  population,
   statusLine,
   layoutError,
   buildingsVisible,
@@ -143,6 +146,18 @@ export function CityMapHud({
           hint={statusLine}
           layoutError={layoutError}
         />
+        <div
+          data-city-map-hud="population"
+          className="flex shrink-0 flex-col items-end justify-end self-end border border-hero-dark/70 bg-background-card/80 px-2.5 py-1.5"
+          aria-label={`Bevölkerung ${population.toLocaleString("de-DE")}`}
+        >
+          <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
+            Bevölkerung
+          </span>
+          <span className="font-barlow text-lg font-extrabold leading-none tabular-nums tracking-wide text-hero-vibrant sm:text-xl">
+            {population.toLocaleString("de-DE")}
+          </span>
+        </div>
         <div ref={menuRef} className="relative z-40 flex h-full shrink-0 items-center">
           <button
             type="button"
