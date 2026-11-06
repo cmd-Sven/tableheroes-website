@@ -9,6 +9,7 @@ export const POI_LOCATION_TYPES = [
   "Parkanlage",
   "Denkmal",
   "Platz",
+  "Laden/Geschäft",
   "sonstiger Ort",
 ] as const;
 
@@ -136,6 +137,7 @@ export const SUGGESTED_PARENT_TYPES: Record<string, string[]> = {
   Parkanlage: ["Stadtteil", "Stadt", "Dorf"],
   Denkmal: ["Stadtteil", "Stadt", "Dorf"],
   Platz: ["Stadtteil", "Stadt", "Dorf"],
+  "Laden/Geschäft": ["Stadtteil", "Stadt", "Dorf"],
   "sonstiger Ort": ["Stadtteil", "Stadt", "Dorf"],
   Ort: ["Land", "Region", "Insel"],
   Gebiet: ["Land", "Region"],
@@ -197,6 +199,7 @@ export const SUGGESTED_CHILD_TYPES: Record<string, string[]> = {
     "Parkanlage",
     "Denkmal",
     "Platz",
+    "Laden/Geschäft",
     "sonstiger Ort",
   ],
 };

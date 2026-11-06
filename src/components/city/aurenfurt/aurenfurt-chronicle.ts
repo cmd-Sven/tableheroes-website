@@ -142,15 +142,20 @@ const CITY_STORIES: Story[] = [
   {
     id: "fruehlingsfest-2026",
     title: "Frühlingsfest der Zünfte",
-    summary: "Jahrmarkt und Handwerksmesse. Die Kassen klingeln, und Taschendiebe nutzen das Gedränge.",
+    summary:
+      "Jahrmarkt und Handwerksmesse — das wirtschaftliche Herz schlägt laut. Die Kassen klingeln, und Taschendiebe nutzen das Gedränge.",
     segments: [
       {
         start: "2026-04-15",
         end: "2026-04-29",
         effects: [
-          { meter: "economy", shape: { kind: "rapid", delta: 17 } },
-          { meter: "unemployment", shape: { kind: "flat", delta: -8 } },
-          { meter: "crime", shape: { kind: "slow", delta: 5 } },
+          {
+            meter: "economy",
+            shape: { kind: "rapid", delta: 17 },
+            where: { handwerkerviertel: 1, unterstadt: 0.7, adelsviertel: 0.45, suedtor: 0.5, palast: 0.15 },
+          },
+          { meter: "unemployment", shape: { kind: "flat", delta: -8 }, where: { handwerkerviertel: 1, unterstadt: 0.6 } },
+          { meter: "crime", shape: { kind: "slow", delta: 5 }, where: { unterstadt: 1, handwerkerviertel: 0.5 } },
         ],
       },
     ],

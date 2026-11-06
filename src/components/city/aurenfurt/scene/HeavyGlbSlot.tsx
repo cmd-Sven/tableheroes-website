@@ -86,7 +86,17 @@ function retainHeavy(url: string): { ready: Promise<void>; release: () => void }
     const done = new Promise<void>((resolve) => {
       open = () => resolve();
     });
-    const ready = tail.then(() => undefined);
+    /** Kurze Pause zwischen Decodes, damit der Main-Thread atmen kann. */
+    const ready = tail.then(
+      () =>
+        new Promise<void>((resolve) => {
+          if (typeof requestIdleCallback === "function") {
+            requestIdleCallback(() => resolve(), { timeout: 120 });
+          } else {
+            setTimeout(resolve, 16);
+          }
+        }),
+    );
     tail = done;
     job = { ready, open, users: 0, opened: false };
     jobs.set(url, job);

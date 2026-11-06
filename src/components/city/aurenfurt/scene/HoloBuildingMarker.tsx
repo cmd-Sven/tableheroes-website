@@ -7,6 +7,7 @@ import type { BuildingKind, CityBuilding } from "../aurenfurt-districts";
 import { worldXZToUv, type UvPoint } from "../aurenfurt-district-polygons";
 import { DIORAMA_DEPTH, DIORAMA_WIDTH, surfacePoint } from "./diorama-geometry";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
+import { BuildingHoverChrome } from "./BuildingHoverChrome";
 import { HoloLandmarkMesh } from "./HoloLandmarkMesh";
 
 /** Auswahl vergrößert das Modell leicht. */
@@ -58,7 +59,8 @@ export function HoloBuildingMarker({
   const suppressRef = useRef(suppressSelect);
   suppressRef.current = suppressSelect;
   const [hot, setHot] = useState(false);
-  const lit = selected || hot;
+  /** Auswahl etwas stärker, Hover nur sanft — Spotlight kommt über BuildingHoverChrome. */
+  const lit = selected;
 
   const position = useMemo(() => surfacePoint(u, v), [u, v]);
 
@@ -101,8 +103,14 @@ export function HoloBuildingMarker({
           lit={lit}
         />
       ) : building.landmark ? null : (
-        <BuildingShape kind={building.kind} lit={lit} outside={outside} />
+        <BuildingShape kind={building.kind} lit={lit || hot} outside={outside} />
       )}
+      <BuildingHoverChrome
+        name={building.name}
+        hot={hot}
+        selected={selected}
+        y={building.landmark ? 0.55 : 0.38}
+      />
       {outside ? (
         <group position={[0, building.landmark ? 0.55 : 0.82, 0]} renderOrder={6}>
           <mesh>
@@ -250,8 +258,8 @@ function Solid({
       color={color}
       roughness={0.4}
       metalness={metalness}
-      emissive={lit ? "#fff4c8" : color}
-      emissiveIntensity={lit ? 0.45 : 0.08}
+      emissive={lit ? "#6f9a55" : color}
+      emissiveIntensity={lit ? 0.16 : 0.08}
     />
   );
 }

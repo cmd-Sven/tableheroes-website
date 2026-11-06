@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LORE_SECTION_H2_CLASS } from "@/src/lib/wiki-heading-styles";
 import {
   factionName,
   IDEOLOGY_LABELS,
@@ -24,7 +25,7 @@ function formatLegality(value: number) {
 export function CityFactionLorePanel({ worldId, standing, dayLabel, factionRecordIds }: Props) {
   return (
     <section className="rounded-lg border border-hero-border bg-background-card p-6 shadow-lg">
-      <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-2">
+      <h2 className={`${LORE_SECTION_H2_CLASS.replace("mb-4", "mb-2")}`}>
         Stadtsimulation
       </h2>
       <p className="font-libre text-sm text-gray-400 mb-4">

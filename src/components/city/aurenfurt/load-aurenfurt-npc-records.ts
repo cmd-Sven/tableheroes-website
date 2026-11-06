@@ -7,6 +7,7 @@ import { AURENFURT_WORLD_ID } from "./aurenfurt-district-lore-ids";
 import { allAurenfurtNpcs } from "./aurenfurt-npcs";
 import type { CityActor, CitySimEvent } from "./aurenfurt-pressure";
 import { parseDay } from "./aurenfurt-time";
+import { enrichPressureActors } from "./aurenfurt-verwaltung-runtime";
 
 export async function loadAurenfurtNpcRecordIds(): Promise<Record<string, string>> {
   const supabase = await createClient();
@@ -181,12 +182,12 @@ export async function loadAurenfurtCityPressure(): Promise<{ actors: CityActor[]
     .eq("world_id", AURENFURT_WORLD_ID)
     .eq("for_city_simulation", true);
 
-  const actors: CityActor[] = [];
+  const rawActors: CityActor[] = [];
   for (const row of (rows ?? []) as CityNpcRow[]) {
     const place = placeOf(row);
     if (!place) continue;
     const fields = citySimulationFromDb(row as Parameters<typeof citySimulationFromDb>[0]);
-    actors.push({
+    rawActors.push({
       id: row.id,
       name: row.name?.trim() || "NPC",
       alive: row.status == null || row.status === "Alive",
@@ -209,8 +210,47 @@ export async function loadAurenfurtCityPressure(): Promise<{ actors: CityActor[]
     });
   }
 
+  const catalog = allAurenfurtNpcs();
+  const catalogByName = new Map(
+    catalog.map((npc) => [
+      npc.name.trim().toLowerCase(),
+      {
+        id: npc.id,
+        tier: npc.cityInfluenceTier,
+        isLeader: npc.mapRoles.includes("leader"),
+        factionId: npc.factionId,
+      },
+    ]),
+  );
+  let actors = enrichPressureActors(rawActors, catalogByName);
+  if (actors.length === 0) {
+    actors = enrichPressureActors(
+      catalog.map((npc) => ({
+        id: npc.id,
+        name: npc.name,
+        alive: npc.status === "Alive",
+        districtId: npc.districtId,
+        factionId: npc.factionId,
+        role: npc.role,
+        tier: npc.cityInfluenceTier,
+        axes: {
+          loyalCriminal: npc.cityAxisLoyalCriminal,
+          greedyAltruist: npc.cityAxisGreedyAltruist,
+          piousSkeptic: npc.cityAxisPiousSkeptic,
+          superstitionReason: npc.cityAxisSuperstitionReason,
+        },
+        abilities: npc.cityAbilities,
+        cards: npc.cityEventDeck,
+        plays: [],
+      })),
+      catalogByName,
+    );
+  }
+
   const { data: eventRows } = await (supabase as any).from("city_sim_events")
-    .select("id, title, body, scope, district_id, sector_label, effects, duration_days, start_on, end_when, active")
+    .select(
+      "id, title, body, image_url, scope, district_id, sector_label, effects, duration_days, start_on, end_when, active",
+    )
     .eq("world_id", AURENFURT_WORLD_ID)
     .eq("active", true);
 
@@ -221,6 +261,7 @@ export async function loadAurenfurtCityPressure(): Promise<{ actors: CityActor[]
       id: String(row.id),
       title: String(row.title ?? "Stadtereignis"),
       body: String(row.body ?? ""),
+      imageUrl: typeof row.image_url === "string" && row.image_url.trim() ? row.image_url.trim() : null,
       scope: row.scope === "district" || row.scope === "sector" ? row.scope : "city",
       districtId: districtId as CitySimEvent["districtId"],
       sectorLabel: typeof row.sector_label === "string" ? row.sector_label : null,

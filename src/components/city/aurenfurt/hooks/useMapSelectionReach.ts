@@ -151,6 +151,7 @@ export function useMapSelectionReach({
         tier: npc.cityInfluenceTier,
         influence: npc.influenceAndLoyalty.influence,
         loyalCriminal: npc.cityAxisLoyalCriminal,
+        greedyAltruist: npc.cityAxisGreedyAltruist,
       }));
   }, [selectedBuilding]);
 

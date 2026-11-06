@@ -141,9 +141,13 @@ export function HoloBuildingPanel({
         </button>
       </div>
       <div className="relative z-10 space-y-3 overflow-y-auto px-4 pb-14 pt-3">
-        {buildingImage || leadNpc?.imageUrl || landmarkModel ? (
+        {landmarkModel || buildingImage || leadNpc?.imageUrl ? (
           <div className="relative">
-            {buildingImage ? (
+            {landmarkModel ? (
+              <div className="overflow-hidden rounded border border-accent-gold/40">
+                <HoloLandmarkPreview key={subject.id} model={landmarkModel} />
+              </div>
+            ) : buildingImage ? (
               <div className="relative aspect-[2.4/1] max-h-36 overflow-hidden rounded border border-accent-gold/40">
                 <Image
                   src={buildingImage}
@@ -152,10 +156,6 @@ export function HoloBuildingPanel({
                   sizes="24rem"
                   className="object-cover"
                 />
-              </div>
-            ) : landmarkModel ? (
-              <div className="overflow-hidden rounded border border-accent-gold/40">
-                <HoloLandmarkPreview key={subject.id} model={landmarkModel} />
               </div>
             ) : (
               <div className="aspect-[2.4/1] max-h-36 rounded border border-accent-gold/20 bg-background-dark/50" />

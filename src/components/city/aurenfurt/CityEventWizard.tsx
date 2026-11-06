@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import Image from "next/image";
+import { Plus, Trash2, X } from "lucide-react";
 import { findDistrict, type CityDistrictId } from "./aurenfurt-districts";
 import {
   listCitySimEvents,
@@ -14,6 +15,7 @@ import {
   type CityMeter,
   type MeterEffect,
 } from "@/src/lib/npcs/city-simulation";
+import { uploadLoreImage } from "@/src/lib/profile-media";
 import type { DistrictSector } from "./aurenfurt-sectors";
 import { CityHudFrame } from "./CityHudFrame";
 
@@ -22,13 +24,16 @@ const FIELD =
 
 type Listed = Awaited<ReturnType<typeof listCitySimEvents>>[number];
 type Step = "hub" | "story" | "place" | "effect";
+type EffectDraft = { meter: CityMeter; delta: string };
 
 const STEPS: { id: Step; label: string; short: string }[] = [
   { id: "hub", label: "Start", short: "Karten wählen oder neu anlegen" },
-  { id: "story", label: "Inhalt", short: "Titel und Beschreibung" },
+  { id: "story", label: "Inhalt", short: "Titel, Text und Motiv" },
   { id: "place", label: "Ort", short: "Stadt, Viertel oder Sektor" },
   { id: "effect", label: "Wirkung", short: "Kennzahlen und Dauer" },
 ];
+
+const MAX_EFFECTS = 4;
 
 type Props = {
   day: string;
@@ -41,6 +46,10 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
+
+function blankEffect(meter: CityMeter = "economy", delta = "-6"): EffectDraft {
+  return { meter, delta };
+}
 
 export function CityEventWizard({
   day,
@@ -56,9 +65,10 @@ export function CityEventWizard({
   const [step, setStep] = useState<Step>("hub");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
   const [durationDays, setDurationDays] = useState("7");
-  const [meter, setMeter] = useState<CityMeter>("economy");
-  const [delta, setDelta] = useState("-6");
+  const [effects, setEffects] = useState<EffectDraft[]>([blankEffect()]);
   const [endMeter, setEndMeter] = useState<CityMeter | "">("");
   const [endOp, setEndOp] = useState<"gt" | "lt">("lt");
   const [endValue, setEndValue] = useState("40");
@@ -96,23 +106,42 @@ export function CityEventWizard({
     setError(null);
     setTitle("");
     setBody("");
+    setImageUrl("");
+    setEffects([blankEffect()]);
+    setDurationDays("7");
+    setEndMeter("");
+    setEndOp("lt");
+    setEndValue("40");
     setStep("story");
+  };
+
+  const updateEffect = (index: number, patch: Partial<EffectDraft>) => {
+    setEffects((current) =>
+      current.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)),
+    );
   };
 
   const save = () => {
     setError(null);
     const scope: "city" | "district" | "sector" =
       picked.length > 0 ? "sector" : districtId && !wholeCity ? "district" : "city";
-    const effect: MeterEffect = { meter, delta: Number(delta) || 0 };
+    const parsedEffects: MeterEffect[] = effects
+      .map((entry) => ({ meter: entry.meter, delta: Number(entry.delta) || 0 }))
+      .filter((entry) => entry.delta !== 0);
+    if (parsedEffects.length === 0) {
+      setError("Mindestens eine Wirkung mit Wert ungleich 0 festlegen.");
+      return;
+    }
     setBusy(true);
     void saveCitySimEvent({
       worldId,
       title,
       body,
+      imageUrl: imageUrl.trim() || null,
       scope,
       districtId: scope === "city" ? null : districtId,
       sectorLabel: scope === "sector" ? picked.map((sector) => sector.address).join(", ") : null,
-      effects: effect.delta === 0 ? [] : [effect],
+      effects: parsedEffects,
       durationDays: durationDays.trim() ? Number(durationDays) : null,
       startOn: day,
       endWhen: endMeter ? { meter: endMeter, op: endOp, value: Number(endValue) || 0 } : null,
@@ -211,13 +240,9 @@ export function CityEventWizard({
                   </p>
                   <p className="mt-1 font-libre text-xs leading-relaxed text-gray-300">
                     Eine Karte beschreibt ein Ereignis mit Titel und Text. Du legst Ort (Stadt, Viertel
-                    oder Sektoren), Wirkzeit und Einfluss auf Stadtkennzahlen fest. Aktive Karten fließen
-                    in die Tagessimulation ein; beendete Karten bleiben gespeichert und können erneut
-                    aufgenommen werden.
-                  </p>
-                  <p className="mt-2 font-libre text-xs leading-relaxed text-gray-400">
-                    Neues Ereignis: 4 Schritte — Start → Inhalt → Ort → Wirkung. Bestehende Karten
-                    kannst du hier direkt aktivieren oder beenden.
+                    oder Sektoren), Wirkzeit und Einfluss auf Stadtkennzahlen fest. Mehrere Kennzahlen
+                    können gleichzeitig betroffen sein. Optional lädst du ein Motivbild hoch — es
+                    erscheint, wenn die Karte aktiv ist.
                   </p>
                 </div>
 
@@ -236,32 +261,64 @@ export function CityEventWizard({
                   {events.length === 0 ? (
                     <p className="font-libre text-xs text-gray-500">Noch keine Stadtereigniskarten.</p>
                   ) : (
-                    <ul className="max-h-48 space-y-1 overflow-y-auto">
+                    <ul className="max-h-56 space-y-2 overflow-y-auto">
                       {events.map((event) => (
                         <li
                           key={event.id}
-                          className="flex items-center justify-between gap-2 rounded border border-hero-dark/50 bg-background-card/60 px-2 py-1.5"
+                          className="flex items-stretch gap-2 rounded border border-hero-dark/50 bg-background-card/60 p-2"
                         >
-                          <span className="min-w-0 truncate font-libre text-xs text-gray-200">
-                            {event.title}
-                            {event.active ? (
-                              <span className="text-hero-vibrant"> · aktiv</span>
-                            ) : (
-                              <span className="text-gray-500"> · beendet</span>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            className="shrink-0 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold hover:text-white"
-                            onClick={() => {
-                              void setCitySimEventActive(worldId, event.id, !event.active).then(() => {
-                                reload();
-                                onSaved();
-                              });
-                            }}
-                          >
-                            {event.active ? "Beenden" : "Aufnehmen"}
-                          </button>
+                          {event.image_url ? (
+                            <div className="relative h-14 w-11 shrink-0 overflow-hidden rounded border border-hero-dark">
+                              <Image
+                                src={event.image_url}
+                                alt=""
+                                fill
+                                sizes="44px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-14 w-11 shrink-0 items-center justify-center rounded border border-hero-dark/60 bg-background-dark/70">
+                              <span className="font-barlow text-[8px] font-bold uppercase text-gray-500">
+                                Motiv
+                              </span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-libre text-xs text-gray-200">
+                              {event.title}
+                              {event.active ? (
+                                <span className="text-hero-vibrant"> · aktiv</span>
+                              ) : (
+                                <span className="text-gray-500"> · beendet</span>
+                              )}
+                            </p>
+                            <p className="mt-0.5 truncate font-libre text-[10px] text-gray-500">
+                              {(event.effects ?? [])
+                                .map(
+                                  (effect) =>
+                                    `${CITY_METER_LABELS[effect.meter] ?? effect.meter} ${
+                                      effect.delta > 0 ? "+" : ""
+                                    }${effect.delta}`,
+                                )
+                                .join(" · ") || "Keine Wirkung"}
+                            </p>
+                            <button
+                              type="button"
+                              className="mt-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold hover:text-white"
+                              onClick={() => {
+                                void setCitySimEventActive(worldId, event.id, !event.active).then(
+                                  () => {
+                                    reload();
+                                    onSaved();
+                                  },
+                                );
+                              }}
+                            >
+                              {event.active ? "Beenden" : "Ausspielen"}
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -284,6 +341,72 @@ export function CityEventWizard({
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                 />
+                <div className="rounded border border-hero-dark/60 bg-background-dark/40 p-2">
+                  <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                    Kartenmotiv (optional)
+                  </p>
+                  <p className="mt-1 font-libre text-[11px] leading-snug text-gray-400">
+                    Wird als Bild der Karte gezeigt, wenn du sie ausspielst.
+                  </p>
+                  <div className="mt-2 flex items-start gap-3">
+                    {imageUrl ? (
+                      <div className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded border border-hero-border">
+                        <Image
+                          src={imageUrl}
+                          alt="Kartenmotiv"
+                          fill
+                          sizes="72px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-24 w-[4.5rem] shrink-0 items-center justify-center rounded border border-dashed border-hero-dark bg-slate-900/80">
+                        <span className="px-1 text-center font-barlow text-[9px] font-bold uppercase text-gray-500">
+                          Kein Bild
+                        </span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={imageUploading}
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (!file) return;
+                          setImageUploading(true);
+                          setError(null);
+                          try {
+                            const result = await uploadLoreImage(file, { worldId });
+                            if ("error" in result) {
+                              setError(result.error);
+                              return;
+                            }
+                            setImageUrl(result.publicUrl);
+                          } finally {
+                            setImageUploading(false);
+                          }
+                        }}
+                        className="w-full rounded border border-hero-dark bg-slate-900 p-1.5 font-libre text-[11px] text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-hero-dark file:px-2 file:py-1 file:font-barlow file:text-[10px] file:font-bold file:uppercase file:text-accent-gold"
+                      />
+                      {imageUrl ? (
+                        <button
+                          type="button"
+                          className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:text-white"
+                          onClick={() => setImageUrl("")}
+                        >
+                          Motiv entfernen
+                        </button>
+                      ) : (
+                        <p className="font-libre text-[10px] text-gray-500">
+                          {imageUploading ? "Upload läuft…" : "JPEG, PNG oder WebP · max. 5 MB"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <p className="font-libre text-xs text-gray-400">
                   Beginn ist der gewählte Kartentag {day}.
                 </p>
@@ -299,6 +422,18 @@ export function CityEventWizard({
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
                   {placeLabel}
                 </p>
+                {picked.length > 0 ? (
+                  <ul className="flex flex-wrap gap-1.5" aria-label="Gewählte Sektoren">
+                    {picked.map((sector) => (
+                      <li
+                        key={sector.id}
+                        className="rounded border border-accent-gold/60 bg-accent-gold/10 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold"
+                      >
+                        {sector.label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {districtId && sectors.length === 0 ? (
                   <p className="font-libre text-xs text-gray-400">
                     Dieses Viertel hat noch keine Sektoren. Das Ereignis gilt für das ganze Viertel.
@@ -307,14 +442,14 @@ export function CityEventWizard({
                 {districtId && sectors.length > 0 && picked.length === 0 ? (
                   <p className="font-libre text-xs text-gray-400">
                     Ohne gewählten Sektor gilt das ganze Viertel. Klicke Sektoren an, um sie
-                    festzulegen.
+                    festzulegen — der Name erscheint auf der Karte und hier.
                   </p>
                 ) : null}
               </div>
             ) : null}
 
             {step === "effect" ? (
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-3">
                 <p className="font-libre text-xs text-gray-300">{placeLabel}</p>
                 <label className="block font-libre text-xs text-gray-400">
                   Wirkzeit in Tagen
@@ -325,25 +460,68 @@ export function CityEventWizard({
                     onChange={(event) => setDurationDays(event.target.value)}
                   />
                 </label>
-                <div className="grid grid-cols-[1fr_5rem] gap-2">
-                  <select
-                    className={FIELD}
-                    value={meter}
-                    onChange={(event) => setMeter(event.target.value as CityMeter)}
-                  >
-                    {CITY_METERS.map((key) => (
-                      <option key={key} value={key}>
-                        {CITY_METER_LABELS[key]}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className={FIELD}
-                    inputMode="numeric"
-                    value={delta}
-                    onChange={(event) => setDelta(event.target.value)}
-                  />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                      Wirkungen auf Kennzahlen
+                    </p>
+                    <button
+                      type="button"
+                      disabled={effects.length >= MAX_EFFECTS}
+                      onClick={() =>
+                        setEffects((current) =>
+                          current.length >= MAX_EFFECTS
+                            ? current
+                            : [...current, blankEffect("crime", "4")],
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded border border-hero-dark px-2 py-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant disabled:opacity-40"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden />
+                      Wirkung
+                    </button>
+                  </div>
+                  <p className="font-libre text-[11px] leading-snug text-gray-400">
+                    Bis zu {MAX_EFFECTS} Kennzahlen gleichzeitig. Positiv hebt, negativ senkt den Wert.
+                  </p>
+                  {effects.map((entry, index) => (
+                    <div key={index} className="grid grid-cols-[1fr_5rem_2rem] gap-2">
+                      <select
+                        className={FIELD}
+                        value={entry.meter}
+                        onChange={(event) =>
+                          updateEffect(index, { meter: event.target.value as CityMeter })
+                        }
+                      >
+                        {CITY_METERS.map((key) => (
+                          <option key={key} value={key}>
+                            {CITY_METER_LABELS[key]}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className={FIELD}
+                        inputMode="numeric"
+                        value={entry.delta}
+                        onChange={(event) => updateEffect(index, { delta: event.target.value })}
+                        aria-label="Änderung"
+                      />
+                      <button
+                        type="button"
+                        disabled={effects.length <= 1}
+                        onClick={() =>
+                          setEffects((current) => current.filter((_, i) => i !== index))
+                        }
+                        className="flex items-center justify-center rounded border border-hero-dark text-gray-400 hover:text-red-300 disabled:opacity-30"
+                        aria-label="Wirkung entfernen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </div>
+                  ))}
                 </div>
+
                 <p className="font-libre text-xs text-gray-400">Oder Ende, sobald ein Wert erreicht ist.</p>
                 <div className="grid grid-cols-[1fr_5.5rem_4rem] gap-2">
                   <select
@@ -374,7 +552,8 @@ export function CityEventWizard({
                   />
                 </div>
                 <p className="font-libre text-xs text-gray-400">
-                  Ein Sektor wirkt auf die Werte seines Viertels.
+                  Dauer und Schwelle gelten für die ganze Karte. Sektoren wirken auf die Werte ihres
+                  Viertels.
                 </p>
               </div>
             ) : null}

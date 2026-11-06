@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { Group } from "three";
 import {
   AURENFURT_DISTRICTS,
@@ -34,7 +34,7 @@ import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
 import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
 import { PoiReachOverlay } from "./scene/PoiReachOverlay";
-import type { SectorCrimeCell } from "./aurenfurt-crime-heatmap";
+import type { SectorHeatCell } from "./aurenfurt-city-heatmap";
 import type { PoiReachCell } from "./aurenfurt-sector-reach";
 import { HoloLandmarkInstances, type LandmarkInstanceItem } from "./scene/HoloLandmarkInstances";
 
@@ -74,7 +74,7 @@ type Props = {
   eventSectorIds?: string[];
   onPickEventSector?: (sector: DistrictSector) => void;
   crimeHeatmapVisible?: boolean;
-  crimeCells?: SectorCrimeCell[];
+  crimeCells?: SectorHeatCell[];
   /** Sektoren im Einflussbereich des gewählten besonderen Orts. */
   poiReachCells?: PoiReachCell[];
   poiReachVisible?: boolean;
@@ -183,6 +183,9 @@ export function CityModel({
 
   const placingSomething = placingBuilding || placingPoi;
   const mapLocked = drawingStreet || drawingWall || placingSomething;
+  /** Während Sektor-Auswahl: dieses Viertel + Gebäude/POIs dürfen den Ray nicht abfangen. */
+  const sectorPickDistrictId = eventPickSectors[0]?.districtId ?? null;
+  const sectorPicking = sectorPickDistrictId !== null;
   const showDistrictHandles = Boolean(
     editorTool === "districts" && editingDistrictId && !placingSomething,
   );
@@ -193,26 +196,38 @@ export function CityModel({
   const selectBuildingOrDistrict = (buildingId: string) => {
     onSelect({ type: "building", id: buildingId });
   };
-  const landmarkBuckets = new Map<LandmarkModel, LandmarkInstanceItem[]>();
-  for (const building of buildings) {
-    if (!building.landmark) continue;
-    const uv = resolveBuildingUv(building, buildingPositions);
-    const item: LandmarkInstanceItem = {
-      id: building.id,
-      u: uv.u,
-      v: uv.v,
-      scaleMultiplier: resolveLandmarkScale(building.id, landmarkScales),
-      rotationDegrees: resolveLandmarkRotation(building.id, landmarkRotations),
-      selected:
-        buildingsEditable &&
-        sameSelection(selection, { type: "building", id: building.id }),
+  /** Stabile Referenzen — sonst schreibt Instancing jede Frame die Matrizen neu. */
+  const selectedBuildingId = selection?.type === "building" ? selection.id : null;
+  const { instancedLandmarks, instancedModels } = useMemo(() => {
+    const landmarkBuckets = new Map<LandmarkModel, LandmarkInstanceItem[]>();
+    for (const building of buildings) {
+      if (!building.landmark) continue;
+      const uv = resolveBuildingUv(building, buildingPositions);
+      const item: LandmarkInstanceItem = {
+        id: building.id,
+        name: building.name,
+        u: uv.u,
+        v: uv.v,
+        scaleMultiplier: resolveLandmarkScale(building.id, landmarkScales),
+        rotationDegrees: resolveLandmarkRotation(building.id, landmarkRotations),
+        selected: selectedBuildingId === building.id,
+      };
+      const bucket = landmarkBuckets.get(building.landmark);
+      if (bucket) bucket.push(item);
+      else landmarkBuckets.set(building.landmark, [item]);
+    }
+    const instanced = [...landmarkBuckets.entries()].filter(([, items]) => items.length >= 2);
+    return {
+      instancedLandmarks: instanced,
+      instancedModels: new Set(instanced.map(([model]) => model)),
     };
-    const bucket = landmarkBuckets.get(building.landmark);
-    if (bucket) bucket.push(item);
-    else landmarkBuckets.set(building.landmark, [item]);
-  }
-  const instancedLandmarks = [...landmarkBuckets.entries()].filter(([, items]) => items.length >= 2);
-  const instancedModels = new Set(instancedLandmarks.map(([model]) => model));
+  }, [
+    buildings,
+    buildingPositions,
+    landmarkScales,
+    landmarkRotations,
+    selectedBuildingId,
+  ]);
 
   return (
     <>
@@ -230,6 +245,7 @@ export function CityModel({
         {AURENFURT_DISTRICTS.map((district) => {
           const entry = polygons[district.id];
           const isEditing = showDistrictHandles && editingDistrictId === district.id;
+          const pickingSectorsHere = sectorPickDistrictId === district.id;
           return (
             <DistrictNode
               key={district.id}
@@ -238,11 +254,15 @@ export function CityModel({
               color={entry.color}
               hoverOpacity={entry.hoverOpacity}
               selected={sameSelection(selection, { type: "district", id: district.id })}
-              hovered={sameSelection(hovered, { type: "district", id: district.id })}
+              hovered={
+                pickingSectorsHere
+                  ? false
+                  : sameSelection(hovered, { type: "district", id: district.id })
+              }
               showHandles={isEditing}
               editingActive={Boolean(editorTool === "districts" && editingDistrictId === district.id)}
               highlight={highlightDistricts}
-              suppressSelect={suppressSelect || mapLocked}
+              suppressSelect={suppressSelect || mapLocked || pickingSectorsHere}
               onSelect={onSelect}
               onHover={onHover}
               onMoveVertex={onMoveVertex}
@@ -270,7 +290,7 @@ export function CityModel({
             key={model}
             model={model}
             items={items}
-            suppressSelect={suppressSelect || mapLocked}
+            suppressSelect={suppressSelect || mapLocked || sectorPicking}
             editable={buildingsEditable}
             onSelect={selectBuildingOrDistrict}
             onHover={(id) => {
@@ -298,11 +318,8 @@ export function CityModel({
               building={building}
               u={uv.u}
               v={uv.v}
-              selected={
-                buildingsEditable &&
-                sameSelection(selection, { type: "building", id: building.id })
-              }
-              suppressSelect={suppressSelect || mapLocked}
+              selected={sameSelection(selection, { type: "building", id: building.id })}
+              suppressSelect={suppressSelect || mapLocked || sectorPicking}
               editable={editable}
               outside={outside}
               showLandmark={!building.landmark || !instancedModels.has(building.landmark)}
@@ -334,7 +351,7 @@ export function CityModel({
                 worldId={worldId}
                 campaignId={campaignId}
                 selected={sameSelection(selection, { type: "poi", id: poi.id })}
-                suppressSelect={suppressSelect || mapLocked}
+                suppressSelect={suppressSelect || mapLocked || sectorPicking}
                 editable={poisEditable}
                 onSelect={(id) => onSelect({ type: "poi", id })}
                 onHover={(id) => onHover(id ? { type: "poi", id } : null)}

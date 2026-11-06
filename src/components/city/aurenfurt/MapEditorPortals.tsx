@@ -226,6 +226,11 @@ export function MapEditorPortals({
             const poly = polygons.polygons[editingDistrictId]?.points ?? [];
             return sectorsApi.divideDistrict(editingDistrictId, poly, cellSize);
           }}
+          onClearSectors={() => {
+            if (!editingDistrictId) return;
+            sectorsApi.clearDistrict(editingDistrictId);
+            setSectorPreviewSectors([]);
+          }}
           onSectorPreviewChange={setSectorPreviewSectors}
           sectorCount={
             editingDistrictId
@@ -251,6 +256,7 @@ export function MapEditorPortals({
             setPoiDraftDistrictId(null);
           }}
           onSavePoi={mutations.saveNewPoi}
+          onSavePoiReach={mutations.savePoiReach}
           onClose={closeEditor}
         />
       ) : null}

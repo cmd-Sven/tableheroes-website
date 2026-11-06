@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { Layers, Loader2, X } from "lucide-react";
+import { Layers, Loader2, ShoppingBag, X } from "lucide-react";
 import { layNpcCityCard } from "@/src/app/dashboard/worlds/city-sim-event-actions";
 import { factionName, isCityFactionId } from "./aurenfurt-factions";
 import {
@@ -60,6 +60,7 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCards, setShowCards] = useState(false);
+  const [showShop, setShowShop] = useState(false);
   const [layPendingId, setLayPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -69,6 +70,7 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
     setError(null);
     setDetail(null);
     setShowCards(false);
+    setShowShop(false);
     void loadMapNpcOverlayDetail(worldId, lead.id).then((row) => {
       if (!active) return;
       if (!row) {
@@ -179,6 +181,12 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
                 {CITY_INFLUENCE_TIER_LABELS[detail.cityInfluenceTier as CityInfluenceTier]}
               </p>
             ) : null}
+            {detail?.isMerchant && detail.shopId ? (
+              <p className="inline-flex items-center gap-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+                <ShoppingBag className="h-3 w-3" aria-hidden />
+                Händler
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -234,6 +242,81 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
             {detail.cityDeity ? (
               <p className="mt-2 font-libre text-xs text-gray-400">Gottheit: {detail.cityDeity}</p>
             ) : null}
+          </div>
+        ) : null}
+
+        {canSeeCards && detail?.shop ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowShop((open) => !open)}
+              aria-expanded={showShop}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded border px-4 py-2 font-barlow text-xs font-bold uppercase tracking-wide transition-colors ${
+                showShop
+                  ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                  : "border-hero-dark bg-hero-dark/30 text-cyan-100 hover:border-accent-gold/60 hover:text-accent-gold"
+              }`}
+            >
+              <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
+              {showShop
+                ? "Ladenkatalog schließen"
+                : `Ladenkatalog (${detail.shop.items.length})`}
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showShop ? (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className="rounded border border-hero-dark/70 bg-background-dark/50 p-3">
+                    <p className="font-cinzel text-sm font-bold text-accent-gold">
+                      {detail.shop.name}
+                    </p>
+                    <p className="mt-0.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      {detail.shop.shop_mode === "archetype" ? "Archetyp" : "Unique"} · nur Ansicht
+                    </p>
+                    {detail.shop.items.length === 0 ? (
+                      <p className="mt-2 font-libre text-xs text-gray-400">
+                        Keine Waren hinterlegt.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto">
+                        {detail.shop.items.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex items-start justify-between gap-2 rounded border border-hero-dark/50 bg-background-card/40 px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-barlow text-[11px] font-bold uppercase tracking-wide text-cyan-100">
+                                {item.name}
+                              </p>
+                              <p className="font-libre text-[10px] text-gray-400">
+                                {[item.item_type, item.rarity, item.is_magical ? "magisch" : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                            <span className="shrink-0 font-barlow text-[11px] font-bold tabular-nums text-accent-gold">
+                              {Number(item.base_price_gp).toLocaleString("de-DE", {
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              GM
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="mt-2 font-libre text-[10px] leading-relaxed text-gray-500">
+                      Handel aktivieren: Live-Session → NPC auf die Bühne → „Shop öffnen“.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         ) : null}
 
@@ -351,3 +434,4 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
     </motion.aside>
   );
 }
+

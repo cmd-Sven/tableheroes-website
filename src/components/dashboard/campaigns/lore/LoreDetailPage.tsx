@@ -21,6 +21,7 @@ import { isAurenfurtLore, type CityDistrictId } from "@/src/components/city/aure
 import { AurenfurtBuildingStreetBlock } from "@/src/components/city/aurenfurt/AurenfurtBuildingStreetBlock";
 import { PoiInfluencesSection } from "@/src/components/city/aurenfurt/PoiInfluencesSection";
 import type { AurenfurtPoiLoreExtras } from "@/src/components/city/aurenfurt/load-aurenfurt-poi-lore";
+import { LORE_SECTION_H2_CLASS_TIGHT } from "@/src/lib/wiki-heading-styles";
 
 type LoreEntry = {
   id: string;
@@ -237,7 +238,7 @@ export function LoreDetailPage({
           {/* Gottheits-Details */}
           {lore.type === "Gottheit" && deityDetails && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Göttliches Profil
               </h2>
 
@@ -358,7 +359,7 @@ export function LoreDetailPage({
           {/* Religion-Details */}
           {lore.type === "Religion" && (religionDetails || religionDeityLore) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Glaubensprofil
               </h2>
 
@@ -545,7 +546,7 @@ export function LoreDetailPage({
           {/* Structured Lore Metadata */}
           {lore.type === "Rasse" && (loreMetadata.cultureName || loreMetadata.raceSubtypes || loreMetadata.raceTraits || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0)) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Rassenprofil
               </h2>
 
@@ -622,7 +623,7 @@ export function LoreDetailPage({
 
           {lore.type === "Kultur" && ((loreMetadata.linkedRaces && loreMetadata.linkedRaces.length > 0) || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0) || (loreMetadata.linkedReligions && loreMetadata.linkedReligions.length > 0)) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Kulturprofil
               </h2>
 
@@ -681,7 +682,7 @@ export function LoreDetailPage({
 
           {lore.type === "Sprache" && ((loreMetadata.spokenByCultures && loreMetadata.spokenByCultures.length > 0) || (loreMetadata.spokenByRaces && loreMetadata.spokenByRaces.length > 0)) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Sprachprofil
               </h2>
 
@@ -723,7 +724,7 @@ export function LoreDetailPage({
 
           {lore.type === "Religion" && loreMetadata.spokenByCultures && loreMetadata.spokenByCultures.length > 0 && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Verbreitung
               </h2>
               <div>
@@ -745,7 +746,7 @@ export function LoreDetailPage({
 
           {isLocationType(lore.type) && (loreMetadata.cultureName || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0) || (loreMetadata.linkedReligions && loreMetadata.linkedReligions.length > 0)) && (
             <div className="rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+              <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
                 Ortsprofil
               </h2>
               {loreMetadata.cultureName && (

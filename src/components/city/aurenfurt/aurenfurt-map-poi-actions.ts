@@ -9,16 +9,22 @@ import {
   loreIdFromDistrictId,
 } from "./aurenfurt-district-lore-ids";
 import {
+  DEFAULT_POI_REACH,
   isPoiInfluenceAspect,
   isPoiKind,
+  isPoiReachMode,
   mapEditorRowToPoi,
   poiTooltipImage,
+  serializePoiInfluencePayload,
   type AurenfurtMapPoi,
   type MapEditorPoiRow,
   type PoiInfluence,
   type PoiKind,
+  type PoiReachSetting,
 } from "./aurenfurt-map-pois";
 import { revalidatePath } from "next/cache";
+import { NPC_PORTRAIT_PLACEHOLDER } from "./aurenfurt-npc-types";
+import { resolveShopItems } from "@/src/lib/shop-resolve-items";
 
 async function assertWorldGm(worldId: string) {
   const supabase = await createClient();
@@ -64,6 +70,16 @@ function normalizeInfluences(raw: PoiInfluence[]): PoiInfluence[] | { error: str
     out.push({ aspect: entry.aspect, delta });
   }
   return out;
+}
+
+function normalizeReach(raw: PoiReachSetting | null | undefined): PoiReachSetting | { error: string } {
+  if (!raw) return { ...DEFAULT_POI_REACH };
+  if (!isPoiReachMode(raw.mode)) return { error: "Ungültiger Einflussbereich." };
+  if (raw.mode === "district") return { mode: "district", radius: 0 };
+  if (![0, 1, 2, 3, 4].includes(raw.radius)) {
+    return { error: "Sektor-Reichweite muss 0–4 sein." };
+  }
+  return { mode: "sector", radius: raw.radius };
 }
 
 /** Kartenfelder ohne gm_notes. locations bleibt für Notizen nur dem Spielleiter offen. */
@@ -219,6 +235,7 @@ export type CreateAurenfurtMapPoiInput = {
   kind: PoiKind;
   imageUrl?: string | null;
   influences: PoiInfluence[];
+  reach?: PoiReachSetting;
   u: number;
   v: number;
 };
@@ -247,6 +264,9 @@ export async function createAurenfurtMapPoi(
 
     const influences = normalizeInfluences(input.influences);
     if ("error" in influences) return { ok: false, error: influences.error };
+    const reach = normalizeReach(input.reach);
+    if ("error" in reach) return { ok: false, error: reach.error };
+    const influencePayload = serializePoiInfluencePayload(influences, reach);
 
     const parentId = loreIdFromDistrictId(input.districtId);
 
@@ -346,7 +366,7 @@ export async function createAurenfurtMapPoi(
       map_v: input.v,
       map_district_id: input.districtId,
       map_poi_kind: input.kind,
-      map_poi_influences: influences,
+      map_poi_influences: influencePayload,
       created_via_map_editor: true,
     };
 
@@ -381,7 +401,7 @@ export async function createAurenfurtMapPoi(
       map_v: input.v,
       map_district_id: input.districtId,
       map_poi_kind: input.kind,
-      map_poi_influences: influences,
+      map_poi_influences: influencePayload,
       created_via_map_editor: true,
       parent_location_id: parentId,
     });
@@ -421,9 +441,17 @@ export type MapLocationLeadNpc = {
   role: string | null;
 };
 
+type LeadNpcRow = {
+  id: string;
+  name: string | null;
+  image_url: string | null;
+  role: string | null;
+  is_merchant?: boolean | null;
+};
+
 /**
  * Führender NPC eines Orts: zuerst Ansässige (home), sonst Gäste (current).
- * Nur mit Portrait, damit das Kartenfenster einen Kreis zeigen kann.
+ * Händler bevorzugt; fehlendes Portrait → Platzhalter.
  */
 export async function loadLeadingNpcForMapLocation(
   worldId: string,
@@ -452,81 +480,77 @@ export async function loadLeadingNpcForMapLocation(
       if (!admin) return null;
     }
 
-    const pick = (
-      rows: Array<{ id: string; name: string | null; image_url: string | null; role: string | null }>,
-    ) => {
-      for (const row of rows) {
-        const imageUrl = (row.image_url ?? "").trim();
-        if (!imageUrl) continue;
+    const pick = (rows: LeadNpcRow[]) => {
+      const ranked = [...rows].sort(
+        (a, b) => Number(Boolean(b.is_merchant)) - Number(Boolean(a.is_merchant)),
+      );
+      for (const row of ranked) {
         const name = (row.name ?? "").trim();
         if (!name) continue;
         return {
           id: row.id,
           name,
-          imageUrl,
+          imageUrl: (row.image_url ?? "").trim() || NPC_PORTRAIT_PLACEHOLDER,
           role: (row.role ?? "").trim() || null,
         } satisfies MapLocationLeadNpc;
       }
       return null;
     };
 
+    const leadSelect = "id, name, image_url, role, is_merchant";
+
     const { data: residents } = await (supabase.from("npcs") as any)
-      .select("id, name, image_url, role")
+      .select(leadSelect)
       .eq("world_id", worldId)
       .eq("home_location_id", locationId)
       .order("name", { ascending: true })
       .limit(8);
 
-    const resident = pick(
-      (residents ?? []) as Array<{
-        id: string;
-        name: string | null;
-        image_url: string | null;
-        role: string | null;
-      }>,
-    );
+    const resident = pick((residents ?? []) as LeadNpcRow[]);
     if (resident) return resident;
 
     const { data: guests } = await (supabase.from("npcs") as any)
-      .select("id, name, image_url, role")
+      .select(leadSelect)
       .eq("world_id", worldId)
       .eq("current_location_id", locationId)
       .order("name", { ascending: true })
       .limit(8);
 
-    const guest = pick(
-      (guests ?? []) as Array<{
-        id: string;
-        name: string | null;
-        image_url: string | null;
-        role: string | null;
-      }>,
-    );
+    const guest = pick((guests ?? []) as LeadNpcRow[]);
     if (guest) return guest;
 
     const fallbackCatalogId = options?.fallbackCatalogId?.trim();
     if (!fallbackCatalogId) return null;
 
     const { data: catalogNpc } = await (supabase.from("npcs") as any)
-      .select("id, name, image_url, role")
+      .select(leadSelect)
       .eq("world_id", worldId)
       .eq("aurenfurt_catalog_id", fallbackCatalogId)
       .maybeSingle();
 
-    return catalogNpc
-      ? pick([
-          catalogNpc as {
-            id: string;
-            name: string | null;
-            image_url: string | null;
-            role: string | null;
-          },
-        ])
-      : null;
+    return catalogNpc ? pick([catalogNpc as LeadNpcRow]) : null;
   } catch {
     return null;
   }
 }
+
+export type MapNpcShopPreviewItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  base_price_gp: number;
+  rarity: string;
+  item_type: string;
+  is_magical: boolean;
+  is_ration_package: boolean;
+};
+
+export type MapNpcShopPreview = {
+  id: string;
+  name: string;
+  shop_mode: "archetype" | "unique" | string;
+  items: MapNpcShopPreviewItem[];
+};
 
 export type MapNpcOverlayDetail = {
   id: string;
@@ -547,6 +571,10 @@ export type MapNpcOverlayDetail = {
   cityAxisGreedyAltruist: number | null;
   cityAxisPiousSkeptic: number | null;
   cityAxisSuperstitionReason: number | null;
+  isMerchant: boolean;
+  shopId: string | null;
+  /** Nur für den Spielleiter befüllt. */
+  shop: MapNpcShopPreview | null;
   /** Nur für den Spielleiter befüllt. */
   eventCards: Array<{
     id: string;
@@ -565,7 +593,7 @@ export type MapNpcOverlayDetail = {
 
 /**
  * Volle Karten-Overlay-Daten zu einem NPC (Portrait-Klick).
- * Ereigniskarten nur für den Spielleiter der Welt.
+ * Ereigniskarten und Shop-Katalog nur für den Spielleiter der Welt.
  */
 export async function loadMapNpcOverlayDetail(
   worldId: string,
@@ -594,7 +622,7 @@ export async function loadMapNpcOverlayDetail(
 
     const { data: row } = await (supabase.from("npcs") as any)
       .select(
-        "id, name, title, role, race, status, alignment, image_url, description, world_id, for_city_simulation, city_influence_tier, city_faction_id, city_deity, city_agenda, city_axis_loyal_criminal, city_axis_greedy_altruist, city_axis_pious_skeptic, city_axis_superstition_reason, city_event_deck, city_card_plays",
+        "id, name, title, role, race, status, alignment, image_url, description, world_id, is_merchant, shop_id, for_city_simulation, city_influence_tier, city_faction_id, city_deity, city_agenda, city_axis_loyal_criminal, city_axis_greedy_altruist, city_axis_pious_skeptic, city_axis_superstition_reason, city_event_deck, city_card_plays",
       )
       .eq("id", npcId)
       .eq("world_id", worldId)
@@ -604,8 +632,50 @@ export async function loadMapNpcOverlayDetail(
     const { citySimulationFromDb } = await import("@/src/lib/npcs/city-simulation");
     const city = citySimulationFromDb(row as Parameters<typeof citySimulationFromDb>[0]);
     const isGm = worldGm || staff;
-    const imageUrl = ((row as { image_url?: string | null }).image_url ?? "").trim();
-    if (!imageUrl) return null;
+    const imageUrl =
+      ((row as { image_url?: string | null }).image_url ?? "").trim() || NPC_PORTRAIT_PLACEHOLDER;
+    const isMerchant = Boolean((row as { is_merchant?: boolean | null }).is_merchant);
+    const shopIdRaw = (row as { shop_id?: string | null }).shop_id;
+    const shopId = shopIdRaw != null ? String(shopIdRaw).trim() || null : null;
+
+    let shop: MapNpcShopPreview | null = null;
+    if (isGm && isMerchant && shopId) {
+      const { data: shopRaw } = await (supabase.from("campaign_shops") as any)
+        .select("id, name, shop_mode, archetype_key, price_modifier_percent")
+        .eq("id", shopId)
+        .maybeSingle();
+      if (shopRaw) {
+        const { data: itemRows } = await (supabase.from("campaign_shop_items") as any)
+          .select(
+            "id, name, description, base_price_gp, is_magical, is_legal, rarity, item_type, target_fap, is_ration_package",
+          )
+          .eq("shop_id", shopId)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true });
+        const resolved = resolveShopItems(
+          shopRaw as {
+            shop_mode: string;
+            archetype_key: string | null;
+          },
+          (itemRows ?? []) as never[],
+        );
+        shop = {
+          id: String((shopRaw as { id: string }).id),
+          name: String((shopRaw as { name?: string | null }).name ?? "Shop").trim() || "Shop",
+          shop_mode: String((shopRaw as { shop_mode?: string }).shop_mode ?? "unique"),
+          items: resolved.map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            base_price_gp: item.base_price_gp,
+            rarity: item.rarity,
+            item_type: item.item_type,
+            is_magical: item.is_magical,
+            is_ration_package: Boolean(item.is_ration_package),
+          })),
+        };
+      }
+    }
 
     return {
       id: String((row as { id: string }).id),
@@ -626,6 +696,9 @@ export async function loadMapNpcOverlayDetail(
       cityAxisGreedyAltruist: city.cityAxisGreedyAltruist,
       cityAxisPiousSkeptic: city.cityAxisPiousSkeptic,
       cityAxisSuperstitionReason: city.cityAxisSuperstitionReason,
+      isMerchant,
+      shopId,
+      shop,
       eventCards: isGm
         ? city.cityEventDeck.map((card) => ({
             id: card.id,
@@ -644,6 +717,72 @@ export async function loadMapNpcOverlayDetail(
     };
   } catch {
     return null;
+  }
+}
+
+export type UpdateAurenfurtMapPoiReachInput = {
+  worldId?: string;
+  poiId: string;
+  influences: PoiInfluence[];
+  reach: PoiReachSetting;
+};
+
+export type UpdateAurenfurtMapPoiReachResult =
+  | { ok: true; poi: AurenfurtMapPoi }
+  | { ok: false; error: string };
+
+/** Einflussfaktoren und Reichweite eines bestehenden Karten-Orts speichern. */
+export async function updateAurenfurtMapPoiReach(
+  input: UpdateAurenfurtMapPoiReachInput,
+): Promise<UpdateAurenfurtMapPoiReachResult> {
+  const worldId = input.worldId || AURENFURT_WORLD_ID;
+  try {
+    const { supabase } = await assertWorldGm(worldId);
+    const influences = normalizeInfluences(input.influences);
+    if ("error" in influences) return { ok: false, error: influences.error };
+    const reach = normalizeReach(input.reach);
+    if ("error" in reach) return { ok: false, error: reach.error };
+    const influencePayload = serializePoiInfluencePayload(influences, reach);
+
+    const { data: existing, error: fetchError } = await (supabase.from("locations") as any)
+      .select(POI_COLUMNS + ", world_id")
+      .eq("id", input.poiId)
+      .maybeSingle();
+
+    if (fetchError || !existing || existing.world_id !== worldId) {
+      return { ok: false, error: "Ort nicht gefunden." };
+    }
+    if (!existing.created_via_map_editor || !existing.map_poi_kind) {
+      return { ok: false, error: "Nur Karten-Editor-Orte können angepasst werden." };
+    }
+
+    const { error } = await (supabase.from("locations") as any)
+      .update({ map_poi_influences: influencePayload })
+      .eq("id", input.poiId);
+
+    if (error) {
+      return {
+        ok: false,
+        error: error.message
+          ? `Einflussbereich konnte nicht gespeichert werden: ${error.message}`
+          : "Einflussbereich konnte nicht gespeichert werden.",
+      };
+    }
+
+    const poi = mapEditorRowToPoi({
+      ...(existing as MapEditorPoiRow),
+      map_poi_influences: influencePayload,
+    });
+    if (!poi) return { ok: false, error: "Ort konnte nach dem Speichern nicht geladen werden." };
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/worlds/${worldId}`);
+    return { ok: true, poi };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Unbekannter Fehler beim Speichern.",
+    };
   }
 }
 

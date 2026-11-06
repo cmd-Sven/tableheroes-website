@@ -141,6 +141,7 @@ export function BuildingsToolBody({
         tier: npc.cityInfluenceTier,
         influence: npc.influenceAndLoyalty.influence,
         loyalCriminal: npc.cityAxisLoyalCriminal,
+        greedyAltruist: npc.cityAxisGreedyAltruist,
       }));
     return reportBuildingReach(
       {
@@ -158,15 +159,18 @@ export function BuildingsToolBody({
     );
   }, [selectedBuilding, buildingPositions, sectorsByDistrict, polygons]);
 
+  const selectedLandmarkScale = selectedBuilding?.landmark
+    ? resolveLandmarkScale(selectedBuilding.id, landmarkScales)
+    : LANDMARK_SCALE_DEFAULT;
+  const selectedLandmarkRotation = selectedBuilding?.landmark
+    ? resolveLandmarkRotation(selectedBuilding.id, landmarkRotations)
+    : 0;
+
   function renderBuildingRow(building: CityBuilding) {
     const uv = resolveBuildingUv(building, buildingPositions);
     const poly = polygons[building.districtId]?.points ?? [];
     const outside = !pointInPolygon(uv, poly);
     const inactive = !isCityBuildingActive(building);
-    const landmarkScale = building.landmark
-      ? resolveLandmarkScale(building.id, landmarkScales)
-      : LANDMARK_SCALE_DEFAULT;
-    const landmarkRotation = building.landmark ? resolveLandmarkRotation(building.id, landmarkRotations) : 0;
     const selected = selectedBuildingId === building.id;
     return (
       <li key={building.id}>
@@ -194,53 +198,14 @@ export function BuildingsToolBody({
             >
               {building.name}
               {inactive ? <span className="ml-1 text-[10px] text-amber-400">· inaktiv</span> : null}
+              {building.landmark ? (
+                <span className="ml-1 text-[10px] text-hero-vibrant">· 3D</span>
+              ) : null}
             </p>
             {outside ? (
               <p className="font-libre text-[11px] leading-snug text-red-400">
                 Gebäude befindet sich außerhalb seines Viertels
               </p>
-            ) : null}
-            {building.landmark ? (
-              <>
-              <label
-                className="mt-1.5 block space-y-1"
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
-                  3D-Größe · {landmarkScale.toFixed(2)}×
-                </span>
-                <input
-                  type="range"
-                  min={LANDMARK_SCALE_MIN}
-                  max={LANDMARK_SCALE_MAX}
-                  step={LANDMARK_SCALE_STEP}
-                  value={landmarkScale}
-                  onChange={(e) => onLandmarkScaleChange(building.id, Number(e.target.value))}
-                  className="w-full accent-hero-vibrant"
-                  aria-label={`3D-Größe für ${building.name}`}
-                />
-              </label>
-              <label
-                className="mt-1.5 block space-y-1"
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
-                  Ausrichtung · {Math.round(landmarkRotation)}°
-                </span>
-                <input
-                  type="range"
-                  min={LANDMARK_ROTATION_MIN}
-                  max={LANDMARK_ROTATION_MAX}
-                  step={LANDMARK_ROTATION_STEP}
-                  value={landmarkRotation}
-                  onChange={(e) => onLandmarkRotationChange(building.id, Number(e.target.value))}
-                  className="w-full accent-hero-vibrant"
-                  aria-label={`Ausrichtung für ${building.name}`}
-                />
-              </label>
-              </>
             ) : null}
           </div>
         </button>
@@ -254,7 +219,8 @@ export function BuildingsToolBody({
         Alle Gebäude
       </p>
       <p className="font-libre text-[11px] text-gray-500">
-        Goldener Würfel am Pin zieht das Gebäude. Orbit ist beim Ziehen aus.
+        Gebäude auf der Karte anklicken — Skalierung und Ausrichtung erscheinen hier. Goldener Würfel
+        zieht den Pin; Orbit ist beim Ziehen aus.
       </p>
 
       {selectedBuilding && selectedCategory ? (
@@ -274,6 +240,48 @@ export function BuildingsToolBody({
                     : ""}
             </p>
           ) : null}
+          {selectedBuilding.landmark ? (
+            <>
+              <label className="block space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
+                  3D-Größe · {selectedLandmarkScale.toFixed(2)}×
+                </span>
+                <input
+                  type="range"
+                  min={LANDMARK_SCALE_MIN}
+                  max={LANDMARK_SCALE_MAX}
+                  step={LANDMARK_SCALE_STEP}
+                  value={selectedLandmarkScale}
+                  onChange={(e) =>
+                    onLandmarkScaleChange(selectedBuilding.id, Number(e.target.value))
+                  }
+                  className="w-full accent-hero-vibrant"
+                  aria-label={`3D-Größe für ${selectedBuilding.name}`}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">
+                  Ausrichtung · {Math.round(selectedLandmarkRotation)}°
+                </span>
+                <input
+                  type="range"
+                  min={LANDMARK_ROTATION_MIN}
+                  max={LANDMARK_ROTATION_MAX}
+                  step={LANDMARK_ROTATION_STEP}
+                  value={selectedLandmarkRotation}
+                  onChange={(e) =>
+                    onLandmarkRotationChange(selectedBuilding.id, Number(e.target.value))
+                  }
+                  className="w-full accent-hero-vibrant"
+                  aria-label={`Ausrichtung für ${selectedBuilding.name}`}
+                />
+              </label>
+            </>
+          ) : (
+            <p className="font-libre text-[11px] text-gray-500">
+              Für dieses Gebäude ist kein 3D-Modell hinterlegt.
+            </p>
+          )}
           <label className="block space-y-1">
             <span className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant">
               Kategorie
@@ -300,7 +308,11 @@ export function BuildingsToolBody({
             <p className="font-libre text-[11px] text-red-400">{buildingSaveError}</p>
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        <p className="rounded border border-dashed border-hero-dark/60 bg-slate-900/20 px-2 py-2 font-libre text-[11px] text-gray-500">
+          Noch kein Gebäude gewählt — auf der Karte anklicken.
+        </p>
+      )}
 
       {buildingsByDistrict.length === 0 && orphanBuildings.length === 0 ? (
         <p className="font-libre text-xs text-gray-500">Noch keine Gebäude.</p>

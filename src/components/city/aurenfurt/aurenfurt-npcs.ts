@@ -203,6 +203,7 @@ export function generateNpcs(): AurenfurtNpc[] {
   kaiser.cityAxisSuperstitionReason = 3;
   kaiser.cityDeity = "Elysia";
   kaiser.cityAgenda = "Gesetze erlassen, Befehle erteilen und den Vattrak-Vorrat nach seinem Rang verteilen.";
+  // buildNpc füllt bereits Kaiser-Karten + Automatisierung
   byId.set(kaiser.id, kaiser);
 
   const npcs = [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));

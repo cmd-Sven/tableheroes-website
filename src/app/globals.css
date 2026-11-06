@@ -632,12 +632,37 @@ button.bg-hero-gold[disabled] {
 }
 .lore-editor h3,
 .lore-rich-text h3 {
-  font-family: var(--font-barlow), sans-serif;
-  font-weight: 600;
+  font-family: var(--font-cinzel), serif;
+  font-weight: 700;
   font-size: 1.25rem;
   line-height: 1.3;
   color: #cab926;
   margin: 1.15rem 0 0.5rem;
+}
+
+/* Einheitliche Lore-Prose: Absätze atmen, Zeilen ruhiger, kein extremes Justify */
+.lore-rich-text {
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+.lore-rich-text p {
+  margin-top: 0.95rem;
+  margin-bottom: 0.95rem;
+  line-height: 1.8;
+  text-wrap: pretty;
+}
+.lore-rich-text p:first-child {
+  margin-top: 0;
+}
+.lore-rich-text ul,
+.lore-rich-text ol {
+  margin-top: 0.95rem;
+  margin-bottom: 0.95rem;
+}
+.lore-rich-text li {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  line-height: 1.75;
 }
 .lore-editor h1:first-child,
 .lore-editor h2:first-child,

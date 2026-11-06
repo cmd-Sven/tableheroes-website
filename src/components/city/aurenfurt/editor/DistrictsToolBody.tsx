@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   AURENFURT_DISTRICTS,
   type CityDistrict,
@@ -41,6 +41,7 @@ export function DistrictsToolBody({
   onColorChange,
   onHoverOpacityChange,
   onDivideSectors,
+  onClearSectors,
 }: {
   polygons: DistrictPolygons;
   editingDistrictId: CityDistrictId | null;
@@ -64,7 +65,9 @@ export function DistrictsToolBody({
   onColorChange: (id: CityDistrictId, color: string) => void;
   onHoverOpacityChange: (id: CityDistrictId, opacity: number) => void;
   onDivideSectors: (cellSize: SectorCellSize) => DivideDistrictResult | null;
+  onClearSectors: () => void;
 }) {
+  const [clearConfirmPending, setClearConfirmPending] = useState(false);
   return (
     <>
       <p className="mb-2 font-barlow text-[11px] font-bold uppercase tracking-wide text-hero-vibrant">
@@ -159,24 +162,26 @@ export function DistrictsToolBody({
               Sektoren
             </p>
             <p className="font-libre text-[11px] text-gray-500">
-              Feste Rechtecke in Karten-Einheiten (UV, wie die Viertel-Polygone). Adresse z.&nbsp;B.{" "}
+              Gitterzellen in Karten-Einheiten. Schräge und runde Ränder werden als Anschnitte
+              behalten (kein Weglassen). Adresse z.&nbsp;B.{" "}
               <span className="text-accent-gold">{activeDistrict.name} E19</span>.
             </p>
             {districtBboxHint ? (
               <p className="font-libre text-[11px] text-gray-500">
                 Dieses Viertel misst ca. {districtBboxHint.width.toFixed(3)} ×{" "}
-                {districtBboxHint.height.toFixed(3)} Karten-Einheiten — Werte wie 20 wären größer als
-                die Stadt; sinnvoll sind eher 0,02–0,08.
+                {districtBboxHint.height.toFixed(3)} Karten-Einheiten — sinnvoll sind eher 0,01–0,04
+                (Standard 0,02 ≈ doppelte frühere Dichte).
               </p>
             ) : null}
             {!sectorsLocked ? (
               <p className="rounded border border-amber-500/50 bg-amber-950/40 px-2 py-1.5 font-libre text-[11px] leading-snug text-amber-200">
-                Einmal gespeichert, lassen sich Größe und Einteilung nicht mehr ändern oder löschen.
+                Nach dem Speichern ist die Einteilung gesperrt. Neu einteilen geht über „Sektoren
+                löschen“.
               </p>
             ) : (
               <p className="rounded border border-hero-border/50 bg-slate-900/50 px-2 py-1.5 font-libre text-[11px] leading-snug text-gray-300">
-                Gespeichert und gesperrt: {sectorCount} Sektoren. Größe und Einteilung lassen sich
-                nicht mehr ändern oder löschen.
+                Gespeichert: {sectorCount} Sektoren. Zum Verfeinern zuerst löschen, dann mit kleinerer
+                Zellengröße neu speichern.
               </p>
             )}
             <SectorSizeField
@@ -220,8 +225,8 @@ export function DistrictsToolBody({
               sectorConfirmPending ? (
                 <div className="space-y-2">
                   <p className="font-libre text-[11px] leading-snug text-amber-200">
-                    Endgültig speichern? Danach sind Größe und Einteilung für dieses Viertel
-                    unveränderlich.
+                    Endgültig speichern? Danach ist die Einteilung gesperrt, bis du die Sektoren
+                    wieder löschst.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -266,7 +271,45 @@ export function DistrictsToolBody({
                   Endgültig speichern
                 </button>
               )
-            ) : null}
+            ) : clearConfirmPending ? (
+              <div className="space-y-2">
+                <p className="font-libre text-[11px] leading-snug text-amber-200">
+                  Sektoren von {activeDistrict?.name ?? "diesem Viertel"} löschen und neu einteilen?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={sectorBusy}
+                    onClick={() => {
+                      onClearSectors();
+                      setClearConfirmPending(false);
+                      setLastDivideResult(null);
+                      setSectorConfirmPending(false);
+                    }}
+                    className="flex-1 rounded border border-accent-blood bg-accent-blood/20 px-2 py-1.5 font-barlow text-[11px] font-bold uppercase text-red-200"
+                  >
+                    Löschen
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sectorBusy}
+                    onClick={() => setClearConfirmPending(false)}
+                    className="rounded border border-hero-dark px-2 py-1.5 font-barlow text-[11px] font-bold uppercase text-gray-400"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={sectorBusy}
+                onClick={() => setClearConfirmPending(true)}
+                className="w-full rounded border border-hero-border px-2 py-1.5 font-barlow text-[11px] font-bold uppercase text-gray-200 hover:border-accent-gold"
+              >
+                Sektoren löschen / neu einteilen
+              </button>
+            )}
           </div>
 
           <p className="font-libre text-xs text-gray-400">

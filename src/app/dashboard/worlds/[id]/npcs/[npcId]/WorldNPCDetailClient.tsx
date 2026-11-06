@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { LORE_SECTION_H2_CLASS_COMPACT } from "@/src/lib/wiki-heading-styles";
 import {
   Star,
   Eye,
@@ -307,7 +308,7 @@ export function WorldNPCDetailClient({
         <div className="md:col-span-2 p-6 space-y-6">
           {npc.description && (
             <section>
-              <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS_COMPACT} flex items-center gap-2`}>
                 <BookOpen className="h-4 w-4" />
                 Beschreibung
               </h2>
@@ -322,7 +323,7 @@ export function WorldNPCDetailClient({
           )}
           {npc.appearance && (
             <section>
-              <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS_COMPACT} flex items-center gap-2`}>
                 <Eye className="h-4 w-4" />
                 Aussehen
               </h2>
@@ -337,7 +338,7 @@ export function WorldNPCDetailClient({
           )}
           {npc.personality_traits && (
             <section>
-              <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS_COMPACT} flex items-center gap-2`}>
                 <Heart className="h-4 w-4" />
                 Persönlichkeit
               </h2>
@@ -352,7 +353,7 @@ export function WorldNPCDetailClient({
           )}
           {npc.current_location?.name && (
             <section>
-              <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS_COMPACT} flex items-center gap-2`}>
                 <MapPin className="h-4 w-4" />
                 Aufenthaltsort
               </h2>
@@ -361,7 +362,7 @@ export function WorldNPCDetailClient({
           )}
           {(worldFactions.length > 0 || cityFactionLabel) && (
             <section>
-              <h2 className="font-barlow font-semibold text-lg text-accent-blood border-b border-hero-border pb-2 mb-3 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS_COMPACT} flex items-center gap-2`}>
                 <Users className="h-4 w-4" />
                 Fraktionen
               </h2>

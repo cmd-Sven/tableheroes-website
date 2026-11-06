@@ -64,6 +64,7 @@ export type CitySimEvent = {
   id: string;
   title: string;
   body: string;
+  imageUrl: string | null;
   scope: "city" | "district" | "sector";
   districtId: CityDistrictId | null;
   sectorLabel: string | null;

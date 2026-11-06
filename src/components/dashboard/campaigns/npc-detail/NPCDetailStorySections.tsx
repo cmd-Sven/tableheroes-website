@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import { LORE_SECTION_H2_CLASS } from "@/src/lib/wiki-heading-styles";
 import {
   BookOpen,
   Loader2,
@@ -60,7 +61,7 @@ export function NPCDetailStorySections({ c }: { c: NPCDetailController }) {
               {/* Dark Overlay for readability */}
               <div className="absolute inset-0 bg-black/40 pointer-events-none" />
               <div className="relative z-10">
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                <h2 className={`${LORE_SECTION_H2_CLASS} flex items-center gap-2`}>
                   <Sparkles className="h-6 w-6" />
                   Story Opportunities
                 </h2>

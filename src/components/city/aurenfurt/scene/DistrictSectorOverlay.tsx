@@ -21,6 +21,35 @@ type Props = {
   onPick?: (sector: DistrictSector) => void;
 };
 
+function SectorLabel({ sector, emphasize }: { sector: DistrictSector; emphasize?: boolean }) {
+  const centroid = sector.centroid;
+  if (!centroid || !Number.isFinite(centroid.u) || !Number.isFinite(centroid.v)) {
+    return null;
+  }
+  const world = surfacePoint(centroid.u, centroid.v);
+  return (
+    <Html
+      position={[world.x, world.y + DISTRICT_OUTLINE_LIFT + 0.05, world.z]}
+      center
+      sprite
+      distanceFactor={emphasize ? 5.5 : 8}
+      style={{ pointerEvents: "none", userSelect: "none" }}
+      zIndexRange={[160, 120]}
+    >
+      <span
+        className={`whitespace-nowrap rounded px-1.5 py-0.5 font-barlow font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] ${
+          emphasize
+            ? "border border-accent-gold/70 bg-background-dark/90 text-[11px]"
+            : "bg-background-dark/80 text-[9px]"
+        }`}
+        aria-hidden
+      >
+        {sector.label}
+      </span>
+    </Html>
+  );
+}
+
 function SectorHit({
   sector,
   selected,
@@ -40,15 +69,31 @@ function SectorHit({
   }
 
   return (
-    <mesh geometry={geometry} renderOrder={5} onClick={pick}>
-      <meshBasicMaterial
-        color={selected ? "#cab926" : "#379806"}
-        transparent
-        opacity={selected ? 0.5 : 0.18}
-        depthWrite={false}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
+    <group>
+      <mesh
+        geometry={geometry}
+        position={[0, 0.02, 0]}
+        renderOrder={8}
+        onClick={pick}
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "";
+        }}
+      >
+        <meshBasicMaterial
+          color={selected ? "#cab926" : "#379806"}
+          transparent
+          opacity={selected ? 0.5 : 0.22}
+          depthWrite={false}
+          depthTest={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {selected ? <SectorLabel sector={sector} emphasize /> : null}
+    </group>
   );
 }
 
@@ -123,6 +168,12 @@ export function DistrictSectorOverlay({
     [lineObject],
   );
 
+  const editorLabels = useMemo(() => {
+    if (preview || pickable) return [] as DistrictSector[];
+    if (sectors.length > 48) return [] as DistrictSector[];
+    return sectors;
+  }, [pickable, preview, sectors]);
+
   if (sectors.length === 0) return null;
 
   return (
@@ -140,36 +191,9 @@ export function DistrictSectorOverlay({
           )
         : null}
       {lineObject ? <primitive object={lineObject} /> : null}
-      {!preview
-        ? sectors.map((sector) => {
-            const centroid = sector.centroid;
-            if (
-              !centroid ||
-              !Number.isFinite(centroid.u) ||
-              !Number.isFinite(centroid.v)
-            ) {
-              return null;
-            }
-            const world = surfacePoint(centroid.u, centroid.v);
-            return (
-              <Html
-                key={sector.id}
-                position={[world.x, world.y + DISTRICT_OUTLINE_LIFT + 0.02, world.z]}
-                center
-                distanceFactor={7.5}
-                style={{ pointerEvents: "none", userSelect: "none" }}
-                zIndexRange={[100, 0]}
-              >
-                <span
-                  className="whitespace-nowrap font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]"
-                  aria-hidden
-                >
-                  {sector.label}
-                </span>
-              </Html>
-            );
-          })
-        : null}
+      {editorLabels.map((sector) => (
+        <SectorLabel key={sector.id} sector={sector} />
+      ))}
     </group>
   );
 }

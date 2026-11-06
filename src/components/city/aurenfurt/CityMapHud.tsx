@@ -10,10 +10,15 @@ import { MapLayerVisibilityBar } from "./MapLayerVisibilityBar";
 import type { MapLayerId } from "./hooks/useMapLayerVisibility";
 import type { DayWeather } from "./aurenfurt-weather";
 import type { WeatherFxId, WeatherFxMode } from "./aurenfurt-weather-fx";
+import { HEATMAP_ASPECTS, type HeatmapAspect } from "./aurenfurt-city-heatmap";
+import type { CityDistrictId } from "./aurenfurt-districts";
+import { DistrictHudKpis, type DistrictHudKpi } from "./DistrictHudKpis";
 
 type Props = {
   citySurface: CitySurface;
   onCitySurface: (mode: CitySurface) => void;
+  /** SL/Admin: Tab Verwaltung anzeigen */
+  showVerwaltung?: boolean;
   day: string;
   minDay: string;
   maxDay: string;
@@ -28,7 +33,11 @@ type Props = {
   onToggleMapAdminMode: () => void;
   eventWizardOpen: boolean;
   onToggleEventWizard: () => void;
-  statusLine: string;
+  /** Großer Titel rechts neben dem Kalender (Viertel oder Stadt). */
+  districtTitle: string;
+  districtId: CityDistrictId | null;
+  districtKpis: DistrictHudKpi[];
+  statusLine: string | null;
   layoutError: string | null;
   buildingsVisible: boolean;
   poisVisible: boolean;
@@ -41,13 +50,14 @@ type Props = {
   weatherMode: WeatherFxMode;
   autoEffect: WeatherFxId;
   onWeatherMode: (mode: WeatherFxMode) => void;
-  crimeHeatmap: boolean;
-  onToggleCrimeHeatmap: () => void;
+  heatmapAspect: HeatmapAspect | null;
+  onHeatmapAspect: (aspect: HeatmapAspect | null) => void;
 };
 
 export function CityMapHud({
   citySurface,
   onCitySurface,
+  showVerwaltung = false,
   day,
   minDay,
   maxDay,
@@ -62,6 +72,9 @@ export function CityMapHud({
   onToggleMapAdminMode,
   eventWizardOpen,
   onToggleEventWizard,
+  districtTitle,
+  districtId,
+  districtKpis,
   statusLine,
   layoutError,
   buildingsVisible,
@@ -75,8 +88,8 @@ export function CityMapHud({
   weatherMode,
   autoEffect,
   onWeatherMode,
-  crimeHeatmap,
-  onToggleCrimeHeatmap,
+  heatmapAspect,
+  onHeatmapAspect,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -102,10 +115,14 @@ export function CityMapHud({
     <>
       <header
         data-city-map-hud="top"
-        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[140px] items-end gap-2.5 bg-background-dark px-2 pb-3"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[168px] items-end gap-2.5 overflow-visible bg-background-dark px-2 pb-3"
       >
         <div className="shrink-0" style={{ marginRight: 50 }}>
-          <CityViewSwitch mode={citySurface} onChange={onCitySurface} />
+          <CityViewSwitch
+            mode={citySurface}
+            onChange={onCitySurface}
+            showVerwaltung={showVerwaltung}
+          />
         </div>
         <HoloDayStrip
           day={day}
@@ -118,17 +135,14 @@ export function CityMapHud({
           onStepYear={onStepYear}
           onGoToday={onGoToday}
         />
-        <div data-cal-hint="" className="ml-auto flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
-          <p className="truncate font-cinzel text-xs font-bold text-accent-gold">Aurenfurt</p>
-          {layoutError ? (
-            <p className="truncate font-libre text-[11px] leading-snug text-red-300" role="alert">
-              {layoutError}
-            </p>
-          ) : null}
-          <p className="truncate font-libre text-[11px] leading-snug text-gray-200" title={statusLine}>
-            {statusLine}
-          </p>
-        </div>
+        <DistrictHudKpis
+          title={districtTitle}
+          districtId={districtId}
+          day={day}
+          kpis={districtKpis}
+          hint={statusLine}
+          layoutError={layoutError}
+        />
         <div ref={menuRef} className="relative z-40 flex h-full shrink-0 items-center">
           <button
             type="button"
@@ -168,27 +182,34 @@ export function CityMapHud({
                       aria-hidden
                     />
                   </button>
-                  {filterOpen ? (
-                    <button
-                      type="button"
-                      role="menuitemcheckbox"
-                      aria-checked={crimeHeatmap}
-                      data-crime-heatmap={crimeHeatmap ? "on" : "off"}
-                      onClick={onToggleCrimeHeatmap}
-                      className={`${menuItem} pl-9 ${crimeHeatmap ? "text-hero-vibrant" : ""}`}
-                    >
-                      <span
-                        aria-hidden
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                          crimeHeatmap ? "bg-orange-300" : "bg-gray-500"
-                        }`}
-                      />
-                      Kriminalität
-                      <span className="ml-auto font-libre text-[10px] normal-case tracking-normal text-gray-400">
-                        {crimeHeatmap ? "an" : "aus"}
-                      </span>
-                    </button>
-                  ) : null}
+                  {filterOpen
+                    ? HEATMAP_ASPECTS.map((aspect) => {
+                        const active = heatmapAspect === aspect.key;
+                        return (
+                          <button
+                            key={aspect.key}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={active}
+                            data-heatmap-aspect={aspect.key}
+                            data-heatmap-on={active ? "on" : "off"}
+                            onClick={() => onHeatmapAspect(active ? null : aspect.key)}
+                            className={`${menuItem} pl-9 ${active ? "text-hero-vibrant" : ""}`}
+                          >
+                            <span
+                              aria-hidden
+                              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                                active ? "bg-orange-300" : "bg-gray-500"
+                              }`}
+                            />
+                            {aspect.label}
+                            <span className="ml-auto font-libre text-[10px] normal-case tracking-normal text-gray-400">
+                              {active ? "an" : "aus"}
+                            </span>
+                          </button>
+                        );
+                      })
+                    : null}
                 </div>
 
                 {isGm ? (

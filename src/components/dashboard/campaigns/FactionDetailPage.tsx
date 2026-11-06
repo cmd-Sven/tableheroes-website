@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
+import { LORE_SECTION_H2_CLASS } from "@/src/lib/wiki-heading-styles";
 import {
   ArrowLeft,
   Shield,
@@ -835,7 +836,7 @@ export function FactionDetailPage({
               <GothicSpotlightDescription
                 backgroundImageUrl={faction.banner_url || faction.image_url || undefined}
               >
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                <h2 className={LORE_SECTION_H2_CLASS}>
                   Beschreibung
                 </h2>
                 <InlineEditField
@@ -883,7 +884,7 @@ export function FactionDetailPage({
           >
             <div className="absolute inset-0 bg-black/40 pointer-events-none" />
             <div className="relative z-10">
-              <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+              <h2 className={`${LORE_SECTION_H2_CLASS} flex items-center gap-2`}>
                 <Handshake className="h-6 w-6" />
                 Diplomatie
               </h2>
@@ -1148,7 +1149,7 @@ export function FactionDetailPage({
               >
                 <div className="absolute inset-0 bg-black/40 pointer-events-none" />
                 <div className="relative z-10">
-                  <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                  <h2 className={`${LORE_SECTION_H2_CLASS} flex items-center gap-2`}>
                     <UserPlus className="h-6 w-6" />
                     Mitglieder (TODO)
                   </h2>
@@ -1204,7 +1205,7 @@ export function FactionDetailPage({
               {/* Dark Overlay for readability */}
               <div className="absolute inset-0 bg-black/40 pointer-events-none" />
               <div className="relative z-10">
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4 flex items-center gap-2">
+                <h2 className={`${LORE_SECTION_H2_CLASS} flex items-center gap-2`}>
                   <Users className="h-6 w-6" />
                   Mitglieder ({faction.npcs.length})
                 </h2>

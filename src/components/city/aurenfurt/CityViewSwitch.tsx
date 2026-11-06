@@ -1,8 +1,8 @@
 "use client";
 
-import { Box, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { Box, LayoutDashboard, ScrollText, type LucideIcon } from "lucide-react";
 
-export type CitySurface = "map" | "dashboard";
+export type CitySurface = "map" | "dashboard" | "verwaltung";
 
 /** Referenzgröße für die Tageskarten in der HUD. */
 export const CITY_VIEW_CARD_SIZE = 112;
@@ -17,17 +17,29 @@ const OPTIONS: {
   label: string;
   hint: string;
   Icon: LucideIcon;
+  gmOnly?: boolean;
 }[] = [
   { id: "map", label: "Stadtansicht", hint: "3D-Stadtansicht", Icon: Box },
   { id: "dashboard", label: "Dashboard", hint: "Stadt-Dashboard", Icon: LayoutDashboard },
+  {
+    id: "verwaltung",
+    label: "Verwaltung",
+    hint: "Kaiser-Verwaltung (nur SL)",
+    Icon: ScrollText,
+    gmOnly: true,
+  },
 ];
 
 type Props = {
   mode: CitySurface;
   onChange: (mode: CitySurface) => void;
+  /** Zeigt den Tab Verwaltung (SL/Admin). */
+  showVerwaltung?: boolean;
 };
 
-export function CityViewSwitch({ mode, onChange }: Props) {
+export function CityViewSwitch({ mode, onChange, showVerwaltung = false }: Props) {
+  const options = OPTIONS.filter((option) => !option.gmOnly || showVerwaltung);
+
   return (
     <div
       role="tablist"
@@ -35,7 +47,7 @@ export function CityViewSwitch({ mode, onChange }: Props) {
       className="pointer-events-auto flex items-end"
       style={{ gap: GAP }}
     >
-      {OPTIONS.map(({ id, label, hint, Icon }) => {
+      {options.map(({ id, label, hint, Icon }) => {
         const active = mode === id;
         return (
           <button

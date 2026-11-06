@@ -8,6 +8,7 @@ import { GothicSpotlightDescription } from "./GothicSpotlightDescription";
 import { WikiEditor, type WikiMentionEntity } from "@/src/components/ui/WikiEditor";
 import { SmartText } from "@/src/components/ui/SmartText";
 import { useWorldEntities } from "@/src/hooks/useWorldEntities";
+import { LORE_SECTION_H2_CLASS } from "@/src/lib/wiki-heading-styles";
 
 // Inline Edit Field Component
 type InlineEditFieldProps = {
@@ -175,7 +176,7 @@ export function LoreDescription({ lore, campaignId, isGM, onUpdate }: Props) {
       className="rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.8)] transition-shadow duration-300"
     >
       <GothicSpotlightDescription backgroundImageUrl={lore.image_url || undefined}>
-        <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+        <h2 className={LORE_SECTION_H2_CLASS}>
           Beschreibung
         </h2>
         <InlineEditField

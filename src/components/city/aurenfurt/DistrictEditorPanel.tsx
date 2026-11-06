@@ -15,7 +15,13 @@ import type { LandmarkScales } from "./aurenfurt-landmark-scales";
 import type { LandmarkRotations } from "./aurenfurt-landmark-rotations";
 import type { DistrictPolygons, UvPoint } from "./aurenfurt-district-polygons";
 import { nearbyStreetsForBuilding } from "./aurenfurt-map-buildings";
-import type { AurenfurtMapPoi, PoiInfluence, PoiKind } from "./aurenfurt-map-pois";
+import {
+  DEFAULT_POI_REACH,
+  type AurenfurtMapPoi,
+  type PoiInfluence,
+  type PoiKind,
+  type PoiReachSetting,
+} from "./aurenfurt-map-pois";
 import { effectiveStreet, type AurenfurtStreet, type StreetWorks } from "./aurenfurt-streets";
 import type { DayWeather } from "./aurenfurt-weather";
 import {
@@ -78,6 +84,7 @@ type Props = {
   onColorChange: (id: CityDistrictId, color: string) => void;
   onHoverOpacityChange: (id: CityDistrictId, opacity: number) => void;
   onDivideSectors: (cellSize: SectorCellSize) => DivideDistrictResult | null;
+  onClearSectors: () => void;
   onSectorPreviewChange: (sectors: DistrictSector[]) => void;
   onStartDrawStreet: () => void;
   onFinishDrawStreet: () => void;
@@ -107,6 +114,12 @@ type Props = {
     kind: PoiKind;
     imageUrl: string | null;
     influences: PoiInfluence[];
+    reach: PoiReachSetting;
+  }) => void;
+  onSavePoiReach: (input: {
+    poiId: string;
+    influences: PoiInfluence[];
+    reach: PoiReachSetting;
   }) => void;
   onClose: () => void;
 };
@@ -165,6 +178,7 @@ export function DistrictEditorPanel({
   onColorChange,
   onHoverOpacityChange,
   onDivideSectors,
+  onClearSectors,
   onSectorPreviewChange,
   onStartDrawStreet,
   onFinishDrawStreet,
@@ -181,6 +195,7 @@ export function DistrictEditorPanel({
   onCancelPlacePoi,
   onClearPoiDraft,
   onSavePoi,
+  onSavePoiReach,
   onClose,
 }: Props) {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
@@ -198,6 +213,7 @@ export function DistrictEditorPanel({
   const [poiInfluences, setPoiInfluences] = useState<PoiInfluence[]>([
     { aspect: "religion", delta: 5 },
   ]);
+  const [poiReach, setPoiReach] = useState<PoiReachSetting>({ ...DEFAULT_POI_REACH });
   const [sectorWidth, setSectorWidth] = useState(SECTOR_SIZE_DEFAULT);
   const [sectorHeight, setSectorHeight] = useState(SECTOR_SIZE_DEFAULT);
   const [sectorConfirmPending, setSectorConfirmPending] = useState(false);
@@ -257,6 +273,7 @@ export function DistrictEditorPanel({
     setPoiKind("Statue");
     setPoiImageUrl("");
     setPoiInfluences([{ aspect: "religion", delta: 5 }]);
+    setPoiReach({ ...DEFAULT_POI_REACH });
   }, [poiFormKey]);
 
   useEffect(() => {
@@ -266,7 +283,14 @@ export function DistrictEditorPanel({
     setPoiKind("Statue");
     setPoiImageUrl("");
     setPoiInfluences([{ aspect: "religion", delta: 5 }]);
+    setPoiReach({ ...DEFAULT_POI_REACH });
   }, [tool]);
+
+  useEffect(() => {
+    if (!selectedPoiId) return;
+    const poi = pois.find((entry) => entry.id === selectedPoiId);
+    if (poi?.reach) setPoiReach(poi.reach);
+  }, [pois, selectedPoiId]);
 
   useEffect(() => {
     setSectorConfirmPending(false);
@@ -463,6 +487,7 @@ export function DistrictEditorPanel({
           onColorChange={onColorChange}
           onHoverOpacityChange={onHoverOpacityChange}
           onDivideSectors={onDivideSectors}
+          onClearSectors={onClearSectors}
         />
       ) : null}
 
@@ -528,6 +553,7 @@ export function DistrictEditorPanel({
           poiImageUrl={poiImageUrl}
           poiImageUploading={poiImageUploading}
           poiInfluences={poiInfluences}
+          poiReach={poiReach}
           setPoiCreateOpen={setPoiCreateOpen}
           setPoiName={setPoiName}
           setPoiDescription={setPoiDescription}
@@ -535,6 +561,7 @@ export function DistrictEditorPanel({
           setPoiImageUrl={setPoiImageUrl}
           setPoiImageUploading={setPoiImageUploading}
           setPoiInfluences={setPoiInfluences}
+          setPoiReach={setPoiReach}
           onSelectPoi={selectPoi}
           onStartPlacePoi={onStartPlacePoi}
           onStartRepositionPoi={onStartRepositionPoi}
@@ -543,6 +570,7 @@ export function DistrictEditorPanel({
           onCancelPlaceBuilding={onCancelPlaceBuilding}
           onClearBuildingDraft={onClearBuildingDraft}
           onSavePoi={onSavePoi}
+          onSavePoiReach={onSavePoiReach}
         />
       ) : null}
 

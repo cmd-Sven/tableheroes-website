@@ -138,12 +138,18 @@ export function useMapEditorSession({ isGm, buildings, focusSelection, addStreet
     setSelectedPoiId(null);
     setDrawingStreet(false);
     setDraftStreetPoints([]);
+    setEditingWallId(null);
+    setDrawingWall(false);
+    setWallDraftReady(false);
+    setDraftWallPoints([]);
     resetPlacementState();
     setSectorPreviewSectors([]);
     setSelectedBuildingId(id);
     setBuildingSaveError(null);
     setCategorySaveNote(null);
     if (id) {
+      // Kartenklick im Admin: Gebäude-Werkzeug öffnen, damit Skala/Drehung sofort da sind.
+      setActiveTool("buildings");
       const building = findBuilding(id, buildings);
       if (building) {
         setEditingDistrictId(building.districtId);

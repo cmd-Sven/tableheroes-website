@@ -16,6 +16,8 @@ export type CitySimEventInput = {
   worldId: string;
   title: string;
   body: string;
+  /** Optionales Kartenmotiv (öffentliche URL). */
+  imageUrl?: string | null;
   scope: "city" | "district" | "sector";
   districtId: string | null;
   sectorLabel: string | null;
@@ -64,10 +66,12 @@ export async function saveCitySimEvent(input: CitySimEventInput) {
   const effects = z.array(MeterEffectSchema).max(4).parse(input.effects);
   const endWhen = input.endWhen ? EndWhenSchema.parse(input.endWhen) : null;
   const supabase = await assertGm(input.worldId);
+  const imageUrl = (input.imageUrl ?? "").trim() || null;
   const row = {
     world_id: input.worldId,
     title,
     body: input.body.trim(),
+    image_url: imageUrl,
     scope: input.scope,
     district_id: input.scope === "city" ? null : input.districtId,
     sector_label: input.scope === "sector" ? input.sectorLabel?.trim() ?? null : null,
@@ -98,8 +102,11 @@ export async function setCitySimEventActive(worldId: string, eventId: string, ac
 
 export async function listCitySimEvents(worldId: string) {
   const supabase = await assertGm(worldId);
-  const { data, error } = await (supabase as any).from("city_sim_events")
-    .select("id, title, body, scope, district_id, sector_label, effects, duration_days, start_on, end_when, active")
+  const { data, error } = await (supabase as any)
+    .from("city_sim_events")
+    .select(
+      "id, title, body, image_url, scope, district_id, sector_label, effects, duration_days, start_on, end_when, active",
+    )
     .eq("world_id", worldId)
     .order("start_on", { ascending: false });
   if (error) return [];
@@ -107,6 +114,7 @@ export async function listCitySimEvents(worldId: string) {
     id: string;
     title: string;
     body: string;
+    image_url: string | null;
     scope: "city" | "district" | "sector";
     district_id: string | null;
     sector_label: string | null;

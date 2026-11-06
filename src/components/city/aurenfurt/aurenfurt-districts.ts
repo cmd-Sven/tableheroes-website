@@ -46,7 +46,30 @@ export type CityDistrict = {
   sim: SimProfile;
 };
 
-export type LandmarkModel = "wirtshaus" | "kraemer" | "nordtor" | "suedtor" | "wachturm" | "palais" | "kapelle" | "hofkanzlei" | "observatorium";
+export type LandmarkModel =
+  | "wirtshaus"
+  | "kraemer"
+  | "nordtor"
+  | "suedtor"
+  | "wachturm"
+  | "wachhaus"
+  | "palais"
+  | "kapelle"
+  | "hofkanzlei"
+  | "observatorium"
+  | "schmiede"
+  | "rotelaterne"
+  | "umschlagplatz"
+  | "saalordnung"
+  | "blauergarten"
+  | "hofwache"
+  | "rosehof"
+  | "kontor"
+  | "schwertschule"
+  | "ostbrunnen"
+  | "hausdesnordens"
+  | "bibliothek"
+  | "zunfthaus";
 
 export type ProsperityLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -193,6 +216,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.46,
     v: 0.52,
     summary: "Wachstube am inneren Ring. Hier meldet die Garde dem Hof, und Willkür trägt ein Siegel.",
+    landmark: "hofwache",
     guildId: "stadtwachen",
     prosperityLevel: 4,
     isHotspot: 18,
@@ -261,6 +285,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.4,
     v: 0.3,
     summary: "Heckenhöfe der Häuser. Nach Sonnenuntergang schließt das letzte Gitter.",
+    landmark: "blauergarten",
     guildId: "haeuser-des-nordens",
     prosperityLevel: 5,
     isHotspot: 10,
@@ -278,6 +303,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     v: 0.3,
     summary:
       "Leises Haus, teure Krüge. Die Goldkelchen spielen hier für Adelsohren — und lauschen für das Haus der Seide.",
+    landmark: "wirtshaus",
     guildId: "goldkelchen",
     prosperityLevel: 4,
     isHotspot: 28,
@@ -294,6 +320,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.45,
     v: 0.22,
     summary: "Empfangszimmer mit Seidenbahnen. Das Haus der Seide verkauft hier Rang und Stoffe zugleich.",
+    landmark: "hausdesnordens",
     guildId: "haus-der-seide",
     prosperityLevel: 5,
     isHotspot: 16,
@@ -311,6 +338,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.74,
     v: 0.42,
     summary: "Die große Ostkuppel. Tagsüber Pilger, nachts eine Liturgie, die nicht im Kalender steht.",
+    landmark: "kapelle",
     guildId: "konklave-ewige-ordnung",
     prosperityLevel: 4,
     isHotspot: 35,
@@ -327,6 +355,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.64,
     v: 0.34,
     summary: "Brunnen zwischen Palastgärten und Tempeln. Opfergaben verschwinden schneller als Wasser.",
+    landmark: "ostbrunnen",
     guildId: "bund-silberne-rose",
     prosperityLevel: 3,
     isHotspot: 30,
@@ -343,6 +372,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.78,
     v: 0.36,
     summary: "Offener Kreuzgang mit weißen Rosen. Hier predigen Elysia-Anhänger gegen gezähltes Schicksal.",
+    landmark: "rosehof",
     guildId: "bund-silberne-rose",
     prosperityLevel: 3,
     isHotspot: 40,
@@ -359,6 +389,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.7,
     v: 0.48,
     summary: "Geschlossener Chorraum. Chromus-Liturgie tickt in Kerzen und Zahlen.",
+    landmark: "saalordnung",
     guildId: "konklave-ewige-ordnung",
     prosperityLevel: 4,
     isHotspot: 38,
@@ -395,6 +426,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     v: 0.54,
     summary:
       "Militärakademie für Gardisten und Wachleute. Drillhöfe, Stangen und der Geruch von Öl und Disziplin.",
+    landmark: "schwertschule",
     guildId: "stadtwachen",
     prosperityLevel: 3,
     isHotspot: 28,
@@ -412,6 +444,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     v: 0.5,
     summary:
       "Wissensspeicher zwischen den Konfessionen und der Akademie. Regale, Register — und Abschriften, die niemand ausleihen darf.",
+    landmark: "bibliothek",
     guildId: "zirkel-observatorium",
     prosperityLevel: 4,
     isHotspot: 26,
@@ -429,6 +462,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.7,
     v: 0.64,
     summary: "Esse an der Südostmauer. Die Zunft kauft Erz, bevor die Garde Fragen stellt.",
+    landmark: "schmiede",
     guildId: "zunftbund",
     prosperityLevel: 3,
     isHotspot: 32,
@@ -445,6 +479,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.6,
     v: 0.6,
     summary: "Schreibstube und Lager der Zünfte. Verträge gelten hier mehr als Wappen.",
+    landmark: "zunfthaus",
     guildId: "zunftbund",
     prosperityLevel: 3,
     isHotspot: 36,
@@ -461,6 +496,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.65,
     v: 0.56,
     summary: "Stand und Schreibstube am Handwerkermarkt. Hohe Gebühren, längere Reichweite bis in die blauen Salons.",
+    landmark: "kontor",
     guildId: "haus-der-seide",
     prosperityLevel: 4,
     isHotspot: 28,
@@ -547,6 +583,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.31,
     v: 0.74,
     summary: "Eng, laut, und die Wache kommt spät. Im Keller wird Malanthir nicht nur geflüstert.",
+    landmark: "rotelaterne",
     guildId: "rotes-auge",
     prosperityLevel: 1,
     isHotspot: 78,
@@ -563,6 +600,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.28,
     v: 0.68,
     summary: "Verdeckter Hof des Roten Auges. Kisten ohne Siegel, Wege ohne Namen, Ware die niemand sehen soll.",
+    landmark: "umschlagplatz",
     guildId: "rotes-auge",
     prosperityLevel: 1,
     isHotspot: 88,
@@ -579,6 +617,7 @@ export const CITY_BUILDINGS: CityBuilding[] = [
     u: 0.38,
     v: 0.7,
     summary: "Dünn besetzte Stube der Stadtwachen. Unterwandert, überfordert — und trotzdem da.",
+    landmark: "wachhaus",
     guildId: "stadtwachen",
     prosperityLevel: 1,
     isHotspot: 70,

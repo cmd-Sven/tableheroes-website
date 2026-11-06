@@ -81,6 +81,7 @@ const LOCATION_TYPE_SORT: Record<string, number> = {
   Hafen: 15,
   Schmiede: 16,
   Geschäft: 17,
+  "Laden/Geschäft": 17,
 };
 
 function locationSortKey(entry: LoreOverviewSourceEntry): [number, string] {

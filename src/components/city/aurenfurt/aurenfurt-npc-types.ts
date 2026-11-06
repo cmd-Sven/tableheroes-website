@@ -7,6 +7,7 @@ import type { FactionId } from "./aurenfurt-factions";
 import type {
   CityEventCard,
   CityInfluenceTier,
+  NpcAbility,
 } from "@/src/lib/npcs/city-simulation";
 
 export const NPC_PORTRAIT_PLACEHOLDER = "/images/npcs/npc-platzhalter.png";
@@ -124,6 +125,7 @@ export type AurenfurtNpc = {
   cityFactionId: FactionId | null;
   cityAgenda: string;
   cityEventDeck: CityEventCard[];
+  cityAbilities: NpcAbility[];
 };
 
 /** Prefill-Form für den Narrative-/KI-NPC-Wizard. */

@@ -2,7 +2,7 @@
 
 import { Component, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { AdaptiveDpr, AdaptiveEvents, OrbitControls } from "@react-three/drei";
 import { CityModel } from "../CityModel";
 import type { BuildingPositions } from "../aurenfurt-building-positions";
 import type { LandmarkScales } from "../aurenfurt-landmark-scales";
@@ -15,10 +15,11 @@ import type { AurenfurtWall } from "../aurenfurt-walls";
 import type { DayWeather } from "../aurenfurt-weather";
 import type { WeatherFxId } from "../aurenfurt-weather-fx";
 import type { DistrictSector } from "../aurenfurt-sectors";
-import type { SectorCrimeCell } from "../aurenfurt-crime-heatmap";
+import type { SectorHeatCell } from "../aurenfurt-city-heatmap";
 import type { PoiReachCell } from "../aurenfurt-sector-reach";
 import type { AurenfurtMapEditorTool } from "../aurenfurt-map-editor-tool";
 import { HoloFocusRig } from "./HoloFocusRig";
+import { HoloSelectionDim } from "./HoloSelectionDim";
 
 type Props = {
   selection: HoloSelection | null;
@@ -54,7 +55,7 @@ type Props = {
   eventSectorIds?: string[];
   onPickEventSector?: (sector: DistrictSector) => void;
   crimeHeatmapVisible?: boolean;
-  crimeCells?: SectorCrimeCell[];
+  crimeCells?: SectorHeatCell[];
   poiReachCells?: PoiReachCell[];
   poiReachVisible?: boolean;
   /** Kamera bleibt stehen, z. B. während der Ort auf der Karte gewählt wird. */
@@ -263,11 +264,12 @@ export default function HoloCityCanvas({
           // Schweben, Autorotation, Wetter und der Heatmap-Fade hängen an useFrame.
           frameloop="always"
           shadows={false}
-          dpr={[1, 1.25]}
+          dpr={[1, 1.15]}
           gl={{
             antialias: false,
             alpha: false,
             stencil: false,
+            depth: true,
             powerPreference: "high-performance",
             failIfMajorPerformanceCaveat: false,
           }}
@@ -278,12 +280,11 @@ export default function HoloCityCanvas({
             onSelect(null);
           }}
         >
+          <AdaptiveDpr />
+          <AdaptiveEvents />
           <color attach="background" args={["#02080c"]} />
           <fog attach="fog" args={["#02080c", 8.5, 16]} />
-          <ambientLight intensity={0.64} />
-          <directionalLight position={[3.4, 6.4, 2.4]} intensity={1.5} color="#fff6e4" />
-          <directionalLight position={[-4.2, 2.4, -1.6]} intensity={0.3} color="#9fd8ff" />
-          <pointLight position={[0, -0.7, 0]} intensity={1.8} color="#37d7ff" distance={8} />
+          <HoloSelectionDim active={selection?.type === "building"} />
           <Suspense fallback={null}>
             <CityModel
               selection={selection}

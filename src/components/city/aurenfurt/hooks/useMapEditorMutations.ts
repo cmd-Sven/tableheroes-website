@@ -15,12 +15,17 @@ import {
   type BuildingCategory,
 } from "../aurenfurt-building-categories";
 import { LORE_PLACEHOLDER_IMAGE } from "../aurenfurt-district-lore-ids";
-import { createAurenfurtMapPoi, updateAurenfurtMapPoiPosition } from "../aurenfurt-map-poi-actions";
+import {
+  createAurenfurtMapPoi,
+  updateAurenfurtMapPoiPosition,
+  updateAurenfurtMapPoiReach,
+} from "../aurenfurt-map-poi-actions";
 import {
   districtIdAtUv,
   type AurenfurtMapPoi,
   type PoiInfluence,
   type PoiKind,
+  type PoiReachSetting,
 } from "../aurenfurt-map-pois";
 import type { MapEditorSession } from "./useMapEditorSession";
 import type { useBuildingPositions } from "./useBuildingPositions";
@@ -304,6 +309,7 @@ export function useMapEditorMutations({
     kind: PoiKind;
     imageUrl: string | null;
     influences: PoiInfluence[];
+    reach: PoiReachSetting;
   }) {
     if (!poiDraftUv || !poiDraftDistrictId) {
       setPoiSaveError("Bitte zuerst eine Position auf der Karte setzen.");
@@ -319,6 +325,7 @@ export function useMapEditorMutations({
         kind: input.kind,
         imageUrl: input.imageUrl,
         influences: input.influences,
+        reach: input.reach,
         u: poiDraftUv.u,
         v: poiDraftUv.v,
       });
@@ -343,6 +350,27 @@ export function useMapEditorMutations({
     });
   }
 
+  function savePoiReach(input: {
+    poiId: string;
+    influences: PoiInfluence[];
+    reach: PoiReachSetting;
+  }) {
+    setPoiSaveError(null);
+    startSavePoi(async () => {
+      const result = await updateAurenfurtMapPoiReach({
+        worldId,
+        poiId: input.poiId,
+        influences: input.influences,
+        reach: input.reach,
+      });
+      if (!result.ok) {
+        setPoiSaveError(result.error);
+        return;
+      }
+      setPois((current) => current.map((poi) => (poi.id === result.poi.id ? result.poi : poi)));
+    });
+  }
+
   return {
     savingBuilding,
     savingCategory,
@@ -354,5 +382,6 @@ export function useMapEditorMutations({
     saveNewBuilding,
     saveBuildingCategory,
     saveNewPoi,
+    savePoiReach,
   };
 }

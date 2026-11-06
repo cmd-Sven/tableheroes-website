@@ -1,0 +1,309 @@
+================================================================================
+  TABLEHEROES – AURENFURT STADTSIMULATION
+  Übersicht: Attribute, Wertebereiche und Zusammenhänge
+  Stand: November 2026 (aus dem Code abgeleitet)
+================================================================================
+
+1. ZWECK
+--------
+Die Stadtsimulation modelliert Aurenfurt als lebendige Stadt mit sieben Vierteln.
+Tägliche Kennzahlen (0–100) entstehen aus Gebäuden, Straßen, POIs, NPCs,
+Glauben/Magie, Chronik-Ereignissen und aktivem „Druck“ (Karten, Fähigkeiten,
+Stadtereignisse). Die 3D-Karte, das Dashboard und der Ereignis-Wizard lesen
+dieselben Tagesprofile.
+
+
+2. GEOGRAFIE – SIEBEN VIERTEL
+-----------------------------
+ID                  Name                 Rolle (kurz)
+adelsviertel        Adelsviertel         Blaue Höfe, Häuser des Nordens
+tempelbezirk        Tempelbezirk         Elysia vs. Chromus, Liturgie
+akademieviertel     Akademieviertel      Observatorium, weiße Magie, Archive
+handwerkerviertel   Handwerkerviertel    Zünfte, Märkte, Wirtschaftskern
+suedtor             Südtor               Löwentor, Einreise, Schmuggel
+unterstadt          Unterstadt           Dichte, Crime, Malanthir, Schattenhandel
+palast              Palast               Festungspalast, Hofmacht, hohe Garde
+
+Statische Portrait-Seed-Werte (nur Ausgangsbild in aurenfurt-districts;
+die laufende Simulation überschreibt sie über aurenfurt-city-sim / history):
+
+  Viertel            Crime Vattrak Malanthir Guard Refugees Economy Unemp Elysia Chromus
+  Adelsviertel         12     76        8     82       14      84    14     34       8
+  Tempelbezirk         16     86       29     73       33      68    34     54      22
+  Akademieviertel      22     80       30     72       12      70    18     24      10
+  Handwerkerviertel    41     37       17     44       42      74    27     18       6
+  Südtor               34     44       15     71       79      61    36     20       7
+  Unterstadt           72     18       56     21       88      26    68     14       5
+  Palast                6     94       11     96        5      91    12     70      12
+
+
+3. KENNZAHLEN (METER) – 0 … 100
+--------------------------------
+Schlüssel          Anzeige (UI)              Bedeutung
+crime              Kriminalität              Unruhe / Verbrechen
+guard              Garde / Sicherheit        Präsenz der Ordnung
+vattrak            Religion (HUD) / Vattrak  Religiöse Stabilität / Ordnung der Stadtgottheit
+malanthir          Malanthir-Korruption      Dunkle Korruption / Untergrund
+economy            Wirtschaft                Prosperität / Handel
+unemployment       Arbeitslosigkeit          Prekarität
+refugees           Flüchtlinge               Zustrom / Belastung
+elysia             Elysia-Präsenz            Linie Elysia (Hoffnung / offene Höfe)
+chromus            Chromus-Präsenz           Linie Chromus (gezähltes Schicksal)
+
+Zusätzlich (abgeleitet, nicht als Roh-Meter gespeichert):
+  Spannung (tensionOf)  – Index aus Unzufriedenheit minus Zufriedenheit
+  underground[]         – benannte Untergrundzellen mit strength 0–100
+  tensionBias           – Zuschlag aus Chronik-Ereignissen auf die Spannungsformel
+
+Stadtweit: cityMetricsOn mittelt Viertel gewichtet nach Gebäudegewicht.
+
+
+4. ABGELEITETE SPANNUNG (tensionOf)
+----------------------------------
+Unzufriedenheit =
+    crime×0.26
+  + unemployment×0.20
+  + malanthir×0.14
+  + refugees×0.10
+  + (100−economy)×0.12
+  + max(0, guard−55)×0.14
+
+Zufriedenheit =
+    max(0, economy−45)×0.10
+  + max(0, vattrak−40)×0.12
+  + max(0, elysia−45)×0.04
+
+Spannung = clamp(Unzufriedenheit − Zufriedenheit + tensionBias, 0, 100)
+
+Gilt für Viertel und Stadtprofil gleichermaßen.
+
+
+5. TAGESPROFIL – SCHICHTEN
+--------------------------
+Endwert je Meter an Tag T (vereinfacht):
+
+  Rohziel (targetsFor) aus Gebäuden, Straßen, POIs, NPCs, Magie-Sättigung, Geo-Rollen
+    → zeitliche Glättung (ALPHA) Richtung Ziel
+    → Bond-Verschiebung (Beziehungen, skaliert)
+    → Pressure-Delta (aktive Karten / Fähigkeiten / Stadtereignisse), Cap ±16/Tag
+    → Chronik-Shift (datierte Geschichten)
+    → clamp 0–100
+
+Historischer Start der Zeitreihe: 2023-09-26 (HISTORY_START).
+
+
+6. STRUKTURROLLE JE VIERTEL (Konstanten)
+---------------------------------------
+ECON_ROLE (Wirtschaftsbias):
+  Handwerk +24, Unterstadt +16, Adel +8, Südtor +7,
+  Akademie −2, Tempel −4, Palast −12
+  Extra: Südtor +8, Unterstadt +10 in der Economy-Formel
+
+STREET_ECON_BIAS (Straßenbeitrag):
+  Handwerk 1.18, Unterstadt 1.12, Südtor 1.05, Adel 1.00,
+  Akademie 0.92, Tempel 0.88, Palast 0.78
+
+GUARD_ROLE:
+  Palast +36, Tempel +29, Akademie +29, Adel +22, Südtor +18,
+  Handwerk −2, Unterstadt −4
+
+UNEMP_ROLE:
+  Unterstadt 34, Tempel 24, Akademie 14, Südtor 12,
+  Handwerk 11, Adel 10, Palast 8
+
+REFUGEE_GEO:
+  Unterstadt 86, Südtor 78, Handwerk 36, Tempel 28,
+  Adel 12, Akademie 10, Palast 4
+
+MAL_BASE (Malanthir-Grundlage):
+  Unterstadt 38, Akademie 25, Tempel 24, Südtor 10,
+  Palast 9, Handwerk 6, Adel 6
+
+ELYSIA_ROLE / CHROMUS_ROLE (Glaubens-Basispräsenz):
+  Elysia: Palast 70, Tempel 54, Adel 34, Akademie 24, Südtor 20, Handwerk 18, Unterstadt 14
+  Chromus: Tempel 22, Palast 12, Akademie 10, Adel 8, Südtor 7, Handwerk 6, Unterstadt 5
+
+
+7. WICHTIGE FORMEL-ZUSAMMENHÄNGE (Rohziele)
+------------------------------------------
+Kriminalität
+  Gebäude (Hotspot, Prosperität, Kategorie) ×0.62 + NPCs (loyalCriminal/Gier) ×0.38
+  − Garde-/Riten-Sättigung, + Malanthir-Push, + Unruhe
+  Straßen (falls vorhanden) mischen 26 % ein
+  Sektorfeld (Gebäude/NPC-Reichweite) justiert Crime und Guard lokal
+  Elysia/Chromus über Schwellen dämpfen Crime, heben Guard leicht
+
+Wirtschaft
+  Prosperität×15.5 + Luxury-Sättigung×8 + Craft×22 + ECON_ROLE
+  − dunkle Schmieden/Forschung ohne Magie, − Malanthir/Unruhe
+  + NPC-Altruismus-Beitrag; Straßen mischen 18 % ein
+  Markt-Reihenfolge (Lore/Design): Handwerk > Unterstadt > Adel > Tor; Palast = Hof, nicht Markt
+
+Garde
+  18 + GUARD_ROLE + Wachen×8 + Prosperität×3 + sat.guard×16 + sat.rite×6
+  + Tempelriten (Elysia/Chromus), − hohe Malanthir
+
+Arbeitslosigkeit / Flüchtlinge
+  aus Prosperität, Civic-Sättigung, Refugees, UNEMP_ROLE / REFUGEE_GEO
+
+Vattrak / Malanthir
+  aus Magie-Sättigung + POI-Einflüssen (religion/knowledge → Vattrak;
+  knowledge mindert Malanthir leicht)
+
+POI-Einfluss-Caps: typisch ±8, bei vattrak/malanthir ±4
+
+
+8. MAGIE / SÄTTIGUNG
+--------------------
+Bergvorrat (MOUNTAIN_BASE = 85) wird auf Buckets verteilt:
+  luxury, guard, rite, research, craft, civic
+Bedarf je Gebäude (DEMAND_PER), Caps P1_CAP=0.3 / P2_CAP=0.2
+Mangel (z. B. craft/research) schwächt Wirtschaft, hebt „dunkle“ Anteile.
+
+Zeitliche Annäherung an Ziele (ALPHA, Anteil pro Schritt):
+  crime 0.35, guard 0.22, vattrak 0.18, economy 0.08,
+  unemployment 0.05, refugees/elysia 0.05–0.06, malanthir/chromus niedrig
+
+
+9. SEKTOREN
+-----------
+Viertel können in ein UV-Raster unterteilt werden (Standardzellengröße ca. 0.02).
+Adressen z. B. „Unterstadt E19“.
+
+NPC-Sektor-Reichweite (Chebyshev-Schritte, eigener Sektor inklusive):
+  local 2 | regional_economy 4 | authority_faction 6 | apex_global 8
+
+Gebäude-Fußabdruck: BUILDING_FOOTPRINT_HALF = 0.01 UV
+Gebäude-Aspekt-Reichweite (Heatmap ohne NPC): 2 Schritte
+POI-Reichweite: mode sector|district, radius 0–4
+
+Sektoren beeinflussen Crime/Guard-Feld und Heatmaps; Stadtereignisse können
+einzelne Sektoren als Ort speichern (wirken sim-seitig auf das Viertel).
+
+
+10. NPCs IN DER SIMULATION
+--------------------------
+Pflichtfelder wenn forCitySimulation = true:
+
+Einfluss-Tier
+  local | regional_economy | authority_faction | apex_global
+  Gewichte: 1 | 2 | 3 | 5
+
+Achsen (−5 … +5)
+  loyalCriminal      loyal ↔ kriminell
+  greedyAltruist     gierig ↔ altruistisch
+  piousSkeptic       fromm ↔ skeptisch
+  superstitionReason Aberglaube ↔ Vernunft
+
+Weitere Felder
+  cityFactionId, cityDeity (Elysia-/Chromus-Linie), cityAgenda
+  cityEventDeck (bis zu 4 Effects/Karte), cityAbilities, cityCardPlays
+
+Kartenreichweite: district | adjacent | sector | city
+Standard-Dauer nach Tier: 3 | 7 | 10 | 14 Tage
+Standard-Reichweite: district | adjacent | adjacent | city
+
+Fähigkeiten: Bedingungen auf Meter, Effects ±20, Dauer 1–60, Cooldown 1–180,
+optional Beziehungsbias (same_faction / rival_faction), Gegenreaktion einer Fraktion.
+
+
+11. FRAKTIONEN
+--------------
+ID                        Name                         Ideologie     Kernviertel
+rotes-auge                Das rote Auge                malanthir     Unterstadt
+goldkelchen               Aurenfurter Goldkelchen      neutral       Unterstadt, Handwerk, Adel
+haus-der-seide            Haus der Seide               neutral       Handwerk, Unterstadt, Adel
+stadtwachen               Aurenfurter Stadtwachen      imperial      Palast, Adel, Südtor, …
+haeuser-des-nordens       Häuser des Nordens           imperial      Adel, Palast
+bund-silberne-rose        Bund der Silbernen Rose      elysia        Tempel, Palast
+konklave-ewige-ordnung    Konklave der Ewigen Ordnung  chromus       Tempel, Palast
+zunftbund                 Zunftbund Aurenfurt          guild         Handwerk
+zirkel-observatorium      Zirkel des Observatoriums    neutral       Akademie
+
+Standing (berechnet): power 0–100, legality −100…+100, economicImpact 0–100
+Netzwerk-Kanten: ally, rival, patron, client, infiltrated, tension, subordinate
+  (strength 0–100)
+
+Druck kann Bond-Intensität same_faction / rival_faction verschieben.
+
+
+12. DRUCKSYSTEM (Pressure)
+--------------------------
+Quellen
+  – Stadtereignisse (city_sim_events): scope city|district|sector, effects[], Dauer,
+    optional endWhen (Meter gt/lt Schwelle), optional image_url (Kartenmotiv)
+  – Ausgelegte NPC-Karten (city_card_plays)
+  – NPC-Fähigkeiten + optionale Gegenimpulse
+
+Pro Tag und Viertel: Summe der Effects, geclampt auf ±16 je Meter (CAP).
+Aktive Pulse erzeugen Notes fürs Dashboard / Lagebild.
+
+
+13. STADTEREIGNIS-WIZARD (SL)
+----------------------------
+Schritte: Start → Inhalt (Titel, Text, optional Motivbild) → Ort → Wirkung
+Ort: ganze Stadt, Viertel oder mehrere Sektoren
+Wirkung: bis zu 4 Kennzahl-Deltas (−20…+20), gemeinsame Dauer und/oder Schwellen-Ende
+Speicher: Tabelle city_sim_events (inkl. image_url)
+
+
+14. GEBÄUDE & POIs
+-----------------
+Gebäude: districtId, category, prosperity 1–5, hotspot 0–100, optional landmark,
+  guildId, specialBonus, elysia/chromus-Präsenz
+Kategorien steuern Crime (Taverne/Markt +, Wache/Tor −, Palast/Tempel −).
+
+POIs: influences { aspect, delta }, optional reach (sector/district + radius)
+Aspekte fließen in Crime, Guard, Economy, Vattrak, Religion, Prestige, Knowledge, …
+
+
+15. GLAUBE
+----------
+Nur zwei Linien in der Sim: Elysia (Kinder Amoria, Fedrix, Weilin) und
+Chromus (Chrona, Fundrah, Imperus).
+Benannte Kultorte (z. B. Silberkapelle, Rose-Hof) haben feste Präsenzwerte.
+Elysia stützt Ordnung stärker; Chromus zieht erst ab dichter Präsenz mit.
+
+
+16. UI / KANÄLE
+---------------
+3D-Karte (HoloCityMap): HUD-KPIs (Crime, Wirtschaft, Garde, Arbeitslos, Religion,
+  Spannung), Heatmaps, Sektor-Overlay, Ereignis-Ort wählen
+Dashboard: Lage, Top-NPCs/Fraktionen, Charts, Druck-Notizen
+Chronik: datierte historische Shifts inkl. tension
+Wetter: parallel zur Tageszeitreihe, getrennt von den Kernmetern
+
+
+17. WERTGRENZEN (Kurzreferenz)
+-----------------------------
+Meter / Scores          0 … 100
+NPC-Achsen             −5 … +5
+Effect-Deltas          −20 … +20 (Karten/Fähigkeiten)
+Pressure Cap / Tag     ±16 je Meter
+Legalität Fraktion     −100 … +100
+Prosperität Gebäude    1 … 5
+Karten-Dauer           1 … 90 Tage
+Fähigkeits-Dauer       1 … 60 Tage
+Cooldown                 1 … 180 Tage
+Sektor-POI-Radius      0 … 4
+
+
+18. ZENTRALE CODE-EINSTIEGE
+---------------------------
+lib/npcs/city-simulation.ts          Schema NPCs/Karten/Meter
+aurenfurt-sim.ts                     SimProfile-Typ
+aurenfurt-city-sim-types.ts          Rollen, ALPHA, Magie-Buckets
+aurenfurt-city-sim-meters.ts         Rohziele je Viertel
+aurenfurt-city-sim-range.ts          Glättung ALPHA
+aurenfurt-history.ts                 Tagesprofile + Stadtmittel
+aurenfurt-pressure.ts                Druck / Pulse
+aurenfurt-analytics.ts               Spannung, Reports
+aurenfurt-factions.ts                Fraktionen & Standing
+aurenfurt-sector-reach.ts            Sektorfelder & Reichweiten
+aurenfurt-faith.ts                   Elysia/Chromus
+CityEventWizard + city-sim-event-actions.ts
+
+
+================================================================================
+Ende der Übersicht
+================================================================================

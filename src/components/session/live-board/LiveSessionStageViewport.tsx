@@ -4,6 +4,7 @@
 "use client";
 
 import type { Dispatch, DragEvent, ReactNode, SetStateAction, TransitionStartFunction } from "react";
+import { ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { setCombatInitiative } from "@/src/lib/actions/combat-initiative-actions";
 import { parseInitiativeLabel } from "@/src/lib/combat-initiative";
@@ -254,6 +255,72 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                 ) : null}
               </div>
             ) : null}
+            {/* Shop stays available even when a battlemap owns the viewport. */}
+            {!isGuest && liveState?.active_shop_id ? (
+              <div className="pointer-events-auto absolute inset-x-0 top-[72px] z-[45] px-4 md:px-8">
+                <LiveStageShopOverlay
+                  campaignId={campaignId}
+                  shopId={liveState.active_shop_id}
+                  merchantNpcId={liveState.active_merchant_npc_id ?? null}
+                  characterId={currentPlayerCharacter?.id ?? null}
+                  isGM={isGM}
+                  partyCharacters={displayPartyCharacters
+                    .filter((pc) => !pc.isSessionDummy && pc.id)
+                    .map((pc) => ({
+                      id: pc.id,
+                      name: pc.name,
+                      playerUserId: pc.playerUserId ?? null,
+                    }))}
+                  onClose={
+                    isGM
+                      ? () =>
+                          updateLiveState({
+                            active_shop_id: null,
+                            active_merchant_npc_id: null,
+                          })
+                      : undefined
+                  }
+                />
+              </div>
+            ) : null}
+
+            {/* Compact merchant controls while battlemap hides the stage roster. */}
+            {battlemapActive &&
+            isGM &&
+            !liveState?.active_shop_id &&
+            sortedActiveNpcs.some((npc) => Boolean(npc.is_merchant && npc.shop_id)) ? (
+              <div className="pointer-events-auto absolute left-4 top-[72px] z-[44] flex max-w-[min(100%-2rem,28rem)] flex-wrap gap-2">
+                {sortedActiveNpcs
+                  .filter((npc) => Boolean(npc.is_merchant && npc.shop_id))
+                  .map((npc) => {
+                    const npcId = String(npc.id);
+                    const isOpen = liveState?.active_merchant_npc_id === npcId;
+                    return (
+                      <button
+                        key={npcId}
+                        type="button"
+                        disabled={isShopBusy || isUpdating}
+                        onClick={() => toggleShopForNpc(npc)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-accent-gold/70 bg-background-dark/95 px-3 py-1.5 font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold shadow-lg backdrop-blur transition-colors hover:bg-accent-gold hover:text-black disabled:opacity-60"
+                        title={
+                          isOpen
+                            ? `Shop von ${npc.name} schließen`
+                            : `Shop von ${npc.name} öffnen`
+                        }
+                        aria-label={
+                          isOpen
+                            ? `Shop von ${npc.name} für Spieler schließen`
+                            : `Shop von ${npc.name} für Spieler öffnen`
+                        }
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
+                        {isOpen ? `${npc.name}: schließen` : `${npc.name}: Shop öffnen`}
+                      </button>
+                    );
+                  })}
+              </div>
+            ) : null}
+
             {/* Battlemap owns the viewport — stage deck UI must not sit on top and steal clicks. */}
             {battlemapActive ? null : !stageHasDeckContent ? (
               <div className="pointer-events-none relative z-[1] flex h-full min-h-[calc(48vh+120px)] items-center justify-center px-4 text-center">
@@ -285,31 +352,6 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                         : "pt-[60px]"
                 }`}
               >
-                {!isGuest && liveState?.active_shop_id ? (
-                  <LiveStageShopOverlay
-                    campaignId={campaignId}
-                    shopId={liveState.active_shop_id}
-                    merchantNpcId={liveState.active_merchant_npc_id ?? null}
-                    characterId={currentPlayerCharacter?.id ?? null}
-                    isGM={isGM}
-                    partyCharacters={displayPartyCharacters
-                      .filter((pc) => !pc.isSessionDummy && pc.id)
-                      .map((pc) => ({
-                        id: pc.id,
-                        name: pc.name,
-                        playerUserId: pc.playerUserId ?? null,
-                      }))}
-                    onClose={
-                      isGM
-                        ? () =>
-                            updateLiveState({
-                              active_shop_id: null,
-                              active_merchant_npc_id: null,
-                            })
-                        : undefined
-                    }
-                  />
-                ) : null}
                 {liveState?.current_loot_id ? (
                   <div className="relative z-20 w-full shrink-0 overflow-x-visible overflow-y-visible py-1">
                     <StageLootItemCards

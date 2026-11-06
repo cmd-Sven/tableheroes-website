@@ -5,6 +5,7 @@
 import { findBuilding } from "./aurenfurt-districts";
 import { AURENFURT_FACTIONS, factionName, type FactionId } from "./aurenfurt-factions";
 import type { CityInfluenceTier, CitySimulationFields } from "@/src/lib/npcs/city-simulation";
+import { enrichNpcEventContent } from "./aurenfurt-npc-event-content";
 import {
   NPC_PORTRAIT_PLACEHOLDER,
   type AurenfurtNpc,
@@ -161,6 +162,18 @@ export function buildNpc(seed: NpcSeed): AurenfurtNpc {
   const faction = factionName(seed.factionId);
   const place = locationName(seed.locationId);
   const citySim = citySimFromAurenfurtSeed(seed);
+  const eventPack = enrichNpcEventContent({
+    id: seed.id,
+    catalogId: seed.id,
+    name: seed.name,
+    role: seed.role,
+    districtId: seed.districtId,
+    tier: citySim.cityInfluenceTier,
+    isLeader: seed.mapRoles.includes("leader"),
+    factionId: seed.factionId,
+    cards: [],
+    abilities: [],
+  });
   return {
     id: seed.id,
     mapRoles: [...seed.mapRoles],
@@ -207,6 +220,7 @@ export function buildNpc(seed: NpcSeed): AurenfurtNpc {
     cityDeity: citySim.cityDeity,
     cityFactionId: seed.factionId,
     cityAgenda: seed.agenda,
-    cityEventDeck: [],
+    cityEventDeck: eventPack.cards,
+    cityAbilities: eventPack.abilities,
   };
 }

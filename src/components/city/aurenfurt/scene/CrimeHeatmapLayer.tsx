@@ -3,16 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { crimeHeatColor } from "../aurenfurt-crime-heat-color";
-import type { SectorCrimeCell } from "../aurenfurt-crime-heatmap";
+import { heatColor } from "../aurenfurt-crime-heat-color";
+import type { SectorHeatCell } from "../aurenfurt-city-heatmap";
 import { createPolygonDistrictGeometry } from "./diorama-geometry";
 
 type Props = {
-  cells: SectorCrimeCell[];
+  cells: SectorHeatCell[];
   visible: boolean;
 };
 
-function buildHeatGeometry(cells: SectorCrimeCell[]) {
+function buildHeatGeometry(cells: SectorHeatCell[]) {
   const positions: number[] = [];
   const tints: number[] = [];
   const alphas: number[] = [];
@@ -26,7 +26,7 @@ function buildHeatGeometry(cells: SectorCrimeCell[]) {
       piece.dispose();
       continue;
     }
-    const color = crimeHeatColor(cell.crime);
+    const color = heatColor(cell.heat);
     const offset = positions.length / 3;
     for (let index = 0; index < position.count; index += 1) {
       positions.push(position.getX(index), position.getY(index), position.getZ(index));
@@ -58,7 +58,7 @@ function buildHeatGeometry(cells: SectorCrimeCell[]) {
 export function CrimeHeatmapLayer({ cells, visible }: Props) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const fade = useRef(0);
-  const held = useRef<SectorCrimeCell[]>(cells);
+  const held = useRef<SectorHeatCell[]>(cells);
   const hideOnce = useRef(false);
   const [present, setPresent] = useState(visible);
 

@@ -29,7 +29,7 @@ export function loadCityMapSectors(worldId: string, isGm: boolean) {
       rememberOnce([DISTRICT_SECTORS_STORAGE_KEY]);
       const stored = parseStoredDistrictSectors(
         JSON.stringify({
-          version: 2,
+          version: 3,
           districts: Object.fromEntries((data ?? []).map((row) => [row.district_id, row.sectors])),
         }),
       );

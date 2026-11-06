@@ -59,24 +59,41 @@ export const GUARD_ROLE: Record<CityDistrictId, number> = {
   unterstadt: -4,
 };
 
+/**
+ * Struktureller Wirtschaftsanteil je Viertel.
+ * Reihenfolge der Märkte: Handwerk → Unterstadt (dichtes Volk) → Adel → Tor → Rest;
+ * der Palast ist Hofmacht, kein Marktzentrum.
+ */
 export const ECON_ROLE: Record<CityDistrictId, number> = {
-  palast: 2,
-  adelsviertel: -2,
+  handwerkerviertel: 24,
+  unterstadt: 16,
+  adelsviertel: 8,
+  suedtor: 7,
+  akademieviertel: -2,
   tempelbezirk: -4,
-  akademieviertel: -4,
-  handwerkerviertel: 13,
-  suedtor: 6,
-  unterstadt: -8,
+  palast: -12,
+};
+
+/** Straßen-Wirtschaftsfaktor: Handwerk/Unterstadt tragen mehr Verkehr zum Index bei als Hofalleen. */
+export const STREET_ECON_BIAS: Record<CityDistrictId, number> = {
+  handwerkerviertel: 1.18,
+  unterstadt: 1.12,
+  adelsviertel: 1.0,
+  suedtor: 1.05,
+  akademieviertel: 0.92,
+  tempelbezirk: 0.88,
+  palast: 0.78,
 };
 
 export const UNEMP_ROLE: Record<CityDistrictId, number> = {
-  palast: 10,
-  adelsviertel: 9,
-  tempelbezirk: 26,
-  akademieviertel: 12,
-  handwerkerviertel: 13,
-  suedtor: 9,
-  unterstadt: 32,
+  palast: 8,
+  adelsviertel: 10,
+  tempelbezirk: 24,
+  akademieviertel: 14,
+  handwerkerviertel: 11,
+  suedtor: 12,
+  /** Viele Hände, viel Prekarität — trotz aktiver Schattenwirtschaft. */
+  unterstadt: 34,
 };
 
 export const CIVIC_PULL: Record<CityDistrictId, number> = {
@@ -125,6 +142,10 @@ export type SimStreet = {
 export type SimPoi = {
   districtId: CityDistrictId;
   influences: { aspect: string; delta: number }[];
+  u: number;
+  v: number;
+  /** Admin-Einflussbereich; fehlt → Ableitung aus Einflussstärke. */
+  reach?: { mode: "sector" | "district"; radius: 0 | 1 | 2 | 3 | 4 };
 };
 
 export type CitySimLive = {
@@ -157,6 +178,8 @@ export type HistoryShift = {
   unemployment: number;
   elysia: number;
   chromus: number;
+  vattrak: number;
+  malanthir: number;
   cells: { name: string; delta: number }[];
 };
 

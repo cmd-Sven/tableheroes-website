@@ -14,8 +14,20 @@ import type { SimProfile, UndergroundCell } from "./aurenfurt-sim";
 import { formatDay, parseDay, utcToday } from "./aurenfurt-time";
 import { chronicleMarksOn, chronicleShift } from "./aurenfurt-chronicle";
 import { bindWeatherWinter, weatherOn } from "./aurenfurt-weather";
+import { WAR_HISTORY_EVENTS } from "./aurenfurt-war-events";
+import { isPopulationBuilding, isVattrakStockBuilding } from "./aurenfurt-meter-build-guards";
+import { vattrakScarcityMeterBias, vattrakStockOn } from "./aurenfurt-vattrak-stock";
+import { kaiserPlaysAsEvents } from "./aurenfurt-kaiser-plays";
+import {
+  guardMeterBias,
+  isAutomationDisabled,
+  verwaltungVersionNow,
+} from "./aurenfurt-verwaltung-store";
 
 export { formatDay, parseDay, utcToday };
+
+/** Verhindert Zyklus profileOn → Vattrak-Serie → Bevölkerung → profileOn. */
+let scarcityGuard = 0;
 
 /** Stand der Viertel-Profile. Laufende Ereignisse bleiben ab ihrem Plateau wirksam. */
 export const HISTORY_ANCHOR = "2026-09-26";
@@ -51,9 +63,9 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2023-10-15",
     end: "2024-04-30",
     impact: {
-      unterstadt: { refugees: 10, crime: 8, economy: -10, vattrak: -6, unemployment: 12, cells: [{ name: "Flüstern der Roten Gassen", delta: 8 }] },
+      unterstadt: { refugees: 10, crime: 8, economy: -6, vattrak: -6, unemployment: 12, cells: [{ name: "Flüstern der Roten Gassen", delta: 8 }] },
       suedtor: { refugees: 16, crime: 6, economy: -6, guard: -4, unemployment: 10 },
-      handwerkerviertel: { refugees: 8, economy: -4, unemployment: 6 },
+      handwerkerviertel: { refugees: 8, economy: -3, unemployment: 6 },
       tempelbezirk: { refugees: 6, vattrak: -3, unemployment: 5 },
       akademieviertel: { refugees: 4, economy: -3, unemployment: 4, vattrak: -2 },
       adelsviertel: { refugees: 3, guard: 4, unemployment: 2 },
@@ -67,13 +79,13 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2023-12-01",
     end: "2024-03-20",
     impact: {
-      unterstadt: { economy: -16, crime: 10, vattrak: -8, unemployment: 10 },
+      unterstadt: { economy: -12, crime: 10, vattrak: -8, unemployment: 10 },
       suedtor: { economy: -12, crime: 6, vattrak: -6, unemployment: 8 },
-      handwerkerviertel: { economy: -14, vattrak: -6, unemployment: 8 },
+      handwerkerviertel: { economy: -10, vattrak: -6, unemployment: 8 },
       tempelbezirk: { economy: -8, vattrak: -4, unemployment: 6 },
       akademieviertel: { economy: -7, vattrak: -3, unemployment: 5 },
       adelsviertel: { economy: -6, vattrak: -3, unemployment: 3 },
-      palast: { economy: -4, vattrak: -2, unemployment: 2 },
+      palast: { economy: -5, vattrak: -2, unemployment: 2 },
     },
   },
   {
@@ -83,9 +95,9 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2024-01-20",
     end: "2024-05-15",
     impact: {
-      unterstadt: { economy: -20, crime: 12, malanthir: 10, vattrak: -8, unemployment: 16, cells: [{ name: "Malanthir-Zellen", delta: 12 }] },
+      unterstadt: { economy: -12, crime: 12, malanthir: 10, vattrak: -8, unemployment: 16, cells: [{ name: "Malanthir-Zellen", delta: 12 }] },
       suedtor: { economy: -12, crime: 8, unemployment: 12 },
-      handwerkerviertel: { economy: -10, crime: 4, unemployment: 10 },
+      handwerkerviertel: { economy: -8, crime: 4, unemployment: 10 },
       tempelbezirk: { economy: -6, vattrak: -4, refugees: 4, unemployment: 8 },
       akademieviertel: {
         economy: -9,
@@ -121,9 +133,9 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2024-02-25",
     end: "2024-06-10",
     impact: {
-      unterstadt: { guard: 16, crime: -6, economy: -8, vattrak: -4 },
+      unterstadt: { guard: 16, crime: -6, economy: -5, vattrak: -4 },
       suedtor: { guard: 12, crime: -4, economy: -8 },
-      handwerkerviertel: { guard: 8, economy: -6 },
+      handwerkerviertel: { guard: 8, economy: -4 },
       tempelbezirk: { guard: 6, vattrak: -3 },
       akademieviertel: { guard: 8, economy: -4, vattrak: -2 },
       adelsviertel: { guard: 8, economy: -3 },
@@ -137,12 +149,12 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2024-04-10",
     end: "2024-11-01",
     impact: {
-      suedtor: { economy: 20, vattrak: 10, refugees: -8, crime: -4, cells: [{ name: "Löwentor-Schmuggler", delta: -8 }] },
-      handwerkerviertel: { economy: 12, vattrak: 5 },
-      unterstadt: { economy: 8, refugees: -4, vattrak: 4 },
-      akademieviertel: { economy: 7, vattrak: 4 },
-      adelsviertel: { economy: 6 },
-      palast: { economy: 4, vattrak: 3 },
+      suedtor: { economy: 18, vattrak: 10, refugees: -8, crime: -4, cells: [{ name: "Löwentor-Schmuggler", delta: -8 }] },
+      handwerkerviertel: { economy: 18, vattrak: 5 },
+      unterstadt: { economy: 14, refugees: -4, vattrak: 4 },
+      akademieviertel: { economy: 6, vattrak: 4 },
+      adelsviertel: { economy: 7 },
+      palast: { economy: 2, vattrak: 3 },
       tempelbezirk: { vattrak: 3 },
     },
   },
@@ -154,8 +166,8 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     end: "2025-03-01",
     impact: {
       suedtor: { guard: 8, economy: -8, refugees: 6, unemployment: 8 },
-      unterstadt: { crime: 6, economy: -6, refugees: 4, unemployment: 10 },
-      handwerkerviertel: { economy: -10, guard: 4, unemployment: 12, cells: [{ name: "Zunftkeller", delta: 8 }] },
+      unterstadt: { crime: 6, economy: -5, refugees: 4, unemployment: 10 },
+      handwerkerviertel: { economy: -8, guard: 4, unemployment: 12, cells: [{ name: "Zunftkeller", delta: 8 }] },
       akademieviertel: { economy: -5, guard: 5, unemployment: 7 },
       adelsviertel: { guard: 4, unemployment: 2 },
       palast: { guard: 6, unemployment: 1 },
@@ -169,11 +181,12 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2024-11-20",
     end: "2025-03-01",
     impact: {
-      suedtor: { economy: 14, vattrak: 6 },
-      adelsviertel: { economy: 12, vattrak: 6, cells: [{ name: "Salons der Häuser", delta: 6 }] },
-      handwerkerviertel: { economy: 8 },
+      suedtor: { economy: 12, vattrak: 6 },
+      handwerkerviertel: { economy: 14 },
+      unterstadt: { economy: 10 },
+      adelsviertel: { economy: 8, vattrak: 6, cells: [{ name: "Salons der Häuser", delta: 6 }] },
       akademieviertel: { economy: 5, vattrak: 3 },
-      palast: { vattrak: 4, economy: 3 },
+      palast: { vattrak: 4, economy: 2 },
       tempelbezirk: { vattrak: 2 },
     },
   },
@@ -279,13 +292,13 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2025-06-01",
     end: null,
     impact: {
-      unterstadt: { unemployment: -18, guard: 6, economy: 4 },
+      unterstadt: { unemployment: -18, guard: 6, economy: 6 },
       suedtor: { unemployment: -12, guard: 8, economy: 3 },
-      handwerkerviertel: { unemployment: -10, guard: 5, economy: 5 },
+      handwerkerviertel: { unemployment: -10, guard: 5, economy: 8 },
       akademieviertel: { unemployment: -14, guard: 6, economy: 4 },
       tempelbezirk: { unemployment: -8, guard: 4, economy: 2 },
-      adelsviertel: { unemployment: -6, guard: 4, economy: 2 },
-      palast: { unemployment: -8, guard: 5, economy: 2 },
+      adelsviertel: { unemployment: -6, guard: 4, economy: 3 },
+      palast: { unemployment: -8, guard: 5, economy: 1 },
     },
   },
   {
@@ -295,15 +308,17 @@ export const AURENFURT_HISTORY: HistoryEvent[] = [
     start: "2026-02-01",
     end: null,
     impact: {
-      unterstadt: { economy: -16, crime: 6, cells: [{ name: "Flüstern der Roten Gassen", delta: 6 }] },
-      handwerkerviertel: { economy: -12 },
+      /** Formaler Preisdruck — Schattenhandel in der Unterstadt fängt einen Teil auf. */
+      unterstadt: { economy: -6, crime: 8, cells: [{ name: "Flüstern der Roten Gassen", delta: 6 }] },
+      handwerkerviertel: { economy: -10 },
       suedtor: { economy: -4, crime: 5, cells: [{ name: "Löwentor-Schmuggler", delta: 10 }] },
       akademieviertel: { economy: -4 },
-      adelsviertel: { economy: -4 },
+      adelsviertel: { economy: -5 },
       tempelbezirk: { economy: -3 },
-      palast: { economy: -2 },
+      palast: { economy: -3 },
     },
   },
+  ...WAR_HISTORY_EVENTS,
 ];
 
 function clamp(value: number) {
@@ -344,7 +359,17 @@ function wobble(districtId: string, day: number, key: string) {
   return ((hash >>> 0) / 4294967295 - 0.5) * 2.4;
 }
 
-const HISTORY_SHIFT_KEYS = ["crime", "guard", "refugees", "economy", "unemployment", "elysia", "chromus"] as const;
+const HISTORY_SHIFT_KEYS = [
+  "crime",
+  "guard",
+  "refugees",
+  "economy",
+  "unemployment",
+  "elysia",
+  "chromus",
+  "vattrak",
+  "malanthir",
+] as const;
 
 function historyShift(districtId: CityDistrictId, day: number): HistoryShift {
   const anchor = parseDay(HISTORY_ANCHOR);
@@ -356,6 +381,8 @@ function historyShift(districtId: CityDistrictId, day: number): HistoryShift {
     unemployment: 0,
     elysia: 0,
     chromus: 0,
+    vattrak: 0,
+    malanthir: 0,
     cells: [],
   };
   for (const event of AURENFURT_HISTORY) {
@@ -448,13 +475,19 @@ function rawProfile(districtId: CityDistrictId, day: number): SimProfile | null 
 let pressureCache: { version: number; book: PressureBook } | null = null;
 
 function pressureBook() {
-  const version = citySimVersion();
+  const version = citySimVersion() * 1000 + verwaltungVersionNow();
   if (pressureCache?.version === version) return pressureCache.book;
   const book = foldCityPressure({
     from: parseDay(HISTORY_START),
     to: utcToday(),
-    actors: cityPressureActors(),
-    events: cityPressureEvents(),
+    actors: cityPressureActors().map((actor) => ({
+      ...actor,
+      abilities: actor.abilities.map((ability) => ({
+        ...ability,
+        enabled: ability.enabled && !isAutomationDisabled(actor.id, ability.id),
+      })),
+    })),
+    events: [...cityPressureEvents(), ...kaiserPlaysAsEvents(formatDay(utcToday()))],
     readMeters: (districtId, day) => {
       const raw = rawProfile(districtId, day) ?? EMPTY_PROFILE;
       const rise = bondRise(day);
@@ -497,16 +530,41 @@ function profileOn(districtId: CityDistrictId, day: number): SimProfile {
   const bond = bondShiftForDistrict(bondsForDay(day), districtId);
   const press = pressureBook().delta(districtId, day);
   const chronicle = chronicleShift(districtId, day);
+  const guardBias = guardMeterBias(districtId, formatDay(day));
+  let crime = clamp(raw.crime + bond.crime * rise + press.crime + chronicle.crime);
+  let vattrak = clamp(raw.vattrak + press.vattrak + chronicle.vattrak);
+  let malanthir = clamp(raw.malanthir + bond.malanthir * rise + press.malanthir + chronicle.malanthir);
+  const guard = clamp(raw.guard + bond.guard * rise + press.guard + chronicle.guard + guardBias);
+  const refugees = clamp(raw.refugees + press.refugees + chronicle.refugees);
+  const economy = clamp(raw.economy + press.economy + chronicle.economy);
+  const unemployment = clamp(raw.unemployment + press.unemployment + chronicle.unemployment);
+  const elysia = clamp(raw.elysia + press.elysia + chronicle.elysia);
+  const chromus = clamp(raw.chromus + press.chromus + chronicle.chromus);
+
+  // Während Pop-/Stock-Serienbau keine Scarcity: sonst pro Tag voller HISTORY→today-Rebuild (O(n²)).
+  if (scarcityGuard === 0 && !isVattrakStockBuilding() && !isPopulationBuilding()) {
+    scarcityGuard += 1;
+    try {
+      const snap = vattrakStockOn(formatDay(day));
+      const bias = vattrakScarcityMeterBias(snap.level, snap.unmetLuxuryRatio);
+      crime = clamp(crime + bias.crime);
+      vattrak = clamp(vattrak + bias.vattrak);
+      malanthir = clamp(malanthir + bias.malanthir);
+    } finally {
+      scarcityGuard -= 1;
+    }
+  }
+
   return {
-    crime: clamp(raw.crime + bond.crime * rise + press.crime + chronicle.crime),
-    vattrak: clamp(raw.vattrak + press.vattrak + chronicle.vattrak),
-    malanthir: clamp(raw.malanthir + bond.malanthir * rise + press.malanthir + chronicle.malanthir),
-    guard: clamp(raw.guard + bond.guard * rise + press.guard + chronicle.guard),
-    refugees: clamp(raw.refugees + press.refugees + chronicle.refugees),
-    economy: clamp(raw.economy + press.economy + chronicle.economy),
-    unemployment: clamp(raw.unemployment + press.unemployment + chronicle.unemployment),
-    elysia: clamp(raw.elysia + press.elysia + chronicle.elysia),
-    chromus: clamp(raw.chromus + press.chromus + chronicle.chromus),
+    crime,
+    vattrak,
+    malanthir,
+    guard,
+    refugees,
+    economy,
+    unemployment,
+    elysia,
+    chromus,
     underground: raw.underground,
     tensionBias: chronicle.tension,
   };
@@ -559,13 +617,28 @@ export function cityMetricsOn(day = utcToday()): SimProfile {
 
 export type DistrictDay = SimProfile & { day: string };
 
+type DistrictSeriesCache = { version: number; from: number; to: number; points: DistrictDay[] };
+const districtSeriesCache = new Map<CityDistrictId, DistrictSeriesCache>();
+
 export function districtSeries(districtId: CityDistrictId, from = parseDay(HISTORY_START), to = utcToday()): DistrictDay[] {
   const start = Math.max(from, parseDay(HISTORY_START));
   const end = Math.min(to, utcToday());
+  const version = citySimVersion();
+  const hit = districtSeriesCache.get(districtId);
+  if (hit && hit.version === version && hit.from <= start && hit.to >= end) {
+    if (hit.from === start && hit.to === end) return hit.points;
+    return hit.points.filter((point) => {
+      const ms = parseDay(point.day);
+      return ms >= start && ms <= end;
+    });
+  }
+
   const points: DistrictDay[] = [];
   for (let day = start; day <= end; day += DAY_MS) {
     points.push({ day: formatDay(day), ...districtMetricsOn(districtId, day) });
   }
+  if (districtSeriesCache.size > 10) districtSeriesCache.clear();
+  districtSeriesCache.set(districtId, { version, from: start, to: end, points });
   return points;
 }
 

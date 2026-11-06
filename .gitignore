@@ -43,5 +43,6 @@ next-env.d.ts
 # local / tooling
 .vscode/
 supabase/.temp/
+public/models/aurenfurt/_backup-pre-optimize/
 
 .vercel

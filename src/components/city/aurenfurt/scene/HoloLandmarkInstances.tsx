@@ -4,17 +4,16 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
-  Color,
   Matrix4,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
   type Mesh,
-  type MeshStandardMaterial,
   type Object3D,
 } from "three";
 import type { LandmarkModel } from "../aurenfurt-districts";
 import { BUILDING_SELECTED_SCALE } from "./HoloBuildingMarker";
+import { BuildingHoverChrome } from "./BuildingHoverChrome";
 import {
   applyLandmarkLit,
   LANDMARK_URL,
@@ -22,14 +21,14 @@ import {
   measureLandmarkBounds,
   type LandmarkBounds,
 } from "./HoloLandmarkMesh";
-
-const LIT_EMISSIVE = new Color("#fff4c8");
 import { disposeCloneKeepSource } from "./dispose-cloned-gltf";
 import { HeavyGlbSlot } from "./HeavyGlbSlot";
+import { prepareLandmarkGltf } from "./prepare-landmark-gltf";
 import { surfacePoint } from "./diorama-geometry";
 
 export type LandmarkInstanceItem = {
   id: string;
+  name: string;
   u: number;
   v: number;
   scaleMultiplier: number;
@@ -63,7 +62,11 @@ function collectParts(scene: Object3D): { bounds: LandmarkBounds; parts: MeshPar
     const mesh = child as Mesh;
     if (!mesh.isMesh) return;
     const skinned = (mesh as Mesh & { isSkinnedMesh?: boolean }).isSkinnedMesh;
-    if (skinned || !mesh.geometry || Array.isArray(mesh.material)) {
+    if (skinned || !mesh.geometry) {
+      blocked = true;
+      return;
+    }
+    if (Array.isArray(mesh.material)) {
       blocked = true;
       return;
     }
@@ -118,7 +121,6 @@ function InstancePart({
   const ref = useRef<InstancedMesh>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
-  const [hotId, setHotId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -133,24 +135,6 @@ function InstancePart({
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
   }, [bounds, items, local]);
-
-  useLayoutEffect(() => {
-    const standard = material as MeshStandardMaterial;
-    if (!standard || typeof standard.emissiveIntensity !== "number") return;
-    if (!standard.userData.holoBaseEmissiveIntensity) {
-      standard.userData.holoBaseEmissiveIntensity = standard.emissiveIntensity;
-      standard.userData.holoBaseEmissive = standard.emissive?.clone?.() ?? new Color(0x000000);
-    }
-    const lit = Boolean(hotId) || items.some((item) => item.selected);
-    if (lit) {
-      standard.emissive.copy(LIT_EMISSIVE);
-      standard.emissiveIntensity = Math.max(0.35, standard.userData.holoBaseEmissiveIntensity + 0.28);
-    } else {
-      standard.emissive.copy(standard.userData.holoBaseEmissive);
-      standard.emissiveIntensity = standard.userData.holoBaseEmissiveIntensity;
-    }
-    standard.needsUpdate = true;
-  }, [hotId, items, material]);
 
   function idAt(instanceId: number | undefined): string | null {
     if (instanceId == null || instanceId < 0) return null;
@@ -169,13 +153,11 @@ function InstancePart({
     const id = idAt(event.instanceId);
     if (!id) return;
     document.body.style.cursor = editable ? "default" : "pointer";
-    setHotId(id);
     onHover(id);
   }
 
   function out() {
     document.body.style.cursor = "";
-    setHotId(null);
     onHover(null);
   }
 
@@ -183,7 +165,6 @@ function InstancePart({
     <instancedMesh
       ref={ref}
       args={[geometry, material, items.length]}
-      key={items.length}
       castShadow={false}
       receiveShadow={false}
       onClick={suppressSelect ? undefined : select}
@@ -211,7 +192,6 @@ function ClonedLandmark({
   const object = useMemo(() => scene.clone(true), [scene]);
   const position = useMemo(() => surfacePoint(item.u, item.v), [item.u, item.v]);
   const [hot, setHot] = useState(false);
-  const lit = item.selected || hot;
 
   useLayoutEffect(() => {
     object.rotation.set(0, 0, 0);
@@ -225,8 +205,8 @@ function ClonedLandmark({
   }, [item.scaleMultiplier, object]);
 
   useLayoutEffect(() => {
-    applyLandmarkLit(object, lit);
-  }, [lit, object]);
+    applyLandmarkLit(object, item.selected);
+  }, [item.selected, object]);
 
   useLayoutEffect(() => () => disposeCloneKeepSource(object, scene), [object, scene]);
 
@@ -259,6 +239,7 @@ function ClonedLandmark({
       <group rotation={[0, (item.rotationDegrees * Math.PI) / 180, 0]}>
         <primitive object={object} />
       </group>
+      <BuildingHoverChrome name={item.name} hot={hot} selected={item.selected} y={0.55} />
     </group>
   );
 }
@@ -271,8 +252,19 @@ function InstancesBody({
   onSelect,
   onHover,
 }: Omit<Props, "model"> & { url: string }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useGLTF(url, true, true);
+  useLayoutEffect(() => {
+    prepareLandmarkGltf(scene);
+  }, [scene]);
   const prepared = useMemo(() => collectParts(scene), [scene]);
+  const [hotId, setHotId] = useState<string | null>(null);
+  const hotItem = hotId ? items.find((item) => item.id === hotId) ?? null : null;
+  const selectedItem = items.find((item) => item.selected) ?? null;
+
+  function handleHover(id: string | null) {
+    setHotId(id);
+    onHover(id);
+  }
 
   if (!prepared) {
     return (
@@ -292,6 +284,8 @@ function InstancesBody({
     );
   }
 
+  const spotlightItem = hotItem ?? (selectedItem && !hotItem ? selectedItem : null);
+
   return (
     <>
       {prepared.parts.map((part, index) => (
@@ -305,9 +299,19 @@ function InstancesBody({
           suppressSelect={suppressSelect}
           editable={editable}
           onSelect={onSelect}
-          onHover={onHover}
+          onHover={handleHover}
         />
       ))}
+      {spotlightItem ? (
+        <group position={surfacePoint(spotlightItem.u, spotlightItem.v)}>
+          <BuildingHoverChrome
+            name={spotlightItem.name}
+            hot={Boolean(hotItem)}
+            selected={spotlightItem.selected}
+            y={0.55}
+          />
+        </group>
+      ) : null}
     </>
   );
 }

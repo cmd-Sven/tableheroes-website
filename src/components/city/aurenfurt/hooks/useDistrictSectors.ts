@@ -105,10 +105,25 @@ export function useDistrictSectors(worldId: string, isGm: boolean) {
     [persist, sectorsByDistrict],
   );
 
+  const clearDistrict = useCallback(
+    (districtId: CityDistrictId) => {
+      setSectorsByDistrict((current) => {
+        if (!current[districtId]?.length) return current;
+        const next: DistrictSectorsByDistrict = { ...current };
+        delete next[districtId];
+        persist(next);
+        registerDistrictSectorsForLookup(next);
+        return next;
+      });
+    },
+    [persist],
+  );
+
   return {
     sectorsByDistrict,
     sectorsFor,
     divideDistrict,
+    clearDistrict,
     saved,
     ready,
     saveError,

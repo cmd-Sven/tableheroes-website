@@ -17,6 +17,7 @@ export const POI_KINDS = [
   "Parkanlage",
   "Denkmal",
   "Platz",
+  "Laden/Geschäft",
   "sonstiger Ort",
 ] as const;
 
@@ -49,6 +50,75 @@ export type PoiInfluence = {
   delta: number;
 };
 
+/** Einflussbereich auf der Karte: Sektor-Schritte oder ganzes Viertel. */
+export const POI_REACH_MODES = ["sector", "district"] as const;
+export type PoiReachMode = (typeof POI_REACH_MODES)[number];
+/** Nach feinerem Sektornetz: bis 4 Schritte ≈ frühere ~2 Schritte bei 0.04. */
+export const POI_REACH_RADII = [0, 1, 2, 3, 4] as const;
+export type PoiReachRadius = (typeof POI_REACH_RADII)[number];
+
+export type PoiReachSetting = {
+  mode: PoiReachMode;
+  /** Nur bei mode=sector: 0 = eigener Sektor, sonst Chebyshev-Schritte. */
+  radius: PoiReachRadius;
+};
+
+export const DEFAULT_POI_REACH: PoiReachSetting = { mode: "sector", radius: 2 };
+
+export function isPoiReachRadius(value: unknown): value is PoiReachRadius {
+  return typeof value === "number" && (POI_REACH_RADII as readonly number[]).includes(value);
+}
+
+export function isPoiReachMode(value: unknown): value is PoiReachMode {
+  return typeof value === "string" && (POI_REACH_MODES as readonly string[]).includes(value);
+}
+
+export function parsePoiReach(raw: unknown, influences: PoiInfluence[] = []): PoiReachSetting {
+  const fromEnvelope =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as { reach?: unknown }).reach
+      : null;
+  const source = fromEnvelope && typeof fromEnvelope === "object" ? fromEnvelope : null;
+  if (source) {
+    const mode = (source as { mode?: unknown }).mode;
+    const radiusRaw = (source as { radius?: unknown }).radius;
+    if (mode === "district") return { mode: "district", radius: 0 };
+    if (mode === "sector") {
+      const radius = Number(radiusRaw);
+      if (isPoiReachRadius(radius)) return { mode: "sector", radius };
+      return { mode: "sector", radius: DEFAULT_POI_REACH.radius };
+    }
+  }
+  // Alte Einträge ohne Reach: aus Einflussstärke ableiten (an feineres Raster angepasst).
+  if (!influences.length) return { ...DEFAULT_POI_REACH, radius: 0 };
+  const peak = Math.max(...influences.map((entry) => Math.abs(entry.delta)));
+  if (peak >= 5) return { mode: "sector", radius: 4 };
+  if (peak >= 3) return { mode: "sector", radius: 3 };
+  if (peak >= 2) return { mode: "sector", radius: 2 };
+  if (peak >= 1) return { mode: "sector", radius: 1 };
+  return { mode: "sector", radius: 0 };
+}
+
+export function serializePoiInfluencePayload(
+  influences: PoiInfluence[],
+  reach: PoiReachSetting = DEFAULT_POI_REACH,
+): { influences: PoiInfluence[]; reach: PoiReachSetting } {
+  return {
+    influences,
+    reach:
+      reach.mode === "district"
+        ? { mode: "district", radius: 0 }
+        : { mode: "sector", radius: reach.radius },
+  };
+}
+
+export function poiReachLabel(reach: PoiReachSetting): string {
+  if (reach.mode === "district") return "Ganzes Viertel";
+  if (reach.radius === 0) return "Nur eigener Sektor";
+  if (reach.radius === 1) return "Eigener Sektor + Nachbarn";
+  return `${reach.radius} Sektor-Schritte`;
+}
+
 export type MapEditorPoiRow = {
   id: string;
   name: string;
@@ -75,6 +145,7 @@ export type AurenfurtMapPoi = {
   description: string;
   imageUrl: string;
   influences: PoiInfluence[];
+  reach: PoiReachSetting;
 };
 
 const DISTRICT_IDS = new Set<string>(AURENFURT_DISTRICTS.map((d) => d.id));
@@ -90,7 +161,7 @@ export function aspectLabel(aspect: PoiInfluenceAspect): string {
   return POI_INFLUENCE_ASPECTS.find((entry) => entry.key === aspect)?.label ?? aspect;
 }
 
-export function parsePoiInfluences(raw: unknown): PoiInfluence[] {
+function parseInfluenceList(raw: unknown): PoiInfluence[] {
   if (!Array.isArray(raw)) return [];
   const out: PoiInfluence[] = [];
   for (const entry of raw) {
@@ -104,6 +175,15 @@ export function parsePoiInfluences(raw: unknown): PoiInfluence[] {
     out.push({ aspect, delta: whole });
   }
   return out;
+}
+
+/** Akzeptiert Legacy-Array sowie Envelope `{ influences, reach }`. */
+export function parsePoiInfluences(raw: unknown): PoiInfluence[] {
+  if (Array.isArray(raw)) return parseInfluenceList(raw);
+  if (raw && typeof raw === "object") {
+    return parseInfluenceList((raw as { influences?: unknown }).influences);
+  }
+  return [];
 }
 
 /** Spielertext ohne Roh-Dashboard: „stärkt Religion“, „senkt Kriminalität“. */
@@ -196,6 +276,7 @@ export function mapEditorRowToPoi(row: MapEditorPoiRow): AurenfurtMapPoi | null 
 
   const uv = clampUvPoint({ u: mapU, v: mapV });
   const imageUrl = (row.image_url ?? "").trim() || LORE_PLACEHOLDER_IMAGE;
+  const influences = parsePoiInfluences(row.map_poi_influences);
 
   return {
     id: row.id,
@@ -206,7 +287,8 @@ export function mapEditorRowToPoi(row: MapEditorPoiRow): AurenfurtMapPoi | null 
     v: uv.v,
     description: (row.description ?? "").trim(),
     imageUrl,
-    influences: parsePoiInfluences(row.map_poi_influences),
+    influences,
+    reach: parsePoiReach(row.map_poi_influences, influences),
   };
 }
 

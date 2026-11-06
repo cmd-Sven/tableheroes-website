@@ -94,7 +94,7 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
   {
     id: "rotes-auge",
     name: "Das rote Auge",
-    role: "Untergrundschurken und Malanthir-Schmuggler in den roten Gassen.",
+    role: "Schattenhandel und Malanthir in den roten Gassen — kriminell, aber umsatzstark.",
     ideologyAlignment: "malanthir",
     districtIds: ["unterstadt"],
     baseLegality: -78,
@@ -120,9 +120,9 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
   {
     id: "haus-der-seide",
     name: "Das Haus der Seide",
-    role: "Reiche Handelsleute am Markt: hohe Standgebühren, Netz in die Adelshäuser.",
+    role: "Handelsnetz vom Handwerkermarkt bis Westmarkt: Standgelder, Ware, Arme in die blauen Salons.",
     ideologyAlignment: "neutral",
-    districtIds: ["handwerkerviertel", "adelsviertel"],
+    districtIds: ["handwerkerviertel", "unterstadt", "adelsviertel"],
     baseLegality: 48,
     links: [
       { targetId: "goldkelchen", kind: "patron", strength: 72 },
@@ -149,7 +149,7 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
   {
     id: "haeuser-des-nordens",
     name: "Häuser des Nordens",
-    role: "Blaue Salons und Wappen: Hofnähe, Gärten, und Druck auf Markt und Garde.",
+    role: "Blaue Salons und Wappen: Hofnähe und Stand — kauft vom Handwerk, drückt auf Markt und Garde.",
     ideologyAlignment: "imperial",
     districtIds: ["adelsviertel", "palast"],
     baseLegality: 62,
@@ -191,7 +191,7 @@ export const AURENFURT_FACTIONS: readonly FactionBlueprint[] = [
   {
     id: "zunftbund",
     name: "Zunftbund Aurenfurt",
-    role: "Essen und Kontore: Verträge wiegen mehr als Wappen.",
+    role: "Wirtschaftliches Rückgrat: Essen, Kontore und Verträge wiegen mehr als Wappen.",
     ideologyAlignment: "guild",
     districtIds: ["handwerkerviertel"],
     baseLegality: 36,

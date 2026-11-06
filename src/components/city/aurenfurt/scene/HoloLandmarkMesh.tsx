@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useLayoutEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
@@ -16,8 +16,10 @@ import type { LandmarkModel } from "../aurenfurt-districts";
 import { LANDMARK_SCALE_DEFAULT } from "../aurenfurt-landmark-scales";
 import { disposeCloneKeepSource } from "./dispose-cloned-gltf";
 import { HeavyGlbSlot } from "./HeavyGlbSlot";
+import { prepareLandmarkGltf } from "./prepare-landmark-gltf";
 
-const LIT_EMISSIVE = new Color("#fff4c8");
+/** Sanftes GrÃ¼n â€” Spotlight, kein WeiÃŸflash. */
+const LIT_TINT = new Color("#6f9a55");
 
 export function applyLandmarkLit(root: Object3D, lit: boolean) {
   root.traverse((child) => {
@@ -27,13 +29,16 @@ export function applyLandmarkLit(root: Object3D, lit: boolean) {
     for (const material of materials) {
       const standard = material as MeshStandardMaterial;
       if (!standard || typeof standard.emissiveIntensity !== "number") continue;
-      if (!standard.userData.holoBaseEmissiveIntensity) {
+      if (standard.userData.holoBaseEmissiveIntensity == null) {
         standard.userData.holoBaseEmissiveIntensity = standard.emissiveIntensity;
         standard.userData.holoBaseEmissive = standard.emissive?.clone?.() ?? new Color(0x000000);
       }
       if (lit) {
-        standard.emissive.copy(LIT_EMISSIVE);
-        standard.emissiveIntensity = Math.max(0.35, standard.userData.holoBaseEmissiveIntensity + 0.28);
+        standard.emissive.copy(standard.userData.holoBaseEmissive).lerp(LIT_TINT, 0.4);
+        standard.emissiveIntensity = Math.min(
+          0.42,
+          Math.max(0.12, standard.userData.holoBaseEmissiveIntensity + 0.1),
+        );
       } else {
         standard.emissive.copy(standard.userData.holoBaseEmissive);
         standard.emissiveIntensity = standard.userData.holoBaseEmissiveIntensity;
@@ -49,10 +54,24 @@ export const LANDMARK_URL: Record<LandmarkModel, string> = {
   nordtor: "/models/aurenfurt/nordtor.glb",
   suedtor: "/models/aurenfurt/suedtor.glb",
   wachturm: "/models/aurenfurt/wachturm.glb",
+  wachhaus: "/models/aurenfurt/wachhaus.glb",
   palais: "/models/aurenfurt/palais.glb",
   kapelle: "/models/aurenfurt/kapelle.glb",
   hofkanzlei: "/models/aurenfurt/hofkanzlei.glb",
   observatorium: "/models/aurenfurt/observatorium.glb",
+  schmiede: "/models/aurenfurt/schmiede.glb",
+  rotelaterne: "/models/aurenfurt/rotelaterne.glb",
+  umschlagplatz: "/models/aurenfurt/umschlagplatz.glb",
+  saalordnung: "/models/aurenfurt/saalordnung.glb",
+  blauergarten: "/models/aurenfurt/blauergarten.glb",
+  hofwache: "/models/aurenfurt/hofwache.glb",
+  rosehof: "/models/aurenfurt/rosehof.glb",
+  kontor: "/models/aurenfurt/kontor.glb",
+  schwertschule: "/models/aurenfurt/schwertschule.glb",
+  ostbrunnen: "/models/aurenfurt/ostbrunnen.glb",
+  hausdesnordens: "/models/aurenfurt/hausdesnordens.glb",
+  bibliothek: "/models/aurenfurt/bibliothek.glb",
+  zunfthaus: "/models/aurenfurt/zunfthaus.glb",
 };
 
 /** Fußabdruck auf der Tafel, in Welteinheiten. Die Stadt selbst ist etwa vier Einheiten breit. */
@@ -65,7 +84,7 @@ export type LandmarkBounds = {
   centerZ: number;
 };
 
-/** Hüllbox im lokalen Raum des Modells, ohne Kartenposition und ohne Drehgruppe. */
+/** HÃ¼llbox im lokalen Raum des Modells, ohne Kartenposition und ohne Drehgruppe. */
 function boundsInObjectSpace(root: Object3D): Box3 {
   root.updateWorldMatrix(true, true);
   const rootInv = new Matrix4().copy(root.matrixWorld).invert();
@@ -108,7 +127,7 @@ type Props = {
   model: LandmarkModel;
   /** Multiplikator auf LANDMARK_WIDTH (Default 1). */
   scaleMultiplier?: number;
-  /** Drehung um die Hochachse, in Grad. Das Gebäude bleibt auf dem Pin. */
+  /** Drehung um die Hochachse, in Grad. Das GebÃ¤ude bleibt auf dem Pin. */
   rotationDegrees?: number;
   /** Auswahl oder Hover: Modell etwas heller. */
   lit?: boolean;
@@ -144,7 +163,11 @@ function HoloLandmarkBody({
   rotationDegrees: number;
   lit: boolean;
 }) {
-  const { scene } = useGLTF(url);
+  /** Meshopt/Draco-Decoder an — komprimierte Stadt-GLBs. */
+  const { scene } = useGLTF(url, true, true);
+  useLayoutEffect(() => {
+    prepareLandmarkGltf(scene);
+  }, [scene]);
   const object = useMemo(() => scene.clone(true), [scene]);
 
   useLayoutEffect(() => {

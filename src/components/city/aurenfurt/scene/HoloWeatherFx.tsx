@@ -5,14 +5,19 @@ import { useFrame } from "@react-three/fiber";
 import {
   AdditiveBlending,
   CanvasTexture,
+  Color,
   InstancedMesh,
   Object3D,
   Points,
   Sprite,
   type Texture,
 } from "three";
+import { Lensflare, LensflareElement } from "three/examples/jsm/objects/Lensflare.js";
 import { DIORAMA_DEPTH, DIORAMA_WIDTH } from "./diorama-geometry";
 import type { WeatherFxId } from "../aurenfurt-weather-fx";
+
+/** Sonne im Sonnenschein-Effekt — Anker für Glow und Lensflare. */
+const SUN_POS: [number, number, number] = [2.15, 2.15, -1.35];
 
 type Props = {
   effect: WeatherFxId;
@@ -20,8 +25,8 @@ type Props = {
   intensity: number;
 };
 
-const RAIN_COUNT = 640;
-const SNOW_COUNT = 420;
+const RAIN_COUNT = 360;
+const SNOW_COUNT = 240;
 
 function ignoreRaycast() {
   return null;
@@ -199,21 +204,57 @@ function DriftingSprites({
   );
 }
 
+/** Leichter Lensflare — eigene Textur (dispose gehört zu Lensflare), kein Bloom. */
+function SunLensflare() {
+  const flare = useMemo(() => {
+    const map = radialTexture("rgba(255,245,210,0.95)", "rgba(255,220,140,0)");
+    const lensflare = new Lensflare();
+    lensflare.addElement(new LensflareElement(map, 140, 0, new Color("#ffe7b8")));
+    lensflare.addElement(new LensflareElement(map, 48, 0.22, new Color("#ffd28a")));
+    lensflare.addElement(new LensflareElement(map, 28, 0.48, new Color("#ffc070")));
+    lensflare.addElement(new LensflareElement(map, 64, 0.72, new Color("#fff1d0")));
+    lensflare.raycast = ignoreRaycast;
+    return lensflare;
+  }, []);
+
+  useLayoutEffect(
+    () => () => {
+      flare.dispose();
+    },
+    [flare],
+  );
+
+  return <primitive object={flare} position={SUN_POS} />;
+}
+
 function Sunshine() {
   const sun = useRadialTexture("rgba(255,236,170,0.95)", "rgba(255,236,170,0)");
   const glowRef = useRef<Sprite>(null);
+  const streakRef = useRef<Sprite>(null);
 
   useFrame((state) => {
-    if (!glowRef.current) return;
-    const material = glowRef.current.material;
-    material.opacity = 0.82 + Math.sin(state.clock.elapsedTime * 0.8) * 0.08;
+    const pulse = Math.sin(state.clock.elapsedTime * 0.8) * 0.08;
+    if (glowRef.current) glowRef.current.material.opacity = 0.82 + pulse;
+    if (streakRef.current) streakRef.current.material.opacity = 0.18 + pulse * 0.35;
   });
 
   return (
     <group>
-      <sprite ref={glowRef} position={[2.15, 2.15, -1.35]} scale={[0.85, 0.85, 1]} raycast={ignoreRaycast}>
+      <sprite ref={glowRef} position={SUN_POS} scale={[0.85, 0.85, 1]} raycast={ignoreRaycast}>
         <spriteMaterial map={sun} transparent depthWrite={false} />
       </sprite>
+      {/* Anamorphischer Soft-Streifen am Sonnenkern */}
+      <sprite ref={streakRef} position={SUN_POS} scale={[2.35, 0.07, 1]} raycast={ignoreRaycast}>
+        <spriteMaterial
+          map={sun}
+          color="#ffe4ad"
+          transparent
+          opacity={0.18}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
+      </sprite>
+      <SunLensflare />
       <directionalLight position={[2.4, 3.4, -1.1]} intensity={0.85} color="#ffe4ad" />
       {[0, 1, 2].map((index) => (
         <mesh

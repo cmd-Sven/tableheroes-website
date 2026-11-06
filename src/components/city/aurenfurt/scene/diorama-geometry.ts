@@ -7,34 +7,24 @@ const IMAGE_ASPECT = 927 / 1697;
 
 export const DIORAMA_WIDTH = 8.8;
 export const DIORAMA_DEPTH = DIORAMA_WIDTH * IMAGE_ASPECT;
-export const DOME_HEIGHT = 0.48;
+/** Historisch: früher Kuppelhöhe; Karte ist jetzt eben (y = 0). */
+export const DOME_HEIGHT = 0;
 export const PLINTH_HEIGHT = 0.36;
-/** Viertel-/Sektor-Flächen über der gewölbten Kartenoptik (ca. +5px Sicht). */
+/** Viertel-/Sektor-Flächen leicht über der ebenen Karte (Z-Fighting vermeiden). */
 export const DISTRICT_SURFACE_LIFT = 0.08;
 export const DISTRICT_OUTLINE_LIFT = 0.105;
 
-/** Bildkoordinate (Ursprung oben links) auf die gewölbte Tafelfläche. */
+/** Bildkoordinate (Ursprung oben links) auf die ebene Tafelfläche. */
 export function surfacePoint(u: number, v: number) {
   const x = (u - 0.5) * DIORAMA_WIDTH;
   const z = (v - 0.5) * DIORAMA_DEPTH;
-  const nx = x / (DIORAMA_WIDTH / 2);
-  const nz = z / (DIORAMA_DEPTH / 2);
-  const y = DOME_HEIGHT * (1 - nx * nx) * (1 - nz * nz);
-  return new THREE.Vector3(x, y, z);
+  return new THREE.Vector3(x, 0, z);
 }
 
+/** Ebene Stadttafel (früher leicht gewölbt — für stabile Modellplatzierung flach). */
 export function createDomedCityGeometry() {
-  const geo = new THREE.PlaneGeometry(DIORAMA_WIDTH, DIORAMA_DEPTH, 80, 48);
+  const geo = new THREE.PlaneGeometry(DIORAMA_WIDTH, DIORAMA_DEPTH, 1, 1);
   geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i += 1) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    const nx = x / (DIORAMA_WIDTH / 2);
-    const nz = z / (DIORAMA_DEPTH / 2);
-    pos.setY(i, DOME_HEIGHT * (1 - nx * nx) * (1 - nz * nz));
-  }
-  pos.needsUpdate = true;
   geo.computeVertexNormals();
   return geo;
 }
@@ -44,7 +34,7 @@ function pushSurface(positions: number[], u: number, v: number, lift: number) {
   positions.push(point.x, point.y + lift, point.z);
 }
 
-/** Leicht angehobenes Ringsegment auf der Kuppel, für Klicks auf ein Viertel. */
+/** Leicht angehobenes Ringsegment auf der Tafel, für Klicks auf ein Viertel. */
 export function createDistrictGeometry(start: number, end: number, inner: number, outer: number) {
   const span = arcSpan(start, end);
   const steps = Math.max(10, Math.round(span / 7));

@@ -85,6 +85,7 @@ const event: CitySimEvent = {
   id: "markt",
   title: "Marktstillstand",
   body: "Die Händler schließen.",
+  imageUrl: null,
   scope: "district",
   districtId: "handwerkerviertel",
   sectorLabel: null,

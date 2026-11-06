@@ -13,6 +13,7 @@ import {
   ECON_ROLE,
   GUARD_ROLE,
   REFUGEE_GEO,
+  STREET_ECON_BIAS,
   UNEMP_ROLE,
   type HistoryShift,
   type RawMeters,
@@ -64,6 +65,21 @@ function crimeFromNpcs(districtId: CityDistrictId) {
   return weight > 0 ? acc / weight : null;
 }
 
+/** Gutmenschen stützen Handel, Habgier schwächt ihn — gewichtet wie Crime. */
+function economyFromNpcs(districtId: CityDistrictId) {
+  const rows = currentNpcSnaps().filter((npc) => npc.districtId === districtId);
+  if (rows.length === 0) return 0;
+  let weight = 0;
+  let acc = 0;
+  for (const npc of rows) {
+    const influence = Math.max(0.35, npc.influence / 100);
+    const rowWeight = npc.tierWeight * influence;
+    acc += rowWeight * (npc.greedyAltruist / 5) * 8;
+    weight += rowWeight;
+  }
+  return weight > 0 ? acc / weight : 0;
+}
+
 function faithFromNpcs(districtId: CityDistrictId) {
   const rows = currentNpcSnaps().filter((npc) => npc.districtId === districtId);
   if (rows.length === 0) return null;
@@ -111,7 +127,8 @@ function streetEconomy(districtId: CityDistrictId) {
     acc += rowWeight * score;
     weight += rowWeight;
   }
-  return weight > 0 ? acc / weight : null;
+  if (weight <= 0) return null;
+  return (acc / weight) * STREET_ECON_BIAS[districtId];
 }
 
 function poiShift(districtId: CityDistrictId, aspect: string) {
@@ -149,6 +166,10 @@ export function targetsFor(
       local.map((building) => building.prosperity),
       3,
     );
+    const unrest = mean(
+      local.map((building) => building.hotspot),
+      28,
+    );
     const watches = local.filter((building) => magicBucket(building) === "guard").length;
     const buildingCrime = crimeFromBuildings(local);
     const npcCrime = crimeFromNpcs(district.id);
@@ -158,7 +179,8 @@ export function targetsFor(
       (npcCrime ?? buildingCrime) * 0.38 -
       sat.guard * 7 -
       sat.rite * 6 +
-      malanthirCrimePush(malanthir);
+      malanthirCrimePush(malanthir) +
+      Math.max(0, unrest - 40) * 0.08;
     if (roads != null) crime = crime * 0.74 + roads * 0.26;
 
     const forgesDark = local.some((building) => needsMagicSource(building) && magicBucket(building) === "craft")
@@ -168,13 +190,17 @@ export function targetsFor(
       district.id === "akademieviertel" ? Math.max(0, 0.62 - sat.research) * 18 : 0;
     let economy =
       prosperity * 15.5 +
-      sat.luxury * 12 +
-      sat.craft * 18 +
+      sat.luxury * 8 +
+      sat.craft * 22 +
       ECON_ROLE[district.id] +
-      (district.id === "suedtor" ? 8 : 0) -
+      (district.id === "suedtor" ? 8 : 0) +
+      /** Dichte Märkte und Schattenhandel — trotz Crime aktiv. */
+      (district.id === "unterstadt" ? 10 : 0) -
       forgesDark -
       researchDark -
-      malanthir * 0.06;
+      malanthir * 0.05 -
+      unrest * 0.1 +
+      economyFromNpcs(district.id);
     const trade = streetEconomy(district.id);
     if (trade != null) economy = economy * 0.82 + trade * 0.18;
 
@@ -210,7 +236,9 @@ export function targetsFor(
       refugees * 0.05 +
       UNEMP_ROLE[district.id] -
       sat.craft * 6 -
-      sat.luxury * 4;
+      sat.luxury * 4 +
+      unrest * 0.1 -
+      economyFromNpcs(district.id) * 0.35;
 
     const buildingElysia = mean(
       local.map((building) => building.elysia),
@@ -238,8 +266,8 @@ export function targetsFor(
     const shift = shiftOf(district.id);
     out[district.id] = {
       crime: clampScore(crime + shift.crime + poiShift(district.id, "crime")),
-      vattrak: clampScore(vattrak),
-      malanthir: clampScore(malanthir),
+      vattrak: clampScore(vattrak + shift.vattrak + poiShift(district.id, "vattrak")),
+      malanthir: clampScore(malanthir + shift.malanthir + poiShift(district.id, "malanthir")),
       guard: clampScore(guard + shift.guard + poiShift(district.id, "guard")),
       refugees: clampScore(refugees + shift.refugees + poiShift(district.id, "refugees")),
       economy: clampScore(economy + shift.economy + poiShift(district.id, "economy")),

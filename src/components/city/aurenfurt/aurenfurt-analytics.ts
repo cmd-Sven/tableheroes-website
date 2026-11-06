@@ -5,9 +5,15 @@
  * nicht erfunden, das Fenster rückt auf den ersten berechneten Tag.
  */
 
-import { AURENFURT_DISTRICTS, type CityDistrictId } from "./aurenfurt-districts";
+import { AURENFURT_DISTRICTS, findDistrict, type CityDistrictId } from "./aurenfurt-districts";
 import { buildingWeights, citySimVersion } from "./aurenfurt-city-sim";
-import { allFactionStandings } from "./aurenfurt-factions";
+import {
+  allFactionStandings,
+  factionName,
+  RELATIONSHIP_LABELS,
+  type FactionId,
+} from "./aurenfurt-factions";
+import { allAurenfurtNpcs, withDistrictModulation } from "./aurenfurt-npcs";
 import { chronicleInWindow, chronicleMarksOn } from "./aurenfurt-chronicle";
 import {
   AURENFURT_HISTORY,
@@ -105,6 +111,23 @@ export type AnalyticsFaction = {
   power: number;
   legality: number;
   economicImpact: number;
+  ideologyLabel: string;
+  districtNames: string[];
+  relationships: { label: string; strength: number; targetName: string }[];
+};
+
+export type AnalyticsNpc = {
+  id: string;
+  name: string;
+  title: string;
+  role: string;
+  factionId: FactionId;
+  factionName: string;
+  districtId: CityDistrictId;
+  districtName: string;
+  influence: number;
+  description: string;
+  agenda: string;
 };
 
 export type AnalyticsInsight = {
@@ -132,6 +155,7 @@ export type CityAnalytics = {
   weather: WeatherShare[];
   events: AnalyticsEvent[];
   factions: AnalyticsFaction[];
+  npcs: AnalyticsNpc[];
   cells: { name: string; strength: number }[];
   insights: AnalyticsInsight[];
   liveWeatherNote: string | null;
@@ -236,15 +260,24 @@ function averageProfiles(profiles: SimProfile[]): SimProfile {
   };
 }
 
+/**
+ * Unzufriedenheit / Spannung der Region.
+ * Crime, Arbeitslosigkeit, Unruhe-Proxy (schwache Wirtschaft), Malanthir und
+ * überzogene Garde-Präsenz treiben; Religion (Vattrak) und Wohlstand dämpfen.
+ */
 export function tensionOf(profile: SimProfile) {
-  const raw =
-    profile.crime * 0.28 +
-    profile.unemployment * 0.22 +
-    profile.malanthir * 0.18 +
-    profile.refugees * 0.12 +
-    (100 - profile.guard) * 0.12 +
-    (100 - profile.economy) * 0.08;
-  return clampScore(raw + (profile.tensionBias ?? 0));
+  const dissatisfaction =
+    profile.crime * 0.26 +
+    profile.unemployment * 0.2 +
+    profile.malanthir * 0.14 +
+    profile.refugees * 0.1 +
+    (100 - profile.economy) * 0.12 +
+    Math.max(0, profile.guard - 55) * 0.14;
+  const satisfaction =
+    Math.max(0, profile.economy - 45) * 0.1 +
+    Math.max(0, profile.vattrak - 40) * 0.12 +
+    Math.max(0, profile.elysia - 45) * 0.04;
+  return clampScore(dissatisfaction - satisfaction + (profile.tensionBias ?? 0));
 }
 
 function germanDay(iso: string) {
@@ -549,12 +582,28 @@ function buildInsights(input: {
     return [{ key: meter.key, delta, label: meter.label }];
   }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
+  const byCrime = [...input.districts].sort((a, b) => b.average.crime - a.average.crime);
+  const byGuard = [...input.districts].sort((a, b) => b.average.guard - a.average.guard);
+  const crimeLead = byCrime[0];
+  const guardLead = byGuard[0];
+  const unterstadt = input.districts.find((district) => district.id === "unterstadt");
+  const unterstadtCrimeHigh = Boolean(unterstadt && unterstadt.average.crime >= 55);
+
   const lead = moves[0];
-  if (lead && input.previous) {
+  if (unterstadtCrimeHigh) {
+    insights.push({
+      id: "move",
+      title: "Kriminalität in der Unterstadt weiterhin hoch",
+      tone: "alert",
+      text: `Die Unterstadt liegt bei Kriminalität ${unterstadt!.average.crime}${
+        lead ? ` · stärkste Bewegung im Fenster: ${lead.label} ${signed(lead.delta)} gegenüber ${compare}` : ""
+      }.`,
+    });
+  } else if (lead && input.previous) {
     const good = HIGHER_IS_WORSE.has(lead.key) ? lead.delta < 0 : lead.delta > 0;
     insights.push({
       id: "move",
-      title: good ? "Bewegung zugunsten der Stadt" : "Bewegung zu Lasten der Stadt",
+      title: `${lead.label} ${lead.delta > 0 ? "steigt" : "sinkt"}`,
       tone: good ? "up" : "down",
       text: `${lead.label} von ${input.scopeLabel} liegt im Fenster bei ${input.average[lead.key]} und hat sich gegenüber ${compare} um ${signed(lead.delta)} verändert.`,
     });
@@ -563,69 +612,37 @@ function buildInsights(input: {
       id: "move",
       title: "Stand ohne Vergleich",
       tone: "neutral",
-      text: `Für ${input.scopeLabel} fehlt ein gleich langer Zeitraum davor. Der Wirtschaftsindex steht bei ${input.average.economy}, die Kriminalität bei ${input.average.crime}.`,
+      text: `Für ${input.scopeLabel} fehlt ein gleich langer Zeitraum davor.`,
     });
   }
 
-  const byEconomy = [...input.districts].sort((a, b) => b.average.economy - a.average.economy);
-  const byCrime = [...input.districts].sort((a, b) => b.average.crime - a.average.crime);
-  const byGuard = [...input.districts].sort((a, b) => b.average.guard - a.average.guard);
-  const richest = byEconomy[0];
-  const poorest = byEconomy[byEconomy.length - 1];
-  const crimeLead = byCrime[0];
-  const guardLead = byGuard[0];
-  if (richest && poorest && crimeLead && guardLead) {
+  if (crimeLead && guardLead) {
     const gap = input.average.crime - input.average.guard;
-    const balance =
-      gap >= 8
-        ? ` In ${input.scopeLabel} liegt die Kriminalität ${gap} Punkte über der Garde.`
-        : input.average.guard - input.average.crime >= 12
-          ? ` Die Garde von ${input.scopeLabel} liegt ${input.average.guard - input.average.crime} Punkte über der Kriminalität.`
-          : "";
     insights.push({
       id: "districts",
       title: gap >= 8 ? "Sicherheitsdefizit" : "Viertel im Vergleich",
       tone: gap >= 8 ? "alert" : "neutral",
-      text: `${richest.name} führt die Wirtschaft mit ${richest.average.economy}, ${poorest.name} liegt bei ${poorest.average.economy}. ${crimeLead.name} hat die höchste Kriminalität (${crimeLead.average.crime}), ${guardLead.name} die stärkste Garde (${guardLead.average.guard}).${balance}`,
+      text: `${crimeLead.name} führt die Kriminalität (${crimeLead.average.crime}), ${guardLead.name} die Garde (${guardLead.average.guard}).`,
     });
   }
 
-  const harsh = input.weather.filter((share) => share.kind === "rain" || share.kind === "storm" || share.kind === "snow" || share.kind === "frost");
-  const harshDays = harsh.reduce((sum, share) => sum + share.days, 0);
-  const dominant = input.weather[0];
   const driver = input.events[0];
-  if (dominant && input.dayCount > 1) {
-    const weatherText = harshDays
-      ? `An ${harshDays} von ${input.dayCount} Tagen war das Wetter hart, am häufigsten ${dominant.label.toLowerCase()}. Das sitzt in der Simulation auf Versorgung, Wirtschaft und Kriminalität.`
-      : `Das Wetter ist überwiegend ${dominant.label.toLowerCase()} (${dominant.days} von ${input.dayCount} Tagen) und drückt die Reihe kaum.`;
+  if (driver) {
     insights.push({
       id: "drivers",
-      title: driver ? driver.title : "Wetter als Treiber",
-      tone: harshDays > input.dayCount * 0.35 ? "down" : "neutral",
-      text: driver ? `${weatherText} Dazu wirkt „${driver.title}“: ${driver.summary}` : weatherText,
-    });
-  } else if (dominant) {
-    insights.push({
-      id: "drivers",
-      title: "Wetter des Tages",
+      title: driver.title,
       tone: "neutral",
-      text: driver
-        ? `Der Tag ist ${dominant.label.toLowerCase()}. „${driver.title}“ liegt auf der Stadt: ${driver.summary}`
-        : `Der Tag ist ${dominant.label.toLowerCase()}. Kein Geschichtsereignis liegt stark genug auf diesem Fenster, die Lage kommt aus Vierteln, Versorgung und Wetter.`,
+      text: driver.summary,
     });
   }
 
   const faction = input.factions[0];
-  const cell = input.cells[0];
   if (faction) {
-    const law = faction.legality >= 0 ? `Legalität ${faction.legality}` : `Legalität ${faction.legality}, also im Schatten`;
     insights.push({
       id: "power",
       title: "Macht und Untergrund",
       tone: faction.legality < 0 ? "alert" : "neutral",
-      text: `${faction.name} ist die stärkste Fraktion (Macht ${faction.power}, ${law}, Wirtschaft ${faction.economicImpact}).${
-        cell ? ` Die lauteste Zelle ist ${cell.name} mit Stärke ${cell.strength}.` : ""
-      }`,
+      text: `${faction.name} ist die stärkste Fraktion (Macht ${faction.power}).`,
     });
   }
 
@@ -681,8 +698,38 @@ export function buildCityAnalytics(input: AnalyticsInput): CityAnalytics {
       power: faction.power,
       legality: faction.legality,
       economicImpact: faction.economicImpact,
+      ideologyLabel: faction.ideologyLabel,
+      districtNames: faction.districtIds.map(
+        (id) => findDistrict(id)?.name ?? id,
+      ),
+      relationships: faction.networkRelationships.map((link) => ({
+        label: RELATIONSHIP_LABELS[link.kind],
+        strength: link.strength,
+        targetName: factionName(link.targetId),
+      })),
     }))
     .sort((a, b) => b.power - a.power);
+
+  const npcs: AnalyticsNpc[] = allAurenfurtNpcs()
+    .filter((npc) => !factionScope || npc.districtId === factionScope)
+    .map((npc) => {
+      const modulated = withDistrictModulation(npc, anchor);
+      return {
+        id: modulated.id,
+        name: modulated.name,
+        title: modulated.title ?? modulated.role,
+        role: modulated.role,
+        factionId: modulated.factionId,
+        factionName: factionName(modulated.factionId),
+        districtId: modulated.districtId,
+        districtName: findDistrict(modulated.districtId)?.name ?? modulated.districtId,
+        influence: modulated.influenceAndLoyalty.influence,
+        description: modulated.description,
+        agenda: modulated.influenceAndLoyalty.agenda,
+      };
+    })
+    .sort((a, b) => b.influence - a.influence)
+    .slice(0, 8);
 
   const scopeLabel = input.scopeId
     ? (AURENFURT_DISTRICTS.find((district) => district.id === input.scopeId)?.name ?? "Viertel")
@@ -708,6 +755,7 @@ export function buildCityAnalytics(input: AnalyticsInput): CityAnalytics {
     weather: shares,
     events,
     factions,
+    npcs,
     cells,
     liveWeatherNote: liveNote,
     insights: buildInsights({

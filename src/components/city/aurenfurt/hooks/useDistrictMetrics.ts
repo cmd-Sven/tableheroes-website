@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { startTransition, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { CityDistrictId } from "../aurenfurt-districts";
 import { citySimVersion, subscribeCitySim } from "../aurenfurt-city-sim";
 import {
@@ -30,19 +30,31 @@ export function useDistrictMetrics(
   const viewDay = useMemo(() => parseDay(dayIso), [dayIso]);
   const seriesEnd = useMemo(() => utcToday(), []);
   const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
+  const [seriesReady, setSeriesReady] = useState(false);
 
-  return useMemo(() => {
-    if (!districtId) {
-      return {
-        sim: cityMetricsOn(viewDay),
-        series: null,
-        influences: influencesOn(null, viewDay),
-      };
-    }
-    return {
-      sim: districtMetricsOn(districtId, viewDay),
-      series: districtSeries(districtId, undefined, seriesEnd),
-      influences: influencesOn(districtId, viewDay),
-    };
-  }, [districtId, viewDay, seriesEnd, simVersion]);
+  useEffect(() => {
+    setSeriesReady(false);
+    if (!districtId) return;
+    const id = requestAnimationFrame(() => {
+      startTransition(() => setSeriesReady(true));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [districtId, viewDay, simVersion]);
+
+  const sim = useMemo(() => {
+    if (!districtId) return cityMetricsOn(viewDay);
+    return districtMetricsOn(districtId, viewDay);
+  }, [districtId, viewDay, simVersion]);
+
+  const influences = useMemo(
+    () => influencesOn(districtId, viewDay),
+    [districtId, viewDay, simVersion],
+  );
+
+  const series = useMemo(() => {
+    if (!districtId || !seriesReady) return null;
+    return districtSeries(districtId, undefined, seriesEnd);
+  }, [districtId, seriesEnd, seriesReady, simVersion]);
+
+  return { sim, series, influences };
 }

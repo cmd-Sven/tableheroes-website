@@ -2,10 +2,10 @@ import {
   AURENFURT_DISTRICTS,
   type CityDistrictId,
 } from "./aurenfurt-districts";
-import { pointInPolygon, type UvPoint } from "./aurenfurt-district-polygons";
+import { type UvPoint } from "./aurenfurt-district-polygons";
 
-/** Neuer Key – v1 wird bewusst nicht gelesen/migriert. */
-export const DISTRICT_SECTORS_STORAGE_KEY = "aurenfurt-district-sectors-v2";
+/** Neuer Key – ältere Versionen werden bewusst nicht gelesen/migriert. */
+export const DISTRICT_SECTORS_STORAGE_KEY = "aurenfurt-district-sectors-v3";
 
 /** Globale Gitterursprung (Karten-UV), für alle Viertel gleich. */
 export const SECTOR_GRID_ORIGIN: UvPoint = { u: 0, v: 0 };
@@ -13,13 +13,16 @@ export const SECTOR_GRID_ORIGIN: UvPoint = { u: 0, v: 0 };
 /** Sektorgröße in denselben UV-/Karten-Einheiten wie die Viertel-Polygone. */
 export const SECTOR_SIZE_MIN = 0.005;
 export const SECTOR_SIZE_MAX = 0.25;
-export const SECTOR_SIZE_DEFAULT = 0.04;
+/** Halbe frühere Default-Größe → etwa doppelte Sektorzahl. */
+export const SECTOR_SIZE_DEFAULT = 0.02;
 export const SECTOR_SIZE_STEP = 0.001;
 /** Soft-Cap für Vorschau/Speichern (Schutz vor riesigen Gittern). */
 export const SECTOR_CELL_MAX = 2500;
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const AREA_EPSILON = 1e-14;
+/** Mindestfläche eines Anschnitts (UV²), darunter gilt die Zelle als leer. */
+const CLIP_AREA_EPSILON = 1e-10;
 
 /** Ein Sektor innerhalb eines Viertels – spätere Heatmap-Zelle. */
 export type DistrictSector = {
@@ -50,7 +53,7 @@ export type DivideDistrictResult = {
   sectors: DistrictSector[];
   cellWidth: number;
   cellHeight: number;
-  /** Anzahl Zellen mit Mittelpunkt im Polygon. */
+  /** Anzahl Zellen mit Schnittfläche im Viertel (inkl. Anschnitte). */
   actual: number;
   /** Anzahl beschrifteter Spalten (A, B, …). */
   cols: number;
@@ -167,6 +170,85 @@ function fixedCellRect(col: number, row: number, cellW: number, cellH: number): 
   ];
 }
 
+function polygonArea(points: UvPoint[]): number {
+  if (points.length < 3) return 0;
+  let area2 = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    area2 += points[j].u * points[i].v - points[i].u * points[j].v;
+  }
+  return Math.abs(area2) * 0.5;
+}
+
+/**
+ * Sutherland–Hodgman: Subject gegen eine konvexe AABB schneiden.
+ * So bleiben schräge/runde Anschnitte als echte Teilpolygone erhalten.
+ */
+export function clipPolygonToAabb(
+  subject: UvPoint[],
+  box: BBox,
+): UvPoint[] {
+  if (subject.length < 3) return [];
+
+  function clipEdge(
+    input: UvPoint[],
+    inside: (p: UvPoint) => boolean,
+    intersect: (a: UvPoint, b: UvPoint) => UvPoint,
+  ): UvPoint[] {
+    if (input.length === 0) return [];
+    const output: UvPoint[] = [];
+    for (let i = 0; i < input.length; i += 1) {
+      const current = input[i];
+      const previous = input[(i + input.length - 1) % input.length];
+      const currentIn = inside(current);
+      const previousIn = inside(previous);
+      if (currentIn) {
+        if (!previousIn) output.push(intersect(previous, current));
+        output.push(current);
+      } else if (previousIn) {
+        output.push(intersect(previous, current));
+      }
+    }
+    return output;
+  }
+
+  let poly = subject;
+  poly = clipEdge(
+    poly,
+    (p) => p.u >= box.minU,
+    (a, b) => {
+      const t = (box.minU - a.u) / (b.u - a.u || Number.EPSILON);
+      return { u: box.minU, v: a.v + t * (b.v - a.v) };
+    },
+  );
+  poly = clipEdge(
+    poly,
+    (p) => p.u <= box.maxU,
+    (a, b) => {
+      const t = (box.maxU - a.u) / (b.u - a.u || Number.EPSILON);
+      return { u: box.maxU, v: a.v + t * (b.v - a.v) };
+    },
+  );
+  poly = clipEdge(
+    poly,
+    (p) => p.v >= box.minV,
+    (a, b) => {
+      const t = (box.minV - a.v) / (b.v - a.v || Number.EPSILON);
+      return { u: a.u + t * (b.u - a.u), v: box.minV };
+    },
+  );
+  poly = clipEdge(
+    poly,
+    (p) => p.v <= box.maxV,
+    (a, b) => {
+      const t = (box.maxV - a.v) / (b.v - a.v || Number.EPSILON);
+      return { u: a.u + t * (b.u - a.u), v: box.maxV };
+    },
+  );
+
+  if (poly.length < 3 || polygonArea(poly) < CLIP_AREA_EPSILON) return [];
+  return poly.map((p) => ({ u: p.u, v: p.v }));
+}
+
 type GridHit = {
   col: number;
   row: number;
@@ -175,9 +257,9 @@ type GridHit = {
 };
 
 /**
- * Legt ein globales Gitter fester Zellengröße über die Karte und behält
- * jede Zelle, deren Mittelpunkt im Viertel-Polygon liegt.
- * Zellen werden nie gestreckt oder an die Bounding-Box angepasst.
+ * Legt ein globales Gitter fester Zellengröße über die Karte.
+ * Jede Zelle mit Schnittfläche zum Viertel bleibt erhalten; das Sektor-Polygon
+ * ist der Anschnitt (Zell-Rechteck ∩ Viertel), keine Lücken an Schrägen/Bögen.
  */
 export function divideDistrictIntoSectors(
   districtId: CityDistrictId,
@@ -211,13 +293,16 @@ export function divideDistrictIntoSectors(
 
   for (let row = rowStart; row <= rowEnd; row += 1) {
     for (let col = colStart; col <= colEnd; col += 1) {
-      const polygon = fixedCellRect(col, row, cellWidth, cellHeight);
-      const centroid = {
-        u: SECTOR_GRID_ORIGIN.u + (col + 0.5) * cellWidth,
-        v: SECTOR_GRID_ORIGIN.v + (row + 0.5) * cellHeight,
+      const cell = fixedCellRect(col, row, cellWidth, cellHeight);
+      const cellBox: BBox = {
+        minU: cell[0].u,
+        maxU: cell[1].u,
+        minV: cell[0].v,
+        maxV: cell[2].v,
       };
-      if (!pointInPolygon(centroid, districtPoly)) continue;
-      hits.push({ col, row, polygon, centroid });
+      const polygon = clipPolygonToAabb(districtPoly, cellBox);
+      if (polygon.length < 3) continue;
+      hits.push({ col, row, polygon, centroid: polygonCentroid(polygon) });
       if (hits.length >= SECTOR_CELL_MAX) {
         truncated = true;
         break;

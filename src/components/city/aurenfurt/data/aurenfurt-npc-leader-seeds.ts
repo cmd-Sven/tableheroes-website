@@ -17,7 +17,7 @@ export const FACTION_LEADER_SEEDS: readonly NpcSeed[] = [
     race: "Halbelfin",
     alignment: "Neutral Evil",
     description:
-      "Vespera führt das Malanthir-Netz der Unterstadt vom Umschlagplatz aus. Wer sie sieht, sieht oft nur einen Schatten zwischen Kisten.",
+      "Vespera führt das Malanthir-Netz und den Schattenhandel der Unterstadt vom Umschlagplatz aus — kriminell, aber umsatzstark, weil hier die meisten leben.",
     appearance:
       "Schlank, aschfahle Haut, eine Narbe über dem linken Auge, dunkler Kapuzenmantel mit rotem Fadenstick.",
     personality_traits: "Ruhig, berechnend, selten laut — aber gnadenlos, wenn jemand ihre Routen verrät.",
@@ -123,7 +123,7 @@ export const FACTION_LEADER_SEEDS: readonly NpcSeed[] = [
     race: "Mensch",
     alignment: "Lawful Neutral",
     description:
-      "Seraphine führt das Kontor am Handwerkermarkt: hohe Standgelder, längere Arme bis in die blauen Salons.",
+      "Seraphine führt das lauteste Kontor der Stadt am Handwerkermarkt: Standgelder, Westmarkt-Arme und Fäden bis in die blauen Salons.",
     appearance:
       "Silbernes Haar streng gebunden, Seidenhandschuhe, ein Siegelring mit Spinnweben-Motiv.",
     personality_traits: "Höflich, unnachgiebig, spricht in Preisen und Fristen.",
@@ -323,7 +323,7 @@ export const FACTION_LEADER_SEEDS: readonly NpcSeed[] = [
     race: "Zwergin",
     alignment: "Lawful Neutral",
     description:
-      "Greta führt das Zunfthaus: Verträge wiegen mehr als Wappen, Essen und Kontore halten zusammen.",
+      "Greta führt das Zunfthaus — das wirtschaftliche Rückgrat Aurenfurts: Verträge wiegen mehr als Wappen, Essen und Kontore halten den Umsatz.",
     appearance:
       "Rußige Schürze über guter Wolle, Hammeramulett, kurze graue Zöpfe, feste Handschläge.",
     personality_traits: "Direkt, fair unter Zünftigen, misstrauisch gegen Adel und Seide.",

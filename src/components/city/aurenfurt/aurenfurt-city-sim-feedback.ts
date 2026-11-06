@@ -31,11 +31,17 @@ export function applyDistrictFeedback(base: RawMeters, prior: RawMeters | null):
   const malanthirCrime = prior.malanthir * 0.1;
   const vattrakCalm = prior.vattrak * 0.05;
   const guardOrder = Math.max(0, prior.guard - 55) * 0.1;
-  const crimeDelta = (necessityCrime - prosperityCalm + malanthirCrime - vattrakCalm - guardOrder) * calm;
+  // Dichte Garde senkt Crime, erzeugt aber Druck (Unruhe) → leichter Crime-/Wirtschafts-Rebound.
+  const garrisonFriction = Math.max(0, prior.guard - 58) * 0.07;
+  const jobCrime = Math.max(0, prior.unemployment - 35) * 0.12;
+  const crimeDelta =
+    (necessityCrime - prosperityCalm + malanthirCrime - vattrakCalm - guardOrder + garrisonFriction * 0.45 + jobCrime) *
+    calm;
 
   const merchantFlight = Math.max(0, prior.crime - 32) * 0.16;
+  const unrestTrade = Math.max(0, prior.unemployment - 30) * 0.06 + Math.max(0, prior.crime - 40) * 0.04;
   const vattrakTrade = Math.max(0, prior.vattrak - 50) * 0.04;
-  const economyDelta = (-merchantFlight + vattrakTrade) * calm;
+  const economyDelta = (-merchantFlight - unrestTrade - garrisonFriction * 0.55 + vattrakTrade) * calm;
 
   const calledGuard = Math.max(0, prior.crime - 28) * 0.2;
   const vattrakOrder = prior.vattrak * 0.03;
@@ -50,8 +56,12 @@ export function applyDistrictFeedback(base: RawMeters, prior: RawMeters | null):
   const malanthirSiphon = Math.max(0, prior.malanthir - 25) * 0.05;
   const vattrakDelta = -malanthirSiphon * calm;
 
-  const joblessness = Math.max(0, 40 - prior.economy) * 0.2 + prior.malanthir * 0.05;
-  const hiring = Math.max(0, prior.economy - 60) * 0.08;
+  const joblessness =
+    Math.max(0, 40 - prior.economy) * 0.2 +
+    prior.malanthir * 0.05 +
+    Math.max(0, prior.crime - 38) * 0.08 +
+    garrisonFriction * 0.35;
+  const hiring = Math.max(0, prior.economy - 60) * 0.08 + Math.max(0, prior.vattrak - 55) * 0.03;
   const unemploymentDelta = (joblessness - hiring) * calm;
 
   return {

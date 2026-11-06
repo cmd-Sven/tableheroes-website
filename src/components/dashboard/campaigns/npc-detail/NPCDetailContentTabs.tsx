@@ -6,6 +6,7 @@
 import { BookOpen, Eye, Heart, Loader2, Save, Swords } from "lucide-react";
 import { toast } from "sonner";
 import { GothicSpotlightDescription } from "@/src/components/dashboard/campaigns/lore/GothicSpotlightDescription";
+import { LORE_SECTION_H2_CLASS } from "@/src/lib/wiki-heading-styles";
 import { MarkdownEditor } from "@/src/components/ui/MarkdownEditor";
 import { SmartText } from "@/src/components/ui/SmartText";
 import { NpcCombatStatsEditor } from "@/src/components/dashboard/campaigns/npcs/NpcCombatStatsEditor";
@@ -110,7 +111,7 @@ export function NPCDetailContentTabs({ c }: { c: NPCDetailController }) {
               <GothicSpotlightDescription
                 backgroundImageUrl={npc.image_url || undefined}
               >
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                <h2 className={LORE_SECTION_H2_CLASS}>
                   Beschreibung
                 </h2>
                 <InlineEditField
@@ -148,7 +149,7 @@ export function NPCDetailContentTabs({ c }: { c: NPCDetailController }) {
               <GothicSpotlightDescription
                 backgroundImageUrl={npc.image_url || undefined}
               >
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                <h2 className={LORE_SECTION_H2_CLASS}>
                   Aussehen
                 </h2>
                 <InlineEditField
@@ -187,7 +188,7 @@ export function NPCDetailContentTabs({ c }: { c: NPCDetailController }) {
               <GothicSpotlightDescription
                 backgroundImageUrl={npc.image_url || undefined}
               >
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                <h2 className={LORE_SECTION_H2_CLASS}>
                   Persönlichkeit
                 </h2>
                 <InlineEditField
@@ -228,7 +229,7 @@ export function NPCDetailContentTabs({ c }: { c: NPCDetailController }) {
 
             {isGM && activeTab === "combat" ? (
               <div className="relative z-10 p-6 space-y-4">
-                <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+                <h2 className={LORE_SECTION_H2_CLASS}>
                   Kampfwerte (nur SL)
                 </h2>
                 <p className="font-libre text-sm text-gray-400">

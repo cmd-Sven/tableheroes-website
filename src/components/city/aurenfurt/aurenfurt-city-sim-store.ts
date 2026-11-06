@@ -5,7 +5,13 @@ import {
   type CityDistrictId,
 } from "./aurenfurt-districts";
 import { buildingCategoryForId, isBuildingCategory } from "./aurenfurt-building-categories";
-import { sectorCrimeShifts, sectorFaithShifts } from "./aurenfurt-sector-reach";
+import {
+  sectorAspectShifts,
+  sectorCrimeShifts,
+  sectorFaithShifts,
+  type HeatmapAspect,
+  type ReachPoi,
+} from "./aurenfurt-sector-reach";
 import { faithPresenceForBuilding } from "./aurenfurt-faith";
 import type { CityBond } from "./aurenfurt-bonds";
 import type { CityActor, CitySimEvent } from "./aurenfurt-pressure";
@@ -32,6 +38,11 @@ let pressureSignature = "";
 function emit() {
   version += 1;
   for (const listener of listeners) listener();
+}
+
+/** Externe Module (z. B. Verwaltung) invalidieren Meter-/Pressure-Caches. */
+export function bumpCitySimVersion() {
+  emit();
 }
 
 export function citySimVersion() {
@@ -127,6 +138,30 @@ export function liveSectorCrimeDeltas() {
   const buildings = activeBuildings();
   return AURENFURT_DISTRICTS.flatMap((district) =>
     sectorCrimeShifts(district.id, buildings, npcSnaps, live.sectors, live.polygons),
+  );
+}
+
+function livePois(): ReachPoi[] {
+  return live.pois.map((poi) => ({
+    districtId: poi.districtId,
+    influences: poi.influences,
+    u: poi.u,
+    v: poi.v,
+    reach: poi.reach,
+  }));
+}
+
+/** Sektor-Abweichungen für ein Heatmap-/Dashboard-Meter (Gebäude, NPCs, Orte). */
+export function liveSectorAspectDeltas(aspect: HeatmapAspect) {
+  const buildings = activeBuildings();
+  const pois = livePois();
+  return AURENFURT_DISTRICTS.flatMap((district) =>
+    sectorAspectShifts(district.id, buildings, npcSnaps, pois, live.sectors, live.polygons).map(
+      (row) => ({
+        sector: row.sector,
+        delta: row[aspect],
+      }),
+    ),
   );
 }
 

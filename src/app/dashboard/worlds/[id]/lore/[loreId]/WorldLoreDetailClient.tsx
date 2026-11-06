@@ -21,6 +21,7 @@ import type { AurenfurtPoiLoreExtras } from "@/src/components/city/aurenfurt/loa
 import { POI_LOCATION_TYPES } from "@/src/lib/lore-types";
 import { LocationNpcAssignSearch } from "@/src/components/worlds/LocationNpcAssignSearch";
 import type { PoiInfluence } from "@/src/components/city/aurenfurt/aurenfurt-map-pois";
+import { LORE_SECTION_H2_CLASS, LORE_SECTION_H2_CLASS_TIGHT } from "@/src/lib/wiki-heading-styles";
 
 type LoreData = {
   name: string;
@@ -596,7 +597,7 @@ export function WorldLoreDetailClient({
       {/* Structured Lore Metadata */}
       {lore.type === "Rasse" && (loreMetadata.cultureName || loreMetadata.raceSubtypes || loreMetadata.raceTraits || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0)) && (
         <div className="mt-6 rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+          <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
             Rassenprofil
           </h2>
           {loreMetadata.cultureName && (
@@ -648,7 +649,7 @@ export function WorldLoreDetailClient({
 
       {lore.type === "Kultur" && ((loreMetadata.linkedRaces && loreMetadata.linkedRaces.length > 0) || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0) || (loreMetadata.linkedReligions && loreMetadata.linkedReligions.length > 0)) && (
         <div className="mt-6 rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+          <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
             Kulturprofil
           </h2>
           {loreMetadata.linkedRaces && loreMetadata.linkedRaces.length > 0 && (
@@ -686,7 +687,7 @@ export function WorldLoreDetailClient({
 
       {lore.type === "Sprache" && ((loreMetadata.spokenByCultures && loreMetadata.spokenByCultures.length > 0) || (loreMetadata.spokenByRaces && loreMetadata.spokenByRaces.length > 0)) && (
         <div className="mt-6 rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+          <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
             Sprachprofil
           </h2>
           {loreMetadata.spokenByCultures && loreMetadata.spokenByCultures.length > 0 && (
@@ -714,7 +715,7 @@ export function WorldLoreDetailClient({
 
       {lore.type === "Religion" && loreMetadata.spokenByCultures && loreMetadata.spokenByCultures.length > 0 && (
         <div className="mt-6 rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+          <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
             Verbreitung
           </h2>
           <div>
@@ -730,7 +731,7 @@ export function WorldLoreDetailClient({
 
       {isLocation && (loreMetadata.cultureName || (loreMetadata.linkedLanguages && loreMetadata.linkedLanguages.length > 0) || (loreMetadata.linkedReligions && loreMetadata.linkedReligions.length > 0)) && (
         <div className="mt-6 rounded-lg border border-hero-border bg-background-card p-6 space-y-4">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-1">
+          <h2 className={LORE_SECTION_H2_CLASS_TIGHT}>
             Ortsprofil
           </h2>
           {loreMetadata.cultureName && (
@@ -765,7 +766,7 @@ export function WorldLoreDetailClient({
       {/* Verknüpfter Ort (für Lore wie Geschichten & Legenden) */}
       {!isLocation && parent && parent.type && isLocationType(parent.type) && (
         <div className="mt-6 rounded-lg border border-hero-dark bg-background-card p-6">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+          <h2 className={LORE_SECTION_H2_CLASS}>
             Verknüpfter Ort
           </h2>
           <Link
@@ -783,7 +784,7 @@ export function WorldLoreDetailClient({
         <div className="mt-6 space-y-6">
           {/* Parent verknüpfen / erstellen */}
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            <h2 className={LORE_SECTION_H2_CLASS}>
               Übergeordneter Ort
             </h2>
             {parent ? (
@@ -870,7 +871,7 @@ export function WorldLoreDetailClient({
 
           {/* Children / Unterorte verknüpfen / erstellen */}
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            <h2 className={LORE_SECTION_H2_CLASS}>
               Untergeordnete Orte
             </h2>
             {canHaveChildren && (
@@ -969,7 +970,7 @@ export function WorldLoreDetailClient({
 
           {/* Geschichten & Legenden */}
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            <h2 className={LORE_SECTION_H2_CLASS}>
               Geschichten & Legenden
             </h2>
             {storiesAndLegends.length > 0 && (
@@ -997,7 +998,7 @@ export function WorldLoreDetailClient({
 
           {/* NPCs */}
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            <h2 className={LORE_SECTION_H2_CLASS}>
               NPCs
             </h2>
             {(locationNPCs.residents.length > 0 || locationNPCs.guests.length > 0) ? (
@@ -1057,7 +1058,7 @@ export function WorldLoreDetailClient({
 
           {/* Fraktionen */}
           <div className="rounded-lg border border-hero-dark bg-background-card p-6">
-            <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+            <h2 className={LORE_SECTION_H2_CLASS}>
               Fraktionen (Hauptsitz)
             </h2>
             {factionsByLocation.length > 0 ? (
@@ -1091,7 +1092,7 @@ export function WorldLoreDetailClient({
       {/* Bildergalerie (alle zusätzlichen Bilder) */}
       {(lore.additional_images || []).length > 0 && (
         <div className="mt-6 rounded-lg border border-hero-dark bg-background-card p-6">
-          <h2 className="font-barlow font-semibold text-2xl text-accent-blood border-b border-hero-border pb-2 mb-4">
+          <h2 className={LORE_SECTION_H2_CLASS}>
             Bildergalerie
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

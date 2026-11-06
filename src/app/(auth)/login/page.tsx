@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useFormStatus } from "react-dom";
 import { login } from "../actions";
@@ -25,10 +25,16 @@ export default function LoginPage() {
 
   async function handleSubmit(formData: FormData) {
     setErrorMessage(null);
-    const result = await login(formData);
-    if (result) {
-      setErrorMessage(result);
+    try {
+      const result = await login(formData);
+      if (result) {
+        setErrorMessage(result);
+        return;
+      }
+    } catch {
+      // redirect() wirft — Navigation absichern falls Client-Handler hangt
     }
+    window.location.assign("/dashboard");
   }
 
   return (
@@ -82,4 +88,3 @@ export default function LoginPage() {
     </>
   );
 }
-

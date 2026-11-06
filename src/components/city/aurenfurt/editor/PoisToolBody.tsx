@@ -5,16 +5,85 @@ import { MapPin } from "lucide-react";
 import { AURENFURT_DISTRICTS, type CityDistrictId } from "../aurenfurt-districts";
 import type { UvPoint } from "../aurenfurt-district-polygons";
 import {
+  DEFAULT_POI_REACH,
   POI_INFLUENCE_ASPECTS,
   POI_KINDS,
+  POI_REACH_RADII,
   formatInfluenceDelta,
+  poiReachLabel,
   type AurenfurtMapPoi,
   type PoiInfluence,
   type PoiInfluenceAspect,
   type PoiKind,
+  type PoiReachRadius,
+  type PoiReachSetting,
 } from "../aurenfurt-map-pois";
 import { uploadLoreImage } from "@/src/lib/profile-media";
 import { AURENFURT_WORLD_ID } from "../aurenfurt-district-lore-ids";
+
+function ReachControls({
+  reach,
+  onChange,
+}: {
+  reach: PoiReachSetting;
+  onChange: (next: PoiReachSetting) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="font-barlow text-[10px] font-bold uppercase text-hero-vibrant">
+        Einflussbereich
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange({ mode: "sector", radius: reach.mode === "sector" ? reach.radius : 1 })}
+          className={`rounded border px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+            reach.mode === "sector"
+              ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+              : "border-hero-dark text-gray-300 hover:border-hero-vibrant"
+          }`}
+        >
+          Sektoren
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ mode: "district", radius: 0 })}
+          className={`rounded border px-2 py-1 font-barlow text-[10px] font-bold uppercase ${
+            reach.mode === "district"
+              ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+              : "border-hero-dark text-gray-300 hover:border-hero-vibrant"
+          }`}
+        >
+          Ganzes Viertel
+        </button>
+      </div>
+      {reach.mode === "sector" ? (
+        <label className="block space-y-1">
+          <span className="font-libre text-[10px] text-gray-400">
+            Radius: {poiReachLabel(reach)}
+          </span>
+          <select
+            value={reach.radius}
+            onChange={(e) =>
+              onChange({ mode: "sector", radius: Number(e.target.value) as PoiReachRadius })
+            }
+            className="w-full rounded border border-hero-dark bg-slate-900 p-1.5 font-libre text-[11px] text-white outline-none focus:border-hero-vibrant"
+          >
+            {POI_REACH_RADII.map((radius) => (
+              <option key={radius} value={radius}>
+                {poiReachLabel({ mode: "sector", radius })}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="font-libre text-[10px] text-gray-400">
+          Der Einfluss gilt für alle Sektoren des Viertels.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function PoisToolBody({
   pois,
@@ -34,6 +103,7 @@ export function PoisToolBody({
   poiImageUrl,
   poiImageUploading,
   poiInfluences,
+  poiReach,
   setPoiCreateOpen,
   setPoiName,
   setPoiDescription,
@@ -41,6 +111,7 @@ export function PoisToolBody({
   setPoiImageUrl,
   setPoiImageUploading,
   setPoiInfluences,
+  setPoiReach,
   onSelectPoi,
   onStartPlacePoi,
   onStartRepositionPoi,
@@ -49,6 +120,7 @@ export function PoisToolBody({
   onCancelPlaceBuilding,
   onClearBuildingDraft,
   onSavePoi,
+  onSavePoiReach,
 }: {
   pois: AurenfurtMapPoi[];
   selectedPoiId: string | null;
@@ -67,6 +139,7 @@ export function PoisToolBody({
   poiImageUrl: string;
   poiImageUploading: boolean;
   poiInfluences: PoiInfluence[];
+  poiReach: PoiReachSetting;
   setPoiCreateOpen: Dispatch<SetStateAction<boolean>>;
   setPoiName: Dispatch<SetStateAction<string>>;
   setPoiDescription: Dispatch<SetStateAction<string>>;
@@ -74,6 +147,7 @@ export function PoisToolBody({
   setPoiImageUrl: Dispatch<SetStateAction<string>>;
   setPoiImageUploading: Dispatch<SetStateAction<boolean>>;
   setPoiInfluences: Dispatch<SetStateAction<PoiInfluence[]>>;
+  setPoiReach: Dispatch<SetStateAction<PoiReachSetting>>;
   onSelectPoi: (id: string | null) => void;
   onStartPlacePoi: () => void;
   onStartRepositionPoi: () => void;
@@ -87,6 +161,12 @@ export function PoisToolBody({
     kind: PoiKind;
     imageUrl: string | null;
     influences: PoiInfluence[];
+    reach: PoiReachSetting;
+  }) => void;
+  onSavePoiReach: (input: {
+    poiId: string;
+    influences: PoiInfluence[];
+    reach: PoiReachSetting;
   }) => void;
 }) {
   return (
@@ -122,6 +202,7 @@ export function PoisToolBody({
                     {poi.influences.length > 0
                       ? ` · ${poi.influences.map(formatInfluenceDelta).join(", ")}`
                       : ""}
+                    {` · ${poiReachLabel(poi.reach ?? DEFAULT_POI_REACH)}`}
                   </p>
                 </button>
               </li>
@@ -133,6 +214,17 @@ export function PoisToolBody({
       {selectedPoi && !poiCreateOpen ? (
         <div className="space-y-2 rounded border border-hero-border/40 bg-slate-900/30 p-2">
           <p className="font-libre text-xs text-gray-300 line-clamp-3">{selectedPoi.description}</p>
+          <ReachControls
+            reach={poiReach}
+            onChange={(next) => {
+              setPoiReach(next);
+              onSavePoiReach({
+                poiId: selectedPoi.id,
+                influences: selectedPoi.influences,
+                reach: next,
+              });
+            }}
+          />
           <a
             href={`/dashboard/worlds/${AURENFURT_WORLD_ID}/lore/${selectedPoi.id}/edit`}
             target="_blank"
@@ -156,10 +248,10 @@ export function PoisToolBody({
             {repositioningPoi ? "Klick auf Karte…" : "Position neu setzen"}
           </button>
           <p className="font-libre text-[10px] leading-snug text-gray-400">
-            Orte liegen frei auf der Karte (kein Sektor-Raster). Im Orte-Modus kannst du den Token
-            auch ziehen. Betroffene Sektoren folgen dem Einfluss aus der exakten Position.
+            Orte liegen frei auf der Karte. Der Einflussbereich steuert, welche Sektoren (oder das
+            ganze Viertel) hervorgehoben werden.
           </p>
-          {poiSaveError && repositioningPoi ? (
+          {poiSaveError && !poiCreateOpen ? (
             <p className="font-libre text-[11px] text-red-400" role="alert">
               {poiSaveError}
             </p>
@@ -308,6 +400,7 @@ export function PoisToolBody({
               + Einfluss
             </button>
           </div>
+          <ReachControls reach={poiReach} onChange={setPoiReach} />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -357,6 +450,7 @@ export function PoisToolBody({
                   kind: poiKind,
                   imageUrl: poiImageUrl.trim() || null,
                   influences: poiInfluences,
+                  reach: poiReach,
                 })
               }
               className="rounded border border-accent-gold bg-accent-gold/10 px-2 py-1 font-barlow text-[11px] font-bold uppercase text-accent-gold disabled:opacity-40"

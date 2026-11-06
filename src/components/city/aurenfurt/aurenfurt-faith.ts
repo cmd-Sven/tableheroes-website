@@ -68,7 +68,9 @@ function namedByTitle(name: string): FaithScores | null {
   if (!title) return null;
   if (title.includes("silbernen rose") || title.includes("silberne rose")) return { elysia: 88, chromus: 8 };
   if (title.includes("ewigen ordnung") || title.includes("konklave")) return { elysia: 14, chromus: 84 };
-  if (title.includes("goldene tempelkuppel")) return { elysia: 24, chromus: 76 };
+  if (title.includes("goldene kapelle") || title.includes("goldene tempelkuppel")) {
+    return { elysia: 24, chromus: 76 };
+  }
   if (title.includes("festungspalast")) return { elysia: 84, chromus: 14 };
   if (title === "ostbrunnen") return { elysia: 74, chromus: 12 };
   return null;

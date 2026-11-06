@@ -47,10 +47,41 @@ export function isFestungspalast(name: string, category: BuildingCategory): bool
   return name.trim().toLowerCase() === "festungspalast";
 }
 
+/** Wachstube Rote Gassen trägt das Wachhaus-Modell. */
+export function isWachhausRoteGassen(name: string, category: BuildingCategory): boolean {
+  if (category !== "Wache") return false;
+  return /wachstube\s*rote\s*gassen/i.test(name.trim());
+}
+
+function namedLandmark(name: string, category: BuildingCategory): CityBuilding["landmark"] {
+  const n = name.trim().toLowerCase();
+  if (category === "Schmiede" && /gro(?:ß|ss)e\s+schmiede/.test(n)) return "schmiede";
+  if (category === "Taverne" && /rote\s+laterne/.test(n)) return "rotelaterne";
+  if (category === "Taverne" && /blau(?:en?\s+)?hirsch/.test(n)) return "wirtshaus";
+  if (/ostbrunnen/.test(n)) return "ostbrunnen";
+  if (category === "Kontor" && /kontor.*seide|seide.*kontor|haus(?:es)?\s+der\s+seide/.test(n)) {
+    return "kontor";
+  }
+  if (category === "Kontor" && /seidensalon|nordh[äa]user/.test(n)) return "hausdesnordens";
+  if (category === "Kontor" && /zunfthaus|zunft\s*haus/.test(n)) return "zunfthaus";
+  if (category === "Bibliothek" && /biblioth?ek/.test(n)) return "bibliothek";
+  if (category === "Akademie" && /schwertschule/.test(n)) return "schwertschule";
+  if (category === "Lager" && /malanthir|umschlagplatz/.test(n)) return "umschlagplatz";
+  if (category === "Tempel" && /ewigen?\s+ordnung/.test(n)) return "saalordnung";
+  if (category === "Tempel" && /hof\s+der\s+silbernen\s+rose/.test(n)) return "rosehof";
+  if (category === "Tempel" && /goldene\s+(tempel)?kapelle|goldene\s+tempelkuppel/.test(n)) {
+    return "kapelle";
+  }
+  if (category === "Wohnhaus" && /blaue\s+g[äa]rten/.test(n)) return "blauergarten";
+  if (category === "Wache" && /hofwache/.test(n)) return "hofwache";
+  return undefined;
+}
+
 function editorLandmark(name: string, category: BuildingCategory): CityBuilding["landmark"] {
   if (isNumberedWatchtower(name, category)) return "wachturm";
   if (isFestungspalast(name, category)) return "palais";
-  return undefined;
+  if (isWachhausRoteGassen(name, category)) return "wachhaus";
+  return namedLandmark(name, category);
 }
 
 function distPointToSegment(p: UvPoint, a: UvPoint, b: UvPoint): number {
@@ -131,7 +162,8 @@ export function mapEditorRowToCityBuilding(row: MapEditorBuildingRow): EditorCit
     v: uv.v,
     summary: (row.description ?? "").trim() || "Über den Karten-Editor angelegt.",
     guildId: isFestungspalast(row.name, category) ? "haeuser-des-nordens" : "zunftbund",
-    prosperityLevel: isFestungspalast(row.name, category) ? 5 : 2,
+    /** Hof macht Präsenz, kein Marktvolumen — Festungspalast nicht als Wohlstands-Spitze. */
+    prosperityLevel: isFestungspalast(row.name, category) ? 3 : 2,
     isHotspot: isFestungspalast(row.name, category) ? 6 : 20,
     specialBonus: {
       name: "Kartengebäude",
@@ -162,11 +194,13 @@ export function mergeCityBuildings(
   for (const building of editorBuildings) {
     const category = categoryOverrides[building.id] ?? ("category" in building ? building.category : undefined);
     const resolvedCategory = isBuildingCategory(category) ? category : buildingCategoryForId(building.id);
+    const seedLandmark = byId.get(building.id)?.landmark;
     const next = {
       ...building,
       category: resolvedCategory,
       kind: categoryToBuildingKind(resolvedCategory),
-      landmark: editorLandmark(building.name, resolvedCategory) ?? building.landmark,
+      landmark:
+        editorLandmark(building.name, resolvedCategory) ?? building.landmark ?? seedLandmark,
     };
     if (!isNumberedWatchtower(building.name, resolvedCategory) && building.landmark === "wachturm") {
       next.landmark = undefined;

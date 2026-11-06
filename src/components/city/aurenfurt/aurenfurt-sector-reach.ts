@@ -23,21 +23,28 @@ import {
 import type { CityInfluenceTier } from "@/src/lib/npcs/city-simulation";
 
 /** Halbe Kantenlänge des Gebäude-Fußabdrucks in Karten-UV. Nahe an einer Grenze zählen beide Sektoren. */
-export const BUILDING_FOOTPRINT_HALF = 0.008;
+export const BUILDING_FOOTPRINT_HALF = 0.01;
 
-/** Chebyshev-Schritte, eigener Sektor immer dabei. */
+/**
+ * Chebyshev-Schritte, eigener Sektor immer dabei.
+ * Nach Halbierung der Sektorgröße (0.04→0.02) verdoppelt, damit die UV-Reichweite gleich bleibt.
+ */
 export const NPC_SECTOR_REACH: Record<CityInfluenceTier, number> = {
-  local: 1,
-  regional_economy: 2,
-  authority_faction: 3,
-  apex_global: 4,
+  local: 2,
+  regional_economy: 4,
+  authority_faction: 6,
+  apex_global: 8,
 };
+
+/** Basis-Sektorradius für Gebäude-Wohlstand/Unruhe auf der Heatmap (ohne NPCs). */
+export const BUILDING_ASPECT_REACH = 2;
 
 export type ReachNpc = {
   locationId: string | null;
   tier: CityInfluenceTier;
   influence: number;
   loyalCriminal: number;
+  greedyAltruist?: number;
 };
 
 export type ReachBuilding = {
@@ -106,7 +113,7 @@ export function sectorsForDistrict(
     defaultDistrictPolygons()[districtId]?.points ??
     [];
   if (!district || points.length < 3) return [];
-  const key = `${districtId}|${polygonSignature(points)}`;
+  const key = `${districtId}|v3|${SECTOR_SIZE_DEFAULT}|${polygonSignature(points)}`;
   const cached = derivedSectorCache.get(key);
   if (cached) return cached;
   const sectors = divideDistrictIntoSectors(districtId, district.name, points, {
@@ -216,7 +223,50 @@ export type SectorFaithShift = {
   chromusDelta: number;
 };
 
-type FaithBuilding = ReachBuilding & { elysia: number; chromus: number };
+/** Meter, die die Heatmap und das Stadt-Dashboard teilen. */
+export const HEATMAP_ASPECTS = [
+  { key: "crime", label: "Kriminalität" },
+  { key: "economy", label: "Wirtschaft" },
+  { key: "guard", label: "Garde" },
+  { key: "vattrak", label: "Religion" },
+  { key: "malanthir", label: "Malanthir" },
+  { key: "refugees", label: "Flüchtlinge" },
+  { key: "unemployment", label: "Arbeitslosigkeit" },
+  { key: "elysia", label: "Elysia" },
+  { key: "chromus", label: "Chromus" },
+] as const;
+
+export type HeatmapAspect = (typeof HEATMAP_ASPECTS)[number]["key"];
+
+export type SectorAspectShift = {
+  sector: DistrictSector;
+} & Record<HeatmapAspect, number>;
+
+export type ReachPoi = {
+  u: number;
+  v: number;
+  districtId: CityDistrictId;
+  influences: { aspect: string; delta: number }[];
+  reach?: { mode: "sector" | "district"; radius: 0 | 1 | 2 | 3 | 4 };
+};
+
+/** Anteil eines POI-Einflussaspekts am Heatmap-/Sim-Meter. */
+export function poiAspectWeight(influenceAspect: string, meter: HeatmapAspect): number {
+  if (influenceAspect === meter) return 1;
+  if (meter === "vattrak" && influenceAspect === "religion") return 0.55;
+  if (meter === "vattrak" && influenceAspect === "knowledge") return 0.25;
+  if (meter === "economy" && influenceAspect === "prestige") return 0.5;
+  if (meter === "malanthir" && influenceAspect === "knowledge") return -0.2;
+  if (meter === "guard" && influenceAspect === "crime") return -0.35;
+  if (meter === "crime" && influenceAspect === "guard") return -0.35;
+  return 0;
+}
+
+type FaithBuilding = ReachBuilding & {
+  elysia: number;
+  chromus: number;
+  prosperity?: number;
+};
 type FaithNpc = ReachNpc & { faith?: "elysia" | "chromus" | null };
 
 /**
@@ -268,6 +318,153 @@ export function sectorFaithShifts(
   });
 }
 
+function emptyAspectSlot(): Record<HeatmapAspect, number> {
+  return {
+    crime: 0,
+    economy: 0,
+    guard: 0,
+    vattrak: 0,
+    malanthir: 0,
+    refugees: 0,
+    unemployment: 0,
+    elysia: 0,
+    chromus: 0,
+  };
+}
+
+function clampAspect(aspect: HeatmapAspect, value: number) {
+  if (aspect === "crime") return Math.max(-10, Math.min(14, value));
+  if (aspect === "guard") return Math.max(-8, Math.min(12, value));
+  if (aspect === "economy") return Math.max(-10, Math.min(14, value));
+  if (aspect === "unemployment") return Math.max(-8, Math.min(12, value));
+  if (aspect === "elysia" || aspect === "chromus") return Math.max(-14, Math.min(18, value));
+  if (aspect === "vattrak" || aspect === "malanthir") return Math.max(-8, Math.min(10, value));
+  return Math.max(-8, Math.min(10, value));
+}
+
+/**
+ * Sektor-Abweichungen für alle Heatmap-Meter: Gebäude, NPCs und Orte mit Reichweite.
+ * Der Viertelwert bleibt der Mittelwert der Sektoren (Zentrierung in der Heatmap).
+ */
+export function sectorAspectShifts(
+  districtId: CityDistrictId,
+  buildings: FaithBuilding[],
+  npcs: FaithNpc[],
+  pois: ReachPoi[],
+  stored: DistrictSectorsByDistrict | null | undefined,
+  polygons?: DistrictPolygons | null,
+): SectorAspectShift[] {
+  const sectors = sectorsForDistrict(districtId, stored, polygons);
+  const delta = new Map<string, Record<HeatmapAspect, number>>();
+  for (const sector of sectors) delta.set(sector.id, emptyAspectSlot());
+
+  const crimeRows = sectorShifts(districtId, buildings, npcs, stored, polygons);
+  for (const row of crimeRows) {
+    const slot = delta.get(row.sector.id);
+    if (!slot) continue;
+    slot.crime += row.crimeDelta;
+    slot.guard += row.guardDelta;
+  }
+
+  const faithRows = sectorFaithShifts(districtId, buildings, npcs, stored, polygons);
+  for (const row of faithRows) {
+    const slot = delta.get(row.sector.id);
+    if (!slot) continue;
+    slot.elysia += row.elysiaDelta;
+    slot.chromus += row.chromusDelta;
+    slot.vattrak += row.elysiaDelta * 0.22 + row.chromusDelta * 0.12;
+  }
+
+  for (const building of buildings) {
+    if (building.districtId !== districtId) continue;
+    const occupied = sectorsOccupiedByBuilding(building, sectors);
+    const prosperityPull = ((building.prosperity ?? 3) - 3) * 3.2;
+    const unrestPull = (building.hotspot - 35) * 0.12;
+    const marketBoost =
+      building.category === "Markt"
+        ? 6
+        : building.category === "Geschäft" || building.category === "Kontor"
+          ? 4.5
+          : building.category === "Werkstatt" || building.category === "Schmiede"
+            ? 3.5
+            : building.category === "Taverne"
+              ? 3
+              : 0;
+    const templePull = building.category === "Tempel" ? 4 : 0;
+    const unrestRadius = Math.min(
+      4,
+      BUILDING_ASPECT_REACH + (building.hotspot >= 70 ? 1 : 0) + ((building.prosperity ?? 3) <= 1 ? 1 : 0),
+    );
+    const reached = sectorsWithinReach(occupied, unrestRadius, sectors);
+    for (const { sector, distance } of reached) {
+      const weight = falloff(distance, unrestRadius);
+      const slot = delta.get(sector.id);
+      if (!slot) continue;
+      slot.economy += (prosperityPull + marketBoost - unrestPull * 0.85) * weight;
+      slot.unemployment += (-prosperityPull * 0.55 - marketBoost * 0.35 + unrestPull * 0.7) * weight;
+      slot.crime += unrestPull * 1.1 * weight + ((building.prosperity ?? 3) <= 2 ? (3 - (building.prosperity ?? 3)) * 1.4 * weight : 0);
+      slot.vattrak += (templePull + (building.elysia - 35) * 0.05) * weight;
+      slot.malanthir += (building.category === "Lager" && building.hotspot >= 70 ? 5 : unrestPull * 0.25) * weight;
+      slot.refugees +=
+        (building.category === "Tor" ? 2.5 : building.category === "Taverne" ? 1.2 : 0) * weight;
+    }
+  }
+
+  for (const building of buildings) {
+    if (building.districtId !== districtId) continue;
+    const occupied = sectorsOccupiedByBuilding(building, sectors);
+    const staff = npcs.filter((npc) => npc.locationId === building.id);
+    for (const npc of staff) {
+      const radius = NPC_SECTOR_REACH[npc.tier] ?? 2;
+      const reached = sectorsWithinReach(occupied, radius, sectors);
+      for (const { sector, distance } of reached) {
+        const weight = Math.max(0, Math.min(1, npc.influence / 100)) * falloff(distance, radius);
+        const slot = delta.get(sector.id);
+        if (!slot) continue;
+        const altruism = (npc.greedyAltruist ?? 0) / 5;
+        slot.economy += 3.2 * altruism * weight;
+        slot.unemployment -= 2.4 * altruism * weight;
+        slot.vattrak += Math.max(0, -npc.loyalCriminal) * 0.35 * weight;
+      }
+    }
+  }
+
+  for (const poi of pois) {
+    if (poi.districtId !== districtId) continue;
+    const reached = sectorsInPoiInfluence(poi, stored, polygons);
+    if (reached.length === 0) continue;
+    const radius = resolvePoiRadius(poi);
+    for (const { sector, distance } of reached) {
+      const weight = Number.isFinite(radius) ? falloff(distance, radius) : distance === 0 ? 1 : 0.72;
+      const slot = delta.get(sector.id);
+      if (!slot) continue;
+      for (const influence of poi.influences) {
+        for (const aspect of HEATMAP_ASPECTS) {
+          const factor = poiAspectWeight(influence.aspect, aspect.key);
+          if (factor === 0) continue;
+          slot[aspect.key] += influence.delta * factor * weight;
+        }
+      }
+    }
+  }
+
+  return sectors.map((sector) => {
+    const shift = delta.get(sector.id) ?? emptyAspectSlot();
+    return {
+      sector,
+      crime: clampAspect("crime", shift.crime),
+      economy: clampAspect("economy", shift.economy),
+      guard: clampAspect("guard", shift.guard),
+      vattrak: clampAspect("vattrak", shift.vattrak),
+      malanthir: clampAspect("malanthir", shift.malanthir),
+      refugees: clampAspect("refugees", shift.refugees),
+      unemployment: clampAspect("unemployment", shift.unemployment),
+      elysia: clampAspect("elysia", shift.elysia),
+      chromus: clampAspect("chromus", shift.chromus),
+    };
+  });
+}
+
 function sectorShifts(
   districtId: CityDistrictId,
   buildings: ReachBuilding[],
@@ -297,13 +494,19 @@ function sectorShifts(
         // Klein gehalten: ein Viertel wie der Palast hat nur wenige Sektoren,
         // und eine Wache mit großem Radius darf den Zähler nicht auf 0 drücken.
         if (guards) {
-          slot.crime -= 4 * weight;
-          slot.guard += 3 * weight;
+          slot.crime -= 5 * weight;
+          slot.guard += 3.5 * weight;
         }
         if (criminal && !guards) {
-          slot.crime += 8 * weight;
-          slot.guard -= 3 * weight;
+          slot.crime += 9 * weight;
+          slot.guard -= 3.5 * weight;
         }
+        const greed = Math.max(0, -(npc.greedyAltruist ?? 0)) / 5;
+        const altruism = Math.max(0, npc.greedyAltruist ?? 0) / 5;
+        slot.crime += 3.5 * greed * weight;
+        slot.crime -= 2.2 * altruism * weight;
+        // Dichte Präsenz der Garde beruhigt Crime, erzeugt aber lokalen Druck (Unruhe-Proxy).
+        if (guards) slot.crime += 1.2 * weight * 0.35;
       }
     }
   }
@@ -312,8 +515,8 @@ function sectorShifts(
     const shift = delta.get(sector.id) ?? { crime: 0, guard: 0 };
     return {
       sector,
-      crimeDelta: Math.max(-6, Math.min(10, shift.crime)),
-      guardDelta: Math.max(-4, Math.min(5, shift.guard)),
+      crimeDelta: Math.max(-8, Math.min(12, shift.crime)),
+      guardDelta: Math.max(-5, Math.min(7, shift.guard)),
     };
   });
 }
@@ -354,6 +557,8 @@ export type PoiReachPoint = {
   v: number;
   districtId: CityDistrictId;
   influences: { delta: number }[];
+  /** Explizit gesetzt (Admin); sonst Ableitung aus Einflussstärke. */
+  reach?: { mode: "sector" | "district"; radius: 0 | 1 | 2 | 3 | 4 };
 };
 
 export type PoiReachCell = {
@@ -368,9 +573,17 @@ export type PoiReachCell = {
 export function poiInfluenceRadius(influences: { delta: number }[]): number {
   if (!influences.length) return 0;
   const peak = Math.max(...influences.map((entry) => Math.abs(entry.delta)));
-  if (peak >= 5) return 2;
-  if (peak >= 2) return 1;
+  if (peak >= 5) return 4;
+  if (peak >= 3) return 3;
+  if (peak >= 2) return 2;
+  if (peak >= 1) return 1;
   return 0;
+}
+
+function resolvePoiRadius(poi: PoiReachPoint): number {
+  if (poi.reach?.mode === "district") return Number.POSITIVE_INFINITY;
+  if (poi.reach?.mode === "sector") return poi.reach.radius;
+  return poiInfluenceRadius(poi.influences);
 }
 
 /** Sektoren im optischen Einflussbereich eines besonderen Orts. */
@@ -383,7 +596,13 @@ export function sectorsInPoiInfluence(
   if (sectors.length === 0) return [];
   const occupied = sectorsOccupiedByBuilding(poi, sectors);
   if (occupied.length === 0) return [];
-  const radius = poiInfluenceRadius(poi.influences);
+  const radius = resolvePoiRadius(poi);
+  if (!Number.isFinite(radius)) {
+    return sectors.map((sector) => {
+      const home = occupied.some((entry) => entry.id === sector.id);
+      return { sector, distance: home ? 0 : 1 };
+    });
+  }
   const reached = sectorsWithinReach(occupied, radius, sectors);
   if (reached.length > 0) return reached;
   return occupied.map((sector) => ({ sector, distance: 0 }));

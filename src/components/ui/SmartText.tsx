@@ -12,6 +12,7 @@ export type EntityForSmartText = {
   id: string;
   name: string;
   type: "npc" | "location" | "faction";
+  aliases?: string[];
 };
 
 type SmartTextProps = {
@@ -46,8 +47,25 @@ function buildEntityUrl(
   }
   if (entity.type === "faction") {
     if (campaignId) return `/dashboard/campaigns/${campaignId}/factions/${entity.id}`;
+    if (worldId) return `/dashboard/worlds/${worldId}/factions/${entity.id}`;
   }
   return null;
+}
+
+type MatchTerm = { term: string; entity: EntityForSmartText };
+
+function buildMatchTerms(entities: EntityForSmartText[]): MatchTerm[] {
+  const terms: MatchTerm[] = [];
+  for (const entity of entities) {
+    terms.push({ term: entity.name, entity });
+    for (const alias of entity.aliases ?? []) {
+      const trimmed = alias.trim();
+      if (trimmed && trimmed.toLowerCase() !== entity.name.toLowerCase()) {
+        terms.push({ term: trimmed, entity });
+      }
+    }
+  }
+  return terms.sort((a, b) => b.term.length - a.term.length);
 }
 
 function processTextWithEntities(
@@ -59,12 +77,10 @@ function processTextWithEntities(
 ): React.ReactNode[] {
   if (!entities.length) return [text];
 
-  const sortedEntities = [...entities].sort(
-    (a, b) => b.name.length - a.name.length
-  );
-  const pattern = sortedEntities
-    .map((e) => escapeRegex(e.name))
-    .join("|");
+  const matchTerms = buildMatchTerms(entities).filter((t) => t.term.length >= 3);
+  if (!matchTerms.length) return [text];
+
+  const pattern = matchTerms.map((t) => escapeRegex(t.term)).join("|");
   const regex = new RegExp(
     `(?:^|(?<=[^\\w]))(?:${pattern})(?=(?:[^\\w]|$))`,
     "gi"
@@ -78,22 +94,20 @@ function processTextWithEntities(
   while ((m = re.exec(text)) !== null) {
     const matched = m[0];
     const lower = matched.toLowerCase();
-    const entity = sortedEntities.find(
-      (e) => e.name.toLowerCase() === lower
-    );
-    if (entity) {
-      const url = buildEntityUrl(entity, campaignId, worldId);
+    const hit = matchTerms.find((t) => t.term.toLowerCase() === lower);
+    if (hit) {
+      const url = buildEntityUrl(hit.entity, campaignId, worldId);
       if (url) {
         if (m.index > lastIndex) {
           parts.push(text.slice(lastIndex, m.index));
         }
         parts.push(
           <Link
-            key={`${entity.id}-${m.index}`}
+            key={`${hit.entity.id}-${m.index}`}
             href={url}
             target={openInNewTab ? "_blank" : undefined}
             rel={openInNewTab ? "noopener noreferrer" : undefined}
-            className="text-hero-vibrant underline hover:text-hero-vibrant/90"
+            className="text-hero-vibrant underline underline-offset-2 hover:text-hero-vibrant/90"
           >
             {matched}
           </Link>
@@ -297,12 +311,11 @@ export function SmartText({
 
   return (
     <div
-      className={`lore-rich-text w-full min-w-0 break-words font-libre text-[#e5e5e5] leading-relaxed max-w-none
-        [&_p]:my-2 [&_p]:leading-relaxed
+      className={`lore-rich-text w-full min-w-0 break-words font-libre text-gray-200 leading-[1.8]
         [&_strong]:font-bold [&_strong]:text-white
-        [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6
-        [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6
-        [&_a]:text-hero-vibrant [&_a:hover]:underline
+        [&_ul]:list-disc [&_ul]:pl-6
+        [&_ol]:list-decimal [&_ol]:pl-6
+        [&_a]:text-hero-vibrant [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-hero-vibrant/90
         ${largeImages ? "" : "[&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-md"}
         [&_hr]:my-6 [&_hr]:border-hero-border/70
         ${className}`}

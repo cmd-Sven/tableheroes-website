@@ -6,10 +6,11 @@ export type CrimeHeatColor = {
 };
 
 const HEAT_STOPS: { t: number; r: number; g: number; b: number; opacity: number }[] = [
-  { t: 0, r: 0.1, g: 0.32, b: 0.55, opacity: 0.14 },
-  { t: 0.34, r: 0.9, g: 0.78, b: 0.18, opacity: 0.4 },
-  { t: 0.67, r: 0.9, g: 0.4, b: 0.08, opacity: 0.66 },
-  { t: 1, r: 0.72, g: 0.05, b: 0.04, opacity: 0.9 },
+  { t: 0, r: 0.08, g: 0.28, b: 0.52, opacity: 0.22 },
+  { t: 0.28, r: 0.2, g: 0.55, b: 0.42, opacity: 0.38 },
+  { t: 0.5, r: 0.92, g: 0.78, b: 0.16, opacity: 0.55 },
+  { t: 0.72, r: 0.92, g: 0.38, b: 0.06, opacity: 0.74 },
+  { t: 1, r: 0.78, g: 0.04, b: 0.05, opacity: 0.92 },
 ];
 
 function clampScore(value: number) {
@@ -17,9 +18,12 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-/** Niedrig kühl und durchsichtig, hoch Gelb über Orange nach Rot. Gleiche Werte, gleiche Farbe. */
-export function crimeHeatColor(crime: number): CrimeHeatColor {
-  const t = clampScore(crime) / 100;
+/**
+ * Niedrig kühl und durchsichtig, hoch Gelb über Orange nach Rot.
+ * Erwartet bereits relativ gestreckte Heat-Werte (siehe citySectorHeat).
+ */
+export function heatColor(heat: number): CrimeHeatColor {
+  const t = clampScore(heat) / 100;
   let lower = HEAT_STOPS[0];
   let upper = HEAT_STOPS[HEAT_STOPS.length - 1];
   for (let index = 0; index < HEAT_STOPS.length - 1; index += 1) {
@@ -38,4 +42,9 @@ export function crimeHeatColor(crime: number): CrimeHeatColor {
     b: lower.b + (upper.b - lower.b) * mix,
     opacity: lower.opacity + (upper.opacity - lower.opacity) * mix,
   };
+}
+
+/** Alias für bestehende Aufrufer. */
+export function crimeHeatColor(crime: number): CrimeHeatColor {
+  return heatColor(crime);
 }

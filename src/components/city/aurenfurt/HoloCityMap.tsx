@@ -10,6 +10,8 @@ import type { AnalyticsRange } from "./aurenfurt-analytics";
 import { MapEditorPortals } from "./MapEditorPortals";
 import { CityMapHud } from "./CityMapHud";
 import { CityEventWizard } from "./CityEventWizard";
+import CityVerwaltung from "./CityVerwaltung";
+import { pruneExpiredKaiserPlays } from "./aurenfurt-verwaltung-store";
 import {
   CITY_BUILDINGS,
   findBuilding,
@@ -42,8 +44,11 @@ import { useMapSelectionReach } from "./hooks/useMapSelectionReach";
 import { useMapEditorSession } from "./hooks/useMapEditorSession";
 import { useMapEditorMutations } from "./hooks/useMapEditorMutations";
 import type { DistrictSector } from "./aurenfurt-sectors";
-import { citySectorCrime } from "./aurenfurt-crime-heatmap";
+import { citySectorHeat, type HeatmapAspect } from "./aurenfurt-city-heatmap";
+import { buildDistrictHudKpis } from "./DistrictHudKpis";
+import { cityMetricsOn, districtMetricsOn } from "./aurenfurt-history";
 import { parseDay } from "./aurenfurt-time";
+import { weatherConditionPenalty } from "./aurenfurt-streets";
 import { loadAurenfurtCityPressure } from "./load-aurenfurt-npc-records";
 import { mergeCityBuildings } from "./aurenfurt-map-buildings";
 import { AURENFURT_WORLD_ID } from "./aurenfurt-district-lore-ids";
@@ -123,13 +128,19 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         category: street.category,
         crime: street.crime,
         security: street.security,
-        condition: street.condition,
+        condition: Math.max(
+          0,
+          Math.min(100, street.condition - weatherConditionPenalty(climate.current)),
+        ),
         traffic: street.traffic,
         segments: Math.max(1, street.points.length - 1),
       })),
       pois: pois.map((poi) => ({
         districtId: poi.districtId,
         influences: poi.influences,
+        u: poi.u,
+        v: poi.v,
+        reach: poi.reach,
       })),
       liveWeatherKind: climate.current.source === "live" ? climate.current.kind : null,
       sectors: sectorsApi.sectorsByDistrict,
@@ -150,6 +161,12 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     saveError: layerVisibilityError,
   } = useMapLayerVisibility(resolvedWorldId, isGm);
   const [citySurface, setCitySurface] = useState<CitySurface>("map");
+  useEffect(() => {
+    pruneExpiredKaiserPlays(calendar.day);
+  }, [calendar.day]);
+  useEffect(() => {
+    if (!isGm && citySurface === "verwaltung") setCitySurface("map");
+  }, [isGm, citySurface]);
   const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
   const [range, setRange] = useState<AnalyticsRange>("month");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("economy");
@@ -159,11 +176,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   const [eventDistrictId, setEventDistrictId] = useState<CityDistrictId | null>(null);
   const [eventSectorIds, setEventSectorIds] = useState<string[]>([]);
   const [eventWholeCity, setEventWholeCity] = useState(false);
-  const [crimeHeatmap, setCrimeHeatmap] = useState(false);
+  const [heatmapAspect, setHeatmapAspect] = useState<HeatmapAspect | null>(null);
   const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
-  const crimeCells = useMemo(
-    () => (crimeHeatmap ? citySectorCrime(parseDay(calendar.day)) : []),
-    [calendar.day, crimeHeatmap, simVersion],
+  const heatCells = useMemo(
+    () => (heatmapAspect ? citySectorHeat(parseDay(calendar.day), heatmapAspect) : []),
+    [calendar.day, heatmapAspect, simVersion],
   );
 
   const session = useMapEditorSession({
@@ -222,6 +239,26 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       ? view.hoveredSubject.name
       : null;
 
+  const focusDistrictId = view.subject?.districtId ?? null;
+  const districtTitle = focusDistrictId
+    ? (findDistrict(focusDistrictId)?.name ?? "Viertel")
+    : "Aurenfurt";
+  const districtKpis = useMemo(() => {
+    const dayMs = parseDay(calendar.day);
+    const dayStep = 86_400_000;
+    const maxMs = parseDay(calendar.maxDay);
+    const minMs = parseDay(calendar.minDay);
+    const current = focusDistrictId
+      ? districtMetricsOn(focusDistrictId, dayMs)
+      : cityMetricsOn(dayMs);
+    const lookingForward = dayMs + dayStep <= maxMs;
+    const compareMs = lookingForward ? dayMs + dayStep : Math.max(minMs, dayMs - dayStep);
+    const compare = focusDistrictId
+      ? districtMetricsOn(focusDistrictId, compareMs)
+      : cityMetricsOn(compareMs);
+    return buildDistrictHudKpis(current, compare, { fromPast: !lookingForward });
+  }, [calendar.day, calendar.maxDay, calendar.minDay, focusDistrictId, simVersion]);
+
   const eventPickSectors =
     eventWizardOpen && eventPlaceStep && eventDistrictId
       ? (sectorsApi.sectorsByDistrict[eventDistrictId] ?? [])
@@ -257,8 +294,16 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         setEventWholeCity(false);
         setEventDistrictId(districtId);
         setEventSectorIds([]);
+        view.hover(null);
       }
       return;
+    }
+    if (session.mapAdminMode && selection?.type === "building") {
+      session.selectBuilding(selection.id);
+      return;
+    }
+    if (session.mapAdminMode && !selection) {
+      session.selectBuilding(null);
     }
     view.focus(selection);
   };
@@ -303,7 +348,15 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         />
       ) : null}
       <div className="relative min-w-0 flex-1">
-        <div className={citySurface === "dashboard" ? "invisible absolute inset-0" : eventPlaceStep ? "h-full cursor-crosshair" : "h-full"}>
+        <div
+          className={
+            citySurface === "dashboard" || citySurface === "verwaltung"
+              ? "invisible absolute inset-0"
+              : eventPlaceStep
+                ? "h-full cursor-crosshair"
+                : "h-full"
+          }
+        >
         <HoloCityLoadingOverlay
           enabled={citySurface === "map"}
           sceneBooted={sceneBooted}
@@ -338,8 +391,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           weatherFx={shownWeather.effect}
           weatherFxIntensity={shownWeather.intensity}
           viewedDay={calendar.day}
-          streetsLayerVisible={crimeHeatmap ? false : layers.streets}
-          buildingsVisible={crimeHeatmap ? false : layers.buildings}
+          streetsLayerVisible={heatmapAspect ? false : layers.streets}
+          buildingsVisible={heatmapAspect ? false : layers.buildings}
           poisVisible={layers.pois}
           wallsVisible={layers.walls}
           polygons={polygons.polygons}
@@ -360,8 +413,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           eventPickSectors={eventPickSectors}
           eventSectorIds={eventSectorIds}
           onPickEventSector={onPickEventSector}
-          crimeHeatmapVisible={crimeHeatmap}
-          crimeCells={crimeCells}
+          crimeHeatmapVisible={Boolean(heatmapAspect)}
+          crimeCells={heatCells}
           poiReachCells={reach.poiReachCells}
           poiReachVisible={poiReachVisible}
           holdStill={eventPlaceStep}
@@ -400,6 +453,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
         <CityMapHud
           citySurface={citySurface}
           onCitySurface={setCitySurface}
+          showVerwaltung={isGm}
           day={calendar.day}
           minDay={calendar.minDay}
           maxDay={calendar.maxDay}
@@ -414,6 +468,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onToggleMapAdminMode={session.toggleMapAdminMode}
           eventWizardOpen={eventWizardOpen}
           onToggleEventWizard={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
+          districtTitle={districtTitle}
+          districtId={focusDistrictId}
+          districtKpis={districtKpis}
           statusLine={
             eventWizardOpen && eventPlaceStep
               ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
@@ -425,7 +482,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
                     ? session.repositioningPoi
                       ? "Klicke auf die Karte, um den Ort neu zu setzen."
                       : "Klicke auf die Karte, um den besonderen Ort zu setzen."
-                    : (hint ?? view.subject?.name ?? "Viertel links wählen.")
+                    : hint
+                      ? hint
+                      : focusDistrictId
+                        ? null
+                        : "Viertel links wählen."
           }
           layoutError={layoutError}
           buildingsVisible={layers.buildings}
@@ -439,8 +500,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           weatherMode={weatherFx.preference.mode}
           autoEffect={shownWeather.autoEffect}
           onWeatherMode={weatherFx.setMode}
-          crimeHeatmap={crimeHeatmap}
-          onToggleCrimeHeatmap={() => setCrimeHeatmap((current) => !current)}
+          heatmapAspect={heatmapAspect}
+          onHeatmapAspect={setHeatmapAspect}
         />
         {isGm && eventWizardOpen ? (
           <CityEventWizard
@@ -470,6 +531,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             onStepYear={calendar.stepYear}
             onGoToday={calendar.goToday}
             onShowMap={() => setCitySurface("map")}
+            onShowVerwaltung={() => setCitySurface("verwaltung")}
+            showVerwaltung={isGm}
             onLeave={onLeave}
             range={range}
             setRange={setRange}
@@ -477,6 +540,14 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             setChartMetric={setChartMetric}
             lines={lines}
             setLines={setLines}
+          />
+        ) : null}
+        {citySurface === "verwaltung" && isGm ? (
+          <CityVerwaltung
+            day={calendar.day}
+            onShowMap={() => setCitySurface("map")}
+            onShowDashboard={() => setCitySurface("dashboard")}
+            onLeave={onLeave}
           />
         ) : null}
         {citySurface === "map" && !session.mapAdminMode && view.subject?.type !== "district" ? (
