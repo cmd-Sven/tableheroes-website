@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Castle, CloudSun, MapPin, Route, type LucideIcon } from "lucide-react";
+import { Building2, Castle, CloudSun, MapPin, Moon, Route, Sun, type LucideIcon } from "lucide-react";
 import type { MapLayerId } from "./hooks/useMapLayerVisibility";
 
 const LAYERS: {
@@ -24,6 +24,9 @@ type Props = {
   weatherVisible: boolean;
   onToggleLayer: (layer: MapLayerId) => void;
   onToggleWeather: () => void;
+  /** SL: Tag/Nacht — erscheint rechts neben Wetter. */
+  nightMode?: boolean;
+  onToggleNightMode?: () => void;
 };
 
 function visibilityLabel(label: string, visible: boolean) {
@@ -38,6 +41,8 @@ export function MapLayerVisibilityBar({
   weatherVisible,
   onToggleLayer,
   onToggleWeather,
+  nightMode = false,
+  onToggleNightMode,
 }: Props) {
   const visibleById = {
     buildings: buildingsVisible,
@@ -79,6 +84,36 @@ export function MapLayerVisibilityBar({
           </button>
         );
       })}
+      {onToggleNightMode ? (
+        <button
+          type="button"
+          aria-label={nightMode ? "Nachtmodus, aktiv — auf Tag umschalten" : "Nachtmodus, aus — Nacht einläuten"}
+          title={nightMode ? "Nacht aktiv" : "Nachtmodus"}
+          aria-pressed={nightMode}
+          onClick={onToggleNightMode}
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded transition-[opacity,background-color] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-1px] focus-visible:outline-accent-gold ${
+            nightMode
+              ? "bg-background-card/80 opacity-100"
+              : "opacity-55 hover:opacity-80"
+          }`}
+        >
+          {nightMode ? (
+            <Moon
+              className="h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]"
+              strokeWidth={2.25}
+              style={{ color: "#cab926" }}
+              aria-hidden
+            />
+          ) : (
+            <Sun
+              className="h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]"
+              strokeWidth={2.25}
+              style={{ color: "#e8b86d" }}
+              aria-hidden
+            />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }

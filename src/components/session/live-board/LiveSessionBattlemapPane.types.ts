@@ -117,6 +117,16 @@ export type LiveSessionBattlemapPaneProps = {
   campaignId: string;
   worldId: string | null | undefined;
   activeWorldMapId: string | null;
+  activeAurenfurtCity?: boolean;
+  isPrepMode?: boolean;
+  liveState?: LiveState | null;
+  partyCharacters?: Array<{
+    id: string;
+    name: string;
+    playerUserId?: string | null;
+    avatar_url?: string | null;
+  }>;
+  updateLiveState?: (patch: Partial<LiveState>) => void;
   battlemapActive: boolean;
   battlemapTrayScenes: StageSceneMediaItem[];
   startTransition: TransitionStartFunction;

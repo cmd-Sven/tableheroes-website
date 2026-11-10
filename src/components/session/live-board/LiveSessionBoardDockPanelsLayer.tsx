@@ -1,4 +1,4 @@
-﻿/**
+/**
  * LiveSessionBoardDockPanelsLayer — Left dock and right side panels.
  */
 "use client";
@@ -33,6 +33,7 @@ export function LiveSessionBoardDockPanelsLayer() {
       sessionLocationLoreReadable,
       campaignShops,
       guestJoinUrl,
+      aurenfurtCityEnabled,
     },
     router,
     isGM,
@@ -503,6 +504,7 @@ export function LiveSessionBoardDockPanelsLayer() {
         urgentHandRaise={urgentHandRaise}
         isUpdating={isUpdating}
         startTransition={startTransition}
+        aurenfurtCityEnabled={Boolean(aurenfurtCityEnabled)}
       />
 
     </>

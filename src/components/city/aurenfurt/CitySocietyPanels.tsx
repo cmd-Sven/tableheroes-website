@@ -21,6 +21,8 @@ import type { CityDistrictId } from "./aurenfurt-districts";
 import { findDistrict } from "./aurenfurt-districts";
 import { districtMetricsOn } from "./aurenfurt-history";
 import { buildFinanceSeries, calculateDistrictFinances, formatGp, sumFinances } from "./aurenfurt-finances";
+import { kaiserTreasuryIncomeOn } from "./aurenfurt-kaiser-plays";
+import { treasuryDeltaOn } from "./aurenfurt-treasury-events";
 import {
   cityMarketSeriesForRange,
   districtMarketSeriesForRange,
@@ -34,6 +36,7 @@ import {
 import { POP_LAYER_LABELS } from "./aurenfurt-population-types";
 import { parseDay } from "./aurenfurt-time";
 import { vattrakStockOn } from "./aurenfurt-vattrak-stock";
+import { VattrakLagerCard } from "./VattrakLagerCard";
 import { warPhaseLabel, warPhaseLore, warPhaseOn } from "./aurenfurt-war-events";
 import type { AnalyticsRange } from "./aurenfurt-analytics";
 
@@ -129,17 +132,36 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
   }, [seriesReady, day, fromIso, scopeId]);
 
   const finances = useMemo(() => {
-    if (!popSnap) return { income: 0, expenses: 0, net: 0 };
-    if (scopeId) {
-      const layers = popSnap.districts[scopeId];
-      const economy = districtMetricsOn(scopeId, parseDay(day)).economy;
-      return calculateDistrictFinances(layers, economy);
-    }
-    return sumFinances(
-      Object.values(popSnap.districts).map((layers) =>
-        calculateDistrictFinances(layers, districtMetricsOn(layers.districtId, parseDay(day)).economy),
-      ),
-    );
+    if (!popSnap) return { income: 0, expenses: 0, net: 0, notes: [] as string[] };
+    const dayMs = parseDay(day);
+    const base = scopeId
+      ? (() => {
+          const layers = popSnap.districts[scopeId];
+          const meters = districtMetricsOn(scopeId, dayMs);
+          return calculateDistrictFinances(layers, meters.economy, {
+            crime: meters.crime,
+            guardMeter: meters.guard,
+          });
+        })()
+      : sumFinances(
+          Object.values(popSnap.districts).map((layers) => {
+            const meters = districtMetricsOn(layers.districtId, dayMs);
+            return calculateDistrictFinances(layers, meters.economy, {
+              crime: meters.crime,
+              guardMeter: meters.guard,
+            });
+          }),
+        );
+    const delta = treasuryDeltaOn(day, scopeId);
+    const kaiserLoan = scopeId ? { income: 0, titles: [] as string[] } : kaiserTreasuryIncomeOn(day);
+    const income = base.income + delta.income + kaiserLoan.income;
+    const expenses = base.expenses + delta.expenses;
+    return {
+      income,
+      expenses,
+      net: income - expenses,
+      notes: [...delta.titles, ...kaiserLoan.titles],
+    };
   }, [day, popSnap, scopeId]);
 
   const financeChart = useMemo(() => {
@@ -149,6 +171,7 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
       income: point.income,
       expenses: point.expenses,
       net: point.net,
+      notes: point.notes,
     }));
   }, [seriesReady, day, fromIso, scopeId]);
 
@@ -165,8 +188,6 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
 
   const guardsInCity = scopeId ? popSnap.districts[scopeId].pop_guards : popSnap.pop_guards;
   const phase = warPhaseOn(parseDay(day));
-  const rationLabel =
-    stock.level === "critical" ? "Kritisch" : stock.level === "rationed" ? "Rationiert" : "Ruhig";
 
   return (
     <section className="mt-4 space-y-4">
@@ -254,15 +275,23 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
               </div>
             </dl>
             <p className="mt-2 font-libre text-[10px] text-gray-500">
-              Abgeleitet aus Bevölkerung × Wirtschaft — ohne Rückwirkung auf die Simulation.
+              Basis aus Bevölkerung × Wirtschaft, plus historische Kassenimpulse — ohne Rückwirkung auf Meter.
             </p>
+            {finances.notes.length > 0 ? (
+              <p className="mt-1 font-libre text-[10px] leading-snug text-accent-gold/80">
+                Heute u. a.: {finances.notes.slice(0, 2).join(" · ")}
+                {finances.notes.length > 2 ? ` · +${finances.notes.length - 2}` : ""}
+              </p>
+            ) : null}
           </article>
         </div>
       </div>
 
       <article className="rounded-md border border-hero-dark bg-background-card p-4 shadow-lg">
         <h3 className="font-cinzel text-base font-bold text-accent-gold">Kassenverlauf · {scopeLabel}</h3>
-        <p className="mt-1 font-libre text-xs text-gray-400">Tägliche Einnahmen, Ausgaben und Netto (GP)</p>
+        <p className="mt-1 font-libre text-xs text-gray-400">
+          Tägliche Einnahmen, Ausgaben und Netto (GP) — inkl. Bau, Ausbildung, Handelsdeals
+        </p>
         <div className="mt-3 h-52">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={financeChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -271,10 +300,39 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
               <YAxis tick={{ fill: "#d1d5db", fontSize: 11 }} axisLine={false} tickLine={false} width={44} />
               <Tooltip
                 contentStyle={{ background: "#0a1f10", border: "1px solid #217d42", borderRadius: 6, fontSize: 12 }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const notes = (payload[0]?.payload as { notes?: string[] } | undefined)?.notes ?? [];
+                  return (
+                    <div className="max-w-xs rounded-md border border-hero-dark bg-background-dark px-3 py-2 shadow-lg">
+                      <p className="font-barlow text-[11px] font-bold uppercase text-accent-gold">{label}</p>
+                      {payload.map((row) => (
+                        <p key={String(row.dataKey)} className="font-libre text-xs text-gray-100">
+                          <span style={{ color: row.color }}>{row.name}</span>{" "}
+                          {typeof row.value === "number" ? Math.round(row.value).toLocaleString("de-DE") : row.value} GP
+                        </p>
+                      ))}
+                      {notes.length > 0 ? (
+                        <div className="mt-1.5 border-t border-hero-dark/70 pt-1.5">
+                          {notes.slice(0, 3).map((note) => (
+                            <p key={note} className="font-libre text-[10px] leading-snug text-gray-300">
+                              {note}
+                            </p>
+                          ))}
+                          {notes.length > 3 ? (
+                            <p className="font-barlow text-[9px] font-bold uppercase text-gray-500">
+                              +{notes.length - 3} weitere
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }}
               />
-              <Line type="monotone" dataKey="income" name="Einnahmen" stroke="#379806" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="expenses" name="Ausgaben" stroke="#f87171" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="net" name="Netto" stroke="#cab926" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="income" name="Einnahmen" stroke="#379806" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="expenses" name="Ausgaben" stroke="#f87171" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="net" name="Netto" stroke="#cab926" strokeWidth={2} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -317,47 +375,7 @@ export function CitySocietyPanels({ day, range, scopeId }: Props) {
           </ul>
         </article>
 
-        <article className="rounded-md border border-hero-dark bg-background-card p-4 shadow-lg">
-          <h3 className="font-cinzel text-base font-bold text-accent-gold">Vattrak-Lager</h3>
-          <dl className="mt-3 space-y-2 font-libre text-sm text-gray-200">
-            <div className="flex justify-between gap-2">
-              <dt className="text-gray-400">Bestand</dt>
-              <dd className="tabular-nums text-hero-vibrant">{stock.stock}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-gray-400">Zufluss / Bedarf</dt>
-              <dd className="tabular-nums">
-                {stock.supply} / {stock.demand}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-gray-400">Rationierung</dt>
-              <dd
-                className={
-                  stock.level === "critical"
-                    ? "text-red-300"
-                    : stock.level === "rationed"
-                      ? "text-accent-gold"
-                      : "text-hero-vibrant"
-                }
-              >
-                {rationLabel}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-gray-400">Front-Anteil am Bedarf</dt>
-              <dd className="tabular-nums">{Math.round(stock.frontShare * 100)} %</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-gray-400">Kürzung Handwerk/Adel</dt>
-              <dd className="tabular-nums">{Math.round(stock.unmetLuxuryRatio * 100)} %</dd>
-            </div>
-          </dl>
-          <p className="mt-2 font-libre text-[10px] leading-snug text-gray-500">
-            {stock.cutHint}. Priorität: Front → Tempel → Handwerk → Adel. Knappheit senkt Vattrak-Meter und
-            treibt Malanthir sowie Kriminalität.
-          </p>
-        </article>
+        <VattrakLagerCard stock={stock} />
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
 /**
- * Genau fünf vorgefertigte Kaiser-Ereigniskarten für die Verwaltung.
- * Regler = dauerhafte Präsenz; Karten = zeitlich begrenzte Intensität/Befehle.
+ * Vorgefertigte Kaiser-Ereigniskarten für die Verwaltung / Stadt-Hand.
+ * Regler = dauerhafte Präsenz; Karten = zeitlich begrenzte Intensität/Befehle/Anleihen.
  */
 
 import type { CityDistrictId } from "./aurenfurt-districts";
@@ -19,7 +19,7 @@ export type KaiserEventCard = {
   title: string;
   description: string;
   durationDays: number;
-  /** Symbolische Hofkasse in GP (Anzeige; volle Buchhaltung stub). */
+  /** Symbolische Hofkasse in GP (Anzeige / Anleihe-Kosten). */
   cost: number;
   scope: KaiserCardScope;
   /** Pflicht bei scope === "district"; UI wählt Viertel. */
@@ -27,7 +27,11 @@ export type KaiserEventCard = {
   /** Wenn true: Wachen-Zahl unverändert, nur Intensität/Fokus. */
   intensityOnly?: boolean;
   effects: MeterEffect[];
+  /** Tägliche GP in die Stadtkasse, solange die Karte wirkt (Anleihen). */
+  treasuryIncomePerDay?: number;
   spawnedOrders?: KaiserNpcOrder[];
+  /** Kartenmotiv — zur Laufzeit aus Verwaltung-Overrides gemerged. */
+  imageUrl?: string | null;
 };
 
 export const KAISER_EVENT_CARDS: readonly KaiserEventCard[] = [
@@ -135,6 +139,48 @@ export const KAISER_EVENT_CARDS: readonly KaiserEventCard[] = [
       {
         targetHint: "Hofkanzlei",
         order: "Steuererlass verkünden und Audienztermine staffeln.",
+      },
+    ],
+  },
+  {
+    id: "kaiser-anleihe-haus-der-seide",
+    title: "Anleihe beim Haus der Seide",
+    description:
+      "Die Seidenkontore schießen der Stadt Kredit vor. Die Kasse atmet auf — Zinsen und Einfluss der Händler wachsen, Vattrak spürt den Druck.",
+    durationDays: 14,
+    cost: 0,
+    scope: "city",
+    treasuryIncomePerDay: 4200,
+    effects: [
+      { meter: "economy", delta: 4 },
+      { meter: "vattrak", delta: -5 },
+      { meter: "unemployment", delta: -2 },
+    ],
+    spawnedOrders: [
+      {
+        targetHint: "Haus der Seide / Seidenkontor",
+        order: "Anleihevertrag siegeln; Tilgungsraten und Handelsprivilegien festhalten.",
+      },
+    ],
+  },
+  {
+    id: "kaiser-anleihe-haeuser-des-nordens",
+    title: "Anleihe bei den Häusern des Nordens",
+    description:
+      "Die blauen Salons leihen dem Thron. Hofnahe Kredite füllen die Kasse — der Adel verlangt Mitspracherecht bei Garde und Steuern.",
+    durationDays: 12,
+    cost: 0,
+    scope: "palace",
+    treasuryIncomePerDay: 3600,
+    effects: [
+      { meter: "economy", delta: 3 },
+      { meter: "guard", delta: -4 },
+      { meter: "crime", delta: 2 },
+    ],
+    spawnedOrders: [
+      {
+        targetHint: "Häuser des Nordens / Hofkanzlei",
+        order: "Kreditlinien und politische Zugeständnisse in der Audienz festschreiben.",
       },
     ],
   },

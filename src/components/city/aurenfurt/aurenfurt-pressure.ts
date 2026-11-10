@@ -166,6 +166,17 @@ function meets(endWhen: CitySimEvent["endWhen"], meters: MeterSnapshot) {
   return endWhen.op === "gt" ? meters[endWhen.meter] > endWhen.value : meters[endWhen.meter] < endWhen.value;
 }
 
+function meterMeets(
+  condition: { meter: CityMeter; op: "gt" | "lt" | "gte" | "lte"; value: number },
+  meters: MeterSnapshot,
+) {
+  const value = meters[condition.meter];
+  if (condition.op === "gt") return value > condition.value;
+  if (condition.op === "lt") return value < condition.value;
+  if (condition.op === "gte") return value >= condition.value;
+  return value <= condition.value;
+}
+
 function gatesPass(actor: CityActor, ability: NpcAbility) {
   if (!ability.enabled || !actor.alive) return false;
   const role = ability.roleGate?.trim().toLowerCase();
@@ -180,9 +191,22 @@ function gatesPass(actor: CityActor, ability: NpcAbility) {
 }
 
 function conditionsPass(ability: NpcAbility, meters: MeterSnapshot) {
-  return ability.conditions.every((condition) =>
-    condition.op === "gt" ? meters[condition.meter] > condition.value : meters[condition.meter] < condition.value,
-  );
+  return ability.conditions.every((condition) => meterMeets(condition, meters));
+}
+
+/** Stadtweite Bedingung: irgendein Viertel erfüllt alle Trigger gleichzeitig. */
+function conditionsPassSomewhere(
+  ability: NpcAbility,
+  seen: Map<CityDistrictId, MeterSnapshot>,
+): boolean {
+  for (const meters of seen.values()) {
+    if (conditionsPass(ability, meters)) return true;
+  }
+  return false;
+}
+
+function abilityReach(actor: CityActor, ability: NpcAbility): CityDistrictId[] {
+  return reachDistricts(actor.districtId, ability.range ?? "district", undefined, actor.tier);
 }
 
 function eventDistricts(event: CitySimEvent): CityDistrictId[] {
@@ -254,7 +278,17 @@ export function foldCityPressure(input: {
       if (pulse.stopped || day < pulse.start || day >= pulse.end) continue;
       for (const districtId of pulse.districtIds) touched.add(districtId);
     }
-    for (const actor of input.actors) touched.add(actor.districtId);
+    for (const actor of input.actors) {
+      touched.add(actor.districtId);
+      for (const ability of actor.abilities) {
+        if (!ability.enabled) continue;
+        if (ability.conditionScope === "city" || ability.range === "city") {
+          for (const district of AURENFURT_DISTRICTS) touched.add(district.id);
+        } else if (ability.range === "adjacent") {
+          for (const id of abilityReach(actor, ability)) touched.add(id);
+        }
+      }
+    }
 
     const seen = new Map<CityDistrictId, MeterSnapshot>();
     for (const districtId of touched) {
@@ -283,17 +317,31 @@ export function foldCityPressure(input: {
     }
 
     for (const actor of input.actors) {
-      const meters = seen.get(actor.districtId);
-      if (!meters) continue;
       for (const ability of actor.abilities) {
         const key = `${actor.id}:${ability.id}`;
         if ((ready.get(key) ?? Number.NEGATIVE_INFINITY) > day) continue;
-        if (!gatesPass(actor, ability) || !conditionsPass(ability, meters)) continue;
+        if (!gatesPass(actor, ability)) continue;
+        const homeMeters = seen.get(actor.districtId);
+        const triggerOk =
+          ability.conditionScope === "city"
+            ? conditionsPassSomewhere(ability, seen)
+            : Boolean(homeMeters && conditionsPass(ability, homeMeters));
+        if (!triggerOk) continue;
+        const reach = abilityReach(actor, ability);
+        /** Stadtweite Bedingungen: nur Viertel treffen, die die Schwelle selbst überschreiten. */
+        const districtIds =
+          ability.conditionScope === "city"
+            ? reach.filter((districtId) => {
+                const meters = seen.get(districtId);
+                return Boolean(meters && conditionsPass(ability, meters));
+              })
+            : reach;
+        if (districtIds.length === 0) continue;
         pulses.push({
           key,
           title: `${actor.name}: ${ability.title}`,
           kind: "ability",
-          districtIds: [actor.districtId],
+          districtIds,
           effects: ability.effects,
           start: day,
           end: day + ability.durationDays * DAY,
@@ -304,17 +352,23 @@ export function foldCityPressure(input: {
               : { target: ability.relationshipTarget, delta: ability.relationshipDelta },
           stopped: false,
         });
-        const bucket = dayDelta.get(actor.districtId) ?? blankDelta();
-        for (const effect of ability.effects) addEffect(bucket, effect);
-        dayDelta.set(actor.districtId, bucket);
+        for (const districtId of districtIds) {
+          const bucket = dayDelta.get(districtId) ?? blankDelta();
+          for (const effect of ability.effects) addEffect(bucket, effect);
+          dayDelta.set(districtId, bucket);
+        }
         if (ability.relationshipTarget !== "none" && ability.relationshipDelta !== 0) {
           dayBias.push({ target: ability.relationshipTarget, delta: ability.relationshipDelta });
         }
+        const cooldownNote =
+          ability.cooldownDays > 0
+            ? `${ability.durationDays} Tage Wirkung, danach ${ability.cooldownDays} Tage Ruhe.`
+            : `${ability.durationDays} Tage Wirkung — greift erneut, solange die Schwelle hält.`;
         dayNotes.push({
           id: key,
           title: `${actor.name}: ${ability.title}`,
           kind: "ability",
-          detail: `${ability.durationDays} Tage Wirkung, danach ${ability.cooldownDays} Tage Ruhe.`,
+          detail: cooldownNote,
         });
         ready.set(key, day + (ability.durationDays + ability.cooldownDays) * DAY);
         if (ability.counterFactionId && ability.counterEffects.length > 0) {
@@ -322,7 +376,7 @@ export function foldCityPressure(input: {
             key: `${key}:counter`,
             title: `Gegenreaktion auf ${ability.title}`,
             kind: "counter",
-            districtIds: [actor.districtId],
+            districtIds,
             effects: ability.counterEffects,
             start: day + ability.counterDelayDays * DAY,
             end: day + (ability.counterDelayDays + ability.counterDurationDays) * DAY,

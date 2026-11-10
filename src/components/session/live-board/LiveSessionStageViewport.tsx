@@ -3,7 +3,14 @@
  */
 "use client";
 
-import type { Dispatch, DragEvent, ReactNode, SetStateAction, TransitionStartFunction } from "react";
+import {
+  useEffect,
+  type Dispatch,
+  type DragEvent,
+  type ReactNode,
+  type SetStateAction,
+  type TransitionStartFunction,
+} from "react";
 import { ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { setCombatInitiative } from "@/src/lib/actions/combat-initiative-actions";
@@ -15,6 +22,7 @@ import { LiveStageShopOverlay } from "@/src/app/session/[sessionId]/LiveStageSho
 import { StageLootItemCards } from "@/src/components/session/StageLootItemCards";
 import { StageSceneCard, type StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import { StageDeckHand } from "@/src/app/session/[sessionId]/StageDeckHand";
+import { CitySimDeckHand } from "@/src/components/session/CitySimDeckHand";
 import type { LiveCampaignShopOption } from "@/src/app/session/[sessionId]/StageNpcShopControls";
 import type { CampaignCreatureStateRow } from "@/src/app/dashboard/campaigns/[id]/creature-state-actions";
 import type { SessionBattlemapToken } from "@/src/lib/session/battlemap-types";
@@ -54,6 +62,7 @@ export type LiveSessionStageViewportContentProps = {
   activeCombatParticipant: CombatParticipant | null | undefined;
   isGM: boolean;
   isGuest: boolean;
+  isPrepMode?: boolean;
   currentPlayerCharacter: PartyCharacter | null | undefined;
   rollingInitiativeId: string | null;
   sessionId: string;
@@ -114,6 +123,7 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
     activeCombatParticipant,
     isGM,
     isGuest,
+    isPrepMode = false,
     currentPlayerCharacter,
     rollingInitiativeId,
     sessionId,
@@ -256,20 +266,31 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
               </div>
             ) : null}
             {/* Shop stays available even when a battlemap owns the viewport. */}
-            {!isGuest && liveState?.active_shop_id ? (
+            {!isGuest &&
+            liveState?.active_shop_id &&
+            !liveState?.active_aurenfurt_city ? (
               <div className="pointer-events-auto absolute inset-x-0 top-[72px] z-[45] px-4 md:px-8">
                 <LiveStageShopOverlay
                   campaignId={campaignId}
+                  sessionId={sessionId}
                   shopId={liveState.active_shop_id}
                   merchantNpcId={liveState.active_merchant_npc_id ?? null}
                   characterId={currentPlayerCharacter?.id ?? null}
                   isGM={isGM}
+                  isPrepMode={isPrepMode}
+                  shopSellingUnlocked={Boolean(liveState.shop_selling_unlocked)}
+                  onToggleShopSelling={
+                    isGM
+                      ? (unlocked) => updateLiveState({ shop_selling_unlocked: unlocked })
+                      : undefined
+                  }
                   partyCharacters={displayPartyCharacters
                     .filter((pc) => !pc.isSessionDummy && pc.id)
                     .map((pc) => ({
                       id: pc.id,
                       name: pc.name,
                       playerUserId: pc.playerUserId ?? null,
+                      avatarUrl: pc.avatar_url ?? null,
                     }))}
                   onClose={
                     isGM
@@ -277,6 +298,7 @@ export function LiveSessionStageViewportContent(props: LiveSessionStageViewportC
                           updateLiveState({
                             active_shop_id: null,
                             active_merchant_npc_id: null,
+                            shop_selling_unlocked: false,
                           })
                       : undefined
                   }
@@ -532,6 +554,15 @@ export function LiveSessionStagePartyTraySection(p: LiveSessionStagePartyTraySec
 
 export type LiveSessionStageDeckHandSectionProps = {
   showGmDeckHand: boolean;
+  /** Aurenfurt-3D aktiv → Stadt-/NPC-Ereigniskarten statt Bühnenhand. */
+  aurenfurtCityActive?: boolean;
+  /** Geöffneter Ladenkatalog → Stadt-Hand ausblenden (z-[90] sonst über Shop). */
+  shopCatalogOpen?: boolean;
+  /** Scheduled = Vorbereitung → Stadt-Hand nur Ansicht. */
+  isPrepMode?: boolean;
+  sessionId: string;
+  /** Kalendertag der Stadtsim (Restlaufzeit aktiver Karten). */
+  dayIso?: string | null;
   stageDeckHandOpen: boolean;
   setStageDeckHandOpen: Dispatch<SetStateAction<boolean>>;
   inHandNpcs: CampaignNpc[];
@@ -542,6 +573,11 @@ export type LiveSessionStageDeckHandSectionProps = {
 
 export function LiveSessionStageDeckHandSection({
   showGmDeckHand,
+  aurenfurtCityActive = false,
+  shopCatalogOpen = false,
+  isPrepMode = false,
+  sessionId,
+  dayIso = null,
   stageDeckHandOpen,
   setStageDeckHandOpen,
   inHandNpcs,
@@ -549,18 +585,34 @@ export function LiveSessionStageDeckHandSection({
   inHandScenes,
   placeOnStage,
 }: LiveSessionStageDeckHandSectionProps) {
+  /* Stadt-Hand startet eingeklappt; beim Verlassen der Stadtkarte wieder zu. */
+  useEffect(() => {
+    if (!aurenfurtCityActive) setStageDeckHandOpen(false);
+  }, [aurenfurtCityActive, setStageDeckHandOpen]);
+
+  if (aurenfurtCityActive) {
+    if (shopCatalogOpen) return null;
+    return (
+      <CitySimDeckHand
+        sessionId={sessionId}
+        open={stageDeckHandOpen}
+        onToggle={() => setStageDeckHandOpen((v) => !v)}
+        isPrepMode={isPrepMode}
+        dayIso={dayIso}
+      />
+    );
+  }
+
+  if (!showGmDeckHand) return null;
+
   return (
-    <>
-{showGmDeckHand ? (
-          <StageDeckHand
-            open={stageDeckHandOpen}
-            onToggle={() => setStageDeckHandOpen((v) => !v)}
-            npcs={inHandNpcs}
-            factions={inHandFactions}
-            scenes={inHandScenes}
-            onPlace={placeOnStage}
-          />
-        ) : null}
-    </>
+    <StageDeckHand
+      open={stageDeckHandOpen}
+      onToggle={() => setStageDeckHandOpen((v) => !v)}
+      npcs={inHandNpcs}
+      factions={inHandFactions}
+      scenes={inHandScenes}
+      onPlace={placeOnStage}
+    />
   );
 }

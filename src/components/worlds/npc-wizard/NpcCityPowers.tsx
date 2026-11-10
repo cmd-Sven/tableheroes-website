@@ -1,6 +1,9 @@
 "use client";
 
+import Image from "next/image";
+import { useState } from "react";
 import { AURENFURT_DISTRICTS } from "@/src/components/city/aurenfurt/aurenfurt-districts";
+import { AURENFURT_WORLD_ID } from "@/src/components/city/aurenfurt/aurenfurt-district-lore-ids";
 import { AURENFURT_FACTIONS } from "@/src/components/city/aurenfurt/aurenfurt-factions";
 import {
   CARD_RANGE_LABELS,
@@ -18,6 +21,7 @@ import {
   type MeterEffect,
   type NpcAbility,
 } from "@/src/lib/npcs/city-simulation";
+import { uploadLoreImage } from "@/src/lib/profile-media";
 import { Plus, Trash2 } from "lucide-react";
 
 const FIELD =
@@ -26,9 +30,11 @@ const FIELD =
 type Props = {
   value: CitySimulationFields;
   onChange: (next: CitySimulationFields) => void;
+  /** Für Kartenmotiv-Upload; Default Aurenfurt. */
+  worldId?: string;
 };
 
-export function NpcCityPowers({ value, onChange }: Props) {
+export function NpcCityPowers({ value, onChange, worldId = AURENFURT_WORLD_ID }: Props) {
   const tier = value.cityInfluenceTier;
   const patch = (partial: Partial<CitySimulationFields>) => onChange({ ...value, ...partial });
 
@@ -107,6 +113,7 @@ export function NpcCityPowers({ value, onChange }: Props) {
             <CardForm
               key={card.id}
               card={card}
+              worldId={worldId}
               tierDefault={defaultCardRange(tier)}
               onChange={(partial) => updateCard(index, partial)}
               onRemove={() =>
@@ -269,17 +276,21 @@ function AbilityForm({
 
 function CardForm({
   card,
+  worldId,
   tierDefault,
   onChange,
   onRemove,
 }: {
   card: CityEventCard;
+  worldId: string;
   tierDefault: CardRange;
   onChange: (partial: Partial<CityEventCard>) => void;
   onRemove: () => void;
 }) {
   const range = card.range ?? tierDefault;
   const extra = new Set(card.extraDistrictIds ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   return (
     <div className="space-y-2 rounded border border-hero-dark bg-slate-950/50 p-3">
       <div className="flex items-center gap-2">
@@ -302,6 +313,75 @@ function CardForm({
         placeholder="Wann der Spielleiter sie auslegen sollte"
         className={FIELD}
       />
+      <div className="rounded border border-hero-dark/60 bg-background-dark/40 p-2">
+        <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+          Kartenmotiv (optional)
+        </p>
+        <div className="mt-2 flex items-start gap-3">
+          {card.imageUrl ? (
+            <div className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded border border-hero-border">
+              <Image
+                src={card.imageUrl}
+                alt=""
+                fill
+                sizes="72px"
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className="flex h-24 w-[4.5rem] shrink-0 items-center justify-center rounded border border-dashed border-hero-dark bg-slate-900/80">
+              <span className="px-1 text-center font-barlow text-[9px] font-bold uppercase text-gray-500">
+                Kein Bild
+              </span>
+            </div>
+          )}
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploading}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                setUploading(true);
+                setUploadError(null);
+                try {
+                  const result = await uploadLoreImage(file, {
+                    worldId,
+                    loreId: `npc-card-${card.id}`,
+                  });
+                  if ("error" in result) {
+                    setUploadError(result.error);
+                    return;
+                  }
+                  onChange({ imageUrl: result.publicUrl });
+                } finally {
+                  setUploading(false);
+                }
+              }}
+              className="w-full rounded border border-hero-dark bg-slate-900 p-1.5 font-libre text-[11px] text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-hero-dark file:px-2 file:py-1 file:font-barlow file:text-[10px] file:font-bold file:uppercase file:text-accent-gold"
+            />
+            {card.imageUrl ? (
+              <button
+                type="button"
+                className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:text-white"
+                onClick={() => onChange({ imageUrl: null })}
+              >
+                Motiv entfernen
+              </button>
+            ) : (
+              <p className="font-libre text-[10px] text-gray-500">
+                {uploading ? "Upload läuft…" : "JPEG, PNG oder WebP · max. 5 MB"}
+              </p>
+            )}
+            {uploadError ? (
+              <p className="font-libre text-[10px] text-red-300">{uploadError}</p>
+            ) : null}
+          </div>
+        </div>
+      </div>
       <div className="grid gap-2 md:grid-cols-2">
         <select value={range} onChange={(event) => onChange({ range: event.target.value as CardRange })} className={FIELD}>
           {CARD_RANGES.map((entry) => (
@@ -354,8 +434,8 @@ function ConditionRow({
   condition,
   onChange,
 }: {
-  condition: { meter: CityMeter; op: "gt" | "lt"; value: number };
-  onChange: (next: { meter: CityMeter; op: "gt" | "lt"; value: number }) => void;
+  condition: { meter: CityMeter; op: "gt" | "lt" | "gte" | "lte"; value: number };
+  onChange: (next: { meter: CityMeter; op: "gt" | "lt" | "gte" | "lte"; value: number }) => void;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -364,9 +444,17 @@ function ConditionRow({
           <option key={meter} value={meter}>{CITY_METER_LABELS[meter]}</option>
         ))}
       </select>
-      <select value={condition.op} onChange={(event) => onChange({ ...condition, op: event.target.value as "gt" | "lt" })} className={FIELD}>
+      <select
+        value={condition.op}
+        onChange={(event) =>
+          onChange({ ...condition, op: event.target.value as "gt" | "lt" | "gte" | "lte" })
+        }
+        className={FIELD}
+      >
         <option value="gt">über</option>
+        <option value="gte">mindestens</option>
         <option value="lt">unter</option>
+        <option value="lte">höchstens</option>
       </select>
       <input
         type="number"

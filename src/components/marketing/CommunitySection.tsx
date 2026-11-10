@@ -77,9 +77,9 @@ export function CommunitySection() {
         <Image
           src="/images/corner-dragon-only.webp"
           alt=""
-          width={100}
-          height={100}
-          className="max-w-[100px] h-auto"
+          width={125}
+          height={125}
+          className="max-w-[125px] h-auto"
           style={{ height: "auto" }}
         />
       </div>
@@ -89,9 +89,9 @@ export function CommunitySection() {
         <Image
           src="/images/skull-corner-only.webp"
           alt=""
-          width={70}
-          height={70}
-          className="w-[70px] h-auto scale-x-[-1]"
+          width={88}
+          height={88}
+          className="w-[88px] h-auto scale-x-[-1]"
           style={{ height: "auto" }}
         />
       </div>
@@ -101,9 +101,9 @@ export function CommunitySection() {
         <Image
           src="/images/skull-corner-only.webp"
           alt=""
-          width={70}
-          height={70}
-          className="w-[70px] h-auto scale-y-[-1]"
+          width={88}
+          height={88}
+          className="w-[88px] h-auto scale-y-[-1]"
           style={{ height: "auto" }}
         />
       </div>
@@ -113,9 +113,9 @@ export function CommunitySection() {
         <Image
           src="/images/corner-claw-only.webp"
           alt=""
-          width={100}
-          height={100}
-          className="max-w-[100px] h-auto scale-x-[-1]"
+          width={125}
+          height={125}
+          className="max-w-[125px] h-auto scale-x-[-1]"
           style={{ height: "auto" }}
         />
       </div>

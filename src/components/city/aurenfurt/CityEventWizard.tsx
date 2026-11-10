@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Plus, Trash2, X } from "lucide-react";
 import { findDistrict, type CityDistrictId } from "./aurenfurt-districts";
 import {
+  activateCitySimEvent,
   listCitySimEvents,
   saveCitySimEvent,
   setCitySimEventActive,
@@ -43,6 +44,18 @@ type Props = {
   sectorIds: string[];
   sectors: DistrictSector[];
   onPlaceStep: (active: boolean) => void;
+  /** Explizit: ganze Stadt (ohne Viertel/Sektoren). */
+  onSelectWholeCity: () => void;
+  /** Explizit: ganzes Viertel (Sektorwahl zurücksetzen). */
+  onSelectWholeDistrict: () => void;
+  /** Sektorwahl leeren, Viertel behalten. */
+  onClearSectors: () => void;
+  /** Ort aus vorhandener Karte laden (Bearbeiten). */
+  onLoadPlace: (place: {
+    wholeCity: boolean;
+    districtId: CityDistrictId | null;
+    sectorLabel: string | null;
+  }) => void;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -59,10 +72,15 @@ export function CityEventWizard({
   sectorIds,
   sectors,
   onPlaceStep,
+  onSelectWholeCity,
+  onSelectWholeDistrict,
+  onClearSectors,
+  onLoadPlace,
   onClose,
   onSaved,
 }: Props) {
   const [step, setStep] = useState<Step>("hub");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -75,10 +93,30 @@ export function CityEventWizard({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<Listed[]>([]);
+  /** Ort wird beim Verlassen des Ort-Schritts eingefroren — speichert auch, wenn Props später leer sind. */
+  const [committedPlace, setCommittedPlace] = useState<{
+    wholeCity: boolean;
+    districtId: CityDistrictId | null;
+    sectorIds: string[];
+    sectorAddresses: string[];
+  } | null>(null);
 
   useEffect(() => {
     onPlaceStep(step === "place");
   }, [onPlaceStep, step]);
+
+  /** Während Ort-Schritt: Auswahl live mitschreiben, damit Speichern nicht „ganzes Viertel“ wird. */
+  useEffect(() => {
+    if (step !== "place") return;
+    const addresses =
+      sectors.filter((sector) => sectorIds.includes(sector.id)).map((sector) => sector.address);
+    setCommittedPlace({
+      wholeCity,
+      districtId,
+      sectorIds: [...sectorIds],
+      sectorAddresses: addresses.length > 0 ? addresses : [...sectorIds],
+    });
+  }, [step, wholeCity, districtId, sectorIds, sectors]);
 
   const reload = () => {
     void listCitySimEvents(worldId).then(setEvents).catch(() => setEvents([]));
@@ -89,21 +127,47 @@ export function CityEventWizard({
   }, [worldId]);
 
   const picked = sectors.filter((sector) => sectorIds.includes(sector.id));
-  const placeReady = wholeCity || Boolean(districtId);
-  const districtName = districtId ? (findDistrict(districtId)?.name ?? districtId) : null;
+  const effectiveWholeCity = committedPlace?.wholeCity ?? wholeCity;
+  const effectiveDistrictId = committedPlace?.districtId ?? districtId;
+  const effectiveSectorIds = committedPlace?.sectorIds ?? sectorIds;
+  const effectiveAddresses =
+    committedPlace?.sectorAddresses ??
+    (picked.length > 0 ? picked.map((sector) => sector.address) : []);
+  const placeReady = effectiveWholeCity || Boolean(effectiveDistrictId);
+  const districtName = effectiveDistrictId
+    ? (findDistrict(effectiveDistrictId)?.name ?? effectiveDistrictId)
+    : null;
   const stepIndex = STEPS.findIndex((entry) => entry.id === step);
   const placing = step === "place";
 
-  const placeLabel = wholeCity
+  const placeLabel = effectiveWholeCity
     ? "Ganze Stadt"
-    : picked.length > 0
-      ? `${districtName}: ${picked.map((sector) => sector.label).join(", ")}`
-      : districtId
+    : effectiveSectorIds.length > 0
+      ? `${districtName}: ${
+          picked.length > 0
+            ? picked.map((sector) => sector.label).join(", ")
+            : effectiveAddresses.map((address) => address.split(" ").pop() ?? address).join(", ")
+        }`
+      : effectiveDistrictId
         ? `${districtName} (ganzes Viertel)`
         : "Noch kein Ort";
 
+  const commitPlaceFromLive = () => {
+    setCommittedPlace({
+      wholeCity,
+      districtId,
+      sectorIds: [...sectorIds],
+      sectorAddresses:
+        picked.length > 0
+          ? picked.map((sector) => sector.address)
+          : [...sectorIds],
+    });
+  };
+
   const startCreate = () => {
     setError(null);
+    setEditingId(null);
+    setCommittedPlace(null);
     setTitle("");
     setBody("");
     setImageUrl("");
@@ -112,6 +176,47 @@ export function CityEventWizard({
     setEndMeter("");
     setEndOp("lt");
     setEndValue("40");
+    onSelectWholeCity();
+    setStep("story");
+  };
+
+  const startEdit = (event: Listed) => {
+    setError(null);
+    setEditingId(event.id);
+    setCommittedPlace(null);
+    setTitle(event.title ?? "");
+    setBody(event.body ?? "");
+    setImageUrl(event.image_url?.trim() ?? "");
+    setDurationDays(
+      typeof event.duration_days === "number" && event.duration_days > 0
+        ? String(event.duration_days)
+        : "7",
+    );
+    const nextEffects =
+      Array.isArray(event.effects) && event.effects.length > 0
+        ? event.effects.map((effect) => ({
+            meter: effect.meter,
+            delta: String(effect.delta),
+          }))
+        : [blankEffect()];
+    setEffects(nextEffects);
+    if (event.end_when?.meter) {
+      setEndMeter(event.end_when.meter);
+      setEndOp(event.end_when.op === "gt" ? "gt" : "lt");
+      setEndValue(String(event.end_when.value ?? 40));
+    } else {
+      setEndMeter("");
+      setEndOp("lt");
+      setEndValue("40");
+    }
+    onLoadPlace({
+      wholeCity: event.scope === "city",
+      districtId:
+        event.scope !== "city" && event.district_id
+          ? (event.district_id as CityDistrictId)
+          : null,
+      sectorLabel: event.scope === "sector" ? event.sector_label : null,
+    });
     setStep("story");
   };
 
@@ -123,24 +228,61 @@ export function CityEventWizard({
 
   const save = () => {
     setError(null);
+    const liveOrCommitted = committedPlace ?? {
+      wholeCity,
+      districtId,
+      sectorIds: [...sectorIds],
+      sectorAddresses:
+        picked.length > 0 ? picked.map((sector) => sector.address) : [...sectorIds],
+    };
     const scope: "city" | "district" | "sector" =
-      picked.length > 0 ? "sector" : districtId && !wholeCity ? "district" : "city";
+      liveOrCommitted.sectorIds.length > 0 && !liveOrCommitted.wholeCity
+        ? "sector"
+        : liveOrCommitted.districtId && !liveOrCommitted.wholeCity
+          ? "district"
+          : "city";
+    const sectorLabel =
+      scope === "sector"
+        ? liveOrCommitted.sectorAddresses.filter(Boolean).join(", ") || null
+        : null;
+    if (scope === "sector" && !sectorLabel?.trim()) {
+      setError("Sektoren gewählt, aber ohne Bezeichnung — bitte Ort-Schritt erneut öffnen.");
+      return;
+    }
+    if (scope !== "city" && !liveOrCommitted.districtId) {
+      setError("Bitte ein Viertel wählen.");
+      return;
+    }
     const parsedEffects: MeterEffect[] = effects
-      .map((entry) => ({ meter: entry.meter, delta: Number(entry.delta) || 0 }))
+      .map((entry) => {
+        const raw = Number(entry.delta) || 0;
+        const delta = Math.max(-20, Math.min(20, raw));
+        return { meter: entry.meter, delta };
+      })
       .filter((entry) => entry.delta !== 0);
     if (parsedEffects.length === 0) {
       setError("Mindestens eine Wirkung mit Wert ungleich 0 festlegen.");
       return;
     }
+    if (
+      effects.some((entry) => {
+        const raw = Number(entry.delta);
+        return Number.isFinite(raw) && (raw < -20 || raw > 20);
+      })
+    ) {
+      setError("Wirkung pro Kennzahl nur zwischen −20 und +20.");
+      return;
+    }
     setBusy(true);
     void saveCitySimEvent({
+      id: editingId ?? undefined,
       worldId,
       title,
       body,
       imageUrl: imageUrl.trim() || null,
       scope,
-      districtId: scope === "city" ? null : districtId,
-      sectorLabel: scope === "sector" ? picked.map((sector) => sector.address).join(", ") : null,
+      districtId: scope === "city" ? null : liveOrCommitted.districtId,
+      sectorLabel,
       effects: parsedEffects,
       durationDays: durationDays.trim() ? Number(durationDays) : null,
       startOn: day,
@@ -239,10 +381,8 @@ export function CityEventWizard({
                     So funktionieren Stadtereigniskarten
                   </p>
                   <p className="mt-1 font-libre text-xs leading-relaxed text-gray-300">
-                    Eine Karte beschreibt ein Ereignis mit Titel und Text. Du legst Ort (Stadt, Viertel
-                    oder Sektoren), Wirkzeit und Einfluss auf Stadtkennzahlen fest. Mehrere Kennzahlen
-                    können gleichzeitig betroffen sein. Optional lädst du ein Motivbild hoch — es
-                    erscheint, wenn die Karte aktiv ist.
+                    Karten bleiben in der Hand: ausgespielt = aktiv (ausgegraut), nach Ablauf wieder
+                    bereit. Ort, Dauer und Wirkung kannst du jederzeit bearbeiten.
                   </p>
                 </div>
 
@@ -291,7 +431,7 @@ export function CityEventWizard({
                               {event.active ? (
                                 <span className="text-hero-vibrant"> · aktiv</span>
                               ) : (
-                                <span className="text-gray-500"> · beendet</span>
+                                <span className="text-gray-500"> · bereit</span>
                               )}
                             </p>
                             <p className="mt-0.5 truncate font-libre text-[10px] text-gray-500">
@@ -304,20 +444,30 @@ export function CityEventWizard({
                                 )
                                 .join(" · ") || "Keine Wirkung"}
                             </p>
-                            <button
-                              type="button"
-                              className="mt-1 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold hover:text-white"
-                              onClick={() => {
-                                void setCitySimEventActive(worldId, event.id, !event.active).then(
-                                  () => {
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold hover:text-white"
+                                onClick={() => startEdit(event)}
+                              >
+                                Bearbeiten
+                              </button>
+                              <button
+                                type="button"
+                                className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant hover:text-white"
+                                onClick={() => {
+                                  const action = event.active
+                                    ? setCitySimEventActive(worldId, event.id, false)
+                                    : activateCitySimEvent(worldId, event.id, day);
+                                  void action.then(() => {
                                     reload();
                                     onSaved();
-                                  },
-                                );
-                              }}
-                            >
-                              {event.active ? "Beenden" : "Ausspielen"}
-                            </button>
+                                  });
+                                }}
+                              >
+                                {event.active ? "Beenden" : "Ausspielen"}
+                              </button>
+                            </div>
                           </div>
                         </li>
                       ))}
@@ -414,35 +564,96 @@ export function CityEventWizard({
             ) : null}
 
             {step === "place" ? (
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-3">
                 <p className="font-libre text-xs leading-relaxed text-gray-200">
-                  Klicke auf der Karte ein Viertel. Danach liegen dessen Sektoren auf dem Modell und
-                  lassen sich einzeln treffen. Ein Klick neben die Viertel setzt die ganze Stadt.
+                  Reichweite wählen: ganze Stadt (Button), ein Viertel (Karte) oder Sektoren (Klick
+                  auf Felder). Namen nur in der Liste unten — nicht auf der Karte.
                 </p>
+                <div
+                  className="grid grid-cols-3 gap-1.5"
+                  role="group"
+                  aria-label="Ereignis-Reichweite"
+                >
+                  <button
+                    type="button"
+                    onClick={onSelectWholeCity}
+                    className={`rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase tracking-wide ${
+                      wholeCity
+                        ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                        : "border-hero-dark text-gray-300 hover:border-hero-vibrant/60"
+                    }`}
+                  >
+                    Ganze Stadt
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!districtId && !wholeCity}
+                    onClick={() => {
+                      if (!districtId) return;
+                      onSelectWholeDistrict();
+                    }}
+                    className={`rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase tracking-wide disabled:opacity-40 ${
+                      !wholeCity && districtId && picked.length === 0
+                        ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                        : "border-hero-dark text-gray-300 hover:border-hero-vibrant/60"
+                    }`}
+                  >
+                    Ganzes Viertel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!districtId || sectors.length === 0}
+                    onClick={() => {
+                      /* Sektorwahl auf der Karte; Button macht nur den Modus sichtbar. */
+                      if (picked.length > 0) return;
+                      onClearSectors();
+                    }}
+                    className={`rounded border px-2 py-2 font-barlow text-[10px] font-bold uppercase tracking-wide disabled:opacity-40 ${
+                      picked.length > 0
+                        ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
+                        : "border-hero-dark text-gray-300 hover:border-hero-vibrant/60"
+                    }`}
+                  >
+                    Sektoren
+                  </button>
+                </div>
                 <p className="font-barlow text-sm font-bold uppercase tracking-wide text-accent-gold">
                   {placeLabel}
                 </p>
                 {picked.length > 0 ? (
-                  <ul className="flex flex-wrap gap-1.5" aria-label="Gewählte Sektoren">
-                    {picked.map((sector) => (
-                      <li
-                        key={sector.id}
-                        className="rounded border border-accent-gold/60 bg-accent-gold/10 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold"
-                      >
-                        {sector.label}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="space-y-1.5">
+                    <ul className="flex flex-wrap gap-1.5" aria-label="Gewählte Sektoren">
+                      {picked.map((sector) => (
+                        <li
+                          key={sector.id}
+                          className="rounded border border-accent-gold/60 bg-accent-gold/10 px-2 py-0.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold"
+                        >
+                          {sector.label}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={onSelectWholeDistrict}
+                      className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant hover:text-accent-gold"
+                    >
+                      Sektoren verwerfen → ganzes Viertel
+                    </button>
+                  </div>
                 ) : null}
                 {districtId && sectors.length === 0 ? (
                   <p className="font-libre text-xs text-gray-400">
                     Dieses Viertel hat noch keine Sektoren. Das Ereignis gilt für das ganze Viertel.
                   </p>
                 ) : null}
-                {districtId && sectors.length > 0 && picked.length === 0 ? (
+                {districtId && sectors.length > 0 && picked.length === 0 && !wholeCity ? (
                   <p className="font-libre text-xs text-gray-400">
-                    Ohne gewählten Sektor gilt das ganze Viertel. Klicke Sektoren an, um sie
-                    festzulegen — der Name erscheint auf der Karte und hier.
+                    Aktuell: ganzes Viertel. Für engere Wirkung Sektoren auf der Karte anklicken.
+                  </p>
+                ) : null}
+                {wholeCity ? (
+                  <p className="font-libre text-xs text-gray-400">
+                    Stadtweit — wirkt in allen Vierteln. Viertel klicken, um einzuschränken.
                   </p>
                 ) : null}
               </div>
@@ -483,7 +694,8 @@ export function CityEventWizard({
                     </button>
                   </div>
                   <p className="font-libre text-[11px] leading-snug text-gray-400">
-                    Bis zu {MAX_EFFECTS} Kennzahlen gleichzeitig. Positiv hebt, negativ senkt den Wert.
+                    Bis zu {MAX_EFFECTS} Kennzahlen gleichzeitig. Positiv hebt, negativ senkt (−20 bis
+                    +20).
                   </p>
                   {effects.map((entry, index) => (
                     <div key={index} className="grid grid-cols-[1fr_5rem_2rem] gap-2">
@@ -565,9 +777,10 @@ export function CityEventWizard({
                 <button
                   type="button"
                   className="rounded border border-hero-dark px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-gray-200"
-                  onClick={() =>
-                    setStep(step === "effect" ? "place" : step === "place" ? "story" : "hub")
-                  }
+                  onClick={() => {
+                    if (step === "effect") setCommittedPlace(null);
+                    setStep(step === "effect" ? "place" : step === "place" ? "story" : "hub");
+                  }}
                 >
                   Zurück
                 </button>
@@ -586,7 +799,10 @@ export function CityEventWizard({
                     type="button"
                     disabled={!placeReady}
                     className="rounded border border-hero-vibrant px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-hero-vibrant disabled:opacity-40"
-                    onClick={() => setStep("effect")}
+                    onClick={() => {
+                      commitPlaceFromLive();
+                      setStep("effect");
+                    }}
                   >
                     Weiter
                   </button>
@@ -598,7 +814,7 @@ export function CityEventWizard({
                     className="rounded border border-hero-vibrant px-3 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-hero-vibrant disabled:opacity-40"
                     onClick={save}
                   >
-                    Stadtereignis anlegen
+                    {editingId ? "Änderungen speichern" : "Stadtereignis anlegen"}
                   </button>
                 ) : null}
               </div>

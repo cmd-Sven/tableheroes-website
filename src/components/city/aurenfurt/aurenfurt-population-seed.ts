@@ -24,16 +24,17 @@ export const POPULATION_START_TOTALS: Record<CityDistrictId, number> = {
 
 /**
  * Schicht-Splits je Viertel (Köpfe). Adelige vor allem Palast/Adel;
- * Garde stark Palast/Südtor/Tempel; Prekariat dominant in der Unterstadt.
+ * Garde ~3 % Stadtweit (historisch glaubwürdige stehende Wache), Schwerpunkt Südtor/Tempel/Palast.
+ * Freigewordene Köpfe → Bürger.
  */
 const LAYER_SEED: Record<CityDistrictId, PopulationLayers> = {
-  palast: { pop_nobles: 280, pop_citizens: 200, pop_guards: 280, pop_lowerclass: 43 },
-  adelsviertel: { pop_nobles: 720, pop_citizens: 1080, pop_guards: 360, pop_lowerclass: 249 },
-  akademieviertel: { pop_nobles: 140, pop_citizens: 2100, pop_guards: 280, pop_lowerclass: 291 },
-  tempelbezirk: { pop_nobles: 180, pop_citizens: 2170, pop_guards: 540, pop_lowerclass: 724 },
-  suedtor: { pop_nobles: 50, pop_citizens: 1920, pop_guards: 960, pop_lowerclass: 1888 },
-  handwerkerviertel: { pop_nobles: 60, pop_citizens: 3850, pop_guards: 450, pop_lowerclass: 2064 },
-  unterstadt: { pop_nobles: 20, pop_citizens: 2240, pop_guards: 280, pop_lowerclass: 8703 },
+  palast: { pop_nobles: 280, pop_citizens: 380, pop_guards: 100, pop_lowerclass: 43 },
+  adelsviertel: { pop_nobles: 720, pop_citizens: 1320, pop_guards: 120, pop_lowerclass: 249 },
+  akademieviertel: { pop_nobles: 140, pop_citizens: 2290, pop_guards: 90, pop_lowerclass: 291 },
+  tempelbezirk: { pop_nobles: 180, pop_citizens: 2560, pop_guards: 150, pop_lowerclass: 724 },
+  suedtor: { pop_nobles: 50, pop_citizens: 2630, pop_guards: 250, pop_lowerclass: 1888 },
+  handwerkerviertel: { pop_nobles: 60, pop_citizens: 4170, pop_guards: 130, pop_lowerclass: 2064 },
+  unterstadt: { pop_nobles: 20, pop_citizens: 2410, pop_guards: 110, pop_lowerclass: 8703 },
 };
 
 function assertSeedIntegrity() {

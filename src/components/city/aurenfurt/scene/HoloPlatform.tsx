@@ -6,6 +6,7 @@ import * as THREE from "three";
 import {
   DIORAMA_DEPTH,
   DIORAMA_WIDTH,
+  MAP_SURFACE_Y,
   PLINTH_HEIGHT,
   createDomedCityGeometry,
 } from "./diorama-geometry";
@@ -18,7 +19,7 @@ type Props = {
 
 export function HoloPlatform({ onClear, interactive = true }: Props) {
   const geometry = useMemo(() => createDomedCityGeometry(), []);
-  const texture = useTexture("/images/cities/aurenfurt.jpg?v=detail-20261001");
+  const texture = useTexture("/images/cities/aurenfurt.jpg?v=plaza-20261110b");
 
   useLayoutEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -32,7 +33,7 @@ export function HoloPlatform({ onClear, interactive = true }: Props) {
     <group>
       <mesh
         geometry={geometry}
-        position={[0, 0.012, 0]}
+        position={[0, MAP_SURFACE_Y, 0]}
         castShadow={false}
         receiveShadow={false}
         onClick={

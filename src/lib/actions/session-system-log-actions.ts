@@ -16,6 +16,7 @@ export async function createSystemLog(
   sessionId: string,
   type: string,
   value: unknown,
+  meta?: Record<string, unknown> | null,
 ) {
   const supabase = await createClient();
   const {
@@ -67,15 +68,18 @@ export async function createSystemLog(
         ? String((value as { text?: unknown }).text ?? "")
         : JSON.stringify(value ?? "");
 
-  const nextLog = {
+  const nextLog: Record<string, unknown> = {
     id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     at: new Date().toISOString(),
     text: text.trim(),
     type,
     author_name: "System",
   };
+  if (meta && typeof meta === "object") {
+    nextLog.meta = meta;
+  }
 
-  if (!nextLog.text) {
+  if (!String(nextLog.text ?? "").trim()) {
     return null;
   }
 
@@ -121,7 +125,13 @@ export async function createSystemLog(
   }
 
   try {
-    await mirrorSystemLogToChronicle(writeClient, sessionId, type, nextLog.text, nextLog.at);
+    await mirrorSystemLogToChronicle(
+      writeClient,
+      sessionId,
+      type,
+      String(nextLog.text ?? ""),
+      String(nextLog.at ?? ""),
+    );
   } catch (mirrorErr) {
     console.warn("[createSystemLog] Chronist-Marker:", mirrorErr);
   }

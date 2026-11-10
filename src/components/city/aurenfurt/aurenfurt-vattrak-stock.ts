@@ -19,6 +19,9 @@ export const VATTRAK_STOCK_START = 420;
 export const VATTRAK_STOCK_CAP = 600;
 /** Basis-Zufluss/Tag aus Nord/Berglinie bei ruhiger Lage. */
 export const VATTRAK_BASE_SUPPLY = 4.2;
+/** Große Nordkarawane alle N Tage (zusätzlich zum Tageszufluss). */
+export const VATTRAK_CONVOY_INTERVAL_DAYS = 10;
+export const VATTRAK_CONVOY_BONUS = 32;
 
 export type VattrakRationLevel = "calm" | "rationed" | "critical";
 
@@ -29,10 +32,20 @@ export type VattrakDemandBuckets = {
   nobles: number;
 };
 
+export type VattrakDeliveryInfo = {
+  /** 0 = Lieferung heute. */
+  daysUntil: number;
+  dayIso: string;
+  amount: number;
+  label: string;
+};
+
 export type VattrakStockSnapshot = {
   day: string;
   stock: number;
   supply: number;
+  /** Nur der Karawanen-Anteil am heutigen Zufluss (0 wenn kein Konvoi). */
+  convoySupply: number;
   demand: number;
   /** stock / Mehrwochenbedarf. */
   coverage: number;
@@ -43,6 +56,9 @@ export type VattrakStockSnapshot = {
   unmetLuxuryRatio: number;
   /** Kurztext: wer gekürzt wurde. */
   cutHint: string;
+  demandBuckets: VattrakDemandBuckets;
+  servedBuckets: VattrakDemandBuckets;
+  nextDelivery: VattrakDeliveryInfo;
 };
 
 const PRIORITY = ["front", "temple", "craft", "nobles"] as const;
@@ -68,6 +84,40 @@ function supplyForPhase(phase: ReturnType<typeof warPhaseOn>, winterish: number)
   if (phase === "peak") supply *= 0.48;
   if (phase === "aftermath") supply *= 0.8;
   return Math.max(0.4, supply);
+}
+
+function convoyBonusOn(dayMs: number, phase: ReturnType<typeof warPhaseOn>): number {
+  const from = parseDay(HISTORY_START);
+  const dayIndex = Math.floor((dayMs - from) / DAY_MS);
+  if (dayIndex < 0 || dayIndex % VATTRAK_CONVOY_INTERVAL_DAYS !== 0) return 0;
+  let bonus = VATTRAK_CONVOY_BONUS * (1 - winterishOn(dayMs) * 0.25);
+  if (phase === "mobilization") bonus *= 0.7;
+  if (phase === "peak") bonus *= 0.4;
+  if (phase === "aftermath") bonus *= 0.85;
+  return Math.max(4, bonus);
+}
+
+function nextDeliveryInfo(
+  dayMs: number,
+  phase: ReturnType<typeof warPhaseOn>,
+): VattrakDeliveryInfo {
+  const from = parseDay(HISTORY_START);
+  const dayIndex = Math.max(0, Math.floor((dayMs - from) / DAY_MS));
+  const rem = dayIndex % VATTRAK_CONVOY_INTERVAL_DAYS;
+  const daysUntil = rem === 0 ? 0 : VATTRAK_CONVOY_INTERVAL_DAYS - rem;
+  const deliveryMs = dayMs + daysUntil * DAY_MS;
+  const amount = Math.round(convoyBonusOn(deliveryMs, warPhaseOn(deliveryMs)) * 10) / 10;
+  return {
+    daysUntil,
+    dayIso: formatDay(deliveryMs),
+    amount,
+    label:
+      daysUntil === 0
+        ? `Nordkarawane heute (+${amount})`
+        : daysUntil === 1
+          ? `Nordkarawane morgen (+${amount})`
+          : `Nordkarawane in ${daysUntil} Tagen (+${amount})`,
+  };
 }
 
 function demandBuckets(
@@ -127,17 +177,26 @@ let stockCache: StockCache | null = null;
 
 export { isVattrakStockBuilding } from "./aurenfurt-meter-build-guards";
 
+function blankBuckets(): VattrakDemandBuckets {
+  return { front: 0, temple: 0, craft: 0, nobles: 0 };
+}
+
 function calmStub(dayIso: string): VattrakStockSnapshot {
+  const dayMs = parseDay(dayIso);
   return {
     day: dayIso,
     stock: VATTRAK_STOCK_START,
     supply: VATTRAK_BASE_SUPPLY,
+    convoySupply: 0,
     demand: 2,
     coverage: 1,
     level: "calm",
     frontShare: 0,
     unmetLuxuryRatio: 0,
     cutHint: "Alle Kontingente bedient",
+    demandBuckets: blankBuckets(),
+    servedBuckets: blankBuckets(),
+    nextDelivery: nextDeliveryInfo(Number.isFinite(dayMs) ? dayMs : utcToday(), "aftermath"),
   };
 }
 
@@ -173,24 +232,41 @@ export function buildVattrakStockSeries(toIso = formatDay(utcToday())): VattrakS
     for (let dayMs = from; dayMs <= to; dayMs += DAY_MS) {
       const day = formatDay(dayMs);
       const phase = warPhaseOn(dayMs);
-      const supply = supplyForPhase(phase, winterishOn(dayMs));
+      const trickle = supplyForPhase(phase, winterishOn(dayMs));
+      const convoy = convoyBonusOn(dayMs, phase);
+      const supply = trickle + convoy;
       const pop = popByDay.get(day) ?? popSeries[popSeries.length - 1];
       const buckets = demandBuckets(pop, phase);
       const demand = buckets.front + buckets.temple + buckets.craft + buckets.nobles;
-      const { unmetLuxuryRatio, cutHint, consumed } = allocate(stock + supply, buckets);
+      const { served, unmetLuxuryRatio, cutHint, consumed } = allocate(stock + supply, buckets);
       stock = Math.max(0, Math.min(VATTRAK_STOCK_CAP, stock + supply - consumed));
       const coverage = demand <= 0 ? 1 : Math.min(2, stock / Math.max(demand * 14, 1));
       const frontShare = demand <= 0 ? 0 : Math.min(0.75, buckets.front / demand);
+      const roundBucket = (value: number) => Math.round(value * 100) / 100;
       const point: VattrakStockSnapshot = {
         day,
         stock: Math.round(stock * 10) / 10,
         supply: Math.round(supply * 100) / 100,
+        convoySupply: Math.round(convoy * 100) / 100,
         demand: Math.round(demand * 100) / 100,
         coverage: Math.round(coverage * 100) / 100,
         level: levelOf(coverage),
         frontShare: Math.round(frontShare * 100) / 100,
         unmetLuxuryRatio: Math.round(unmetLuxuryRatio * 100) / 100,
         cutHint,
+        demandBuckets: {
+          front: roundBucket(buckets.front),
+          temple: roundBucket(buckets.temple),
+          craft: roundBucket(buckets.craft),
+          nobles: roundBucket(buckets.nobles),
+        },
+        servedBuckets: {
+          front: roundBucket(served.front),
+          temple: roundBucket(served.temple),
+          craft: roundBucket(served.craft),
+          nobles: roundBucket(served.nobles),
+        },
+        nextDelivery: nextDeliveryInfo(dayMs, phase),
       };
       points.push(point);
       byDay.set(day, point);

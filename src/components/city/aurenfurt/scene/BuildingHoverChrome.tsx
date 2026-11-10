@@ -49,6 +49,7 @@ export function BuildingHoverChrome({ name, hot, selected = false, y = 0.42 }: P
 
 function BuildingSpotlight({ hot, selected }: { hot: boolean; selected: boolean }) {
   const lightRef = useRef<SpotLight>(null);
+  /** Target als Geschwister — nie Kind der SpotLight (sonst kippt die Richtung). */
   const target = useMemo(() => new Object3D(), []);
   const coneRef = useRef<Mesh>(null);
   const coneMaterial = useMemo(
@@ -68,11 +69,10 @@ function BuildingSpotlight({ hot, selected }: { hot: boolean; selected: boolean 
   useLayoutEffect(() => () => coneMaterial.dispose(), [coneMaterial]);
 
   useLayoutEffect(() => {
-    target.position.set(0, -0.85, 0);
+    // Auf den Boden / Fußpunkt des Gebäudes zeigen (unter dem Chrome-Anker).
+    target.position.set(0, -0.95, 0);
     const light = lightRef.current;
-    if (!light) return;
-    light.target = target;
-    light.add(target);
+    if (light) light.target = target;
   }, [target]);
 
   useFrame((_, delta) => {
@@ -84,9 +84,10 @@ function BuildingSpotlight({ hot, selected }: { hot: boolean; selected: boolean 
     const light = lightRef.current;
     if (light) {
       light.intensity = (hot ? 1.55 : 1.15) * t;
-      light.distance = (hot ? 1.55 : 1.35) * (0.85 + 0.15 * t);
-      light.angle = selected ? 0.42 : 0.34;
+      light.distance = (hot ? 2.1 : 1.85) * (0.85 + 0.15 * t);
+      light.angle = selected ? 0.38 : 0.3;
       light.penumbra = 0.72;
+      light.target.updateMatrixWorld();
     }
 
     coneMaterial.opacity = (selected ? 0.14 : hot ? 0.08 : 0) * t;
@@ -99,23 +100,26 @@ function BuildingSpotlight({ hot, selected }: { hot: boolean; selected: boolean 
         ref={lightRef}
         color="#a8d48a"
         intensity={hot ? 1.55 : 1.15}
-        distance={hot ? 1.55 : 1.35}
-        angle={selected ? 0.42 : 0.34}
+        distance={hot ? 2.1 : 1.85}
+        angle={selected ? 0.38 : 0.3}
         penumbra={0.72}
         decay={2}
-        position={[0, 0.85, 0]}
+        position={[0, 0.95, 0]}
       />
-      {/* Sichtbarer Soft-Kegel — Opacity nur, kein Layout-Thrash */}
+      <primitive object={target} />
+      {/*
+        Spotlight-Volumen: Spitze am Licht (oben), breite Basis auf dem Gebäude (unten).
+        ConeGeometry hat die Spitze bei +Y — keine Flip-Rotation.
+      */}
       <mesh
         ref={coneRef}
-        position={[0, 0.22, 0]}
-        rotation={[Math.PI, 0, 0]}
+        position={[0, 0.12, 0]}
         material={coneMaterial}
         raycast={ignoreRaycast}
         visible={false}
         renderOrder={5}
       >
-        <coneGeometry args={[0.42, 1.05, 20, 1, true]} />
+        <coneGeometry args={[0.4, 1.05, 20, 1, true]} />
       </mesh>
       <pointLight color="#a8d48a" intensity={hot ? 0.35 : selected ? 0.28 : 0} distance={0.55} decay={2} />
     </group>

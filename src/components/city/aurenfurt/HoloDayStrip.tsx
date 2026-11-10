@@ -12,13 +12,14 @@ import type { WeatherPresetId } from "@/src/lib/session-weather";
 
 const DAY_MS = 86_400_000;
 const WINDOW = 5;
-const GAP = 10;
-const ACTIVE_SCALE = 1.12;
+const GAP = 6;
+const ACTIVE_SCALE = 1.08;
 const CELL_MAX = CITY_VIEW_CARD_SIZE;
-const CELL_MIN = 72;
+const CELL_MIN = 56;
 const GOLD = "#cab926";
 
 const WEEKDAYS_DE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"] as const;
+const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
 
 /** Dieselben Grafiken wie die Live-Session. Nebel und Frost nutzen „Nur Wolken“, dort gibt es kein eigenes Bild. */
 const KIND_PRESET: Record<WeatherKind, WeatherPresetId> = {
@@ -55,6 +56,11 @@ function around(center: string) {
 function weekdayDe(iso: string) {
   const [year, month, day] = iso.split("-").map(Number);
   return WEEKDAYS_DE[new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? "";
+}
+
+function weekdayShort(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return WEEKDAYS_SHORT[new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? "";
 }
 
 function dayNumber(iso: string) {
@@ -98,10 +104,11 @@ export function HoloDayStrip({
       }, 0);
       const gaps = headerGap * Math.max(0, header.children.length - 1);
       const free = header.clientWidth - pad - gaps - reserved;
-      // 4 Seiten + 1 aktiver (größer) + 4 Abstände à 10px
+      // Rahmen-Padding (px-2 * 2) + innere Gaps abziehen
+      const framePad = 16;
       const next = Math.max(
         CELL_MIN,
-        Math.min(CELL_MAX, Math.floor((free - (WINDOW - 1) * GAP) / (WINDOW - 1 + ACTIVE_SCALE))),
+        Math.min(CELL_MAX, Math.floor((free - framePad - (WINDOW - 1) * GAP) / (WINDOW - 1 + ACTIVE_SCALE))),
       );
       setSide((current) => (current === next ? current : next));
     };
@@ -116,18 +123,17 @@ export function HoloDayStrip({
   const cells = around(day);
 
   return (
-    <div ref={rootRef} className="relative flex shrink-0 items-end">
+    <div
+      ref={rootRef}
+      data-city-map-hud="day-strip"
+      className="relative flex shrink-0 items-end rounded-md border border-hero-dark/80 bg-background-dark/95 p-1.5 shadow-inner"
+    >
       <p className="sr-only" aria-live="polite">
         {formatGermanDay(day)}
         {isToday ? ", heute" : ""}
       </p>
 
-      <div
-        className="flex items-end"
-        style={{ gap: GAP }}
-        role="group"
-        aria-labelledby={labelId}
-      >
+      <div className="flex items-end" style={{ gap: GAP }} role="group" aria-labelledby={labelId}>
         <span id={labelId} className="sr-only">
           Stadttage, der aktive Tag steht in der Mitte
         </span>
@@ -138,7 +144,7 @@ export function HoloDayStrip({
           const inRange = iso >= minDay && iso <= maxDay;
           const selected = iso === day;
           const size = selected ? active : side;
-          const iconPx = Math.round(size * 0.42);
+          const iconPx = Math.round(size * 0.36);
           const label = [weekdayDe(iso), formatGermanDay(iso), weather.label, holiday?.title]
             .filter(Boolean)
             .join(", ");
@@ -152,7 +158,7 @@ export function HoloDayStrip({
               aria-label={label}
               title={label}
               onClick={() => onDayChange(iso)}
-              className={`relative flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] bg-[#D3D3D3] px-1 py-1.5 shadow-sm transition-[width,height] duration-200 disabled:opacity-40 ${
+              className={`relative flex shrink-0 flex-col items-center justify-center gap-0 rounded-[8px] bg-[#D3D3D3] px-0.5 py-1 shadow-sm transition-[width,height] duration-200 disabled:opacity-40 ${
                 selected ? "" : "border border-black/10"
               }`}
               style={{
@@ -160,22 +166,22 @@ export function HoloDayStrip({
                 height: size,
                 ...(selected
                   ? {
-                      border: `3px solid ${GOLD}`,
+                      border: `2px solid ${GOLD}`,
                       boxSizing: "border-box",
                     }
                   : null),
               }}
             >
               <span
-                className={`font-barlow text-[10px] font-bold uppercase leading-none tracking-wide ${
+                className={`font-barlow text-[8px] font-bold uppercase leading-none tracking-wide ${
                   inRange ? "text-black" : "text-gray-400"
                 }`}
               >
-                {weekdayDe(iso)}
+                {weekdayShort(iso)}
               </span>
               <span
                 className={`shrink-0 font-barlow font-extrabold tabular-nums leading-none ${
-                  selected ? "text-xl" : "text-lg"
+                  selected ? "text-base" : "text-sm"
                 } ${inRange ? "text-black" : "text-gray-400"}`}
               >
                 {dayNumber(iso)}
@@ -191,11 +197,11 @@ export function HoloDayStrip({
                   style={{
                     width: 0,
                     height: 0,
-                    marginLeft: -9,
+                    marginLeft: -7,
                     marginBottom: -1,
-                    borderLeft: "9px solid transparent",
-                    borderRight: "9px solid transparent",
-                    borderBottom: `12px solid ${GOLD}`,
+                    borderLeft: "7px solid transparent",
+                    borderRight: "7px solid transparent",
+                    borderBottom: `10px solid ${GOLD}`,
                   }}
                 />
               ) : null}

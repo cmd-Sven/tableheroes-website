@@ -10,6 +10,7 @@ import {
   requiresCityDeity,
 } from "@/src/lib/npcs/city-simulation";
 import { NpcCityPowers } from "@/src/components/worlds/npc-wizard/NpcCityPowers";
+import { SearchableSelect } from "@/src/components/ui/SearchableSelect";
 
 type Props = {
   value: CitySimulationFields;
@@ -20,6 +21,8 @@ type Props = {
   className?: string;
   /** Ort der Stadtsimulation: „Nein“ ist keine Option. */
   locked?: boolean;
+  /** Für Kartenmotiv-Upload bei Ereigniskarten. */
+  worldId?: string;
 };
 
 function BipolarSlider({
@@ -73,6 +76,7 @@ export function NpcCitySimulationFields({
   deities = [],
   className,
   locked = false,
+  worldId,
 }: Props) {
   const patch = (partial: Partial<CitySimulationFields>) =>
     onChange({ ...value, ...partial });
@@ -186,18 +190,14 @@ export function NpcCitySimulationFields({
               Zugehörige Gottheit{deityRequired ? " *" : " (optional)"}
             </label>
             {deities.length > 0 ? (
-              <select
-                value={value.cityDeity ?? ""}
-                onChange={(e) => patch({ cityDeity: e.target.value || null })}
-                className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white focus:border-hero-vibrant outline-none"
-              >
-                <option value="">— keine / später —</option>
-                {deities.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                options={deities.map((d) => ({ value: d.name, label: d.name }))}
+                value={value.cityDeity}
+                onChange={(v) => patch({ cityDeity: v })}
+                placeholder="Gottheit suchen…"
+                noneLabel="— keine / später —"
+                aria-label="Zugehörige Gottheit"
+              />
             ) : (
               <input
                 type="text"
@@ -218,22 +218,18 @@ export function NpcCitySimulationFields({
             <label className="mb-1 block font-barlow font-bold text-xs uppercase text-gray-400">
               Fraktionszugehörigkeit (Aurenfurt) *
             </label>
-            <select
-              value={value.cityFactionId ?? ""}
-              onChange={(e) =>
+            <SearchableSelect
+              options={AURENFURT_FACTIONS.map((f) => ({ value: f.id, label: f.name }))}
+              value={value.cityFactionId}
+              onChange={(v) =>
                 patch({
-                  cityFactionId: (e.target.value || null) as FactionId | null,
+                  cityFactionId: (v as FactionId | null) ?? null,
                 })
               }
-              className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white focus:border-hero-vibrant outline-none"
-            >
-              <option value="">keine</option>
-              {AURENFURT_FACTIONS.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Fraktion suchen…"
+              noneLabel="— keine —"
+              aria-label="Fraktionszugehörigkeit Aurenfurt"
+            />
             <p className="mt-1 font-libre text-[11px] text-gray-500">
               Auswahl aus dem Aurenfurt-Fraktionsmodell — getrennt von der Welt-Fraktion oben.
             </p>
@@ -252,7 +248,7 @@ export function NpcCitySimulationFields({
             />
           </div>
 
-          <NpcCityPowers value={value} onChange={onChange} />
+          <NpcCityPowers value={value} onChange={onChange} worldId={worldId} />
         </div>
       )}
     </div>

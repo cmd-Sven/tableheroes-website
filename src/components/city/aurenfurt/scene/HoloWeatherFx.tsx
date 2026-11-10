@@ -25,24 +25,25 @@ type Props = {
   intensity: number;
 };
 
-const RAIN_COUNT = 360;
+const RAIN_COUNT = 720;
 const SNOW_COUNT = 240;
 
 function ignoreRaycast() {
   return null;
 }
 
-function radialTexture(inner: string, outer: string) {
+function radialTexture(inner: string, outer: string, mid?: string) {
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext("2d");
   if (!ctx) return new CanvasTexture(canvas);
-  const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  const gradient = ctx.createRadialGradient(128, 128, 8, 128, 128, 128);
   gradient.addColorStop(0, inner);
+  if (mid) gradient.addColorStop(0.48, mid);
   gradient.addColorStop(1, outer);
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillRect(0, 0, 256, 256);
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
   return texture;
@@ -59,40 +60,64 @@ function Rain({ intensity }: { intensity: number }) {
   const dummy = useMemo(() => new Object3D(), []);
   const drops = useMemo(
     () =>
-      Array.from({ length: RAIN_COUNT }, () => ({
-        x: (Math.random() - 0.5) * DIORAMA_WIDTH,
-        y: Math.random() * 2.1,
-        z: (Math.random() - 0.5) * DIORAMA_DEPTH,
-        speed: 1.7 + Math.random() * 1.5,
-      })),
+      Array.from({ length: RAIN_COUNT }, () => {
+        const length = 0.045 + Math.random() * 0.07;
+        return {
+          x: (Math.random() - 0.5) * DIORAMA_WIDTH,
+          y: Math.random() * 2.1,
+          z: (Math.random() - 0.5) * DIORAMA_DEPTH,
+          speed: 2.4 + Math.random() * 2.2,
+          /** Dünne Streaks: Breite/Tiefe stark unter der Länge. */
+          sx: 0.0016 + Math.random() * 0.0014,
+          sy: length,
+          sz: 0.0016 + Math.random() * 0.0014,
+          tilt: -0.22 - Math.random() * 0.12,
+        };
+      }),
     [],
   );
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    const step = Math.min(delta, 0.05) * (0.7 + intensity / 120);
+    const step = Math.min(delta, 0.05) * (0.85 + intensity / 110);
+    const drift = 0.55 + intensity / 180;
     for (let index = 0; index < drops.length; index += 1) {
       const drop = drops[index];
       drop.y -= drop.speed * step;
-      drop.x += step * 0.35;
-      if (drop.y < 0.04 || drop.x > DIORAMA_WIDTH / 2) {
-        drop.y = 1.55 + Math.random() * 0.7;
+      drop.x += step * drift;
+      if (drop.y < 0.03 || drop.x > DIORAMA_WIDTH / 2) {
+        drop.y = 1.65 + Math.random() * 0.85;
         drop.x = -DIORAMA_WIDTH / 2 + Math.random() * DIORAMA_WIDTH;
         drop.z = (Math.random() - 0.5) * DIORAMA_DEPTH;
       }
       dummy.position.set(drop.x, drop.y, drop.z);
-      dummy.rotation.set(0, 0, -0.18);
+      dummy.rotation.set(0.08, 0, drop.tilt);
+      dummy.scale.set(drop.sx / 0.0025, drop.sy / 0.08, drop.sz / 0.0025);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
   });
 
+  const opacity = 0.28 + (intensity / 100) * 0.22;
+
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, RAIN_COUNT]} raycast={ignoreRaycast} frustumCulled={false}>
-      <boxGeometry args={[0.012, 0.18, 0.012]} />
-      <meshBasicMaterial color="#d5e6ff" transparent opacity={0.62} depthWrite={false} />
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, RAIN_COUNT]}
+      raycast={ignoreRaycast}
+      frustumCulled={false}
+    >
+      {/* Basis-Streak; Instanz-Scale macht die Tropfen unterschiedlich lang/dünn. */}
+      <boxGeometry args={[0.0025, 0.08, 0.0025]} />
+      <meshBasicMaterial
+        color="#c8daf5"
+        transparent
+        opacity={opacity}
+        depthWrite={false}
+        blending={AdditiveBlending}
+      />
     </instancedMesh>
   );
 }
@@ -197,7 +222,7 @@ function DriftingSprites({
           scale={[seed.scale, seed.scale * 0.62, 1]}
           raycast={ignoreRaycast}
         >
-          <spriteMaterial map={texture} transparent opacity={opacity} depthWrite={false} />
+          <spriteMaterial map={texture} transparent opacity={opacity} depthWrite={false} fog={false} />
         </sprite>
       ))}
     </>
@@ -277,50 +302,109 @@ function Sunshine() {
   );
 }
 
+/** Weicher Bodennebel ohne harte Rechteckkante — radial auslaufend. */
+function SoftGroundMist({ intensity }: { intensity: number }) {
+  const mist = useRadialTexture(
+    "rgba(210,220,228,0.55)",
+    "rgba(210,220,228,0)",
+    "rgba(210,220,228,0.22)",
+  );
+  const veil = useRadialTexture(
+    "rgba(186,198,208,0.28)",
+    "rgba(186,198,208,0)",
+    "rgba(186,198,208,0.1)",
+  );
+  const strength = Math.max(20, Math.min(100, intensity || 55));
+  const baseOpacity = 0.22 + (strength / 100) * 0.18;
+  const layers = useMemo(
+    () =>
+      [
+        { y: 0.14, scale: DIORAMA_WIDTH * 1.35, opacity: baseOpacity * 0.85, speed: 0.04 },
+        { y: 0.32, scale: DIORAMA_WIDTH * 1.15, opacity: baseOpacity * 0.55, speed: 0.06 },
+        { y: 0.55, scale: DIORAMA_WIDTH * 0.95, opacity: baseOpacity * 0.35, speed: 0.08 },
+      ] as const,
+    [baseOpacity],
+  );
+  const layerRefs = useRef<(Sprite | null)[]>([]);
+
+  useFrame((state) => {
+    const time = state.clock.elapsedTime;
+    layers.forEach((layer, index) => {
+      const sprite = layerRefs.current[index];
+      if (!sprite) return;
+      sprite.position.x = Math.sin(time * layer.speed + index) * 0.18;
+      sprite.position.z = Math.cos(time * layer.speed * 0.8 + index * 1.2) * 0.12;
+      sprite.material.opacity = layer.opacity * (0.92 + Math.sin(time * 0.45 + index) * 0.08);
+    });
+  });
+
+  return (
+    <group>
+      {layers.map((layer, index) => (
+        <sprite
+          key={index}
+          ref={(node) => {
+            layerRefs.current[index] = node;
+          }}
+          position={[0, layer.y, 0]}
+          scale={[layer.scale, layer.scale * (DIORAMA_DEPTH / DIORAMA_WIDTH), 1]}
+          raycast={ignoreRaycast}
+          frustumCulled={false}
+        >
+          <spriteMaterial
+            map={index === 0 ? veil : mist}
+            color="#d5dee6"
+            transparent
+            opacity={layer.opacity}
+            depthWrite={false}
+            fog={false}
+          />
+        </sprite>
+      ))}
+      <DriftingSprites
+        texture={mist}
+        count={5}
+        yMin={0.22}
+        ySpan={0.55}
+        scaleMin={2.2}
+        scaleSpan={1.8}
+        opacity={0.22 + (strength / 100) * 0.12}
+        speed={0.1}
+      />
+    </group>
+  );
+}
+
 export function HoloWeatherFx({ effect, intensity }: Props) {
-  const cloud = useRadialTexture("rgba(198,206,214,0.55)", "rgba(198,206,214,0)");
-  const mist = useRadialTexture("rgba(214,224,228,0.42)", "rgba(214,224,228,0)");
+  const overcast = useRadialTexture(
+    "rgba(110,120,132,0.22)",
+    "rgba(110,120,132,0)",
+    "rgba(110,120,132,0.08)",
+  );
   const strength = Math.max(20, Math.min(100, intensity || 55));
 
   return (
     <group>
       {effect === "regen" ? <Rain intensity={strength} /> : null}
       {effect === "schnee" ? <Snow intensity={strength} /> : null}
-      {effect === "nebel" ? (
-        <>
-          <mesh position={[0, 0.22, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={ignoreRaycast}>
-            <planeGeometry args={[DIORAMA_WIDTH * 1.04, DIORAMA_DEPTH * 1.04]} />
-            <meshBasicMaterial color="#c5d0d6" transparent opacity={0.22} depthWrite={false} />
-          </mesh>
-          <DriftingSprites
-            texture={mist}
-            count={7}
-            yMin={0.28}
-            ySpan={0.45}
-            scaleMin={1.8}
-            scaleSpan={1.6}
-            opacity={0.34}
-            speed={0.18}
-          />
-        </>
-      ) : null}
+      {effect === "nebel" ? <SoftGroundMist intensity={strength} /> : null}
       {effect === "bewoelkt" ? (
-        <>
-          <mesh position={[0, 1.7, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={ignoreRaycast}>
-            <planeGeometry args={[DIORAMA_WIDTH * 1.2, DIORAMA_DEPTH * 1.2]} />
-            <meshBasicMaterial color="#6e7884" transparent opacity={0.16} depthWrite={false} />
-          </mesh>
-          <DriftingSprites
-            texture={cloud}
-            count={6}
-            yMin={0.95}
-            ySpan={0.45}
-            scaleMin={1.6}
-            scaleSpan={1.5}
-            opacity={0.42}
-            speed={0.12}
+        /* PNG-Wolken: HoloDriftingClouds; hier nur weicher Himmelsschleier. */
+        <sprite
+          position={[0, 1.65, 0]}
+          scale={[DIORAMA_WIDTH * 1.45, DIORAMA_DEPTH * 1.45, 1]}
+          raycast={ignoreRaycast}
+          frustumCulled={false}
+        >
+          <spriteMaterial
+            map={overcast}
+            color="#6e7884"
+            transparent
+            opacity={0.28}
+            depthWrite={false}
+            fog={false}
           />
-        </>
+        </sprite>
       ) : null}
       {effect === "sonnenschein" ? <Sunshine /> : null}
     </group>

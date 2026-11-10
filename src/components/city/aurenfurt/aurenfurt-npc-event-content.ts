@@ -39,6 +39,7 @@ function kaiserPack(): NpcEventPack {
       range: card.scope === "district" ? "district" : "city",
       extraDistrictIds: card.scope === "palace" ? ["palast"] : [],
       effects: card.effects,
+      imageUrl: card.imageUrl ?? null,
     }),
   );
   return {
@@ -49,14 +50,35 @@ function kaiserPack(): NpcEventPack {
         title: "Flüchtlingsstopp an den Toren",
         enabled: true,
         roleGate: "Kaiser",
+        /** Beliebiges Viertel > 70 löst aus; Wirkung nur dort, bis wieder ≤ 70. */
+        conditionScope: "city",
+        range: "city",
         conditions: [{ meter: "refugees", op: "gt", value: 70 }],
         effects: [
           { meter: "refugees", delta: -6 },
           { meter: "guard", delta: 3 },
           { meter: "economy", delta: -2 },
         ],
-        durationDays: 8,
-        cooldownDays: 20,
+        durationDays: 5,
+        /** Keine Pause: greift weiter, solange ein Viertel über der Schwelle liegt. */
+        cooldownDays: 0,
+      }),
+      makeAbility({
+        id: "kaiser-auto-garde-obergrenze",
+        title: "Garde-Obergrenze der Hofkanzlei",
+        enabled: true,
+        roleGate: "Kaiser",
+        /** Überbesetzte Wache irgendwo in der Stadt → Sold und Präsenz drosseln. */
+        conditionScope: "city",
+        range: "city",
+        conditions: [{ meter: "guard", op: "gte", value: 72 }],
+        effects: [
+          { meter: "guard", delta: -6 },
+          { meter: "economy", delta: 2 },
+          { meter: "crime", delta: 2 },
+        ],
+        durationDays: 6,
+        cooldownDays: 0,
       }),
     ],
   };
@@ -93,16 +115,26 @@ function hauptmannPack(seed: ContentSeed): NpcEventPack {
     ],
     abilities: [
       makeAbility({
-        id: `${seed.id}-auto-fluechtlinge`,
-        title: "Flüchtlingsstopp Tor",
+        id: `${seed.id}-auto-extremkriminalitaet`,
+        title: "Stadtweite Sicherheitslage",
         enabled: true,
-        conditions: [{ meter: "refugees", op: "gt", value: 60 }],
+        factionGate: "stadtwachen",
+        conditionScope: "city",
+        range: "city",
+        conditions: [{ meter: "crime", op: "gte", value: 90 }],
         effects: [
-          { meter: "refugees", delta: -5 },
-          { meter: "guard", delta: 2 },
+          { meter: "crime", delta: -7 },
+          { meter: "guard", delta: 6 },
+          { meter: "economy", delta: -3 },
         ],
         durationDays: 6,
-        cooldownDays: 14,
+        cooldownDays: 16,
+        relationshipTarget: "rival_faction",
+        relationshipDelta: -6,
+        counterFactionId: "rotes-auge",
+        counterDelayDays: 2,
+        counterDurationDays: 3,
+        counterEffects: [{ meter: "crime", delta: 4 }],
       }),
     ],
   };
@@ -450,7 +482,31 @@ export function enrichNpcEventContent(input: {
       factionId: input.factionId ?? "",
     });
     if (cards.length < 2) cards = pack.cards;
-    if (abilities.length < 1) abilities = pack.abilities;
+    if (abilities.length < 1) {
+      abilities = pack.abilities;
+    } else if (catalogId === "npc-leader-stadtwachen") {
+      // Alte Flüchtlings-Auto durch stadtweite Crime-Auto ersetzen.
+      const nextId = `${catalogId}-auto-extremkriminalitaet`;
+      if (!abilities.some((ability) => ability.id === nextId)) {
+        abilities = [
+          ...abilities.filter((ability) => ability.id !== `${catalogId}-auto-fluechtlinge`),
+          ...pack.abilities.filter((ability) => ability.id === nextId),
+        ];
+      }
+    } else if (catalogId === "npc-kaiser-artheus") {
+      // Kaiser-Autos aus dem Pack nachziehen (Flüchtlingsstopp + Garde-Obergrenze).
+      const keepIds = new Set([
+        "kaiser-auto-fluechtlingsstopp",
+        "kaiser-auto-garde-obergrenze",
+      ]);
+      const refreshed = pack.abilities.filter((ability) => keepIds.has(ability.id));
+      if (refreshed.length > 0) {
+        abilities = [
+          ...abilities.filter((ability) => !keepIds.has(ability.id)),
+          ...refreshed,
+        ];
+      }
+    }
   }
 
   return { cards, abilities };

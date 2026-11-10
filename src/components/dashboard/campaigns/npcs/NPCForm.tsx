@@ -1099,6 +1099,7 @@ export function NPCForm({ campaignId, worldId, initialData, hookContext, faction
           value={citySim}
           onChange={setCitySim}
           deities={deitiesOptions}
+          worldId={effectiveWorldId ?? undefined}
         />
 
         {/* Footer */}

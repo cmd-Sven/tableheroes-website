@@ -1,9 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
+import {
+  loadAurenfurtPartyTokens,
+  saveAurenfurtPartyTokens,
+} from "@/src/lib/actions/aurenfurt-session-actions";
 import { HoloCityRail } from "./HoloCityRail";
 import { HoloOverlay } from "./HoloOverlay";
+import { CityPartyTokenTray } from "./CityPartyTokenTray";
+import {
+  clearPartyTokenDraft,
+  getPartyTokenDraft,
+  getPartyTokenState,
+  partyTokenVersion,
+  replacePartyTokenState,
+  subscribePartyTokens,
+} from "./aurenfurt-party-tokens";
 import type { CitySurface } from "./CityViewSwitch";
 import type { ChartMetric, LineKey } from "./CityDashboard";
 import type { AnalyticsRange } from "./aurenfurt-analytics";
@@ -24,8 +38,12 @@ import { useAurenfurtDay } from "./hooks/useAurenfurtDay";
 import { useAurenfurtStreets } from "./hooks/useAurenfurtStreets";
 import { useAurenfurtWalls } from "./hooks/useAurenfurtWalls";
 import { useAurenfurtWeather } from "./hooks/useAurenfurtWeather";
+import { useNightModeControl } from "./hooks/useNightModeControl";
+import { useWeatherApiControl } from "./hooks/useWeatherApiControl";
 import { useWeatherFxControl } from "./hooks/useWeatherFxControl";
-import { resolveWeatherFx } from "./aurenfurt-weather-fx";
+import { resolveCityWeatherFx } from "./aurenfurt-weather-fx";
+import { isWeatherPresetId } from "@/src/lib/session-weather";
+import type { SessionDayPhase } from "@/src/lib/session-day-phase";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
 import { bindCityPressure, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
@@ -47,6 +65,7 @@ import type { DistrictSector } from "./aurenfurt-sectors";
 import { citySectorHeat, type HeatmapAspect } from "./aurenfurt-city-heatmap";
 import { buildDistrictHudKpis } from "./DistrictHudKpis";
 import { cityMetricsOn, districtMetricsOn } from "./aurenfurt-history";
+import { calculateDistrictFinances, sumFinances } from "./aurenfurt-finances";
 import { populationOn } from "./aurenfurt-population";
 import { parseDay } from "./aurenfurt-time";
 import { weatherConditionPenalty } from "./aurenfurt-streets";
@@ -55,6 +74,12 @@ import { mergeCityBuildings } from "./aurenfurt-map-buildings";
 import { AURENFURT_WORLD_ID } from "./aurenfurt-district-lore-ids";
 import { findPoi } from "./aurenfurt-map-pois";
 import { HoloCityLoadingOverlay } from "./HoloCityLoadingOverlay";
+import {
+  activeCityCardsByDistrict,
+  districtsAffectedByCard,
+  listActiveCityCardEffects,
+} from "./aurenfurt-active-city-events";
+import { listActiveMeasures } from "./aurenfurt-active-measures";
 
 const HoloCityCanvas = dynamic(() => import("./scene/HoloCityCanvas"), {
   ssr: false,
@@ -74,14 +99,104 @@ type Props = {
   onLeave: () => void;
   worldId?: string | null;
   campaignId?: string | null;
+  /** Live-Session-ID (Stadt-Handel / Prep-Kontext). */
+  sessionId?: string | null;
   isGm?: boolean;
+  /**
+   * Live-Spieler: nur 3D-Stadtkarte — kein Dashboard-/Verwaltungs-Tab.
+   * SL behält volle Steuerung (Dashboard + Kaiser).
+   */
+  playerMapOnly?: boolean;
+  /** Session-Status Scheduled → Vorbereitung: keine Live-Wirkung. */
+  isPrepMode?: boolean;
+  /** Leave-Button-Text (Live: „Stadtkarte beenden“, Lore: Standard). */
+  leaveLabel?: string;
+  /** Leave in der Rail anzeigen (Live-Spieler: aus). */
+  showLeave?: boolean;
+  /** Live: Ladenkatalog öffnet Session-Shop (active_shop_id). */
+  onOpenMerchantShop?: (shopId: string, merchantNpcId: string) => void;
+  /** Live-Atmosphäre: optisches Wetter (Stats bleiben API/Simulation). */
+  opticalWeatherPreset?: string | null;
+  opticalWeatherIntensity?: number | null;
+  /** Live-Tagesphase → Nachtmodus der Stadtkarte. */
+  sessionDayPhase?: SessionDayPhase | null;
+  /** Wenn die SL den Nacht-Schalter an der Karte nutzt. */
+  onSessionNightChange?: (night: boolean) => void;
+  /** Live-Party für Stadtkarten-Tokens. */
+  partyCharacters?: Array<{
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    tokenUrl?: string | null;
+    canPlace?: boolean;
+  }>;
 };
 
-export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm = false }: Props) {
+export function HoloCityMap({
+  onLeave,
+  worldId = null,
+  campaignId = null,
+  sessionId = null,
+  isGm = false,
+  playerMapOnly = false,
+  isPrepMode = false,
+  leaveLabel = "Zurück zur Lore",
+  showLeave,
+  onOpenMerchantShop,
+  opticalWeatherPreset = null,
+  opticalWeatherIntensity = null,
+  sessionDayPhase = null,
+  onSessionNightChange,
+  partyCharacters = [],
+}: Props) {
+  const mapOnly = playerMapOnly && !isGm;
+  const leaveVisible = showLeave ?? !mapOnly;
   const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
+  const partyTokenTick = useSyncExternalStore(
+    subscribePartyTokens,
+    partyTokenVersion,
+    partyTokenVersion,
+  );
+  const partyTokenState = useMemo(() => {
+    void partyTokenTick;
+    return getPartyTokenState();
+  }, [partyTokenTick]);
+  const partyTokenDraft = useMemo(() => {
+    void partyTokenTick;
+    return getPartyTokenDraft();
+  }, [partyTokenTick]);
+  const persistPartyTokens = useCallback(() => {
+    if (!sessionId) return;
+    const snapshot = getPartyTokenState();
+    void saveAurenfurtPartyTokens(sessionId, snapshot).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Token-Position nicht speicherbar.");
+    });
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let active = true;
+    void loadAurenfurtPartyTokens(sessionId).then((row) => {
+      if (active) replacePartyTokenState(row);
+    });
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") clearPartyTokenDraft();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sessionId]);
   const bootstrap = useAurenfurtMapBootstrap();
   const { editorBuildings, categoryOverrides, pois, places, npcRecordIds, factionRecordIds } = bootstrap;
   const weatherFx = useWeatherFxControl(resolvedWorldId, isGm);
+  const weatherApi = useWeatherApiControl(resolvedWorldId, isGm);
+  const nightMode = useNightModeControl(resolvedWorldId, isGm);
   const polygons = useDistrictPolygons(resolvedWorldId, isGm);
   const sectorsApi = useDistrictSectors(resolvedWorldId, isGm);
   const buildingPositions = useBuildingPositions(resolvedWorldId, isGm);
@@ -111,12 +226,75 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     npcRecordIds,
     calendar.day,
   );
-  const climate = useAurenfurtWeather(calendar.day);
-  const shownWeather = resolveWeatherFx(
-    weatherFx.preference,
-    climate.current.kind,
-    climate.current.intensity,
+  const climate = useAurenfurtWeather(calendar.day, { apiEnabled: weatherApi.enabled });
+  const opticalPreset = isWeatherPresetId(opticalWeatherPreset) ? opticalWeatherPreset : null;
+  const shownWeather = resolveCityWeatherFx({
+    preference: weatherFx.preference,
+    kind: climate.current.kind,
+    dayIntensity: climate.current.intensity,
+    opticalPreset: sessionId ? opticalPreset : null,
+    opticalIntensity: sessionId ? opticalWeatherIntensity : null,
+  });
+
+  const lastSyncedDayPhase = useRef<SessionDayPhase | null>(null);
+  useEffect(() => {
+    if (!sessionId || !sessionDayPhase) return;
+    if (lastSyncedDayPhase.current === sessionDayPhase) return;
+    lastSyncedDayPhase.current = sessionDayPhase;
+    nightMode.setNight(sessionDayPhase === "night", { force: true, persist: isGm });
+  }, [sessionId, sessionDayPhase, nightMode.setNight, isGm]);
+
+  const onToggleNightMode = useCallback(() => {
+    if (!nightMode.canToggle) return;
+    const next = !nightMode.night;
+    nightMode.setNight(next);
+    if (sessionId) onSessionNightChange?.(next);
+  }, [nightMode, sessionId, onSessionNightChange]);
+
+  const prepBlockToast = useCallback(() => {
+    toast.message("Vorbereitung: Kalender und Simulation starten erst, wenn die Session Live ist.");
+  }, []);
+
+  const onDayChangeGuarded = useCallback(
+    (iso: string) => {
+      if (isPrepMode) {
+        prepBlockToast();
+        return;
+      }
+      calendar.setDay(iso);
+    },
+    [calendar, isPrepMode, prepBlockToast],
   );
+
+  const onStepDayGuarded = useCallback(
+    (delta: number) => {
+      if (isPrepMode) {
+        prepBlockToast();
+        return;
+      }
+      calendar.stepDay(delta);
+    },
+    [calendar, isPrepMode, prepBlockToast],
+  );
+
+  const onStepYearGuarded = useCallback(
+    (delta: number) => {
+      if (isPrepMode) {
+        prepBlockToast();
+        return;
+      }
+      calendar.stepYear(delta);
+    },
+    [calendar, isPrepMode, prepBlockToast],
+  );
+
+  const onGoTodayGuarded = useCallback(() => {
+    if (isPrepMode) {
+      prepBlockToast();
+      return;
+    }
+    calendar.goToday();
+  }, [calendar, isPrepMode, prepBlockToast]);
 
   useEffect(() => {
     setCitySimLive({
@@ -168,6 +346,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
   useEffect(() => {
     if (!isGm && citySurface === "verwaltung") setCitySurface("map");
   }, [isGm, citySurface]);
+  useEffect(() => {
+    if (mapOnly && citySurface !== "map") setCitySurface("map");
+  }, [mapOnly, citySurface]);
   const [dashboardScope, setDashboardScope] = useState<CityDistrictId | null>(null);
   const [range, setRange] = useState<AnalyticsRange>("month");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("economy");
@@ -241,6 +422,36 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       : null;
 
   const focusDistrictId = view.subject?.districtId ?? null;
+  const [previewDistrictId, setPreviewDistrictId] = useState<CityDistrictId | null>(null);
+  const [selectedActiveCityCardId, setSelectedActiveCityCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedActiveCityCardId(null);
+  }, [calendar.day]);
+
+  const activeCityCards = useMemo(
+    () => listActiveCityCardEffects(calendar.day),
+    [calendar.day, simVersion],
+  );
+  const activeMeasures = useMemo(
+    () => listActiveMeasures(calendar.day),
+    [calendar.day, simVersion],
+  );
+  const activeCardsByDistrict = useMemo(
+    () => activeCityCardsByDistrict(calendar.day),
+    [calendar.day, simVersion],
+  );
+  const previewDistrictIds = useMemo(() => {
+    if (!previewDistrictId) return [] as CityDistrictId[];
+    const cards = activeCardsByDistrict.get(previewDistrictId) ?? [];
+    if (cards.length === 0) return [] as CityDistrictId[];
+    const ids = new Set<CityDistrictId>();
+    for (const card of cards) {
+      for (const id of districtsAffectedByCard(card)) ids.add(id);
+    }
+    return [...ids];
+  }, [activeCardsByDistrict, previewDistrictId]);
+
   const districtTitle = focusDistrictId
     ? (findDistrict(focusDistrictId)?.name ?? "Viertel")
     : "Aurenfurt";
@@ -269,10 +480,29 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
     return snap.population_total;
   }, [calendar.day, focusDistrictId, simVersion]);
 
-  const eventPickSectors =
-    eventWizardOpen && eventPlaceStep && eventDistrictId
+  /** Täglicher Umsatz (Einnahmen) — Stadt gesamt oder gewähltes Viertel. */
+  const revenueTotal = useMemo(() => {
+    const snap = populationOn(calendar.day);
+    const dayMs = parseDay(calendar.day);
+    if (focusDistrictId) {
+      const layers = snap.districts[focusDistrictId];
+      if (!layers) return 0;
+      return calculateDistrictFinances(layers, districtMetricsOn(focusDistrictId, dayMs).economy).income;
+    }
+    return sumFinances(
+      Object.values(snap.districts).map((layers) =>
+        calculateDistrictFinances(layers, districtMetricsOn(layers.districtId, dayMs).economy),
+      ),
+    ).income;
+  }, [calendar.day, focusDistrictId, simVersion]);
+
+  /** Für Wizard/Speichern immer, solange ein Viertel gewählt ist (nicht nur im Ort-Schritt). */
+  const eventWizardSectors =
+    eventWizardOpen && eventDistrictId
       ? (sectorsApi.sectorsByDistrict[eventDistrictId] ?? [])
       : [];
+  /** Auf der Karte nur während der Ort-Auswahl anklickbar. */
+  const eventPickSectors = eventPlaceStep ? eventWizardSectors : [];
 
   const closeEventWizard = () => {
     setEventWizardOpen(false);
@@ -284,12 +514,8 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
 
   const onCanvasSelect = (selection: HoloSelection | null) => {
     if (eventWizardOpen && eventPlaceStep) {
-      if (!selection) {
-        setEventWholeCity(true);
-        setEventDistrictId(null);
-        setEventSectorIds([]);
-        return;
-      }
+      // Leere Treffer ignorieren (ganze Stadt nur über den Wizard-Button).
+      if (!selection) return;
       const districtId =
         selection.type === "district"
           ? selection.id
@@ -302,8 +528,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
               : null;
       if (districtId) {
         setEventWholeCity(false);
+        // Gleiches Viertel erneut: Sektorwahl behalten. Anderes Viertel: Sektoren zurücksetzen.
+        if (eventDistrictId !== districtId) setEventSectorIds([]);
         setEventDistrictId(districtId);
-        setEventSectorIds([]);
         view.hover(null);
       }
       return;
@@ -332,7 +559,29 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
       .catch(() => bindCityPressure([], []));
   };
 
+  useEffect(() => {
+    const onReload = () => reloadCityPressure();
+    window.addEventListener("th:aurenfurt-pressure-reload", onReload);
+    return () => window.removeEventListener("th:aurenfurt-pressure-reload", onReload);
+  }, []);
+
+  useEffect(() => {
+    if (!isGm || !resolvedWorldId) return;
+    let cancelled = false;
+    void import("@/src/app/dashboard/worlds/city-sim-event-actions").then(({ deactivateExpiredCitySimEvents }) =>
+      deactivateExpiredCitySimEvents(resolvedWorldId, calendar.day).then((count) => {
+        if (cancelled || !count) return;
+        reloadCityPressure();
+        window.dispatchEvent(new CustomEvent("th:aurenfurt-pressure-reload"));
+      }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [calendar.day, isGm, resolvedWorldId]);
+
   const [sceneBooted, setSceneBooted] = useState(false);
+  const [loadCoverVisible, setLoadCoverVisible] = useState(true);
   const mapBuildings = buildings.length > 0 ? buildings : CITY_BUILDINGS;
   /** Ein HeavyGlb-Slot pro Landmark-Typ (Instancing oder Einzelmesh). */
   const expectedHeavyCount = useMemo(() => {
@@ -355,6 +604,10 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             view.focus(selection);
           }}
           onLeave={onLeave}
+          showLeave={leaveVisible}
+          leaveLabel={leaveLabel}
+          activeCardsByDistrict={activeCardsByDistrict}
+          onPreviewDistrict={setPreviewDistrictId}
         />
       ) : null}
       <div className="relative min-w-0 flex-1">
@@ -371,12 +624,15 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           enabled={citySurface === "map"}
           sceneBooted={sceneBooted}
           expectedHeavyCount={expectedHeavyCount}
+          onCoverVisibleChange={setLoadCoverVisible}
         />
         <HoloCityCanvas
           onSceneBoot={() => setSceneBooted(true)}
           selection={
-            eventWizardOpen && eventPlaceStep && eventDistrictId
-              ? { type: "district", id: eventDistrictId }
+            eventWizardOpen && eventPlaceStep
+              ? eventDistrictId
+                ? { type: "district", id: eventDistrictId }
+                : null
               : view.selection
           }
           hovered={view.hovered}
@@ -400,6 +656,7 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           dayWeather={climate.current}
           weatherFx={shownWeather.effect}
           weatherFxIntensity={shownWeather.intensity}
+          nightMode={nightMode.night}
           viewedDay={calendar.day}
           streetsLayerVisible={heatmapAspect ? false : layers.streets}
           buildingsVisible={heatmapAspect ? false : layers.buildings}
@@ -429,6 +686,11 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           poiReachVisible={poiReachVisible}
           holdStill={eventPlaceStep}
           highlightDistricts={eventPlaceStep}
+          activeCityCards={loadCoverVisible ? [] : activeCityCards}
+          sectorsByDistrict={sectorsApi.sectorsByDistrict}
+          previewDistrictIds={previewDistrictIds}
+          selectedActiveCityCardId={selectedActiveCityCardId}
+          onSelectActiveCityCard={setSelectedActiveCityCardId}
           buildings={mapBuildings}
           pois={pois}
           worldId={resolvedWorldId}
@@ -459,32 +721,52 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           onMovePoi={isGm && session.poisTool ? mutations.movePoiPoint : undefined}
           onCommitPoi={isGm && session.poisTool ? mutations.commitPoiPoint : undefined}
           onSelectStreet={session.selectStreet}
+          partyTokensEnabled={Boolean(sessionId)}
+          partyTokensEditable={Boolean(sessionId) && (isGm || partyCharacters.some((pc) => pc.canPlace !== false))}
+          onPartyTokensPersist={persistPartyTokens}
         />
+        {citySurface === "map" && sessionId && !loadCoverVisible ? (
+          <CityPartyTokenTray
+            characters={partyCharacters}
+            draft={partyTokenDraft}
+            placed={partyTokenState}
+            canManage={isGm || partyCharacters.some((pc) => pc.canPlace !== false)}
+          />
+        ) : null}
+        {!loadCoverVisible ? (
         <CityMapHud
           citySurface={citySurface}
           onCitySurface={setCitySurface}
-          showVerwaltung={isGm}
+          showVerwaltung={isGm && !mapOnly}
+          showDashboard={!mapOnly}
+          mapOnly={mapOnly}
           day={calendar.day}
           minDay={calendar.minDay}
           maxDay={calendar.maxDay}
           isToday={calendar.isToday}
           liveWeather={climate.live}
-          onDayChange={calendar.setDay}
-          onStepDay={calendar.stepDay}
-          onStepYear={calendar.stepYear}
-          onGoToday={calendar.goToday}
+          onDayChange={onDayChangeGuarded}
+          onStepDay={onStepDayGuarded}
+          onStepYear={onStepYearGuarded}
+          onGoToday={onGoTodayGuarded}
           isGm={isGm}
           mapAdminMode={session.mapAdminMode}
           onToggleMapAdminMode={session.toggleMapAdminMode}
           eventWizardOpen={eventWizardOpen}
-          onToggleEventWizard={() => (eventWizardOpen ? closeEventWizard() : setEventWizardOpen(true))}
+          onToggleEventWizard={() => {
+            if (eventWizardOpen) closeEventWizard();
+            else setEventWizardOpen(true);
+          }}
           districtTitle={districtTitle}
           districtId={focusDistrictId}
           districtKpis={districtKpis}
           population={populationTotal}
+          revenue={revenueTotal}
           statusLine={
             eventWizardOpen && eventPlaceStep
-              ? "Klicke ein Viertel. Danach erscheinen die Sektoren. Ein Klick neben die Stadt trifft die ganze Stadt."
+              ? eventDistrictId
+                ? "Draufsicht: Sektoren anklicken (Mehrfachwahl). Gold = ausgewählt, Bezeichnung darüber."
+                : "Draufsicht: Viertel wählen. Danach Zoom auf die Sektoren. Klick neben die Stadt = ganze Stadt."
               : session.wallDrawActive
                 ? "Klicke Punkte für die Mauer. Doppelklick schließt die Linie."
                 : session.placingBuildingActive
@@ -511,9 +793,13 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
           weatherMode={weatherFx.preference.mode}
           autoEffect={shownWeather.autoEffect}
           onWeatherMode={weatherFx.setMode}
+          nightMode={nightMode.night}
+          onToggleNightMode={nightMode.canToggle ? onToggleNightMode : undefined}
           heatmapAspect={heatmapAspect}
           onHeatmapAspect={setHeatmapAspect}
+          activeMeasures={activeMeasures}
         />
+        ) : null}
         {isGm && eventWizardOpen ? (
           <CityEventWizard
             day={calendar.day}
@@ -521,14 +807,57 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             districtId={eventDistrictId}
             wholeCity={eventWholeCity}
             sectorIds={eventSectorIds}
-            sectors={eventPickSectors}
+            sectors={eventWizardSectors}
             onPlaceStep={setEventPlaceStep}
+            onSelectWholeCity={() => {
+              setEventWholeCity(true);
+              setEventDistrictId(null);
+              setEventSectorIds([]);
+            }}
+            onSelectWholeDistrict={() => {
+              if (!eventDistrictId) return;
+              setEventWholeCity(false);
+              setEventSectorIds([]);
+            }}
+            onClearSectors={() => setEventSectorIds([])}
+            onLoadPlace={({ wholeCity, districtId, sectorLabel }) => {
+              setEventWholeCity(wholeCity);
+              setEventDistrictId(districtId);
+              if (wholeCity || !districtId || !sectorLabel?.trim()) {
+                setEventSectorIds([]);
+                return;
+              }
+              const wanted = new Set(
+                sectorLabel
+                  .split(",")
+                  .map((part) => part.trim().toLowerCase())
+                  .filter(Boolean),
+              );
+              const pool = sectorsApi.sectorsByDistrict[districtId] ?? [];
+              const districtName = (findDistrict(districtId)?.name ?? "").toLowerCase();
+              setEventSectorIds(
+                pool
+                  .filter((sector) => {
+                    const address = sector.address.toLowerCase();
+                    const label = sector.label.toLowerCase();
+                    return (
+                      wanted.has(address) ||
+                      wanted.has(label) ||
+                      wanted.has(`${districtName} ${label}`.trim())
+                    );
+                  })
+                  .map((sector) => sector.id),
+              );
+            }}
             onClose={closeEventWizard}
-            onSaved={reloadCityPressure}
+            onSaved={() => {
+              reloadCityPressure();
+              window.dispatchEvent(new CustomEvent("th:aurenfurt-pressure-reload"));
+            }}
           />
         ) : null}
         </div>
-        {citySurface === "dashboard" ? (
+        {citySurface === "dashboard" && !mapOnly ? (
           <CityDashboard
             day={calendar.day}
             minDay={calendar.minDay}
@@ -537,28 +866,34 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
             liveWeather={climate.current}
             scopeId={dashboardScope}
             onScopeId={setDashboardScope}
-            onDayChange={calendar.setDay}
-            onStepDay={calendar.stepDay}
-            onStepYear={calendar.stepYear}
-            onGoToday={calendar.goToday}
+            onDayChange={onDayChangeGuarded}
+            onStepDay={onStepDayGuarded}
+            onStepYear={onStepYearGuarded}
+            onGoToday={onGoTodayGuarded}
             onShowMap={() => setCitySurface("map")}
             onShowVerwaltung={() => setCitySurface("verwaltung")}
             showVerwaltung={isGm}
             onLeave={onLeave}
+            leaveLabel={leaveLabel}
             range={range}
             setRange={setRange}
             chartMetric={chartMetric}
             setChartMetric={setChartMetric}
             lines={lines}
             setLines={setLines}
+            worldId={resolvedWorldId}
+            campaignId={campaignId}
+            npcRecordIds={npcRecordIds}
+            factionRecordIds={factionRecordIds}
           />
         ) : null}
-        {citySurface === "verwaltung" && isGm ? (
+        {citySurface === "verwaltung" && isGm && !mapOnly ? (
           <CityVerwaltung
             day={calendar.day}
             onShowMap={() => setCitySurface("map")}
             onShowDashboard={() => setCitySurface("dashboard")}
             onLeave={onLeave}
+            leaveLabel={leaveLabel}
           />
         ) : null}
         {citySurface === "map" && !session.mapAdminMode && view.subject?.type !== "district" ? (
@@ -580,6 +915,9 @@ export function HoloCityMap({ onLeave, worldId = null, campaignId = null, isGm =
               npcLinkContext={{ worldId: resolvedWorldId, campaignId }}
               viewDay={calendar.day}
               isGm={isGm}
+              isPrepMode={isPrepMode}
+              sessionId={sessionId}
+              onOpenShop={onOpenMerchantShop}
               selectedPoi={selectedPoi}
               districtPois={reach.districtPoiInfluences}
               influenceReachOn={poiReachVisible}

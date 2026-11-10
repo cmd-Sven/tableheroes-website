@@ -37,6 +37,11 @@ type Props = {
   /** Betrachteter Kalendertag `YYYY-MM-DD` für Diagramm-Marke */
   viewDay?: string;
   isGm?: boolean;
+  /** Live Session noch Scheduled → Vorbereitung. */
+  isPrepMode?: boolean;
+  sessionId?: string | null;
+  /** Live: Shop über session_live_states öffnen. */
+  onOpenShop?: (shopId: string, merchantNpcId: string) => void;
   selectedPoi?: AurenfurtMapPoi | null;
   districtPois?: AurenfurtMapPoi[];
   /** Einflussbereich des besonderen Orts auf der Karte hervorheben. */
@@ -61,7 +66,11 @@ export function HoloOverlay({
   lore,
   operator = null,
   npcLinkContext = {},
+  factionRecordIds = {},
   isGm = false,
+  isPrepMode = false,
+  sessionId = null,
+  onOpenShop,
   selectedPoi = null,
   influenceReachOn = false,
   onToggleInfluenceReach,
@@ -96,6 +105,7 @@ export function HoloOverlay({
       <HoloPoiPanel
         poi={selectedPoi}
         leadNpc={leadNpc}
+        factionRecordIds={factionRecordIds}
         npcLinkContext={npcLinkContext}
         influenceReachOn={influenceReachOn}
         onToggleInfluenceReach={onToggleInfluenceReach}
@@ -134,6 +144,9 @@ export function HoloOverlay({
             worldId={worldId}
             npcLinkContext={npcLinkContext}
             isGm={isGm}
+            isPrepMode={isPrepMode}
+            sessionId={sessionId}
+            onOpenShop={onOpenShop}
             onClose={() => setNpcOpen(false)}
           />
         ) : null}

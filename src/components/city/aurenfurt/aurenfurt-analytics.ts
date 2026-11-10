@@ -5,7 +5,12 @@
  * nicht erfunden, das Fenster rückt auf den ersten berechneten Tag.
  */
 
-import { AURENFURT_DISTRICTS, findDistrict, type CityDistrictId } from "./aurenfurt-districts";
+import {
+  AURENFURT_DISTRICTS,
+  findBuilding,
+  findDistrict,
+  type CityDistrictId,
+} from "./aurenfurt-districts";
 import { buildingWeights, citySimVersion } from "./aurenfurt-city-sim";
 import {
   allFactionStandings,
@@ -27,6 +32,8 @@ import {
 } from "./aurenfurt-history";
 import { SIM_METERS, type SimMeterKey, type SimProfile } from "./aurenfurt-sim";
 import { weatherOn, type DayWeather, type WeatherKind } from "./aurenfurt-weather";
+import { listActiveMeasures } from "./aurenfurt-active-measures";
+import { NPC_PORTRAIT_PLACEHOLDER } from "./aurenfurt-npcs";
 
 const DAY_MS = 86_400_000;
 
@@ -116,6 +123,13 @@ export type AnalyticsFaction = {
   relationships: { label: string; strength: number; targetName: string }[];
 };
 
+export type AnalyticsNpcActiveItem = {
+  id: string;
+  title: string;
+  detail: string;
+  effectsLabel: string | null;
+};
+
 export type AnalyticsNpc = {
   id: string;
   name: string;
@@ -125,9 +139,17 @@ export type AnalyticsNpc = {
   factionName: string;
   districtId: CityDistrictId;
   districtName: string;
+  /** Gebäude-/Ortssitz in der Stadt, falls bekannt. */
+  seatName: string | null;
   influence: number;
   description: string;
   agenda: string;
+  portraitUrl: string;
+  recordId: string | null;
+  /** Aktive Automatismen dieses NPCs am Stichtag. */
+  activeAutomations: AnalyticsNpcActiveItem[];
+  /** Aktive NPC-Ereigniskarten dieses NPCs am Stichtag. */
+  activeEventCards: AnalyticsNpcActiveItem[];
 };
 
 export type AnalyticsInsight = {
@@ -375,35 +397,44 @@ function pointFrom(
   };
 }
 
-function activeNames(day: number, scopeId: CityDistrictId | null): string[] {
-  const names: string[] = [];
+function activeRanked(day: number, scopeId: CityDistrictId | null): Array<{ name: string; weight: number }> {
+  const ranked: Array<{ name: string; weight: number }> = [];
   const seen = new Set<string>();
-  const add = (name: string) => {
-    if (seen.has(name)) return;
-    seen.add(name);
-    names.push(name);
+  const add = (name: string, weight: number) => {
+    const title = name.trim();
+    if (!title || seen.has(title)) return;
+    seen.add(title);
+    ranked.push({ name: title, weight });
   };
   for (const event of AURENFURT_HISTORY) {
-    if (eventWeight(event, day) < 0.2) continue;
+    const weight = eventWeight(event, day);
+    if (weight < 0.2) continue;
     if (scopeId && !event.impact[scopeId]) continue;
-    add(event.title);
+    add(event.title, weight);
   }
-  for (const mark of chronicleMarksOn(day, scopeId)) add(mark.title);
-  for (const note of pressureNotesOn(day)) add(note.title);
-  return names;
+  for (const mark of chronicleMarksOn(day, scopeId)) add(mark.title, 0.85);
+  for (const note of pressureNotesOn(day)) {
+    const weight = note.kind === "ability" || note.kind === "counter" ? 0.95 : 0.75;
+    add(note.title, weight);
+  }
+  return ranked.sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name, "de"));
+}
+
+function activeNames(day: number, scopeId: CityDistrictId | null): string[] {
+  return activeRanked(day, scopeId).map((entry) => entry.name);
 }
 
 function namesOnDays(days: number[], scopeId: CityDistrictId | null) {
-  const names: string[] = [];
-  const seen = new Set<string>();
+  const best = new Map<string, number>();
   for (const day of days) {
-    for (const name of activeNames(day, scopeId)) {
-      if (seen.has(name)) continue;
-      seen.add(name);
-      names.push(name);
+    for (const entry of activeRanked(day, scopeId)) {
+      const prev = best.get(entry.name) ?? 0;
+      if (entry.weight > prev) best.set(entry.name, entry.weight);
     }
   }
-  return names;
+  return [...best.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
+    .map(([name]) => name);
 }
 
 function previousWindow(range: AnalyticsRange, from: number, to: number) {
@@ -576,77 +607,159 @@ function buildInsights(input: {
           ? "den Vormonat"
           : "das Vorjahr";
 
-  const moves = SIM_METERS.flatMap((meter) => {
-    const delta = input.deltas[meter.key];
-    if (delta == null || delta === 0) return [];
-    return [{ key: meter.key, delta, label: meter.label }];
-  }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const push = (insight: AnalyticsInsight) => {
+    if (insights.some((entry) => entry.id === insight.id || entry.title === insight.title)) return;
+    insights.push(insight);
+  };
 
   const byCrime = [...input.districts].sort((a, b) => b.average.crime - a.average.crime);
   const byGuard = [...input.districts].sort((a, b) => b.average.guard - a.average.guard);
   const crimeLead = byCrime[0];
   const guardLead = byGuard[0];
   const unterstadt = input.districts.find((district) => district.id === "unterstadt");
-  const unterstadtCrimeHigh = Boolean(unterstadt && unterstadt.average.crime >= 55);
-
+  const tempel = input.districts.find((district) => district.id === "tempelbezirk");
+  const crimeHot = byCrime.filter((district) => district.average.crime >= 65);
+  const moves = SIM_METERS.flatMap((meter) => {
+    const delta = input.deltas[meter.key];
+    if (delta == null || delta === 0) return [];
+    return [{ key: meter.key, delta, label: meter.label }];
+  }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   const lead = moves[0];
-  if (unterstadtCrimeHigh) {
-    insights.push({
-      id: "move",
+
+  // 1) Konkrete Hotspots & Alltagsfolgen
+  if (unterstadt && unterstadt.average.crime >= 55) {
+    push({
+      id: "crime-unterstadt",
       title: "Kriminalität in der Unterstadt weiterhin hoch",
       tone: "alert",
-      text: `Die Unterstadt liegt bei Kriminalität ${unterstadt!.average.crime}${
-        lead ? ` · stärkste Bewegung im Fenster: ${lead.label} ${signed(lead.delta)} gegenüber ${compare}` : ""
+      text: `Die Unterstadt liegt bei ${unterstadt.average.crime} Kriminalität${
+        unterstadt.average.guard <= 45
+          ? `, die Garde hält dort nur ${unterstadt.average.guard}`
+          : ""
       }.`,
     });
-  } else if (lead && input.previous) {
-    const good = HIGHER_IS_WORSE.has(lead.key) ? lead.delta < 0 : lead.delta > 0;
-    insights.push({
-      id: "move",
-      title: `${lead.label} ${lead.delta > 0 ? "steigt" : "sinkt"}`,
-      tone: good ? "up" : "down",
-      text: `${lead.label} von ${input.scopeLabel} liegt im Fenster bei ${input.average[lead.key]} und hat sich gegenüber ${compare} um ${signed(lead.delta)} verändert.`,
-    });
-  } else {
-    insights.push({
-      id: "move",
-      title: "Stand ohne Vergleich",
-      tone: "neutral",
-      text: `Für ${input.scopeLabel} fehlt ein gleich langer Zeitraum davor.`,
+  } else if (crimeLead && crimeLead.average.crime >= 60) {
+    push({
+      id: "crime-lead",
+      title: `Kriminalität in ${crimeLead.name} besonders hoch`,
+      tone: "alert",
+      text: `${crimeLead.name} führt mit ${crimeLead.average.crime} — die Garde dort bei ${crimeLead.average.guard}.`,
     });
   }
 
+  if (crimeHot.length > 0) {
+    const names = crimeHot.map((district) => district.name).join(", ");
+    push({
+      id: "shops-early",
+      title: "Einige Läden schließen früher",
+      tone: "alert",
+      text: `Bei Kriminalität über 65 greift die Sperrstunde: betroffen u. a. ${names}.`,
+    });
+  }
+
+  // 2) Konfession / Tempel
+  const confessionEvent = input.events.find((event) =>
+    /konfession|elysia|chromus|glaube|tempel/i.test(`${event.title} ${event.summary}`),
+  );
+  const faithClash = Boolean(
+    tempel &&
+      (Math.abs(tempel.average.elysia - tempel.average.chromus) >= 12 ||
+        tempel.average.malanthir >= 45 ||
+        confessionEvent),
+  );
+  if (faithClash) {
+    push({
+      id: "confession",
+      title: "Konfessionsstreit im Tempelbezirk",
+      tone: "alert",
+      text: confessionEvent
+        ? confessionEvent.summary
+        : `Elysia ${tempel!.average.elysia} gegen Chromus ${tempel!.average.chromus} — die Höfe sind gespalten.`,
+    });
+  }
+
+  // 3) Sicherheit konkret (kein vages „Viertel im Vergleich“)
   if (crimeLead && guardLead) {
     const gap = input.average.crime - input.average.guard;
-    insights.push({
-      id: "districts",
-      title: gap >= 8 ? "Sicherheitsdefizit" : "Viertel im Vergleich",
-      tone: gap >= 8 ? "alert" : "neutral",
-      text: `${crimeLead.name} führt die Kriminalität (${crimeLead.average.crime}), ${guardLead.name} die Garde (${guardLead.average.guard}).`,
-    });
+    if (gap >= 8) {
+      push({
+        id: "security-gap",
+        title: "Sicherheitslücke: Kriminalität überholt die Garde",
+        tone: "alert",
+        text: `Stadtweit Crime ${input.average.crime} vs. Garde ${input.average.guard}. Heißester Herd: ${crimeLead.name}.`,
+      });
+    } else if (crimeLead.id !== guardLead.id) {
+      push({
+        id: "district-hot",
+        title: `${crimeLead.name} unsicherer als ${guardLead.name}`,
+        tone: "neutral",
+        text: `${crimeLead.name} führt bei Kriminalität (${crimeLead.average.crime}), ${guardLead.name} bei Garde (${guardLead.average.guard}).`,
+      });
+    }
   }
 
-  const driver = input.events[0];
-  if (driver) {
-    insights.push({
-      id: "drivers",
-      title: driver.title,
+  // 4) Laufende Ereignisse (Titel + Zusammenfassung)
+  for (const event of input.events.slice(0, 3)) {
+    if (/konfession/i.test(event.title) && insights.some((entry) => entry.id === "confession")) {
+      continue;
+    }
+    push({
+      id: `event-${event.id}`,
+      title: event.title,
       tone: "neutral",
-      text: driver.summary,
+      text: event.summary,
     });
   }
 
+  // 5) Fraktion / Untergrund — mit Namen, nicht als Kategorie
   const faction = input.factions[0];
+  const topCell = input.cells[0];
   if (faction) {
-    insights.push({
-      id: "power",
-      title: "Macht und Untergrund",
+    const where =
+      faction.districtNames.length > 0
+        ? `Schwerpunkt: ${faction.districtNames.slice(0, 2).join(", ")}`
+        : "stadtweit aktiv";
+    push({
+      id: "faction-lead",
+      title:
+        faction.legality < 0
+          ? `${faction.name} stärkt den Untergrund`
+          : `${faction.name} hält den größten Einfluss`,
       tone: faction.legality < 0 ? "alert" : "neutral",
-      text: `${faction.name} ist die stärkste Fraktion (Macht ${faction.power}).`,
+      text: `Macht ${faction.power} · ${where}${
+        topCell ? ` · Nest „${topCell.name}“ (${topCell.strength})` : ""
+      }.`,
+    });
+  } else if (topCell) {
+    push({
+      id: "underground-cell",
+      title: `Untergrundnest „${topCell.name}“ aktiv`,
+      tone: "alert",
+      text: `Stärke ${topCell.strength} — die Schattenwirtschaft bleibt spürbar.`,
     });
   }
 
-  return insights.slice(0, 4);
+  // 6) Stärkste Meter-Bewegung nur, wenn noch Platz
+  if (insights.length < 4 && lead && input.previous) {
+    const good = HIGHER_IS_WORSE.has(lead.key) ? lead.delta < 0 : lead.delta > 0;
+    push({
+      id: "meter-move",
+      title: `${lead.label} ${lead.delta > 0 ? "steigt" : "sinkt"} spürbar`,
+      tone: good ? "up" : "down",
+      text: `In ${input.scopeLabel} ${signed(lead.delta)} gegenüber ${compare} (aktuell ${input.average[lead.key]}).`,
+    });
+  }
+
+  if (insights.length === 0) {
+    push({
+      id: "quiet",
+      title: "Keine besonderen Spannungen im Fenster",
+      tone: "neutral",
+      text: `${input.scopeLabel} wirkt im gewählten Zeitraum vergleichsweise ruhig.`,
+    });
+  }
+
+  return insights.slice(0, 5);
 }
 
 export function buildCityAnalytics(input: AnalyticsInput): CityAnalytics {
@@ -710,10 +823,15 @@ export function buildCityAnalytics(input: AnalyticsInput): CityAnalytics {
     }))
     .sort((a, b) => b.power - a.power);
 
+  const dayMeasures = listActiveMeasures(formatDay(anchor));
   const npcs: AnalyticsNpc[] = allAurenfurtNpcs()
     .filter((npc) => !factionScope || npc.districtId === factionScope)
     .map((npc) => {
       const modulated = withDistrictModulation(npc, anchor);
+      const prefix = `${modulated.id}:`;
+      const forNpc = dayMeasures.filter(
+        (measure) => measure.id === modulated.id || measure.id.startsWith(prefix),
+      );
       return {
         id: modulated.id,
         name: modulated.name,
@@ -723,9 +841,31 @@ export function buildCityAnalytics(input: AnalyticsInput): CityAnalytics {
         factionName: factionName(modulated.factionId),
         districtId: modulated.districtId,
         districtName: findDistrict(modulated.districtId)?.name ?? modulated.districtId,
+        seatName:
+          modulated.current_location_name_suggestion?.trim() ||
+          findBuilding(modulated.locationId)?.name ||
+          null,
         influence: modulated.influenceAndLoyalty.influence,
         description: modulated.description,
         agenda: modulated.influenceAndLoyalty.agenda,
+        portraitUrl: modulated.portraitUrl?.trim() || NPC_PORTRAIT_PLACEHOLDER,
+        recordId: modulated.recordId,
+        activeAutomations: forNpc
+          .filter((measure) => measure.kind === "ability" || measure.kind === "counter")
+          .map((measure) => ({
+            id: measure.id,
+            title: measure.title.replace(`${modulated.name}: `, ""),
+            detail: measure.detail,
+            effectsLabel: measure.effectsLabel,
+          })),
+        activeEventCards: forNpc
+          .filter((measure) => measure.kind === "npc-card")
+          .map((measure) => ({
+            id: measure.id,
+            title: measure.title,
+            detail: measure.detail,
+            effectsLabel: measure.effectsLabel,
+          })),
       };
     })
     .sort((a, b) => b.influence - a.influence)
@@ -778,4 +918,178 @@ export function deltaTone(key: SimMeterKey, delta: number): "up" | "down" | "neu
   if (delta === 0) return "neutral";
   const good = HIGHER_IS_WORSE.has(key) ? delta < 0 : delta > 0;
   return good ? "up" : "down";
+}
+
+/** Monatspunkt für die Tableau-artige 3-Jahres-Übersicht. */
+export type LongTermMonthPoint = {
+  /** Achsenlabel, z. B. „Sep 23“. */
+  label: string;
+  /** ISO-Monatsanfang. */
+  day: string;
+  year: number;
+  month: number;
+  crime: number;
+  vattrak: number;
+  malanthir: number;
+  guard: number;
+  refugees: number;
+  economy: number;
+  unemployment: number;
+  elysia: number;
+  chromus: number;
+  tension: number;
+  /** Bevölkerung im Zuschnitt (Stadt oder Viertel), Köpfe. */
+  population: number;
+};
+
+type LongTermCacheEntry = {
+  version: number;
+  throughIso: string;
+  scopeKey: string;
+  points: LongTermMonthPoint[];
+};
+
+let longTermCache: LongTermCacheEntry | null = null;
+
+/**
+ * Monatliche Mittelwerte von HISTORY_START bis Stichtag — für Small-Multiples
+ * (Kriminalität, Wirtschaft, Bevölkerung auf einen Blick).
+ * Ergebnis wird je Sim-Version / Stichtag / Zuschnitt gecacht.
+ */
+export function buildLongTermMonthlySeries(
+  throughIso: string,
+  scopeId: CityDistrictId | null = null,
+): LongTermMonthPoint[] {
+  const version = citySimVersion();
+  const scopeKey = scopeId ?? "city";
+  if (
+    longTermCache &&
+    longTermCache.version === version &&
+    longTermCache.throughIso === throughIso &&
+    longTermCache.scopeKey === scopeKey
+  ) {
+    return longTermCache.points;
+  }
+
+  const through = Math.max(parseDay(HISTORY_START), Math.min(utcToday(), parseDay(throughIso)));
+  const start = parseDay(HISTORY_START);
+  const startDate = new Date(start);
+  let cursor = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1);
+  const points: LongTermMonthPoint[] = [];
+
+  while (cursor <= through) {
+    const monthEnd = Math.min(lastOfMonth(cursor), through);
+    // Monatsserie: statt aller Tage nur 3 Stützstellen (Start/Mitte/Ende) — spart ~10× Rechenzeit.
+    const sampleDays = sampleMonthDays(Math.max(cursor, start), monthEnd);
+    if (sampleDays.length === 0) {
+      const next = new Date(cursor);
+      cursor = Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 1);
+      continue;
+    }
+    const profiles = sampleDays.map((day) => scopeProfile(rememberBundle(day), scopeId));
+    const avg = averageProfiles(profiles);
+    const date = new Date(cursor);
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    points.push({
+      label: `${MONTHS_SHORT[month]} ${String(year).slice(2)}`,
+      day: formatDay(cursor),
+      year,
+      month,
+      crime: avg.crime,
+      vattrak: avg.vattrak,
+      malanthir: avg.malanthir,
+      guard: avg.guard,
+      refugees: avg.refugees,
+      economy: avg.economy,
+      unemployment: avg.unemployment,
+      elysia: avg.elysia,
+      chromus: avg.chromus,
+      tension: tensionOf(avg),
+      population: 0,
+    });
+    cursor = Date.UTC(year, month + 1, 1);
+  }
+
+  longTermCache = { version, throughIso, scopeKey, points };
+  return points;
+}
+
+/** Drei Stützstellen pro Monat — reicht für Monatsmittel, spart Tagesloops. */
+function sampleMonthDays(fromMs: number, toMs: number): number[] {
+  if (toMs < fromMs) return [];
+  if (toMs === fromMs) return [fromMs];
+  const mid = fromMs + Math.floor((toMs - fromMs) / 2);
+  const days = [fromMs];
+  if (mid > fromMs && mid < toMs) days.push(mid);
+  days.push(toMs);
+  return days;
+}
+
+export type LongTermPathMarker = {
+  id: string;
+  title: string;
+  label: string;
+  crime: number;
+  economy: number;
+  day: string;
+};
+
+/**
+ * Wichtige Geschichtsereignisse auf den nächsten Monatspunkt der Long-Term-Serie legen.
+ * Max. 6 Marker — für den Pfad-Scatter lesbar.
+ */
+export function longTermPathMarkers(
+  points: LongTermMonthPoint[],
+  scopeId: CityDistrictId | null = null,
+): LongTermPathMarker[] {
+  if (points.length === 0) return [];
+  const fromMs = parseDay(points[0].day);
+  const toMs = parseDay(points[points.length - 1].day);
+  const candidates = AURENFURT_HISTORY.filter((event) => {
+    const startMs = parseDay(event.start);
+    if (startMs < fromMs || startMs > toMs) return false;
+    if (scopeId && !event.impact[scopeId]) return false;
+    return true;
+  })
+    .map((event) => {
+      const startMs = parseDay(event.start);
+      let peak = 0;
+      for (const key of Object.keys(event.impact) as CityDistrictId[]) {
+        const impact = event.impact[key];
+        if (!impact) continue;
+        peak = Math.max(
+          peak,
+          Math.abs(impact.crime ?? 0) +
+            Math.abs(impact.economy ?? 0) +
+            Math.abs(impact.refugees ?? 0) +
+            Math.abs(impact.guard ?? 0),
+        );
+      }
+      return { event, startMs, peak };
+    })
+    .sort((a, b) => b.peak - a.peak || a.startMs - b.startMs)
+    .slice(0, 6);
+
+  const markers: LongTermPathMarker[] = [];
+  for (const candidate of candidates) {
+    let best = points[0];
+    let bestDist = Math.abs(parseDay(best.day) - candidate.startMs);
+    for (const point of points) {
+      const dist = Math.abs(parseDay(point.day) - candidate.startMs);
+      if (dist < bestDist) {
+        best = point;
+        bestDist = dist;
+      }
+    }
+    markers.push({
+      id: candidate.event.id,
+      title: candidate.event.title,
+      label: best.label,
+      crime: best.crime,
+      economy: best.economy,
+      day: best.day,
+    });
+  }
+  return markers;
 }

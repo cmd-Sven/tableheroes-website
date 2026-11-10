@@ -12,7 +12,7 @@ import {
   sampleWallPath,
   type AurenfurtWall,
 } from "../aurenfurt-walls";
-import { DIORAMA_DEPTH, DIORAMA_WIDTH, surfacePoint } from "./diorama-geometry";
+import { DIORAMA_DEPTH, DIORAMA_WIDTH, MAP_SURFACE_Y, surfacePoint } from "./diorama-geometry";
 
 type Props = {
   walls: AurenfurtWall[];
@@ -182,7 +182,7 @@ function buildWallGeometry(wall: AurenfurtWall) {
   if (total < 0.01) return null;
   const half = Math.max(0.01, wall.thickness) * 0.5;
   const textureScale = Math.max(0.04, wall.textureScale);
-  const y0 = 0.012;
+  const y0 = MAP_SURFACE_Y;
   const y1 = y0 + wall.height;
   const positions: number[] = [];
   const uvs: number[] = [];

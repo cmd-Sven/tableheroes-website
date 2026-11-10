@@ -161,6 +161,10 @@ export function DistrictNode({
           transparent
           opacity={opacity}
           depthWrite={false}
+          depthTest
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
           side={DoubleSide}
         />
       </mesh>

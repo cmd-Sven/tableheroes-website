@@ -561,9 +561,15 @@ export async function setActiveWorldMap(
     }
   }
 
+  const patch: Record<string, unknown> = { active_world_map_id: worldMapId };
+  // Weltkarte und Aurenfurt-3D schließen sich als Force-View gegenseitig aus.
+  if (worldMapId) {
+    patch.active_aurenfurt_city = false;
+  }
+
   const { error } = await (supabase as any)
     .from("session_live_states")
-    .update({ active_world_map_id: worldMapId })
+    .update(patch)
     .eq("session_id", sessionId);
 
   if (error) throw new Error(error.message);

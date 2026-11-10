@@ -7,8 +7,9 @@ const BORDER_Y = "/images/border_left-right_gold.webp";
 type Density = "panel" | "card" | "rail";
 
 const SPEC = {
-  panel: { corner: 48, edgeX: 14, edgeY: 12 },
-  card: { corner: 36, edgeX: 12, edgeY: 10 },
+  /** Ecken ~25 % größer als die Leisten-Enden, damit sie bündig überdecken. */
+  panel: { corner: 60, edgeX: 14, edgeY: 12 },
+  card: { corner: 45, edgeX: 12, edgeY: 10 },
   rail: { corner: 0, edgeX: 8, edgeY: 8 },
 } as const;
 
@@ -37,7 +38,7 @@ function Corner({
         width={width}
         height={height}
         sizes={`${size}px`}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-contain"
         style={{ width: "100%", height: "100%" }}
       />
     </div>
@@ -53,12 +54,11 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-[1]">
+      {/* Leisten laufen unter die freigestellten Ecken durch (z-0). */}
       {rightEdgeOnly ? null : (
         <div
-          className="absolute top-0"
+          className="absolute inset-x-0 top-0 z-0"
           style={{
-            left: corner,
-            right: corner,
             height: edgeX,
             backgroundImage: `url('${BORDER_X}')`,
             backgroundRepeat: "repeat-x",
@@ -69,10 +69,8 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
       )}
       {rightEdgeOnly ? null : (
         <div
-          className="absolute bottom-0"
+          className="absolute inset-x-0 bottom-0 z-0"
           style={{
-            left: corner,
-            right: corner,
             height: edgeX,
             backgroundImage: `url('${BORDER_X}')`,
             backgroundRepeat: "repeat-x",
@@ -83,10 +81,8 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
       )}
       {rightEdgeOnly ? null : (
         <div
-          className="absolute left-0"
+          className="absolute inset-y-0 left-0 z-0"
           style={{
-            top: corner,
-            bottom: corner,
             width: edgeY,
             backgroundImage: `url('${BORDER_Y}')`,
             backgroundRepeat: "repeat-y",
@@ -96,10 +92,8 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
         />
       )}
       <div
-        className="absolute right-0"
+        className="absolute inset-y-0 right-0 z-0"
         style={{
-          top: corner,
-          bottom: corner,
           width: edgeY,
           backgroundImage: `url('${BORDER_Y}')`,
           backgroundRepeat: "repeat-y",
@@ -114,28 +108,28 @@ export function CityHudChrome({ density = "panel" }: ChromeProps) {
             width={243}
             height={247}
             size={corner}
-            className="absolute left-0 top-0"
+            className="absolute left-0 top-0 z-[2]"
           />
           <Corner
             src="/images/corner-claw-only.webp"
             width={240}
             height={240}
             size={corner}
-            className="absolute bottom-0 left-0"
+            className="absolute bottom-0 left-0 z-[2]"
           />
           <Corner
             src="/images/skull-corner-only.webp"
             width={158}
             height={166}
             size={corner}
-            className="absolute right-0 top-0 scale-y-[-1]"
+            className="absolute right-0 top-0 z-[2] scale-y-[-1]"
           />
           <Corner
             src="/images/skull-corner-only.webp"
             width={158}
             height={166}
             size={corner}
-            className="absolute bottom-0 right-0"
+            className="absolute bottom-0 right-0 z-[2]"
           />
         </>
       ) : null}

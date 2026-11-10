@@ -55,6 +55,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
     transcriptionMode = null,
     guestJoinUrl = null,
     campaignSystem = null,
+    aurenfurtCityEnabled = false,
   } = props;
 
   const router = useRouter();
@@ -311,6 +312,7 @@ export function useLiveSessionBoardOrchestration(props: LiveSessionBoardProps) {
       sessionLocationLoreReadable,
       campaignShops,
       guestJoinUrl,
+      aurenfurtCityEnabled,
     },
     router,
     isGM,

@@ -50,6 +50,8 @@ export type LiveState = {
   active_scene_media_id?: string | null;
   active_battlemap_id?: string | null;
   active_world_map_id?: string | null;
+  /** Force-View: Aurenfurt-3D-Stadtkarte für alle Teilnehmer. */
+  active_aurenfurt_city?: boolean | null;
   battlemap_movement_paused?: boolean | null;
   background_url?: string | null;
   is_background_manual_override?: boolean | null;
@@ -59,6 +61,8 @@ export type LiveState = {
   combat_round?: number | null;
   active_shop_id?: string | null;
   active_merchant_npc_id?: string | null;
+  /** GM gibt Spielern Verkauf am offenen Shop frei. */
+  shop_selling_unlocked?: boolean | null;
   current_loot_id?: string | null;
   loot_hide_npcs?: boolean | null;
   fate_coins?: FateCoin[] | null;
@@ -230,4 +234,6 @@ export type LiveSessionBoardProps = {
   transcriptionMode?: "table" | "jitsi" | null;
   guestJoinUrl?: string | null;
   campaignSystem?: string | null;
+  /** Prep: Aurenfurt-Stadtsimulation für diese Session freigeschaltet. */
+  aurenfurtCityEnabled?: boolean;
 };

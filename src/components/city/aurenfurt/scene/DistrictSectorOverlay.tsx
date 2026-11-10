@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -21,7 +21,21 @@ type Props = {
   onPick?: (sector: DistrictSector) => void;
 };
 
-function SectorLabel({ sector, emphasize }: { sector: DistrictSector; emphasize?: boolean }) {
+function sectorFillColor(index: number, selected: boolean, hovered: boolean): string {
+  if (selected) return "#cab926";
+  const hues = [145, 160, 175, 120, 190, 135];
+  const hue = hues[index % hues.length];
+  if (hovered) return `hsl(${hue} 62% 42%)`;
+  return `hsl(${hue} 48% 28%)`;
+}
+
+function SectorLabel({
+  sector,
+  emphasize,
+}: {
+  sector: DistrictSector;
+  emphasize?: boolean;
+}) {
   const centroid = sector.centroid;
   if (!centroid || !Number.isFinite(centroid.u) || !Number.isFinite(centroid.v)) {
     return null;
@@ -29,18 +43,19 @@ function SectorLabel({ sector, emphasize }: { sector: DistrictSector; emphasize?
   const world = surfacePoint(centroid.u, centroid.v);
   return (
     <Html
-      position={[world.x, world.y + DISTRICT_OUTLINE_LIFT + 0.05, world.z]}
+      position={[world.x, world.y + DISTRICT_OUTLINE_LIFT + 0.08, world.z]}
       center
       sprite
-      distanceFactor={emphasize ? 5.5 : 8}
+      distanceFactor={emphasize ? 4.2 : 7.2}
       style={{ pointerEvents: "none", userSelect: "none" }}
-      zIndexRange={[160, 120]}
+      zIndexRange={[180, 140]}
+      occlude={false}
     >
       <span
-        className={`whitespace-nowrap rounded px-1.5 py-0.5 font-barlow font-bold uppercase tracking-wide text-accent-gold drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] ${
+        className={`whitespace-nowrap rounded px-1.5 py-0.5 font-barlow font-bold uppercase tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] ${
           emphasize
-            ? "border border-accent-gold/70 bg-background-dark/90 text-[11px]"
-            : "bg-background-dark/80 text-[9px]"
+            ? "border border-accent-gold/80 bg-background-dark/95 text-[12px] text-accent-gold"
+            : "bg-background-dark/80 text-[9px] text-accent-gold"
         }`}
         aria-hidden
       >
@@ -52,54 +67,61 @@ function SectorLabel({ sector, emphasize }: { sector: DistrictSector; emphasize?
 
 function SectorHit({
   sector,
+  index,
   selected,
   onPick,
 }: {
   sector: DistrictSector;
+  index: number;
   selected: boolean;
   onPick: (sector: DistrictSector) => void;
 }) {
+  const [hovered, setHovered] = useState(false);
   const geometry = useMemo(() => createPolygonDistrictGeometry(sector.polygon), [sector.polygon]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  function pick(event: ThreeEvent<MouseEvent>) {
+  function pick(event: ThreeEvent<PointerEvent | MouseEvent>) {
     event.stopPropagation();
     onPick(sector);
   }
 
   return (
-    <group>
-      <mesh
-        geometry={geometry}
-        position={[0, 0.02, 0]}
-        renderOrder={8}
-        onClick={pick}
-        onPointerOver={(event) => {
-          event.stopPropagation();
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "";
-        }}
-      >
-        <meshBasicMaterial
-          color={selected ? "#cab926" : "#379806"}
-          transparent
-          opacity={selected ? 0.5 : 0.22}
-          depthWrite={false}
-          depthTest={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {selected ? <SectorLabel sector={sector} emphasize /> : null}
-    </group>
+    <mesh
+      geometry={geometry}
+      position={[0, 0.025, 0]}
+      renderOrder={8}
+      onPointerDown={(event) => {
+        // pointerDown statt click: zuverlässiger gegen Orbit/Label-Konflikte.
+        if (event.button !== 0) return;
+        pick(event);
+      }}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        document.body.style.cursor = "";
+      }}
+    >
+      <meshBasicMaterial
+        color={sectorFillColor(index, selected, hovered)}
+        transparent
+        opacity={selected ? 0.58 : hovered ? 0.38 : 0.22}
+        depthWrite={false}
+        depthTest={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 }
 
 /**
  * Sektorgrenzen und Bezeichnungen nur für das gewählte Viertel.
- * Im Editor ohne Klicks, im Stadtereignis-Assistenten mit treffbaren Flächen.
+ * Im Editor ohne Klicks, im Stadtereignis-Assistenten mit treffbaren Flächen
+ * (ohne Namens-Labels auf dem Feld — Namen nur in der Wizard-Liste).
  */
 export function DistrictSectorOverlay({
   sectors,
@@ -146,14 +168,14 @@ export function DistrictSectorOverlay({
     const material = new THREE.LineBasicMaterial({
       color: preview ? "#8a9a6a" : "#cab926",
       transparent: true,
-      opacity: preview ? 0.38 : 0.72,
+      opacity: preview ? 0.38 : pickable ? 0.88 : 0.72,
       depthTest: false,
     });
     const lines = new THREE.LineSegments(geometry, material);
     lines.renderOrder = 3;
     lines.raycast = () => undefined;
     return lines;
-  }, [preview, sectors]);
+  }, [pickable, preview, sectors]);
 
   useEffect(
     () => () => {
@@ -179,11 +201,12 @@ export function DistrictSectorOverlay({
   return (
     <group>
       {pickable && onPick
-        ? sectors.map((sector) =>
+        ? sectors.map((sector, index) =>
             Array.isArray(sector.polygon) && sector.polygon.length >= 3 ? (
               <SectorHit
                 key={sector.id}
                 sector={sector}
+                index={index}
                 selected={selectedIds.includes(sector.id)}
                 onPick={onPick}
               />

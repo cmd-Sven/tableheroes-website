@@ -653,6 +653,7 @@ export function LiveSessionLeftDockSession(p: LiveSessionLeftDockSessionProps) {
             onCommitTemperature={commitTemperatureValue}
             onUpdateLiveState={updateLiveState}
             onWeatherSystemLog={(message) => writeSystemLog("weather_change", message)}
+            worldId={worldId}
           />
         }
         chronistContent={

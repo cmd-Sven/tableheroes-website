@@ -28,6 +28,8 @@ type VerwaltungState = {
   activeKaiserPlays: ActiveKaiserPlay[];
   /** Keys: `${npcId}:${abilityId}` — deaktivierte Automationen. */
   disabledAutomations: string[];
+  /** Kartenmotive der Kaiser-Hand (cardId → öffentliche Bild-URL). */
+  kaiserCardImages: Record<string, string>;
 };
 
 function equalShares(): GuardShares {
@@ -81,12 +83,22 @@ function normalizeShares(input: Partial<GuardShares>): GuardShares {
   return next;
 }
 
+function normalizeKaiserCardImages(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "string" && value.trim()) out[key] = value.trim();
+  }
+  return out;
+}
+
 function defaultState(): VerwaltungState {
   return {
     guardSoll: equalShares(),
     sollSince: todayIso(),
     activeKaiserPlays: [],
     disabledAutomations: [],
+    kaiserCardImages: {},
   };
 }
 
@@ -113,6 +125,7 @@ function readStorage(): VerwaltungState | null {
       disabledAutomations: Array.isArray(parsed.disabledAutomations)
         ? parsed.disabledAutomations.filter((key): key is string => typeof key === "string")
         : [],
+      kaiserCardImages: normalizeKaiserCardImages(parsed.kaiserCardImages),
     };
   } catch {
     return null;
@@ -295,7 +308,32 @@ export function setAutomationEnabled(npcId: string, abilityId: string, enabled: 
 }
 
 export function listKaiserHand(): readonly KaiserEventCard[] {
-  return KAISER_EVENT_CARDS;
+  return KAISER_EVENT_CARDS.map((card) => withKaiserCardImage(card));
+}
+
+export function getKaiserCardImageUrl(cardId: string): string | null {
+  ensureHydrated();
+  const url = state.kaiserCardImages[cardId];
+  return url?.trim() ? url.trim() : null;
+}
+
+export function setKaiserCardImageUrl(cardId: string, imageUrl: string | null) {
+  ensureHydrated();
+  if (!findKaiserCard(cardId)) throw new Error("Unbekannte Kaiser-Karte.");
+  const next = { ...state.kaiserCardImages };
+  const trimmed = imageUrl?.trim() ?? "";
+  if (trimmed) next[cardId] = trimmed;
+  else delete next[cardId];
+  commit({ ...state, kaiserCardImages: next });
+}
+
+export function withKaiserCardImage(card: KaiserEventCard): KaiserEventCard {
+  return { ...card, imageUrl: getKaiserCardImageUrl(card.id) };
+}
+
+export function resolveKaiserEventCard(cardId: string): KaiserEventCard | null {
+  const card = findKaiserCard(cardId);
+  return card ? withKaiserCardImage(card) : null;
 }
 
 export { KAISER_EVENT_CARDS, findKaiserCard };

@@ -17,13 +17,15 @@ import { pointInPolygon, type DistrictPolygons, type UvPoint } from "./aurenfurt
 import type { AurenfurtStreet } from "./aurenfurt-streets";
 import type { DayWeather } from "./aurenfurt-weather";
 import { DistrictNode } from "./DistrictNode";
-import { useHoloFloat } from "./hooks/useHoloFloat";
+import { HOLO_FLOAT_AMPLITUDE, useHoloFloat } from "./hooks/useHoloFloat";
 import { HoloBuildingMarker } from "./scene/HoloBuildingMarker";
 import { HoloChains } from "./scene/HoloChains";
 import { HoloPlatform } from "./scene/HoloPlatform";
 import { HoloPoiMarker } from "./scene/HoloPoiMarker";
+import { HoloPartyTokenLayer } from "./scene/HoloPartyTokenLayer";
 import { HoloStreetLayer } from "./scene/HoloStreetLayer";
 import { HoloWallLayer } from "./scene/HoloWallLayer";
+import { HoloDriftingClouds } from "./scene/HoloDriftingClouds";
 import { HoloWeatherFx } from "./scene/HoloWeatherFx";
 import { FreeMapPlaceSurface } from "./scene/FreeMapPlaceSurface";
 import type { WeatherFxId } from "./aurenfurt-weather-fx";
@@ -34,9 +36,11 @@ import type { AurenfurtMapEditorTool } from "./aurenfurt-map-editor-tool";
 import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
 import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
 import { PoiReachOverlay } from "./scene/PoiReachOverlay";
+import { ActiveCityEventLayer } from "./scene/ActiveCityEventLayer";
 import type { SectorHeatCell } from "./aurenfurt-city-heatmap";
 import type { PoiReachCell } from "./aurenfurt-sector-reach";
 import { HoloLandmarkInstances, type LandmarkInstanceItem } from "./scene/HoloLandmarkInstances";
+import type { ActiveCityCardEffect } from "./aurenfurt-active-city-events";
 
 type Props = {
   selection: HoloSelection | null;
@@ -79,6 +83,14 @@ type Props = {
   poiReachCells?: PoiReachCell[];
   poiReachVisible?: boolean;
   highlightDistricts?: boolean;
+  /** Aktive Stadt-Ereigniskarten (Blitz + Einflussbereich). */
+  activeCityCards?: ActiveCityCardEffect[];
+  /** Sektoren für Positions- und Sektor-Highlight aktiver Ereignisse. */
+  sectorsByDistrict?: Partial<Record<CityDistrictId, DistrictSector[]>>;
+  /** Viertel-Hover aus der linken Rail → Kartenhervorhebung. */
+  previewDistrictIds?: CityDistrictId[];
+  selectedActiveCityCardId?: string | null;
+  onSelectActiveCityCard?: (cardId: string | null) => void;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   worldId: string;
@@ -108,6 +120,10 @@ type Props = {
   onSelectStreet: (streetId: string | null) => void;
   onOrbitLock: (locked: boolean) => void;
   onDragActive: (active: boolean) => void;
+  /** Party-Tokens auf der Live-Stadtkarte setzen/verschieben. */
+  partyTokensEnabled?: boolean;
+  partyTokensEditable?: boolean;
+  onPartyTokensPersist?: () => void;
 };
 
 export function CityModel({
@@ -147,6 +163,11 @@ export function CityModel({
   poiReachCells = [],
   poiReachVisible = false,
   highlightDistricts = false,
+  activeCityCards = [],
+  sectorsByDistrict = {},
+  previewDistrictIds = [],
+  selectedActiveCityCardId = null,
+  onSelectActiveCityCard,
   buildings,
   pois,
   worldId,
@@ -176,10 +197,13 @@ export function CityModel({
   onSelectStreet,
   onOrbitLock,
   onDragActive,
+  partyTokensEnabled = false,
+  partyTokensEditable = false,
+  onPartyTokensPersist,
 }: Props) {
   const floating = useRef<Group>(null);
   const editMode = editorTool !== null;
-  useHoloFloat(floating, editMode ? 0 : 0.055);
+  useHoloFloat(floating, editMode ? 0 : HOLO_FLOAT_AMPLITUDE);
 
   const placingSomething = placingBuilding || placingPoi;
   const mapLocked = drawingStreet || drawingWall || placingSomething;
@@ -246,6 +270,7 @@ export function CityModel({
           const entry = polygons[district.id];
           const isEditing = showDistrictHandles && editingDistrictId === district.id;
           const pickingSectorsHere = sectorPickDistrictId === district.id;
+          const previewHot = previewDistrictIds.includes(district.id);
           return (
             <DistrictNode
               key={district.id}
@@ -257,11 +282,11 @@ export function CityModel({
               hovered={
                 pickingSectorsHere
                   ? false
-                  : sameSelection(hovered, { type: "district", id: district.id })
+                  : previewHot || sameSelection(hovered, { type: "district", id: district.id })
               }
               showHandles={isEditing}
               editingActive={Boolean(editorTool === "districts" && editingDistrictId === district.id)}
-              highlight={highlightDistricts}
+              highlight={highlightDistricts || previewHot}
               suppressSelect={suppressSelect || mapLocked || pickingSectorsHere}
               onSelect={onSelect}
               onHover={onHover}
@@ -284,6 +309,16 @@ export function CityModel({
         ) : null}
         <CrimeHeatmapLayer cells={crimeCells} visible={crimeHeatmapVisible} />
         <PoiReachOverlay cells={poiReachCells} visible={poiReachVisible} />
+        {activeCityCards.length > 0 && eventPickSectors.length === 0 ? (
+          <ActiveCityEventLayer
+            cards={activeCityCards}
+            polygons={polygons}
+            sectorsByDistrict={sectorsByDistrict}
+            highlightDistrictIds={previewDistrictIds}
+            selectedCardId={selectedActiveCityCardId}
+            onSelectCard={onSelectActiveCityCard ?? (() => undefined)}
+          />
+        ) : null}
         <group visible={buildingsVisible}>
         {instancedLandmarks.map(([model, items]) => (
           <HoloLandmarkInstances
@@ -384,6 +419,14 @@ export function CityModel({
           onPlace={placingPoi ? onPlacePoiPoint : onPlaceBuildingPoint}
           onOrbitLock={onOrbitLock}
         />
+        {partyTokensEnabled ? (
+          <HoloPartyTokenLayer
+            canEdit={partyTokensEditable && !editMode}
+            onOrbitLock={onOrbitLock}
+            onDragActive={onDragActive}
+            onPersist={onPartyTokensPersist}
+          />
+        ) : null}
         <HoloWallLayer
           walls={walls}
           editMode={editorTool === "walls"}
@@ -400,6 +443,15 @@ export function CityModel({
           onOrbitLock={onOrbitLock}
           onDragActive={onDragActive}
           layerVisible={wallsVisible}
+        />
+        <HoloDriftingClouds
+          density={
+            weatherFx === "bewoelkt"
+              ? "heavy"
+              : weatherFx === "nebel" || weatherFx === "regen" || weatherFx === "schnee"
+                ? "medium"
+                : "light"
+          }
         />
         {weatherFx ? <HoloWeatherFx effect={weatherFx} intensity={weatherFxIntensity} /> : null}
       </group>

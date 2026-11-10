@@ -6,8 +6,14 @@
 import { toast } from "sonner";
 import { BattlemapTokenTray } from "@/src/components/session/battlemap/BattlemapTokenTray";
 import { LiveWorldMapOverlay } from "@/src/components/world-maps/LiveWorldMapOverlay";
+import { LiveAurenfurtCityOverlay } from "@/src/components/session/LiveAurenfurtCityOverlay";
 import { setActiveWorldMap } from "@/src/lib/actions/world-map-actions";
+import { setActiveAurenfurtCity } from "@/src/lib/actions/aurenfurt-session-actions";
 import { createBattlemapProp } from "@/src/lib/actions/battlemap-actions";
+import {
+  resolveSessionDayPhase,
+  sessionDayPhaseLabel,
+} from "@/src/lib/session-day-phase";
 import { normalizeLiveRow } from "./live-session-normalize";
 import { LiveSessionBattlemapStageHost } from "./LiveSessionBattlemapStageHost";
 import type { LiveSessionBattlemapPaneProps } from "./LiveSessionBattlemapPane.types";
@@ -19,6 +25,12 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
     isGM,
     worldId,
     activeWorldMapId,
+    activeAurenfurtCity = false,
+    isPrepMode = false,
+    liveState = null,
+    partyCharacters = [],
+    currentPlayerCharacterId = null,
+    updateLiveState,
     campaignId,
     sessionId,
     startTransition,
@@ -55,7 +67,7 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
   return (
     <>
       <LiveSessionBattlemapStageHost {...props} />
-      {activeWorldMapId && worldId ? (
+      {activeWorldMapId && worldId && !activeAurenfurtCity ? (
         <LiveWorldMapOverlay
           worldMapId={activeWorldMapId}
           worldId={worldId}
@@ -105,6 +117,88 @@ export function LiveSessionBattlemapPane(props: LiveSessionBattlemapPaneProps) {
                         e instanceof Error
                           ? e.message
                           : "Weltkarte konnte nicht geschlossen werden.",
+                      );
+                    }
+                  });
+                }
+              : undefined
+          }
+        />
+      ) : null}
+      {activeAurenfurtCity ? (
+        <LiveAurenfurtCityOverlay
+          worldId={worldId ?? null}
+          campaignId={campaignId}
+          sessionId={sessionId}
+          isGm={isGM}
+          isPrepMode={isPrepMode}
+          opticalWeatherPreset={liveState?.weather_preset ?? null}
+          opticalWeatherIntensity={liveState?.weather_intensity ?? null}
+          sessionDayPhase={resolveSessionDayPhase(liveState?.current_time)}
+          onSessionNightChange={
+            isGM && updateLiveState
+              ? (night) =>
+                  updateLiveState({
+                    current_time: sessionDayPhaseLabel(night ? "night" : "day"),
+                  })
+              : undefined
+          }
+          activeShopId={liveState?.active_shop_id ?? null}
+          activeMerchantNpcId={liveState?.active_merchant_npc_id ?? null}
+          shopSellingUnlocked={Boolean(liveState?.shop_selling_unlocked)}
+          characterId={currentPlayerCharacterId}
+          partyCharacters={partyCharacters.map((pc) => ({
+            id: pc.id,
+            name: pc.name,
+            playerUserId: pc.playerUserId ?? null,
+            avatarUrl: pc.avatar_url ?? null,
+          }))}
+          onOpenShop={
+            isGM && updateLiveState
+              ? (shopId, merchantNpcId) => {
+                  updateLiveState({
+                    active_shop_id: shopId,
+                    active_merchant_npc_id: merchantNpcId,
+                    shop_selling_unlocked: false,
+                  });
+                }
+              : undefined
+          }
+          onCloseShop={
+            isGM && updateLiveState
+              ? () =>
+                  updateLiveState({
+                    active_shop_id: null,
+                    active_merchant_npc_id: null,
+                    shop_selling_unlocked: false,
+                  })
+              : undefined
+          }
+          onToggleShopSelling={
+            isGM && updateLiveState
+              ? (unlocked) => updateLiveState({ shop_selling_unlocked: unlocked })
+              : undefined
+          }
+          onClose={
+            isGM
+              ? () => {
+                  startTransition(async () => {
+                    try {
+                      await setActiveAurenfurtCity(sessionId, false);
+                      setLiveState((prev) => {
+                        if (!prev) return prev;
+                        const next = normalizeLiveRow({
+                          ...prev,
+                          active_aurenfurt_city: false,
+                        });
+                        liveStateRef.current = next;
+                        return next;
+                      });
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Stadtkarte konnte nicht geschlossen werden.",
                       );
                     }
                   });

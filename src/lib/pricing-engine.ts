@@ -19,11 +19,11 @@ function clampInt(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
-function getLocationReputationModifier(locationReputation: number) {
+export function getLocationReputationModifier(locationReputation: number) {
   return LOCATION_REPUTATION_MODIFIERS[clampInt(locationReputation, -6, 6)] ?? 0;
 }
 
-function getNpcReputationModifier(npcReputation: number): number | null {
+export function getNpcReputationModifier(npcReputation: number): number | null {
   const reputation = clampInt(npcReputation, -100, 100);
 
   if (reputation <= -90) return null;
@@ -45,6 +45,46 @@ function getNpcReputationModifier(npcReputation: number): number | null {
   if (reputation <= 79) return -30;
   if (reputation <= 89) return -35;
   return -40;
+}
+
+export type PriceModifierBreakdown = {
+  shopModifierPercent: number;
+  locationReputation: number;
+  locationModifierPercent: number;
+  npcReputation: number;
+  npcModifierPercent: number | null;
+  bargainDiscountPercent: number;
+  /** Summe der additiven Laden-Modifikatoren (ohne Feilschen). null bei Verkaufsverweigerung. */
+  totalModifierPercent: number | null;
+  saleRefused: boolean;
+};
+
+/** SL-Übersicht: aktive Preiseinflüsse inkl. optionalem Feilschen-Nachlass. */
+export function explainPriceModifiers(
+  shopModifierPercent: number,
+  locationReputation: number,
+  npcReputation: number,
+  bargainDiscountPercent = 0,
+): PriceModifierBreakdown {
+  const shop = Number.isFinite(shopModifierPercent) ? shopModifierPercent : 0;
+  const location = getLocationReputationModifier(locationReputation);
+  const npc = getNpcReputationModifier(npcReputation);
+  const bargain = Math.max(
+    0,
+    Math.min(50, Number.isFinite(bargainDiscountPercent) ? bargainDiscountPercent : 0),
+  );
+  const saleRefused = npc == null;
+
+  return {
+    shopModifierPercent: shop,
+    locationReputation: clampInt(locationReputation, -6, 6),
+    locationModifierPercent: location,
+    npcReputation: clampInt(npcReputation, -100, 100),
+    npcModifierPercent: npc,
+    bargainDiscountPercent: bargain,
+    totalModifierPercent: saleRefused ? null : shop + location + npc,
+    saleRefused,
+  };
 }
 
 /** Preis in Kupfer nach Ruf/Modifikator (D&D 5e). */

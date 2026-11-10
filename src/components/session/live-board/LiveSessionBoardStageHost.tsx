@@ -236,7 +236,11 @@ export function LiveSessionBoardStageHost() {
   return (
     <div
       className={`relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 pt-3 md:px-5 md:pt-5 ${
-        showGmDeckHand ? (stageDeckHandOpen ? "pb-64" : "pb-20") : "pb-3 md:pb-5"
+        showGmDeckHand || liveState?.active_aurenfurt_city
+          ? stageDeckHandOpen
+            ? "pb-64"
+            : "pb-20"
+          : "pb-3 md:pb-5"
       }`}
     >
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-2xl border border-amber-900/60 bg-linear-to-b from-background-card/95 via-emerald-950/90 to-background-dark/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm">
@@ -398,6 +402,18 @@ export function LiveSessionBoardStageHost() {
               campaignId={campaignId}
               worldId={worldId}
               activeWorldMapId={activeWorldMapId}
+              activeAurenfurtCity={Boolean(liveState?.active_aurenfurt_city)}
+              isPrepMode={isPrepMode}
+              liveState={liveState}
+              partyCharacters={displayPartyCharacters
+                .filter((pc) => !pc.isSessionDummy && pc.id)
+                .map((pc) => ({
+                  id: pc.id,
+                  name: pc.name,
+                  playerUserId: pc.playerUserId ?? null,
+                  avatar_url: pc.avatar_url ?? null,
+                }))}
+              updateLiveState={updateLiveState}
               battlemapActive={battlemapActive}
               battlemapTrayScenes={battlemapTrayScenes}
               startTransition={startTransition}
@@ -444,6 +460,7 @@ export function LiveSessionBoardStageHost() {
               activeCombatParticipant={activeCombatParticipant}
               isGM={isGM}
               isGuest={isGuest}
+              isPrepMode={isPrepMode}
               currentPlayerCharacter={currentPlayerCharacter}
               rollingInitiativeId={rollingInitiativeId}
               sessionId={sessionId}
@@ -526,6 +543,10 @@ export function LiveSessionBoardStageHost() {
 
       <LiveSessionStageDeckHandSection
         showGmDeckHand={showGmDeckHand}
+        aurenfurtCityActive={Boolean(liveState?.active_aurenfurt_city)}
+        shopCatalogOpen={Boolean(liveState?.active_shop_id)}
+        isPrepMode={isPrepMode}
+        sessionId={sessionId}
         stageDeckHandOpen={stageDeckHandOpen}
         setStageDeckHandOpen={setStageDeckHandOpen}
         inHandNpcs={inHandNpcs}

@@ -3,7 +3,14 @@
  */
 "use client";
 
-import type { Dispatch, MutableRefObject, SetStateAction, TransitionStartFunction } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  type TransitionStartFunction,
+} from "react";
 import { toast } from "sonner";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { dismissSessionHand } from "@/src/lib/actions/session-hand-raise-actions";
@@ -17,6 +24,7 @@ import {
   creaturePlacementDraft,
   npcPlacementDraft,
 } from "@/src/components/session/LiveSessionTokensPanel";
+import { setPartyTokenDraft } from "@/src/components/city/aurenfurt/aurenfurt-party-tokens";
 import type { MainSidePanelId } from "@/src/components/session/live-session-side-types";
 import type { SessionBattlemap } from "@/src/lib/session/battlemap-types";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
@@ -77,6 +85,7 @@ export type LiveSessionSidePanelsHostProps = {
   urgentHandRaise: SessionHandRaise | null;
   isUpdating: boolean;
   startTransition: TransitionStartFunction;
+  aurenfurtCityEnabled?: boolean;
 };
 
 export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
@@ -129,7 +138,13 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
     urgentHandRaise,
     isUpdating,
     startTransition,
+    aurenfurtCityEnabled: aurenfurtCityEnabledProp = false,
   } = p;
+
+  const [aurenfurtCityEnabled, setAurenfurtCityEnabled] = useState(aurenfurtCityEnabledProp);
+  useEffect(() => {
+    setAurenfurtCityEnabled(aurenfurtCityEnabledProp);
+  }, [aurenfurtCityEnabledProp]);
 
   return (
     <>
@@ -253,6 +268,7 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
               const next = normalizeLiveRow({
                 ...prev,
                 active_world_map_id: id,
+                ...(id ? { active_aurenfurt_city: false } : {}),
               });
               liveStateRef.current = next;
               return next;
@@ -288,11 +304,36 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
             imageUrl: c.image_url,
           }))}
           onStartPlayerTokenPlacement={(player) => {
+            if (liveState?.active_aurenfurt_city) {
+              if (!player.canPlace) {
+                toast.error("Diesen Token kannst du nicht setzen.");
+                return;
+              }
+              setPartyTokenDraft({
+                kind: "character",
+                characterId: player.id,
+                name: player.name,
+                imageUrl: player.tokenUrl || player.imageUrl || null,
+              });
+              toast.message(`${player.name}: Klicke auf die Stadtkarte.`);
+              closeMainSidePanel();
+              return;
+            }
             if (!battlemapActive) {
-              toast.error("Zuerst eine Battlemap aktivieren.");
+              toast.error("Zuerst Battlemap oder Stadtkarte aktivieren.");
               return;
             }
             startCharacterTokenPlacement(player.id, player.name);
+            closeMainSidePanel();
+          }}
+          onStartCityGroupTokenPlacement={() => {
+            if (!isGM || !liveState?.active_aurenfurt_city) return;
+            setPartyTokenDraft({
+              kind: "group",
+              name: "Gruppe",
+              imageUrl: null,
+            });
+            toast.message("Gruppe: Klicke auf die Stadtkarte.");
             closeMainSidePanel();
           }}
           onStartNpcTokenPlacement={(npc) => {
@@ -328,6 +369,21 @@ export function LiveSessionSidePanelsHost(p: LiveSessionSidePanelsHostProps) {
             router.refresh();
           }}
           worldMapActive={Boolean(liveState?.active_world_map_id)}
+          aurenfurtCityEnabled={aurenfurtCityEnabled}
+          aurenfurtCityActive={Boolean(liveState?.active_aurenfurt_city)}
+          onAurenfurtCityEnabledChange={setAurenfurtCityEnabled}
+          onAurenfurtCityActiveChange={(active) => {
+            setLiveState((prev) => {
+              if (!prev) return prev;
+              const next = normalizeLiveRow({
+                ...prev,
+                active_aurenfurt_city: active,
+                ...(active ? { active_world_map_id: null } : {}),
+              });
+              liveStateRef.current = next;
+              return next;
+            });
+          }}
           activeLootId={liveState?.current_loot_id ?? null}
           onClearStageLoot={() => {
             updateLiveState({ current_loot_id: null, loot_hide_npcs: false });

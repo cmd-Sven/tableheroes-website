@@ -44,7 +44,7 @@ export function PoiReachOverlay({ cells, visible }: Props) {
   if (!visible || meshes.length === 0) return null;
 
   return (
-    <group position={[0, 0.012, 0]}>
+    <group>
       {meshes.map((mesh) => (
         <mesh key={mesh.id} geometry={mesh.geometry} renderOrder={6} raycast={() => undefined}>
           <meshBasicMaterial

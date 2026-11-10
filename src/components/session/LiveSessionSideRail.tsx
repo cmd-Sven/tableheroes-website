@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  Building2,
   CircleDot,
   Gift,
   Globe2,
@@ -34,6 +35,7 @@ type Props = {
   downtimeActive?: boolean;
   lootActive?: boolean;
   worldMapActive?: boolean;
+  aurenfurtCityActive?: boolean;
   onToggleMain: (id: MainSidePanelId) => void;
 };
 
@@ -87,6 +89,7 @@ export function LiveSessionSideRail({
   downtimeActive = false,
   lootActive = false,
   worldMapActive = false,
+  aurenfurtCityActive = false,
   onToggleMain,
 }: Props) {
   const mainItems: RailItem[] = [
@@ -137,6 +140,15 @@ export function LiveSessionSideRail({
             icon: Globe2,
             active: mainPanel === "worldmaps",
             onClick: () => onToggleMain("worldmaps"),
+            gmOnly: true,
+          },
+          {
+            id: "aurenfurt",
+            label: "Aurenfurt",
+            icon: Building2,
+            active: mainPanel === "aurenfurt",
+            onClick: () => onToggleMain("aurenfurt"),
+            dot: aurenfurtCityActive,
             gmOnly: true,
           },
           {

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Layers, Loader2, ShoppingBag, X } from "lucide-react";
+import { toast } from "sonner";
 import { layNpcCityCard } from "@/src/app/dashboard/worlds/city-sim-event-actions";
 import { factionName, isCityFactionId } from "./aurenfurt-factions";
 import {
@@ -12,15 +13,11 @@ import {
 } from "./aurenfurt-map-poi-actions";
 import { npcDetailHref, type NpcDetailLinkContext } from "./aurenfurt-npcs";
 import { CityHudChrome } from "./CityHudFrame";
+import { HoloNpcEventCardsModal } from "./HoloNpcEventCardsModal";
 import { shortIntro, type HoloLeadNpc } from "./holo-overlay-utils";
 import {
-  CARD_RANGE_LABELS,
   CITY_INFLUENCE_TIER_LABELS,
-  CITY_METER_LABELS,
-  defaultCardDuration,
-  defaultCardRange,
   type CityInfluenceTier,
-  type CityMeter,
 } from "@/src/lib/npcs/city-simulation";
 
 type Props = {
@@ -29,6 +26,11 @@ type Props = {
   npcLinkContext: NpcDetailLinkContext;
   /** Client-Prop; Server prüft zusätzlich die GM-Rechte. */
   isGm: boolean;
+  /** Live Session Scheduled → Vorbereitung. */
+  isPrepMode?: boolean;
+  sessionId?: string | null;
+  /** Live: öffnet den Session-Shop-Fullscreen-Overlay. */
+  onOpenShop?: (shopId: string, merchantNpcId: string) => void;
   onClose: () => void;
 };
 
@@ -49,13 +51,16 @@ const AXES: Array<{
   { key: "cityAxisSuperstitionReason", left: "Aberglaube", right: "Aufgeklärt" },
 ];
 
-function playIsOpen(startedOn: string, durationDays: number) {
-  const start = Date.parse(`${startedOn}T00:00:00Z`);
-  if (!Number.isFinite(start)) return false;
-  return Date.now() < start + durationDays * 86_400_000;
-}
-
-export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: Props) {
+export function HoloNpcPanel({
+  lead,
+  worldId,
+  npcLinkContext,
+  isGm,
+  isPrepMode = false,
+  sessionId = null,
+  onOpenShop,
+  onClose,
+}: Props) {
   const [detail, setDetail] = useState<MapNpcOverlayDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +68,7 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
   const [showShop, setShowShop] = useState(false);
   const [layPendingId, setLayPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const liveShopAvailable = Boolean(onOpenShop && sessionId);
 
   useEffect(() => {
     let active = true;
@@ -97,6 +103,10 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
 
   function layCard(cardId: string) {
     if (!detail || layPendingId) return;
+    if (isPrepMode) {
+      toast.message("Vorbereitung: Ereigniskarten können erst Live ausgespielt werden.");
+      return;
+    }
     setLayPendingId(cardId);
     startTransition(() => {
       void layNpcCityCard(worldId, detail.id, cardId)
@@ -114,6 +124,18 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
         .catch((err: Error) => alert(err.message || "Karte konnte nicht ausgelegt werden."))
         .finally(() => setLayPendingId(null));
     });
+  }
+
+  function openLadenkatalog() {
+    if (!detail?.shopId) return;
+    if (liveShopAvailable && onOpenShop) {
+      if (isPrepMode) {
+        toast.message("Vorbereitung: Katalog nur zur Ansicht — kein Handel möglich.");
+      }
+      onOpenShop(detail.shopId, detail.id);
+      return;
+    }
+    setShowShop((open) => !open);
   }
 
   return (
@@ -249,22 +271,24 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
           <div className="space-y-2">
             <button
               type="button"
-              onClick={() => setShowShop((open) => !open)}
-              aria-expanded={showShop}
+              onClick={openLadenkatalog}
+              aria-expanded={liveShopAvailable ? undefined : showShop}
               className={`inline-flex w-full items-center justify-center gap-2 rounded border px-4 py-2 font-barlow text-xs font-bold uppercase tracking-wide transition-colors ${
-                showShop
+                !liveShopAvailable && showShop
                   ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
                   : "border-hero-dark bg-hero-dark/30 text-cyan-100 hover:border-accent-gold/60 hover:text-accent-gold"
               }`}
             >
               <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
-              {showShop
-                ? "Ladenkatalog schließen"
-                : `Ladenkatalog (${detail.shop.items.length})`}
+              {liveShopAvailable
+                ? `Ladenkatalog (${detail.shop.items.length})`
+                : showShop
+                  ? "Ladenkatalog schließen"
+                  : `Ladenkatalog (${detail.shop.items.length})`}
             </button>
 
             <AnimatePresence initial={false}>
-              {showShop ? (
+              {!liveShopAvailable && showShop ? (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
@@ -321,103 +345,15 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
         ) : null}
 
         {canSeeCards ? (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => setShowCards((open) => !open)}
-              aria-expanded={showCards}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded border px-4 py-2 font-barlow text-xs font-bold uppercase tracking-wide transition-colors ${
-                showCards
-                  ? "border-accent-gold bg-accent-gold/20 text-accent-gold"
-                  : "border-hero-dark bg-hero-dark/30 text-cyan-100 hover:border-accent-gold/60 hover:text-accent-gold"
-              }`}
-            >
-              <Layers className="h-3.5 w-3.5" aria-hidden />
-              {showCards
-                ? "Ereigniskarten schließen"
-                : cards.length > 0
-                  ? `Ereigniskarten (${cards.length})`
-                  : "Ereigniskarten"}
-            </button>
-
-            <AnimatePresence initial={false}>
-              {showCards ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden"
-                >
-                  {cards.length === 0 ? (
-                    <p className="font-libre text-xs text-gray-400">
-                      Für diesen NPC liegen noch keine Ereigniskarten im Deck.
-                    </p>
-                  ) : (
-                    <ol className="space-y-2">
-                      {[...cards]
-                        .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map((card, index) => {
-                          const duration = card.durationDays ?? defaultCardDuration(tier);
-                          const range = card.range ?? defaultCardRange(tier);
-                          const open = (detail?.cardPlays ?? []).some(
-                            (play) =>
-                              play.cardId === card.id && playIsOpen(play.startedOn, duration),
-                          );
-                          return (
-                            <li
-                              key={card.id}
-                              className="rounded border border-hero-dark/70 bg-background-dark/50 p-3"
-                            >
-                              <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                                Karte {index + 1}
-                              </p>
-                              <h3 className="mt-0.5 font-cinzel text-sm font-bold text-accent-gold">
-                                {card.title}
-                              </h3>
-                              <p className="mt-1.5 font-libre text-xs leading-relaxed text-gray-200">
-                                {card.text}
-                              </p>
-                              {card.trigger?.trim() ? (
-                                <p className="mt-1 font-libre text-[11px] text-gray-400">
-                                  Auslöser: {card.trigger}
-                                </p>
-                              ) : null}
-                              <p className="mt-1 font-libre text-[11px] text-gray-400">
-                                {CARD_RANGE_LABELS[range]}
-                                {card.sectorLabel ? ` · ${card.sectorLabel}` : ""} · {duration} Tage
-                                {(card.effects ?? [])
-                                  .map((effect) => {
-                                    const meter = effect.meter as CityMeter;
-                                    const label =
-                                      meter in CITY_METER_LABELS
-                                        ? CITY_METER_LABELS[meter]
-                                        : effect.meter;
-                                    return ` · ${label} ${effect.delta > 0 ? "+" : ""}${effect.delta}`;
-                                  })
-                                  .join("")}
-                              </p>
-                              <button
-                                type="button"
-                                disabled={open || layPendingId === card.id}
-                                onClick={() => layCard(card.id)}
-                                className="mt-2 inline-flex items-center justify-center rounded border border-hero-border px-3 py-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant disabled:border-gray-700 disabled:text-gray-500"
-                              >
-                                {open
-                                  ? "Liegt bereits aus"
-                                  : layPendingId === card.id
-                                    ? "Wird ausgelegt…"
-                                    : "Karte ausspielen"}
-                              </button>
-                            </li>
-                          );
-                        })}
-                    </ol>
-                  )}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowCards(true)}
+            aria-haspopup="dialog"
+            className="inline-flex w-full items-center justify-center gap-2 rounded border border-hero-dark bg-hero-dark/30 px-4 py-2 font-barlow text-xs font-bold uppercase tracking-wide text-cyan-100 transition-colors hover:border-accent-gold/60 hover:text-accent-gold"
+          >
+            <Layers className="h-3.5 w-3.5" aria-hidden />
+            {cards.length > 0 ? `Ereigniskarten (${cards.length})` : "Ereigniskarten"}
+          </button>
         ) : null}
 
         {href ? (
@@ -431,6 +367,21 @@ export function HoloNpcPanel({ lead, worldId, npcLinkContext, isGm, onClose }: P
           </a>
         ) : null}
       </div>
+
+      {canSeeCards ? (
+        <HoloNpcEventCardsModal
+          open={showCards}
+          onClose={() => setShowCards(false)}
+          npcName={detail?.name || lead.name}
+          cards={cards}
+          cardPlays={detail?.cardPlays ?? []}
+          tier={tier}
+          npcHref={href}
+          layPendingId={layPendingId}
+          isPrepMode={isPrepMode}
+          onLayCard={layCard}
+        />
+      ) : null}
     </motion.aside>
   );
 }

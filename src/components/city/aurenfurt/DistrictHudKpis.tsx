@@ -6,12 +6,16 @@ import {
   Activity,
   Briefcase,
   Coins,
+  Flower2,
+  Hourglass,
   Shield,
   ShieldAlert,
+  Skull,
   Sparkles,
   TrendingDown,
   TrendingUp,
   Minus,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -26,7 +30,7 @@ import {
 import { tensionOf } from "./aurenfurt-analytics";
 import type { CityDistrictId } from "./aurenfurt-districts";
 import { cityMetricsOn, districtMetricsOn, formatDay, parseDay } from "./aurenfurt-history";
-import type { SimProfile } from "./aurenfurt-sim";
+import { SIM_METERS, type SimProfile } from "./aurenfurt-sim";
 
 export type KpiTrend = "up" | "down" | "flat";
 
@@ -41,14 +45,32 @@ const DAY_MS = 86_400_000;
 const WEEK_DAYS = 7;
 const WEEKDAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
 const TREND_EPS = 0.75;
+const MARBLE_BG = "/images/dark-marmor.webp";
 
 const KPI_ICON: Record<string, { Icon: LucideIcon; stroke: string }> = {
   crime: { Icon: ShieldAlert, stroke: "#ef4444" },
-  economy: { Icon: Coins, stroke: "#cab926" },
-  guard: { Icon: Shield, stroke: "#38bdf8" },
-  unemployment: { Icon: Briefcase, stroke: "#d4a574" },
   vattrak: { Icon: Sparkles, stroke: "#379806" },
+  malanthir: { Icon: Skull, stroke: "#a78bfa" },
+  guard: { Icon: Shield, stroke: "#38bdf8" },
+  refugees: { Icon: Users, stroke: "#f59e0b" },
+  economy: { Icon: Coins, stroke: "#cab926" },
+  unemployment: { Icon: Briefcase, stroke: "#d4a574" },
+  elysia: { Icon: Flower2, stroke: "#e7b6c9" },
+  chromus: { Icon: Hourglass, stroke: "#7f93c9" },
   tension: { Icon: Activity, stroke: "#f0a36b" },
+};
+
+const KPI_SHORT: Record<string, string> = {
+  crime: "Kriminalität",
+  vattrak: "Vattrak",
+  malanthir: "Malanthir",
+  guard: "Garde",
+  refugees: "Flüchtlinge",
+  economy: "Wirtschaft",
+  unemployment: "Arbeitslos",
+  elysia: "Elysia",
+  chromus: "Chromus",
+  tension: "Spannung",
 };
 
 function trendOf(current: number, reference: number): KpiTrend {
@@ -86,7 +108,7 @@ export function buildHudKpiWeekSeries(
 }
 
 /**
- * Wichtigste Viertel-KPIs.
+ * Alle Stadt-KPIs (Sim-Meter + Spannung) für die Karten-HUD.
  * `display` = angezeigter Tageswert.
  * `compare` = Folgetag (Vorausschau) oder Vortag (`fromPast`).
  * Trend up = Wert steigt (Richtung Zukunft bzw. seit gestern).
@@ -99,31 +121,35 @@ export function buildDistrictHudKpis(
   const fromPast = Boolean(options?.fromPast);
   const slope = (compareValue: number, displayValue: number): KpiTrend =>
     fromPast ? trendOf(displayValue, compareValue) : trendOf(compareValue, displayValue);
+
+  const meters = SIM_METERS.map((meter) => ({
+    key: meter.key,
+    label: KPI_SHORT[meter.key] ?? meter.label,
+    value: display[meter.key] as number,
+    trend: slope(compare[meter.key] as number, display[meter.key] as number),
+  }));
+
   const tensionNow = tensionOf(display);
   const tensionCompare = tensionOf(compare);
   return [
-    { key: "crime", label: "Kriminalität", value: display.crime, trend: slope(compare.crime, display.crime) },
-    { key: "economy", label: "Wirtschaft", value: display.economy, trend: slope(compare.economy, display.economy) },
-    { key: "guard", label: "Garde", value: display.guard, trend: slope(compare.guard, display.guard) },
+    ...meters,
     {
-      key: "unemployment",
-      label: "Arbeitslos",
-      value: display.unemployment,
-      trend: slope(compare.unemployment, display.unemployment),
+      key: "tension",
+      label: KPI_SHORT.tension,
+      value: tensionNow,
+      trend: slope(tensionCompare, tensionNow),
     },
-    { key: "vattrak", label: "Religion", value: display.vattrak, trend: slope(compare.vattrak, display.vattrak) },
-    { key: "tension", label: "Spannung", value: tensionNow, trend: slope(tensionCompare, tensionNow) },
   ];
 }
 
 function TrendMark({ trend }: { trend: KpiTrend }) {
   if (trend === "up") {
-    return <TrendingUp className="h-3.5 w-3.5 shrink-0 text-hero-vibrant" aria-label="steigend" />;
+    return <TrendingUp className="h-2.5 w-2.5 shrink-0 text-hero-vibrant" aria-label="steigend" />;
   }
   if (trend === "down") {
-    return <TrendingDown className="h-3.5 w-3.5 shrink-0 text-red-400" aria-label="sinkend" />;
+    return <TrendingDown className="h-2.5 w-2.5 shrink-0 text-red-400" aria-label="sinkend" />;
   }
-  return <Minus className="h-3.5 w-3.5 shrink-0 text-accent-gold" aria-label="unverändert" />;
+  return <Minus className="h-2.5 w-2.5 shrink-0 text-accent-gold" aria-label="unverändert" />;
 }
 
 type Props = {
@@ -150,20 +176,20 @@ export function DistrictHudKpis({ title, kpis, day, districtId, hint, layoutErro
     weekSeries.length >= 2 ? weekSeries[weekSeries.length - 1].value - weekSeries[0].value : 0;
 
   return (
-    <div data-cal-hint="" className="relative ml-auto flex min-w-0 flex-1 flex-col justify-end gap-1.5 pr-1">
-      <div className="min-w-0">
-        <p className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
-          {cityWide ? "Stadt gesamt" : "Ausgewähltes Viertel"}
+    <div data-cal-hint="" className="relative ml-auto flex min-w-0 flex-1 flex-col justify-end gap-0.5 pr-1">
+      <div className="flex min-w-0 items-baseline gap-1.5">
+        <p className="shrink-0 font-barlow text-[8px] font-bold uppercase tracking-wide text-gray-400">
+          {cityWide ? "Stadt gesamt" : "Viertel"}
         </p>
-        <p className="truncate font-cinzel text-xl font-bold leading-tight text-accent-gold sm:text-2xl">{title}</p>
+        <p className="truncate font-cinzel text-sm font-bold leading-tight text-accent-gold">{title}</p>
       </div>
       {layoutError ? (
-        <p className="truncate font-libre text-[11px] leading-snug text-red-300" role="alert">
+        <p className="truncate font-libre text-[10px] leading-snug text-red-300" role="alert">
           {layoutError}
         </p>
       ) : null}
       <div className="relative" onMouseLeave={() => setHoverKey(null)}>
-      <div className="flex min-w-0 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+      <div className="flex min-w-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
         {kpis.map((kpi) => {
           const meta = KPI_ICON[kpi.key];
           const Icon = meta?.Icon;
@@ -179,18 +205,23 @@ export function DistrictHudKpis({ title, kpis, day, districtId, hint, layoutErro
               role="button"
               aria-expanded={hot}
               aria-label={`${kpi.label}: ${rounded}. Wochenverlauf anzeigen.`}
-              className={`min-w-[5.5rem] shrink-0 rounded-md border bg-background-card px-2.5 py-2 shadow-lg outline-none transition ${
-                hot ? "border-hero-vibrant ring-1 ring-hero-vibrant/40" : "border-hero-dark"
+              className={`min-w-[3.35rem] shrink-0 rounded border px-1 py-0.5 shadow-md outline-none transition ${
+                hot ? "border-hero-vibrant ring-1 ring-hero-vibrant/40" : "border-hero-dark/80"
               }`}
+              style={{
+                backgroundImage: `url('${MARBLE_BG}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
             >
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <div className="flex items-center justify-between gap-0.5">
+                <span className="truncate font-barlow text-[7px] font-bold uppercase tracking-wide text-gray-300">
                   {kpi.label}
                 </span>
-                {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden /> : null}
+                {Icon ? <Icon className="h-2.5 w-2.5 shrink-0" style={{ color }} aria-hidden /> : null}
               </div>
-              <div className="mt-1 flex items-end justify-between gap-1">
-                <span className="font-barlow text-2xl font-extrabold leading-none tabular-nums tracking-wide text-white sm:text-3xl">
+              <div className="mt-px flex items-end justify-between gap-0.5">
+                <span className="font-barlow text-sm font-extrabold leading-none tabular-nums tracking-wide text-white">
                   {rounded}
                 </span>
                 <TrendMark trend={kpi.trend} />

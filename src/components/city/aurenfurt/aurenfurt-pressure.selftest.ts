@@ -109,4 +109,66 @@ assert.equal(reachDistricts("unterstadt", "city", [], "local").length, 7);
 assert.ok(reachDistricts("unterstadt", "adjacent", ["palast"], "local").includes("suedtor"));
 assert.deepEqual(reachDistricts("unterstadt", undefined, [], "apex_global").length, 7);
 
+const citywide = newNpcAbility({
+  id: "sicherheitslage",
+  title: "Stadtweite Sicherheitslage",
+  factionGate: "stadtwachen",
+  conditionScope: "city",
+  range: "city",
+  conditions: [{ meter: "crime", op: "gte", value: 90 }],
+  effects: [
+    { meter: "crime", delta: -7 },
+    { meter: "guard", delta: 6 },
+  ],
+  durationDays: 6,
+  cooldownDays: 16,
+});
+
+const citywideBook = foldCityPressure({
+  from,
+  to: 6 * DAY,
+  actors: [actor({ districtId: "palast", abilities: [citywide] })],
+  events: [],
+  readMeters: (districtId) => (districtId === "unterstadt" ? rough : calm),
+});
+assert.equal(citywideBook.delta("unterstadt", 0).crime, -7);
+/** Nur das Viertel über der Schwelle — nicht der ruhige Palast. */
+assert.equal(citywideBook.delta("palast", 0).crime, 0);
+assert.equal(citywideBook.delta("unterstadt", 0).guard, 6);
+assert.equal(citywideBook.notes(0).some((note) => note.title.includes("Sicherheitslage")), true);
+
+const refugeeStop = newNpcAbility({
+  id: "fluechtlingsstopp",
+  title: "Flüchtlingsstopp an den Toren",
+  roleGate: "Kaiser",
+  conditionScope: "city",
+  range: "city",
+  conditions: [{ meter: "refugees", op: "gt", value: 70 }],
+  effects: [{ meter: "refugees", delta: -6 }],
+  durationDays: 5,
+  cooldownDays: 0,
+});
+const refugeeHigh = { ...calm, refugees: 100 };
+const refugeeBook = foldCityPressure({
+  from,
+  to: 10 * DAY,
+  actors: [actor({ districtId: "palast", role: "Kaiser", abilities: [refugeeStop] })],
+  events: [],
+  readMeters: (districtId) => (districtId === "unterstadt" ? refugeeHigh : calm),
+});
+assert.equal(refugeeBook.delta("unterstadt", 0).refugees, -6);
+assert.equal(refugeeBook.delta("palast", 0).refugees, 0);
+/** Ohne Cooldown: nach Ablauf der Dauer erneut, solange die Schwelle hält. */
+assert.equal(refugeeBook.delta("unterstadt", 5 * DAY).refugees, -6);
+assert.equal(refugeeBook.delta("unterstadt", 4 * DAY).refugees, -6);
+
+const citywideCalm = foldCityPressure({
+  from,
+  to: DAY,
+  actors: [actor({ districtId: "palast", abilities: [citywide] })],
+  events: [],
+  readMeters: () => calm,
+});
+assert.equal(citywideCalm.delta("unterstadt", 0).crime, 0);
+
 console.log("aurenfurt-pressure.selftest ok");

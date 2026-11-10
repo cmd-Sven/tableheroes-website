@@ -54,7 +54,7 @@ export const CITY_METER_LABELS: Record<CityMeter, string> = {
 
 export const MeterConditionSchema = z.object({
   meter: z.enum(CITY_METERS),
-  op: z.enum(["gt", "lt"]),
+  op: z.enum(["gt", "lt", "gte", "lte"]),
   value: z.number().min(0).max(100),
 });
 
@@ -87,6 +87,12 @@ export const CityEventCardSchema = z.object({
   sectorLabel: z.string().optional().nullable(),
   extraDistrictIds: z.array(z.string()).max(6).optional(),
   effects: z.array(MeterEffectSchema).max(4).optional(),
+  /** Kartenmotiv (öffentliche URL), optional. */
+  imageUrl: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => (typeof value === "string" && value.trim() ? value.trim() : null)),
 });
 
 export type CityEventCard = z.infer<typeof CityEventCardSchema>;
@@ -113,6 +119,10 @@ export const NpcAbilitySchema = z.object({
     .nullable(),
   conditions: z.array(MeterConditionSchema).max(4),
   effects: z.array(MeterEffectSchema).max(4),
+  /** Wo die Bedingung gemessen wird: Heimatviertel oder irgendwo in der Stadt. */
+  conditionScope: z.enum(["district", "city"]).optional(),
+  /** Wirkungsreichweite der Automatisierung (wie bei Ereigniskarten). */
+  range: z.enum(CARD_RANGES).optional(),
   durationDays: z.number().int().min(1).max(60),
   cooldownDays: z.number().int().min(1).max(180),
   relationshipTarget: z.enum(["none", "same_faction", "rival_faction"]),
@@ -376,6 +386,7 @@ export function newCityEventCard(partial?: Partial<CityEventCard>): CityEventCar
     sectorLabel: partial?.sectorLabel ?? null,
     extraDistrictIds: partial?.extraDistrictIds ?? [],
     effects: partial?.effects ?? [],
+    imageUrl: partial?.imageUrl?.trim() ? partial.imageUrl.trim() : null,
   };
 }
 
@@ -408,6 +419,8 @@ export function newNpcAbility(partial?: Partial<NpcAbility>): NpcAbility {
     axisGate: partial?.axisGate ?? null,
     conditions: partial?.conditions ?? [{ meter: "crime", op: "gt", value: 80 }],
     effects: partial?.effects ?? [{ meter: "guard", delta: 6 }],
+    conditionScope: partial?.conditionScope,
+    range: partial?.range,
     durationDays: partial?.durationDays ?? 5,
     cooldownDays: partial?.cooldownDays ?? 14,
     relationshipTarget: partial?.relationshipTarget ?? "none",

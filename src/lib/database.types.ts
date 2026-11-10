@@ -3241,8 +3241,11 @@ export type Database = {
       }
       session_live_states: {
         Row: {
+          active_aurenfurt_city: boolean
+          aurenfurt_party_tokens: Json
           active_merchant_npc_id: string | null
           active_shop_id: string | null
+          shop_selling_unlocked: boolean
           background_url: string | null
           current_location_id: string | null
           current_location_lore_id: string | null
@@ -3278,8 +3281,11 @@ export type Database = {
           weather_temperature: string | null
         }
         Insert: {
+          active_aurenfurt_city?: boolean
+          aurenfurt_party_tokens?: Json
           active_merchant_npc_id?: string | null
           active_shop_id?: string | null
+          shop_selling_unlocked?: boolean
           background_url?: string | null
           current_location_id?: string | null
           current_location_lore_id?: string | null
@@ -3314,8 +3320,11 @@ export type Database = {
           weather_temperature?: string | null
         }
         Update: {
+          active_aurenfurt_city?: boolean
+          aurenfurt_party_tokens?: Json
           active_merchant_npc_id?: string | null
           active_shop_id?: string | null
+          shop_selling_unlocked?: boolean
           background_url?: string | null
           current_location_id?: string | null
           current_location_lore_id?: string | null
@@ -3468,6 +3477,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          aurenfurt_city_enabled: boolean
           campaign_id: string
           created_at: string | null
           description: string | null
@@ -3489,6 +3499,7 @@ export type Database = {
           visible_on_public_landing: boolean
         }
         Insert: {
+          aurenfurt_city_enabled?: boolean
           campaign_id: string
           created_at?: string | null
           description?: string | null
@@ -3510,6 +3521,7 @@ export type Database = {
           visible_on_public_landing?: boolean
         }
         Update: {
+          aurenfurt_city_enabled?: boolean
           campaign_id?: string
           created_at?: string | null
           description?: string | null

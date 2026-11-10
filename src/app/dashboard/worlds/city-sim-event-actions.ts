@@ -77,14 +77,15 @@ export async function saveCitySimEvent(input: CitySimEventInput) {
     sector_label: input.scope === "sector" ? input.sectorLabel?.trim() ?? null : null,
     effects,
     duration_days: input.durationDays,
-    start_on: input.startOn,
     end_when: endWhen,
-    active: true,
+    // Neu: inaktiv in der Hand. Updates behalten active + start_on (Wirkzeit läuft weiter).
     updated_at: new Date().toISOString(),
   };
   const query = input.id
     ? (supabase as any).from("city_sim_events").update(row).eq("id", input.id).eq("world_id", input.worldId)
-    : (supabase as any).from("city_sim_events").insert(row);
+    : (supabase as any)
+        .from("city_sim_events")
+        .insert({ ...row, start_on: input.startOn, active: false });
   const { error } = await query;
   if (error) throw new Error(error.message);
   revalidatePath(`/dashboard/worlds/${input.worldId}`);
@@ -98,6 +99,63 @@ export async function setCitySimEventActive(worldId: string, eventId: string, ac
     .eq("world_id", worldId);
   if (error) throw new Error(error.message);
   revalidatePath(`/dashboard/worlds/${worldId}`);
+}
+
+/** Ausspielen: aktiv + Starttag setzen (für Wirkzeit). */
+export async function activateCitySimEvent(
+  worldId: string,
+  eventId: string,
+  startOn: string,
+) {
+  const supabase = await assertGm(worldId);
+  const { error } = await (supabase as any).from("city_sim_events")
+    .update({
+      active: true,
+      start_on: startOn,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", eventId)
+    .eq("world_id", worldId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/worlds/${worldId}`);
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Abgelaufene Stadtereignisse (Wirkzeit vorbei am Betrachtungsdatum) wieder
+ * inaktiv setzen — sie stehen dann erneut in der Hand zur Verfügung.
+ */
+export async function deactivateExpiredCitySimEvents(worldId: string, dayIso: string) {
+  const supabase = await assertGm(worldId);
+  const dayMs = Date.parse(`${dayIso}T12:00:00.000Z`);
+  if (!Number.isFinite(dayMs)) return 0;
+
+  const { data, error } = await (supabase as any)
+    .from("city_sim_events")
+    .select("id, start_on, duration_days")
+    .eq("world_id", worldId)
+    .eq("active", true);
+  if (error || !data?.length) return 0;
+
+  const expiredIds: string[] = [];
+  for (const row of data as Array<{ id: string; start_on: string; duration_days: number | null }>) {
+    const days = typeof row.duration_days === "number" ? row.duration_days : null;
+    if (days == null || days <= 0) continue;
+    const startMs = Date.parse(`${String(row.start_on).slice(0, 10)}T12:00:00.000Z`);
+    if (!Number.isFinite(startMs)) continue;
+    if (dayMs >= startMs + days * DAY_MS) expiredIds.push(String(row.id));
+  }
+  if (expiredIds.length === 0) return 0;
+
+  const { error: updateError } = await (supabase as any)
+    .from("city_sim_events")
+    .update({ active: false, updated_at: new Date().toISOString() })
+    .eq("world_id", worldId)
+    .in("id", expiredIds);
+  if (updateError) throw new Error(updateError.message);
+  revalidatePath(`/dashboard/worlds/${worldId}`);
+  return expiredIds.length;
 }
 
 export async function listCitySimEvents(worldId: string) {
@@ -124,4 +182,63 @@ export async function listCitySimEvents(worldId: string) {
     end_when: CitySimEventInput["endWhen"];
     active: boolean;
   }>;
+}
+
+const KAISER_CATALOG_ID = "npc-kaiser-artheus";
+
+/**
+ * Kartenmotiv einer Kaiser-Ereigniskarte im NPC-Deck speichern
+ * (aurenfurt_catalog_id = Kaiser). Legt die Karte an, falls sie noch fehlt.
+ */
+export async function setKaiserEventCardImage(
+  worldId: string,
+  cardId: string,
+  imageUrl: string | null,
+) {
+  const trimmedCardId = cardId.trim();
+  if (!trimmedCardId) throw new Error("Karten-ID fehlt.");
+  const supabase = await assertGm(worldId);
+  const { data: npc, error: loadError } = await (supabase.from("npcs") as any)
+    .select("id, city_event_deck")
+    .eq("world_id", worldId)
+    .eq("aurenfurt_catalog_id", KAISER_CATALOG_ID)
+    .maybeSingle();
+  if (loadError) throw new Error(loadError.message);
+  if (!npc) throw new Error("Kaiser-NPC nicht in der Welt gefunden.");
+
+  const { KAISER_EVENT_CARDS } = await import(
+    "@/src/components/city/aurenfurt/aurenfurt-kaiser-cards"
+  );
+  const template = KAISER_EVENT_CARDS.find((card) => card.id === trimmedCardId);
+  if (!template) throw new Error("Unbekannte Kaiser-Karte.");
+
+  const deck = Array.isArray(npc.city_event_deck)
+    ? (npc.city_event_deck as Array<Record<string, unknown>>)
+    : [];
+  const nextUrl = (imageUrl ?? "").trim() || null;
+  let found = false;
+  const nextDeck = deck.map((card) => {
+    if (String(card.id ?? "") !== trimmedCardId) return card;
+    found = true;
+    return { ...card, imageUrl: nextUrl };
+  });
+  if (!found) {
+    nextDeck.push({
+      id: template.id,
+      title: template.title,
+      text: template.description,
+      sortOrder: nextDeck.length,
+      durationDays: template.durationDays,
+      range: template.scope === "district" ? "district" : "city",
+      extraDistrictIds: template.scope === "palace" ? ["palast"] : [],
+      effects: template.effects,
+      imageUrl: nextUrl,
+    });
+  }
+
+  const { error } = await (supabase.from("npcs") as any)
+    .update({ city_event_deck: nextDeck })
+    .eq("id", npc.id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/worlds/${worldId}`);
 }

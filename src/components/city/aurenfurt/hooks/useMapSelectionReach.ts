@@ -64,41 +64,24 @@ export function useMapSelectionReach({
       (selectedBuilding.fromEditor ? selectedBuilding.id : null)
     : null;
 
+  /**
+   * Kein Nähe-Fallback mehr: öffentliche POIs (Platz, Brunnen, …) bekommen Fraktionen,
+   * nicht den nächsten Tavernen-/Tor-Betreiber (z. B. Rhessa am Marktplatz).
+   * Laden/Geschäft: nur DB-Zuordnung (home/current_location) — kein Katalog-Ersatz.
+   */
   const poiOperatorFallbackCatalogId = useMemo(() => {
     if (!selectedPoi) return null;
-
-    // Artgleiche Orte zuerst (z. B. Brunnen → Brunnenhüter), auch ohne direkte Zuweisung.
-    if (selectedPoi.kind === "Brunnen") {
-      for (const building of mapBuildings) {
-        if (!/brunnen/i.test(building.id) && !/brunnen/i.test(building.name)) continue;
-        const operator = operatorForLocation(building.id);
-        if (operator) return operator.id;
-      }
-    }
-
-    let bestSameDistrict: { catalogId: string; dist: number } | null = null;
-    let bestNearby: { catalogId: string; dist: number } | null = null;
+    if (selectedPoi.kind !== "Laden/Geschäft") return null;
+    // Nur exakter Namens-Match zu einem Gebäude-Betreiber (Salon ↔ Salon-Betreiber).
+    const poiName = selectedPoi.name.trim().toLowerCase();
     for (const building of mapBuildings) {
+      const buildingName = building.name.trim().toLowerCase();
+      if (!buildingName || buildingName !== poiName) continue;
       const operator = operatorForLocation(building.id);
-      if (!operator) continue;
-      const uv = resolveBuildingUv(building, buildingPositions);
-      const du = uv.u - selectedPoi.u;
-      const dv = uv.v - selectedPoi.v;
-      const dist = du * du + dv * dv;
-      if (building.districtId === selectedPoi.districtId) {
-        if (!bestSameDistrict || dist < bestSameDistrict.dist) {
-          bestSameDistrict = { catalogId: operator.id, dist };
-        }
-      }
-      if (!bestNearby || dist < bestNearby.dist) {
-        bestNearby = { catalogId: operator.id, dist };
-      }
+      if (operator) return operator.id;
     }
-    if (bestSameDistrict) return bestSameDistrict.catalogId;
-    // Stadtweit nur sehr nahe Betreiber (ca. zwei Sektorweiten).
-    if (bestNearby && bestNearby.dist <= 0.08 * 0.08) return bestNearby.catalogId;
     return null;
-  }, [buildingPositions, mapBuildings, selectedPoi]);
+  }, [mapBuildings, selectedPoi]);
 
   const buildingOperatorFallbackCatalogId = useMemo(() => {
     if (!selectedBuilding) return null;

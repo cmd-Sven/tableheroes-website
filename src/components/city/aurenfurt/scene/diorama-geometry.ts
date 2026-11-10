@@ -2,17 +2,22 @@ import * as THREE from "three";
 import type { UvPoint } from "../aurenfurt-district-polygons";
 import { arcSpan, polarToImage, wedgeAnchor } from "../aurenfurt-layout";
 
-/** Aufsicht public/images/cities/aurenfurt.jpg, 1697×927. */
-const IMAGE_ASPECT = 927 / 1697;
+/** Aufsicht public/images/cities/aurenfurt.jpg, 1024×571 (freie Mandala-Plaza). */
+const IMAGE_ASPECT = 571 / 1024;
 
 export const DIORAMA_WIDTH = 8.8;
 export const DIORAMA_DEPTH = DIORAMA_WIDTH * IMAGE_ASPECT;
 /** Historisch: früher Kuppelhöhe; Karte ist jetzt eben (y = 0). */
 export const DOME_HEIGHT = 0;
 export const PLINTH_HEIGHT = 0.36;
-/** Viertel-/Sektor-Flächen leicht über der ebenen Karte (Z-Fighting vermeiden). */
-export const DISTRICT_SURFACE_LIFT = 0.08;
-export const DISTRICT_OUTLINE_LIFT = 0.105;
+/** Y der Kartentextur in `HoloPlatform` — Hover-Flächen müssen darauf sitzen. */
+export const MAP_SURFACE_Y = 0.012;
+/**
+ * Viertel-/Sektor-Flächen knapp über dem Hintergrundbild (kein sichtbarer Spalt,
+ * der Gebäude „verschluckt“). Nur minimale Epsilon gegen Z-Fighting.
+ */
+export const DISTRICT_SURFACE_LIFT = MAP_SURFACE_Y + 0.0025;
+export const DISTRICT_OUTLINE_LIFT = MAP_SURFACE_Y + 0.004;
 
 /** Bildkoordinate (Ursprung oben links) auf die ebene Tafelfläche. */
 export function surfacePoint(u: number, v: number) {

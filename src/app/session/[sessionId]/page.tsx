@@ -107,10 +107,32 @@ export default async function SessionPage({ params, searchParams }: Props) {
   }
 
   // 1. Load Session
-  const { data: sessionRaw, error: sessionError } = await (supabase.from("sessions") as any)
-    .select("id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, guest_join_token")
-    .eq("id", sessionId)
-    .single();
+  let sessionRaw: Record<string, unknown> | null = null;
+  let sessionError: { message?: string } | null = null;
+  {
+    const withCity = await (supabase.from("sessions") as any)
+      .select(
+        "id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, guest_join_token, aurenfurt_city_enabled",
+      )
+      .eq("id", sessionId)
+      .single();
+    if (
+      withCity.error &&
+      String(withCity.error.message ?? "").includes("aurenfurt_city_enabled")
+    ) {
+      const fallback = await (supabase.from("sessions") as any)
+        .select(
+          "id, campaign_id, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, guest_join_token",
+        )
+        .eq("id", sessionId)
+        .single();
+      sessionRaw = fallback.data as Record<string, unknown> | null;
+      sessionError = fallback.error;
+    } else {
+      sessionRaw = withCity.data as Record<string, unknown> | null;
+      sessionError = withCity.error;
+    }
+  }
 
   const session = sessionRaw as {
     id: string;
@@ -122,6 +144,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
     stage_deck_creature_ids?: string[] | null;
     transcription_mode?: string | null;
     guest_join_token?: string | null;
+    aurenfurt_city_enabled?: boolean | null;
   } | null;
 
   if (sessionError || !session) {
@@ -620,6 +643,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
       }
       guestJoinUrl={guestJoinUrl}
       campaignSystem={campaign.system ?? null}
+      aurenfurtCityEnabled={Boolean(session.aurenfurt_city_enabled)}
     />
   );
 }

@@ -55,7 +55,12 @@ export function normalizeLiveRow(row: unknown): LiveState {
       r.active_battlemap_id != null ? String(r.active_battlemap_id) : null,
     active_world_map_id:
       r.active_world_map_id != null ? String(r.active_world_map_id) : null,
+    active_aurenfurt_city: r.active_aurenfurt_city === true,
     battlemap_movement_paused: r.battlemap_movement_paused === true,
+    shop_selling_unlocked: r.shop_selling_unlocked === true,
+    active_shop_id: r.active_shop_id != null ? String(r.active_shop_id) : null,
+    active_merchant_npc_id:
+      r.active_merchant_npc_id != null ? String(r.active_merchant_npc_id) : null,
     system_logs: Array.isArray(logsRaw)
       ? logsRaw
           .filter((entry): entry is Record<string, unknown> =>
@@ -159,6 +164,7 @@ export function liveStatePollFingerprint(state: LiveState): string {
   return [
     state.active_battlemap_id ?? "",
     state.active_world_map_id ?? "",
+    String(state.active_aurenfurt_city ?? false),
     state.active_scene_media_id ?? "",
     state.background_url ?? "",
     state.current_location ?? "",

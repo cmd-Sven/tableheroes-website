@@ -56,7 +56,7 @@ export function useLiveSessionBoardUiState({
   const [leftPanel, setLeftPanel] = useState<LeftPanelId | null>(null);
   const [topPanel, setTopPanel] = useState<TopToolbarPanelId | null>(null);
   const [stageRosterOpen, setStageRosterOpen] = useState(true);
-  const [stageDeckHandOpen, setStageDeckHandOpen] = useState(true);
+  const [stageDeckHandOpen, setStageDeckHandOpen] = useState(false);
   const [npcMerchantOverrides, setNpcMerchantOverrides] = useState<
     Record<string, { is_merchant: boolean; shop_id: string | null }>
   >({});

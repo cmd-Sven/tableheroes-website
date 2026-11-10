@@ -39,12 +39,32 @@ export default async function SessionStagePrepPage({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: sessionRaw, error: sessionErr } = await (supabase.from("sessions") as any)
-    .select(
-      "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode",
-    )
-    .eq("id", sessionId)
-    .single();
+  let sessionRaw: Record<string, unknown> | null = null;
+  let sessionErr: { message?: string } | null = null;
+  {
+    const withCity = await (supabase.from("sessions") as any)
+      .select(
+        "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode, aurenfurt_city_enabled",
+      )
+      .eq("id", sessionId)
+      .single();
+    if (
+      withCity.error &&
+      String(withCity.error.message ?? "").includes("aurenfurt_city_enabled")
+    ) {
+      const fallback = await (supabase.from("sessions") as any)
+        .select(
+          "id, campaign_id, title, status, stage_deck_npc_ids, stage_deck_faction_ids, stage_deck_scene_media_ids, stage_deck_creature_ids, transcription_mode",
+        )
+        .eq("id", sessionId)
+        .single();
+      sessionRaw = fallback.data as Record<string, unknown> | null;
+      sessionErr = fallback.error;
+    } else {
+      sessionRaw = withCity.data as Record<string, unknown> | null;
+      sessionErr = withCity.error;
+    }
+  }
 
   const session = sessionRaw as {
     id: string;
@@ -56,6 +76,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
     stage_deck_scene_media_ids?: string[] | null;
     stage_deck_creature_ids?: string[] | null;
     transcription_mode?: string | null;
+    aurenfurt_city_enabled?: boolean | null;
   } | null;
 
   if (sessionErr || !session || session.campaign_id !== campaignId) {
@@ -196,6 +217,7 @@ export default async function SessionStagePrepPage({ params }: Props) {
       sessionWorldMaps={serializeForClient(
         await getSessionWorldMaps(sessionId).catch(() => []),
       )}
+      aurenfurtCityEnabled={Boolean(session.aurenfurt_city_enabled)}
       showDnd5eSheet={isDnd5eCampaignSystem(campaign?.system)}
     />
   );

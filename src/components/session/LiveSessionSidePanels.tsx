@@ -22,6 +22,7 @@ import {
 import type { StageSceneMediaItem } from "@/src/components/session/StageSceneCard";
 import { TravelDowntimeGmPanel } from "@/src/components/session/TravelDowntimeGmPanel";
 import { LiveSessionWorldMapsPanel } from "@/src/components/session/LiveSessionWorldMapsPanel";
+import { LiveSessionAurenfurtPanel } from "@/src/components/session/LiveSessionAurenfurtPanel";
 import type { SessionActivityEntry } from "@/src/lib/actions/session-activity-actions";
 import type { FapAllocationsMap } from "@/src/lib/downtime-fap-types";
 import type { SessionHandRaise } from "@/src/lib/session/hand-raises";
@@ -90,6 +91,7 @@ type Props = {
   onStartPlayerTokenPlacement?: (player: TokensPanelPlayer) => void;
   onStartNpcTokenPlacement?: (npc: TokensPanelNpc) => void;
   onStartCreatureTokenPlacement?: (creature: TokensPanelCreature) => void;
+  onStartCityGroupTokenPlacement?: () => void;
   partyCharacters: PartyCharacter[];
   downtimeCurrentDay: number;
   downtimeTotalDays: number;
@@ -100,6 +102,10 @@ type Props = {
   onClearStageLoot: () => void;
   onLootPublished: () => void | Promise<void>;
   worldMapActive?: boolean;
+  aurenfurtCityEnabled?: boolean;
+  aurenfurtCityActive?: boolean;
+  onAurenfurtCityEnabledChange?: (enabled: boolean) => void;
+  onAurenfurtCityActiveChange?: (active: boolean) => void;
 };
 
 export function LiveSessionSidePanels({
@@ -149,6 +155,7 @@ export function LiveSessionSidePanels({
   onStartPlayerTokenPlacement,
   onStartNpcTokenPlacement,
   onStartCreatureTokenPlacement,
+  onStartCityGroupTokenPlacement,
   partyCharacters,
   downtimeCurrentDay,
   downtimeTotalDays,
@@ -159,6 +166,10 @@ export function LiveSessionSidePanels({
   onClearStageLoot,
   onLootPublished,
   worldMapActive = false,
+  aurenfurtCityEnabled = false,
+  aurenfurtCityActive = false,
+  onAurenfurtCityEnabledChange,
+  onAurenfurtCityActiveChange,
 }: Props) {
   const showMain = mainPanel != null;
   const showPanelStack = showMain;
@@ -256,11 +267,24 @@ export function LiveSessionSidePanels({
                     />
                   ) : null}
 
+                  {mainPanel === "aurenfurt" && isGM ? (
+                    <LiveSessionAurenfurtPanel
+                      onClose={onCloseMain}
+                      sessionId={sessionId}
+                      isGM={isGM}
+                      enabled={aurenfurtCityEnabled}
+                      active={aurenfurtCityActive}
+                      onEnabledChange={onAurenfurtCityEnabledChange}
+                      onActiveChange={onAurenfurtCityActiveChange}
+                    />
+                  ) : null}
+
                   {mainPanel === "tokens" ? (
                     <LiveSessionTokensPanel
                       onClose={onCloseMain}
                       isGM={isGM}
                       battlemapActive={battlemapActive}
+                      aurenfurtCityActive={aurenfurtCityActive}
                       players={tokenPlayers}
                       npcs={tokenNpcs}
                       creatures={tokenCreatures}
@@ -273,6 +297,7 @@ export function LiveSessionSidePanels({
                       onStartCreaturePlacement={(c) => {
                         onStartCreatureTokenPlacement?.(c);
                       }}
+                      onStartGroupPlacement={onStartCityGroupTokenPlacement}
                     />
                   ) : null}
 
@@ -368,6 +393,7 @@ export function LiveSessionSidePanels({
           downtimeActive={downtimeActive}
           lootActive={lootActive}
           worldMapActive={worldMapActive}
+          aurenfurtCityActive={aurenfurtCityActive}
           onToggleMain={onToggleMain}
         />
       </div>

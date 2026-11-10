@@ -9,6 +9,7 @@ import { ChronicleMicMonitor } from "@/src/components/session/ChronicleMicMonito
 import { LiveSessionStageManager } from "./LiveSessionStageManager";
 import { LiveSessionQuestOverlay } from "./LiveSessionQuestOverlay";
 import { LiveSessionStagePortraitModal } from "./LiveSessionStagePortraitModal";
+import { AurenfurtPresentedCardFromLogs } from "@/src/components/session/AurenfurtPresentedCardFromLogs";
 import { useLiveSessionBoardContext } from "./LiveSessionBoardContext";
 
 export function LiveSessionBoardFloatOverlaysLayer() {
@@ -383,6 +384,12 @@ export function LiveSessionBoardFloatOverlaysLayer() {
         portrait={stagePortrait}
         onClose={() => setStagePortrait(null)}
       />
+      {!isGM ? (
+        <AurenfurtPresentedCardFromLogs
+          logs={systemLogs}
+          enabled={Boolean(liveState?.active_aurenfurt_city)}
+        />
+      ) : null}
       {isGM && sessionStatus === "Live" && chronistTableMode ? (
         <ChronicleMicMonitor
           recorder={chronicleRecorder}

@@ -16,6 +16,7 @@ import type { SessionWorldMap, WorldMap } from "@/src/lib/world-maps/types";
 import type { TranscriptionMode } from "@/src/lib/session-chronicle/constants";
 import { SessionWorldMapsPanel } from "@/src/components/world-maps/SessionWorldMapsPanel";
 import { StagePrepDeckPicker } from "@/src/components/session/StagePrepDeckPicker";
+import { StagePrepAurenfurtCity } from "@/src/components/session/StagePrepAurenfurtCity";
 
 type CampaignNpc = {
   id: string;
@@ -58,6 +59,7 @@ type Props = {
   initialBattlemaps: SessionBattlemap[];
   availableWorldMaps?: WorldMap[];
   sessionWorldMaps?: SessionWorldMap[];
+  aurenfurtCityEnabled?: boolean;
   showDnd5eSheet?: boolean;
 };
 
@@ -96,6 +98,7 @@ export function StagePrepClient({
   initialBattlemaps,
   availableWorldMaps = [],
   sessionWorldMaps = [],
+  aurenfurtCityEnabled = false,
   showDnd5eSheet = false,
 }: Props) {
   const router = useRouter();
@@ -526,6 +529,19 @@ export function StagePrepClient({
             sessionId={sessionId}
             availableMaps={availableWorldMaps}
             attached={sessionWorldMaps}
+          />
+        </div>
+
+        <div
+          id="aurenfurt-stadt"
+          className="scroll-mt-24 rounded-lg border border-hero-dark bg-background-card/80 p-6"
+        >
+          <h2 className="mb-3 font-barlow text-lg font-bold uppercase text-accent-gold">
+            Stadtsimulation für diese Session
+          </h2>
+          <StagePrepAurenfurtCity
+            sessionId={sessionId}
+            initialEnabled={aurenfurtCityEnabled}
           />
         </div>
 

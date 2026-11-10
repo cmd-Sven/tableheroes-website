@@ -21,7 +21,11 @@ import { sendMessage } from "@/src/lib/actions/message-actions";
 import { stopTranscriptionRecording } from "@/src/lib/session-chronicle/transcription-server";
 import { schedulePendingTranscriptionChunksProcessing } from "@/src/lib/session-chronicle/process-chunk";
 
-export async function archiveSession(
+/**
+ * Nicht exportiert: In "use server"-Modulen gehen Aufrufe exportierter Actions
+ * über Proxies — trailing Flags wie skipRevalidate kommen dort unzuverlässig an.
+ */
+async function archiveSessionImpl(
   sessionId: string,
   campaignId: string,
   sessionName?: string | null,
@@ -265,14 +269,24 @@ export async function archiveSession(
     throw new Error(combatCleanupError.message);
   }
 
-  revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  if (!skipRevalidate) {
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
+  }
   return serializeForClient(archiveRaw) as any;
+}
+
+export async function archiveSession(
+  sessionId: string,
+  campaignId: string,
+  sessionName?: string | null,
+) {
+  return archiveSessionImpl(sessionId, campaignId, sessionName, false);
 }
 
 // ============================================================================
 // End Session (Archive Journal & Mark as Completed)
 // ============================================================================
-export async function endSession(sessionId: string, skipRevalidate = false) {
+async function endSessionImpl(sessionId: string, skipRevalidate = false) {
   const supabase = await createClient();
 
   // 1. Auth Check
@@ -318,10 +332,11 @@ export async function endSession(sessionId: string, skipRevalidate = false) {
   }
 
   // 4. Archive live state before cleanup/close.
-  await archiveSession(
+  await archiveSessionImpl(
     sessionId,
     (session as any).campaign_id,
     (session as any).title || "Unbenannte Session",
+    skipRevalidate,
   );
 
   // 5. Close Session (status + end_time)
@@ -340,6 +355,10 @@ export async function endSession(sessionId: string, skipRevalidate = false) {
   }
 
   return { success: true, campaignId: (session as any).campaign_id };
+}
+
+export async function endSession(sessionId: string) {
+  return endSessionImpl(sessionId, false);
 }
 
 /**
@@ -392,7 +411,7 @@ export async function expirePastScheduledSessionsForCampaign(
   let staleLiveCount = 0;
   for (const r of staleLive) {
     try {
-      await endSession(String(r.id), true);
+      await endSessionImpl(String(r.id), true);
       staleLiveCount += 1;
     } catch (e) {
       console.warn("[expirePastScheduledSessionsForCampaign] endSession (stale live):", r.id, e);

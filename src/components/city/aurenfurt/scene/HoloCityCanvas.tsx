@@ -18,6 +18,7 @@ import type { DistrictSector } from "../aurenfurt-sectors";
 import type { SectorHeatCell } from "../aurenfurt-city-heatmap";
 import type { PoiReachCell } from "../aurenfurt-sector-reach";
 import type { AurenfurtMapEditorTool } from "../aurenfurt-map-editor-tool";
+import type { ActiveCityCardEffect } from "../aurenfurt-active-city-events";
 import { HoloFocusRig } from "./HoloFocusRig";
 import { HoloSelectionDim } from "./HoloSelectionDim";
 
@@ -42,6 +43,8 @@ type Props = {
   dayWeather: DayWeather;
   weatherFx?: WeatherFxId | null;
   weatherFxIntensity?: number;
+  /** SL-Nachtmodus (weicher Übergang in HoloSelectionDim). */
+  nightMode?: boolean;
   viewedDay: string;
   streetsLayerVisible?: boolean;
   buildingsVisible?: boolean;
@@ -61,6 +64,11 @@ type Props = {
   /** Kamera bleibt stehen, z. B. während der Ort auf der Karte gewählt wird. */
   holdStill?: boolean;
   highlightDistricts?: boolean;
+  activeCityCards?: ActiveCityCardEffect[];
+  sectorsByDistrict?: Partial<Record<CityDistrictId, DistrictSector[]>>;
+  previewDistrictIds?: CityDistrictId[];
+  selectedActiveCityCardId?: string | null;
+  onSelectActiveCityCard?: (cardId: string | null) => void;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   worldId: string;
@@ -89,6 +97,9 @@ type Props = {
   onSelectStreet: (streetId: string | null) => void;
   /** WebGL-Kontext steht — Lade-Overlay kann auf Assets warten. */
   onSceneBoot?: () => void;
+  partyTokensEnabled?: boolean;
+  partyTokensEditable?: boolean;
+  onPartyTokensPersist?: () => void;
 };
 
 type BoundaryProps = { children: ReactNode; onRetry?: () => void };
@@ -176,6 +187,7 @@ export default function HoloCityCanvas({
   dayWeather,
   weatherFx = null,
   weatherFxIntensity = 55,
+  nightMode = false,
   viewedDay,
   streetsLayerVisible = true,
   buildingsVisible = true,
@@ -193,6 +205,11 @@ export default function HoloCityCanvas({
   poiReachVisible = false,
   holdStill = false,
   highlightDistricts = false,
+  activeCityCards = [],
+  sectorsByDistrict = {},
+  previewDistrictIds = [],
+  selectedActiveCityCardId = null,
+  onSelectActiveCityCard,
   buildings,
   pois,
   worldId,
@@ -220,6 +237,9 @@ export default function HoloCityCanvas({
   onCommitPoi,
   onSelectStreet,
   onSceneBoot,
+  partyTokensEnabled = false,
+  partyTokensEditable = false,
+  onPartyTokensPersist,
 }: Props) {
   const [orbitLocked, setOrbitLocked] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -227,8 +247,8 @@ export default function HoloCityCanvas({
   const dragActiveRef = useRef(false);
   const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placingSomething = placingBuilding || placingPoi;
-  /** Kamera-Draufsicht-Lock nur beim Straßen-Zeichnen. */
-  const cameraDrawLock = drawingStreet || drawingWall;
+  /** Kamera-Draufsicht-Lock: Straßen/Mauer oder Stadtereignis-Ort wählen. */
+  const cameraDrawLock = drawingStreet || drawingWall || holdStill;
   const rotateLocked = orbitLocked || cameraDrawLock;
   const editMode = editorTool !== null;
 
@@ -276,15 +296,29 @@ export default function HoloCityCanvas({
           style={{ width: "100%", height: "100%", touchAction: "none" }}
           onCreated={() => onSceneBoot?.()}
           onPointerMissed={() => {
-            if (dragActiveRef.current || drawingStreet || drawingWall || placingSomething) return;
+            /* Während Stadtereignis-Ort: kein Null-Select — sonst landet Sektor-Klick als „ganze Stadt“. */
+            if (
+              dragActiveRef.current ||
+              drawingStreet ||
+              drawingWall ||
+              placingSomething ||
+              holdStill
+            ) {
+              return;
+            }
             onSelect(null);
           }}
         >
           <AdaptiveDpr />
           <AdaptiveEvents />
           <color attach="background" args={["#02080c"]} />
-          <fog attach="fog" args={["#02080c", 8.5, 16]} />
-          <HoloSelectionDim active={selection?.type === "building"} />
+          {/* Weicher Rand-Auslauf; früher (8.5–16) schnitt hart und färbte Modelle ungleich. */}
+          <fog attach="fog" args={["#02080c", 14, 28]} />
+          <HoloSelectionDim
+            active={selection?.type === "building"}
+            night={nightMode}
+            floatAmplitude={editMode ? 0 : undefined}
+          />
           <Suspense fallback={null}>
             <CityModel
               selection={selection}
@@ -323,6 +357,11 @@ export default function HoloCityCanvas({
               poiReachCells={poiReachCells}
               poiReachVisible={poiReachVisible}
               highlightDistricts={highlightDistricts}
+              activeCityCards={activeCityCards}
+              sectorsByDistrict={sectorsByDistrict}
+              previewDistrictIds={previewDistrictIds}
+              selectedActiveCityCardId={selectedActiveCityCardId}
+              onSelectActiveCityCard={onSelectActiveCityCard}
               buildings={buildings}
               pois={pois}
               worldId={worldId}
@@ -352,6 +391,9 @@ export default function HoloCityCanvas({
               onSelectStreet={onSelectStreet}
               onOrbitLock={setOrbitLocked}
               onDragActive={onDragActive}
+              partyTokensEnabled={partyTokensEnabled}
+              partyTokensEditable={partyTokensEditable}
+              onPartyTokensPersist={onPartyTokensPersist}
             />
           </Suspense>
           <HoloFocusRig
@@ -360,7 +402,8 @@ export default function HoloCityCanvas({
             buildingPositions={buildingPositions}
             buildings={buildings}
             pois={pois}
-            drawingStreet={cameraDrawLock}
+            drawingStreet={drawingStreet || drawingWall}
+            eventPlaceTopDown={holdStill}
           />
           <OrbitControls
             makeDefault
@@ -370,7 +413,7 @@ export default function HoloCityCanvas({
             enableZoom={!rotateLocked}
             enableDamping={!cameraDrawLock}
             dampingFactor={0.08}
-            autoRotate={!selection && !editMode && !rotateLocked && !holdStill}
+            autoRotate={!selection && !editMode && !rotateLocked && !holdStill && !nightMode}
             autoRotateSpeed={0.28}
             minPolarAngle={0}
             maxPolarAngle={cameraDrawLock ? 0 : 1.15}

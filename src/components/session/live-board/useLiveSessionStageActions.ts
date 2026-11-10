@@ -274,7 +274,11 @@ export function useLiveSessionStageActions({
       liveStateRef.current?.active_merchant_npc_id === String(npc.id);
 
     if (shopIsOpen) {
-      updateLiveState({ active_shop_id: null, active_merchant_npc_id: null });
+      updateLiveState({
+        active_shop_id: null,
+        active_merchant_npc_id: null,
+        shop_selling_unlocked: false,
+      });
       writeSystemLog("shop", `${npc.name} schließt den Handel.`);
       return;
     }
@@ -282,6 +286,7 @@ export function useLiveSessionStageActions({
     updateLiveState({
       active_shop_id: npc.shop_id,
       active_merchant_npc_id: String(npc.id),
+      shop_selling_unlocked: false,
     });
     writeSystemLog("shop", `${npc.name} öffnet den Shop für die Gruppe.`);
   }
@@ -313,6 +318,7 @@ export function useLiveSessionStageActions({
         updateLiveState({
           active_shop_id: trimmedShopId,
           active_merchant_npc_id: npcId,
+          shop_selling_unlocked: false,
         });
         writeSystemLog("shop", `${npc.name} öffnet den Shop für die Gruppe.`);
       } catch (err: unknown) {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Filter, Menu, ScrollText, Shield } from "lucide-react";
+import { ChevronRight, Filter, ScrollText, Settings, Shield } from "lucide-react";
 import { CityViewSwitch, type CitySurface } from "./CityViewSwitch";
 import { HoloDayStrip } from "./HoloDayStrip";
 import { HoloWeatherControl } from "./HoloWeatherControl";
@@ -13,12 +14,18 @@ import type { WeatherFxId, WeatherFxMode } from "./aurenfurt-weather-fx";
 import { HEATMAP_ASPECTS, type HeatmapAspect } from "./aurenfurt-city-heatmap";
 import type { CityDistrictId } from "./aurenfurt-districts";
 import { DistrictHudKpis, type DistrictHudKpi } from "./DistrictHudKpis";
+import { ActiveMeasuresPanel } from "./ActiveMeasuresPanel";
+import type { ActiveMeasure } from "./aurenfurt-active-measures";
 
 type Props = {
   citySurface: CitySurface;
   onCitySurface: (mode: CitySurface) => void;
   /** SL/Admin: Tab Verwaltung anzeigen */
   showVerwaltung?: boolean;
+  /** Dashboard-Tab (Live-Spieler: aus) */
+  showDashboard?: boolean;
+  /** Nur 3D-Karte — View-Switch ausblenden */
+  mapOnly?: boolean;
   day: string;
   minDay: string;
   maxDay: string;
@@ -39,6 +46,8 @@ type Props = {
   districtKpis: DistrictHudKpi[];
   /** Aktuelle Bevölkerung (Stadt gesamt oder ausgewähltes Viertel). */
   population: number;
+  /** Täglicher Umsatz/Einnahmen in GP (Stadt oder Viertel). */
+  revenue: number;
   statusLine: string | null;
   layoutError: string | null;
   buildingsVisible: boolean;
@@ -52,14 +61,20 @@ type Props = {
   weatherMode: WeatherFxMode;
   autoEffect: WeatherFxId;
   onWeatherMode: (mode: WeatherFxMode) => void;
+  /** SL-Nachtmodus (weicher Übergang). */
+  nightMode?: boolean;
+  onToggleNightMode?: () => void;
   heatmapAspect: HeatmapAspect | null;
   onHeatmapAspect: (aspect: HeatmapAspect | null) => void;
+  activeMeasures: ActiveMeasure[];
 };
 
 export function CityMapHud({
   citySurface,
   onCitySurface,
   showVerwaltung = false,
+  showDashboard = true,
+  mapOnly = false,
   day,
   minDay,
   maxDay,
@@ -78,6 +93,7 @@ export function CityMapHud({
   districtId,
   districtKpis,
   population,
+  revenue,
   statusLine,
   layoutError,
   buildingsVisible,
@@ -91,13 +107,26 @@ export function CityMapHud({
   weatherMode,
   autoEffect,
   onWeatherMode,
+  nightMode = false,
+  onToggleNightMode,
   heatmapAspect,
   onHeatmapAspect,
+  activeMeasures,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [measuresOpen, setMeasuresOpen] = useState(false);
+  const [layersHost, setLayersHost] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setLayersHost(document.body);
+  }, []);
+
+  useEffect(() => {
+    setMeasuresOpen(false);
+  }, [day]);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -118,15 +147,18 @@ export function CityMapHud({
     <>
       <header
         data-city-map-hud="top"
-        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[168px] items-end gap-2.5 overflow-visible bg-background-dark px-2 pb-3"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-[120px] items-end gap-2 overflow-visible bg-background-dark px-3 pb-2 pt-3"
       >
-        <div className="shrink-0" style={{ marginRight: 50 }}>
-          <CityViewSwitch
-            mode={citySurface}
-            onChange={onCitySurface}
-            showVerwaltung={showVerwaltung}
-          />
-        </div>
+        {!mapOnly ? (
+          <div className="shrink-0 self-end" style={{ marginRight: 28 }}>
+            <CityViewSwitch
+              mode={citySurface}
+              onChange={onCitySurface}
+              showVerwaltung={showVerwaltung}
+              showDashboard={showDashboard}
+            />
+          </div>
+        ) : null}
         <HoloDayStrip
           day={day}
           minDay={minDay}
@@ -146,29 +178,60 @@ export function CityMapHud({
           hint={statusLine}
           layoutError={layoutError}
         />
-        <div
-          data-city-map-hud="population"
-          className="flex shrink-0 flex-col items-end justify-end self-end border border-hero-dark/70 bg-background-card/80 px-2.5 py-1.5"
-          aria-label={`Bevölkerung ${population.toLocaleString("de-DE")}`}
-        >
-          <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-gray-400">
-            Bevölkerung
-          </span>
-          <span className="font-barlow text-lg font-extrabold leading-none tabular-nums tracking-wide text-hero-vibrant sm:text-xl">
-            {population.toLocaleString("de-DE")}
-          </span>
+        <div data-city-map-hud="stats" className="flex shrink-0 items-stretch gap-1 self-end">
+          <div
+            data-city-map-hud="population"
+            className="flex flex-col items-end justify-end border border-hero-dark/70 px-1.5 py-0.5"
+            style={{
+              backgroundImage: "url('/images/dark-marmor.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+            aria-label={`Bevölkerung ${population.toLocaleString("de-DE")}`}
+          >
+            <span className="font-barlow text-[7px] font-bold uppercase tracking-wide text-gray-300">
+              Bevölkerung
+            </span>
+            <span className="font-barlow text-sm font-extrabold leading-none tabular-nums tracking-wide text-hero-vibrant">
+              {population.toLocaleString("de-DE")}
+            </span>
+          </div>
+          <div
+            data-city-map-hud="revenue"
+            className="flex flex-col items-end justify-end border border-hero-dark/70 px-1.5 py-0.5"
+            style={{
+              backgroundImage: "url('/images/dark-marmor.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+            aria-label={`Umsatz ${Math.round(revenue).toLocaleString("de-DE")} GP`}
+          >
+            <span className="font-barlow text-[7px] font-bold uppercase tracking-wide text-gray-300">
+              Umsatz
+            </span>
+            <span className="font-barlow text-sm font-extrabold leading-none tabular-nums tracking-wide text-accent-gold">
+              {Math.round(revenue).toLocaleString("de-DE")}
+              <span className="ml-0.5 text-[8px] font-bold text-accent-gold/80">GP</span>
+            </span>
+          </div>
         </div>
-        <div ref={menuRef} className="relative z-40 flex h-full shrink-0 items-center">
+        <div className="relative z-40 ml-auto flex shrink-0 items-end gap-1 self-end">
+          <ActiveMeasuresPanel
+            open={measuresOpen}
+            onToggle={() => setMeasuresOpen((open) => !open)}
+            measures={activeMeasures}
+          />
+          <div ref={menuRef} className="relative">
           <button
             type="button"
             data-city-burger=""
-            aria-label="Menü"
+            aria-label="Einstellungen"
             aria-expanded={menuOpen}
             aria-controls={menuId}
             onClick={() => setMenuOpen((open) => !open)}
-            className="inline-flex items-center justify-center border border-hero-dark bg-hero-dark p-2 text-accent-gold hover:bg-background-card"
+            className="inline-flex items-center justify-center border border-hero-dark bg-hero-dark p-1.5 text-accent-gold hover:bg-background-card"
           >
-            <Menu className="h-5 w-5" aria-hidden />
+            <Settings className="h-4 w-4" aria-hidden />
           </button>
           <AnimatePresence>
             {menuOpen ? (
@@ -269,22 +332,37 @@ export function CityMapHud({
               </motion.div>
             ) : null}
           </AnimatePresence>
+          </div>
         </div>
       </header>
-      <div
-        data-city-map-hud="layers"
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center"
-      >
-        <MapLayerVisibilityBar
-          buildingsVisible={buildingsVisible}
-          poisVisible={poisVisible}
-          streetsVisible={streetsVisible}
-          wallsVisible={wallsVisible}
-          weatherVisible={weatherVisible}
-          onToggleLayer={onToggleLayer}
-          onToggleWeather={onToggleWeather}
-        />
-      </div>
+      {layersHost && citySurface === "map"
+        ? createPortal(
+            <div
+              data-city-map-hud="layers"
+              className="pointer-events-none fixed inset-x-0 z-[95] flex justify-center"
+              style={{
+                /*
+                 * Knapp über dem Hand-Toggle (nicht volle Hand-Höhe), über der Hand (z-90).
+                 * CitySimDeckHand setzt --th-hand-dock-layers-h.
+                 */
+                bottom: "var(--th-hand-dock-layers-h, var(--th-hand-dock-h, 4.75rem))",
+              }}
+            >
+              <MapLayerVisibilityBar
+                buildingsVisible={buildingsVisible}
+                poisVisible={poisVisible}
+                streetsVisible={streetsVisible}
+                wallsVisible={wallsVisible}
+                weatherVisible={weatherVisible}
+                onToggleLayer={onToggleLayer}
+                onToggleWeather={onToggleWeather}
+                nightMode={nightMode}
+                onToggleNightMode={onToggleNightMode}
+              />
+            </div>,
+            layersHost,
+          )
+        : null}
     </>
   );
 }

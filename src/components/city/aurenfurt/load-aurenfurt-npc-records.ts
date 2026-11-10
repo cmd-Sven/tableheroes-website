@@ -39,6 +39,379 @@ export async function loadAurenfurtNpcRecordIds(): Promise<Record<string, string
   return records;
 }
 
+export type CityNpcDashboardRelationship = {
+  otherName: string;
+  roleLabel: string;
+  intensity: number;
+};
+
+export type CityNpcDashboardExtras = {
+  portraitUrl: string | null;
+  /** Heimat-/Sitzort in der Stadt. */
+  seatName: string | null;
+  relationships: CityNpcDashboardRelationship[];
+  faction: {
+    name: string;
+    imageUrl: string | null;
+    intro: string;
+  } | null;
+};
+
+/**
+ * Portrait, Fraktion und wichtigste Beziehungen für das Dashboard-NPC-Detail.
+ * Auth wie die übrigen Aurenfurt-Loader: Welt-GM oder Admin.
+ */
+export async function loadCityNpcDashboardExtras(
+  npcRecordId: string,
+  factionCatalogId: string | null = null,
+): Promise<CityNpcDashboardExtras> {
+  const empty: CityNpcDashboardExtras = {
+    portraitUrl: null,
+    seatName: null,
+    relationships: [],
+    faction: null,
+  };
+  if (!npcRecordId) return empty;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return empty;
+
+  const [{ data: world }, { data: profile }] = await Promise.all([
+    (supabase.from("worlds") as any).select("gm_id").eq("id", AURENFURT_WORLD_ID).maybeSingle(),
+    (supabase.from("users") as any).select("primary_role").eq("id", user.id).maybeSingle(),
+  ]);
+  const isAdmin = profile?.primary_role === "Admin";
+  const isWorldGm = world?.gm_id != null && String(world.gm_id) === String(user.id);
+  if (!isAdmin && !isWorldGm) return empty;
+
+  const { data: npcRow } = await (supabase.from("npcs") as any)
+    .select("id, name, image_url, city_faction_id, home_location_id, current_location_id")
+    .eq("id", npcRecordId)
+    .eq("world_id", AURENFURT_WORLD_ID)
+    .maybeSingle();
+  if (!npcRow) return empty;
+
+  const portraitUrl =
+    typeof npcRow.image_url === "string" && npcRow.image_url.trim()
+      ? npcRow.image_url.trim()
+      : null;
+
+  const seatLocationId =
+    (typeof npcRow.home_location_id === "string" && npcRow.home_location_id.trim()) ||
+    (typeof npcRow.current_location_id === "string" && npcRow.current_location_id.trim()) ||
+    null;
+  let seatName: string | null = null;
+  if (seatLocationId) {
+    const { data: seatRow } = await (supabase.from("locations") as any)
+      .select("name")
+      .eq("id", seatLocationId)
+      .maybeSingle();
+    seatName =
+      typeof seatRow?.name === "string" && seatRow.name.trim() ? seatRow.name.trim() : null;
+  }
+
+  const catalogFactionId =
+    (typeof factionCatalogId === "string" && factionCatalogId.trim()) ||
+    (typeof npcRow.city_faction_id === "string" && npcRow.city_faction_id.trim()) ||
+    null;
+
+  let faction: CityNpcDashboardExtras["faction"] = null;
+  if (catalogFactionId) {
+    const { data: factionRow } = await (supabase.from("factions") as any)
+      .select("name, image_url, banner_url, description, aurenfurt_catalog_id")
+      .eq("world_id", AURENFURT_WORLD_ID)
+      .eq("aurenfurt_catalog_id", catalogFactionId)
+      .maybeSingle();
+    if (factionRow) {
+      const imageUrl =
+        (typeof factionRow.image_url === "string" && factionRow.image_url.trim()) ||
+        (typeof factionRow.banner_url === "string" && factionRow.banner_url.trim()) ||
+        null;
+      const intro =
+        (typeof factionRow.description === "string" && factionRow.description.trim()) ||
+        "";
+      faction = {
+        name: String(factionRow.name ?? "").trim() || catalogFactionId,
+        imageUrl,
+        intro,
+      };
+    }
+  }
+
+  const { data: links } = await (supabase.from("relationships") as any)
+    .select("source_id, target_id, source_role, target_role, intensity, target_type")
+    .eq("world_id", AURENFURT_WORLD_ID)
+    .eq("target_type", "npc")
+    .or(`source_id.eq.${npcRecordId},target_id.eq.${npcRecordId}`);
+
+  const linkRows = Array.isArray(links) ? links : [];
+  const otherIds = new Set<string>();
+  for (const link of linkRows as {
+    source_id: string;
+    target_id: string;
+  }[]) {
+    const otherId = link.source_id === npcRecordId ? link.target_id : link.source_id;
+    if (otherId) otherIds.add(otherId);
+  }
+
+  const nameById = new Map<string, string>();
+  if (otherIds.size > 0) {
+    const { data: others } = await (supabase.from("npcs") as any)
+      .select("id, name")
+      .in("id", [...otherIds]);
+    for (const row of (others ?? []) as { id: string; name: string | null }[]) {
+      nameById.set(row.id, String(row.name ?? "").trim() || "Unbekannt");
+    }
+  }
+
+  const relationships: CityNpcDashboardRelationship[] = (
+    linkRows as {
+      source_id: string;
+      target_id: string;
+      source_role: string | null;
+      target_role: string | null;
+      intensity: number | null;
+    }[]
+  )
+    .map((link) => {
+      const fromSelf = link.source_id === npcRecordId;
+      const otherId = fromSelf ? link.target_id : link.source_id;
+      const roleLabel = fromSelf
+        ? String(link.source_role ?? "").trim() || "Beziehung"
+        : String(link.target_role ?? "").trim() || "Beziehung";
+      return {
+        otherName: nameById.get(otherId) ?? "Unbekannt",
+        roleLabel,
+        intensity: Number(link.intensity ?? 0),
+      };
+    })
+    .sort((a, b) => Math.abs(b.intensity) - Math.abs(a.intensity))
+    .slice(0, 6);
+
+  return { portraitUrl, seatName, relationships, faction };
+}
+
+export type CityFactionDashboardMember = {
+  id: string;
+  name: string;
+  title: string | null;
+  role: string | null;
+  influence: number | null;
+};
+
+export type CityFactionDashboardExtras = {
+  recordId: string | null;
+  name: string;
+  emblemUrl: string | null;
+  bannerUrl: string | null;
+  intro: string;
+  loreExcerpt: string | null;
+  loreId: string | null;
+  members: CityFactionDashboardMember[];
+};
+
+/**
+ * Lore-Auszug, Wappen/Banner und Mitglieder für das Dashboard-Fraktionsdetail.
+ */
+export async function loadCityFactionDashboardExtras(
+  factionCatalogId: string,
+): Promise<CityFactionDashboardExtras | null> {
+  if (!factionCatalogId) return null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [{ data: world }, { data: profile }] = await Promise.all([
+    (supabase.from("worlds") as any).select("gm_id").eq("id", AURENFURT_WORLD_ID).maybeSingle(),
+    (supabase.from("users") as any).select("primary_role").eq("id", user.id).maybeSingle(),
+  ]);
+  const isAdmin = profile?.primary_role === "Admin";
+  const isWorldGm = world?.gm_id != null && String(world.gm_id) === String(user.id);
+  if (!isAdmin && !isWorldGm) return null;
+
+  const { data: factionRow } = await (supabase.from("factions") as any)
+    .select("id, name, image_url, banner_url, description, lore_id, planned_members, important_npcs_info")
+    .eq("world_id", AURENFURT_WORLD_ID)
+    .eq("aurenfurt_catalog_id", factionCatalogId)
+    .maybeSingle();
+  if (!factionRow) return null;
+
+  const intro =
+    (typeof factionRow.description === "string" && factionRow.description.trim()) || "";
+  const emblemUrl =
+    typeof factionRow.image_url === "string" && factionRow.image_url.trim()
+      ? factionRow.image_url.trim()
+      : null;
+  const bannerUrl =
+    typeof factionRow.banner_url === "string" && factionRow.banner_url.trim()
+      ? factionRow.banner_url.trim()
+      : null;
+
+  let loreExcerpt: string | null = null;
+  const loreId =
+    typeof factionRow.lore_id === "string" && factionRow.lore_id.trim()
+      ? factionRow.lore_id.trim()
+      : null;
+  if (loreId) {
+    const { data: loreRow } = await (supabase.from("world_lore") as any)
+      .select("description")
+      .eq("id", loreId)
+      .maybeSingle();
+    const text =
+      typeof loreRow?.description === "string" ? loreRow.description.trim() : "";
+    if (text) loreExcerpt = text.slice(0, 420);
+  }
+  if (!loreExcerpt && intro) loreExcerpt = intro.slice(0, 420);
+
+  const catalog = allAurenfurtNpcs().filter((npc) => npc.factionId === factionCatalogId);
+  const catalogByName = new Map(
+    catalog.map((npc) => [npc.name.trim().toLowerCase(), npc] as const),
+  );
+  const influenceByCatalogId = new Map(
+    catalog.map((npc) => [npc.id, npc.influenceAndLoyalty.influence] as const),
+  );
+
+  const catalogIds = catalog.map((npc) => npc.id);
+  const [{ data: byFactionRows }, { data: byCatalogRows }] = await Promise.all([
+    (supabase.from("npcs") as any)
+      .select("id, name, title, role, city_faction_id, aurenfurt_catalog_id")
+      .eq("world_id", AURENFURT_WORLD_ID)
+      .eq("city_faction_id", factionCatalogId),
+    catalogIds.length > 0
+      ? (supabase.from("npcs") as any)
+          .select("id, name, title, role, city_faction_id, aurenfurt_catalog_id")
+          .eq("world_id", AURENFURT_WORLD_ID)
+          .in("aurenfurt_catalog_id", catalogIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+  ]);
+
+  const membersById = new Map<string, CityFactionDashboardMember>();
+  for (const row of [...(byFactionRows ?? []), ...(byCatalogRows ?? [])] as {
+    id: string;
+    name: string | null;
+    title: string | null;
+    role: string | null;
+    city_faction_id: string | null;
+    aurenfurt_catalog_id: string | null;
+  }[]) {
+    if (membersById.has(row.id)) continue;
+    const catalogId = row.aurenfurt_catalog_id;
+    const name = String(row.name ?? "").trim();
+    if (!name) continue;
+    membersById.set(row.id, {
+      id: row.id,
+      name,
+      title: (row.title ?? "").trim() || null,
+      role: (row.role ?? "").trim() || null,
+      influence:
+        catalogId && influenceByCatalogId.has(catalogId)
+          ? influenceByCatalogId.get(catalogId)!
+          : catalogByName.get(name.toLowerCase())?.influenceAndLoyalty.influence ?? null,
+    });
+  }
+
+  // Katalog-Mitglieder ohne DB-Zeile ergänzen
+  for (const npc of catalog) {
+    const already = [...membersById.values()].some(
+      (member) => member.name.trim().toLowerCase() === npc.name.trim().toLowerCase(),
+    );
+    if (already) continue;
+    membersById.set(npc.id, {
+      id: npc.id,
+      name: npc.name,
+      title: npc.title,
+      role: npc.role,
+      influence: npc.influenceAndLoyalty.influence,
+    });
+  }
+
+  // Geplante Mitglieder / wichtige Persönlichkeiten als Fallback-Namen
+  const planned = Array.isArray(factionRow.planned_members)
+    ? (factionRow.planned_members as Array<{ name?: string; description?: string; npc_id?: string | null }>)
+    : [];
+  for (const entry of planned) {
+    const name = String(entry.name ?? "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if ([...membersById.values()].some((member) => member.name.toLowerCase() === key)) continue;
+    membersById.set(entry.npc_id || `planned:${key}`, {
+      id: entry.npc_id || `planned:${key}`,
+      name,
+      title: null,
+      role: String(entry.description ?? "").trim() || null,
+      influence: null,
+    });
+  }
+
+  const members = [...membersById.values()]
+    .sort((a, b) => (b.influence ?? -1) - (a.influence ?? -1) || a.name.localeCompare(b.name, "de"))
+    .slice(0, 12);
+
+  return {
+    recordId: String(factionRow.id),
+    name: String(factionRow.name ?? "").trim() || factionCatalogId,
+    emblemUrl,
+    bannerUrl,
+    intro,
+    loreExcerpt,
+    loreId,
+    members,
+  };
+}
+
+export type CityFactionListMedia = {
+  emblemUrl: string | null;
+  bannerUrl: string | null;
+};
+
+/** Wappen/Banner aller Stadtfraktionen für Listen im Dashboard. */
+export async function loadAurenfurtFactionListMedia(): Promise<
+  Record<string, CityFactionListMedia>
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+
+  const [{ data: world }, { data: profile }] = await Promise.all([
+    (supabase.from("worlds") as any).select("gm_id").eq("id", AURENFURT_WORLD_ID).maybeSingle(),
+    (supabase.from("users") as any).select("primary_role").eq("id", user.id).maybeSingle(),
+  ]);
+  const isAdmin = profile?.primary_role === "Admin";
+  const isWorldGm = world?.gm_id != null && String(world.gm_id) === String(user.id);
+  if (!isAdmin && !isWorldGm) return {};
+
+  const { data, error } = await (supabase.from("factions") as any)
+    .select("aurenfurt_catalog_id, image_url, banner_url")
+    .eq("world_id", AURENFURT_WORLD_ID)
+    .not("aurenfurt_catalog_id", "is", null);
+  if (error || !Array.isArray(data)) return {};
+
+  const media: Record<string, CityFactionListMedia> = {};
+  for (const row of data as {
+    aurenfurt_catalog_id: string | null;
+    image_url: string | null;
+    banner_url: string | null;
+  }[]) {
+    const id = row.aurenfurt_catalog_id?.trim();
+    if (!id) continue;
+    media[id] = {
+      emblemUrl:
+        typeof row.image_url === "string" && row.image_url.trim() ? row.image_url.trim() : null,
+      bannerUrl:
+        typeof row.banner_url === "string" && row.banner_url.trim() ? row.banner_url.trim() : null,
+    };
+  }
+  return media;
+}
+
 /** Katalog-ID der Stadtfraktion → Fraktions-UUID in Welt & Lore. */
 export async function loadAurenfurtFactionRecordIds(): Promise<Record<string, string>> {
   const supabase = await createClient();

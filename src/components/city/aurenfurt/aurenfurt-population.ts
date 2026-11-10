@@ -24,6 +24,14 @@ import {
   WAR_PEAK_MS,
   warPhaseOn,
 } from "./aurenfurt-war-events";
+import {
+  applyLayerMortality,
+  applyRefugeeWarDrain,
+} from "./aurenfurt-population-mortality";
+import {
+  applyGuardCapBrake,
+  canRecruitGuards,
+} from "./aurenfurt-population-guard-cap";
 import { formatDay, parseDay, utcToday } from "./aurenfurt-time";
 import type { SimProfile } from "./aurenfurt-sim";
 
@@ -97,16 +105,35 @@ function draftGuards(state: LiveState, fraction: number) {
   return moved;
 }
 
+/** Deterministische Tageswelle −1…+1 (für Rekrutierungsschübe). */
+function dayWave(districtId: string, dayMs: number) {
+  const dayIndex = Math.floor(dayMs / DAY_MS);
+  let hash = dayIndex * 2654435761;
+  for (let i = 0; i < districtId.length; i += 1) hash = (hash + districtId.charCodeAt(i) * (i + 3)) >>> 0;
+  return ((hash % 2000) / 1000) - 1;
+}
+
 /** Leichte Vorkriegs-Rekrutierung: Bürger → Garde, keine Flüchtlinge. */
-function applyPrewarLightDay(layers: PopulationLayers, profile: SimProfile) {
-  const recruit = profile.guard > 55 ? 0.08 : 0.03;
-  const fromCitizens = Math.min(layers.pop_citizens * 0.00015, recruit);
+function applyPrewarLightDay(layers: PopulationLayers, profile: SimProfile, dayMs: number, districtId: string) {
+  if (!canRecruitGuards(layers, "prewar_light")) return;
+  const wave = dayWave(districtId, dayMs);
+  const recruit =
+    (profile.guard > 55 ? 0.06 : 0.025) * (1 + wave * 0.35) + Math.max(0, profile.crime - 55) * 0.0015;
+  const fromCitizens = Math.min(layers.pop_citizens * 0.00018, recruit);
   layers.pop_citizens -= fromCitizens;
   layers.pop_guards += fromCitizens;
 }
 
-function applyDailyDelta(layers: PopulationLayers, profile: SimProfile, phase: ReturnType<typeof warPhaseOn>) {
+function applyDailyDelta(
+  layers: PopulationLayers,
+  profile: SimProfile,
+  phase: ReturnType<typeof warPhaseOn>,
+  dayMs: number,
+  districtId: string,
+) {
   const tension = tensionApprox(profile);
+  const wave = dayWave(districtId, dayMs);
+  const dayIndex = Math.floor(dayMs / DAY_MS);
 
   // Adelige: stabil; Abwanderung nur bei Extremen
   if (profile.crime > 80 || tension > 85) {
@@ -123,33 +150,71 @@ function applyDailyDelta(layers: PopulationLayers, profile: SimProfile, phase: R
     layers.pop_citizens -= layers.pop_citizens * 0.00035;
   }
 
-  // Garde folgt leicht dem Meter (Rekrutierung aus Bürgern/Lower), außer in Peak-Chaos
+  /**
+   * Garde: Meter/Crime steuern Nachfrage — aber Cap bremst harte Aufblähung.
+   * Peak-Phase: kaum Neuwerbung (alles geht an die Front).
+   */
   if (phase !== "peak") {
+    const crimePressure = Math.max(0, profile.crime - 48) / 52;
     const guardGap = (profile.guard - 50) / 100;
-    if (guardGap > 0.05) {
-      const need = Math.min(layers.pop_citizens + layers.pop_lowerclass, guardGap * 0.4);
-      const fromC = Math.min(layers.pop_citizens * 0.0002, need * 0.6);
-      const fromL = Math.min(layers.pop_lowerclass * 0.00015, need * 0.4);
+    const economyFactor = profile.economy / 100;
+    const wantMore = guardGap * 0.9 + crimePressure * 0.75 + wave * 0.12;
+    const wantLess = -guardGap * 0.7 + (1 - crimePressure) * 0.15;
+    const recruitingAllowed = canRecruitGuards(layers, phase);
+
+    if (recruitingAllowed && wantMore > 0.04) {
+      const rate =
+        (0.00035 + wantMore * 0.0012 + crimePressure * 0.0007) *
+        (0.55 + economyFactor * 0.7) *
+        (phase === "mobilization" ? 1.1 : phase === "aftermath" ? 0.7 : 1);
+      const fromC = Math.min(layers.pop_citizens * rate * 0.62, layers.pop_citizens * 0.0012);
+      const fromL = Math.min(layers.pop_lowerclass * rate * 0.35, layers.pop_lowerclass * 0.0008);
       layers.pop_citizens -= fromC;
       layers.pop_lowerclass -= fromL;
       layers.pop_guards += fromC + fromL;
-    } else if (guardGap < -0.1 && layers.pop_guards > 10) {
-      const demob = Math.min(layers.pop_guards * 0.0002, 0.5);
+    } else if (wantLess > 0.12 && layers.pop_guards > 18) {
+      const demob = Math.min(
+        layers.pop_guards * (0.0009 + wantLess * 0.0022) * (0.8 + Math.abs(wave) * 0.4),
+        layers.pop_guards * 0.004,
+      );
       layers.pop_guards -= demob;
       layers.pop_citizens += demob;
     }
+
+    // Wöchentlicher Ausbildungsschub — nur unter Cap
+    if (
+      recruitingAllowed &&
+      dayIndex % 7 === Math.abs(districtId.length) % 7 &&
+      economyFactor > 0.38
+    ) {
+      const batch = Math.min(
+        0.55 + crimePressure * 0.8 + guardGap * 0.6,
+        layers.pop_citizens * 0.0004 + 0.25,
+      );
+      const take = Math.min(layers.pop_citizens, Math.max(0, batch));
+      layers.pop_citizens -= take;
+      layers.pop_guards += take;
+    }
   }
 
-  // Lowerclass / Flüchtlinge — vor Mobilmachung kein Kriegszuzug
+  // Lowerclass / Flüchtlinge — vor Mobilmachung kaum Kriegszuzug
   if (phase === "prewar_light") {
     layers.pop_lowerclass += layers.pop_lowerclass * 0.00001;
   } else {
     const influx = Math.max(0, profile.refugees - 40) * 0.08;
     layers.pop_lowerclass += influx;
-    const attrition =
-      ((profile.crime + profile.malanthir + tension * 2) / 100) * 0.012 * Math.max(10, layers.pop_lowerclass * 0.01);
-    layers.pop_lowerclass = Math.max(0, layers.pop_lowerclass - attrition);
   }
+
+  // Mobilmachung: Prekariat → Ausbildung nur unter Cap; Abwanderung läuft weiter
+  applyRefugeeWarDrain(layers, profile, phase, {
+    allowRecruit: canRecruitGuards(layers, phase),
+  });
+
+  // Harte Bremse: Überschuss demobilisieren
+  applyGuardCapBrake(layers, phase);
+
+  // Sterblichkeit je Viertel × Schicht (Krankheit, Hunger, Überfüllung, Kriegsphase)
+  applyLayerMortality(layers, districtId, profile, phase);
 
   const next = roundLayers(layers);
   Object.assign(layers, next);
@@ -270,8 +335,8 @@ export function buildPopulationSeries(toIso = formatDay(utcToday())): CityPopula
       for (const district of AURENFURT_DISTRICTS) {
         const profile = districtMetricsOn(district.id, dayMs);
         const layers = state.districts[district.id];
-        if (phase === "prewar_light") applyPrewarLightDay(layers, profile);
-        applyDailyDelta(layers, profile, phase);
+        if (phase === "prewar_light") applyPrewarLightDay(layers, profile, dayMs, district.id);
+        applyDailyDelta(layers, profile, phase, dayMs, district.id);
       }
 
       applyReturnees(state, dayMs);

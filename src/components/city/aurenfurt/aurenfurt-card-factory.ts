@@ -21,6 +21,7 @@ export function makeEventCard(partial: Partial<CityEventCard> & Pick<CityEventCa
     sectorLabel: partial.sectorLabel ?? null,
     extraDistrictIds: partial.extraDistrictIds ?? [],
     effects: partial.effects ?? [],
+    imageUrl: partial.imageUrl?.trim() ? partial.imageUrl.trim() : null,
   };
 }
 
@@ -36,6 +37,8 @@ export function makeAbility(
     axisGate: partial.axisGate ?? null,
     conditions: partial.conditions,
     effects: partial.effects,
+    conditionScope: partial.conditionScope,
+    range: partial.range,
     durationDays: partial.durationDays ?? 5,
     cooldownDays: partial.cooldownDays ?? 14,
     relationshipTarget: partial.relationshipTarget ?? "none",

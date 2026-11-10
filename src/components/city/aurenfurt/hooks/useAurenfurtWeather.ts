@@ -9,18 +9,31 @@ import {
   type DayWeather,
 } from "../aurenfurt-weather";
 
-export type LiveWeatherState = "loading" | "ready" | "unavailable";
+export type LiveWeatherState = "loading" | "ready" | "unavailable" | "disabled";
 
-export function useAurenfurtWeather(dayIso: string) {
+export type UseAurenfurtWeatherOptions = {
+  /** Wenn false: keine Open-Meteo-Abfrage; Statistik nutzt simuliertes Wetter. */
+  apiEnabled?: boolean;
+};
+
+export function useAurenfurtWeather(dayIso: string, options: UseAurenfurtWeatherOptions = {}) {
+  const apiEnabled = options.apiEnabled !== false;
   const today = useMemo(() => utcToday(), []);
   const todayIso = useMemo(() => formatDay(today), [today]);
   const isLiveDay = dayIso === todayIso;
   const history = useMemo(() => weatherSeries(parseDay(HISTORY_START), today), [today]);
   const [live, setLive] = useState<DayWeather | null>(null);
-  const [liveState, setLiveState] = useState<LiveWeatherState>("loading");
+  const [liveState, setLiveState] = useState<LiveWeatherState>(apiEnabled ? "loading" : "disabled");
 
   useEffect(() => {
+    if (!apiEnabled) {
+      setLive(null);
+      setLiveState("disabled");
+      return;
+    }
+
     const controller = new AbortController();
+    setLiveState("loading");
     fetchLiveAurenfurtWeather(controller.signal)
       .then((reading) => {
         if (controller.signal.aborted) return;
@@ -37,17 +50,17 @@ export function useAurenfurtWeather(dayIso: string) {
         setLiveState("unavailable");
       });
     return () => controller.abort();
-  }, [today]);
+  }, [apiEnabled, today]);
 
   const series = useMemo(() => {
-    if (!live) return history;
+    if (!apiEnabled || !live) return history;
     return history.map((entry) => (entry.day === todayIso ? live : entry));
-  }, [history, live, todayIso]);
+  }, [apiEnabled, history, live, todayIso]);
 
   const current = useMemo(() => {
-    if (isLiveDay && live) return live;
+    if (apiEnabled && isLiveDay && live) return live;
     return weatherOn(parseDay(dayIso));
-  }, [isLiveDay, live, dayIso]);
+  }, [apiEnabled, isLiveDay, live, dayIso]);
 
-  return { current, series, liveState, live };
+  return { current, series, liveState, live, apiEnabled };
 }

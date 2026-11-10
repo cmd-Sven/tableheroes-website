@@ -60,7 +60,8 @@ const merchants = [
     n: 1,
     shopName: "Fundstücke vom Kieselschweif",
     shopNotes: "Findus — Hehlerware & Schnäppchen",
-    priceMod: 0,
+    // −12 % auf PHB-Listenpreise → Verkleidungsset 25→≈22 GM als Hehler-Schnäppchen
+    priceMod: -12,
     locName: "Stand des Kieselschweifs",
     district: "unterstadt",
     parent: DIST.unterstadt,
@@ -119,8 +120,8 @@ const merchants = [
       },
       {
         name: "Verkleidungsset",
-        description: "Perücken, Schminke, Requisiten (PHB).",
-        base_price_gp: 22,
+        description: "Perücken, Schminke, Requisiten (PHB Listenpreis 25 GM).",
+        base_price_gp: 25,
         item_type: "gear",
         rarity: "common",
         is_legal: false,

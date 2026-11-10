@@ -46,6 +46,8 @@ import {
 import { generateNpcCombatSheet } from "@/src/app/dashboard/worlds/world-npc-actions";
 import { NpcCitySimulationFields } from "@/src/components/worlds/npc-wizard/NpcCitySimulationFields";
 import { WorldFactionCheckboxList } from "@/src/components/dashboard/campaigns/npcs/WorldFactionCheckboxList";
+import { SearchableSelect } from "@/src/components/ui/SearchableSelect";
+import { SearchableMultiSelect } from "@/src/components/ui/SearchableMultiSelect";
 import {
   EMPTY_CITY_SIMULATION,
   activateCitySimulation,
@@ -494,18 +496,15 @@ export function NarrativeNPCWizard({
                   Rasse (optional)
                 </label>
                 {races.length > 0 ? (
-                  <select
-                    value={race}
-                    onChange={(e) => setRace(e.target.value)}
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-3 text-white font-libre focus:border-hero-vibrant outline-none"
-                  >
-                    <option value="">— Rasse wählen oder freilassen —</option>
-                    {races.map((r) => (
-                      <option key={r.id} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    options={races.map((r) => ({ value: r.name, label: r.name }))}
+                    value={race || null}
+                    onChange={(v) => setRace(v ?? "")}
+                    placeholder="Rasse suchen…"
+                    noneLabel="— Rasse wählen oder freilassen —"
+                    size="md"
+                    aria-label="Rasse"
+                  />
                 ) : (
                   <input
                     type="text"
@@ -524,29 +523,33 @@ export function NarrativeNPCWizard({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Wohnort / Heimatort</label>
-                  <select
-                    value={homeLocationId ?? ""}
-                    onChange={(e) => setHomeLocationId(e.target.value || null)}
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                  >
-                    <option value="">— Keiner —</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    options={locations.map((l) => ({
+                      value: l.id,
+                      label: l.name,
+                      secondary: l.type,
+                    }))}
+                    value={homeLocationId}
+                    onChange={setHomeLocationId}
+                    placeholder="Ort suchen…"
+                    noneLabel="— Keiner —"
+                    aria-label="Wohnort / Heimatort"
+                  />
                 </div>
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Aktueller Aufenthaltsort</label>
-                  <select
-                    value={selectedLocationId ?? ""}
-                    onChange={(e) => setSelectedLocationId(e.target.value || null)}
-                    className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                  >
-                    <option value="">— Keiner —</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    options={locations.map((l) => ({
+                      value: l.id,
+                      label: l.name,
+                      secondary: l.type,
+                    }))}
+                    value={selectedLocationId}
+                    onChange={setSelectedLocationId}
+                    placeholder="Ort suchen…"
+                    noneLabel="— Keiner —"
+                    aria-label="Aktueller Aufenthaltsort"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -559,88 +562,52 @@ export function NarrativeNPCWizard({
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Religion(en)</label>
                   {religions.length > 0 ? (
-                    <select
-                      multiple
-                      value={selectedReligions}
-                      onChange={(e) =>
-                        setSelectedReligions(
-                          Array.from(e.target.selectedOptions).map((o) => o.value)
-                        )
-                      }
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-xs focus:border-hero-vibrant outline-none h-20"
-                    >
-                      {religions.map((r) => (
-                        <option key={r.id} value={r.name}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableMultiSelect
+                      options={religions.map((r) => ({ value: r.name, label: r.name }))}
+                      values={selectedReligions}
+                      onChange={setSelectedReligions}
+                      placeholder="Religion suchen…"
+                      aria-label="Religionen"
+                    />
                   ) : (
                     <p className="font-libre text-xs text-gray-500">
                       Lege Religionen zuerst als Lore vom Typ „Religion“ an.
                     </p>
                   )}
-                  <p className="mt-1 text-[10px] text-gray-500 font-libre">
-                    Mehrfachauswahl mit Strg/Cmd + Klick.
-                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Göttliche Bezüge</label>
                   {deities.length > 0 ? (
-                    <select
-                      multiple
-                      value={selectedDeities}
-                      onChange={(e) =>
-                        setSelectedDeities(
-                          Array.from(e.target.selectedOptions).map((o) => o.value)
-                        )
-                      }
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-xs focus:border-hero-vibrant outline-none h-20"
-                    >
-                      {deities.map((d) => (
-                        <option key={d.id} value={d.name}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableMultiSelect
+                      options={deities.map((d) => ({ value: d.name, label: d.name }))}
+                      values={selectedDeities}
+                      onChange={setSelectedDeities}
+                      placeholder="Gottheit suchen…"
+                      aria-label="Göttliche Bezüge"
+                    />
                   ) : (
                     <p className="font-libre text-xs text-gray-500">
                       Lege Götter zuerst als Lore vom Typ „Gottheit“ an.
                     </p>
                   )}
-                  <p className="mt-1 text-[10px] text-gray-500 font-libre">
-                    Mehrfachauswahl mit Strg/Cmd + Klick.
-                  </p>
                 </div>
                 <div>
                   <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Sprachen</label>
                   {languages.length > 0 ? (
-                    <select
-                      multiple
-                      value={selectedLanguages}
-                      onChange={(e) =>
-                        setSelectedLanguages(
-                          Array.from(e.target.selectedOptions).map((o) => o.value)
-                        )
-                      }
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-xs focus:border-hero-vibrant outline-none h-20"
-                    >
-                      {languages.map((lang) => (
-                        <option key={lang.id} value={lang.name}>
-                          {lang.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableMultiSelect
+                      options={languages.map((lang) => ({ value: lang.name, label: lang.name }))}
+                      values={selectedLanguages}
+                      onChange={setSelectedLanguages}
+                      placeholder="Sprache suchen…"
+                      aria-label="Sprachen"
+                    />
                   ) : (
                     <p className="font-libre text-xs text-gray-500">
                       Lege Sprachen zuerst als Lore vom Typ „Sprache“ an.
                     </p>
                   )}
-                  <p className="mt-1 text-[10px] text-gray-500 font-libre">
-                    Mehrfachauswahl mit Strg/Cmd + Klick.
-                  </p>
                 </div>
               </div>
             </div>
@@ -653,6 +620,7 @@ export function NarrativeNPCWizard({
               }}
               deities={deities}
               locked={requireCitySimulation}
+              worldId={worldId}
             />
 
             {/* Existierenden NPC verbinden */}
@@ -662,16 +630,14 @@ export function NarrativeNPCWizard({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">NPC</label>
-                    <select
-                      value={linkedNpcId ?? ""}
-                      onChange={(e) => setLinkedNpcId(e.target.value || null)}
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                    >
-                      <option value="">— Kein NPC —</option>
-                      {worldNPCs.map((n) => (
-                        <option key={n.id} value={n.id}>{n.name}</option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      options={worldNPCs.map((n) => ({ value: n.id, label: n.name }))}
+                      value={linkedNpcId}
+                      onChange={setLinkedNpcId}
+                      placeholder="NPC suchen…"
+                      noneLabel="— Kein NPC —"
+                      aria-label="Existierenden NPC verbinden"
+                    />
                   </div>
                   <div>
                     <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Beziehungsart</label>
@@ -987,16 +953,18 @@ export function NarrativeNPCWizard({
                   />
                   <div>
                     <label className="block font-barlow font-bold text-xs uppercase text-gray-400 mb-1">Aufenthaltsort (optional)</label>
-                    <select
-                      value={selectedLocationId ?? ""}
-                      onChange={(e) => setSelectedLocationId(e.target.value || null)}
-                      className="w-full rounded bg-slate-900 border border-hero-dark p-2 text-white text-sm focus:border-hero-vibrant outline-none"
-                    >
-                      <option value="">Keiner</option>
-                      {locations.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      options={locations.map((l) => ({
+                        value: l.id,
+                        label: l.name,
+                        secondary: l.type,
+                      }))}
+                      value={selectedLocationId}
+                      onChange={setSelectedLocationId}
+                      placeholder="Ort suchen…"
+                      noneLabel="— Keiner —"
+                      aria-label="Aufenthaltsort"
+                    />
                   </div>
                 </div>
               </div>

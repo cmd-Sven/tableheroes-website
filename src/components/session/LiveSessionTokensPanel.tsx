@@ -39,12 +39,15 @@ type Props = {
   onClose: () => void;
   isGM: boolean;
   battlemapActive: boolean;
+  /** Aurenfurt-3D aktiv → Spieler-Tokens auf die Stadtkarte. */
+  aurenfurtCityActive?: boolean;
   players: TokensPanelPlayer[];
   npcs: TokensPanelNpc[];
   creatures: TokensPanelCreature[];
   onStartPlayerPlacement: (player: TokensPanelPlayer) => void;
   onStartNpcPlacement: (npc: TokensPanelNpc) => void;
   onStartCreaturePlacement: (creature: TokensPanelCreature) => void;
+  onStartGroupPlacement?: () => void;
 };
 
 function TokenThumb({
@@ -83,7 +86,7 @@ function TokenThumb({
           {label}
         </span>
         <span className="font-libre text-[10px] text-gray-500">
-          {disabled ? "Nicht verfügbar" : "Klicken → Zelle wählen"}
+          {disabled ? "Nicht verfügbar" : "Klicken → auf Karte setzen"}
         </span>
       </span>
     </button>
@@ -94,14 +97,22 @@ export function LiveSessionTokensPanel({
   onClose,
   isGM,
   battlemapActive,
+  aurenfurtCityActive = false,
   players,
   npcs,
   creatures,
   onStartPlayerPlacement,
   onStartNpcPlacement,
   onStartCreaturePlacement,
+  onStartGroupPlacement,
 }: Props) {
-  const placeDisabled = !battlemapActive;
+  const cityPlace = aurenfurtCityActive;
+  const placeDisabled = cityPlace ? false : !battlemapActive;
+  const placeHint = cityPlace
+    ? "Auf die 3D-Stadtkarte setzen"
+    : battlemapActive
+      ? "Auf die aktive Battlemap setzen"
+      : "Zuerst Battlemap oder Stadtkarte aktivieren";
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-amber-900/60 bg-linear-to-b from-background-card/98 via-emerald-950/95 to-background-dark/98 shadow-2xl backdrop-blur-md">
@@ -112,11 +123,7 @@ export function LiveSessionTokensPanel({
             <h2 className="font-barlow text-sm font-bold uppercase text-gray-200">
               Tokens
             </h2>
-            <p className="font-libre text-[10px] text-gray-500">
-              {battlemapActive
-                ? "Auf die aktive Battlemap setzen"
-                : "Zuerst eine Battlemap aktivieren"}
-            </p>
+            <p className="font-libre text-[10px] text-gray-500">{placeHint}</p>
           </div>
         </div>
         <button
@@ -154,7 +161,27 @@ export function LiveSessionTokensPanel({
           )}
         </section>
 
-        {isGM ? (
+        {cityPlace && onStartGroupPlacement ? (
+          <section>
+            <p className="mb-2 flex items-center gap-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+              <Users className="h-3.5 w-3.5" />
+              Gruppe
+            </p>
+            <TokenThumb
+              imageUrl={null}
+              label="Gruppentoken"
+              disabled={placeDisabled || !isGM}
+              accentClass="border-accent-gold/50 bg-black/25 hover:border-accent-gold/80"
+              onClick={() => onStartGroupPlacement()}
+            />
+            <p className="mt-1.5 font-libre text-[10px] leading-snug text-gray-500">
+              Wenn alle zusammen unterwegs sind. Einzel-Tokens bleiben gespeichert, sind
+              aber ausgeblendet.
+            </p>
+          </section>
+        ) : null}
+
+        {isGM && !cityPlace ? (
           <>
             <section>
               <p className="mb-2 flex items-center gap-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">

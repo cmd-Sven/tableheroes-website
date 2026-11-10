@@ -16,6 +16,8 @@ import {
   type WeatherPresetId,
 } from "@/src/lib/session-weather";
 import { SessionDayPhaseIndicator } from "@/src/components/session/SessionDayPhaseIndicator";
+import { useWeatherApiControl } from "@/src/components/city/aurenfurt/hooks/useWeatherApiControl";
+import { AURENFURT_WORLD_ID } from "@/src/components/city/aurenfurt/aurenfurt-district-lore-ids";
 import type { LiveState } from "./live-session-types";
 import {
   TEMPERATURE_MIN,
@@ -38,6 +40,8 @@ type Props = {
   onCommitTemperature: (value?: number) => void;
   onUpdateLiveState: (patch: Partial<LiveState>) => void;
   onWeatherSystemLog: (message: string) => void;
+  /** Welt-ID für den Stadt-Wetter-API-Schalter (Aurenfurt-Default). */
+  worldId?: string | null;
 };
 
 export function LiveSessionAtmospherePanel({
@@ -50,11 +54,32 @@ export function LiveSessionAtmospherePanel({
   onCommitTemperature,
   onUpdateLiveState,
   onWeatherSystemLog,
+  worldId = null,
 }: Props) {
+  const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
+  const weatherApi = useWeatherApiControl(resolvedWorldId, true);
+
   return (
     <div className="space-y-6">
       <section>
         <h3 className="font-cinzel font-bold text-xl text-accent-gold mb-2">Wetter</h3>
+        <label className="mb-3 flex cursor-pointer items-start gap-3 rounded border border-hero-dark/70 bg-background-dark/60 px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={weatherApi.enabled}
+            onChange={(event) => weatherApi.setEnabled(event.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-accent-gold"
+          />
+          <span className="min-w-0">
+            <span className="block font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold">
+              Wetter API aktivieren
+            </span>
+            <span className="mt-0.5 block font-libre text-[11px] leading-snug text-gray-300">
+              Statistik und Auswirkungen folgen der API. Die Buttons darunter ändern nur die Optik
+              der Stadt.
+            </span>
+          </span>
+        </label>
         <div className="grid grid-cols-4 gap-3">
           {WEATHER_ICON_OPTIONS.map((option) => {
             const active = weatherVisual.id === option.id;
@@ -89,8 +114,8 @@ export function LiveSessionAtmospherePanel({
                     ? "scale-110 drop-shadow-[0_0_10px_rgba(202,185,38,0.8)]"
                     : "opacity-80 hover:opacity-100"
                 }`}
-                title={option.label}
-                aria-label={`Wetter auf ${option.label} setzen`}
+                title={`${option.label} (nur Optik der Stadt)`}
+                aria-label={`Wetteroptik auf ${option.label} setzen`}
               >
                 <WeatherPngIcon option={option} sizeClassName="h-14 w-14" />
               </button>

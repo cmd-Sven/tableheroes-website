@@ -4,6 +4,7 @@ export type MainSidePanelId =
   | "scenes"
   | "battlemaps"
   | "worldmaps"
+  | "aurenfurt"
   | "tokens"
   | "travel"
   | "loot";

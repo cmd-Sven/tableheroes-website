@@ -26,6 +26,7 @@ import {
   resolveShopItems,
   type ResolvedShopItem,
 } from "@/src/lib/shop-resolve-items";
+import { applyBargainDiscount } from "@/src/lib/shop-bargain";
 
 type CartItemInput = {
   itemId: string;
@@ -212,7 +213,12 @@ export async function checkoutShopCart(
   characterId: string,
   shopId: string,
   cartItems: CartItemInput[],
-  options?: { merchantNpcId?: string | null; gmProxy?: boolean },
+  options?: {
+    merchantNpcId?: string | null;
+    gmProxy?: boolean;
+    /** Erfolgreiches Feilschen: 0–50 % Nachlass. */
+    bargainDiscountPercent?: number;
+  },
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const supabase = await createClient();
   const {
@@ -279,11 +285,17 @@ export async function checkoutShopCart(
       return { success: false, error: "Der Händler weigert sich, an dich zu verkaufen." };
     }
 
+    const discount = Math.max(
+      0,
+      Math.min(50, Math.round(Number(options?.bargainDiscountPercent ?? 0))),
+    );
+    const chargedCp = discount > 0 ? applyBargainDiscount(unitPriceCp, discount) : unitPriceCp;
+
     purchaseLines.push({
       item,
       quantity: line.quantity,
-      unitPriceCp,
-      total: unitPriceCp * line.quantity,
+      unitPriceCp: chargedCp,
+      total: chargedCp * line.quantity,
     });
   }
 

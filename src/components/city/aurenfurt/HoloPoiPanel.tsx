@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Radar, X } from "lucide-react";
+import { Radar, Users, X } from "lucide-react";
 import { findDistrict } from "./aurenfurt-districts";
 import {
   aspectLabel,
@@ -12,6 +12,10 @@ import {
   POI_INFLUENCE_COLORS,
   type AurenfurtMapPoi,
 } from "./aurenfurt-map-pois";
+import {
+  rulingFactionsForPoi,
+  type PoiFactionPresence,
+} from "./aurenfurt-poi-factions";
 import type { NpcDetailLinkContext } from "./aurenfurt-npcs";
 import { CityHudChrome } from "./CityHudFrame";
 import { shortIntro, type HoloLeadNpc } from "./holo-overlay-utils";
@@ -19,6 +23,9 @@ import { shortIntro, type HoloLeadNpc } from "./holo-overlay-utils";
 type HoloPoiPanelProps = {
   poi: AurenfurtMapPoi;
   leadNpc: HoloLeadNpc | null;
+  /** Überschreibt die Standard-Fraktionsliste für den POI. */
+  rulingFactions?: PoiFactionPresence[] | null;
+  factionRecordIds?: Record<string, string>;
   npcLinkContext: NpcDetailLinkContext;
   influenceReachOn: boolean;
   onToggleInfluenceReach?: () => void;
@@ -32,6 +39,8 @@ type HoloPoiPanelProps = {
 export function HoloPoiPanel({
   poi,
   leadNpc,
+  rulingFactions = null,
+  factionRecordIds = {},
   npcLinkContext,
   influenceReachOn,
   onToggleInfluenceReach,
@@ -44,6 +53,9 @@ export function HoloPoiPanel({
   const intro = poi.description ? shortIntro(poi.description) : null;
   const districtName = findDistrict(poi.districtId)?.name ?? "Viertel";
   const influences = poi.influences;
+  const factions = rulingFactions ?? rulingFactionsForPoi(poi);
+  const showNpcPortrait = Boolean(leadNpc?.imageUrl);
+  const showFactions = !showNpcPortrait && factions.length > 0;
 
   return (
     <motion.aside
@@ -84,7 +96,7 @@ export function HoloPoiPanel({
         </button>
       </div>
       <div className="relative z-10 space-y-3 overflow-y-auto px-4 pb-14 pt-3">
-        {poiImage || leadNpc?.imageUrl ? (
+        {poiImage || showNpcPortrait ? (
           <div className="relative">
             {poiImage ? (
               <div className="relative aspect-[2.4/1] max-h-36 overflow-hidden rounded border border-accent-gold/40">
@@ -93,7 +105,7 @@ export function HoloPoiPanel({
             ) : (
               <div className="aspect-[2.4/1] max-h-36 rounded border border-accent-gold/20 bg-background-dark/50" />
             )}
-            {leadNpc?.imageUrl ? (
+            {showNpcPortrait && leadNpc?.imageUrl ? (
               onOpenNpc ? (
                 <button
                   type="button"
@@ -128,6 +140,53 @@ export function HoloPoiPanel({
           </div>
         ) : null}
         {intro ? <p className="font-libre text-sm leading-relaxed text-gray-200">{intro}</p> : null}
+
+        {showFactions ? (
+          <div>
+            <p className="mb-1.5 flex items-center gap-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">
+              <Users className="h-3 w-3" aria-hidden />
+              {factions.length > 1 ? "Präsente Fraktionen" : "Herrschende Fraktion"}
+            </p>
+            <ul className="space-y-1.5" aria-label="Fraktionen an diesem Ort">
+              {factions.map((faction) => {
+                const recordId = factionRecordIds[faction.id];
+                const worldId = npcLinkContext.worldId;
+                const href =
+                  recordId && worldId
+                    ? `/dashboard/worlds/${worldId}/factions/${recordId}`
+                    : null;
+                const body = (
+                  <>
+                    <span className="block truncate font-cinzel text-sm font-bold text-accent-gold">
+                      {faction.name}
+                    </span>
+                    <span className="block font-libre text-[11px] leading-snug text-gray-300">
+                      {faction.note}
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={faction.id}>
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded border border-hero-dark/60 bg-background-dark/40 px-2.5 py-1.5 transition hover:border-accent-gold/50"
+                      >
+                        {body}
+                      </a>
+                    ) : (
+                      <div className="rounded border border-hero-dark/60 bg-background-dark/40 px-2.5 py-1.5">
+                        {body}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
 
         <div>
           <p className="mb-1.5 font-barlow text-[10px] font-bold uppercase tracking-wide text-accent-gold">

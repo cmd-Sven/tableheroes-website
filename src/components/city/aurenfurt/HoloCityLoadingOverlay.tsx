@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useProgress } from "@react-three/drei";
@@ -13,19 +14,39 @@ import {
 } from "./scene/HeavyGlbSlot";
 import { spookyLoadLine } from "./holo-city-load-lines";
 
-const GM_SRC = "/images/city/spielleiter-gruselig.jpg";
+const MAP_ICON_SRC = "/images/city/loading-map-icon.png";
+const MAP_ICON_EMPTY_SRC = "/images/city/loading-map-icon-empty.png";
+/** Dieselbe Schreibfeder wie im Marketing-Header. */
+const QUILL_SRC = "/images/feder-frei.webp";
 /** Nach dem letzten GLB kurz halten. */
 const SETTLE_MS = 1000;
 /** Mindestanzeige. */
 const MIN_VISIBLE_MS = 1400;
 /** Notausstieg. */
 const MAX_WAIT_MS = 60000;
+/** Ein Zeichenzyklus (radiales Enthüllen), läuft in der Schleife. */
+const DRAW_LOOP_SEC = 4.8;
+/**
+ * Schreiblinien auf dem flachen Pergament (nicht am Rollrand).
+ * Werte = Spitzen-Anker in % der Medaillon-Fläche.
+ */
+const QUILL_LINE_TIPS: { left: string; top: string }[] = [
+  { left: "40%", top: "34%" },
+  { left: "58%", top: "34%" },
+  { left: "39%", top: "42%" },
+  { left: "56%", top: "42%" },
+  { left: "41%", top: "50%" },
+  { left: "54%", top: "50%" },
+];
+const QUILL_WRITE_SEC = 8.2;
 
 type Props = {
   enabled?: boolean;
   sceneBooted?: boolean;
   /** Erwartete HeavyGlb-Slots (Landmark-Typen auf der Karte). */
   expectedHeavyCount?: number;
+  /** true, solange der Cover sichtbar ist (Blitze/Layer erst danach). */
+  onCoverVisibleChange?: (visible: boolean) => void;
 };
 
 function getHeavySnapshot() {
@@ -54,15 +75,28 @@ export function HoloCityLoadingOverlay({
   enabled = true,
   sceneBooted = false,
   expectedHeavyCount = 0,
+  onCoverVisibleChange,
 }: Props) {
   const { active, progress, item } = useProgress();
   const heavy = useHeavyLoadSnapshot();
   const [visible, setVisible] = useState(true);
+  const [portalReady, setPortalReady] = useState(false);
   const [idleTick, setIdleTick] = useState(0);
   const [nowTick, setNowTick] = useState(0);
+  /** 0–1 innerhalb des Zeichen-Loops (läuft weiter, auch wenn der Balken steht). */
+  const [loopT, setLoopT] = useState(0);
   const mountedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
   const bootAt = useRef<number | null>(null);
   const peakPending = useRef(0);
+  const loopStartedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    onCoverVisibleChange?.(enabled && visible);
+  }, [enabled, visible, onCoverVisibleChange]);
 
   const busy = active || heavy.pending > 0;
   const texturePct = Math.max(0, Math.min(100, Math.round(progress || 0)));
@@ -85,6 +119,7 @@ export function HoloCityLoadingOverlay({
     peakPending.current = 0;
     setVisible(true);
     mountedAt.current = performance.now();
+    loopStartedAt.current = performance.now();
     bootAt.current = null;
   }, []);
 
@@ -100,6 +135,18 @@ export function HoloCityLoadingOverlay({
     if (!visible) return;
     const timer = window.setInterval(() => setNowTick((n) => n + 1), 250);
     return () => window.clearInterval(timer);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let frame = 0;
+    const tick = (now: number) => {
+      const elapsed = (now - loopStartedAt.current) / 1000;
+      setLoopT((elapsed % DRAW_LOOP_SEC) / DRAW_LOOP_SEC);
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
   }, [visible]);
 
   useEffect(() => {
@@ -156,11 +203,25 @@ export function HoloCityLoadingOverlay({
 
   void nowTick;
 
-  return (
+  const progressPct = Math.max(0, Math.min(100, barWidth));
+  /**
+   * Zeichen-Loop: Radius wächst 0 → progress (mind. 18 %), weiches Ease.
+   * Feder-Spitze wandert zeilenweise über das Pergament.
+   */
+  const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  const loopEase = easeInOut(loopT);
+  const maxReveal = Math.max(18, progressPct);
+  const revealRadius = Math.max(6, loopEase * maxReveal);
+  const softEdge = 10 + (1 - loopEase) * 8;
+  const maskImage = `radial-gradient(circle at 50% 48%, #000 0%, #000 ${Math.max(0, revealRadius - softEdge * 0.35)}%, transparent ${revealRadius + softEdge}%)`;
+  const quillLeftKeys = [...QUILL_LINE_TIPS.map((tip) => tip.left), QUILL_LINE_TIPS[0].left];
+  const quillTopKeys = [...QUILL_LINE_TIPS.map((tip) => tip.top), QUILL_LINE_TIPS[0].top];
+
+  const overlay = (
     <AnimatePresence>
       {visible ? (
         <motion.div
-          className="pointer-events-auto absolute inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-[#07140c]"
+          className="pointer-events-auto fixed inset-0 z-[220] flex flex-col items-center justify-center overflow-hidden bg-[#07140c]"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
@@ -233,7 +294,7 @@ export function HoloCityLoadingOverlay({
             </div>
 
             <motion.div
-              className="relative mt-1 aspect-square w-[min(72vw,22rem)] sm:w-[24rem]"
+              className="relative mt-1 aspect-square w-[min(72vw,20rem)] sm:w-[22rem]"
               initial={{ opacity: 0, y: 24, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.55, ease: "easeOut" }}
@@ -243,20 +304,91 @@ export function HoloCityLoadingOverlay({
                 animate={{ opacity: [0.25, 0.55, 0.3, 0.6, 0.25] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               />
-              <motion.div
-                className="relative h-full w-full"
-                animate={{ y: [0, -4, 0, -2, 0] }}
-                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-              >
+              <div className="relative h-full w-full">
+                {/* Leeres Pergament als Basis. */}
                 <Image
-                  src={GM_SRC}
-                  alt="Spielleiter erzählt unheimlich"
+                  src={MAP_ICON_EMPTY_SRC}
+                  alt=""
                   fill
                   priority
-                  sizes="(max-width: 640px) 72vw, 384px"
+                  sizes="(max-width: 640px) 72vw, 352px"
                   className="object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.55)]"
                 />
-              </motion.div>
+                {/* Volle Karte: radial aus der Mitte, soft fade — Loop während des Ladens. */}
+                <div
+                  className="absolute inset-0"
+                  aria-hidden
+                  style={{
+                    WebkitMaskImage: maskImage,
+                    maskImage,
+                    WebkitMaskRepeat: "no-repeat",
+                    maskRepeat: "no-repeat",
+                    WebkitMaskSize: "100% 100%",
+                    maskSize: "100% 100%",
+                  }}
+                >
+                  <Image
+                    src={MAP_ICON_SRC}
+                    alt="Stadtkarte wird gezeichnet"
+                    fill
+                    priority
+                    sizes="(max-width: 640px) 72vw, 352px"
+                    className="object-contain"
+                  />
+                </div>
+                {/* Weicher Leuchtring am aktuellen Reveal-Rand. */}
+                <div
+                  className="pointer-events-none absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-100/25"
+                  style={{
+                    width: `${revealRadius * 0.92}%`,
+                    height: `${revealRadius * 0.92}%`,
+                    boxShadow: "0 0 18px rgba(255, 220, 150, 0.18)",
+                    opacity: 0.35 + loopEase * 0.4,
+                  }}
+                  aria-hidden
+                />
+                {/* Schreibfeder: Anker = Spitze auf dem Pergament, springt ruhig Zeile für Zeile. */}
+                <motion.div
+                  className="pointer-events-none absolute z-10"
+                  aria-hidden
+                  initial={false}
+                  animate={{ left: quillLeftKeys, top: quillTopKeys }}
+                  transition={{
+                    duration: QUILL_WRITE_SEC,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    times: [0, 0.14, 0.28, 0.42, 0.56, 0.72, 1],
+                  }}
+                >
+                  <div className="-translate-x-[28%] -translate-y-[90%]">
+                    <motion.div
+                      className="h-[4.25rem] w-[4.25rem] origin-[28%_90%] sm:h-[5.25rem] sm:w-[5.25rem]"
+                      animate={{
+                        rotate: [-32, -26, -34, -28, -33, -25, -32],
+                        y: [0, 1, 0, 1.5, 0, 1, 0],
+                      }}
+                      transition={{
+                        rotate: {
+                          duration: QUILL_WRITE_SEC,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          times: [0, 0.14, 0.28, 0.42, 0.56, 0.72, 1],
+                        },
+                        y: { duration: 1.45, repeat: Infinity, ease: "easeInOut" },
+                      }}
+                    >
+                      <Image
+                        src={QUILL_SRC}
+                        alt=""
+                        width={84}
+                        height={84}
+                        priority
+                        className="h-full w-full object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)]"
+                      />
+                    </motion.div>
+                  </div>
+                </motion.div>
+              </div>
             </motion.div>
 
             <motion.p
@@ -274,4 +406,8 @@ export function HoloCityLoadingOverlay({
       ) : null}
     </AnimatePresence>
   );
+
+  /* Portal: über Layer-Leiste (z-95) und Blitz-Html (z~110), sonst scheinen sie durch. */
+  if (!portalReady) return null;
+  return createPortal(overlay, document.body);
 }

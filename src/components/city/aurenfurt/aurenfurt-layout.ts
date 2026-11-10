@@ -1,8 +1,8 @@
 /** Kreis der Stadtmauer in Bildkoordinaten. 0° = Norden, im Uhrzeigersinn. */
 export const CITY_CENTER = { u: 0.5, v: 0.49 };
 export const CITY_RADIUS_V = 0.42;
-/** Breite der Aufsicht 1697×927, damit der Kreis in der Textur rund bleibt. */
-export const CITY_RADIUS_U = CITY_RADIUS_V * (927 / 1697);
+/** Breite der Aufsicht 1024×559, damit der Kreis in der Textur rund bleibt. */
+export const CITY_RADIUS_U = CITY_RADIUS_V * (559 / 1024);
 
 export function arcSpan(start: number, end: number) {
   if (end - start >= 359) return 360;
