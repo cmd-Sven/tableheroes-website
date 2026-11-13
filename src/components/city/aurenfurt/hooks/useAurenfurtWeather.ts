@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { HISTORY_START, formatDay, parseDay, utcToday } from "../aurenfurt-history";
+import { citySimVersion, subscribeCitySim } from "../aurenfurt-city-sim";
 import {
   fetchLiveAurenfurtWeather,
   weatherOn,
@@ -18,7 +19,8 @@ export type UseAurenfurtWeatherOptions = {
 
 export function useAurenfurtWeather(dayIso: string, options: UseAurenfurtWeatherOptions = {}) {
   const apiEnabled = options.apiEnabled !== false;
-  const today = useMemo(() => utcToday(), []);
+  const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
+  const today = useMemo(() => utcToday(), [simVersion]);
   const todayIso = useMemo(() => formatDay(today), [today]);
   const isLiveDay = dayIso === todayIso;
   const history = useMemo(() => weatherSeries(parseDay(HISTORY_START), today), [today]);

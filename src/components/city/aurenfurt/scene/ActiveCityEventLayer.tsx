@@ -241,7 +241,8 @@ export function ActiveCityEventLayer({
 
       {markers.map(({ card, position, color }) => (
         <group key={card.id} position={[position.x, position.y + DISTRICT_SURFACE_LIFT + 0.08, position.z]}>
-          <Html center zIndexRange={[110, 0]} style={{ pointerEvents: "auto" }}>
+          {/* Unter CityMapHud (z-30+), damit Blitze nicht über KPI-/Chart-Panels liegen. */}
+          <Html center zIndexRange={[18, 0]} style={{ pointerEvents: "auto" }}>
             <ZapMarkerButton
               title={card.title}
               color={color}
@@ -261,7 +262,7 @@ export function ActiveCityEventLayer({
             selectedMarker.position.y + DISTRICT_SURFACE_LIFT + 0.42,
             selectedMarker.position.z,
           ]}
-          zIndexRange={[130, 0]}
+          zIndexRange={[22, 0]}
           style={{ pointerEvents: "auto" }}
         >
           <ActiveCardInfoPopup

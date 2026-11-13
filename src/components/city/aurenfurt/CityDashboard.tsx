@@ -80,6 +80,7 @@ type Props = {
   onStepDay: (delta: number) => void;
   onStepYear: (delta: number) => void;
   onGoToday: () => void;
+  onAdvanceDays?: () => void;
   onShowMap: () => void;
   onShowVerwaltung?: () => void;
   showVerwaltung?: boolean;
@@ -109,6 +110,7 @@ export default function CityDashboard({
   onStepDay,
   onStepYear,
   onGoToday,
+  onAdvanceDays,
   onShowMap,
   onShowVerwaltung,
   showVerwaltung = false,
@@ -232,6 +234,7 @@ export default function CityDashboard({
             onStepDay={onStepDay}
             onStepYear={onStepYear}
             onGoToday={onGoToday}
+            onAdvance={onAdvanceDays}
           />
         </div>
       </header>

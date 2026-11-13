@@ -28,8 +28,8 @@ export function useDistrictMetrics(
   dayIso: string,
 ): DistrictMetrics {
   const viewDay = useMemo(() => parseDay(dayIso), [dayIso]);
-  const seriesEnd = useMemo(() => utcToday(), []);
   const simVersion = useSyncExternalStore(subscribeCitySim, citySimVersion, citySimVersion);
+  const seriesEnd = useMemo(() => utcToday(), [simVersion]);
   const [seriesReady, setSeriesReady] = useState(false);
 
   useEffect(() => {

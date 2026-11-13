@@ -1,0 +1,171 @@
+{
+  "epoch": "Jahr 0 ist die Geburt von Kassadras. Kassia formt in diesem Jahr Lendaris Leib zum Planeten.",
+  "presentYear": 5609,
+  "presentLabel": "Jedes Zeitalter zählt von Jahr 0. In Klammern steht das Weltjahr seit der Geburt von Kassadras. Das laufende Jahr ist 563 (5609).",
+  "ages": [
+    {
+      "id": "lied",
+      "name": "Zeitalter des Liedes",
+      "startYear": 0,
+      "endYear": 1681,
+      "summary": "Noch wandeln keine Götter und keine Völker. Kassias Lied hebt Berge und Täler, ihre Tränen füllen die Meere. Im dunklen Nethar schlägt Malaghor gegen den Gürtel aus Thunum.",
+      "events": [
+        {
+          "year": 0,
+          "title": "Geburt von Kassadras",
+          "summary": "Lendari stirbt zwischen den Brüdern. Vatrimus zerschlägt Thunum, sperrt Malaghor in den dunklen Nethar und wird zur Sonne. Aus Lendaris Leib formt Kassia den Planeten.",
+          "basis": "gesetzt"
+        }
+      ]
+    },
+    {
+      "id": "licht",
+      "name": "Zeitalter von Licht und Dunkelheit",
+      "startYear": 1682,
+      "endYear": 4299,
+      "summary": "Die Götter erwachen, binden die Urmonster und rufen die Völker ins Leben. Am Ende zerbricht das Pantheon.",
+      "events": [
+        {
+          "year": 1682,
+          "title": "Erster Dark Fall",
+          "summary": "Vattrak fällt, formt das Land und weckt die Tiere. Kassias Lied ruft die zehn Götter.",
+          "image": "https://i.pinimg.com/736x/17/ba/56/17ba5609aa600ecb5e4583b3684b0b91.jpg",
+          "basis": "rechnung"
+        },
+        {
+          "year": 3364,
+          "title": "Zweiter Dark Fall",
+          "summary": "Malanthir schlägt im Norden, im Süden und im Westen ein. Koraxx, Nerathara und Mordekar führen die neuen Bestien.",
+          "image": "https://i.pinimg.com/736x/4e/2f/28/4e2f28606bf64e947dd93c4367af506e.jpg",
+          "basis": "rechnung"
+        },
+        {
+          "year": 3448,
+          "title": "Lundra wird zum Mond",
+          "summary": "Lunaras Tochter fällt gegen die Urmonster. Aus ihrem Leib wird der Mond, der das Licht der Sonne auf die Welt wirft.",
+          "image": "https://i.pinimg.com/736x/31/ec/19/31ec19167f8f3781f2846bf3a04b65ed.jpg",
+          "basis": "gesetzt"
+        },
+        {
+          "year": 3520,
+          "title": "Ketten des Lichts",
+          "summary": "Ferroth und Fatum schmieden die Ketten. Die Urmonsterfürsten liegen unter der Erde und lassen sich nicht töten.",
+          "basis": "gesetzt"
+        },
+        {
+          "year": 3682,
+          "title": "Die Völker des Lichts",
+          "summary": "Die Götter rufen Hochelfen, Gnome, Zwerge, Tritaner, Mondelfen, Chikari, Khalkmari, Ilithiden, Tiermenschen und Menschen ins Licht.",
+          "basis": "gesetzt"
+        },
+        {
+          "year": 4000,
+          "title": "Bruch des Pantheons",
+          "summary": "Nerath, Terragon und Aquael fallen an Malaghor und lösen die Ketten. Zephyra reißt sich los. Die Chikari werden zu Tieflingen.",
+          "image": "https://i.pinimg.com/736x/63/f3/2b/63f32b91c823a80bdd98f27cd88b715b.jpg",
+          "basis": "gesetzt"
+        }
+      ]
+    },
+    {
+      "id": "zerstoerung",
+      "name": "Zeitalter der Zerstörung",
+      "startYear": 4300,
+      "endYear": 4744,
+      "summary": "Das Axtblatt von Kabalk steckt in den Ebenen der Verzweiflung. Der Krieg der Lichtvölker endet im schwarzen Kataklysmus.",
+      "events": [
+        {
+          "year": 4300,
+          "title": "Einschlag des Axtblatts",
+          "summary": "Ein Bruchstück von Kabalk stürzt in ein Tal. Dort öffnen sich die Ebenen der Verzweiflung.",
+          "basis": "gesetzt"
+        },
+        {
+          "year": 4744,
+          "title": "Sieg und schwarzer Kataklysmus",
+          "summary": "Zephyra verliert ihre Flügel an Koraxx, Mordekar wird am Vulkan Mordus gebannt. Nerath berührt eine Wurzel des Axtblatts, und die Magie verstummt.",
+          "basis": "rechnung"
+        }
+      ]
+    },
+    {
+      "id": "asche",
+      "name": "Zeitalter der Asche",
+      "startYear": 4745,
+      "endYear": 5045,
+      "summary": "Jahrhunderte schweigt die Magie. Die Götter wandeln nicht mehr unter den Völkern. Arta-Maahr steht still.",
+      "events": [
+        {
+          "year": 5036,
+          "title": "Kreuzzug der Menschen",
+          "summary": "Ein Kaiser führt die Menschen allein in den Kreuzzug. Der Sieg fällt unmittelbar vor dem dritten Dark Fall.",
+          "basis": "gesetzt"
+        }
+      ]
+    },
+    {
+      "id": "wiedergeburt",
+      "name": "Zeitalter der Wiedergeburt",
+      "startYear": 5046,
+      "endYear": 5609,
+      "summary": "Mit dem dritten Dark Fall beginnt die Zählung von vorn. Die späten Jahre nennen die Chronisten die Zeit der Abenteurer.",
+      "restartYear": true,
+      "events": [
+        {
+          "year": 5046,
+          "title": "Dritter Dark Fall",
+          "summary": "Vattrak und Malanthir kehren zurück. Menschen, Elfen und Zwerge streiten um das Erz.",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5049,
+          "title": "Großer Plan der Maschinenzwerge",
+          "summary": "Der Große Architekt nimmt den Plan der Maschinenzwerge in Angriff.",
+          "image": "https://i.pinimg.com/1200x/fb/26/43/fb2643689065acbe3b6dfc09db19b2bc.jpg",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5279,
+          "title": "Gründung Exploras",
+          "summary": "Die Enklave hebt Explora als fliegende Zuflucht in den Himmel.",
+          "image": "https://rpg.ambient-mixer.com/images_template/7/2/0/720556c481b69c74706258eadb844f3e_full.jpg",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5300,
+          "title": "Fall von Zalandar",
+          "summary": "Zalandar tauscht seinen Vattrak-Stein gegen Malanthir. Dämonen rauben den Stein, ein Lichtblitz, die Stadt geht unter. Eine Gruppe schläft in Stasis durch den Fall.",
+          "image": "https://i.pinimg.com/1200x/b4/62/31/b46231ce75523280693e43417e936e82.jpg",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5546,
+          "title": "Zeit der Abenteurer",
+          "summary": "Helden und Schurken betreten die Bühne. Die Chronisten sprechen von der Zeit der Abenteurer.",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5599,
+          "title": "Krieg und Flucht nach Aurenfurt",
+          "summary": "Menschen, Zwerge und Elfen fliehen über zehn Jahre vor Xarvathar nach Aurenfurt.",
+          "image": "https://beoxjrswwrcsubazbojy.supabase.co/storage/v1/object/public/profile-media/e4375f6d-d99f-4e04-b47c-4697486c0eec/lore/689a0f11-7aa3-440b-9527-c6da0a84aebb/new-890a3ec1-d3cf-4b26-aa90-c9c6070e47c4/image-1788851832424.webp",
+          "basis": "rechnung"
+        },
+        {
+          "year": 5609,
+          "title": "Explora teleportiert sich fort",
+          "summary": "Kurr erscheint über Explora, um die Stadt zu nehmen. Die Erzmagier der Enklave teleportieren sie fort. Die Gruppe trägt den Vattrak-Stein und ist auf dem Weg nach Greifenberg.",
+          "image": "https://beoxjrswwrcsubazbojy.supabase.co/storage/v1/object/public/profile-media/e4375f6d-d99f-4e04-b47c-4697486c0eec/lore/689a0f11-7aa3-440b-9527-c6da0a84aebb/new-1f39e0c9-d653-4405-9115-e72e8cba61b8/image-1786991110917.webp",
+          "basis": "gesetzt"
+        },
+        {
+          "year": 5609,
+          "title": "Portal über Ghremen",
+          "summary": "Ein Blitz wirft Explora über Ghremen aus dem Portal. Sie streift die Stadt der Westwinder und verschwindet wieder. Ghremen fällt brennend, gesehen aus den Tunneln von Arta-Maahr.",
+          "image": "https://beoxjrswwrcsubazbojy.supabase.co/storage/v1/object/public/profile-media/e4375f6d-d99f-4e04-b47c-4697486c0eec/lore/689a0f11-7aa3-440b-9527-c6da0a84aebb/98607bcb-6776-443e-b706-b2c81fb46335/image-1784917073237.webp",
+          "basis": "gesetzt"
+        }
+      ]
+    }
+  ]
+}

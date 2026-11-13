@@ -22,6 +22,7 @@ import {
   type LongTermMonthPoint,
 } from "./aurenfurt-analytics";
 import { HISTORY_START } from "./aurenfurt-history";
+import { formatKassadrasMonthYear } from "@/src/lib/world/kassadras-calendar";
 import { populationSeriesForRange } from "./aurenfurt-population";
 import { SIM_METERS, type SimMeterKey } from "./aurenfurt-sim";
 import { DERIVED_KPI_META, KPI_META } from "./CityDashboardParts";
@@ -182,8 +183,8 @@ export function CityLongTermOverview({ day, scopeId, scopeLabel }: Props) {
   const populationUnit = scopeId ? `Köpfe (${scopeLabel})` : "Köpfe (Stadt)";
 
   const fromLabel = useMemo(() => {
-    const [y, m] = HISTORY_START.split("-");
-    return `${Number(m)}.${y}`;
+    const [year, month] = HISTORY_START.split("-").map(Number);
+    return formatKassadrasMonthYear(year, month - 1);
   }, []);
 
   const toggleKey = useCallback((key: LongTermChartKey) => {

@@ -22,6 +22,7 @@ import { getFactionById } from "@/src/app/dashboard/campaigns/[id]/factions-acti
 import { CityFactionLorePanel } from "@/src/components/city/aurenfurt/CityFactionLorePanel";
 import { findFaction, isCityFactionId } from "@/src/components/city/aurenfurt/aurenfurt-factions";
 import { formatDay, utcToday } from "@/src/components/city/aurenfurt/aurenfurt-time";
+import { formatKassadrasDay } from "@/src/lib/world/kassadras-calendar";
 
 type Props = {
   params: Promise<{ id: string; factionId: string }>;
@@ -38,12 +39,6 @@ const STATUS_COLORS: Record<string, string> = {
 function getStatusBadgeColor(status: string | null) {
   if (!status) return "bg-gray-800/50 text-gray-300 border-gray-700";
   return STATUS_COLORS[status] ?? "bg-gray-800/50 text-gray-300 border-gray-700";
-}
-
-function formatGermanDay(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) return iso;
-  return `${day}.${month}.${year}`;
 }
 
 /** Parst "Wichtige Persönlichkeiten"-Text in Name + Beschreibung (wie Kampagnen-Detailseite). */
@@ -241,7 +236,7 @@ export default async function WorldFactionDetailPage({ params }: Props) {
         <CityFactionLorePanel
           worldId={worldId}
           standing={cityStanding}
-          dayLabel={formatGermanDay(formatDay(utcToday()))}
+          dayLabel={formatKassadrasDay(formatDay(utcToday()))}
           factionRecordIds={cityFactionRecordIds}
         />
       ) : null}

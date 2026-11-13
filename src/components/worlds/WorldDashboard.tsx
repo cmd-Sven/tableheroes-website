@@ -66,6 +66,12 @@ export async function WorldDashboard({
             </div>
           )}
 
+          <Link
+            href={`/dashboard/worlds/${worldId}/zeitstrahl`}
+            className="mt-8 inline-flex font-barlow font-bold uppercase text-hero-vibrant hover:text-white transition-colors"
+          >
+            Zeitstrahl der Welt
+          </Link>
           <h2 className="font-barlow font-semibold text-xl text-accent-blood border-b border-hero-border pb-2 mt-8 mb-4">
             Welt verwalten
           </h2>

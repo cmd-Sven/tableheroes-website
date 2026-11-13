@@ -131,9 +131,13 @@ export function CitySimDeckHand({
     const root = document.documentElement;
     root.style.setProperty("--th-hand-dock-h", open ? "13.5rem" : "4.75rem");
     root.style.setProperty("--th-hand-dock-layers-h", open ? "5.5rem" : "4.75rem");
+    root.dataset.thCityHandOpen = open ? "1" : "0";
+    window.dispatchEvent(new Event("th:city-hand-open-change"));
     return () => {
       root.style.removeProperty("--th-hand-dock-h");
       root.style.removeProperty("--th-hand-dock-layers-h");
+      delete root.dataset.thCityHandOpen;
+      window.dispatchEvent(new Event("th:city-hand-open-change"));
     };
   }, [open]);
 

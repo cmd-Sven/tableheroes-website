@@ -19,6 +19,36 @@ export type DayWeather = {
   source: "history" | "live";
 };
 
+export type WeatherOrigin = "hand" | "forecast" | "model";
+
+export type WeatherOverride = {
+  day: string;
+  kind: WeatherKind;
+  tempC: number;
+  origin: WeatherOrigin;
+};
+
+const weatherOverrides = new Map<string, DayWeather>();
+
+export function weatherKindLabel(kind: WeatherKind) {
+  return WEATHER_LABEL[kind];
+}
+
+export function applyWeatherOverrides(entries: WeatherOverride[]) {
+  weatherOverrides.clear();
+  for (const entry of entries) {
+    if (!WEATHER_LABEL[entry.kind]) continue;
+    weatherOverrides.set(entry.day, {
+      day: entry.day,
+      kind: entry.kind,
+      label: WEATHER_LABEL[entry.kind],
+      tempC: entry.tempC,
+      intensity: intensityFor(entry.kind, 0.5),
+      source: entry.origin === "forecast" ? "live" : "history",
+    });
+  }
+}
+
 const WEATHER_LABEL: Record<WeatherKind, string> = {
   clear: "Klar",
   cloudy: "Bedeckt",
@@ -73,7 +103,12 @@ function intensityFor(kind: WeatherKind, noise: number) {
 }
 
 /** Simuliertes Tageswetter. Der harte Winter vor drei Jahren drückt die Reihe spürbar nach unten. */
-export function weatherOn(day = utcToday()): DayWeather {
+export function weatherOn(day = utcToday(), options?: { model?: boolean }): DayWeather {
+  const iso = formatDay(day);
+  if (!options?.model) {
+    const forced = weatherOverrides.get(iso);
+    if (forced) return forced;
+  }
   const date = new Date(day);
   const yearStart = Date.UTC(date.getUTCFullYear(), 0, 0);
   const dayOfYear = Math.round((day - yearStart) / DAY_MS);
@@ -84,7 +119,7 @@ export function weatherOn(day = utcToday()): DayWeather {
   const tempC = Math.round(10 + 11 * Math.cos(angle) + (noise - 0.5) * 7 - 12 * winter);
   const kind = kindFromClimate(tempC, wet, noise, winter, date.getUTCMonth());
   return {
-    day: formatDay(day),
+    day: iso,
     kind,
     label: WEATHER_LABEL[kind],
     tempC,
@@ -140,3 +175,40 @@ export const fetchLiveAurenfurtWeather: LiveWeatherProvider = async (signal) => 
     source: "live",
   };
 };
+
+/** Prognose ab dem echten heutigen Tag. Tage ohne Treffer bleiben beim Stadtmodell. */
+export async function fetchWeatherForecast(signal?: AbortSignal): Promise<WeatherOverride[]> {
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", String(AURENFURT_LIVE_COORDINATES.latitude));
+  url.searchParams.set("longitude", String(AURENFURT_LIVE_COORDINATES.longitude));
+  url.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min");
+  url.searchParams.set("forecast_days", "16");
+  url.searchParams.set("timezone", "Europe/Berlin");
+  const response = await fetch(url, { signal });
+  if (!response.ok) return [];
+  const body = (await response.json()) as {
+    daily?: {
+      time?: string[];
+      weather_code?: number[];
+      temperature_2m_max?: number[];
+      temperature_2m_min?: number[];
+    };
+  };
+  const time = body.daily?.time ?? [];
+  const codes = body.daily?.weather_code ?? [];
+  const highs = body.daily?.temperature_2m_max ?? [];
+  const lows = body.daily?.temperature_2m_min ?? [];
+  const drafts: WeatherOverride[] = [];
+  for (let index = 0; index < time.length; index += 1) {
+    const day = time[index];
+    const code = codes[index];
+    if (!day || typeof code !== "number") continue;
+    const high = highs[index];
+    const low = lows[index];
+    const tempC = Math.round(
+      ((typeof high === "number" ? high : 0) + (typeof low === "number" ? low : 0)) / 2,
+    );
+    drafts.push({ day, kind: kindFromWmo(code, tempC), tempC, origin: "forecast" });
+  }
+  return drafts;
+}

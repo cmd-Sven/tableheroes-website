@@ -18,7 +18,7 @@ import {
   RELATIONSHIP_LABELS,
   type FactionId,
 } from "./aurenfurt-factions";
-import { allAurenfurtNpcs, withDistrictModulation } from "./aurenfurt-npcs";
+import { allAurenfurtNpcs, NPC_PORTRAIT_PLACEHOLDER, withDistrictModulation } from "./aurenfurt-npcs";
 import { chronicleInWindow, chronicleMarksOn } from "./aurenfurt-chronicle";
 import {
   AURENFURT_HISTORY,
@@ -33,26 +33,9 @@ import {
 import { SIM_METERS, type SimMeterKey, type SimProfile } from "./aurenfurt-sim";
 import { weatherOn, type DayWeather, type WeatherKind } from "./aurenfurt-weather";
 import { listActiveMeasures } from "./aurenfurt-active-measures";
-import { NPC_PORTRAIT_PLACEHOLDER } from "./aurenfurt-npcs";
+import { formatKassadrasDay, formatKassadrasDayShort, formatKassadrasMonthYear, formatKassadrasShortMonth } from "@/src/lib/world/kassadras-calendar";
 
 const DAY_MS = 86_400_000;
-
-const MONTHS = [
-  "Januar",
-  "Februar",
-  "März",
-  "April",
-  "Mai",
-  "Juni",
-  "Juli",
-  "August",
-  "September",
-  "Oktober",
-  "November",
-  "Dezember",
-] as const;
-
-const MONTHS_SHORT = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"] as const;
 
 export const ANALYTICS_RANGES = ["day", "week", "month", "year"] as const;
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
@@ -303,14 +286,11 @@ export function tensionOf(profile: SimProfile) {
 }
 
 function germanDay(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) return iso;
-  return `${day}. ${MONTHS[month - 1]} ${year}`;
+  return formatKassadrasDay(iso);
 }
 
 function shortDay(utc: number) {
-  const date = new Date(utc);
-  return `${date.getUTCDate()}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.`;
+  return formatKassadrasDayShort(formatDay(utc));
 }
 
 function eachDay(from: number, to: number) {
@@ -357,7 +337,7 @@ function periodLabel(range: AnalyticsRange, from: number, to: number) {
   if (range === "day") return germanDay(formatDay(to));
   if (range === "year") return String(end.getUTCFullYear());
   if (range === "month" && start.getUTCMonth() === end.getUTCMonth()) {
-    return `${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+    return `${formatKassadrasMonthYear(start.getUTCFullYear(), start.getUTCMonth())}`;
   }
   return `${germanDay(formatDay(from))} – ${germanDay(formatDay(to))}`;
 }
@@ -476,7 +456,7 @@ function chartSeries(
     return [...buckets.entries()].map(([key, bucket]) => {
       const month = Number(key.split("-")[1]);
       return pointFrom(
-        MONTHS_SHORT[month] ?? key,
+        formatKassadrasShortMonth(new Date(bucket.days[0]).getUTCFullYear(), month),
         averageProfiles(bucket.profiles),
         namesOnDays(bucket.days, scopeId),
         formatDay(bucket.days[0]),
@@ -992,7 +972,7 @@ export function buildLongTermMonthlySeries(
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     points.push({
-      label: `${MONTHS_SHORT[month]} ${String(year).slice(2)}`,
+      label: formatKassadrasShortMonth(year, month),
       day: formatDay(cursor),
       year,
       month,

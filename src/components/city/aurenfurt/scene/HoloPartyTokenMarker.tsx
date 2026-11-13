@@ -147,7 +147,7 @@ export function HoloPartyTokenMarker({
         <meshBasicMaterial />
       </mesh>
 
-      <Html center position={[0, 0.08, 0]} zIndexRange={[120, 0]} style={{ pointerEvents: "none" }}>
+      <Html center position={[0, 0.08, 0]} zIndexRange={[24, 0]} style={{ pointerEvents: "none" }}>
         <div
           className={`overflow-hidden rounded-full border-2 border-accent-gold bg-background-dark shadow-lg ${
             isGroup ? "h-11 w-11" : "h-9 w-9"
@@ -169,7 +169,7 @@ export function HoloPartyTokenMarker({
       </Html>
 
       {hot || draggingRef.current ? (
-        <Html center position={[0, 0.28, 0]} zIndexRange={[121, 0]} style={{ pointerEvents: "none" }}>
+        <Html center position={[0, 0.28, 0]} zIndexRange={[28, 0]} style={{ pointerEvents: "none" }}>
           <div className="-translate-y-full whitespace-nowrap rounded border border-accent-gold/40 bg-background-card/95 px-2 py-1 shadow-lg">
             <p className="font-cinzel text-xs font-bold text-accent-gold">{label}</p>
           </div>

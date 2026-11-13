@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   HISTORY_START,
   formatDay,
@@ -45,29 +45,39 @@ export type AurenfurtDayControls = {
   goToday: () => void;
 };
 
-export function useAurenfurtDay(): AurenfurtDayControls {
+export function useAurenfurtDay(presentIso: string | null = null): AurenfurtDayControls {
   const minDay = useMemo(() => seriesMinDay(), []);
-  const maxDay = useMemo(() => seriesMaxDay(), []);
-  const [day, setDayRaw] = useState(() => maxDay);
+  const maxDay = presentIso ?? seriesMaxDay();
+  const [day, setDayRaw] = useState(maxDay);
 
-  const setDay = useCallback(
+  const clamp = useCallback(
     (iso: string) => {
-      setDayRaw(clampViewDay(iso));
+      const value = parseDay(iso);
+      if (Number.isNaN(value)) return maxDay;
+      return formatDay(Math.max(parseDay(minDay), Math.min(parseDay(maxDay), value)));
     },
-    [],
+    [maxDay, minDay],
   );
 
+  useEffect(() => {
+    setDayRaw((current) => clamp(current));
+  }, [clamp]);
+
+  const setDay = useCallback((iso: string) => {
+    setDayRaw(clamp(iso));
+  }, [clamp]);
+
   const stepDay = useCallback((delta: number) => {
-    setDayRaw((current) => shiftViewDay(current, delta * DAY_MS));
-  }, []);
+    setDayRaw((current) => clamp(formatDay(parseDay(current) + delta * DAY_MS)));
+  }, [clamp]);
 
   const stepYear = useCallback((delta: number) => {
-    setDayRaw((current) => shiftViewDay(current, delta * YEAR_MS));
-  }, []);
+    setDayRaw((current) => clamp(formatDay(parseDay(current) + delta * YEAR_MS)));
+  }, [clamp]);
 
   const goToday = useCallback(() => {
-    setDayRaw(seriesMaxDay());
-  }, []);
+    setDayRaw(maxDay);
+  }, [maxDay]);
 
   return {
     day,

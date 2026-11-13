@@ -18,6 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import type { CityDistrictId } from "./aurenfurt-districts";
+import { formatKassadrasDayShort } from "@/src/lib/world/kassadras-calendar";
 import { findDistrict } from "./aurenfurt-districts";
 import { districtMetricsOn } from "./aurenfurt-history";
 import { buildFinanceSeries, calculateDistrictFinances, formatGp, sumFinances } from "./aurenfurt-finances";
@@ -72,8 +73,7 @@ function rangeFrom(day: string, range: AnalyticsRange) {
 }
 
 function formatDayLabel(iso: string) {
-  const [, m, d] = iso.split("-");
-  return `${Number(d)}.${m}`;
+  return formatKassadrasDayShort(iso);
 }
 
 export function CitySocietyPanels({ day, range, scopeId }: Props) {

@@ -19,6 +19,7 @@ import type { SectorHeatCell } from "../aurenfurt-city-heatmap";
 import type { PoiReachCell } from "../aurenfurt-sector-reach";
 import type { AurenfurtMapEditorTool } from "../aurenfurt-map-editor-tool";
 import type { ActiveCityCardEffect } from "../aurenfurt-active-city-events";
+import type { ActiveMeasureMapMarker } from "../aurenfurt-active-measures";
 import { HoloFocusRig } from "./HoloFocusRig";
 import { HoloSelectionDim } from "./HoloSelectionDim";
 
@@ -65,10 +66,13 @@ type Props = {
   holdStill?: boolean;
   highlightDistricts?: boolean;
   activeCityCards?: ActiveCityCardEffect[];
+  activeMeasureMarkers?: ActiveMeasureMapMarker[];
   sectorsByDistrict?: Partial<Record<CityDistrictId, DistrictSector[]>>;
   previewDistrictIds?: CityDistrictId[];
   selectedActiveCityCardId?: string | null;
   onSelectActiveCityCard?: (cardId: string | null) => void;
+  selectedActiveMeasureId?: string | null;
+  onSelectActiveMeasure?: (measureId: string | null) => void;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   worldId: string;
@@ -206,10 +210,13 @@ export default function HoloCityCanvas({
   holdStill = false,
   highlightDistricts = false,
   activeCityCards = [],
+  activeMeasureMarkers = [],
   sectorsByDistrict = {},
   previewDistrictIds = [],
   selectedActiveCityCardId = null,
   onSelectActiveCityCard,
+  selectedActiveMeasureId = null,
+  onSelectActiveMeasure,
   buildings,
   pois,
   worldId,
@@ -279,6 +286,11 @@ export default function HoloCityCanvas({
   return (
     <HoloCityErrorBoundary key={canvasKey} onRetry={() => setCanvasKey((value) => value + 1)}>
       <Suspense fallback={<div className="h-full w-full bg-[#02080c]" aria-hidden />}>
+        {/*
+         * Eigene Stapelebene unter HUD, Rail und Panels.
+         * Karten-HTML (Gruppentoken, Tooltips) bleibt so hinter der UI.
+         */}
+        <div className="relative z-0 h-full w-full isolate">
         <Canvas
           camera={{ position: [0.2, 3.5, 5.25], fov: 34, near: 0.1, far: 40 }}
           // Schweben, Autorotation, Wetter und der Heatmap-Fade hängen an useFrame.
@@ -358,10 +370,13 @@ export default function HoloCityCanvas({
               poiReachVisible={poiReachVisible}
               highlightDistricts={highlightDistricts}
               activeCityCards={activeCityCards}
+              activeMeasureMarkers={activeMeasureMarkers}
               sectorsByDistrict={sectorsByDistrict}
               previewDistrictIds={previewDistrictIds}
               selectedActiveCityCardId={selectedActiveCityCardId}
               onSelectActiveCityCard={onSelectActiveCityCard}
+              selectedActiveMeasureId={selectedActiveMeasureId}
+              onSelectActiveMeasure={onSelectActiveMeasure}
               buildings={buildings}
               pois={pois}
               worldId={worldId}
@@ -423,6 +438,7 @@ export default function HoloCityCanvas({
           />
           <CursorReset />
         </Canvas>
+        </div>
       </Suspense>
     </HoloCityErrorBoundary>
   );

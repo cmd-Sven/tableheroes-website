@@ -12,15 +12,14 @@ import {
 } from "./aurenfurt-resource-lore";
 import type { VattrakDemandBuckets, VattrakStockSnapshot } from "./aurenfurt-vattrak-stock";
 import { VATTRAK_STOCK_CAP } from "./aurenfurt-vattrak-stock";
+import { formatKassadrasDay } from "@/src/lib/world/kassadras-calendar";
 
 type Props = {
   stock: VattrakStockSnapshot;
 };
 
 function germanDayLabel(iso: string) {
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${Number(d)}.${Number(m)}.${y}`;
+  return formatKassadrasDay(iso);
 }
 
 const BUCKET_META: Array<{

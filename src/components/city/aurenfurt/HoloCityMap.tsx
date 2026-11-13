@@ -9,14 +9,10 @@ import {
 } from "@/src/lib/actions/aurenfurt-session-actions";
 import { HoloCityRail } from "./HoloCityRail";
 import { HoloOverlay } from "./HoloOverlay";
-import { CityPartyTokenTray } from "./CityPartyTokenTray";
 import {
   clearPartyTokenDraft,
-  getPartyTokenDraft,
   getPartyTokenState,
-  partyTokenVersion,
   replacePartyTokenState,
-  subscribePartyTokens,
 } from "./aurenfurt-party-tokens";
 import type { CitySurface } from "./CityViewSwitch";
 import type { ChartMetric, LineKey } from "./CityDashboard";
@@ -24,6 +20,7 @@ import type { AnalyticsRange } from "./aurenfurt-analytics";
 import { MapEditorPortals } from "./MapEditorPortals";
 import { CityMapHud } from "./CityMapHud";
 import { CityEventWizard } from "./CityEventWizard";
+import { CityDayAdvanceWizard } from "./CityDayAdvanceWizard";
 import CityVerwaltung from "./CityVerwaltung";
 import { pruneExpiredKaiserPlays } from "./aurenfurt-verwaltung-store";
 import {
@@ -34,6 +31,10 @@ import {
   type HoloSelection,
 } from "./aurenfurt-districts";
 import { findPlaceLore } from "./aurenfurt-lore";
+import { loadCityClock } from "@/src/app/dashboard/worlds/city-clock-actions";
+import { applyWeatherOverrides } from "./aurenfurt-weather";
+import { parseDay, setCityPresentMs, wallTodayIso } from "./aurenfurt-time";
+import type { CityClock } from "@/src/lib/world/city-clock";
 import { useAurenfurtDay } from "./hooks/useAurenfurtDay";
 import { useAurenfurtStreets } from "./hooks/useAurenfurtStreets";
 import { useAurenfurtWalls } from "./hooks/useAurenfurtWalls";
@@ -46,7 +47,7 @@ import { isWeatherPresetId } from "@/src/lib/session-weather";
 import type { SessionDayPhase } from "@/src/lib/session-day-phase";
 import { useDistrictFactions } from "./hooks/useDistrictFactions";
 import { useDistrictMetrics } from "./hooks/useDistrictMetrics";
-import { bindCityPressure, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
+import { bindCityPressure, bumpCitySimVersion, citySimVersion, setCitySimLive, simBuildingFromCity, subscribeCitySim } from "./aurenfurt-city-sim";
 import { resolveBuildingUv } from "./aurenfurt-building-positions";
 import { useDistrictNpcs } from "./hooks/useDistrictNpcs";
 import { useBuildingPositions } from "./hooks/useBuildingPositions";
@@ -67,7 +68,6 @@ import { buildDistrictHudKpis } from "./DistrictHudKpis";
 import { cityMetricsOn, districtMetricsOn } from "./aurenfurt-history";
 import { calculateDistrictFinances, sumFinances } from "./aurenfurt-finances";
 import { populationOn } from "./aurenfurt-population";
-import { parseDay } from "./aurenfurt-time";
 import { weatherConditionPenalty } from "./aurenfurt-streets";
 import { loadAurenfurtCityPressure } from "./load-aurenfurt-npc-records";
 import { mergeCityBuildings } from "./aurenfurt-map-buildings";
@@ -79,7 +79,10 @@ import {
   districtsAffectedByCard,
   listActiveCityCardEffects,
 } from "./aurenfurt-active-city-events";
-import { listActiveMeasures } from "./aurenfurt-active-measures";
+import {
+  listActiveMeasureMapMarkers,
+  listActiveMeasures,
+} from "./aurenfurt-active-measures";
 
 const HoloCityCanvas = dynamic(() => import("./scene/HoloCityCanvas"), {
   ssr: false,
@@ -152,19 +155,6 @@ export function HoloCityMap({
   const mapOnly = playerMapOnly && !isGm;
   const leaveVisible = showLeave ?? !mapOnly;
   const resolvedWorldId = worldId || AURENFURT_WORLD_ID;
-  const partyTokenTick = useSyncExternalStore(
-    subscribePartyTokens,
-    partyTokenVersion,
-    partyTokenVersion,
-  );
-  const partyTokenState = useMemo(() => {
-    void partyTokenTick;
-    return getPartyTokenState();
-  }, [partyTokenTick]);
-  const partyTokenDraft = useMemo(() => {
-    void partyTokenTick;
-    return getPartyTokenDraft();
-  }, [partyTokenTick]);
   const persistPartyTokens = useCallback(() => {
     if (!sessionId) return;
     const snapshot = getPartyTokenState();
@@ -212,7 +202,32 @@ export function HoloCityMap({
   }, [buildingPositions.markerBuildings, categoryOverrides, editorBuildings]);
 
   const view = useHoloCityView(buildings, pois);
-  const calendar = useAurenfurtDay();
+  const [cityClock, setCityClock] = useState<CityClock | null>(null);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const calendar = useAurenfurtDay(cityClock?.presentIso ?? null);
+
+  useEffect(() => {
+    let active = true;
+    void loadCityClock(resolvedWorldId, wallTodayIso()).then((loaded) => {
+      if (!active) return;
+      if (loaded.frozen) {
+        setCityPresentMs(parseDay(loaded.presentIso));
+        applyWeatherOverrides(loaded.weather);
+        setCityClock({ presentIso: loaded.presentIso, weather: loaded.weather });
+      } else {
+        setCityPresentMs(null);
+        applyWeatherOverrides([]);
+        setCityClock(null);
+      }
+      bumpCitySimVersion();
+    }).catch((error: unknown) => {
+      if (!active) return;
+      toast.error(error instanceof Error ? error.message : "Die Stadtuhr konnte nicht geladen werden.");
+    });
+    return () => {
+      active = false;
+    };
+  }, [resolvedWorldId]);
   const metrics = useDistrictMetrics(view.subject?.districtId ?? null, calendar.day);
   const districtFactions = useDistrictFactions(view.subject?.districtId ?? null, calendar.day);
   const keyLocations = useKeyLocations(
@@ -226,7 +241,7 @@ export function HoloCityMap({
     npcRecordIds,
     calendar.day,
   );
-  const climate = useAurenfurtWeather(calendar.day, { apiEnabled: weatherApi.enabled });
+  const climate = useAurenfurtWeather(calendar.day, { apiEnabled: weatherApi.enabled && !cityClock });
   const opticalPreset = isWeatherPresetId(opticalWeatherPreset) ? opticalWeatherPreset : null;
   const shownWeather = resolveCityWeatherFx({
     preference: weatherFx.preference,
@@ -272,9 +287,13 @@ export function HoloCityMap({
         prepBlockToast();
         return;
       }
+      if (delta > 0 && calendar.day >= calendar.maxDay && isGm && cityClock) {
+        setAdvanceOpen(true);
+        return;
+      }
       calendar.stepDay(delta);
     },
-    [calendar, isPrepMode, prepBlockToast],
+    [calendar, cityClock, isGm, isPrepMode, prepBlockToast],
   );
 
   const onStepYearGuarded = useCallback(
@@ -424,22 +443,34 @@ export function HoloCityMap({
   const focusDistrictId = view.subject?.districtId ?? null;
   const [previewDistrictId, setPreviewDistrictId] = useState<CityDistrictId | null>(null);
   const [selectedActiveCityCardId, setSelectedActiveCityCardId] = useState<string | null>(null);
+  const [selectedActiveMeasureId, setSelectedActiveMeasureId] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedActiveCityCardId(null);
+    setSelectedActiveMeasureId(null);
   }, [calendar.day]);
 
+  // Client-only: Pressure/Kaiser-Plays kommen aus Browser-State — SSR wäre leer → Hydration-Mismatch.
+  const [clientSimReady, setClientSimReady] = useState(false);
+  useEffect(() => {
+    setClientSimReady(true);
+  }, []);
+
   const activeCityCards = useMemo(
-    () => listActiveCityCardEffects(calendar.day),
-    [calendar.day, simVersion],
+    () => (clientSimReady ? listActiveCityCardEffects(calendar.day) : []),
+    [calendar.day, simVersion, clientSimReady],
   );
   const activeMeasures = useMemo(
-    () => listActiveMeasures(calendar.day),
-    [calendar.day, simVersion],
+    () => (clientSimReady ? listActiveMeasures(calendar.day) : []),
+    [calendar.day, simVersion, clientSimReady],
+  );
+  const activeMeasureMarkers = useMemo(
+    () => (clientSimReady ? listActiveMeasureMapMarkers(calendar.day) : []),
+    [calendar.day, simVersion, clientSimReady],
   );
   const activeCardsByDistrict = useMemo(
-    () => activeCityCardsByDistrict(calendar.day),
-    [calendar.day, simVersion],
+    () => (clientSimReady ? activeCityCardsByDistrict(calendar.day) : new Map()),
+    [calendar.day, simVersion, clientSimReady],
   );
   const previewDistrictIds = useMemo(() => {
     if (!previewDistrictId) return [] as CityDistrictId[];
@@ -686,11 +717,24 @@ export function HoloCityMap({
           poiReachVisible={poiReachVisible}
           holdStill={eventPlaceStep}
           highlightDistricts={eventPlaceStep}
-          activeCityCards={loadCoverVisible ? [] : activeCityCards}
+          activeCityCards={
+            loadCoverVisible || citySurface !== "map" ? [] : activeCityCards
+          }
+          activeMeasureMarkers={
+            loadCoverVisible || citySurface !== "map" ? [] : activeMeasureMarkers
+          }
           sectorsByDistrict={sectorsApi.sectorsByDistrict}
           previewDistrictIds={previewDistrictIds}
           selectedActiveCityCardId={selectedActiveCityCardId}
-          onSelectActiveCityCard={setSelectedActiveCityCardId}
+          onSelectActiveCityCard={(cardId) => {
+            setSelectedActiveCityCardId(cardId);
+            if (cardId) setSelectedActiveMeasureId(null);
+          }}
+          selectedActiveMeasureId={selectedActiveMeasureId}
+          onSelectActiveMeasure={(measureId) => {
+            setSelectedActiveMeasureId(measureId);
+            if (measureId) setSelectedActiveCityCardId(null);
+          }}
           buildings={mapBuildings}
           pois={pois}
           worldId={resolvedWorldId}
@@ -725,14 +769,6 @@ export function HoloCityMap({
           partyTokensEditable={Boolean(sessionId) && (isGm || partyCharacters.some((pc) => pc.canPlace !== false))}
           onPartyTokensPersist={persistPartyTokens}
         />
-        {citySurface === "map" && sessionId && !loadCoverVisible ? (
-          <CityPartyTokenTray
-            characters={partyCharacters}
-            draft={partyTokenDraft}
-            placed={partyTokenState}
-            canManage={isGm || partyCharacters.some((pc) => pc.canPlace !== false)}
-          />
-        ) : null}
         {!loadCoverVisible ? (
         <CityMapHud
           citySurface={citySurface}
@@ -749,6 +785,7 @@ export function HoloCityMap({
           onStepDay={onStepDayGuarded}
           onStepYear={onStepYearGuarded}
           onGoToday={onGoTodayGuarded}
+          onAdvanceDays={isGm && cityClock ? () => setAdvanceOpen(true) : undefined}
           isGm={isGm}
           mapAdminMode={session.mapAdminMode}
           onToggleMapAdminMode={session.toggleMapAdminMode}
@@ -856,6 +893,26 @@ export function HoloCityMap({
             }}
           />
         ) : null}
+        {advanceOpen && cityClock && isGm ? (
+          <CityDayAdvanceWizard
+            worldId={resolvedWorldId}
+            clock={cityClock}
+            onClose={() => {
+              applyWeatherOverrides(cityClock.weather);
+              setCityPresentMs(parseDay(cityClock.presentIso));
+              bumpCitySimVersion();
+              setAdvanceOpen(false);
+            }}
+            onDone={(next) => {
+              setCityPresentMs(parseDay(next.presentIso));
+              applyWeatherOverrides(next.weather);
+              setCityClock(next);
+              bumpCitySimVersion();
+              reloadCityPressure();
+              setAdvanceOpen(false);
+            }}
+          />
+        ) : null}
         </div>
         {citySurface === "dashboard" && !mapOnly ? (
           <CityDashboard
@@ -870,6 +927,7 @@ export function HoloCityMap({
             onStepDay={onStepDayGuarded}
             onStepYear={onStepYearGuarded}
             onGoToday={onGoTodayGuarded}
+            onAdvanceDays={isGm && cityClock ? () => setAdvanceOpen(true) : undefined}
             onShowMap={() => setCitySurface("map")}
             onShowVerwaltung={() => setCitySurface("verwaltung")}
             showVerwaltung={isGm}

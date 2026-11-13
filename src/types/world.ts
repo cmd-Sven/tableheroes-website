@@ -1,3 +1,5 @@
+import type { WorldChronicle } from "@/src/lib/world/chronicle";
+
 export interface WorldBlueprint {
   vibes: {
     genre: string;
@@ -20,5 +22,6 @@ export interface WorldBlueprint {
     currency_name: string;
     currency_details: string;
   };
+  chronicle?: WorldChronicle;
 }
 

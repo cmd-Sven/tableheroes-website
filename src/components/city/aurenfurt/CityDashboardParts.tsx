@@ -23,6 +23,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { formatKassadrasDay } from "@/src/lib/world/kassadras-calendar";
 import {
   type AnalyticsEvent,
   type AnalyticsFaction,
@@ -890,25 +891,8 @@ export function districtBars(report: CityAnalytics, metric: ChartMetric) {
     }));
 }
 
-const TIP_MONTHS = [
-  "Januar",
-  "Februar",
-  "März",
-  "April",
-  "Mai",
-  "Juni",
-  "Juli",
-  "August",
-  "September",
-  "Oktober",
-  "November",
-  "Dezember",
-] as const;
-
 function germanDate(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) return iso;
-  return `${day}. ${TIP_MONTHS[month - 1]} ${year}`;
+  return formatKassadrasDay(iso);
 }
 
 function tipDate(point: AnalyticsPoint | undefined, label?: string) {

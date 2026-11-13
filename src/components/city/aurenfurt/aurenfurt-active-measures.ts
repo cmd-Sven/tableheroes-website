@@ -20,7 +20,32 @@ export type ActiveMeasure = {
   detail: string;
   kind: ActiveMeasureKind;
   effectsLabel: string | null;
+  /** Viertel für Kartenmarker (Heimat / Wirkungsort). */
+  districtIds: CityDistrictId[];
 };
+
+/** Auf der 3D-Karte als gelbes „!“ — nicht als Blitz (das bleiben Stadt-/Kaiser-Ereignisse). */
+export type ActiveMeasureMapMarker = ActiveMeasure & {
+  kind: "ability" | "counter" | "npc-card";
+  districtId: CityDistrictId;
+};
+
+function actorDistrictIdsFromNoteId(noteId: string): CityDistrictId[] {
+  const actors = cityPressureActors();
+  const actor = actors.find((entry) => noteId === entry.id || noteId.startsWith(`${entry.id}:`));
+  return actor ? [actor.districtId] : [];
+}
+
+export function listActiveMeasureMapMarkers(dayIso: string): ActiveMeasureMapMarker[] {
+  return listActiveMeasures(dayIso).flatMap((measure) => {
+    if (measure.kind !== "ability" && measure.kind !== "counter" && measure.kind !== "npc-card") {
+      return [];
+    }
+    const districtId = measure.districtIds[0];
+    if (!districtId) return [];
+    return [{ ...measure, kind: measure.kind, districtId }];
+  });
+}
 
 const KIND_LABEL: Record<ActiveMeasureKind, string> = {
   ability: "Automatismus",
@@ -130,6 +155,7 @@ export function listActiveMeasures(dayIso: string): ActiveMeasure[] {
       detail: note.detail,
       kind: note.kind,
       effectsLabel: null,
+      districtIds: actorDistrictIdsFromNoteId(note.id),
     });
   }
 
@@ -149,6 +175,9 @@ export function listActiveMeasures(dayIso: string): ActiveMeasure[] {
           if (!existing.detail || existing.detail === existing.title) {
             existing.detail = conditionDetail(ability);
           }
+          if (existing.districtIds.length === 0) {
+            existing.districtIds = [actor.districtId];
+          }
         }
         continue;
       }
@@ -159,6 +188,7 @@ export function listActiveMeasures(dayIso: string): ActiveMeasure[] {
         detail: conditionDetail(ability),
         kind: "ability",
         effectsLabel: effectsLabel(ability.effects),
+        districtIds: [actor.districtId],
       });
     }
   }
@@ -172,6 +202,7 @@ export function listActiveMeasures(dayIso: string): ActiveMeasure[] {
       detail: card.body?.trim() || card.title,
       kind: card.source === "kaiser" ? "kaiser" : "city-event",
       effectsLabel: effectsLabel(card.effects),
+      districtIds: card.districtId ? [card.districtId] : [],
     });
   }
 

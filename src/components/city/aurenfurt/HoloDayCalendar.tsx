@@ -3,28 +3,12 @@
 import { useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-
-const MONTHS_DE = [
-  "Januar",
-  "Februar",
-  "März",
-  "April",
-  "Mai",
-  "Juni",
-  "Juli",
-  "August",
-  "September",
-  "Oktober",
-  "November",
-  "Dezember",
-] as const;
+import { formatKassadrasDay, formatKassadrasMonthYear } from "@/src/lib/world/kassadras-calendar";
 
 const WEEKDAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 
 export function formatGermanDay(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) return iso;
-  return `${day}. ${MONTHS_DE[month - 1]} ${year}`;
+  return formatKassadrasDay(iso);
 }
 
 function daysInMonth(year: number, monthIndex: number) {
@@ -52,6 +36,8 @@ type Props = {
   onStepDay: (delta: number) => void;
   onStepYear: (delta: number) => void;
   onGoToday: () => void;
+  /** Am letzten Stadttag: der nächste Klick öffnet den Tagwechsel. */
+  onAdvance?: () => void;
 };
 
 export function HoloDayCalendar({
@@ -63,6 +49,7 @@ export function HoloDayCalendar({
   onStepDay,
   onStepYear,
   onGoToday,
+  onAdvance,
 }: Props) {
   const labelId = useId();
   const [open, setOpen] = useState(false);
@@ -129,10 +116,13 @@ export function HoloDayCalendar({
 
         <button
           type="button"
-          title="Nächster Tag"
-          aria-label="Nächster Tag"
-          disabled={!canNextDay}
-          onClick={() => onStepDay(1)}
+          title={canNextDay ? "Nächster Tag" : "Tage vergehen lassen"}
+          aria-label={canNextDay ? "Nächster Tag" : "Tage vergehen lassen"}
+          disabled={!canNextDay && !onAdvance}
+          onClick={() => {
+            if (canNextDay) onStepDay(1);
+            else onAdvance?.();
+          }}
           className="rounded p-0.5 text-hero-vibrant disabled:opacity-30 hover:bg-hero-vibrant/15"
         >
           <ChevronRight className="h-3.5 w-3.5" />
@@ -190,7 +180,7 @@ export function HoloDayCalendar({
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <p className="font-barlow text-[11px] font-bold uppercase tracking-wide text-accent-gold">
-                {MONTHS_DE[cursor.monthIndex]} {cursor.year}
+                {formatKassadrasMonthYear(cursor.year, cursor.monthIndex)}
               </p>
               <button
                 type="button"
@@ -246,21 +236,9 @@ export function HoloDayCalendar({
               })}
             </div>
 
-            <label className="mt-2 flex items-center gap-2 border-t border-hero-border/30 pt-2 font-barlow text-[9px] font-bold uppercase tracking-wide text-gray-400">
-              Datum
-              <input
-                type="date"
-                min={minDay}
-                max={maxDay}
-                value={day}
-                onChange={(event) => {
-                  if (!event.target.value) return;
-                  onDayChange(event.target.value);
-                  setOpen(false);
-                }}
-                className="min-w-0 flex-1 rounded border border-hero-dark bg-slate-900 px-1.5 py-0.5 text-[11px] normal-case tracking-normal text-white outline-none focus:border-hero-vibrant"
-              />
-            </label>
+            <p className="mt-2 border-t border-hero-border/30 pt-2 font-barlow text-[10px] font-bold normal-case tracking-normal text-accent-gold">
+              {formatKassadrasDay(day)}
+            </p>
           </motion.div>
         ) : null}
       </AnimatePresence>

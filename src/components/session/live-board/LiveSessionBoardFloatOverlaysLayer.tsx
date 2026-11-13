@@ -10,6 +10,7 @@ import { LiveSessionStageManager } from "./LiveSessionStageManager";
 import { LiveSessionQuestOverlay } from "./LiveSessionQuestOverlay";
 import { LiveSessionStagePortraitModal } from "./LiveSessionStagePortraitModal";
 import { AurenfurtPresentedCardFromLogs } from "@/src/components/session/AurenfurtPresentedCardFromLogs";
+import { BarnabasLoreChatFab } from "@/src/components/city/aurenfurt/BarnabasLoreChatFab";
 import { useLiveSessionBoardContext } from "./LiveSessionBoardContext";
 
 export function LiveSessionBoardFloatOverlaysLayer() {
@@ -398,6 +399,10 @@ export function LiveSessionBoardFloatOverlaysLayer() {
       ) : null}
       {isGM && sessionStatus === "Live" && chronistTableMode ? (
         <ChronicleLiveMarkerBar recorder={chronicleRecorder} />
+      ) : null}
+
+      {isGM && !forcePlayerView ? (
+        <BarnabasLoreChatFab worldId={worldId} visible />
       ) : null}
 
       <style>{`

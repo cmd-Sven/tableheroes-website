@@ -22,6 +22,15 @@ const ENTITY_ALIASES: Record<string, string[]> = {
   "Das Kaiserreich Aurelis": ["Kaiserreich Aurelis", "Aurelis"],
   "Das verdorbene Land Xarvar": ["Xarvar", "Land Xarvar"],
   "Xarvathar, das Eiserne Herz des Imperiums": ["Xarvathar", "Imperium von Xarvathar"],
+  "Koraxx-Schlucht": ["Schlucht von Koraxx", "Khorax-Schlucht", "Khoraxx-Schlucht", "Khorax Schlucht"],
+  Koraxx: ["Khoraxx", "Khorax", "Korraxx"],
+  Nerathara: ["Nakahra"],
+  Mordekar: ["Morderkar"],
+  Frostriesen: ["Frostbestien"],
+  "Khalkmari Kultur": ["Khalkmari", "Kalkmari"],
+  "Chikarikultur (Tieflinge)": ["Chikari", "Tieflinge"],
+  Zwergenkultur: ["Zwerge"],
+  Menschenkultur: ["Menschen"],
 };
 
 /**

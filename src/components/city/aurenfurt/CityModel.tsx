@@ -37,6 +37,8 @@ import { DistrictSectorOverlay } from "./scene/DistrictSectorOverlay";
 import { CrimeHeatmapLayer } from "./scene/CrimeHeatmapLayer";
 import { PoiReachOverlay } from "./scene/PoiReachOverlay";
 import { ActiveCityEventLayer } from "./scene/ActiveCityEventLayer";
+import { ActiveMeasureMarkerLayer } from "./scene/ActiveMeasureMarkerLayer";
+import type { ActiveMeasureMapMarker } from "./aurenfurt-active-measures";
 import type { SectorHeatCell } from "./aurenfurt-city-heatmap";
 import type { PoiReachCell } from "./aurenfurt-sector-reach";
 import { HoloLandmarkInstances, type LandmarkInstanceItem } from "./scene/HoloLandmarkInstances";
@@ -85,12 +87,16 @@ type Props = {
   highlightDistricts?: boolean;
   /** Aktive Stadt-Ereigniskarten (Blitz + Einflussbereich). */
   activeCityCards?: ActiveCityCardEffect[];
+  /** Automatismen / NPC-Maßnahmen (gelbes Ausrufezeichen). */
+  activeMeasureMarkers?: ActiveMeasureMapMarker[];
   /** Sektoren für Positions- und Sektor-Highlight aktiver Ereignisse. */
   sectorsByDistrict?: Partial<Record<CityDistrictId, DistrictSector[]>>;
   /** Viertel-Hover aus der linken Rail → Kartenhervorhebung. */
   previewDistrictIds?: CityDistrictId[];
   selectedActiveCityCardId?: string | null;
   onSelectActiveCityCard?: (cardId: string | null) => void;
+  selectedActiveMeasureId?: string | null;
+  onSelectActiveMeasure?: (measureId: string | null) => void;
   buildings: CityBuilding[];
   pois: AurenfurtMapPoi[];
   worldId: string;
@@ -164,10 +170,13 @@ export function CityModel({
   poiReachVisible = false,
   highlightDistricts = false,
   activeCityCards = [],
+  activeMeasureMarkers = [],
   sectorsByDistrict = {},
   previewDistrictIds = [],
   selectedActiveCityCardId = null,
   onSelectActiveCityCard,
+  selectedActiveMeasureId = null,
+  onSelectActiveMeasure,
   buildings,
   pois,
   worldId,
@@ -317,6 +326,14 @@ export function CityModel({
             highlightDistrictIds={previewDistrictIds}
             selectedCardId={selectedActiveCityCardId}
             onSelectCard={onSelectActiveCityCard ?? (() => undefined)}
+          />
+        ) : null}
+        {activeMeasureMarkers.length > 0 && eventPickSectors.length === 0 ? (
+          <ActiveMeasureMarkerLayer
+            markers={activeMeasureMarkers}
+            polygons={polygons}
+            selectedId={selectedActiveMeasureId}
+            onSelect={onSelectActiveMeasure ?? (() => undefined)}
           />
         ) : null}
         <group visible={buildingsVisible}>

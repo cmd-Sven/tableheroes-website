@@ -16,6 +16,7 @@ import {
 } from "../aurenfurt-streets";
 import type { DayWeather } from "../aurenfurt-weather";
 import type { StreetLinkDraft } from "../hooks/useStreetLinkDraft";
+import { formatKassadrasDay } from "@/src/lib/world/kassadras-calendar";
 
 const WORKS_OPTIONS: { kind: StreetWorks["kind"]; label: string }[] = [
   { kind: "none", label: "Normal" },
@@ -402,6 +403,11 @@ export function StreetsToolBody({
                   }}
                   className="w-full rounded border border-hero-dark bg-slate-900 p-1.5 font-libre text-xs text-white outline-none focus:border-hero-vibrant"
                 />
+                {activeStreet.works.closureStart ? (
+                  <span className="block font-libre text-[10px] normal-case tracking-normal text-accent-gold">
+                    {formatKassadrasDay(activeStreet.works.closureStart)}
+                  </span>
+                ) : null}
               </label>
               <label className="block space-y-1">
                 <span className="font-barlow text-[10px] font-bold uppercase tracking-wide text-hero-vibrant">

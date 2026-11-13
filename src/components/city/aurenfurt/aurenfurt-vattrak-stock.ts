@@ -208,6 +208,14 @@ function prefixStock(points: VattrakStockSnapshot[], toMs: number): VattrakStock
   return points.slice(0, count);
 }
 
+export function convoyFallsOn(iso: string) {
+  const from = parseDay(HISTORY_START);
+  const dayMs = parseDay(iso);
+  if (!Number.isFinite(dayMs)) return false;
+  const dayIndex = Math.floor((dayMs - from) / DAY_MS);
+  return dayIndex >= 0 && dayIndex % VATTRAK_CONVOY_INTERVAL_DAYS === 0;
+}
+
 export function buildVattrakStockSeries(toIso = formatDay(utcToday())): VattrakStockSnapshot[] {
   const version = citySimVersion();
   const wantMs = parseDay(toIso);

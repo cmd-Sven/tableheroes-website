@@ -26,7 +26,7 @@ export function ActiveMeasuresPanel({ open, onToggle, measures }: Props) {
   const automations = measures.filter((m) => m.kind === "ability" || m.kind === "counter").length;
 
   return (
-    <div className="pointer-events-auto relative flex shrink-0 items-end self-end">
+    <div className="pointer-events-auto relative flex h-10 shrink-0 items-stretch">
       <AnimatePresence>
         {open ? (
           <motion.div
@@ -111,7 +111,7 @@ export function ActiveMeasuresPanel({ open, onToggle, measures }: Props) {
         }
         title="Aktive Maßnahmen"
         onClick={onToggle}
-        className={`relative inline-flex h-9 w-9 items-center justify-center border border-hero-dark bg-hero-dark text-accent-gold hover:bg-background-card ${
+        className={`relative inline-flex h-10 w-10 items-center justify-center border border-hero-dark bg-hero-dark text-accent-gold hover:bg-background-card ${
           open ? "bg-background-card text-hero-vibrant" : ""
         }`}
       >

@@ -44,6 +44,7 @@ import {
   Globe2,
   Eye,
   Monitor,
+  History,
 } from "lucide-react";
 import Image from "next/image";
 import { signOut } from "@/src/app/(auth)/signout-action";
@@ -412,6 +413,12 @@ export function Sidebar({
           tab: "lore",
         },
         {
+          href: `/dashboard/campaigns/${campaignId}/zeitstrahl`,
+          label: "Zeitstrahl",
+          icon: History,
+          tab: undefined,
+        },
+        {
           href: `/dashboard/campaigns/${campaignId}/npcs`,
           label: "NPCs",
           icon: User,
@@ -512,6 +519,7 @@ export function Sidebar({
         { href: `/dashboard/worlds/${worldId}/npcs`, label: "NPCs", icon: User },
         { href: `/dashboard/worlds/${worldId}/locations`, label: "Orte", icon: Map },
         { href: `/dashboard/worlds/${worldId}/lore`, label: "Lore", icon: Book },
+        { href: `/dashboard/worlds/${worldId}/zeitstrahl`, label: "Zeitstrahl", icon: History },
         { href: `/dashboard/worlds/${worldId}/factions`, label: "Fraktionen", icon: Shield },
         { href: `/dashboard/worlds/${worldId}/bestarium`, label: "Bestarium", icon: PawPrint },
         { href: `/dashboard/worlds/${worldId}/maps`, label: "Weltkarten", icon: Globe2 },
