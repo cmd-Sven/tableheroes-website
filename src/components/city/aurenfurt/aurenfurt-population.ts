@@ -129,7 +129,7 @@ function applyDailyDelta(
   profile: SimProfile,
   phase: ReturnType<typeof warPhaseOn>,
   dayMs: number,
-  districtId: string,
+  districtId: CityDistrictId,
 ) {
   const tension = tensionApprox(profile);
   const wave = dayWave(districtId, dayMs);

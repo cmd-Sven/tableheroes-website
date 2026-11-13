@@ -49,8 +49,8 @@ function radialTexture(inner: string, outer: string, mid?: string) {
   return texture;
 }
 
-function useRadialTexture(inner: string, outer: string) {
-  const texture = useMemo(() => radialTexture(inner, outer), [inner, outer]);
+function useRadialTexture(inner: string, outer: string, mid?: string) {
+  const texture = useMemo(() => radialTexture(inner, outer, mid), [inner, outer, mid]);
   useLayoutEffect(() => () => texture.dispose(), [texture]);
   return texture;
 }

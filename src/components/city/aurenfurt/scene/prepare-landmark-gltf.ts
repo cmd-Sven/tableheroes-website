@@ -29,7 +29,7 @@ export function prepareLandmarkGltf(root: Object3D) {
       if (!material) continue;
       material.side = FrontSide;
       /* Distanz-Fog färbt Gebäude sonst unten hell / oben dunkel (Kamerawinkel). */
-      material.fog = false;
+      if ("fog" in material) (material as { fog: boolean }).fog = false;
       const standard = material as MeshStandardMaterial;
       if (typeof standard.envMapIntensity === "number") standard.envMapIntensity = 0;
       if ("flatShading" in standard) standard.flatShading = false;
