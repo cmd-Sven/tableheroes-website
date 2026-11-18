@@ -15,6 +15,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { CastingCallCard } from "@/src/components/marketing/CastingCallCard";
 import { FireEffect } from "@/src/components/marketing/FireEffect";
 import { SlotProgressBar } from "@/src/components/marketing/SessionTicketCardParts";
 import {
@@ -22,6 +23,7 @@ import {
   type CommunityEvent,
 } from "@/src/lib/community-events/types";
 import { APP_TIMEZONE } from "@/src/lib/datetime/berlin";
+import type { LandingCastingCall } from "@/src/lib/casting/types";
 import {
   loadLandingSessionTickets,
   type SessionTicket,
@@ -36,6 +38,7 @@ type LandingTerminItem =
 
 type Props = {
   events: CommunityEvent[];
+  casting?: LandingCastingCall | null;
 };
 
 function formatEventWhen(iso: string) {
@@ -389,7 +392,7 @@ function CommunityEventDetailModal({
   );
 }
 
-export function TermineUndRundenSection({ events }: Props) {
+export function TermineUndRundenSection({ events, casting = null }: Props) {
   const [tickets, setTickets] = useState<SessionTicket[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -454,7 +457,7 @@ export function TermineUndRundenSection({ events }: Props) {
       el.removeEventListener("scroll", updateScrollButtons);
       window.removeEventListener("resize", updateScrollButtons);
     };
-  }, [items, isLoading, updateScrollButtons]);
+  }, [items, casting, isLoading, updateScrollButtons]);
 
   const scrollByPage = (direction: -1 | 1) => {
     const el = scrollerRef.current;
@@ -465,7 +468,9 @@ export function TermineUndRundenSection({ events }: Props) {
     el.scrollBy({ left: direction * step, behavior: "smooth" });
   };
 
-  const showEmpty = !isLoading && items.length === 0;
+  const cardCount = items.length + (casting ? 1 : 0);
+  const showEmpty = !isLoading && cardCount === 0;
+  const showCarousel = Boolean(casting) || (!isLoading && items.length > 0);
 
   return (
     <section
@@ -503,7 +508,7 @@ export function TermineUndRundenSection({ events }: Props) {
           </motion.p>
         </div>
 
-        {isLoading ? (
+        {isLoading && !casting ? (
           <p className="text-center font-libre text-gray-400">Termine werden geladen…</p>
         ) : null}
 
@@ -528,9 +533,9 @@ export function TermineUndRundenSection({ events }: Props) {
           </div>
         ) : null}
 
-        {!isLoading && items.length > 0 ? (
+        {showCarousel ? (
           <div className="relative">
-            {items.length > 1 ? (
+            {cardCount > 1 ? (
               <>
                 <button
                   type="button"
@@ -557,6 +562,10 @@ export function TermineUndRundenSection({ events }: Props) {
               ref={scrollerRef}
               className="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth px-1 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             >
+              {casting ? <CastingCallCard call={casting} /> : null}
+              {isLoading ? (
+                <p className="self-center font-libre text-gray-400">Weitere Termine werden geladen…</p>
+              ) : null}
               {items.map((item) =>
                 item.kind === "session" ? (
                   <div key={item.id} data-termin-card>

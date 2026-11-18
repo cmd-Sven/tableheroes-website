@@ -4,6 +4,8 @@ import {
   getAllCommunityEventsForAdmin,
   getCommunityEventRsvpCounts,
 } from "@/src/lib/actions/community-event-actions";
+import { getCastingAdminState } from "@/src/lib/casting/queries";
+import { CastingCallPanel } from "@/src/components/dashboard/admin/CastingCallPanel";
 import { AdminEventsClient } from "./AdminEventsClient";
 
 export default async function AdminCommunityEventsPage() {
@@ -25,7 +27,10 @@ export default async function AdminCommunityEventsPage() {
     redirect("/dashboard");
   }
 
-  const events = await getAllCommunityEventsForAdmin();
+  const [events, casting] = await Promise.all([
+    getAllCommunityEventsForAdmin(),
+    getCastingAdminState(),
+  ]);
   const countsMap = await getCommunityEventRsvpCounts(events.map((e) => e.id));
   const initialRsvpCounts: Record<
     string,
@@ -46,6 +51,7 @@ export default async function AdminCommunityEventsPage() {
           melden sich mit ihrem Profil an.
         </p>
       </div>
+      {casting ? <CastingCallPanel initial={casting} /> : null}
       <AdminEventsClient initialEvents={events} initialRsvpCounts={initialRsvpCounts} />
     </div>
   );

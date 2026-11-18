@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { insertOwnCastingSignup } from "@/src/lib/casting/join";
 import { createClient } from "@/src/lib/supabase/server";
 
 export async function login(formData: FormData): Promise<string | undefined> {
@@ -11,13 +12,17 @@ export async function login(formData: FormData): Promise<string | undefined> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signedIn, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return "Login fehlgeschlagen. Bitte überprüfe deine Daten.";
+  }
+
+  if (formData.get("casting") === "1" && signedIn.user) {
+    await insertOwnCastingSignup(supabase as any, signedIn.user.id);
   }
 
   revalidatePath("/", "layout");
@@ -41,6 +46,7 @@ export async function signup(formData: FormData): Promise<string | undefined> {
     options: {
       data: {
         username: username, // WICHTIG für DB Trigger
+        ...(formData.get("casting") === "1" ? { casting_call: "call-to-adventure" } : {}),
       },
     },
   });

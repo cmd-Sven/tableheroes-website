@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 import { login } from "../actions";
 import { Lock, Mail } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -22,6 +22,11 @@ function SubmitButton() {
 
 export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [casting, setCasting] = useState(false);
+
+  useEffect(() => {
+    setCasting(new URLSearchParams(window.location.search).get("casting") === "1");
+  }, []);
 
   async function handleSubmit(formData: FormData) {
     setErrorMessage(null);
@@ -44,6 +49,12 @@ export default function LoginPage() {
       </h1>
 
       <form action={handleSubmit} className="space-y-4" suppressHydrationWarning={true}>
+        {casting ? <input type="hidden" name="casting" value="1" /> : null}
+        {casting ? (
+          <p className="text-center font-libre text-sm text-amber-100">
+            Nach dem Login stehst du auf der Warteliste für Call to Adventure.
+          </p>
+        ) : null}
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-200/80" />
           <input

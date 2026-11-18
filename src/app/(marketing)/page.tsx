@@ -10,7 +10,9 @@ import { ImageSliderSection } from "@/src/components/marketing/ImageSliderSectio
 import { FaqSection } from "@/src/components/marketing/FaqSection";
 import { NewsSection } from "@/src/components/landing/NewsSection";
 import { LatestLoreSection } from "@/src/components/landing/LatestLoreSection";
+import { getLandingCastingCall } from "@/src/lib/casting/queries";
 import { getPublicCommunityEventsForLanding } from "@/src/lib/queries/community-events-queries";
+import { createClient } from "@/src/lib/supabase/server";
 import { getHomepagePublicLoreGroups } from "@/src/lib/queries/public-seo-queries";
 import { getLandingPageNews } from "@/src/lib/actions/news-actions";
 import { absoluteUrl } from "@/src/lib/site-url";
@@ -55,10 +57,15 @@ export const metadata: Metadata = {
 };
 
 export default async function MarketingLandingPage() {
-  const [communityEvents, loreGroups, newsPosts] = await Promise.all([
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [communityEvents, loreGroups, newsPosts, casting] = await Promise.all([
     getPublicCommunityEventsForLanding(8),
     getHomepagePublicLoreGroups(6).catch(() => []),
     getLandingPageNews().catch(() => []),
+    getLandingCastingCall(user?.id ?? null).catch(() => null),
   ]);
 
   return (
@@ -67,7 +74,7 @@ export default async function MarketingLandingPage() {
 
       <SubNavbar />
 
-      <TermineUndRundenSection events={communityEvents} />
+      <TermineUndRundenSection events={communityEvents} casting={casting} />
 
       <NewsSection posts={newsPosts} />
 
