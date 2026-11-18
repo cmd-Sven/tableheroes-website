@@ -47,7 +47,7 @@ export async function setCastingCallActive(
   const { supabase, isAdmin } = await requireAdmin();
   if (!isAdmin) return { ok: false, error: "Nur Admins dürfen die Spielersuche schalten." };
 
-  const { error } = await (supabase.from("casting_calls") as any)
+  const { error } = await ((supabase as any).from("casting_calls"))
     .update({ is_active: isActive, updated_at: new Date().toISOString() })
     .eq("slug", CASTING_CALL_SLUG);
 
@@ -63,14 +63,14 @@ export async function setCastingDateSent(
   const { supabase, isAdmin } = await requireAdmin();
   if (!isAdmin) return { ok: false, error: "Nur Admins dürfen das notieren." };
 
-  const { data: call } = await (supabase.from("casting_calls") as any)
+  const { data: call } = await ((supabase as any).from("casting_calls"))
     .select("id")
     .eq("slug", CASTING_CALL_SLUG)
     .maybeSingle();
   const callId = (call as { id: string } | null)?.id;
   if (!callId) return { ok: false, error: "Die Spielersuche fehlt." };
 
-  const { error } = await (supabase.from("casting_signups") as any)
+  const { error } = await ((supabase as any).from("casting_signups"))
     .update({
       date_sent: dateSent,
       date_sent_at: dateSent ? new Date().toISOString() : null,

@@ -19,7 +19,7 @@ export async function getLandingCastingCall(
   userId: string | null,
 ): Promise<LandingCastingCall | null> {
   const supabase = await createClient();
-  const { data } = await (supabase.from("casting_calls") as any)
+  const { data } = await ((supabase as any).from("casting_calls"))
     .select("id, title, subtitle, body, min_players, is_active")
     .eq("slug", CASTING_CALL_SLUG)
     .eq("is_active", true)
@@ -30,7 +30,7 @@ export async function getLandingCastingCall(
 
   let joined = false;
   if (userId) {
-    const { data: signup } = await (supabase.from("casting_signups") as any)
+    const { data: signup } = await ((supabase as any).from("casting_signups"))
       .select("id")
       .eq("casting_id", call.id)
       .eq("user_id", userId)
@@ -51,7 +51,7 @@ export async function getLandingCastingCall(
 
 export async function getCastingAdminState(): Promise<CastingAdminState | null> {
   const supabase = await createClient();
-  const { data } = await (supabase.from("casting_calls") as any)
+  const { data } = await ((supabase as any).from("casting_calls"))
     .select("id, title, subtitle, body, min_players, is_active")
     .eq("slug", CASTING_CALL_SLUG)
     .maybeSingle();
@@ -59,7 +59,7 @@ export async function getCastingAdminState(): Promise<CastingAdminState | null> 
   const call = data as CallRow | null;
   if (!call) return null;
 
-  const { data: rows } = await (supabase.from("casting_signups") as any)
+  const { data: rows } = await ((supabase as any).from("casting_signups"))
     .select("user_id, created_at, date_sent, date_sent_at, users(username, email)")
     .eq("casting_id", call.id)
     .order("created_at", { ascending: true });
